@@ -1679,6 +1679,10 @@ if ($ProductionLane -ceq 'baseline') {
       )
       $r664MenuAdmissionParent = '89c7970c77629b615a6cb08c9b51946fedcb8cea'
       $r665CollectionParent = '7ef7711e119a4c4d7691423538a91ecc0499c2f2'
+      $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
+      & git -C $root merge-base --is-ancestor $r666AccessibilityParent $head
+      $r666AccessibilityContext = $LASTEXITCODE -eq 0
+      $r665FreezeHead = if ($r666AccessibilityContext) { $r666AccessibilityParent } else { $head }
       & git -C $root merge-base --is-ancestor $r665CollectionParent $head
       $r665CollectionContext = $LASTEXITCODE -eq 0
       $r664MenuFreezeHead = if ($r665CollectionContext) { $r665CollectionParent } else { $head }
@@ -2169,8 +2173,12 @@ if ($ProductionLane -ceq 'baseline') {
         Assert-Coordination ($LASTEXITCODE -eq 0 -and
           -not (Test-Path -LiteralPath $r665MergePath)) 'Collection admission cannot run during a merge.'
         $r665PolicyBefore = Get-R66Utf8GitJson $r665CollectionParent $r665Owners[0]
-        $r665PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r665Owners[0]) | ConvertFrom-Json
+        $r665PolicyAfter = if ($r666AccessibilityContext) {
+          Get-R66Utf8GitJson $r666AccessibilityParent $r665Owners[0]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r665Owners[0]) | ConvertFrom-Json
+        }
         $r665Primary = @($r665PolicyAfter.activeClaims | Where-Object { $_.task -ceq '/root' })[0]
         Assert-Coordination ($r665Primary.owners.Count -eq 11 -and
           @($r665Primary.owners | Where-Object { $_ -ceq $r665Contract }).Count -eq 1) `
@@ -2180,12 +2188,18 @@ if ($ProductionLane -ceq 'baseline') {
           ($r665PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
           ($r665PolicyAfter | ConvertTo-Json -Depth 100 -Compress)
         ) 'Collection admission changed another claim, registry binding or policy.'
-        Assert-Coordination (
-          (Get-Sha256 (Join-Path $root $r665Owners[1])) -ceq $r665ManifestHash
-        ) 'Collection dependency manifest changed.'
+        if (-not $r666AccessibilityContext) {
+          Assert-Coordination (
+            (Get-Sha256 (Join-Path $root $r665Owners[1])) -ceq $r665ManifestHash
+          ) 'Collection dependency manifest changed.'
+        }
         $r665ScopeBefore = Get-R66Utf8GitJson $r665CollectionParent $r665Owners[2]
-        $r665ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r665Owners[2]) | ConvertFrom-Json
+        $r665ScopeAfter = if ($r666AccessibilityContext) {
+          Get-R66Utf8GitJson $r666AccessibilityParent $r665Owners[2]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r665Owners[2]) | ConvertFrom-Json
+        }
         Assert-Coordination (
           $r665ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r665ManifestHash
         ) 'Collection dependency scope binding changed.'
@@ -2238,13 +2252,106 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and
             (@($r665Committed | Sort-Object) -join '|') -ceq
             (@($r665Owners | Sort-Object) -join '|')) 'Collection admission committed an unexpected owner or draft.'
-          & git -C $root diff --quiet $r665Commit -- @r665Owners
+          if ($r666AccessibilityContext) {
+            & git -C $root diff --quiet $r665Commit $r665FreezeHead -- @r665Owners
+          } else {
+            & git -C $root diff --quiet $r665Commit -- @r665Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Collection dependency or admission binding changed after sealing.'
-          $r665Later = @(& git -C $root log --format=%H "${r665Commit}..$head" -- @r665Owners)
+          $r665Later = @(& git -C $root log --format=%H "${r665Commit}..$r665FreezeHead" -- @r665Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r665Later.Count -eq 0) `
             'Collection dependency admission cannot be reused or changed by later feature commits.'
         }
         $r66CoordinationOwners = @($r66CoordinationOwners) + $r665Contract
+      }
+      if ($r666AccessibilityContext) {
+        # The founder authorises A11Y-001; preserve the previous dependency
+        # admission through its exact parent and add no general native claim.
+        $r666Owners = @($r664MenuOwners)
+        $r666UiOwners = @(
+          'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+          'apps/mobile/lib/ui_v2/profile/global_security_v2.dart',
+          'apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart'
+        )
+        $r666Native = 'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
+        $r666Subject = 'ui(buy-redmi-fixes-v1-20260905): admit global accessibility dependency'
+        $r666ManifestHash = '18F5195AAB125587F11B8E3E84FEF7A2544BE82013BF874C9CA0823931BF791C'
+        $r666PolicyBefore = Get-R66Utf8GitJson $r666AccessibilityParent $r666Owners[0]
+        $r666PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r666Owners[0]) | ConvertFrom-Json
+        $r666Cursor = @($r666PolicyAfter.activeClaims | Where-Object {
+          $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
+        })[0]
+        $r666Primary = @($r666PolicyAfter.activeClaims | Where-Object { $_.task -ceq '/root' })[0]
+        Assert-Coordination ($r666Cursor.owners.Count -eq 45 -and
+          $r666Primary.owners.Count -eq 12 -and
+          @($r666Primary.owners | Where-Object { $_ -ceq $r666Native }).Count -eq 1) `
+          'Accessibility admission requires exactly three UI owners and one primary native owner.'
+        foreach ($r666UiOwner in $r666UiOwners) {
+          Assert-Coordination (@($r666Cursor.owners | Where-Object { $_ -ceq $r666UiOwner }).Count -eq 1) `
+            "Accessibility UI owner is missing or duplicated: $r666UiOwner"
+        }
+        $r666Cursor.owners = @($r666Cursor.owners | Where-Object { $_ -cnotin $r666UiOwners })
+        $r666Primary.owners = @($r666Primary.owners | Where-Object { $_ -cne $r666Native })
+        Assert-Coordination (
+          ($r666PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r666PolicyAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Accessibility admission changed another claim, policy or registry binding.'
+        Assert-Coordination (
+          (Get-Sha256 (Join-Path $root $r666Owners[1])) -ceq $r666ManifestHash
+        ) 'Accessibility admission manifest changed.'
+        $r666ScopeBefore = Get-R66Utf8GitJson $r666AccessibilityParent $r666Owners[2]
+        $r666ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r666Owners[2]) | ConvertFrom-Json
+        Assert-Coordination (
+          $r666ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
+            $r666ManifestHash
+        ) 'Accessibility scope is not bound to its exact manifest.'
+        $r666ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+          $r666ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (
+          ($r666ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r666ScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Accessibility admission changed execution authority beyond its manifest binding.'
+        $r666NativeHash = Get-Sha256 (Join-Path $root $r666Native)
+        Assert-Coordination ($r666NativeHash -cin @(
+          '91CA404E173CC60E16D1223CD097F7586862ADE8FA62BDBF9208F0B624047BAC',
+          '4150F3FC71BFC1A924B7A5597C4CBFFC35D5AA42851CEFAB60B71F151FF471A1'
+        )) 'Accessibility native bridge changed unrelated source or differs from its bounded implementation.'
+        if ($head -ceq $r666AccessibilityParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+            'Pending accessibility admission is not a handoff or acceptance.'
+          $r666Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r666Dirty | Sort-Object) -join '|') -ceq
+            (@($r666Owners | Sort-Object) -join '|')) `
+            'Pending accessibility admission must change exactly four coordination owners.'
+          $r666Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r666Untracked.Count -eq 0 -and
+            $r666NativeHash -ceq '91CA404E173CC60E16D1223CD097F7586862ADE8FA62BDBF9208F0B624047BAC') `
+            'Accessibility admission cannot include untracked or native implementation drafts.'
+        } else {
+          $r666Following = @(& git -C $root rev-list --first-parent --reverse "${r666AccessibilityParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r666Following.Count -gt 0) `
+            'Accessibility admission commit is missing.'
+          $r666Commit = [string]$r666Following[0]
+          $r666Parents = @(& git -C $root show -s --format=%P $r666Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r666Parents.Count -eq 1 -and
+            [string]$r666Parents[0] -ceq $r666AccessibilityParent) 'Accessibility admission parent changed.'
+          $r666ActualSubject = @(& git -C $root show -s --format=%s $r666Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r666ActualSubject.Count -eq 1 -and
+            [string]$r666ActualSubject[0] -ceq $r666Subject) 'Accessibility admission subject changed.'
+          $r666Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r666Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r666Committed | Sort-Object) -join '|') -ceq
+            (@($r666Owners | Sort-Object) -join '|')) 'Accessibility admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r666Commit -- @r666Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Accessibility ownership binding changed after admission.'
+          $r666Later = @(& git -C $root log --format=%H "${r666Commit}..$head" -- @r666Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r666Later.Count -eq 0) `
+            'Accessibility admission cannot be replayed or revised.'
+        }
+        $r66CoordinationOwners = @($r66CoordinationOwners) + $r666Native
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()

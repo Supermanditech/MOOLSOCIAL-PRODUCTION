@@ -43,6 +43,7 @@
         "scripts/check-buy-data-egress-boundary.ps1",
         "scripts/check-brand-integrity.ps1",
         "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
+        "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
         "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
         "docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json"
       ]
@@ -51,6 +52,9 @@
       "task": "/root/cursor_buy_redmi_fixes_v1_20260905",
       "role": "subagent",
       "owners": [
+        "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
+        "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
+        "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart",
         "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
