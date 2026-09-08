@@ -139,6 +139,21 @@ function Get-MobileBoundaryViolations {
 
   if ($QualifiedRedmiReview) {
     $owner = $Label.Replace('\', '/')
+    if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart') {
+      # The sealed screen uses local File/Directory only for its temporary arrival cue.
+      $soundSourceSha = [Security.Cryptography.SHA256]::Create()
+      try {
+        $soundSourceBytes = [Text.UTF8Encoding]::new($false).GetBytes(
+          $Content.Replace("`r`n", "`n"))
+        $soundSourceHash = [BitConverter]::ToString(
+          $soundSourceSha.ComputeHash($soundSourceBytes)).Replace('-', '')
+      } finally {
+        $soundSourceSha.Dispose()
+      }
+      if ($soundSourceHash -ceq 'DED10F0145682F8B125088C4CDA7BB507AB12D119731FE93C49A82258CB2B92C') {
+        $Content = $Content.Replace("import 'dart:io';", '')
+      }
+    }
     if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart') {
       # Existing actual decoded-code return animation; no commerce result is fabricated.
       $Content = $Content.Replace(

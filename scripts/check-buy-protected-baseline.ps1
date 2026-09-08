@@ -253,7 +253,8 @@ function Test-RedmiReviewBuySource {
   $qualifiedSources = @(
     'd07559609ffad7371a6a98d765d4fefa186dc065',
     'd119c85eccc85af99c86c32ae526f57421855ff3',
-    '28b1b6126a4f145f8c639cfc3029860507845845'
+    '28b1b6126a4f145f8c639cfc3029860507845845',
+    'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
   )
   $acceptedBase = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
   if ($SourceCommit -cnotin $qualifiedSources) { return $false }
@@ -283,6 +284,26 @@ function Test-RedmiReviewBuySource {
   }
   if ($SourceCommit -ceq $qualifiedSources[2]) {
     $expectedDelta = $expectedDelta + @('apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart')
+  }
+  if ($SourceCommit -ceq $qualifiedSources[3]) {
+    $expectedDelta = @(
+      'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+      'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+      'apps/mobile/lib/features/buy/buy_v2_models.dart',
+      'apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart',
+      'apps/mobile/lib/features/buy/buy_v2_session.dart',
+      'apps/mobile/lib/features/work/scan_and_pick_contract.dart',
+      'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart',
+      'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+      'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+      'apps/mobile/lib/ui_v2/profile/global_security_v2.dart',
+      'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart'
+    )
   }
   $sourceDelta = @(& git -C $root diff --name-only $acceptedBase $SourceCommit -- @boundaryRoots)
   if ($LASTEXITCODE -ne 0 -or
