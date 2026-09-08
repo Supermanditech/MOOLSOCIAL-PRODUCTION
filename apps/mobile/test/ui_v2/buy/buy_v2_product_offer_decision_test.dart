@@ -80,6 +80,36 @@ void main() {
     expect(panel, findsOneWidget);
   }
 
+  Future<void> revealProductHero(WidgetTester tester, String productId) async {
+    final scroll = find
+        .descendant(
+          of: find.byKey(PageStorageKey('buy-product-$productId')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(
+      find.byKey(ValueKey('buy-product-title-$productId')),
+      -220,
+      scrollable: scroll,
+    );
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> revealAdd(WidgetTester tester, String productId) async {
+    final add = find.byKey(ValueKey('buy-product-primary-$productId'));
+    final scroll = find
+        .descendant(
+          of: find.byKey(PageStorageKey('buy-product-$productId')),
+          matching: find.byType(Scrollable),
+        )
+        .first;
+    await tester.scrollUntilVisible(add, 180, scrollable: scroll);
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(add);
+    await tester.pumpAndSettle();
+    expect(add.hitTestable(), findsOneWidget);
+  }
+
   testWidgets('ready Shop offer shows the complete decision before Add', (
     tester,
   ) async {
@@ -101,16 +131,7 @@ void main() {
       buyV2ProductOfferDecisionContractVersion,
       'buy-product-offer-decision-v1',
     );
-    expect(find.text('Price, pack and delivery'), findsOneWidget);
-    expect(find.text('Available now'), findsOneWidget);
-    expect(find.text('${product.pack} · ${product.variant}'), findsOneWidget);
-    expect(find.textContaining(buyV2Money(product.price)), findsWidgets);
-    expect(find.text('Available to add'), findsOneWidget);
-    expect(
-      find.text(buyV2BuyerDeliveryPromise(factsFor(product))),
-      findsWidgets,
-    );
-    expect(find.textContaining(product.seller), findsWidgets);
+    expect(find.text('Delivery details'), findsOneWidget);
     expect(find.text('Quick local delivery'), findsOneWidget);
     if (product.mrp case final mrp?) {
       expect(
@@ -118,14 +139,39 @@ void main() {
         findsOneWidget,
       );
     }
+    await revealProductHero(tester, product.id);
+    expect(find.text('${product.pack} · ${product.unitPrice}'), findsWidgets);
+    expect(find.text(product.composition ?? product.variant), findsWidgets);
+    expect(find.textContaining(buyV2Money(product.price)), findsWidgets);
+    expect(find.text('Available to add'), findsOneWidget);
+    expect(
+      find.text(buyV2BuyerDeliveryPromise(factsFor(product))),
+      findsWidgets,
+    );
+    expect(find.textContaining(product.seller), findsWidgets);
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-    await tester.ensureVisible(add);
+    await revealAdd(tester, product.id);
     expect(add, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
     expect(
       find.byKey(ValueKey('buy-shop-seller-action-${product.id}')),
-      findsNothing,
+      findsOneWidget,
     );
+    final store = find.byKey(ValueKey('buy-shop-seller-action-${product.id}'));
+    await tester.ensureVisible(store);
+    await tester.pumpAndSettle();
+    await tester.tap(store);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),
+      findsOneWidget,
+    );
+    expect(find.textContaining(product.seller), findsWidgets);
+    expect(session.cartLines, isEmpty);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(session.selectedProductId, product.id);
+    await revealAdd(tester, product.id);
 
     await tester.tap(add);
     await tester.pumpAndSettle();
@@ -266,9 +312,10 @@ void main() {
     await tester.tap(find.byKey(ValueKey('buy-offer-retry-${product.id}')));
     await tester.pumpAndSettle();
     expect(adapter.requestsFor(product.id), 2);
-    expect(find.text('Available now'), findsOneWidget);
+    await revealProductHero(tester, product.id);
+    expect(find.text('Available to add'), findsOneWidget);
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-    await tester.ensureVisible(add);
+    await revealAdd(tester, product.id);
     await tester.tap(add);
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), product.minimumOrder);
@@ -321,11 +368,15 @@ void main() {
     );
     await tester.pumpAndSettle();
     await openProductDecision(tester, session, product.id);
+    expect(find.text('Delivery details'), findsOneWidget);
+    await revealProductHero(tester, product.id);
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
-    await tester.ensureVisible(add);
+    await revealAdd(tester, product.id);
     expect(add, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
-    expect(find.text('Price, pack and delivery'), findsOneWidget);
+    await tester.tap(add);
+    await tester.pumpAndSettle();
+    expect(session.quantityFor(product.id), product.minimumOrder);
     expect(tester.takeException(), isNull);
   });
 }

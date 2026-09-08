@@ -2,6 +2,8 @@ param(
   [switch]$AllowReviewedExistingRuntime,
   [switch]$ProviderOnlyC30M
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -234,11 +236,7 @@ foreach ($relativePath in $files) {
       $secretMatches.Count -eq 2
     ) {
       $fixtureHashes = @($secretMatches | ForEach-Object {
-        [Convert]::ToHexString(
-          [Security.Cryptography.SHA256]::HashData(
-            [Text.Encoding]::UTF8.GetBytes($_.Value)
-          )
-        )
+        (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ([Text.Encoding]::UTF8.GetBytes($_.Value)))))
       })
       $allowedHashedFixture = @($fixtureHashes | Where-Object {
         $_ -cne

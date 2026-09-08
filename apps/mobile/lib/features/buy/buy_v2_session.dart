@@ -4445,6 +4445,11 @@ class BuyV2Session extends ChangeNotifier {
         null => BuyV2CheckoutSubmissionState.idle,
       };
       if (checkoutRequiresResolution) {
+        // Retired choices cannot start a new payment, but an unresolved
+        // persisted attempt must keep its original provider identity.
+        if (const {'Bank transfer', 'UPI'}.contains(storedPayment)) {
+          selectedPayment = storedPayment!;
+        }
         checkoutStep = BuyV2CheckoutStep.payment;
       }
       _pruneCartSelections();
@@ -8740,6 +8745,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool confirmOrder() {
+    if (checkoutBusy || checkoutRequiresResolution) return false;
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
       return false;
     }

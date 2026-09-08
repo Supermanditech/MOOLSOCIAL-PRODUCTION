@@ -3,6 +3,8 @@ param(
   [string]$RepositoryRoot,
   [switch]$PackagingOnly
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -57,11 +59,7 @@ function Write-Fixture($State) {
 function Get-CanonicalTextSha256([string]$Path) {
   $text = [IO.File]::ReadAllText($Path).
     Replace("`r`n", "`n").Replace("`r", "`n")
-  return [Convert]::ToHexString(
-    [Security.Cryptography.SHA256]::HashData(
-      [Text.UTF8Encoding]::new($false).GetBytes($text)
-    )
-  )
+  return (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ([Text.UTF8Encoding]::new($false).GetBytes($text)))))
 }
 
 function Write-ReceiptFixture($State, [string]$ReceiptState) {

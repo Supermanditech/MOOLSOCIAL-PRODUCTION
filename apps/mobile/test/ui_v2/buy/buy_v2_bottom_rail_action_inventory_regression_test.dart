@@ -140,8 +140,24 @@ void main() {
     await tester.pumpAndSettle();
     expectBuyActions();
 
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-address')),
+    );
+    await tester.pumpAndSettle();
+    expectBuyActions();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-payment')),
+    );
+    await tester.pumpAndSettle();
+    expect(checkout.checkoutStep, BuyV2CheckoutStep.confirm);
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('buy-gst-request-wholesale')),
+    );
     await tester.tap(find.byKey(const ValueKey('buy-gst-request-wholesale')));
     await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey('buy-gst-add-wholesale')),
+    );
     await tester.tap(find.byKey(const ValueKey('buy-gst-add-wholesale')));
     await tester.pumpAndSettle();
     expect(find.byKey(const ValueKey('buy-gst-invoice-sheet')), findsOneWidget);

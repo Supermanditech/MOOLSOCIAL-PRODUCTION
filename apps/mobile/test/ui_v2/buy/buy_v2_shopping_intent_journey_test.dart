@@ -55,8 +55,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.byKey(const ValueKey('buy-shopping-intent-bar')),
-        findsOneWidget,
+        findsNothing,
       );
+      expect(session.activeShoppingIntent, BuyV2ShoppingIntent.monthlyBasket);
+      expect(session.selectedProductId, product.id);
       session.closeProduct();
       expect(session.addProduct(product.id), isTrue);
       session.openCart(scope: BuyV2CartScope.shop);

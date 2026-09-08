@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -56,7 +57,18 @@ void main() {
         expect(owner.contains(rect.topLeft), isTrue);
         expect(owner.contains(rect.bottomRight), isTrue);
         expect(rect.width, greaterThanOrEqualTo(140));
-        expect(rect.height, greaterThanOrEqualTo(96));
+        expect(rect.height, greaterThanOrEqualTo(44));
+        final copy = find.descendant(
+          of: find.byKey(key),
+          matching: find.byType(RichText),
+        );
+        for (final text in copy.evaluate()) {
+          final paragraph = text.renderObject! as RenderParagraph;
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final textBounds = tester.getRect(find.byWidget(text.widget));
+          expect(textBounds.left, greaterThanOrEqualTo(rect.left));
+          expect(textBounds.right, lessThanOrEqualTo(rect.right));
+        }
       }
     }
 

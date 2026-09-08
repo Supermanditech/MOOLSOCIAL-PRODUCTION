@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -99,15 +100,30 @@ void main() {
     final promotionRail = find.byKey(
       const ValueKey('buy-catalogue-promotions'),
     );
-    expect(tester.getSize(promotionRail).height, 164);
+    final railBounds = tester.getRect(promotionRail);
+    final cards = [
+      find.byKey(const ValueKey('buy-promotion-shop-basket')),
+      find.byKey(const ValueKey('buy-promotion-shop-wholesale')),
+    ];
+    for (final card in cards) {
+      final bounds = tester.getRect(card);
+      expect(railBounds.contains(bounds.topLeft), isTrue);
+      expect(railBounds.contains(bounds.bottomRight), isTrue);
+      expect(bounds.height, greaterThanOrEqualTo(44));
+      final copy = find.descendant(of: card, matching: find.byType(RichText));
+      for (final text in copy.evaluate()) {
+        final paragraph = text.renderObject! as RenderParagraph;
+        expect(paragraph.didExceedMaxLines, isFalse);
+      }
+    }
     final title = tester.widget<Text>(find.text('Plan the monthly basket'));
     final detail = tester.widget<Text>(
       find.text('Review a curated 30-day household basket'),
     );
-    expect(title.maxLines, 3);
+    expect(title.maxLines, isNull);
     expect(title.overflow, TextOverflow.clip);
     expect(title.style?.fontSize, greaterThanOrEqualTo(10.5));
-    expect(detail.maxLines, 4);
+    expect(detail.maxLines, isNull);
     expect(detail.style?.fontSize, greaterThanOrEqualTo(9.5));
     expect(tester.takeException(), isNull);
   });

@@ -1,3 +1,5 @@
+
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
@@ -18,9 +20,7 @@ function Get-MoolSocialFlutterSupportMutexName {
   $canonicalRoot = [IO.Path]::GetFullPath($RepositoryRoot).
     TrimEnd([char[]]@('\', '/')).ToLowerInvariant()
   $bytes = [Text.Encoding]::UTF8.GetBytes($canonicalRoot)
-  $hash = [Convert]::ToHexString(
-    [Security.Cryptography.SHA256]::HashData($bytes)
-  )
+  $hash = (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ($bytes))))
   return "Local\MoolSocialFlutterSupport_$hash"
 }
 

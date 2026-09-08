@@ -807,6 +807,10 @@ void main() {
           .first;
       final ask = find.bySemanticsLabel('Ask manufacturer');
       await tester.scrollUntilVisible(ask, 220, scrollable: productScroll);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(ask);
+      await tester.pumpAndSettle();
+      expect(ask.hitTestable(), findsOneWidget);
       await tester.tap(ask);
       await tester.pumpAndSettle();
 

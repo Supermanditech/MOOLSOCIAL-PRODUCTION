@@ -41,6 +41,14 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
+    final product = session.product('s-milk');
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-product-hero-store-s-milk')),
+        matching: find.textContaining(product.seller),
+      ),
+      findsOneWidget,
+    );
     final panel = find.byKey(
       const ValueKey('buy-marketplace-trust-ready-s-milk'),
     );
@@ -57,7 +65,7 @@ void main() {
     expect(find.text('Ratings and seller'), findsOneWidget);
     expect(find.text('4.6 from 328 ratings'), findsOneWidget);
     expect(find.text('301'), findsOneWidget);
-    expect(find.text('Family Dairy & Bake'), findsWidgets);
+    expect(session.marketplaceTrustFor(product).partnerName, product.seller);
     expect(find.text('4.8'), findsOneWidget);
     expect(find.text('1842'), findsOneWidget);
     expect(find.text('96% orders delivered as promised'), findsOneWidget);

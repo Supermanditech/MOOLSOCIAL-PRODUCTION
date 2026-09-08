@@ -110,8 +110,15 @@ function Test-SealedBuyBackendOverlay {
     $overlayCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
     $ownerSpec = '{0}:{1}' -f $overlayCommit,$owner
   }
-  & git -C $RepositoryRoot cat-file -e $ownerSpec 2>$null
-  $ownerExists = $LASTEXITCODE -eq 0
+  $probeErrorActionPreference = $ErrorActionPreference
+  try {
+    # Missing historical owners are a negative result, including on PowerShell 5.1.
+    $ErrorActionPreference = 'Continue'
+    & git -C $RepositoryRoot cat-file -e $ownerSpec 2>$null
+    $ownerExists = $LASTEXITCODE -eq 0
+  } finally {
+    $ErrorActionPreference = $probeErrorActionPreference
+  }
   $ownerBytesEqual = $false
   if ($ownerExists) {
     & git -C $RepositoryRoot diff --quiet $overlayCommit -- $owner

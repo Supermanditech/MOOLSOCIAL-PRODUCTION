@@ -12,9 +12,9 @@ void main() {
     final order = session.orders.firstWhere((item) => item.id == 'PO-240783');
 
     expect(order.partner, 'Marwar Foods Distribution');
-    expect(order.partnerType, 'Mool Trade Partner');
+    expect(order.partnerType, 'MoolSocial Fulfilment Partner');
     expect(order.buyerName, 'Shree Balaji Retail');
-    expect(order.buyerType, 'Verified retailer Workspace');
+    expect(order.buyerType, 'Retailer business');
     expect(order.itemSummary, isNot(contains('Shree Balaji Retail')));
     expect(order.paymentMethod, 'Bank transfer');
     expect(order.paymentTermLabel, contains('balance at delivery'));
@@ -62,7 +62,7 @@ void main() {
       expect(find.text('Buyer'), findsOneWidget);
       expect(find.text('Shree Balaji Retail'), findsOneWidget);
       expect(find.text('Buyer role'), findsOneWidget);
-      expect(find.text('Verified retailer Workspace'), findsOneWidget);
+      expect(find.text('Retailer business'), findsOneWidget);
       expect(find.text('Payment status'), findsOneWidget);
       expect(
         find.text('Booking amount paid · balance due at delivery'),
@@ -92,9 +92,11 @@ void main() {
       220,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Mool Trade Partner'), findsOneWidget);
-    expect(find.text('Marwar Foods Distribution'), findsWidgets);
-    expect(find.text('Verified retailer Workspace'), findsOneWidget);
+    expect(
+      find.text('Marwar Foods Distribution · MoolSocial Fulfilment Partner'),
+      findsOneWidget,
+    );
+    expect(find.text('Retailer business'), findsOneWidget);
     expect(find.text('Shree Balaji Retail'), findsOneWidget);
     expect(find.text('Payment status'), findsOneWidget);
     expect(tester.takeException(), isNull);

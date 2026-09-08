@@ -1,3 +1,5 @@
+
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
@@ -15,9 +17,7 @@ if (-not (Test-Path -LiteralPath $checksumsPath -PathType Leaf)) {
 
 function Get-BuyReferenceSha256 {
   param([Parameter(Mandatory = $true)][byte[]]$Bytes)
-  return [Convert]::ToHexString(
-    [Security.Cryptography.SHA256]::HashData($Bytes)
-  ).ToLowerInvariant()
+  return (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ($Bytes)))).ToLowerInvariant()
 }
 
 function Test-BuyReferenceBytes {

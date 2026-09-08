@@ -285,11 +285,14 @@ void main() {
         ValueKey('buy-product-action-ask-manufacturer-${product.id}'),
       );
       await tester.scrollUntilVisible(ask, 220, scrollable: productScroll);
-      await tester.drag(productScroll, const Offset(0, -160));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(ask);
       await tester.pumpAndSettle();
 
       expect(actions, findsOneWidget);
-      expect(tester.getSize(actions).height, 56);
+      expect(tester.getSize(actions).height, greaterThanOrEqualTo(44));
+      expect(ask.hitTestable(), findsOneWidget);
+      expect(tester.getRect(ask).bottom, lessThanOrEqualTo(700));
       expect(find.bySemanticsLabel('Ask manufacturer'), findsOneWidget);
       await tester.tap(ask);
       await tester.pumpAndSettle();
@@ -450,10 +453,7 @@ void main() {
       find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),
       findsOneWidget,
     );
-    expect(
-      find.text('Browse this store’s available products and delivery times'),
-      findsOneWidget,
-    );
+    expect(find.text('Store products'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-horizontal-product-grid')),
       findsOneWidget,

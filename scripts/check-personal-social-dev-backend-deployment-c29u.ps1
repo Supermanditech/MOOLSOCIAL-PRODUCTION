@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param([string]$RepositoryRoot)
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -37,13 +39,13 @@ function Get-C29UTreeSeal([string]$RelativeDirectory, [string]$Filter) {
   Assert-C29U (Test-Path -LiteralPath $directory -PathType Container) "tree missing: $RelativeDirectory"
   $files = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Filter $Filter | Sort-Object FullName)
   $lines = @($files | ForEach-Object {
-    $relative = [IO.Path]::GetRelativePath($root, $_.FullName).Replace('\', '/')
+    $relative = (Get-MoolSocialPortableRelativePath -RelativeTo ($root) -Path ($_.FullName)).Replace('\', '/')
     $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName).Hash
     "$hash $relative"
   })
   $bytes = [Text.Encoding]::UTF8.GetBytes(($lines -join "`n"))
   $sha = [Security.Cryptography.SHA256]::Create()
-  try { $aggregate = [Convert]::ToHexString($sha.ComputeHash($bytes)) } finally { $sha.Dispose() }
+  try { $aggregate = (ConvertTo-MoolSocialPortableHex -Bytes ($sha.ComputeHash($bytes))) } finally { $sha.Dispose() }
   return [pscustomobject]@{ Count = $files.Count; Hash = $aggregate }
 }
 

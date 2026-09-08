@@ -118,6 +118,15 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-product-hero-store-s-oil')),
+        matching: find.textContaining(product.seller),
+      ),
+      findsOneWidget,
+    );
+    expect(find.textContaining(product.brand), findsWidgets);
+    expect(find.text(expectedPromise), findsWidgets);
     final automatic = find.byKey(
       const ValueKey('buy-automatic-fulfilment-s-oil'),
     );
@@ -127,10 +136,8 @@ void main() {
       find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
       findsNothing,
     );
-    expect(find.textContaining(product.seller), findsWidgets);
-    expect(find.text(expectedPromise), findsWidgets);
-    expect(find.text('Ghar Bazaar'), findsOneWidget);
-    expect(find.textContaining('Ghar Bazaar'), findsWidgets);
+    expect(find.text('Fulfilment arranged by MoolSocial'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Medicine pharmacy action keeps prescription and safety facts', (
@@ -160,7 +167,8 @@ void main() {
 
     await tester.tap(action);
     await tester.pumpAndSettle();
-    expect(find.text('More from Sardarpura Health Pharmacy'), findsOneWidget);
+    expect(find.text('Sardarpura Health Pharmacy'), findsWidgets);
+    expect(find.text('Store products'), findsOneWidget);
     expect(find.textContaining('Not medical advice'), findsWidgets);
     expect(
       find.byKey(const ValueKey('buy-product-m-metformin-500')),
@@ -170,7 +178,13 @@ void main() {
       find.byKey(const ValueKey('buy-horizontal-product-grid')),
       findsOneWidget,
     );
-    expect(find.text('Pain relief gel'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-horizontal-product-grid')),
+        matching: find.text('Pain relief gel'),
+      ),
+      findsNothing,
+    );
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();

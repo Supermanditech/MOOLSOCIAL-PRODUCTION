@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param([string]$RepositoryRoot)
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -150,5 +152,5 @@ foreach ($state in $capturedStates) {
   $matrixDigestRecords += "$stateId|$pngSha"
 }
 
-$digest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes(($matrixDigestRecords -join "`n"))))
+$digest = (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ([Text.Encoding]::UTF8.GetBytes(($matrixDigestRecords -join "`n"))))))
 Write-Output "C28D device matrix passed: state=$matrixState; captured=$($capturedStates.Count); digest=$digest"

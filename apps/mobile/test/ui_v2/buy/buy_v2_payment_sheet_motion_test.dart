@@ -408,12 +408,17 @@ void main() {
       session.openCart(scope: BuyV2CartScope.shop);
       expect(session.openCheckout(), isTrue);
       expect(session.selectedPayment, 'PhonePe');
+      final handedOff = <Uri>[];
 
       await tester.pumpWidget(
         MaterialApp(
           theme: MoolTheme.light(),
           home: BuyV2Screen(
             session: session,
+            paymentHandoff: (uri) async {
+              handedOff.add(uri);
+              return true;
+            },
             initialDestination: BuyV2Destination.shop,
             initialView: BuyV2View.checkout,
             initialCartScope: BuyV2CartScope.shop,
@@ -448,16 +453,12 @@ void main() {
       await tester.tap(
         find.byKey(const ValueKey('buy-checkout-primary-payment')),
       );
-      await tester.pump();
-      await tester.pump(const Duration(seconds: 1));
-      expect(
-        find.byKey(const ValueKey('buy-payment-handoff-completed')),
-        findsOneWidget,
-      );
-      await tester.tap(
-        find.byKey(const ValueKey('buy-payment-handoff-completed')),
-      );
       await tester.pumpAndSettle();
+      expect(handedOff, hasLength(1));
+      expect(handedOff.single.scheme, 'https');
+      expect(handedOff.single.host, 'payments.moolsocial.app');
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.cartLines, hasLength(1));
       expect(
         session.checkoutSubmissionState,
         BuyV2CheckoutSubmissionState.paymentPending,
