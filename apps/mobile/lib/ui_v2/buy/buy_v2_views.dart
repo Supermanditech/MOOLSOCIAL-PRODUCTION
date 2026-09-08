@@ -636,29 +636,35 @@ class BuyV2ProductView extends StatelessWidget {
                         ),
                         const SizedBox(height: 7),
                         BuyV2CartAvoidanceRegion(
-                          child: Wrap(
-                            spacing: 8,
-                            runSpacing: 4,
-                            crossAxisAlignment: WrapCrossAlignment.end,
-                            children: [
-                              Text(
-                                buyV2Money(facts.price),
-                                key: ValueKey(
-                                  'buy-product-hero-price-${product.id}',
+                          child: wholesale
+                              ? _WholesaleTradePriceSummary(
+                                  product: product,
+                                  facts: facts,
+                                  decision: offerDecision!,
+                                )
+                              : Wrap(
+                                  spacing: 8,
+                                  runSpacing: 4,
+                                  crossAxisAlignment: WrapCrossAlignment.end,
+                                  children: [
+                                    Text(
+                                      buyV2Money(facts.price),
+                                      key: ValueKey(
+                                        'buy-product-hero-price-${product.id}',
+                                      ),
+                                      style: context.buyTitle.copyWith(
+                                        color: BuyV2Colors.navy,
+                                        fontSize: 25,
+                                      ),
+                                    ),
+                                    Text(
+                                      '${product.pack} · ${product.unitPrice}',
+                                      style: context.buyMeta.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                                style: context.buyTitle.copyWith(
-                                  color: BuyV2Colors.navy,
-                                  fontSize: 25,
-                                ),
-                              ),
-                              Text(
-                                '${product.pack} · ${product.unitPrice}',
-                                style: context.buyMeta.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                ),
-                              ),
-                            ],
-                          ),
                         ),
                         const SizedBox(height: 8),
                         _ProductHeroFact(
@@ -679,14 +685,6 @@ class BuyV2ProductView extends StatelessWidget {
                           value: buyerPromise,
                           color: BuyV2Colors.green,
                         ),
-                        if (wholesale) ...[
-                          const SizedBox(height: 5),
-                          _ProductHeroFact(
-                            icon: Icons.inventory_2_outlined,
-                            value:
-                                'Minimum order · ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}',
-                          ),
-                        ],
                         if (returnSummary case final returnPolicy?) ...[
                           const SizedBox(height: 5),
                           _ProductHeroFact(
@@ -703,7 +701,7 @@ class BuyV2ProductView extends StatelessWidget {
                             ),
                             product: product,
                             quantity: quantity,
-                            showPurchaseFacts: !shop,
+                            showPurchaseFacts: false,
                             leadingAction: storeAction,
                             deliveryDecision: buyerPromise,
                             rxBlocked: rxBlocked,
@@ -804,19 +802,8 @@ class BuyV2ProductView extends StatelessWidget {
                     )
                   else
                     _DecisionPanel(
-                      title: 'Pack, delivery and pharmacy',
+                      title: 'Pharmacy and fulfilment',
                       children: [
-                        _DecisionRow(
-                          icon: Icons.inventory_2_outlined,
-                          label: 'Pack',
-                          value: product.pack,
-                        ),
-                        _DecisionRow(
-                          icon: Icons.schedule_rounded,
-                          label: 'Delivery',
-                          value: buyerPromise,
-                          valueColor: BuyV2Colors.green,
-                        ),
                         if (partnerProducts.isEmpty ||
                             onOpenPartnerCatalogue == null)
                           _DecisionRow(
@@ -1895,9 +1882,6 @@ class _WholesaleTradeDecisionPanelState
     final decision = widget.decision;
     final fulfilmentMode =
         facts.fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product);
-    final statusColor = decision.canAdd
-        ? BuyV2Colors.green
-        : BuyV2Colors.orange;
     final minimumTotal = facts.price * product.minimumOrder;
     final showSignal =
         _loading ||
@@ -1924,13 +1908,6 @@ class _WholesaleTradeDecisionPanelState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          BuyV2CartAvoidanceRegion(
-            child: _WholesaleTradePriceSummary(
-              product: product,
-              facts: facts,
-              decision: decision,
-            ),
-          ),
           if (showSignal) ...[
             const SizedBox(height: 8),
             _WholesaleTradeSignalCard(
@@ -1945,44 +1922,6 @@ class _WholesaleTradeDecisionPanelState
             key: ValueKey('buy-automatic-fulfilment-${product.id}'),
             title: 'Order details',
             children: [
-              _DecisionRow(
-                icon: decision.canAdd
-                    ? Icons.check_circle_outline_rounded
-                    : Icons.info_outline_rounded,
-                label: 'Availability',
-                value: decision.statusLabel,
-                valueColor: statusColor,
-              ),
-              _DecisionRow(
-                icon: Icons.inventory_2_outlined,
-                label: 'Trade pack',
-                value:
-                    '${product.pack} · MOQ ${_packCountLabel(product.minimumOrder)}',
-              ),
-              _DecisionRow(
-                icon: Icons.calculate_outlined,
-                label: 'Minimum total',
-                value:
-                    '${product.minimumOrder} × ${buyV2Money(facts.price)} = '
-                    '${buyV2Money(minimumTotal)}',
-              ),
-              _DecisionRow(
-                icon: Icons.straighten_rounded,
-                label: 'Unit economics',
-                value: product.unitPrice,
-              ),
-              _DecisionRow(
-                icon: Icons.inventory_outlined,
-                label: 'Stock',
-                value: facts.orderabilityLabel,
-                valueColor: statusColor,
-              ),
-              _DecisionRow(
-                icon: Icons.schedule_rounded,
-                label: 'Delivery',
-                value: widget.buyerPromise,
-                valueColor: decision.canAdd ? BuyV2Colors.green : statusColor,
-              ),
               if (facts.dispatchPromise case final dispatchPromise?)
                 _DecisionRow(
                   icon: Icons.inventory_2_outlined,
@@ -2146,6 +2085,7 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
               const SizedBox(height: 3),
               Text(
                 buyV2Money(facts.price),
+                key: ValueKey('buy-product-hero-price-${product.id}'),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 28,
@@ -2155,7 +2095,7 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
               ),
               const SizedBox(height: 4),
               Text(
-                '${product.pack} · ${product.unitPrice} · ${facts.partner}',
+                '${product.pack} · ${product.unitPrice}',
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 10,
@@ -4039,11 +3979,8 @@ Future<void> _showProductReportSheet(
     'Product image does not match',
     'Partner information needs attention',
   ];
-  final callerViewPadding = MediaQuery.viewPaddingOf(context);
   final exportedBottomClearance =
-      defaultTargetPlatform == TargetPlatform.android
-      ? callerViewPadding.top
-      : callerViewPadding.bottom;
+      BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -4581,15 +4518,6 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
             mainAxisSize: MainAxisSize.max,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              const _ProductFeedbackSheetHeader(
-                icon: Icons.flag_outlined,
-                title: title,
-                detail: 'Choose the one listing detail that needs attention.',
-                closeKey: ValueKey('buy-close-product-report'),
-              ),
-              const SizedBox(height: 8),
-              _ProductFeedbackIdentity(product: widget.product),
-              const SizedBox(height: 8),
               Flexible(
                 child: SingleChildScrollView(
                   key: const ValueKey('buy-product-report-reasons-scroll'),
@@ -4597,6 +4525,16 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
+                      const _ProductFeedbackSheetHeader(
+                        icon: Icons.flag_outlined,
+                        title: title,
+                        detail:
+                            'Choose the one listing detail that needs attention.',
+                        closeKey: ValueKey('buy-close-product-report'),
+                      ),
+                      const SizedBox(height: 8),
+                      _ProductFeedbackIdentity(product: widget.product),
+                      const SizedBox(height: 8),
                       for (
                         var index = 0;
                         index < widget.reasons.length;
@@ -4723,8 +4661,8 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
                   const SizedBox(width: 8),
                   Expanded(
                     flex: 2,
-                    child: SizedBox(
-                      height: 48,
+                    child: ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 48),
                       child: FilledButton.icon(
                         key: ValueKey('buy-submit-report-${widget.product.id}'),
                         onPressed: _selectedReason == null || _submitting
@@ -5345,6 +5283,7 @@ Future<void> _confirmBuyV2CartClear(
             'You’ll return to ${scope.label}.';
   final confirmed = await showModalBottomSheet<bool>(
     context: context,
+    isScrollControlled: true,
     useSafeArea: true,
     showDragHandle: true,
     backgroundColor: Colors.white,
@@ -5360,9 +5299,18 @@ Future<void> _confirmBuyV2CartClear(
         namesRoute: true,
         explicitChildNodes: true,
         label: title,
-        child: Padding(
+        child: SingleChildScrollView(
           key: const ValueKey('buy-cart-clear-sheet'),
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16 +
+                MediaQuery.viewInsetsOf(sheetContext).bottom +
+                BuyV2AddressSheetMotion.resolveModalActionBottomInset(
+                  sheetContext,
+                ),
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -12747,7 +12695,8 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
   if (destination == BuyV2Destination.orders) return;
   String browseScope() =>
       '${session.destination.name}|${session.saleTypeSignature}|'
-      '${session.selectedCategoryId}|${session.query}';
+      '${session.selectedCategoryId}|${session.query}|'
+      '${session.catalogueRegionId}|${session.catalogueAreaScope.name}';
   final originalScope = browseScope();
   final current = session.discoveryRefinements;
   var draft = BuyV2DiscoveryRefinements(
@@ -12766,265 +12715,301 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
   final brands = {...session.discoveryBrands, ...current.brands}.toList()
     ..sort();
   const packFilters = [BuyV2PackFilter.standard, BuyV2PackFilter.multipack];
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    showDragHandle: true,
-    backgroundColor: Colors.white,
-    constraints: const BoxConstraints(
-      maxWidth: BuyV2FilterSheetMotion.maxWidth,
-    ),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-    ),
-    clipBehavior: Clip.antiAlias,
-    sheetAnimationStyle: BuyV2FilterSheetMotion.resolve(context),
-    builder: (sheetContext) => StatefulBuilder(
-      builder: (sheetContext, setSheetState) => AnimatedBuilder(
-        animation: session,
-        builder: (sheetContext, _) {
-          final scopeMatches = browseScope() == originalScope;
-          final productCount = session.previewDiscoveryProducts(draft).length;
-          void update(BuyV2DiscoveryRefinements value) =>
-              setSheetState(() => draft = value);
-          return FractionallySizedBox(
-            heightFactor: .92,
-            child: SafeArea(
-              top: false,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'Sort & filter',
-                                key: const ValueKey(
-                                  'buy-discovery-refinement-title',
-                                ),
-                                style: sheetContext.buyTitle.copyWith(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              Text(
-                                scopeMatches
-                                    ? '${_productCountLabel(productCount)} found'
-                                    : 'Your browsing choices changed. Reopen filters.',
-                                key: const ValueKey(
-                                  'buy-discovery-refinement-count',
-                                ),
-                                style: sheetContext.buyMeta,
-                              ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          key: const ValueKey('buy-discovery-refinement-close'),
-                          tooltip: 'Close sort and filters',
-                          onPressed: () => Navigator.of(sheetContext).pop(),
-                          icon: const Icon(Icons.close_rounded),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Divider(height: 1, color: BuyV2Colors.line),
-                  Expanded(
-                    child: ListView(
-                      key: const ValueKey('buy-discovery-refinement-list'),
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                      children: [
-                        _DiscoveryRefinementSection(
-                          id: 'sort',
-                          title: 'Sort by',
-                          summary: _buyV2ProductSortLabel(draft.sort),
-                          children: [
-                            for (final sort in const [
-                              BuyV2ProductSort.relevance,
-                              BuyV2ProductSort.priceLowToHigh,
-                              BuyV2ProductSort.priceHighToLow,
-                            ])
-                              _DiscoveryChoice(
-                                key: ValueKey('buy-sort-${sort.name}'),
-                                label: _buyV2ProductSortLabel(sort),
-                                selected: draft.sort == sort,
-                                onTap: () => update(draft.copyWith(sort: sort)),
-                              ),
-                          ],
-                        ),
-                        _DiscoveryRefinementSection(
-                          id: 'price',
-                          title: 'Pack price',
-                          summary: draft.maximumPrice == null
-                              ? 'Any price'
-                              : 'Up to ${buyV2Money(draft.maximumPrice!)}',
-                          children: [
-                            _DiscoveryChoice(
-                              key: const ValueKey('buy-refine-price-any'),
-                              label: 'Any price',
-                              selected: draft.maximumPrice == null,
-                              onTap: () =>
-                                  update(draft.copyWith(clearPrice: true)),
-                            ),
-                            for (final limit in session.discoveryPriceLimits)
-                              _DiscoveryChoice(
-                                key: ValueKey('buy-refine-price-$limit'),
-                                label: 'Up to ${buyV2Money(limit)}',
-                                selected: draft.maximumPrice == limit,
-                                onTap: () =>
-                                    update(draft.copyWith(maximumPrice: limit)),
-                              ),
-                          ],
-                        ),
-                        if (destination != BuyV2Destination.wholesale)
-                          _DiscoveryRefinementSection(
-                            id: 'pack',
-                            title: 'Pack size',
-                            summary: draft.pack == null
-                                ? 'Any pack'
-                                : _buyV2PackFilterLabel(draft.pack!),
-                            children: [
-                              _DiscoveryChoice(
-                                key: const ValueKey('buy-refine-pack-any'),
-                                label: 'Any pack',
-                                selected: draft.pack == null,
-                                onTap: () =>
-                                    update(draft.copyWith(clearPack: true)),
-                              ),
-                              for (final pack in packFilters)
-                                _DiscoveryChoice(
-                                  key: ValueKey('buy-refine-pack-${pack.name}'),
-                                  label: _buyV2PackFilterLabel(pack),
-                                  selected: draft.pack == pack,
-                                  onTap: () =>
-                                      update(draft.copyWith(pack: pack)),
-                                ),
-                            ],
-                          ),
-                        if (brands.isNotEmpty)
-                          _DiscoveryRefinementSection(
-                            id: 'brand',
-                            title: 'Brand',
-                            summary: draft.brands.isEmpty
-                                ? 'Any brand'
-                                : draft.brands.length == 1
-                                ? draft.brands.single
-                                : '${draft.brands.length} selected',
-                            children: [
-                              for (final brand in brands)
-                                _DiscoveryChoice(
-                                  key: ValueKey(
-                                    'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
-                                  ),
-                                  label: brand,
-                                  selected: draft.brands.contains(brand),
-                                  onTap: () {
-                                    final selected = {...draft.brands};
-                                    if (!selected.remove(brand)) {
-                                      selected.add(brand);
-                                    }
-                                    update(draft.copyWith(brands: selected));
-                                  },
-                                ),
-                            ],
-                          ),
-                        SwitchListTile.adaptive(
-                          key: const ValueKey('buy-refine-available-products'),
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Available to order'),
-                          value: draft.availableOnly,
-                          onChanged: (value) =>
-                              update(draft.copyWith(availableOnly: value)),
-                        ),
-                        if (actions.isNotEmpty)
-                          _DiscoveryRefinementSection(
-                            id: 'tools',
-                            title: 'Shopping tools',
-                            summary: 'Orders, activity and settings',
-                            children: [
-                              for (final action in actions)
-                                _BuyV2FilterToolAction(
-                                  action: action,
-                                  onTap: () async {
-                                    final completed = ModalRoute.of(
-                                      sheetContext,
-                                    )?.completed;
-                                    Navigator.of(sheetContext).pop();
-                                    if (completed != null) await completed;
-                                    if (!context.mounted ||
-                                        browseScope() != originalScope) {
-                                      return;
-                                    }
-                                    action.onTap();
-                                  },
-                                ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(top: BorderSide(color: BuyV2Colors.line)),
-                    ),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            key: const ValueKey(
-                              'buy-discovery-refinement-clear',
-                            ),
-                            onPressed: draft.count == 0
-                                ? null
-                                : () => update(BuyV2DiscoveryRefinements()),
-                            style: OutlinedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                            ),
-                            child: const Text('Clear'),
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: FilledButton(
-                            key: const ValueKey(
-                              'buy-discovery-refinement-done',
-                            ),
-                            onPressed: !scopeMatches
-                                ? null
-                                : () {
-                                    session.applyDiscoveryRefinements(draft);
-                                    Navigator.of(sheetContext).pop();
-                                  },
-                            style: FilledButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 12,
-                                vertical: 12,
-                              ),
-                            ),
-                            child: const Text('Apply'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+  final previewScope = 'refinement-preview-${destination.name}';
+  final preview = session.pagedCatalogueEnabled
+      ? session.acquireCatalogueProducts(previewScope)
+      : null;
+  if (preview != null) {
+    unawaited(preview.open(session.catalogueQuery(refinements: draft)));
+  }
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      backgroundColor: Colors.white,
+      constraints: const BoxConstraints(
+        maxWidth: BuyV2FilterSheetMotion.maxWidth,
       ),
-    ),
-  );
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      clipBehavior: Clip.antiAlias,
+      sheetAnimationStyle: BuyV2FilterSheetMotion.resolve(context),
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) => AnimatedBuilder(
+          animation: Listenable.merge([session, ?preview]),
+          builder: (sheetContext, _) {
+            final scopeMatches = browseScope() == originalScope;
+            final productCount = preview == null
+                ? session.previewDiscoveryProducts(draft).length
+                : preview.loading || preview.message != null
+                ? null
+                : preview.page?.totalCount;
+            void update(BuyV2DiscoveryRefinements value) {
+              setSheetState(() => draft = value);
+              if (preview != null && scopeMatches) {
+                unawaited(
+                  preview.open(session.catalogueQuery(refinements: value)),
+                );
+              }
+            }
+
+            return FractionallySizedBox(
+              heightFactor: .92,
+              child: SafeArea(
+                top: false,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Sort & filter',
+                                  key: const ValueKey(
+                                    'buy-discovery-refinement-title',
+                                  ),
+                                  style: sheetContext.buyTitle.copyWith(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                                Text(
+                                  scopeMatches
+                                      ? productCount != null
+                                            ? '${_productCountLabel(productCount)} found'
+                                            : preview?.loading == true
+                                            ? 'Checking matching products…'
+                                            : 'Count unavailable. Apply to view results.'
+                                      : 'Your browsing choices changed. Reopen filters.',
+                                  key: const ValueKey(
+                                    'buy-discovery-refinement-count',
+                                  ),
+                                  style: sheetContext.buyMeta,
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            key: const ValueKey(
+                              'buy-discovery-refinement-close',
+                            ),
+                            tooltip: 'Close sort and filters',
+                            onPressed: () => Navigator.of(sheetContext).pop(),
+                            icon: const Icon(Icons.close_rounded),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Divider(height: 1, color: BuyV2Colors.line),
+                    Expanded(
+                      child: ListView(
+                        key: const ValueKey('buy-discovery-refinement-list'),
+                        padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+                        children: [
+                          _DiscoveryRefinementSection(
+                            id: 'sort',
+                            title: 'Sort by',
+                            summary: _buyV2ProductSortLabel(draft.sort),
+                            children: [
+                              for (final sort in const [
+                                BuyV2ProductSort.relevance,
+                                BuyV2ProductSort.priceLowToHigh,
+                                BuyV2ProductSort.priceHighToLow,
+                              ])
+                                _DiscoveryChoice(
+                                  key: ValueKey('buy-sort-${sort.name}'),
+                                  label: _buyV2ProductSortLabel(sort),
+                                  selected: draft.sort == sort,
+                                  onTap: () =>
+                                      update(draft.copyWith(sort: sort)),
+                                ),
+                            ],
+                          ),
+                          _DiscoveryRefinementSection(
+                            id: 'price',
+                            title: 'Pack price',
+                            summary: draft.maximumPrice == null
+                                ? 'Any price'
+                                : 'Up to ${buyV2Money(draft.maximumPrice!)}',
+                            children: [
+                              _DiscoveryChoice(
+                                key: const ValueKey('buy-refine-price-any'),
+                                label: 'Any price',
+                                selected: draft.maximumPrice == null,
+                                onTap: () =>
+                                    update(draft.copyWith(clearPrice: true)),
+                              ),
+                              for (final limit in session.discoveryPriceLimits)
+                                _DiscoveryChoice(
+                                  key: ValueKey('buy-refine-price-$limit'),
+                                  label: 'Up to ${buyV2Money(limit)}',
+                                  selected: draft.maximumPrice == limit,
+                                  onTap: () => update(
+                                    draft.copyWith(maximumPrice: limit),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          if (destination != BuyV2Destination.wholesale)
+                            _DiscoveryRefinementSection(
+                              id: 'pack',
+                              title: 'Pack size',
+                              summary: draft.pack == null
+                                  ? 'Any pack'
+                                  : _buyV2PackFilterLabel(draft.pack!),
+                              children: [
+                                _DiscoveryChoice(
+                                  key: const ValueKey('buy-refine-pack-any'),
+                                  label: 'Any pack',
+                                  selected: draft.pack == null,
+                                  onTap: () =>
+                                      update(draft.copyWith(clearPack: true)),
+                                ),
+                                for (final pack in packFilters)
+                                  _DiscoveryChoice(
+                                    key: ValueKey(
+                                      'buy-refine-pack-${pack.name}',
+                                    ),
+                                    label: _buyV2PackFilterLabel(pack),
+                                    selected: draft.pack == pack,
+                                    onTap: () =>
+                                        update(draft.copyWith(pack: pack)),
+                                  ),
+                              ],
+                            ),
+                          if (brands.isNotEmpty)
+                            _DiscoveryRefinementSection(
+                              id: 'brand',
+                              title: 'Brand',
+                              summary: draft.brands.isEmpty
+                                  ? 'Any brand'
+                                  : draft.brands.length == 1
+                                  ? draft.brands.single
+                                  : '${draft.brands.length} selected',
+                              children: [
+                                for (final brand in brands)
+                                  _DiscoveryChoice(
+                                    key: ValueKey(
+                                      'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+                                    ),
+                                    label: brand,
+                                    selected: draft.brands.contains(brand),
+                                    onTap: () {
+                                      final selected = {...draft.brands};
+                                      if (!selected.remove(brand)) {
+                                        selected.add(brand);
+                                      }
+                                      update(draft.copyWith(brands: selected));
+                                    },
+                                  ),
+                              ],
+                            ),
+                          SwitchListTile.adaptive(
+                            key: const ValueKey(
+                              'buy-refine-available-products',
+                            ),
+                            contentPadding: EdgeInsets.zero,
+                            title: const Text('Available to order'),
+                            value: draft.availableOnly,
+                            onChanged: (value) =>
+                                update(draft.copyWith(availableOnly: value)),
+                          ),
+                          if (actions.isNotEmpty)
+                            _DiscoveryRefinementSection(
+                              id: 'tools',
+                              title: 'Shopping tools',
+                              summary: 'Orders, activity and settings',
+                              children: [
+                                for (final action in actions)
+                                  _BuyV2FilterToolAction(
+                                    action: action,
+                                    onTap: () async {
+                                      final completed = ModalRoute.of(
+                                        sheetContext,
+                                      )?.completed;
+                                      Navigator.of(sheetContext).pop();
+                                      if (completed != null) await completed;
+                                      if (!context.mounted ||
+                                          browseScope() != originalScope) {
+                                        return;
+                                      }
+                                      action.onTap();
+                                    },
+                                  ),
+                              ],
+                            ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      decoration: const BoxDecoration(
+                        color: Colors.white,
+                        border: Border(
+                          top: BorderSide(color: BuyV2Colors.line),
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              key: const ValueKey(
+                                'buy-discovery-refinement-clear',
+                              ),
+                              onPressed: draft.count == 0
+                                  ? null
+                                  : () => update(BuyV2DiscoveryRefinements()),
+                              style: OutlinedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                              ),
+                              child: const Text('Clear'),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: FilledButton(
+                              key: const ValueKey(
+                                'buy-discovery-refinement-done',
+                              ),
+                              onPressed: !scopeMatches
+                                  ? null
+                                  : () {
+                                      session.applyDiscoveryRefinements(draft);
+                                      Navigator.of(sheetContext).pop();
+                                    },
+                              style: FilledButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 12,
+                                ),
+                              ),
+                              child: const Text('Apply'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+  } finally {
+    if (preview != null) session.releaseCatalogueProducts(previewScope);
+  }
 }
 
 class _DiscoveryRefinementSection extends StatelessWidget {

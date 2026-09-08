@@ -146,16 +146,42 @@ void main() {
               )
               .first,
         );
-        expect(find.text('${selected.pack} · MOQ 1 pack'), findsOneWidget);
+        final priceSummary = find.byKey(
+          ValueKey('buy-wholesale-price-summary-$selectedId'),
+        );
+        expect(
+          find.descendant(
+            of: priceSummary,
+            matching: find.text('${selected.pack} · ${selected.unitPrice}'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(of: priceSummary, matching: trade),
+          findsOneWidget,
+        );
         final tradeSemantics = find.byKey(
           ValueKey('buy-wholesale-trade-decision-$selectedId'),
         );
+        await tester.scrollUntilVisible(
+          tradeSemantics,
+          160,
+          scrollable: find
+              .descendant(
+                of: find.byKey(PageStorageKey('buy-product-$selectedId')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
         expect(
           tester.widget<Semantics>(tradeSemantics).properties.label,
           contains('Minimum order 1 pack.'),
         );
         await capturePack(tester, 'r5-pack-$offers-$scale-trade');
         final add = find.byKey(ValueKey('buy-product-primary-$selectedId'));
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
         expect(add.hitTestable(), findsOneWidget);
         await tester.tap(add);
         await tester.pumpAndSettle();

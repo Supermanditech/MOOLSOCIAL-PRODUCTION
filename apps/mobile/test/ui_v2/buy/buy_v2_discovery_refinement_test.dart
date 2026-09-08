@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -6,12 +7,45 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
+class _R671RefinementSource extends BuyV2DevelopmentCatalogueSource {
+  _R671RefinementSource()
+    : super(
+        destination: BuyV2Destination.shop,
+        providerCount: 100,
+        skusPerStore: 84,
+      );
+  bool holdNext = false;
+  bool failNext = false;
+  Completer<void>? pending;
+  final requests = <BuyV2CatalogueQuery>[];
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    requests.add(query);
+    if (holdNext) {
+      holdNext = false;
+      pending = Completer<void>();
+      await pending!.future;
+    }
+    if (failNext) {
+      failNext = false;
+      throw StateError('Review count unavailable');
+    }
+    return super.loadProducts(query, cursor: cursor, pageSize: pageSize);
+  }
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -402,6 +436,83 @@ void main() {
     await tester.tap(finder);
     await tester.pumpAndSettle();
   }
+
+  testWidgets(
+    'R665 O03 paged refinement count follows its source without applying drafts',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final source = _R671RefinementSource();
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        cataloguePageSource: source,
+        catalogueAreas: const {'jodhpur': 'Jodhpur'},
+        initialCatalogueRegionId: 'jodhpur',
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final expected = await source.loadProducts(
+        session.catalogueQuery(),
+        pageSize: 1,
+      );
+      expect(
+        expected.totalCount,
+        isNot(
+          session.previewDiscoveryProducts(BuyV2DiscoveryRefinements()).length,
+        ),
+      );
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      source.holdNext = true;
+      await openRefinement(tester, session);
+      final count = find.byKey(
+        const ValueKey('buy-discovery-refinement-count'),
+      );
+      expect(tester.widget<Text>(count).data, 'Checking matching products…');
+      expect(source.pending, isNotNull);
+      source.pending!.complete();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<Text>(count).data,
+        '${expected.totalCount} products found',
+      );
+      expect(source.requests.last, session.catalogueQuery());
+      source.failNext = true;
+      await tapVisible(tester, const ValueKey('buy-refine-price-250'));
+      expect(source.requests.last.maximumPrice, 250);
+      expect(session.maximumProductPrice, isNull);
+      expect(
+        tester.widget<Text>(count).data,
+        'Count unavailable. Apply to view results.',
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-discovery-refinement-close')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.maximumProductPrice, isNull);
+      await openRefinement(tester, session);
+      expect(
+        tester.widget<Text>(count).data,
+        '${expected.totalCount} products found',
+      );
+      source.holdNext = true;
+      await tapVisible(tester, const ValueKey('buy-refine-price-250'));
+      expect(tester.widget<Text>(count).data, 'Checking matching products…');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      source.pending!.complete();
+      await tester.pumpAndSettle();
+      expect(session.maximumProductPrice, isNull);
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   for (final check in [
     'cancel',

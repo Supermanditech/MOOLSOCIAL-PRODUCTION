@@ -270,6 +270,139 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    testWidgets('R665 D02 populated Saved avoids Cart ${destination.name}', (
+      tester,
+    ) async {
+      const size = Size(320, 711);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.addProduct('s-tomato');
+      session.addProduct('w-notebook');
+      session.toggleSaved(
+        destination == BuyV2Destination.shop ? 's-tomato' : 'w-notebook',
+      );
+      session.openDestination(destination);
+      session.showSavedProducts(true);
+      await tester.pumpWidget(
+        app(
+          session,
+          size: size,
+          textScale: 2,
+          safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final header = find.byKey(const ValueKey('buy-saved-decision-shelf'));
+      await tester.ensureVisible(header);
+      await tester.pumpAndSettle();
+      final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
+      expect(cart.hitTestable(), findsOneWidget);
+      await tester.drag(
+        cart,
+        tester.getCenter(header) - tester.getCenter(cart),
+      );
+      await tester.pumpAndSettle();
+      expect(tester.getRect(cart).overlaps(tester.getRect(header)), isFalse);
+      await tester.tap(cart);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.showingSavedProducts, isTrue);
+      expect(session.destination, destination);
+      expect(tester.getRect(cart).overlaps(tester.getRect(header)), isFalse);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final paged in [false, true]) {
+    testWidgets(
+      'R665 D02 search history and no-match text avoid Cart paged=$paged',
+      (tester) async {
+        const size = Size(320, 711);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          cataloguePageSource: paged
+              ? BuyV2DevelopmentCatalogueSource(
+                  destination: BuyV2Destination.shop,
+                  providerCount: 10,
+                  skusPerStore: 84,
+                )
+              : null,
+          catalogueAreas: const {'jodhpur': 'Jodhpur'},
+          initialCatalogueRegionId: 'jodhpur',
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.submitSearch('tomato');
+        session.updateQuery('');
+        session.addProduct('s-tomato');
+        session.addProduct('w-notebook');
+        await tester.pumpWidget(
+          app(
+            session,
+            size: size,
+            textScale: 2,
+            safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+        await tester.pumpAndSettle();
+        final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
+        final recent = find.byKey(const ValueKey('buy-recent-search-0'));
+        expect(recent, findsOneWidget);
+        await tester.drag(
+          cart,
+          tester.getCenter(recent) - tester.getCenter(cart),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(cart).overlaps(tester.getRect(recent)), isFalse);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+        await tester.pumpAndSettle();
+        expect(cart, findsNothing);
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('buy-search-field')),
+          'no-such-item-r665',
+        );
+        await tester.pumpAndSettle();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        final empty = find.text(
+          paged ? 'No matching products' : 'No matches for “no-such-item-r665”',
+        );
+        await tester.ensureVisible(empty);
+        await tester.pumpAndSettle();
+        await tester.drag(
+          cart,
+          tester.getCenter(empty) - tester.getCenter(cart),
+        );
+        await tester.pumpAndSettle();
+        expect(tester.getRect(cart).overlaps(tester.getRect(empty)), isFalse);
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final scenario in [
     for (final size in [
       const Size(320, 700),

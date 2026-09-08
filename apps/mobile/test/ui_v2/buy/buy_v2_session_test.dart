@@ -715,6 +715,50 @@ class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
 }
 
 void main() {
+  for (final now in [
+    DateTime(2026, 9, 8, 18, 29),
+    DateTime(2026, 9, 8, 23, 59),
+    DateTime(2026, 9, 9),
+  ]) {
+    test('R665 D05 undated catalogue promises stay honest at $now', () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core, catalogueNow: () => now);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final relativeDeadline = RegExp(
+        r'\b(today|tomorrow)\s+by\b',
+        caseSensitive: false,
+      );
+      expect(
+        BuyV2Catalogue.products.any(
+          (product) => relativeDeadline.hasMatch(product.deliveryPromise),
+        ),
+        isFalse,
+      );
+      expect(session.product('s-tomato').deliveryPromise, 'Delivery in 12 min');
+      for (final id in ['s-atta', 's-oil', 's-notebook', 'w-atta']) {
+        final product = session.product(id);
+        expect(product.deliveryPromise, 'Delivery time confirmed at checkout');
+        expect(
+          session.productFactsFor(product).deliveryPromise,
+          product.deliveryPromise,
+        );
+        expect(session.addProduct(id), isTrue);
+      }
+      session.openCart();
+      expect(session.scopedCartFulfilmentGroups, isNotEmpty);
+      for (final group in session.scopedCartFulfilmentGroups) {
+        expect(group.promise, 'Delivery time confirmed at checkout');
+        expect(group.promisedByLabel, isNull);
+      }
+      expect(session.openCheckout(), isTrue);
+      for (final group in session.checkoutFulfilmentGroups) {
+        expect(group.promise, 'Delivery time confirmed at checkout');
+        expect(group.promisedByLabel, isNull);
+      }
+    });
+  }
+
   group('R5 collection purchase', () {
     late _CollectionPurchaseHarness harness;
     late BuyV2CollectionCheckoutController checkout;

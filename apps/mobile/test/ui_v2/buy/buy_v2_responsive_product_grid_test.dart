@@ -15,6 +15,64 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final width in [320.0, 360.0]) {
+    testWidgets('R665 O05 full medicine identity at text2 width $width', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = Size(width, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = session.product('m-paracetamol-500');
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: const TextScaler.linear(2)),
+            child: child!,
+          ),
+          home: Scaffold(
+            body: SingleChildScrollView(
+              child: BuyV2ProgressiveProductGrid(
+                session: session,
+                products: [product],
+                storageKey: 'r665-medicine-identity',
+                semanticLabel: 'Medicine products',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final card = find.byKey(ValueKey('buy-product-${product.id}'));
+      final title = find.descendant(
+        of: card,
+        matching: find.text(product.title),
+      );
+      expect(title, findsOneWidget);
+      final paragraph = tester.renderObject<RenderParagraph>(title);
+      expect(paragraph.text.toPlainText(), contains('tablets'));
+      expect(paragraph.didExceedMaxLines, isFalse);
+      final measured = TextPainter(
+        text: paragraph.text,
+        textDirection: paragraph.textDirection,
+        textScaler: paragraph.textScaler,
+      )..layout(maxWidth: paragraph.size.width);
+      expect(paragraph.size.height, greaterThanOrEqualTo(measured.height - .1));
+      measured.dispose();
+      expect(
+        tester.getRect(title).bottom,
+        lessThanOrEqualTo(tester.getRect(card).bottom),
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final destination in [
     BuyV2Destination.shop,
     BuyV2Destination.wholesale,
@@ -615,7 +673,10 @@ void main() {
     expect(tester.getSize(add).height, greaterThanOrEqualTo(44));
     final completePromise = tester.renderObject<RenderParagraph>(
       find
-          .descendant(of: firstCard, matching: find.textContaining('10:30'))
+          .descendant(
+            of: firstCard,
+            matching: find.textContaining('At checkout'),
+          )
           .first,
     );
     expect(completePromise.didExceedMaxLines, isFalse);

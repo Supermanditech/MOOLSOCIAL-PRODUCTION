@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -7,6 +8,7 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
@@ -1167,6 +1169,8 @@ void main() {
       ) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = Size(scale == 2 ? 320 : 390, 844);
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 24);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
         addTearDown(tester.view.reset);
         final core = BuySession();
         final session = BuyV2Session(core: core);
@@ -1183,6 +1187,34 @@ void main() {
         await tester.pumpAndSettle();
         final shop = product.destination == BuyV2Destination.shop;
         final prefix = shop ? 'buy-shop-seller' : 'buy-wholesale-supplier';
+        void expectNestedStatusContrast() {
+          final regions = find.byType(AnnotatedRegion<SystemUiOverlayStyle>);
+          expect(regions, findsWidgets);
+          expect(
+            tester
+                .widget<AnnotatedRegion<SystemUiOverlayStyle>>(regions.last)
+                .value
+                .statusBarIconBrightness,
+            Brightness.light,
+          );
+          final bars = find.byWidgetPredicate(
+            (widget) =>
+                widget is ColoredBox && widget.color == BuyV2Colors.navy,
+          );
+          expect(
+            bars.evaluate().any((element) {
+              final box = element.renderObject;
+              if (box is! RenderBox || !box.hasSize) return false;
+              return (box.localToGlobal(Offset.zero) & box.size).contains(
+                Offset(tester.view.physicalSize.width / 2, 12),
+              );
+            }),
+            isTrue,
+            reason:
+                'R665 D03: light status icons must have a painted dark inset.',
+          );
+        }
+
         final action = find.byKey(
           ValueKey(
             '${shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-$id',
@@ -1231,7 +1263,7 @@ void main() {
             matching: find.byWidgetPredicate(
               (widget) =>
                   widget is RichText &&
-                  widget.text.toPlainText().contains('5:00'),
+                  widget.text.toPlainText().contains('At checkout'),
             ),
           );
           expect(promises, findsOneWidget);
@@ -1302,9 +1334,11 @@ void main() {
         await tester.pumpAndSettle();
         expect(tester.takeException(), isNull);
         expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);
+        expectNestedStatusContrast();
         await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
+        expectNestedStatusContrast();
         expect(
           session.cartScope,
           shop ? BuyV2CartScope.shop : BuyV2CartScope.wholesale,
@@ -1312,6 +1346,7 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);
+        expectNestedStatusContrast();
         expect(
           find.byKey(const ValueKey('buy-store-cart-bar')),
           findsOneWidget,

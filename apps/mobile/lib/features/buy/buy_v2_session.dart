@@ -1795,9 +1795,11 @@ class BuyV2Session extends ChangeNotifier {
     bool offersOnly = false,
     bool collectionOnly = false,
     BuyV2Destination? catalogueDestination,
+    BuyV2DiscoveryRefinements? refinements,
   }) {
     final value = catalogueDestination ?? destination;
     final storeCatalogue = storeId != null;
+    final choices = refinements ?? discoveryRefinements;
     return BuyV2CatalogueQuery(
       destination: value,
       regionId: _catalogueRegionId,
@@ -1807,7 +1809,7 @@ class BuyV2Session extends ChangeNotifier {
       storeId: storeId,
       query: search ?? (storeCatalogue ? '' : query),
       categoryId: categoryId ?? (storeCatalogue ? 'all' : selectedCategoryId),
-      sort: productSort,
+      sort: choices.sort,
       shopSaleType:
           !storeCatalogue && !collectionOnly && value == BuyV2Destination.shop
           ? shopSaleType
@@ -1817,12 +1819,12 @@ class BuyV2Session extends ChangeNotifier {
           : null,
       fulfilmentMode: storeCatalogue || collectionOnly
           ? null
-          : selectedFulfilmentMode,
-      pack: storeCatalogue ? null : selectedPackFilter,
-      filter: storeCatalogue ? null : selectedFilter,
-      brands: storeCatalogue ? const {} : selectedBrands,
-      maximumPrice: storeCatalogue ? null : maximumProductPrice,
-      availableOnly: !storeCatalogue && availableProductsOnly,
+          : choices.fulfilmentMode,
+      pack: storeCatalogue ? null : choices.pack,
+      filter: storeCatalogue ? null : choices.filter,
+      brands: storeCatalogue ? const {} : choices.brands,
+      maximumPrice: storeCatalogue ? null : choices.maximumPrice,
+      availableOnly: !storeCatalogue && choices.availableOnly,
       offersOnly: offersOnly,
       collectionOnly: collectionOnly,
     );

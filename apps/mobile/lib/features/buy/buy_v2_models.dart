@@ -974,12 +974,23 @@ abstract final class BuyV2Catalogue {
       r'^(today|tomorrow)\s+by\s+',
       caseSensitive: false,
     ).hasMatch(value)) {
-      return 'Delivery ${value.toLowerCase()}';
+      // Seed rows have no observation date or order cutoff. A wall-clock label
+      // cannot be reused as today's promise, including after midnight.
+      return 'Delivery time confirmed at checkout';
     }
     return value;
   }
 
-  static String _wholesalePromise(String source) => source.trim();
+  static String _wholesalePromise(String source) {
+    final value = source.trim();
+    if (RegExp(
+      r'^(today|tomorrow)\s+by\s+',
+      caseSensitive: false,
+    ).hasMatch(value)) {
+      return 'Delivery time confirmed at checkout';
+    }
+    return value;
+  }
 
   static String _returnPolicy(
     _BuyV2CommerceSeed seed, {

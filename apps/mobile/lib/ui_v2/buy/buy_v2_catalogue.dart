@@ -1474,17 +1474,19 @@ class _CataloguePageNotice extends StatelessWidget {
   final String? action;
   final VoidCallback? onAction;
   @override
-  Widget build(BuildContext context) => Padding(
-    padding: const EdgeInsets.all(16),
-    child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(title, style: context.buyTitle.copyWith(fontSize: 15)),
-        const SizedBox(height: 4),
-        Text(detail, style: context.buyMeta),
-        if (onAction != null)
-          TextButton(onPressed: onAction, child: Text(action!)),
-      ],
+  Widget build(BuildContext context) => BuyV2CartAvoidanceRegion(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: context.buyTitle.copyWith(fontSize: 15)),
+          const SizedBox(height: 4),
+          Text(detail, style: context.buyMeta),
+          if (onAction != null)
+            TextButton(onPressed: onAction, child: Text(action!)),
+        ],
+      ),
     ),
   );
 }
@@ -1600,15 +1602,20 @@ Future<void> showBuyV2CatalogueArea(
   );
 }
 
+typedef BuyV2ProductVisit =
+    Future<void> Function(BuyV2Product product, String returnLabel);
+
 class BuyV2CatalogueView extends StatelessWidget {
   const BuyV2CatalogueView({
     super.key,
     required this.session,
     this.onOpenStore,
+    this.onVisitProduct,
   });
 
   final BuyV2Session session;
   final ValueChanged<BuyV2Product>? onOpenStore;
+  final BuyV2ProductVisit? onVisitProduct;
 
   @override
   Widget build(BuildContext context) {
@@ -1619,6 +1626,7 @@ class BuyV2CatalogueView extends StatelessWidget {
           _CatalogueAccountReturn(session: session),
         _CatalogueToolbar(
           session: session,
+          onVisitProduct: onVisitProduct,
           savedOnly: savedOnly,
           onSaved: () => session.showSavedProducts(!savedOnly),
         ),
@@ -2548,139 +2556,152 @@ class _SearchReadyState extends StatelessWidget {
       child: ListView(
         key: const ValueKey('buy-search-suggestion-list'),
         padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-        children: [
-          if (recentSearches.isNotEmpty)
-            ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 44),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.history_rounded,
-                    size: 19,
-                    color: BuyV2Colors.navy,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Recent searches',
-                      style: context.buyBody.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                  ),
-                  TextButton(
-                    key: const ValueKey('buy-recent-searches-clear'),
-                    onPressed: () =>
-                        session.clearRecentSearches(session.destination),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(44, 44),
-                    ),
-                    child: const Text('Clear'),
-                  ),
-                ],
-              ),
-            ),
-          for (final (index, recent) in recentSearches.indexed) ...[
-            Semantics(
-              button: true,
-              label: 'Search again for $recent',
-              child: InkWell(
-                key: ValueKey('buy-recent-search-$index'),
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  session.submitSearch(recent);
-                },
-                child: SizedBox(
-                  height: 44,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Row(
-                      children: [
-                        const SizedBox(
-                          width: 30,
-                          child: Icon(
+        children:
+            [
+                  if (recentSearches.isNotEmpty)
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(minHeight: 44),
+                      child: Row(
+                        children: [
+                          const Icon(
                             Icons.history_rounded,
                             size: 19,
-                            color: BuyV2Colors.muted,
+                            color: BuyV2Colors.navy,
                           ),
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            recent,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: BuyV2Colors.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Recent searches',
+                              style: context.buyBody.copyWith(
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            key: const ValueKey('buy-recent-searches-clear'),
+                            onPressed: () => session.clearRecentSearches(
+                              session.destination,
+                            ),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(44, 44),
+                            ),
+                            child: const Text('Clear'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  for (final (index, recent) in recentSearches.indexed) ...[
+                    Semantics(
+                      button: true,
+                      label: 'Search again for $recent',
+                      child: InkWell(
+                        key: ValueKey('buy-recent-search-$index'),
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          session.submitSearch(recent);
+                        },
+                        child: SizedBox(
+                          height: 44,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 30,
+                                  child: Icon(
+                                    Icons.history_rounded,
+                                    size: 19,
+                                    color: BuyV2Colors.muted,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    recent,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: BuyV2Colors.ink,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                const Icon(
+                                  Icons.north_west_rounded,
+                                  size: 17,
+                                  color: BuyV2Colors.muted,
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                        const Icon(
-                          Icons.north_west_rounded,
-                          size: 17,
-                          color: BuyV2Colors.muted,
-                        ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-            const Divider(height: 1, indent: 42, color: BuyV2Colors.line),
-          ],
-          if (recentSearches.isNotEmpty && suggestions.isNotEmpty)
-            const SizedBox(height: 4),
-          for (final (index, suggestion) in suggestions.indexed) ...[
-            Semantics(
-              button: true,
-              label: 'Search ${session.destination.label} for $suggestion',
-              child: InkWell(
-                key: ValueKey(
-                  'buy-search-suggestion-${session.destination.name}-$index',
-                ),
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  session.submitSearch(suggestion);
-                },
-                child: SizedBox(
-                  height: 44,
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                    child: Row(
-                      children: [
-                        const SizedBox(
-                          width: 30,
-                          child: Icon(
-                            Icons.search_rounded,
-                            size: 20,
-                            color: BuyV2Colors.muted,
-                          ),
+                    const Divider(
+                      height: 1,
+                      indent: 42,
+                      color: BuyV2Colors.line,
+                    ),
+                  ],
+                  if (recentSearches.isNotEmpty && suggestions.isNotEmpty)
+                    const SizedBox(height: 4),
+                  for (final (index, suggestion) in suggestions.indexed) ...[
+                    Semantics(
+                      button: true,
+                      label:
+                          'Search ${session.destination.label} for $suggestion',
+                      child: InkWell(
+                        key: ValueKey(
+                          'buy-search-suggestion-${session.destination.name}-$index',
                         ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            suggestion,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: BuyV2Colors.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          session.submitSearch(suggestion);
+                        },
+                        child: SizedBox(
+                          height: 44,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 6),
+                            child: Row(
+                              children: [
+                                const SizedBox(
+                                  width: 30,
+                                  child: Icon(
+                                    Icons.search_rounded,
+                                    size: 20,
+                                    color: BuyV2Colors.muted,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Expanded(
+                                  child: Text(
+                                    suggestion,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: BuyV2Colors.ink,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-              ),
-            ),
-            if (index != suggestions.length - 1)
-              const Divider(height: 1, indent: 42, color: BuyV2Colors.line),
-          ],
-        ],
+                    if (index != suggestions.length - 1)
+                      const Divider(
+                        height: 1,
+                        indent: 42,
+                        color: BuyV2Colors.line,
+                      ),
+                  ],
+                ]
+                .map((child) => BuyV2CartAvoidanceRegion(child: child))
+                .toList(growable: false),
       ),
     );
   }
@@ -2711,51 +2732,53 @@ class _SearchProductResults extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             child: ConstrainedBox(
               constraints: BoxConstraints(minHeight: centeredHeight),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(
-                    Icons.search_off_rounded,
-                    size: 38,
-                    color: BuyV2Colors.muted,
-                  ),
-                  const SizedBox(height: 9),
-                  Text(
-                    'No matches for “$query”',
-                    textAlign: TextAlign.center,
-                    style: context.buyTitle.copyWith(fontSize: 17),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Check the spelling or try a product, brand, seller or code.',
-                    textAlign: TextAlign.center,
-                    style: context.buyMeta,
-                  ),
-                  if (session.hasNarrowedProductSearchScope) ...[
-                    const SizedBox(height: 14),
-                    ConstrainedBox(
-                      constraints: const BoxConstraints(maxWidth: 280),
-                      child: SizedBox(
-                        width: double.infinity,
-                        height: 48,
-                        child: OutlinedButton.icon(
-                          key: ValueKey(
-                            'buy-search-all-${session.destination.name}',
-                          ),
-                          onPressed: session.broadenProductSearchScope,
-                          icon: const Icon(
-                            Icons.travel_explore_rounded,
-                            size: 20,
-                          ),
-                          label: Text(
-                            'Search all ${session.destination.label}',
+              child: BuyV2CartAvoidanceRegion(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(
+                      Icons.search_off_rounded,
+                      size: 38,
+                      color: BuyV2Colors.muted,
+                    ),
+                    const SizedBox(height: 9),
+                    Text(
+                      'No matches for “$query”',
+                      textAlign: TextAlign.center,
+                      style: context.buyTitle.copyWith(fontSize: 17),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Check the spelling or try a product, brand, seller or code.',
+                      textAlign: TextAlign.center,
+                      style: context.buyMeta,
+                    ),
+                    if (session.hasNarrowedProductSearchScope) ...[
+                      const SizedBox(height: 14),
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 280),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            key: ValueKey(
+                              'buy-search-all-${session.destination.name}',
+                            ),
+                            onPressed: session.broadenProductSearchScope,
+                            icon: const Icon(
+                              Icons.travel_explore_rounded,
+                              size: 20,
+                            ),
+                            label: Text(
+                              'Search all ${session.destination.label}',
+                            ),
                           ),
                         ),
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           );
@@ -2819,11 +2842,13 @@ class _CatalogueToolbar extends StatelessWidget {
     required this.session,
     required this.savedOnly,
     required this.onSaved,
+    this.onVisitProduct,
   });
 
   final BuyV2Session session;
   final bool savedOnly;
   final VoidCallback onSaved;
+  final BuyV2ProductVisit? onVisitProduct;
 
   @override
   Widget build(BuildContext context) {
@@ -2857,7 +2882,11 @@ class _CatalogueToolbar extends StatelessWidget {
             active: savedOnly,
             onTap: onSaved,
           );
-          final tools = _CatalogueToolsMenu(session: session, order: order);
+          final tools = _CatalogueToolsMenu(
+            session: session,
+            order: order,
+            onVisitProduct: onVisitProduct,
+          );
           return Container(
             key: const ValueKey('buy-catalogue-toolbar'),
             constraints: const BoxConstraints(minHeight: 60),
@@ -3926,7 +3955,12 @@ class _CatalogueChromeActionState extends State<_CatalogueChromeAction> {
 }
 
 class _CatalogueToolsMenu extends StatelessWidget {
-  const _CatalogueToolsMenu({required this.session, required this.order});
+  const _CatalogueToolsMenu({
+    required this.session,
+    required this.order,
+    this.onVisitProduct,
+  });
+  final BuyV2ProductVisit? onVisitProduct;
 
   final BuyV2Session session;
   final BuyV2Order? order;
@@ -3992,7 +4026,11 @@ class _CatalogueToolsMenu extends StatelessWidget {
                     ? 'Products you open will appear here'
                     : '$count ${count == 1 ? 'product' : 'products'} ready to revisit';
               }(),
-              onTap: () => showBuyV2RecentlyViewed(context, session),
+              onTap: () => showBuyV2RecentlyViewed(
+                context,
+                session,
+                onVisitProduct: onVisitProduct,
+              ),
             ),
           if (session.destination == BuyV2Destination.shop ||
               session.destination == BuyV2Destination.wholesale)
@@ -4001,7 +4039,11 @@ class _CatalogueToolsMenu extends StatelessWidget {
               icon: Icons.tune_rounded,
               title: 'Shopping settings',
               detail: 'Delivery, payments, alerts and saved activity',
-              onTap: () => showBuyV2ShoppingSettings(context, session),
+              onTap: () => showBuyV2ShoppingSettings(
+                context,
+                session,
+                onVisitProduct: onVisitProduct,
+              ),
             ),
           if (session.destination == BuyV2Destination.medicine)
             BuyV2FilterSheetAction(
@@ -4081,8 +4123,9 @@ List<(String, String)> _filterOptionsFor(BuyV2Destination destination) =>
 
 Future<void> showBuyV2ShoppingSettings(
   BuildContext context,
-  BuyV2Session session,
-) async {
+  BuyV2Session session, {
+  BuyV2ProductVisit? onVisitProduct,
+}) async {
   final selectedProductId = await showModalBottomSheet<String>(
     context: context,
     useSafeArea: true,
@@ -4101,6 +4144,7 @@ Future<void> showBuyV2ShoppingSettings(
           showBuyV2SavedProducts(
             sheetContext,
             session,
+            onVisitProduct: onVisitProduct,
             onOpenProduct: (productId) {
               if (sheetContext.mounted) {
                 Navigator.of(sheetContext).pop(productId);
@@ -4114,6 +4158,7 @@ Future<void> showBuyV2ShoppingSettings(
           showBuyV2RecentlyViewed(
             sheetContext,
             session,
+            onVisitProduct: onVisitProduct,
             onOpenProduct: (productId) {
               if (sheetContext.mounted) {
                 Navigator.of(sheetContext).pop(productId);
@@ -4741,6 +4786,7 @@ Future<void> showBuyV2SavedProducts(
   BuildContext context,
   BuyV2Session session, {
   ValueChanged<String>? onOpenProduct,
+  BuyV2ProductVisit? onVisitProduct,
 }) async {
   final destination = session.destination;
   final selectedProductId = await showModalBottomSheet<String>(
@@ -4758,7 +4804,15 @@ Future<void> showBuyV2SavedProducts(
       session: session,
       destination: destination,
       onClose: () => Navigator.of(sheetContext).pop(),
-      onOpenProduct: (productId) => Navigator.of(sheetContext).pop(productId),
+      onOpenProduct: (productId) {
+        if (onVisitProduct != null) {
+          unawaited(
+            onVisitProduct(session.product(productId), 'Saved products'),
+          );
+        } else {
+          Navigator.of(sheetContext).pop(productId);
+        }
+      },
     ),
   );
   if (selectedProductId != null) {
@@ -4774,6 +4828,7 @@ Future<void> showBuyV2RecentlyViewed(
   BuildContext context,
   BuyV2Session session, {
   ValueChanged<String>? onOpenProduct,
+  BuyV2ProductVisit? onVisitProduct,
 }) async {
   final destination = session.destination;
   final selectedProductId = await showModalBottomSheet<String>(
@@ -4791,7 +4846,15 @@ Future<void> showBuyV2RecentlyViewed(
       session: session,
       destination: destination,
       onClose: () => Navigator.of(sheetContext).pop(),
-      onOpenProduct: (productId) => Navigator.of(sheetContext).pop(productId),
+      onOpenProduct: (productId) {
+        if (onVisitProduct != null) {
+          unawaited(
+            onVisitProduct(session.product(productId), 'Recently viewed'),
+          );
+        } else {
+          Navigator.of(sheetContext).pop(productId);
+        }
+      },
       onClear: () => _confirmClearBuyV2RecentlyViewed(sheetContext, session),
     ),
   );
@@ -7717,90 +7780,93 @@ class _SavedDecisionShelf extends StatelessWidget {
       ),
     );
 
-    return Semantics(
-      key: const ValueKey('buy-saved-decision-shelf'),
-      container: true,
-      label: '$savedTitle. ${products.length} $productLabel.',
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(8, 4, 8, 2),
-        padding: const EdgeInsets.fromLTRB(9, 7, 9, 5),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: BuyV2Colors.line),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  width: 30,
-                  height: 30,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: BuyV2ThemeScope.of(context).softAccent,
-                    borderRadius: BorderRadius.circular(9),
+    return BuyV2CartAvoidanceRegion(
+      child: Semantics(
+        key: const ValueKey('buy-saved-decision-shelf'),
+        container: true,
+        label: '$savedTitle. ${products.length} $productLabel.',
+        child: Container(
+          margin: const EdgeInsets.fromLTRB(8, 4, 8, 2),
+          padding: const EdgeInsets.fromLTRB(9, 7, 9, 5),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: BuyV2Colors.line),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: BuyV2ThemeScope.of(context).softAccent,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(
+                      Icons.bookmarks_rounded,
+                      color: BuyV2Colors.navy,
+                      size: 17,
+                    ),
                   ),
-                  child: const Icon(
-                    Icons.bookmarks_rounded,
-                    color: BuyV2Colors.navy,
-                    size: 17,
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        savedTitle,
-                        style: const TextStyle(
-                          color: BuyV2Colors.ink,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w900,
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          savedTitle,
+                          style: const TextStyle(
+                            color: BuyV2Colors.ink,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
                         ),
-                      ),
-                      Text(
-                        '${products.length} $productLabel · ready for Cart',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: context.buyMeta.copyWith(fontSize: 8),
-                      ),
-                    ],
+                        Text(
+                          '${products.length} $productLabel · ready for Cart',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: context.buyMeta.copyWith(fontSize: 8),
+                        ),
+                      ],
+                    ),
+                  ),
+                  if (!expandedHeader) clearAction,
+                ],
+              ),
+              if (expandedHeader)
+                Align(alignment: Alignment.centerRight, child: clearAction),
+              if (hasPrescriptionGate) ...[
+                const SizedBox(height: 4),
+                Text(
+                  'A prescription medicine stays Saved until its prescription '
+                  'is linked.',
+                  style: context.buyMeta.copyWith(
+                    color: BuyV2Colors.navy,
+                    fontWeight: FontWeight.w800,
                   ),
                 ),
-                if (!expandedHeader) clearAction,
               ],
-            ),
-            if (expandedHeader)
-              Align(alignment: Alignment.centerRight, child: clearAction),
-            if (hasPrescriptionGate) ...[
-              const SizedBox(height: 4),
-              Text(
-                'A prescription medicine stays Saved until its prescription '
-                'is linked.',
-                style: context.buyMeta.copyWith(
-                  color: BuyV2Colors.navy,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
-            ],
-            if (hasPrescriptionGate) ...[
-              Align(
-                alignment: Alignment.centerLeft,
-                child: TextButton.icon(
-                  key: const ValueKey('buy-saved-review-prescription'),
-                  onPressed: () => showBuyV2PrescriptionSheet(context, session),
-                  icon: const Icon(
-                    Icons.medical_information_outlined,
-                    size: 17,
+              if (hasPrescriptionGate) ...[
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    key: const ValueKey('buy-saved-review-prescription'),
+                    onPressed: () =>
+                        showBuyV2PrescriptionSheet(context, session),
+                    icon: const Icon(
+                      Icons.medical_information_outlined,
+                      size: 17,
+                    ),
+                    label: const Text('Review prescription'),
                   ),
-                  label: const Text('Review prescription'),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -8258,10 +8324,29 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
         )..layout(maxWidth: (cardWidth - 36).clamp(1.0, double.infinity));
         // Long pharmacy identity and delivery text needs space beyond a
         // two-line promise, without shrinking the image or clipping actions.
-        final extra = (measure.height - measure.preferredLineHeight * 2)
+        final promiseExtra = (measure.height - measure.preferredLineHeight * 2)
             .clamp(0.0, double.infinity)
             .ceilToDouble();
+        final title = TextPainter(
+          text: TextSpan(
+            text: product.title,
+            style: DefaultTextStyle.of(context).style.merge(
+              const TextStyle(
+                fontSize: 10,
+                height: 1.05,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout(maxWidth: (cardWidth - 14).clamp(1.0, double.infinity));
+        final titleExtra = (title.height - title.preferredLineHeight * 3)
+            .clamp(0.0, double.infinity)
+            .ceilToDouble();
+        final extra = promiseExtra + titleExtra;
         if (extra > medicalPromiseReserve) medicalPromiseReserve = extra;
+        title.dispose();
         measure.dispose();
       }
     }
@@ -9571,7 +9656,14 @@ class BuyV2ProductCard extends StatelessWidget {
                               ],
                               Text(
                                 product.title,
-                                maxLines: compact ? 3 : 2,
+                                maxLines:
+                                    compact &&
+                                        product.destination ==
+                                            BuyV2Destination.medicine
+                                    ? null
+                                    : compact
+                                    ? 3
+                                    : 2,
                                 overflow: compact
                                     ? TextOverflow.clip
                                     : TextOverflow.ellipsis,

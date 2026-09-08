@@ -156,10 +156,18 @@ void main() {
         );
         expect(
           find.descendant(
-            of: destination == BuyV2Destination.shop ? actionOwner : panel,
+            of: actionOwner,
             matching: find.text(buyV2Money(product.price)),
           ),
           findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: panel,
+            matching: find.text(buyV2Money(product.price)),
+          ),
+          findsNothing,
+          reason: 'The adjacent purchase hero owns the price once.',
         );
         expect(
           find.descendant(

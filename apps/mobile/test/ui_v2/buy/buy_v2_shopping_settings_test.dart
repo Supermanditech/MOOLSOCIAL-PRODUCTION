@@ -34,6 +34,86 @@ void main() {
 
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final collection in ['saved', 'recently-viewed']) {
+    testWidgets(
+      'R665 O02 $collection product returns through retained settings',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 711);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.openProduct('s-tomato');
+        session.closeProduct();
+        session.toggleSaved('s-tomato');
+        session.addProduct('w-notebook');
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: const TextScaler.linear(2)),
+              child: child!,
+            ),
+            home: BuyV2Screen(session: session),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+        await tester.pumpAndSettle();
+        await expandTools(tester);
+        final settingsAction = find.byKey(
+          const ValueKey('buy-shopping-settings-button'),
+        );
+        await tester.ensureVisible(settingsAction);
+        await tester.pumpAndSettle();
+        await tester.tap(settingsAction);
+        await tester.pumpAndSettle();
+        final entry = find.byKey(ValueKey('buy-settings-$collection'));
+        await tester.ensureVisible(entry);
+        await tester.pumpAndSettle();
+        final position = Scrollable.of(tester.element(entry)).position;
+        final offset = position.pixels;
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+        final open = find.byKey(
+          ValueKey(
+            collection == 'saved'
+                ? 'buy-saved-s-tomato'
+                : 'buy-settings-recently-viewed-product-s-tomato',
+          ),
+        );
+        await tester.ensureVisible(open);
+        await tester.pumpAndSettle();
+        await tester.tap(open);
+        await tester.pumpAndSettle();
+        final label = collection == 'saved'
+            ? 'Saved products'
+            : 'Recently viewed';
+        expect(session.selectedProductId, 's-tomato');
+        expect(session.view, BuyV2View.product);
+        expect(find.text('Back to $label'), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(open.hitTestable(), findsOneWidget);
+        expect(session.view, BuyV2View.catalogue);
+        await tester.tap(find.byKey(ValueKey('buy-info-sheet-close-$label')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-shopping-settings')),
+          findsOneWidget,
+        );
+        expect(position.pixels, offset);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(session.isSaved('s-tomato'), isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   void expectCollectionText(WidgetTester tester, Finder owner) {
     final bounds = tester.getRect(owner);
     for (final paragraph in tester.renderObjectList<RenderParagraph>(

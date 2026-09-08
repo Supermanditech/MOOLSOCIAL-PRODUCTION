@@ -134,6 +134,92 @@ void main() {
     );
   }
 
+  for (final id in ['w-oil', 'm-paracetamol-500']) {
+    testWidgets('R665 O04 one purchase summary retains distinct facts $id', (
+      tester,
+    ) async {
+      const size = Size(320, 844);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = session.product(id);
+      session.openProduct(id);
+      await tester.pumpWidget(app(session, size: size, textScale: 2));
+      await tester.pumpAndSettle();
+      final hero = find.byKey(ValueKey('buy-product-purchase-hero-$id'));
+      expect(
+        find.descendant(
+          of: hero,
+          matching: find.text(buyV2Money(product.price)),
+        ),
+        findsOneWidget,
+      );
+      final scroll = find
+          .descendant(
+            of: find.byKey(PageStorageKey('buy-product-$id')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      if (product.destination == BuyV2Destination.wholesale) {
+        expect(
+          find.descendant(
+            of: hero,
+            matching: find.byKey(ValueKey('buy-wholesale-price-summary-$id')),
+          ),
+          findsOneWidget,
+        );
+        final details = find.byKey(ValueKey('buy-automatic-fulfilment-$id'));
+        await tester.scrollUntilVisible(details, 180, scrollable: scroll);
+        await tester.pumpAndSettle();
+        for (final label in [
+          'Freight',
+          'Tax invoice',
+          'Seller',
+          'Delivery mode',
+        ]) {
+          expect(
+            find.descendant(of: details, matching: find.text(label)),
+            findsOneWidget,
+          );
+        }
+        for (final repeated in [
+          'Unit economics',
+          'Trade pack',
+          'Minimum total',
+          'Stock',
+          'Availability',
+          'Delivery',
+        ]) {
+          expect(
+            find.descendant(of: details, matching: find.text(repeated)),
+            findsNothing,
+          );
+        }
+      } else {
+        expect(
+          find.descendant(
+            of: hero,
+            matching: find.byKey(ValueKey('buy-product-action-delivery-$id')),
+          ),
+          findsNothing,
+        );
+        await tester.scrollUntilVisible(
+          find.text('Pharmacy and fulfilment'),
+          160,
+          scrollable: scroll,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Delivery path'), findsOneWidget);
+        expect(find.text('Price checked'), findsOneWidget);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets(
     'R66 003 retains distinct content delivery compliance and protection facts',
     (tester) async {

@@ -58,6 +58,80 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final viewport in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scope in BuyV2CartScope.values) {
+      testWidgets(
+        'R665 D01 Cart confirmation stays reachable text2 $viewport $scope',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = viewport;
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          for (final destination in [
+            BuyV2Destination.shop,
+            BuyV2Destination.wholesale,
+            BuyV2Destination.medicine,
+          ]) {
+            session.addProduct(productFor(destination).id);
+          }
+          session.openCart(scope: scope);
+          final totalBefore = session.itemCount;
+          final removedCount = session.scopedItemCount;
+          expect(removedCount, greaterThan(0));
+          await tester.pumpWidget(app(session, textScale: 2));
+          await tester.pumpAndSettle();
+          session.openCart(scope: scope);
+          await tester.pumpAndSettle();
+          final open = find.byKey(const ValueKey('buy-cart-empty'));
+          await tester.ensureVisible(open);
+          await tester.tap(open);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          final keep = find.byKey(const ValueKey('buy-cart-clear-cancel'));
+          final remove = find.byKey(const ValueKey('buy-cart-clear-confirm'));
+          await tester.ensureVisible(keep);
+          await tester.pumpAndSettle();
+          expect(keep.hitTestable(), findsOneWidget);
+          await tester.tap(keep);
+          await tester.pumpAndSettle();
+          expect(session.itemCount, totalBefore);
+          expect(session.cartScope, scope);
+          await tester.tap(open);
+          await tester.pumpAndSettle();
+          tester.view.viewInsets = const FakeViewPadding(bottom: 100);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(remove).bottom,
+            lessThanOrEqualTo(viewport.height - 100 - 24),
+          );
+          expect(tester.takeException(), isNull);
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(remove);
+          await tester.pumpAndSettle();
+          expect(remove.hitTestable(), findsOneWidget);
+          final button = tester.getRect(remove);
+          expect(button.top, greaterThanOrEqualTo(24));
+          expect(button.bottom, lessThanOrEqualTo(viewport.height - 24));
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(session.itemCount, totalBefore - removedCount);
+          expect(
+            find.byKey(const ValueKey('buy-cart-clear-sheet')),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final scale in [1.0, 2.0]) {
     for (final reduced in [false, true]) {
       testWidgets(

@@ -3430,6 +3430,85 @@ void main() {
     expect(find.text('Buy now'), findsNothing);
   });
 
+  for (final viewport in [const Size(320, 711), const Size(711, 320)]) {
+    testWidgets(
+      'R665 D04 enlarged report actions fit safe viewport $viewport',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = viewport;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          app(
+            session,
+            textScale: 2,
+            safePadding: const EdgeInsets.only(top: 24, bottom: 24),
+          ),
+        );
+        await tester.pumpAndSettle();
+        const productId = 's-tomato';
+        session.openProduct(productId);
+        await tester.pumpAndSettle();
+        final report = find.byKey(
+          const ValueKey('buy-report-product-s-tomato'),
+        );
+        await tester.scrollUntilVisible(
+          report,
+          250,
+          scrollable: scrollableWithin(
+            const PageStorageKey('buy-product-s-tomato'),
+          ),
+          maxScrolls: 50,
+        );
+        await tester.ensureVisible(report);
+        await tester.pumpAndSettle();
+        await tester.tap(report);
+        await tester.pumpAndSettle();
+        final cancel = find.byKey(const ValueKey('buy-cancel-product-report'));
+        final send = find.byKey(const ValueKey('buy-submit-report-s-tomato'));
+        for (final keyboard in [0.0, 100.0, 0.0]) {
+          tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          expect(cancel.hitTestable(), findsOneWidget);
+          expect(tester.widget<FilledButton>(send).onPressed, isNull);
+          for (final action in [cancel, send]) {
+            final rect = tester.getRect(action);
+            expect(rect.top, greaterThanOrEqualTo(24));
+            expect(
+              rect.bottom,
+              lessThanOrEqualTo(viewport.height - keyboard - 24),
+            );
+            for (final paragraph in tester.renderObjectList<RenderParagraph>(
+              find.descendant(of: action, matching: find.byType(RichText)),
+            )) {
+              final text = TextPainter(
+                text: paragraph.text,
+                textDirection: paragraph.textDirection,
+                textScaler: paragraph.textScaler,
+              )..layout(maxWidth: paragraph.size.width);
+              expect(
+                paragraph.size.height,
+                greaterThanOrEqualTo(text.height - .1),
+              );
+              text.dispose();
+            }
+          }
+        }
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        expect(session.hasReportedProduct(productId), isFalse);
+        expect(session.selectedProduct?.id, productId);
+        expect(session.view, BuyV2View.product);
+        expect(report.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'product detail uses automatic fulfilment reviews and reporting',
     (tester) async {
@@ -6869,7 +6948,10 @@ void main() {
             expect(
               tester.renderObject<RenderParagraph>(eta).text.toPlainText(),
               contains(
-                RegExp(r'day|min|dispatch|delivery', caseSensitive: false),
+                RegExp(
+                  r'day|min|dispatch|delivery|at checkout',
+                  caseSensitive: false,
+                ),
               ),
             );
             await tester.scrollUntilVisible(eta, 60, scrollable: scrollable);
@@ -8813,7 +8895,8 @@ void main() {
       expect(tester.getTopLeft(shopThumb).dx, greaterThan(quickThumbLeft));
       expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsNothing);
       expect(find.byKey(const ValueKey('buy-product-s-atta')), findsOneWidget);
-      expect(find.textContaining('Delivery today'), findsWidgets);
+      expect(find.textContaining('Delivery today'), findsNothing);
+      expect(find.textContaining('At checkout'), findsWidgets);
 
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
       await tester.pumpAndSettle();
