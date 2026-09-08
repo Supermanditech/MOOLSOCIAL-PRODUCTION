@@ -14,7 +14,10 @@ import android.os.ParcelFileDescriptor
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodChannel
 import java.io.ByteArrayOutputStream
+import java.io.DataOutputStream
 import java.io.File
+import java.io.InputStream
+import java.io.OutputStream
 import java.util.concurrent.Executors
 
 /** Local, single-page bridge. File names, paths, URLs and credentials are never accepted. */
@@ -202,15 +205,7 @@ class WorkDocumentPreviewBridge(
         io.execute {
             try {
                 val bytes = ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { stream ->
-                    val buffer = ByteArray(32 * 1024)
-                    val collected = ByteArrayOutputStream()
-                    while (true) {
-                        val read = stream.read(buffer)
-                        if (read < 0) break
-                        check(collected.size() + read <= MAX_BYTES)
-                        collected.write(buffer, 0, read)
-                    }
-                    collected.toByteArray()
+                    WorkDocumentPageFrame.read(stream)
                 }
                 check(bytes.size >= 24 && bytes.copyOfRange(0, 8).contentEquals(PNG_HEADER))
                 main.post {
@@ -281,5 +276,54 @@ class WorkDocumentPreviewBridge(
     companion object {
         private const val MAX_BYTES = 10 * 1024 * 1024
         private val PNG_HEADER = byteArrayOf(137.toByte(), 80, 78, 71, 13, 10, 26, 10)
+    }
+}
+
+/** One bounded page per pipe; completion must not wait for every Binder FD copy to close. */
+internal object WorkDocumentPageFrame {
+    const val MAX_BYTES = 10 * 1024 * 1024
+
+    fun encode(producer: (OutputStream) -> Unit): ByteArray {
+        val collected = object : ByteArrayOutputStream() {
+            override fun write(value: Int) {
+                check(count < MAX_BYTES)
+                super.write(value)
+            }
+
+            override fun write(bytes: ByteArray, offset: Int, length: Int) {
+                require(offset >= 0 && length >= 0 && offset <= bytes.size - length)
+                check(length <= MAX_BYTES - count)
+                super.write(bytes, offset, length)
+            }
+        }
+        producer(collected)
+        return collected.toByteArray().also { require(it.size in 24..MAX_BYTES) }
+    }
+
+    fun write(stream: OutputStream, bytes: ByteArray) {
+        require(bytes.size in 24..MAX_BYTES)
+        val output = DataOutputStream(stream)
+        output.writeInt(bytes.size)
+        output.write(bytes)
+        output.flush()
+    }
+
+    fun read(stream: InputStream): ByteArray {
+        var length = 0
+        repeat(4) {
+            val value = stream.read()
+            check(value >= 0)
+            length = (length shl 8) or value
+        }
+        require(length in 24..MAX_BYTES)
+        val buffer = ByteArray(minOf(length, 32 * 1024))
+        val collected = ByteArrayOutputStream(minOf(length, 32 * 1024))
+        while (collected.size() < length) {
+            val read = stream.read(buffer, 0, minOf(buffer.size, length - collected.size()))
+            check(read > 0)
+            check(collected.size() + read <= MAX_BYTES)
+            collected.write(buffer, 0, read)
+        }
+        return collected.toByteArray()
     }
 }

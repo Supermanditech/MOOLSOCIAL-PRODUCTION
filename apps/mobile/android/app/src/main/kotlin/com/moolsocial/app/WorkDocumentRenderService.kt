@@ -58,8 +58,11 @@ class WorkDocumentRenderService : Service() {
                     try {
                         bitmap.eraseColor(Color.WHITE)
                         page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
-                        ParcelFileDescriptor.AutoCloseOutputStream(output).use { stream ->
+                        val png = WorkDocumentPageFrame.encode { stream ->
                             check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream))
+                        }
+                        ParcelFileDescriptor.AutoCloseOutputStream(output).use { stream ->
+                            WorkDocumentPageFrame.write(stream, png)
                         }
                         response.putInt("page", index)
                         response.putInt("pages", document.pageCount)
