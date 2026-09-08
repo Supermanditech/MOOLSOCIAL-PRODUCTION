@@ -55,9 +55,7 @@ void main() {
           find.descendant(
             of: hero,
             matching: find.textContaining(
-              product.destination == BuyV2Destination.wholesale
-                  ? 'Tomorrow'
-                  : '7:30',
+              'Delivery time confirmed at checkout',
             ),
           ),
           findsOneWidget,
