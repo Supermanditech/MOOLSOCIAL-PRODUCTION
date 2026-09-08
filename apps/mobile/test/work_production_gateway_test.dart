@@ -881,6 +881,57 @@ void main() {
     ..declarationAccepted = true;
 
   test(
+    'R669 correction cue tracks actual changes until acknowledgement',
+    () async {
+      final gateway = ReviewWorkGateway();
+      final work = application(gateway: gateway);
+      addTearDown(work.dispose);
+      expect(await work.submitProfile(), isTrue);
+      final original = work.submittedProfile!;
+      work.reviewReason = 'Please confirm your business details.';
+      expect(work.beginReviewCorrection(), isTrue);
+      expect(work.hasUnsubmittedReviewChanges, isFalse);
+      final changes = <VoidCallback>[
+        () => work.workName = 'Corrected Stores',
+        () => work.authorizedPersonName = 'Another representative',
+        () => work.businessRelationship = 'Manager',
+        () => work.workArea = 'Jodhpur',
+        () => work.primaryActivity = 'Household essentials',
+        () => work.primaryMobile = '9123456780',
+        () => work.contactEmail = 'changed@example.com',
+        () => work.alternateMobile = '9123456780',
+        () => work.addedProofs['shop-front'] = 'replacement-proof',
+      ];
+      for (final change in changes) {
+        change();
+        expect(work.hasUnsubmittedReviewChanges, isTrue);
+        expect(work.submittedProfile, same(original));
+        work.workName = original.name;
+        work.authorizedPersonName = original.authorizedPersonName;
+        work.businessRelationship = original.businessRelationship;
+        work.workArea = original.area;
+        work.primaryActivity = original.primaryActivity;
+        work.primaryMobile = original.primaryMobile;
+        work.contactEmail = original.email;
+        work.alternateMobile = original.alternateMobile;
+        work.addedProofs
+          ..clear()
+          ..addAll(original.proofReferences);
+        expect(work.hasUnsubmittedReviewChanges, isFalse);
+      }
+      work.workName = 'Corrected Stores';
+      work.declarationAccepted = true;
+      gateway.failSubmission = true;
+      expect(await work.submitProfile(), isFalse);
+      expect(work.hasUnsubmittedReviewChanges, isTrue);
+      expect(work.submittedProfile, same(original));
+      expect(await work.submitProfile(), isTrue);
+      expect(work.hasUnsubmittedReviewChanges, isFalse);
+      expect(work.submittedProfile!.name, 'Corrected Stores');
+    },
+  );
+
+  test(
     'S07 device review defaults pending without changing ordinary fixtures',
     () {
       const deviceReview =

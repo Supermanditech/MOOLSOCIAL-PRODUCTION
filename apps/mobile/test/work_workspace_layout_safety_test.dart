@@ -3515,6 +3515,95 @@ void main() {
   ]) {
     for (final channel in WorkContactChannel.values) {
       testWidgets(
+        'R669 contact edit reveals input and actions $channel ${display.scale}',
+        (tester) async {
+          final gateway = ReviewWorkGateway();
+          final work = WorkSession(gateway: gateway)
+            ..selectProfile('retailer-grocery')
+            ..authorizedPersonName = 'Asha Sharma'
+            ..primaryMobile = '9829012321'
+            ..primaryMobileVerified = true
+            ..contactEmail = 'asha@example.com'
+            ..contactEmailVerified = true
+            ..alternateMobile = '9876543210'
+            ..alternateVerified = true;
+          final key = switch (channel) {
+            WorkContactChannel.primaryMobile => 'work-primary-contact',
+            WorkContactChannel.email => 'work-contact-email',
+            WorkContactChannel.alternateMobile => 'work-alternate-contact',
+          };
+          final original = work.workspaceContactValue(channel);
+          await mount(
+            tester,
+            route: '/app/work/workspace/contact',
+            work: work,
+            viewport: Size(display.width, display.height),
+            textScale: display.scale,
+          );
+          final change = find.byKey(Key('$key-change'));
+          await reveal(tester, change);
+          await tester.tap(change);
+          await tester.pumpAndSettle();
+          tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+          await tester.pumpAndSettle();
+          final field = find.byKey(Key('$key-field'));
+          final input = find.descendant(
+            of: field,
+            matching: find.byType(EditableText),
+          );
+          final cancel = find.byKey(Key('$key-cancel'));
+          expect(input, findsOneWidget);
+          expect(cancel.hitTestable(), findsOneWidget);
+          expect(tester.getRect(input).top, greaterThanOrEqualTo(56));
+          expect(
+            tester.getRect(input).bottom,
+            lessThanOrEqualTo(display.height - 240),
+          );
+          expect(
+            tester.getRect(cancel).bottom,
+            lessThanOrEqualTo(display.height - 240),
+          );
+          final value = channel == WorkContactChannel.email
+              ? 'updated@example.com'
+              : '9123456780';
+          await tester.enterText(field, value);
+          await tester.pumpAndSettle();
+          final send = find.byKey(Key('$key-send-otp'));
+          expect(cancel.hitTestable(), findsOneWidget);
+          expect(send.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(send).bottom,
+            lessThanOrEqualTo(display.height - 240),
+          );
+          expect(tester.getRect(input).top, greaterThanOrEqualTo(56));
+          expect(
+            tester.getRect(input).bottom,
+            lessThanOrEqualTo(display.height - 240),
+          );
+          expect(
+            tester.widget<TextField>(field).controller!.selection.baseOffset,
+            value.length,
+          );
+          expect(work.workspaceContactVerified(channel), isFalse);
+          expect(gateway.otpCalls, 0);
+          if (display.scale > 1) {
+            final label = find.byKey(Key('$key-label'));
+            expect(tester.getRect(label).top, greaterThanOrEqualTo(56));
+          }
+          await captureStoreView(
+            tester,
+            'r669-contact-edit-${channel.name}-${display.scale}',
+          );
+          await tester.tap(cancel);
+          await tester.pumpAndSettle();
+          expect(work.workspaceContactValue(channel), original);
+          expect(work.workspaceContactVerified(channel), isTrue);
+          expect(gateway.otpCalls, 0);
+          expect(tester.takeException(), isNull);
+        },
+      );
+
+      testWidgets(
         'S03 contact replacement Cancel keyboard and return $channel ${display.width} ${display.scale}',
         (tester) async {
           final work = WorkSession()
@@ -3681,6 +3770,99 @@ void main() {
     (width: 320.0, height: 568.0, scale: 1.4),
     (width: 320.0, height: 568.0, scale: 2.0),
   ]) {
+    testWidgets(
+      'R669 details validation remains visible ${display.width} ${display.scale}',
+      (tester) async {
+        final work = WorkSession()
+          ..selectProfile('retailer-grocery')
+          ..saveDetails(name: '', area: '', activity: '')
+          ..authorizedPersonName = 'Asha Sharma'
+          ..primaryMobile = '9829012321'
+          ..contactEmail = 'asha@example.com'
+          ..primaryMobileVerified = true
+          ..contactEmailVerified = true;
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        await tester.tap(find.byKey(const Key('work-details-continue')));
+        await tester.pumpAndSettle();
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+        await tester.pumpAndSettle();
+        final name = find.byKey(const Key('work-name'));
+        expect(find.byKey(const Key('work-details-continue')), findsNothing);
+        final area = find.byKey(const Key('work-area'));
+        expect(tester.widget<TextField>(name).focusNode!.hasFocus, isTrue);
+        await tester.enterText(name, 'Mahadev Traders');
+        await tester.pumpAndSettle();
+        await tester.testTextInput.receiveAction(TextInputAction.next);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(area).focusNode!.hasFocus, isTrue);
+        await tester.enterText(area, '30200');
+        await tester.pumpAndSettle();
+        final error = find.text(work.detailsAreaError!);
+        final input = find.descendant(
+          of: area,
+          matching: find.byType(EditableText),
+        );
+        final viewport = tester.getRect(
+          find.byKey(const Key('work-proof-screen')),
+        );
+        expect(error, findsOneWidget);
+        final label = find.byKey(const Key('work-area-full-label'));
+        if (label.evaluate().isNotEmpty) {
+          expect(tester.getRect(label).top, greaterThanOrEqualTo(viewport.top));
+        }
+        await captureStoreView(
+          tester,
+          'r669-details-pin-error-${display.scale}',
+        );
+        expect(tester.getRect(error).top, greaterThanOrEqualTo(viewport.top));
+        expect(
+          tester.getRect(error).bottom,
+          lessThanOrEqualTo(viewport.bottom),
+        );
+        expect(tester.getRect(input).top, greaterThanOrEqualTo(viewport.top));
+        expect(
+          tester.getRect(input).bottom,
+          lessThanOrEqualTo(viewport.bottom),
+        );
+        expect(
+          tester.widget<TextField>(area).controller!.selection.baseOffset,
+          5,
+        );
+        await tester.enterText(area, '302001');
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(area).decoration!.errorText, isNull);
+        expect(tester.widget<TextField>(area).focusNode!.hasFocus, isTrue);
+        expect(
+          tester.widget<TextField>(area).controller!.selection.baseOffset,
+          6,
+        );
+        expect(work.reviewCaseId, isNull);
+        await tester.testTextInput.receiveAction(TextInputAction.next);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('work-activity')))
+              .focusNode!
+              .hasFocus,
+          isTrue,
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        tester.view.viewInsets = FakeViewPadding.zero;
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-details-continue')).hitTestable(),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets(
       'OPPO S04 details local errors focus and progress ${display.width} ${display.scale}',
       (tester) async {
@@ -5109,6 +5291,162 @@ void main() {
         },
       );
     }
+    testWidgets(
+      'R669 document feedback stays with its document ${display.width} ${display.scale}',
+      (tester) async {
+        final gateway = ReviewWorkGateway()..failProof = true;
+        final work = WorkSession(gateway: gateway)
+          ..selectProfile('retailer-grocery')
+          ..recoveredDocumentStep = true
+          ..saveDetails(
+            name: 'Mahadev Traders',
+            area: 'Jaipur',
+            activity: 'Groceries',
+          )
+          ..authorizedPersonName = 'Asha Sharma'
+          ..primaryMobile = '9829012321'
+          ..contactEmail = 'asha@example.com'
+          ..primaryMobileVerified = true
+          ..contactEmailVerified = true;
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        final beforeTop = tester
+            .getRect(find.byKey(const Key('work-proof-screen')))
+            .top;
+        Future<void> tap(String key) async {
+          final action = find.byKey(Key(key));
+          await reveal(tester, action);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+        }
+
+        await tap('work-add-proof-shop-front');
+        await tap('work-proof-source-upload');
+        expect(
+          find.text(
+            'Document not added. Choose the same file or another option and try again.',
+          ),
+          findsOneWidget,
+        );
+        expect(work.addedProofs, isEmpty);
+        await tap('work-proof-source-upload');
+        expect(work.addedProofs.containsKey('shop-front'), isTrue);
+        expect(work.noticeMessage, isNull);
+        expect(find.byKey(const Key('work-notice')), findsNothing);
+        expect(
+          tester.getRect(find.byKey(const Key('work-proof-screen'))).top,
+          beforeTop,
+        );
+        final view = find.byKey(const Key('work-view-proof-shop-front'));
+        await captureStoreView(
+          tester,
+          'r669-document-attached-${display.scale}',
+        );
+        await reveal(tester, view);
+        expect(view.hitTestable(), findsOneWidget);
+        await tap('work-view-proof-shop-front');
+        expect(find.byKey(const Key('work-document-preview')), findsOneWidget);
+        expect(find.byKey(const Key('work-notice')), findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.addedProofs.containsKey('shop-front'), isTrue);
+        expect(
+          tester.getRect(find.byKey(const Key('work-proof-screen'))).top,
+          beforeTop,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'R669 unsent clarification preserves submitted information ${display.width} ${display.scale}',
+      (tester) async {
+        final gateway = ReviewWorkGateway()
+          ..reviewResultStatus = WorkRemoteReviewStatus.pending
+          ..reviewResultReason = 'Please confirm the business name.';
+        final work = WorkSession(gateway: gateway)
+          ..selectProfile('retailer-grocery')
+          ..saveDetails(
+            name: 'Mahadev Traders',
+            area: 'Jaipur',
+            activity: 'Groceries',
+          )
+          ..authorizedPersonName = 'Asha Sharma'
+          ..businessRelationship = 'Owner'
+          ..primaryMobile = '9829012321'
+          ..contactEmail = 'asha@example.com'
+          ..primaryMobileVerified = true
+          ..contactEmailVerified = true
+          ..declarationAccepted = true;
+        expect(await tester.runAsync(work.submitProfile), isTrue);
+        await tester.runAsync(work.checkReview);
+        final submitted = work.submittedProfile;
+        final caseId = work.reviewCaseId;
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        Future<void> tap(String key) async {
+          final action = find.byKey(Key(key));
+          await reveal(tester, action);
+          expect(action.hitTestable(), findsOneWidget);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+        }
+
+        expect(
+          find.byKey(const Key('work-review-unsent-changes')),
+          findsNothing,
+        );
+        await tap('work-inline-update-details');
+        await tap('work-back');
+        expect(
+          find.byKey(const Key('work-review-unsent-changes')),
+          findsNothing,
+        );
+        await tap('work-inline-update-details');
+        final name = find.byKey(const Key('work-name'));
+        await reveal(tester, name);
+        await tester.enterText(name, 'Mahadev Retail');
+        await tap('work-back');
+        final cue = find.byKey(const Key('work-review-unsent-changes'));
+        await reveal(tester, cue);
+        expect(cue, findsOneWidget);
+        expect(work.submittedProfile, same(submitted));
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('work-submitted-summary')),
+            matching: find.text('Mahadev Traders'),
+          ),
+          findsOneWidget,
+        );
+        expect(work.reviewCaseId, caseId);
+        expect(gateway.submissionCalls, 1);
+        await captureStoreView(
+          tester,
+          'r669-clarification-unsent-${display.scale}',
+        );
+        await tap('work-review-resume-changes');
+        expect(
+          find.byKey(const Key('work-review-corrections')),
+          findsOneWidget,
+        );
+        expect(find.text('Mahadev Retail'), findsOneWidget);
+        expect(work.declarationAccepted, isFalse);
+        expect(work.submittedProfile, same(submitted));
+        expect(gateway.submissionCalls, 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     testWidgets(
       'OPPO S06 inline review corrections ${display.width} ${display.scale}',
       (tester) async {

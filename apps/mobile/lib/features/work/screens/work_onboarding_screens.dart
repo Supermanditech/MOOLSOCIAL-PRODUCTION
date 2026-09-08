@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
@@ -1588,6 +1589,11 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   final _nameFocus = FocusNode();
   final _areaFocus = FocusNode();
   final _activityFocus = FocusNode();
+  final _nameDetailAnchor = GlobalKey();
+  final _areaDetailAnchor = GlobalKey();
+  final _activityDetailAnchor = GlobalKey();
+  final _proofAnchors = <String, GlobalKey>{};
+  bool _detailRevealQueued = false;
   final GlobalKey _declarationAnchor = GlobalKey();
   String? _correctionInstruction;
   late final TextEditingController _name = TextEditingController(
@@ -1611,6 +1617,9 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       widget.session.recoveredDocumentStep = false;
     }
     WidgetsBinding.instance.addObserver(this);
+    for (final focus in [_nameFocus, _areaFocus, _activityFocus]) {
+      focus.addListener(_revealFocusedDetail);
+    }
     widget.session.addListener(_onReviewChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) _refreshReview();
@@ -1628,6 +1637,9 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     WidgetsBinding.instance.removeObserver(this);
     _reviewTimer?.cancel();
     widget.session.removeListener(_onReviewChanged);
+    for (final focus in [_nameFocus, _areaFocus, _activityFocus]) {
+      focus.removeListener(_revealFocusedDetail);
+    }
     _scroll.dispose();
     _name.dispose();
     _area.dispose();
@@ -1644,7 +1656,38 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       area: _area.text,
       activity: _activity.text,
     );
+    _revealFocusedDetail();
   }
+
+  void _revealFocusedDetail() {
+    if (_detailRevealQueued || !mounted || _step != 0 || !_showDetailsErrors) {
+      return;
+    }
+    _detailRevealQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _detailRevealQueued = false;
+      if (!mounted || _step != 0) return;
+      for (final (focus, anchor) in [
+        (_nameFocus, _nameDetailAnchor),
+        (_areaFocus, _areaDetailAnchor),
+        (_activityFocus, _activityDetailAnchor),
+      ]) {
+        if (!focus.hasFocus) continue;
+        final target = anchor.currentContext;
+        if (target != null) {
+          Scrollable.ensureVisible(
+            target,
+            alignment: 1,
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          );
+        }
+        return;
+      }
+    });
+  }
+
+  @override
+  void didChangeMetrics() => _revealFocusedDetail();
 
   void _goBack() {
     if (_step == 0) _saveFields();
@@ -1775,12 +1818,38 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
             'Workspace details',
         wrapHeader: true,
         fallbackBackRoute: '/app/work/workspace/contact',
+        headerHeight:
+            _step == 0 &&
+                MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                MediaQuery.sizeOf(context).height -
+                        MediaQuery.viewInsetsOf(context).bottom <
+                    480
+            ? 56
+            : 88,
+        headerTitle:
+            _step == 0 &&
+                MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                MediaQuery.sizeOf(context).height -
+                        MediaQuery.viewInsetsOf(context).bottom <
+                    480
+            ? const Text(
+                'Business details',
+                key: Key('work-page-title'),
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 16,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                ),
+              )
+            : null,
         activeLocalAction: 'workspace',
         hideNavigationWhenKeyboardVisible: true,
         showHeaderChat: false,
         showTrailingAction: false,
         onBack: _goBack,
         bottomAction: switch (_step) {
+          0 when MediaQuery.viewInsetsOf(context).bottom > 0 => null,
           0 => WorkPrimaryButton(
             keyName: 'work-details-continue',
             label: _reviewEditMode
@@ -1798,6 +1867,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                   : null;
               if (invalidFocus != null) {
                 invalidFocus.requestFocus();
+                _revealFocusedDetail();
                 return;
               }
               if (widget.session.validateDetails()) {
@@ -1897,6 +1967,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                     const SizedBox(height: MoolSpacing.sm),
                   ],
                   _WorkDetailField(
+                    key: _nameDetailAnchor,
                     label: 'Business name (as per PAN card)',
                     fieldKey: 'work-name',
                     builder: (decoration) => TextField(
@@ -1920,6 +1991,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                   ),
                   const SizedBox(height: MoolSpacing.sm),
                   _WorkDetailField(
+                    key: _areaDetailAnchor,
                     label: 'Operating city or PIN code',
                     fieldKey: 'work-area',
                     builder: (decoration) => TextField(
@@ -1939,6 +2011,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                   ),
                   const SizedBox(height: MoolSpacing.sm),
                   _WorkDetailField(
+                    key: _activityDetailAnchor,
                     label: 'Primary activity',
                     fieldKey: 'work-activity',
                     builder: (decoration) => TextField(
@@ -2038,6 +2111,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
               for (final proof
                   in widget.session.selectedWorkspaceDocuments) ...[
                 _ProofCard(
+                  key: _proofAnchors.putIfAbsent(proof.id, GlobalKey.new),
                   proof: proof,
                   added: widget.session.addedProofs.containsKey(proof.id),
                   file: widget.session.pickedProofs[proof.id],
@@ -2115,6 +2189,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
                 session: widget.session,
                 onAddDocuments: () => _beginCorrection(1),
                 onUpdateDetails: () => _beginCorrection(0),
+                onReviewChanges: () => _beginCorrection(2),
               ),
             ],
           ],
@@ -2244,8 +2319,15 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   Future<void> _showProofSource(
     BuildContext context,
     WorkProofRequirement proof,
-  ) {
-    return showModalBottomSheet<void>(
+  ) async {
+    final render = _proofAnchors[proof.id]?.currentContext?.findRenderObject();
+    final viewport = render == null
+        ? null
+        : RenderAbstractViewport.maybeOf(render);
+    final rowOffset = render == null
+        ? null
+        : viewport?.getOffsetToReveal(render, 0).offset;
+    final added = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
       useSafeArea: false,
@@ -2254,6 +2336,16 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
       builder: (sheetContext) =>
           _ProofSourceSheet(session: widget.session, proof: proof),
     );
+    if (added != true || !mounted || _step != 1 || rowOffset == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _step != 1 || !_scroll.hasClients) return;
+      _scroll.jumpTo(
+        rowOffset.clamp(
+          _scroll.position.minScrollExtent,
+          _scroll.position.maxScrollExtent,
+        ),
+      );
+    });
   }
 }
 
@@ -2571,7 +2663,7 @@ class _ProofSourceSheetState extends State<_ProofSourceSheet> {
     final added = await widget.session.addProof(widget.proof.id, source);
     if (!mounted) return;
     if (added) {
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(true);
       return;
     }
     setState(() {
@@ -2642,85 +2734,88 @@ class _ProofSourceSheetState extends State<_ProofSourceSheet> {
               MoolSpacing.md,
               MoolSpacing.xs + 16,
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD8DAE8),
-                      borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                Text(
-                  'Add ${widget.proof.label}',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const Text(
-                  'PDF, JPG, JPEG, PNG or WebP · up to 10 MB. Cloud files shows the providers available on this device.',
-                  style: TextStyle(
-                    color: MoolColors.muted,
-                    fontSize: 10.5,
-                    height: 1.3,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-                if (_error case final message?) ...[
-                  Semantics(
-                    liveRegion: true,
-                    child: Text(
-                      message,
-                      key: const Key('work-proof-source-error'),
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontSize: 12,
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 42,
+                      height: 4,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFD8DAE8),
+                        borderRadius: BorderRadius.circular(MoolRadii.capsule),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                ],
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    for (var index = 0; index < sources.length; index++) ...[
-                      Expanded(
-                        child: _ProofSourceTile(
-                          keyName: 'work-proof-source-${sources[index].id}',
-                          label: sources[index].label,
-                          icon: sources[index].icon,
-                          busy: _busySource == sources[index].id,
-                          onTap: _busySource == null
-                              ? () => _pick(
-                                  sources[index].id,
-                                  sources[index].source,
-                                )
-                              : null,
+                  const SizedBox(height: MoolSpacing.sm),
+                  Text(
+                    'Add ${widget.proof.label}',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: MoolColors.ink,
+                      fontSize: 19,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const Text(
+                    'PDF, JPG, JPEG, PNG or WebP · up to 10 MB. Cloud files shows the providers available on this device.',
+                    style: TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 10.5,
+                      height: 1.3,
+                    ),
+                  ),
+                  const SizedBox(height: MoolSpacing.md),
+                  if (_error case final message?) ...[
+                    Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        message,
+                        key: const Key('work-proof-source-error'),
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.error,
+                          fontSize: 12,
                         ),
                       ),
-                      if (index < sources.length - 1) const SizedBox(width: 6),
-                    ],
+                    ),
+                    const SizedBox(height: 12),
                   ],
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                TextButton(
-                  key: const Key('work-proof-source-cancel'),
-                  onPressed: _busySource == null
-                      ? () => Navigator.of(context).pop()
-                      : null,
-                  child: const Text('Cancel'),
-                ),
-              ],
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var index = 0; index < sources.length; index++) ...[
+                        Expanded(
+                          child: _ProofSourceTile(
+                            keyName: 'work-proof-source-${sources[index].id}',
+                            label: sources[index].label,
+                            icon: sources[index].icon,
+                            busy: _busySource == sources[index].id,
+                            onTap: _busySource == null
+                                ? () => _pick(
+                                    sources[index].id,
+                                    sources[index].source,
+                                  )
+                                : null,
+                          ),
+                        ),
+                        if (index < sources.length - 1)
+                          const SizedBox(width: 6),
+                      ],
+                    ],
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                  TextButton(
+                    key: const Key('work-proof-source-cancel'),
+                    onPressed: _busySource == null
+                        ? () => Navigator.of(context).pop()
+                        : null,
+                    child: const Text('Cancel'),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -2879,9 +2974,10 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
     required this.session,
     required this.onAddDocuments,
     required this.onUpdateDetails,
+    required this.onReviewChanges,
   });
   final WorkSession session;
-  final VoidCallback onAddDocuments, onUpdateDetails;
+  final VoidCallback onAddDocuments, onUpdateDetails, onReviewChanges;
   @override
   Widget build(BuildContext context) {
     final status = session.remoteReviewStatus;
@@ -2954,6 +3050,33 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
             ),
           ],
           if (clarification && session.gateway is ReviewWorkGateway) ...[
+            if (session.hasUnsubmittedReviewChanges) ...[
+              const SizedBox(height: 12),
+              Semantics(
+                liveRegion: true,
+                child: Wrap(
+                  key: const Key('work-review-unsent-changes'),
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      'Changes not submitted',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextButton.icon(
+                      key: const Key('work-review-resume-changes'),
+                      onPressed: session.busy ? null : onReviewChanges,
+                      icon: const Icon(Icons.edit_note_outlined, size: 20),
+                      label: const Text('Review changes'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
             const SizedBox(height: 16),
             Wrap(
               spacing: 12,
@@ -3149,6 +3272,7 @@ class _WorkDetailField extends StatelessWidget {
     required this.fieldKey,
     required this.builder,
     this.alwaysShowLabel = false,
+    super.key,
   });
 
   final String label;
@@ -3308,6 +3432,7 @@ class _ProofCard extends StatelessWidget {
     this.onRemove,
     this.removedName,
     this.onUndo,
+    super.key,
   });
   final WorkProofRequirement proof;
   final bool added;
@@ -3347,13 +3472,20 @@ class _ProofCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 5),
-          Text(
-            added
-                ? file?.fileName ?? 'Document attached'
-                : removedName != null
-                ? 'Removed: $removedName'
-                : proof.detail,
-            style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+          Semantics(
+            liveRegion: added,
+            label: added
+                ? '${proof.label}: document attached. ${file?.fileName ?? ''}'
+                : null,
+            excludeSemantics: added,
+            child: Text(
+              added
+                  ? file?.fileName ?? 'Document attached'
+                  : removedName != null
+                  ? 'Removed: $removedName'
+                  : proof.detail,
+              style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+            ),
           ),
           Wrap(
             alignment: WrapAlignment.end,

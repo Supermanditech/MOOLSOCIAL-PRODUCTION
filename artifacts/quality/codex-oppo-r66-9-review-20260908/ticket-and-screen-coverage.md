@@ -32,6 +32,67 @@ This is an implementation checkpoint only: new APK, OPPO replay, R669-S01-ADD-SW
 
 The pre-commit owner check rejected the historical route-ticket document used for this new evidence. No commit was made. Preserve that document unchanged and retain this follow-up only in the already-authorized current review coverage owner. The checker, policy architecture and exact functional owners are unchanged. Original r66.9 APK evidence below describes only its original binary; these newer source fixes are not installed or device-qualified yet.
 
+### Active keyboard, document and review-correction children
+
+Selector checkpoint `e7541d830e4ff8680efffcad91c3e7947de2db74` is committed, pushed and remote-equal. It is not yet in a new OPPO APK.
+
+The next bounded correction covers existing S03 contact-edit visibility, S04 PIN-error visibility, S05 attachment feedback and S07 unsent clarification. Do not duplicate these as new founder observations. Preserve the keyboard-closed approved layout. Contact editing keeps the field and Cancel/Send code reachable; Details hides its fixed continuation while typing, using the existing IME Next/Done flow. Both use a compact editing-only title where space is needed; restore the approved full heading after keyboard dismissal. Draft changes must not overwrite the acknowledged submitted information or send a correction without declaration and explicit submission.
+
+Child R669-S04-ERROR-200: reproduced on local 320x568/200% with 240px keyboard; error bottom294 exceeds viewport bottom216. Original focused log `s04-focused-attempt1.log` SHA256 B8C6B854A3D660F472143C6C9EC8D48C3AB81D1375AF8AEBBEFDC63B399461C2. Fix in progress; retain the original failing capture. Child R669-S05-SOURCE-ERROR-200: a real 71px source-picker overflow on failed upload at200%, raw `s05-s07-focused-attempt1.log` SHA256 BAE2FD02C3EAA317FCF7036087A89DA27084ECBBB31012A68CD6718DB0608A90. The picker must scroll within its safe area, keep retry/cancel operable, and return to the exact attached document after success. These are extensions of existing keyboard/document parents, not unrelated redesign tickets.
+
+Local visual inspection additionally found the active field label can be clipped above the viewport at large text even when the caret/actions pass geometry checks. Strengthen label visibility checks; do not qualify from caret-only assertions. The new disclosure `Changes not submitted` with `Review changes` is only shown for actual editable differences, not simply opening and leaving Edit. No acknowledgement is inferred from a draft, and production correction authority remains pending.
+
+The capture runner's first diagnostic used an absolute folder where the existing helper requires a relative folder and omitted --update-goldens. Preserve that failed command/log; it created no qualified capture and is not a product regression. Correct only invocation of the existing helper, use new external evidence folders, and never update historical goldens. One new clarification test used a nonexistent key; replace it with the actual `work-review-corrections` surface and retain the failed run. Later focused S05/S07 attempt3 passes7 cases. Final full qualification and native replay remain pending.
+
+### Keyboard/document/review correction qualification
+
+Parent `e7541d830e4ff8680efffcad91c3e7947de2db74`. Exact functional owners: Work contact screen, onboarding screen and WorkSession; focused tests in work_workspace_layout_safety_test.dart and work_production_gateway_test.dart. No Dashboard, scanner/collection contract, router, Cursor, backend or native Android changes. All approved keyboard-closed headings/layouts are retained. Only constrained keyboard editing uses a compact title; ordinary large-viewport editing keeps the original heading.
+
+Final focused visual run `s03-s07-visual-attempt3.log`:18 passed,0failed,exit0. All18 new PNGs were personally inspected at100/140/200%, including full active labels, input/actions above simulated IME, PIN error, the exact document after successful upload and the unsent clarification cue. Initial captures showing an artificially scrolled View button were replaced by new captures taken before the test scrolls to that action; old captures are retained. Physical OPPO/200%/TalkBack and backend qualification are not inferred.
+
+Connected cycle1 passed866/81 unchanged intentional skips/0failed, but analysis attempt1 found two new braces-only style lints. After adding those braces, full analysis attempt2 passes with zero issues and both final-source cycles2 and3 each pass866/81 unchanged skips/0failed,exit0. Exact six-file command is the Selector qualification command above. No skip declaration or protected reference was changed, and skipped tests are not qualifications. Source/test files remained unchanged throughout the two final cycles.
+
+Final cycle3 SHA256: `3BE871E60B4E933A85E8E08EB2A29B42D58AAAF47D2E09B57077807E9436BA88`. Remaining complete logs (under external r669-approved-fix-cycle-20260908):
+
+- `s03-focused-attempt1.log`: 43099E94F815C93BB2EA17FB026B2422EE33F075A7F042AF5714F8AE9533A337
+- `s03-s04-focused-attempt2.log`: BA1CDF8CA8EDEA02366239BDE4BF6B5D404E50ED456C32C6F2F69BDA05BC6597
+- `s03-s04-visual-attempt1.log`: EFC7D7AC853F505DD4FC1E9ACD3B8DD2C28D4CB7BB6C939896844E4382F18CFF
+- `s03-s07-connected-cycle1.log`: 0C0978CBF21D0031D3709702BC1AB6A63BF2FDDDB8544B9DCC1B2A22880E20A8
+- `s03-s07-connected-cycle2.log`: 9D504A51B63FE4701C8C1F508C9CE01D2FFB6A192FAFF54906146BE68910D943
+- `s03-s07-full-analysis-attempt1.log`: A6FC2A5005F729550446CB5B3134D0E137DCE1DFEA8C7FD5B05DC57F0E47410E
+- `s03-s07-full-analysis-attempt2.log`: 181A2942EA46D73D04A2E86540C6F13B9497984C31D40E9824AFAF92E4A48812
+- `s03-s07-visual-attempt2.log`: FA69D92D851227AC2687FD12E929CB973FE25E3F1991F484F4F9DC1AF49216B9
+- `s03-s07-visual-attempt3.log`: DB8D0E06556B5286DC7ECF6E769DE0667735A7F8A056193A331A6CAD08C92A57
+- `s04-focused-attempt1.log`: B8C6B854A3D660F472143C6C9EC8D48C3AB81D1375AF8AEBBEFDC63B399461C2
+- `s04-visual-before-fix-attempt1.log`: 2E1EA510BE40C0F2D56324F6B507A5EA878F442515CDD1967F281C0D235C0791
+- `s04-visual-before-fix-attempt2.log`: 8212C710C0FC1F6C509D2C32B7B2E46C846D87F1F36CDF2D32906691758C26F1
+- `s05-s07-focused-attempt1.log`: BAE2FD02C3EAA317FCF7036087A89DA27084ECBBB31012A68CD6718DB0608A90
+- `s05-s07-focused-attempt2.log`: 90AE57F9525ACEE6FCB12C242CFEDD213060F8F0670EF814D0D2BCD74B7AEA7E
+- `s05-s07-focused-attempt3.log`: 391529EF2F632B4468E3B12B482413CE91812620DC7F127C8119AFC9BB010056
+
+Final visual inventory, under `s03-s07-visual-attempt3`:
+
+- `r669-clarification-unsent-1.0.png`: 8351B71B93915BB1A620F60E6AF2BA28D69F707C4B815801263D577E73853940
+- `r669-clarification-unsent-1.4.png`: BC35DE2CDEC68793B473F88C7EE5C39DB0E16650BC1660A2594041FC9B18032A
+- `r669-clarification-unsent-2.0.png`: 4DC7225ED74463851D550D09788897D069F2CB25B53F1DD6106BCBAF2CB9E572
+- `r669-contact-edit-alternateMobile-1.0.png`: 51E83D8635909BAF894F988CAD34B1F2562E07046539F72B91C971E190F1F2A3
+- `r669-contact-edit-alternateMobile-1.4.png`: DF1E0BD73F63420FC8A1D90C31BED56037808BF2FF0D32BAE899E99017DC1B82
+- `r669-contact-edit-alternateMobile-2.0.png`: 3FCF5EE1BBF682ACAC9582D2426A82965513124874D0E9E76C6DB860A559A2DC
+- `r669-contact-edit-email-1.0.png`: 32261BF1930EA06031A177723263FC22DFF0F73FE4BEFC3EA85BB466122DFD0E
+- `r669-contact-edit-email-1.4.png`: 59996E0F8DEEFCF60B801151325FC6978E044D7BAA7CB5CC5095DD9B3483A4C9
+- `r669-contact-edit-email-2.0.png`: 3D733BEE2D6BFEA415FD0917CC6E3566988ACD99C562D91F79E812168D1D8009
+- `r669-contact-edit-primaryMobile-1.0.png`: 7D16E48C078FBDFC594E9585C4D5D3969DB9674FCD344B005854C25FAEC474D0
+- `r669-contact-edit-primaryMobile-1.4.png`: D2D9566D966628A37431EB04CB4195F183B025CB8B1B64329C99D47C24328136
+- `r669-contact-edit-primaryMobile-2.0.png`: F2836BAB2E26A842A383AF4460724F7ADD205393C285103AB60A8E16D6C524AA
+- `r669-details-pin-error-1.0.png`: 459AB426761BD6DE3B9EA15554C3AE79DBE28610C39D99DEA2CDB2DAF977E18E
+- `r669-details-pin-error-1.4.png`: 3A343B25426E61E1C8A19F7EE433DED74CA15B74D9E1D7DB84D85D6C99BD0BB0
+- `r669-details-pin-error-2.0.png`: 28C501A4548B2A5AACA365ED2AB412F430B4E7E5DB13F30AC1229A53BAC48B89
+- `r669-document-attached-1.0.png`: 0046E4E43FF495605A2A705A938C3EEBE1768E4DFF26A883E9B063C7300C7B44
+- `r669-document-attached-1.4.png`: 453EB695CFE813F7C43D48420D64D313B9F8C413E231866E98ED8C57CA3F0395
+- `r669-document-attached-2.0.png`: B1A7BF2E770079541144392E8C85DD266A71496C13F6D81C69940018FDAE1D25
+
+Coordination implementation, regression-memory implementation (4501 entries/2455 applicable) and existing incremental implementation gate pass. This records local source qualification, not native ticket closure. R669-S01-ADD-SWITCH, exact application support context and a new guarded APK/OPPO replay remain open. Existing application-list/review/document backend dependencies remain explicit; no live service or approval was added.
+
 ## Original sealed r66.9 APK coverage — unchanged
 
 AUDIT-R668-01: valid local PDF rendering timeout. The bounded length-framed transport correction is implemented. Native compilation and all23 executable protocol cases pass; full Flutter analysis has zero issues; both exact39-file connected cycles pass with1367 passed,83 existing skips and0 failed each. Complete commands, exclusions and raw hashes are in local-validation.md. The source381 manifest is unchanged throughout qualification.

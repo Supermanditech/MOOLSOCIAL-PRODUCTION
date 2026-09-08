@@ -23,8 +23,8 @@ class WorkWorkspaceContactScreen extends StatefulWidget {
       _WorkWorkspaceContactScreenState();
 }
 
-class _WorkWorkspaceContactScreenState
-    extends State<WorkWorkspaceContactScreen> {
+class _WorkWorkspaceContactScreenState extends State<WorkWorkspaceContactScreen>
+    with WidgetsBindingObserver {
   late final TextEditingController _primaryMobile;
   late final TextEditingController _email;
   late final TextEditingController _alternate;
@@ -44,6 +44,35 @@ class _WorkWorkspaceContactScreenState
   final FocusNode _nameFocus = FocusNode();
   bool _showNameError = false;
   WorkContactChannel? _errorChannel;
+  bool _inputRevealQueued = false;
+
+  void _revealInputActions() {
+    if (_inputRevealQueued || !mounted) return;
+    _inputRevealQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _inputRevealQueued = false;
+      if (!mounted) return;
+      for (final (focus, anchor) in [
+        (_primaryFocus, _primaryCodeActions),
+        (_emailFocus, _emailCodeActions),
+        (_alternateFocus, _alternateCodeActions),
+      ]) {
+        if (!focus.hasFocus) continue;
+        final target = anchor.currentContext;
+        if (target != null) {
+          Scrollable.ensureVisible(
+            target,
+            alignment: 1,
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          );
+        }
+        return;
+      }
+    });
+  }
+
+  @override
+  void didChangeMetrics() => _revealInputActions();
 
   void _focusCode(FocusNode node, GlobalKey actions) {
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -90,11 +119,18 @@ class _WorkWorkspaceContactScreenState
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.session.hydrateAccountSnapshot(widget.accountSnapshot);
     _primaryMobile = TextEditingController(text: widget.session.primaryMobile);
     _email = TextEditingController(text: widget.session.contactEmail);
     _alternate = TextEditingController(text: widget.session.alternateMobile);
     _name = TextEditingController(text: widget.session.authorizedPersonName);
+    for (final focus in [_primaryFocus, _emailFocus, _alternateFocus]) {
+      focus.addListener(_revealInputActions);
+    }
+    for (final controller in [_primaryMobile, _email, _alternate]) {
+      controller.addListener(_revealInputActions);
+    }
   }
 
   @override
@@ -118,6 +154,13 @@ class _WorkWorkspaceContactScreenState
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    for (final focus in [_primaryFocus, _emailFocus, _alternateFocus]) {
+      focus.removeListener(_revealInputActions);
+    }
+    for (final controller in [_primaryMobile, _email, _alternate]) {
+      controller.removeListener(_revealInputActions);
+    }
     _nameFocus.dispose();
     _primaryMobile.dispose();
     _email.dispose();
@@ -219,11 +262,30 @@ class _WorkWorkspaceContactScreenState
       builder: (context, _) {
         final session = widget.session;
         final profile = session.selectedProfile;
+        final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+        final compactEditor =
+            keyboardVisible &&
+            MediaQuery.sizeOf(context).height -
+                    MediaQuery.viewInsetsOf(context).bottom <
+                480;
         return WorkPageScaffold(
           session: session,
           title: 'Set up your Workspace',
           subtitle: profile?.setupSubtitle ?? 'Choose a Workspace first',
           wrapHeader: true,
+          headerHeight: compactEditor ? 56 : 88,
+          headerTitle: compactEditor
+              ? const Text(
+                  'Contact details',
+                  key: Key('work-page-title'),
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 16,
+                    height: 1.1,
+                    fontWeight: FontWeight.w800,
+                  ),
+                )
+              : null,
           fallbackBackRoute: '/app/work/workspace/requirements',
           activeLocalAction: 'workspace',
           showHeaderChat: false,
@@ -666,11 +728,16 @@ class _ContactVerificationCard extends StatelessWidget {
               autocorrect: false,
               enableSuggestions: false,
               textInputAction: TextInputAction.next,
-              scrollPadding: const EdgeInsets.only(bottom: 32),
+              scrollPadding: EdgeInsets.only(
+                top: wrapLabel
+                    ? MediaQuery.textScalerOf(context).scale(12) * 2.6 + 8
+                    : 20,
+                bottom: 32,
+              ),
               onChanged: onEdit,
               decoration: InputDecoration(
                 labelText: wrapLabel ? null : label,
-                helperText: detail,
+                helperText: editing ? null : detail,
                 helperMaxLines: 4,
                 helperStyle: const TextStyle(fontSize: 12),
                 error: !otpSent && error != null ? feedback() : null,
@@ -711,6 +778,7 @@ class _ContactVerificationCard extends StatelessWidget {
           ),
           if (confirmed)
             Row(
+              key: codeActionsKey,
               children: [
                 Expanded(
                   child: Text(

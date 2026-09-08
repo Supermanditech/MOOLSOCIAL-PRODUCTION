@@ -612,6 +612,25 @@ class WorkSession extends ChangeNotifier {
   String? reviewReason;
   WorkRemoteReviewStatus? remoteReviewStatus;
   bool reviewCorrectionDraft = false;
+  bool get hasUnsubmittedReviewChanges {
+    final submitted = submittedProfile;
+    if (!reviewCorrectionDraft ||
+        reviewCaseId == null ||
+        submitted == null ||
+        submitted.profileId != selectedProfile?.id) {
+      return false;
+    }
+    return submitted.name != workName ||
+        submitted.authorizedPersonName != authorizedPersonName ||
+        submitted.businessRelationship != businessRelationship ||
+        submitted.area != workArea ||
+        submitted.primaryActivity != primaryActivity ||
+        submitted.primaryMobile != primaryMobile ||
+        submitted.email != contactEmail ||
+        submitted.alternateMobile != alternateMobile ||
+        !mapEquals(submitted.proofReferences, addedProofs);
+  }
+
   String? _profileSubmissionKey;
   bool gstReminder = false;
   String gstin = '';
@@ -4075,7 +4094,8 @@ class WorkSession extends ChangeNotifier {
         documentRecoveryMessage = _documentRecoveryProofId = null;
       }
       declarationAccepted = false;
-      noticeMessage = 'Document received. You can review it before submission.';
+      // The document row reports the attachment without moving the whole page.
+      noticeMessage = null;
       return true;
     } on WorkGatewayException catch (error) {
       if (!error.cancelled) errorMessage = error.message;
