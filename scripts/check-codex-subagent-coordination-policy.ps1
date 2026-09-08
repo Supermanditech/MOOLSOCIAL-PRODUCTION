@@ -1681,6 +1681,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r665CollectionParent = '7ef7711e119a4c4d7691423538a91ecc0499c2f2'
       $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
       $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
+      $r668FormattingParent = '30228bd6d102123c92bf9a05a8b58180e64bc45c'
+      & git -C $root merge-base --is-ancestor $r668FormattingParent $head
+      $r668FormattingContext = $LASTEXITCODE -eq 0
+      $r667FreezeHead = if ($r668FormattingContext) { $r668FormattingParent } else { $head }
       & git -C $root merge-base --is-ancestor $r667DependenciesParent $head
       $r667DependenciesContext = $LASTEXITCODE -eq 0
       $r666FreezeHead = if ($r667DependenciesContext) { $r667DependenciesParent } else { $head }
@@ -2409,11 +2413,16 @@ if ($ProductionLane -ceq 'baseline') {
           ($r667PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
           ($r667PolicyAfter | ConvertTo-Json -Depth 100 -Compress)
         ) 'Local verification admission changed another claim, policy or registry binding.'
-        Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owners[1])) -ceq $r667ManifestHash) `
-          'Local verification admission manifest changed.'
+        if (-not $r668FormattingContext) {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owners[1])) -ceq $r667ManifestHash) `
+            'Local verification admission manifest changed.'
+        }
         $r667ScopeBefore = Get-R66Utf8GitJson $r667DependenciesParent $r667Owners[2]
-        $r667ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r667Owners[2]) | ConvertFrom-Json
+        $r667ScopeAfter = if ($r668FormattingContext) {
+          Get-R66Utf8GitJson $r668FormattingParent $r667Owners[2]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r667Owners[2]) | ConvertFrom-Json
+        }
         Assert-Coordination (
           $r667ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r667ManifestHash
         ) 'Local verification scope is not bound to its exact manifest.'
@@ -2434,7 +2443,14 @@ if ($ProductionLane -ceq 'baseline') {
           )
         }
         foreach ($r667Owner in $r667CopyHashes.Keys) {
-          Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owner)) -cin $r667CopyHashes[$r667Owner]) `
+          $r667AllowedCopyHashes = $r667CopyHashes[$r667Owner]
+          if ($r668FormattingContext -and $r667Owner -ceq $r667UiOwners[3]) {
+            $r667AllowedCopyHashes = @(
+              '971518A7D413D6D6DB7148678BB33E5896E5E4BF9690326CE82FD8480EC31742',
+              '31CEDA835734EA697CDC570C4741968629825198F9008EED5E8E668BE19C1D9F'
+            )
+          }
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owner)) -cin $r667AllowedCopyHashes) `
             "Local verification permits only the seven recorded Work copy substitutions: $r667Owner"
         }
         Assert-Coordination ((Get-Sha256 (Join-Path $root $r666Native)) -ceq
@@ -2511,13 +2527,76 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and
             (@($r667Committed | Sort-Object) -join '|') -ceq (@($r667Owners | Sort-Object) -join '|')) `
             'Local verification admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r667Commit -- @r667Owners
+          if ($r668FormattingContext) {
+            & git -C $root diff --quiet $r667Commit $r667FreezeHead -- @r667Owners
+          } else {
+            & git -C $root diff --quiet $r667Commit -- @r667Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Local verification ownership binding changed after admission.'
-          $r667Later = @(& git -C $root log --format=%H "${r667Commit}..$head" -- @r667Owners)
+          $r667Later = @(& git -C $root log --format=%H "${r667Commit}..$r667FreezeHead" -- @r667Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r667Later.Count -eq 0) `
             'Local verification admission cannot be replayed or revised.'
         }
         $r66CoordinationOwners = @($r66CoordinationOwners) + $r667PrimaryOwners
+      }
+      if ($r668FormattingContext) {
+        # A single formatter-only source binding; no additional ownership.
+        $r668Owners = @($r667Owners[1], $r667Owners[2], $r667Owners[3])
+        $r668ManifestHash = '899DD6F57BFA33EA7180C4CBA4C92CF023A08A9BBFEE3A4E1ED5F1E0DC4E13BF'
+        $r668Subject = 'ui(buy-redmi-fixes-v1-20260905): admit exact dashboard formatting'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r668Owners[0])) -ceq $r668ManifestHash) `
+          'Dashboard formatting manifest changed.'
+        $r668ScopeBefore = Get-R66Utf8GitJson $r668FormattingParent $r668Owners[1]
+        $r668ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r668Owners[1]) | ConvertFrom-Json
+        Assert-Coordination (
+          $r668ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r668ManifestHash
+        ) 'Dashboard formatting scope has the wrong manifest binding.'
+        $r668ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+          $r668ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (
+          ($r668ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r668ScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Dashboard formatting changed execution authority.'
+        & git -C $root diff --quiet $r668FormattingParent -- $r667Owners[0]
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'Dashboard formatting changed ownership policy.'
+        $r668PolicyHistory = @(& git -C $root log --format=%H "${r668FormattingParent}..$head" -- $r667Owners[0])
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668PolicyHistory.Count -eq 0) `
+          'Dashboard formatting cannot revise ownership history.'
+        if ($head -ceq $r668FormattingParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+            'Pending dashboard formatting admission is not a handoff or acceptance.'
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r667UiOwners[3])) -ceq
+            '971518A7D413D6D6DB7148678BB33E5896E5E4BF9690326CE82FD8480EC31742') `
+            'Dashboard formatting cannot precede its admission.'
+          $r668Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r668Dirty | Sort-Object) -join '|') -ceq (@($r668Owners | Sort-Object) -join '|')) `
+            'Pending dashboard formatting must change exactly three coordination owners.'
+          $r668Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668Untracked.Count -eq 0) `
+            'Dashboard formatting admission cannot include untracked drafts.'
+        } else {
+          $r668Following = @(& git -C $root rev-list --first-parent --reverse "${r668FormattingParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668Following.Count -gt 0) `
+            'Dashboard formatting admission is missing.'
+          $r668Commit = [string]$r668Following[0]
+          $r668Parents = @(& git -C $root show -s --format=%P $r668Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668Parents.Count -eq 1 -and
+            [string]$r668Parents[0] -ceq $r668FormattingParent) 'Dashboard formatting admission parent changed.'
+          $r668ActualSubject = @(& git -C $root show -s --format=%s $r668Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668ActualSubject.Count -eq 1 -and
+            [string]$r668ActualSubject[0] -ceq $r668Subject) 'Dashboard formatting admission subject changed.'
+          $r668Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r668Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r668Committed | Sort-Object) -join '|') -ceq (@($r668Owners | Sort-Object) -join '|')) `
+            'Dashboard formatting admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r668Commit -- @r668Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Dashboard formatting binding changed after admission.'
+          $r668Later = @(& git -C $root log --format=%H "${r668Commit}..$head" -- @r668Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r668Later.Count -eq 0) `
+            'Dashboard formatting admission cannot be replayed or revised.'
+        }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()
