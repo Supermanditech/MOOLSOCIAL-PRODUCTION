@@ -1,5 +1,13 @@
 # r66.10 approved-screen coverage
 
+## Screen 6 approved; Screen 7 Review and submit awaiting review
+
+Founder approved Documents subject to native checks and asked to register genuine findings before advancing. Its bounded checks found no new confirmed defect, with the documented provider/error/accessibility/backend cases still pending. Captures 164–192 now cover Review entry and scrolling, unchecked-submit blocking, QA attachment View/Back, section-specific document Edit, removal/restoration reflected in the summary, declaration reset after a document change, business Edit/keyboard/save/reflection/restoration, and Contact Edit with both Android Back and Save returning to Review. Current OPPO view is Review and submit at 192, first view, awaiting founder review before submission.
+
+No new confirmed defect in those exercised 100% controls; the existing OPPO-S03-02 Contact validation-guidance issue remains open. The declaration was temporarily selected only in the review fixture to test invalidation, and was then cleared by the document edit. Final state is unchecked (191). The only Submit tap was with the declaration unchecked and remained on Review (167); no application, real OTP, external message, payment or admin approval was submitted. Business fixture activity and its QA attachment were restored.
+
+Source, tests, registry, policy, APK and Cursor/Redmi are untouched. Submission/retry outcomes, interruption/account isolation, long-data/physical accessibility and live backend enforcement remain unqualified, not silently closed. Full 001–192 evidence: 384 PNG/XML files; SHA-256 CBFC65D7B5718178C3AFEDA553F5830C294268BCF05117576302392FA3C96999. Per-action results and exact hashes are in device-review.md. Earlier current/awaiting statements below are historical checkpoints.
+
 ## Screen 5 approved; Screen 6 Documents awaiting review
 
 Founder approved Business details subject to native checks and asked to register genuine findings before advancing. Its bounded checks found no new confirmed defect; the Contact validation-guidance continuation remains open. Captures 133–163 now cover Documents entry/scrolling, optional-empty Review boundary and Back, native QA PDF selection, both PDF pages, Zoom/pan/Fit, preview Replace/Cancel/Close, Remove/Restore, QA image replacement through Cloud files/local Downloads, image preview/Back, native Gallery cancellation and attachment-retaining Details Back/re-entry. Current OPPO view is Documents at 163, first view, awaiting founder review before Review and submit.

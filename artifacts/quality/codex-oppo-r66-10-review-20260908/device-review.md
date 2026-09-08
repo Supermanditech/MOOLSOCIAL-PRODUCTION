@@ -1,5 +1,96 @@
 # r66.10 OPPO review
 
+## Founder-paced screen 7 — Review and submit — 9 September 2026
+
+Founder approved Documents subject to Codex finding no defect during OPPO real-user checks and directed that genuine issues be registered before advancing. Its bounded native attachment/navigation checks found no new confirmed defect; earlier document, accessibility and backend limitations remain open. Capture 164 preserves the approved Documents view; 165 enters Review, Step 3 of 3. Current OPPO foreground is Review and submit first view at 192, awaiting founder review. No application has been submitted in this screen-7 round.
+
+Safety boundary: all changes were confined to the existing local review-gateway draft and explicitly named QA attachment. The declaration was temporarily selected at 170 solely to test reset after a draft change; Submit was never tapped while it was selected. Its final native checked state is false (175 and 191). The only Submit tap was the unchecked validation test at 167, which stayed on Review. No real identity document, OTP, account edit, external message, payment or admin approval was sent. The retained local contact confirmations do not qualify server OTP verification.
+
+| Check | Actual result/evidence |
+| --- | --- |
+| Review summary and first view | 165/179/186/192: Step 3 of 3, selected Grocery/Kirana workspace, business/contact summary and section-specific Edit actions. Scrolling at 166 exposes the exact Authorization letter filename, Image/156 KB, View, Documents Edit and declaration. No source or design change was made to founder-approved screens. |
+| Unchecked submission | 167: Submit for review does not advance without the declaration; the complete correction message is visible above the action. 169 retains that unresolved validation after attachment preview Back. This is not a server-submission or rejection test. |
+| Attachment View/Back | 168 renders the exact QA PNG. Android Back at 169 restores Review, not a wrong step or generic document list. Embedded legacy UI inside the QA image is fixture content, not current product design. |
+| Document Edit return | 171 opens Documents in edit mode with Save and return to review. 172 locates the same Authorization letter. Removing the local draft attachment at 173 and saving at 174 changes the summary to No documents added. You can add them later. No original file/evidence was deleted. |
+| Declaration invalidation | Native hierarchy shows checked=true at 170 before editing. After removing the attachment and returning, 175 shows checked=false. Old approval is therefore not silently reused for the changed attachment draft in this exercised case. |
+| Attachment restoration | 176/177 reopen the edit route and removed row. Restore succeeds at 178; Save and return at 179 restores 1 attached and the original filename in Review. The attachment and original QA file remain available. |
+| Business Edit and keyboard | 180 opens the correctly prefilled Details step in edit mode. A temporary QA suffix is entered only in the fixture activity at 181; the focused text is visible above the keyboard. Android Back dismisses the keyboard and exposes Save and return (182), without abandoning the edit. |
+| Correction reflected and restored | 183 shows the changed activity in Review; 184 reopens it with the change retained. 185 removes only the temporary suffix; 186 confirms the original Grocery retail activity in Review. Business name, area, relationship and attachment are preserved. |
+| Contact Edit and Back | 187 opens the correct prefilled contact page, with the existing locally confirmed phone/email and Save and return. Android Back at 188 restores Review. No phone/email value is changed and no code is requested. |
+| Contact Save return | 189 reopens Contact; unchanged Save and return at 190 restores Review, preserving the summary and attachment. This validates this in-session return path, not restart/account-switch persistence or production verification. |
+| Final state | 191 confirms declaration unchecked after all edits. It is an intermediate scroll position, not the bottom-of-scroll limit; earlier 166/167 capture the full declaration/validation area. 192 returns to the top for founder review. Application received and decision states have not been entered in this round. |
+
+No new confirmed defect in the exercised Review summary, attachment preview, unchecked-submit validation, edit/return, draft-reflection and document-change declaration-reset checks at OPPO 100%. The existing OPPO-S03-02 Contact validation-guidance continuation remains open; this successful Contact return does not close it. No duplicate defect ticket or blanket production-ready verdict is created.
+
+Submission success/failure, duplicate-submit/retry, process-death/account-isolation recovery, long-data variants, physical 200%/TalkBack and live server-side authorization/document storage/review remain unqualified by this round. Local preview fixtures cannot prove production identity or approval controls. No production application is submitted to advance the founder review.
+
+Capture-178 tool-output truncation was handled by read-only recovery: the existing PNG/XML pair and runtime foreground were verified before any further action; Restore was not repeated and no capture was overwritten. Source, tests, registry, policy, APK, Cursor and Redmi remain untouched.
+
+### Screen 7 capture hashes
+
+58 new PNG/XML rows, 164–192. Full 001–192 inventory: 384 rows; canonical UTF-8/no-BOM LF-terminated SHA-256 CBFC65D7B5718178C3AFEDA553F5830C294268BCF05117576302392FA3C96999.
+
+```text
+32DA48E62DBFFB30BB3AC5B2981731402BF75744AC8B41DD77508FA7704524DE  r6610-native-164-documents-founder-approved.png
+A35E7092980EE2AAE2509CE928E55C50A0FD267430642AD3169D1953994D0961  r6610-native-164-documents-founder-approved.xml
+7D1AD583EB780D84D1427090EF37562CCDCC1FB6C02E35258178CA1E876BA289  r6610-native-165-review-and-submit-first-view.png
+A80C3E56A90E48B1EA8C80B4C105D003FFB6442A7D39C16CBFA6552BFB6DCFBF  r6610-native-165-review-and-submit-first-view.xml
+DC17988FA7B8A437BF7264FEBD0BA81900208EB046ECDC42AC61156C55445830  r6610-native-166-review-attachment-and-declaration.png
+A1999760C8E5511C0AAD2182E1E27754EC3E6443E30B3D28D485C5503D7DDF15  r6610-native-166-review-attachment-and-declaration.xml
+A916ADE70681B4BB24267CDDCFAE53EA5F75931CCC193DA851E0F76C569CDCFD  r6610-native-167-review-unchecked-submission-blocked.png
+F78E4983A286C5EBC91DA265E54B3649B572B2D53CA3792C3F20C40ADF0607AB  r6610-native-167-review-unchecked-submission-blocked.xml
+240A4F4A575F7B388FFD4D15D72A3F8AA110C103D71695D25466CB64D2389F49  r6610-native-168-review-attachment-preview.png
+11FEED99342D49DDA2D2F7700315B68913C2EAD99781B7ECE1BB9360E8A8C4A0  r6610-native-168-review-attachment-preview.xml
+63ABB08F9D4B5E18A98F045B53C763804D8216DDE4F8BFCD2A78A2601F7A3B9D  r6610-native-169-preview-back-review.png
+F78E4983A286C5EBC91DA265E54B3649B572B2D53CA3792C3F20C40ADF0607AB  r6610-native-169-preview-back-review.xml
+75261DB9AA3EEDC50FAAA176E3A39FB5736F676FD6B0B567C2A43F41C07636D2  r6610-native-170-review-declaration-selected-no-submit.png
+9F1EC1EB63D78AA8768C4AA0B03AEBB7A8E79A0169CA26D32C5195DE57F1AF16  r6610-native-170-review-declaration-selected-no-submit.xml
+B318546093E1B3DCD6B59084F66AB3EC1F376A04DF61A153BB17370CC3FA55BC  r6610-native-171-review-edit-documents.png
+F8514DE2EE5F1DEA5500AD217AF5CD097A85862FAE689A697FFCD98411DE8812  r6610-native-171-review-edit-documents.xml
+E1369B4D4532CBDC2ACB7DE92D5380885512CF0D74089814019FE82DEDFA3D03  r6610-native-172-review-edit-attached-row.png
+A6D6C5850808E2864F025EDF111D1BD50621EAE4D24BAA1B06D1973D4D141C5E  r6610-native-172-review-edit-attached-row.xml
+42891BC05C2E4E7715FB74BD460CC1BD58F9852FDD83E1E08C5982F84A030A95  r6610-native-173-review-edit-document-removed.png
+3CD1A0C3A9AE68775C152BD09CA0837DA3B83B88ACD8C85CA8055763468AABC3  r6610-native-173-review-edit-document-removed.xml
+F62C695DE76CF4C4D0F23A0C765DA35547869ADE6DFF336EFA0CE1831DE52181  r6610-native-174-review-reflects-document-removal.png
+5FA68B8AF9E39CD7A1BD35D31E87D2861FB496FB7A083F0AB9289879F31ACEA8  r6610-native-174-review-reflects-document-removal.xml
+B6A423B3EA35DD28EC8373E8FC51DA09265DBDB6692850E87AB446AB4B4F1832  r6610-native-175-review-declaration-reset-after-edit.png
+31BAF6AC2682D5775A06F2DB320FBE393163FFA8B8FA203B4E766E20B762285A  r6610-native-175-review-declaration-reset-after-edit.xml
+150BEEAE66A43F45768C487BA313A89304449AE9DE086419F5A0616D3E945E3A  r6610-native-176-review-document-edit-return.png
+F8514DE2EE5F1DEA5500AD217AF5CD097A85862FAE689A697FFCD98411DE8812  r6610-native-176-review-document-edit-return.xml
+64F9D6A1C31B9B0908B410D007C9537BA7DF14DEB62CDD9DC4359043D68BEF74  r6610-native-177-review-restore-row.png
+3CD1A0C3A9AE68775C152BD09CA0837DA3B83B88ACD8C85CA8055763468AABC3  r6610-native-177-review-restore-row.xml
+427645F1D2DF6F4037043119B36C7CA6B862BA31A903045EB45DBC3714455F9B  r6610-native-178-review-test-attachment-restored.png
+A6D6C5850808E2864F025EDF111D1BD50621EAE4D24BAA1B06D1973D4D141C5E  r6610-native-178-review-test-attachment-restored.xml
+B8479F675D5D275C5FF8369B463E3E4AE39E32D369B78A2AB32CB70EDF5F664B  r6610-native-179-review-restored-attachment-summary.png
+A80C3E56A90E48B1EA8C80B4C105D003FFB6442A7D39C16CBFA6552BFB6DCFBF  r6610-native-179-review-restored-attachment-summary.xml
+8E4467A755A36EDA5972BF89FEE73829FD975F3EDD10E83F0B4ADDEC1C82B2F7  r6610-native-180-review-business-edit-prefill.png
+35797432D80B94DD7A9469CFDEB0E52208AD57069F5D06AAF6E65414B0E065C3  r6610-native-180-review-business-edit-prefill.xml
+565191968EC34A54DE96A778C0EC63EE4955757BD5BCCD2397AF950B07BD93ED  r6610-native-181-review-business-edit-keyboard.png
+1704F3B9A0DC149302B4F3A8258D405C83AA82CDB6032717418322A9959E7B5B  r6610-native-181-review-business-edit-keyboard.xml
+7329869FF58D9DD723CC955CA9E16D19AC700FE998DFA9F917911D776A3487C3  r6610-native-182-review-business-edit-keyboard-dismissed.png
+F5EFF429607584EBC19993B19618EC3FE3F7843D9EBAF6C8AB3BDAC39877CB9E  r6610-native-182-review-business-edit-keyboard-dismissed.xml
+0B52CDB454F42AC2C13951AB5E56C200F64E813557FBAE06A3A78DFD3A6EFBA6  r6610-native-183-review-business-correction-visible.png
+9AF84B6EF098C7AE9A79E59AB0040A559AA3B2497D4DD4DF3D6EDA9516FA169F  r6610-native-183-review-business-correction-visible.xml
+B3D009017ED45706FFC3742EF597DE46E1FD6D39BBECC4E38AC033A081026B25  r6610-native-184-review-business-correction-retained.png
+3F5CA80BF95C585EBAA5D5FB4D47B401476B5400A573AF722D42C01C31309EBC  r6610-native-184-review-business-correction-retained.xml
+84F28CEDA4A6BBFC87F507E9CAA321CE9D8B99AB9DD0B982852A601B1D455C3D  r6610-native-185-review-business-fixture-restored.png
+F20B31427C629E5EFAE6CBE46E0ACD05A57A0BDABEA008FC955E75ABB21D5C64  r6610-native-185-review-business-fixture-restored.xml
+763199B7AAE9D3E1CC8AA3D5E0C97D1AF90705E45A5D54FD265FE85E44CF6853  r6610-native-186-review-restored-business-summary.png
+3A56BE1C2C5E629A1A74F0F1AB1A348AA625542D268B6923530638F59EC4E8BC  r6610-native-186-review-restored-business-summary.xml
+58DD49BBE33F71984F4712DE297F78994F333FAE16B90E4B360849DEB172B053  r6610-native-187-review-contact-edit-return-contract.png
+957BB8BC7E0D756E27FA0C11396A830DCD86F1EA11140BE18601AE32AF36340F  r6610-native-187-review-contact-edit-return-contract.xml
+24E8EA986529970256776BA0F3876A731BF796EFB854EE3C563A75F8D6A0160C  r6610-native-188-review-contact-android-back.png
+3A56BE1C2C5E629A1A74F0F1AB1A348AA625542D268B6923530638F59EC4E8BC  r6610-native-188-review-contact-android-back.xml
+95C02067DCC7D584BCC115FE548D56338BD4E3F4DBC1709864338744CCA75D92  r6610-native-189-review-contact-save-prefill.png
+957BB8BC7E0D756E27FA0C11396A830DCD86F1EA11140BE18601AE32AF36340F  r6610-native-189-review-contact-save-prefill.xml
+9B5D0D23C9DAC22F23262B3D2B4DBF93B0C7D0681E2E188A7A24048B84C4499C  r6610-native-190-review-contact-save-return.png
+3A56BE1C2C5E629A1A74F0F1AB1A348AA625542D268B6923530638F59EC4E8BC  r6610-native-190-review-contact-save-return.xml
+81DC5100BD0002ABB8720A1F90D6C773570175AB5814EB87C58E1D1917306156  r6610-native-191-review-final-unchecked-declaration.png
+7D6A7D991789F415A7040840A6147B9165EBF3AF9A34C255F1DB8CF437067D6F  r6610-native-191-review-final-unchecked-declaration.xml
+F633D03460888AA164651BE0A1BB2E5B4111C0BE94A5BD3926685C932276238B  r6610-native-192-review-founder-first-view.png
+3A56BE1C2C5E629A1A74F0F1AB1A348AA625542D268B6923530638F59EC4E8BC  r6610-native-192-review-founder-first-view.xml
+```
+
 ## Founder-paced screen 6 — Documents — 9 September 2026
 
 Founder approved Business details subject to Codex finding no defect in native testing and directed that genuine issues be registered before moving ahead. The bounded Details checks below found no new confirmed defect; physical/backend dependencies and the separate Contact validation-guidance finding remain open. Capture 133 preserves the approved Details screen, and 134 opens Documents, Step 2 of 3. Current OPPO foreground is Documents first view at 163, awaiting founder review.
