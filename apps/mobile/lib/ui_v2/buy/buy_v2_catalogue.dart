@@ -8718,7 +8718,16 @@ class _FeaturedProductRail extends StatelessWidget {
         8;
     final rowHeight = titleHeight > hintHeight ? titleHeight : hintHeight;
     // A wrapped heading grows the section, not at the expense of product media.
-    final cardLaneHeight = (accessibleText ? 365.0 : 285.0) - rowHeight - 12;
+    final titleReserve = products.fold(0.0, (height, product) {
+      final extra = _FeaturedProductCard.titleExpansion(
+        context,
+        product,
+        cardWidth,
+      );
+      return height > extra ? height : extra;
+    });
+    final cardLaneHeight =
+        (accessibleText ? 365.0 : 285.0) - rowHeight - 12 + titleReserve;
     return Column(
       key: const ValueKey('buy-featured-products'),
       mainAxisSize: MainAxisSize.min,
@@ -9129,6 +9138,45 @@ class _FeaturedProductCard extends StatefulWidget {
   final BuyV2Session session;
   final BuyV2Product product;
 
+  static const titleStyle = TextStyle(
+    color: BuyV2Colors.ink,
+    fontSize: 11,
+    height: 1.05,
+    fontWeight: FontWeight.w900,
+  );
+
+  static double titleExpansion(
+    BuildContext context,
+    BuyV2Product product,
+    double cardWidth,
+  ) {
+    if (product.destination != BuyV2Destination.medicine) return 0;
+    final title = TextSpan(
+      text: product.title,
+      style: DefaultTextStyle.of(context).style.merge(titleStyle),
+    );
+    // Match the two card borders and the details' horizontal padding.
+    final width = (cardWidth - 18).clamp(1.0, double.infinity);
+    final full = TextPainter(
+      text: title,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: width);
+    final capped = TextPainter(
+      text: title,
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+      maxLines: 2,
+    )..layout(maxWidth: width);
+    // Grow the lane by the newly visible lines, preserving the media/actions.
+    final extra = (full.height - capped.height)
+        .clamp(0.0, double.infinity)
+        .ceilToDouble();
+    full.dispose();
+    capped.dispose();
+    return extra;
+  }
+
   @override
   State<_FeaturedProductCard> createState() => _FeaturedProductCardState();
 }
@@ -9238,14 +9286,13 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                           children: [
                             Text(
                               product.title,
-                              maxLines: 2,
+                              maxLines:
+                                  product.destination ==
+                                      BuyV2Destination.medicine
+                                  ? null
+                                  : 2,
                               overflow: TextOverflow.clip,
-                              style: const TextStyle(
-                                color: BuyV2Colors.ink,
-                                fontSize: 11,
-                                height: 1.05,
-                                fontWeight: FontWeight.w900,
-                              ),
+                              style: _FeaturedProductCard.titleStyle,
                             ),
                             const SizedBox(height: 2),
                             Text(

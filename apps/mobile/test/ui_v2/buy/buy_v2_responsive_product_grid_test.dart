@@ -15,15 +15,19 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  for (final width in [320.0, 360.0]) {
-    testWidgets('R665 O05 full medicine identity at text2 width $width', (
+  for (final fixture in [
+    for (final width in [320.0, 360.0])
+      for (final featured in [false, true]) (width: width, featured: featured),
+  ]) {
+    testWidgets('R665 O05 full medicine identity at text2 $fixture', (
       tester,
     ) async {
       tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = Size(width, 800);
+      tester.view.physicalSize = Size(fixture.width, 800);
       addTearDown(tester.view.reset);
       final core = BuySession();
-      final session = BuyV2Session(core: core);
+      final session = BuyV2Session(core: core)
+        ..openDestination(BuyV2Destination.medicine);
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       final product = session.product('m-paracetamol-500');
@@ -37,14 +41,16 @@ void main() {
             child: child!,
           ),
           home: Scaffold(
-            body: SingleChildScrollView(
-              child: BuyV2ProgressiveProductGrid(
-                session: session,
-                products: [product],
-                storageKey: 'r665-medicine-identity',
-                semanticLabel: 'Medicine products',
-              ),
-            ),
+            body: fixture.featured
+                ? BuyV2CatalogueView(session: session)
+                : SingleChildScrollView(
+                    child: BuyV2ProgressiveProductGrid(
+                      session: session,
+                      products: [product],
+                      storageKey: 'r665-medicine-identity',
+                      semanticLabel: 'Medicine products',
+                    ),
+                  ),
           ),
         ),
       );
@@ -55,6 +61,8 @@ void main() {
         matching: find.text(product.title),
       );
       expect(title, findsOneWidget);
+      await tester.ensureVisible(title);
+      await tester.pumpAndSettle();
       final paragraph = tester.renderObject<RenderParagraph>(title);
       expect(paragraph.text.toPlainText(), contains('tablets'));
       expect(paragraph.didExceedMaxLines, isFalse);
@@ -69,6 +77,24 @@ void main() {
         tester.getRect(title).bottom,
         lessThanOrEqualTo(tester.getRect(card).bottom),
       );
+      if (fixture.featured) {
+        final action = find.descendant(
+          of: card,
+          matching: find.byKey(ValueKey('buy-add-${product.id}')),
+        );
+        expect(action, findsOneWidget);
+        final actionBounds = tester.getRect(action);
+        expect(actionBounds.width, greaterThanOrEqualTo(44));
+        expect(actionBounds.height, greaterThanOrEqualTo(44));
+        expect(
+          actionBounds.top,
+          greaterThanOrEqualTo(tester.getRect(card).top),
+        );
+        expect(
+          actionBounds.bottom,
+          lessThanOrEqualTo(tester.getRect(title).top),
+        );
+      }
       expect(tester.takeException(), isNull);
     });
   }
@@ -462,6 +488,27 @@ void main() {
                     matching: find.text(text),
                   );
                   expect(field, findsOneWidget);
+                  if (destination == BuyV2Destination.medicine &&
+                      text == product.title) {
+                    final paragraph = tester.renderObject<RenderParagraph>(
+                      field,
+                    );
+                    expect(
+                      paragraph.didExceedMaxLines,
+                      isFalse,
+                      reason: '$id retains the full medicine identity',
+                    );
+                    final fullTitle = TextPainter(
+                      text: paragraph.text,
+                      textDirection: paragraph.textDirection,
+                      textScaler: paragraph.textScaler,
+                    )..layout(maxWidth: paragraph.size.width);
+                    expect(
+                      paragraph.size.height,
+                      greaterThanOrEqualTo(fullTitle.height - .1),
+                    );
+                    fullTitle.dispose();
+                  }
                   final fieldBounds = tester.getRect(field);
                   expect(fieldBounds.top, greaterThanOrEqualTo(bounds.top));
                   expect(
