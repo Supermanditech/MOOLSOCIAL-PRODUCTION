@@ -646,3 +646,25 @@ Require clean sealed parent, exactly policy/manifest/scope-hash/coordination cha
   }
 }
 <!-- R670-DATA-END -->
+
+## R671: founder-authorized r66.5 device correction pass — 2026-09-09
+
+Founder instruction: "go ahead with execution" after disclosure of five confirmed UI failures and five observations. This resumes implementation after the retained r66.5 report. Existing Buy journey corrections are MVP-required. Cursor/Redmi remains the target; Desktop/OPPO and authenticated integration remain deferred. This authorizes correction and investigation, not production promotion or reuse of the consumed r66.5 build allowance.
+
+Register R665-D01–D05 and R665-O01–O05 as REG-20260909-4537–4546. REG-20260909-4547 records evidence handling corrections. Observations are not automatically confirmed defects. Preserve every original registry entry, the full 87-record matrix and all unqualified acceptance cases. No item is closed by this admission.
+
+Reuse the existing 65 Cursor and 45 primary owner claims. Correct Medicine confirmation sizing, floating Cart occlusion, nested status-bar contrast, Report issue actions and past delivery promises. Investigate startup, Recent origin, refinement counts, duplicated facts and medicine identity. Complete applicable improvements and exact-fixture/device acceptance before qualifying any successor APK. New build qualification must bind the corrected source and fresh required regression evidence.
+
+<!-- R671-DATA-BEGIN -->
+{
+  "parent": "a2c914539aad677f80b3a73562c3faa591e819e6",
+  "registryCount": 4513,
+  "registrySha256": "651C8FBB852F6D26857318173C991F95A1267B88AB9D2991E1D6DB124714292C",
+  "firstAddedId": "REG-20260909-4537-CURSOR-R665-MEDICINE-DIALOG",
+  "lastAddedId": "REG-20260909-4547-CURSOR-R665-BOUNDED-READ-AND-RECEIPT",
+  "reportPath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/R665-REDMI-DEFECT-REPORT-V1.md",
+  "reportSha256": "EEB51D8DA710C5D4215D3DE01E72CEEC2A3D84A356D6695129962A463EAFE845",
+  "matrixPath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/BUY-UAT-87-COVERAGE-V11.json",
+  "matrixSha256": "3E584EECB765AEDB41E22B0E2CC7C2B8C5BC27A8FFDC30245329FDC82775338F"
+}
+<!-- R671-DATA-END -->

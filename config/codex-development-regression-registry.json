@@ -101663,6 +101663,237 @@
     "docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md",
     "docs/quality/cursor-buy-redmi-uat-v1-20260905/DEFECTS.md"
   ]
+},
+{
+  "id": "REG-20260909-4537-CURSOR-R665-MEDICINE-DIALOG",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Medicine Cart removal overflows by 40 pixels at 200% text and density 360, clipping its destructive action.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Make confirmation body scrollable within safe viewport and keep both actions reachable; verify scope preservation and cancellation.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4538-CURSOR-R665-FLOATING-CART-OCCLUSION",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Floating Cart obscures recent search, no-match heading and populated Saved heading/count with the keyboard hidden.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Protect destination content from Cart placement while preserving drag, keyboard handling and exact Back.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4539-CURSOR-R665-NESTED-STATUS-CONTRAST",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Nested supplier product and Cart show white status icons against a white background.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Give nested routes explicit status-bar ownership and verify restoration through product, Cart and Store returns.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4540-CURSOR-R665-REPORT-SHEET-ACTIONS",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Enlarged Report issue sheet clips Cancel and disabled Send actions.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Constrain and scroll sheet content, keep safe-area actions reachable with keyboard, and preserve disabled-send rules.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4541-CURSOR-R665-PAST-DELIVERY-PROMISE",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Scheduled cards and monthly Cart show already-past deadlines as delivery today late at night.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Use current authoritative delivery windows or an honest unavailable/confirmation state; verify late-evening and midnight boundaries.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4542-CURSOR-R665-STARTUP-QUALIFICATION",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Retained restart am start reports timeout/11309 ms; debug cumulative frame data does not qualify startup or catalogue performance.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Investigate bounded first-frame, interactive and frame measurements; do not convert launch wait into an unsupported user-visible SLA.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4543-CURSOR-R665-RECENT-RETURN-ORIGIN",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Product opened from Settings Recently viewed returns to root Shop; expected origin needs contract verification.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Trace the established Recent origin contract and preserve the owning sheet/settings state when required.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4544-CURSOR-R665-REFINEMENT-COUNT-SOURCE",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Refinement sheet counts and expanded catalogue totals/results disagree.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Investigate and bind displayed counts to the same paged source, query and scope, distinguishing seeded data from a runtime mismatch.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4545-CURSOR-R665-REPEATED-PRODUCT-FACTS",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Adjacent pharmacy and Wholesale blocks repeat price, availability and delivery facts.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Assess accepted duplicate-facts contract; remove redundant presentation while retaining distinct MOQ, freight and invoice information.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4546-CURSOR-R665-MEDICINE-CARD-IDENTITY",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "Enlarged medicine card omits tablets although normal card and detail include the dosage form.",
+  "rootCause": "Observed device finding; code root cause is not yet established and must be diagnosed before asserting closure.",
+  "prevention": "Verify adaptive title fit and preserve required medicine identity across card, detail and Cart.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
+},
+{
+  "id": "REG-20260909-4547-CURSOR-R665-BOUNDED-READ-AND-RECEIPT",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "A full policy read exceeded tool output limits, a status helper emitted an incidental Task result, and a restart wait was initially transcribed incorrectly before correction.",
+  "rootCause": "Unbounded output and manual transcription were used without deriving every summary field from retained receipts.",
+  "prevention": "Use bounded reads and retain hashes; suppress async helper return values; derive timings from immutable native receipts and preserve corrections.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
+  ]
 }
   ]
 }

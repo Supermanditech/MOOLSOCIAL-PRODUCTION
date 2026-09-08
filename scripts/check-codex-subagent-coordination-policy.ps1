@@ -113,7 +113,7 @@ function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
     (@($disposition.owners | Sort-Object) -join '|'))
 }
 
-function Get-R66Utf8GitJson([string]$Commit, [string]$Owner) {
+function Get-R66Utf8GitJson([string]$Commit, [string]$Owner, [switch]$AsText) {
   Assert-Coordination ($Commit -cmatch '^[0-9a-f]{40}$' -and
     $Owner -cmatch '^[A-Za-z0-9_./-]+$' -and -not $root.Contains('"')) `
     'Social repair historical JSON arguments are invalid.'
@@ -134,6 +134,7 @@ function Get-R66Utf8GitJson([string]$Commit, [string]$Owner) {
     $process.WaitForExit()
     [void]$errorRead.GetAwaiter().GetResult()
     Assert-Coordination ($process.ExitCode -eq 0) 'Social repair historical JSON read failed.'
+    if ($AsText) { return $jsonText }
     return ($jsonText | ConvertFrom-Json)
   } finally {
     $process.Dispose()
@@ -1694,6 +1695,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
       $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
       $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
+      $r671CorrectionParent = 'a2c914539aad677f80b3a73562c3faa591e819e6'
+      & git -C $root merge-base --is-ancestor $r671CorrectionParent $head
+      $r671CorrectionContext = $LASTEXITCODE -eq 0
+      $r670FreezeHead = if ($r671CorrectionContext) { $r671CorrectionParent } else { $head }
       & git -C $root merge-base --is-ancestor $r670SourceParent $head
       $r670SourceContext = $LASTEXITCODE -eq 0
       $r669FreezeHead = if ($r670SourceContext) { $r670SourceParent } else { $head }
@@ -2719,8 +2724,12 @@ if ($ProductionLane -ceq 'baseline') {
       if ($r670SourceContext) {
         $r670Owners = @($r667Owners)
         $r670ManifestHash = '12EE0EDB708E805E6E2129BDD5C98B66397E7512C3B0F842C35C6AAA24AAB35D'
-        Assert-Coordination ((Get-Sha256 (Join-Path $root $r670Owners[1])) -ceq $r670ManifestHash) 'Qualified source manifest changed.'
-        $r670Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[1])
+        if ($r671CorrectionContext) {
+          $r670Manifest = Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[1] -AsText
+        } else {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r670Owners[1])) -ceq $r670ManifestHash) 'Qualified source manifest changed.'
+          $r670Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[1])
+        }
         $r670Match = [regex]::Matches($r670Manifest, '(?s)<!-- R670-DATA-BEGIN -->\s*(.*?)\s*<!-- R670-DATA-END -->')
         Assert-Coordination ($r670Match.Count -eq 1) 'Qualified source data missing or duplicated.'
         $r670Data = $r670Match[0].Groups[1].Value | ConvertFrom-Json
@@ -2728,14 +2737,14 @@ if ($ProductionLane -ceq 'baseline') {
         $r670EvidencePath = 'C:\GUARANTEED OUTCOME\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\SINGLECHAT-FULL-REGRESSION-BINDING-V1.json'
         Assert-Coordination ($r670Data.fullRegressionEvidence.path -ceq $r670EvidencePath -and $r670Data.fullRegressionEvidence.cycles -eq 2 -and $r670Data.fullRegressionEvidence.passedPerCycle -eq 1640 -and $r670Data.fullRegressionEvidence.skippedPerCycle -eq 27 -and (Get-Sha256 $r670EvidencePath) -ceq $r670Data.fullRegressionEvidence.sha256) 'Qualified source regression evidence changed.'
         $r670Before = Get-R66Utf8GitJson $r670SourceParent $r670Owners[0]
-        $r670After = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[0]) | ConvertFrom-Json
+        $r670After = if ($r671CorrectionContext) { Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[0]) | ConvertFrom-Json }
         $r670Primary = @($r670After.activeClaims | Where-Object task -ceq '/root')[0]
         $r670Ui = @($r670After.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')[0]
         Assert-Coordination ($r670Ui.owners.Count -eq 65 -and $r670Primary.owners.Count -eq 45 -and @($r670Primary.owners | Where-Object { $_ -ceq $r670Data.additionalPrimaryOwner }).Count -eq 1) 'Qualified source ownership changed.'
         $r670Primary.owners = @($r670Primary.owners | Where-Object { $_ -cne $r670Data.additionalPrimaryOwner })
         Assert-Coordination (($r670Before | ConvertTo-Json -Depth 100 -Compress) -ceq ($r670After | ConvertTo-Json -Depth 100 -Compress)) 'Qualified source changed unrelated policy.'
         $r670ScopeBefore = Get-R66Utf8GitJson $r670SourceParent $r670Owners[2]
-        $r670ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[2]) | ConvertFrom-Json
+        $r670ScopeAfter = if ($r671CorrectionContext) { Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[2] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[2]) | ConvertFrom-Json }
         Assert-Coordination ($r670ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r670ManifestHash) 'Qualified source scope hash changed.'
         $r670ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r670ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
         Assert-Coordination (($r670ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r670ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Qualified source changed execution authority.'
@@ -2760,12 +2769,66 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r670Subject.Count -eq 1 -and [string]$r670Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit qualified Redmi build checks') 'Qualified source admission subject changed.'
           $r670Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r670Commit)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r670Committed | Sort-Object) -join '|') -ceq (@($r670Owners | Sort-Object) -join '|')) 'Qualified source admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r670Commit -- @r670Owners
+          if ($r671CorrectionContext) {
+            & git -C $root diff --quiet $r670Commit $r670FreezeHead -- @r670Owners
+          } else {
+            & git -C $root diff --quiet $r670Commit -- @r670Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Qualified source coordination changed after admission.'
-          $r670Later = @(& git -C $root log --format=%H "${r670Commit}..$head" -- @r670Owners)
+          $r670Later = @(& git -C $root log --format=%H "${r670Commit}..$r670FreezeHead" -- @r670Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r670Later.Count -eq 0) 'Qualified source admission cannot be replayed or revised.'
         }
         $r66CoordinationOwners = @($r66CoordinationOwners) + @($r670Data.additionalPrimaryOwner)
+      }
+      if ($r671CorrectionContext) {
+        # Keep r66.5 qualification immutable in its historical tree. The founder
+        # authorized this one successor correction pass after device replay.
+        $r671Owners = @($r670Owners) + @('config/codex-development-regression-registry.json')
+        $r671ManifestHash = '3146E4A559B8821D98DBEF38CEF1B19A761BC9335F9647E060424306B01E9DE7'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r670Owners[1])) -ceq $r671ManifestHash) 'Device correction manifest changed.'
+        $r671Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[1])
+        Assert-Coordination ($r671Manifest.Replace("`r`n","`n").StartsWith($r670Manifest.Replace("`r`n","`n").TrimEnd())) 'Device correction removed historical manifest evidence.'
+        $r671Match = [regex]::Matches($r671Manifest, '(?s)<!-- R671-DATA-BEGIN -->\s*(.*?)\s*<!-- R671-DATA-END -->')
+        Assert-Coordination ($r671Match.Count -eq 1) 'Device correction data missing or duplicated.'
+        $r671Data = $r671Match[0].Groups[1].Value | ConvertFrom-Json
+        Assert-Coordination ($r671Data.parent -ceq $r671CorrectionParent -and $r671Data.registryCount -eq 4513 -and $registryEntries.Count -eq 4513 -and $registrySha -ceq $r671Data.registrySha256) 'Device correction registry generation changed.'
+        Assert-Coordination ((Get-Sha256 $r671Data.reportPath) -ceq $r671Data.reportSha256 -and (Get-Sha256 $r671Data.matrixPath) -ceq $r671Data.matrixSha256) 'Device correction evidence changed.'
+        $r671RegistryBefore = Get-R66Utf8GitJson $r671CorrectionParent $r671Owners[4]
+        Assert-Coordination ($r671RegistryBefore.entries.Count -eq 4502 -and $registryEntries[4502].id -ceq $r671Data.firstAddedId -and $registryEntries[-1].id -ceq $r671Data.lastAddedId) 'Device correction registry append boundary changed.'
+        $r671RegistryAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $registryPath | ConvertFrom-Json
+        $r671RegistryAfter.entries = @($r671RegistryAfter.entries | Select-Object -First 4502)
+        Assert-Coordination (($r671RegistryBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r671RegistryAfter | ConvertTo-Json -Depth 100 -Compress)) 'Device correction changed existing registry evidence.'
+        $r671PolicyBefore = Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[0]
+        $r671PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r671PolicyAfter.registryBinding = $r671PolicyBefore.registryBinding
+        Assert-Coordination (($r671PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r671PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Device correction changed owner claims or unrelated policy.'
+        $r671ScopeBefore = Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[2]
+        $r671ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[2]) | ConvertFrom-Json
+        Assert-Coordination ($r671ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r671ManifestHash) 'Device correction scope hash changed.'
+        $r671ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r671ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (($r671ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r671ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Device correction changed execution authority.'
+        if ($head -ceq $r671CorrectionParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending device correction admission is not a handoff.'
+          $r671Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r671Dirty | Sort-Object) -join '|') -ceq (@($r671Owners | Sort-Object) -join '|')) 'Pending device correction must change exactly five coordination owners.'
+          $r671Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r671Untracked.Count -eq 0) 'Device correction admission cannot include untracked drafts.'
+        } else {
+          $r671Following = @(& git -C $root rev-list --first-parent --reverse "${r671CorrectionParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r671Following.Count -gt 0) 'Device correction admission missing.'
+          $r671Commit = [string]$r671Following[0]
+          $r671Parents = @(& git -C $root show -s --format=%P $r671Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r671Parents.Count -eq 1 -and [string]$r671Parents[0] -ceq $r671CorrectionParent) 'Device correction admission parent changed.'
+          $r671Subject = @(& git -C $root show -s --format=%s $r671Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r671Subject.Count -eq 1 -and [string]$r671Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit r66.5 device corrections') 'Device correction admission subject changed.'
+          $r671Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r671Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r671Committed | Sort-Object) -join '|') -ceq (@($r671Owners | Sort-Object) -join '|')) 'Device correction admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r671Commit -- @r671Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Device correction coordination changed after admission.'
+          $r671Later = @(& git -C $root log --format=%H "${r671Commit}..$head" -- @r671Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r671Later.Count -eq 0) 'Device correction admission cannot be replayed or revised.'
+        }
+        $r66CoordinationOwners = @($r66CoordinationOwners) + @($r671Owners[4])
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()
