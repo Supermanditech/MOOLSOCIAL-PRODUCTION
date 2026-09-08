@@ -1,3 +1,5 @@
 # r66.10 motion and fit disposition
 
 Preserve founder-approved Dashboard positioning, colours and motion. Bounded corrections keep the active input and its errors/actions visible, avoid a persistent document-success strip, and make the existing Workspace chooser scroll as one surface at large text. Normal/200% local images and assertions are recorded with the implementation. Physical accessibility, measured frame performance and new-APK interaction remain pending; no simulated live/backend authority is inferred.
+
+Host verification is complete on the exact application source: 14 inspected normal/200% Workspace/application captures from c82c7b8e, two connected behavioral passes, current C20E/Universal motion and reduced-motion suites, plus the remaining responsive Buy/Profile surfaces. No new product geometry or motion was introduced by candidate reservation, historical commit naming correction or prebuild evidence. Keep premium-motion machine disposition locally verified with OPPO replay pending; do not claim frame-performance or device accessibility measurements from widget captures.

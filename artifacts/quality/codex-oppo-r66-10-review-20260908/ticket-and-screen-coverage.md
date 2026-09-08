@@ -1,5 +1,9 @@
 # r66.10 approved-screen coverage
 
+## Candidate preparation resumed
+
+The founder removed only the verified empty generated test folder. Its fresh self-test now passes, including cleanup. A nested historical-evidence check required its existing archive parameter; no gate source was modified. Prebuild controls are now complete, all 381 application/test/dependency owners unchanged. Two partitioned 39-file passes each yielded 1423 passed/83 existing reported skips/0 failed; full analysis has zero issues and five review-only isolation tests pass. Exact logs, earlier failures and pending legacy/backend/physical-accessibility distinctions remain in local-validation.md and prebuild-validation.md. Source seal, guarded APK build and OPPO replay are next. Screen children remain open until actual replay.
+
 ## Exact historical naming correction — 9 September 2026
 
 Founder authorized the narrow production-safe disposition of the published metadata commit. The original mistake was selecting a descriptive coordination(...) prefix instead of this continuation's required ui(...). pre_commit checked staged owners; the history-subject validation ran only at clean handoff and correctly rejected the published commit. This was an assistant command-selection error, not a product regression.
