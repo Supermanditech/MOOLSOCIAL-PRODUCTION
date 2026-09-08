@@ -97,8 +97,7 @@ const _retailerGrowth = <WorkWorkspaceBenefit>[
     group: 'Customers',
     action: 'Collect at store',
     title: 'Queues build up at the counter.',
-    detail:
-        'Customers order and pay before arriving. Pack ahead for checked collection.',
+    detail: 'Customers pay in the app. Pack their order before they arrive.',
   ),
   WorkWorkspaceBenefit(
     group: 'Customers',
@@ -193,7 +192,7 @@ const _retailerGrowth = <WorkWorkspaceBenefit>[
     action: 'Settle',
     title: 'How much can reach your bank?',
     detail:
-        'See the amount available and request transfer to your registered account.',
+        'See the amount available and request transfer to your registered bank account.',
   ),
   WorkWorkspaceBenefit(
     group: 'Money',

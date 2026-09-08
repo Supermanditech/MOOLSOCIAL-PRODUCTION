@@ -202,6 +202,9 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
           trailing: PopupMenuButton<String>(
             key: const Key('work-workspace-category'),
             tooltip: 'Business categories',
+            requestFocus: false,
+            onOpened: _searchFocus.unfocus,
+            onCanceled: _searchFocus.unfocus,
             icon: const Icon(Icons.tune_rounded),
             initialValue: category ?? '',
             onSelected: (value) {
@@ -249,13 +252,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
                 const SizedBox(height: MoolSpacing.sm),
                 _WorkspaceOpportunityContext(opportunity: opportunity),
               ],
-              if (widget.session.activeWorkspace case final workspace?) ...[
-                const SizedBox(height: MoolSpacing.sm),
-                _ExistingWorkspaceSummary(
-                  session: widget.session,
-                  workspace: workspace,
-                ),
-              ] else if (widget.session.reviewCaseId != null) ...[
+              if (resumeApplication) ...[
                 const SizedBox(height: MoolSpacing.sm),
                 _WorkspaceApplicationSummary(session: widget.session),
               ],
@@ -1239,116 +1236,6 @@ class _WorkspaceOpportunityContext extends StatelessWidget {
   }
 }
 
-class _ExistingWorkspaceSummary extends StatelessWidget {
-  const _ExistingWorkspaceSummary({
-    required this.session,
-    required this.workspace,
-  });
-
-  final WorkSession session;
-  final WorkWorkspace workspace;
-
-  @override
-  Widget build(BuildContext context) {
-    final route = session.hasVerifiedWorkspace
-        ? '/app/work/workspace/dashboard'
-        : '/app/work/workspace/proof';
-    return WorkCard(
-      keyName: 'workspace-existing-summary',
-      color: const Color(0xFFEAF7E8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const WorkPill(
-            label: 'Active Workspace',
-            color: MoolColors.success,
-            icon: Icons.verified_rounded,
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          Text(
-            workspace.name,
-            style: const TextStyle(
-              color: MoolColors.navy,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          Text(
-            '${workspace.profileLabel} · ${workspace.area}',
-            style: const TextStyle(
-              color: MoolColors.muted,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          if (session.otherWorkspaces.isNotEmpty)
-            Column(
-              key: const Key('workspace-other-list'),
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Divider(height: MoolSpacing.lg),
-                const Text(
-                  'Other Workspaces',
-                  style: TextStyle(
-                    color: MoolColors.navy,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                for (final other in session.otherWorkspaces)
-                  Padding(
-                    key: Key('workspace-other-${other.id}'),
-                    padding: const EdgeInsets.only(bottom: 6),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.dashboard_outlined,
-                          color: MoolColors.success,
-                          size: 18,
-                        ),
-                        const SizedBox(width: MoolSpacing.xs),
-                        Expanded(
-                          child: Text(
-                            '${other.name} · ${other.area}',
-                            style: const TextStyle(
-                              color: MoolColors.ink,
-                              fontSize: 10.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          const SizedBox(height: MoolSpacing.sm),
-          Wrap(
-            spacing: MoolSpacing.xs,
-            runSpacing: MoolSpacing.xs,
-            children: [
-              OutlinedButton.icon(
-                key: const Key('workspace-open-active'),
-                onPressed: () => context.push(route),
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('Open Workspace'),
-              ),
-              TextButton.icon(
-                key: const Key('workspace-settlement'),
-                onPressed: () =>
-                    _showSettlementSummary(context, workspace.name),
-                icon: const Icon(Icons.payments_outlined),
-                label: const Text('Settlements'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _WorkspaceApplicationSummary extends StatelessWidget {
   const _WorkspaceApplicationSummary({required this.session});
 
@@ -1431,88 +1318,6 @@ class _WorkspaceApplicationSummary extends StatelessWidget {
       ),
     );
   }
-}
-
-Future<void> _showSettlementSummary(
-  BuildContext context,
-  String workspaceName,
-) {
-  return showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        0,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        key: const Key('my-work-settlement-sheet'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Settlement overview',
-            style: TextStyle(
-              color: MoolColors.navy,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          WorkCard(
-            color: const Color(0xFFF0FAF3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  workspaceName,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                const Text(
-                  'No payout is due now',
-                  style: TextStyle(
-                    color: MoolColors.success,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                const Text(
-                  'Completed orders, refunds and service fees will appear after their payment records are verified.',
-                  style: TextStyle(
-                    color: MoolColors.muted,
-                    height: 1.35,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          FilledButton(
-            key: const Key('my-work-settlement-open-workspace'),
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              context.push('/app/retailer/home');
-            },
-            child: const Text('Open Workspace'),
-          ),
-          TextButton(
-            key: const Key('my-work-settlement-close'),
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    ),
-  );
 }
 
 class _WorkspaceGroupPresentation {

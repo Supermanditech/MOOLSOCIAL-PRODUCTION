@@ -1063,7 +1063,7 @@ void main() {
     },
   );
 
-  testWidgets('existing Workspaces remain inside the direct chooser', (
+  testWidgets('R669 existing stores stay out of the new Workspace selector', (
     tester,
   ) async {
     final work = WorkSession()..seedMultipleWorkspaces();
@@ -1071,34 +1071,28 @@ void main() {
 
     expect(find.byKey(const Key('my-work-screen')), findsNothing);
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
-    expect(find.byKey(const Key('workspace-existing-summary')), findsOneWidget);
-    expect(find.text('Mahadev Fresh Mart'), findsOneWidget);
-    final chooserScroll = find
-        .descendant(
-          of: find.byKey(const Key('work-choose-screen')),
-          matching: find.byType(Scrollable),
-        )
-        .first;
-    await tester.scrollUntilVisible(
-      find.byKey(const Key('workspace-other-WK-510002')),
-      180,
-      scrollable: chooserScroll,
+    expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+    expect(find.byKey(const Key('workspace-other-list')), findsNothing);
+    expect(find.byKey(const Key('workspace-settlement')), findsNothing);
+    expect(find.byKey(const Key('workspace-open-active')), findsNothing);
+    expect(find.text('Mahadev Fresh Mart'), findsNothing);
+    expect(find.text('No payout is due now'), findsNothing);
+    expect(work.activeWorkspace?.id, 'WK-510001');
+    expect(work.otherWorkspaces, hasLength(2));
+    await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsOneWidget,
     );
-    expect(find.byKey(const Key('workspace-other-list')), findsOneWidget);
-    expect(find.textContaining('Creator Work'), findsOneWidget);
-
-    await tapVisible(tester, const Key('workspace-settlement'));
-    expect(find.byKey(const Key('my-work-settlement-sheet')), findsOneWidget);
-    await tapVisible(tester, const Key('my-work-settlement-close'));
-    await tapVisible(tester, const Key('workspace-settlement'));
-    await tapVisible(tester, const Key('my-work-settlement-open-workspace'));
-    expect(find.byKey(const Key('retailer-home-screen')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+    expect(find.text('Mahadev Fresh Mart'), findsNothing);
     work.startAnotherWork();
     tester.element(find.byType(Scaffold).first).go('/app/work/my-work');
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
     expect(work.activeWorkspace?.name, 'Mahadev Fresh Mart');
+    expect(work.otherWorkspaces, hasLength(2));
   });
 
   testWidgets('status Chat returns to the exact review screen', (tester) async {
@@ -1300,7 +1294,8 @@ void main() {
     expect(find.text('View approved record'), findsOneWidget);
     await tapVisible(tester, const Key('work-dashboard-add-workspace'));
     expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
-    expect(find.byKey(const Key('workspace-existing-summary')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+    expect(work.activeWorkspace?.name, 'Asha Family Clinic');
     await tapVisible(tester, const Key('work-back'));
     expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
   });

@@ -14,6 +14,7 @@ import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
@@ -4187,6 +4188,105 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  test('R669 retailer preview uses exact collection and bank wording', () {
+    for (final id in ['retailer-grocery', 'retailer-speciality']) {
+      final points = workWorkspaceBenefitFor(id).benefits;
+      expect(
+        points.singleWhere((p) => p.action == 'Collect at store').detail,
+        'Customers pay in the app. Pack their order before they arrive.',
+      );
+      expect(
+        points.singleWhere((p) => p.action == 'Settle').detail,
+        'See the amount available and request transfer to your registered bank account.',
+      );
+    }
+  });
+
+  for (final scale in [1.0, 1.4, 2.0]) {
+    testWidgets('R669 category dismissal does not reopen Search at $scale', (
+      tester,
+    ) async {
+      final work = WorkSession()..selectProfile('retailer-grocery');
+      await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+        work: work,
+        viewport: const Size(320, 568),
+        textScale: scale,
+        bottomInset: 24,
+      );
+      final search = find.byKey(const Key('work-workspace-search'));
+      await tester.enterText(search, 'grocery');
+      await tester.pumpAndSettle();
+      final field = tester.widget<TextField>(search);
+      expect(field.focusNode!.hasFocus, isTrue);
+      // Android can dismiss its IME without removing Flutter input focus.
+      tester.testTextInput.hide();
+      await tester.tap(find.byKey(const Key('work-workspace-category')));
+      await tester.pumpAndSettle();
+      expect(field.focusNode!.hasFocus, isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(field.focusNode!.hasFocus, isFalse);
+      expect(tester.testTextInput.isVisible, isFalse);
+      expect(field.controller!.text, 'grocery');
+      expect(work.selectedProfile?.id, 'retailer-grocery');
+      expect(find.byType(PopupMenuItem<String>), findsNothing);
+      expect(
+        find.byKey(const Key('work-profile-retailer-grocery')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'r669-selector-category-dismissed-$scale');
+      await tester.tap(search);
+      await tester.pumpAndSettle();
+      expect(field.focusNode!.hasFocus, isTrue);
+      expect(tester.testTextInput.isVisible, isTrue);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 new Workspace first view and preview at $scale', (
+      tester,
+    ) async {
+      final work = WorkSession()..seedMultipleWorkspaces();
+      work.startAnotherWork();
+      await mount(
+        tester,
+        route: '/app/work/workspace/choose',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+        bottomInset: 24,
+      );
+      expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+      expect(find.byKey(const Key('workspace-open-active')), findsNothing);
+      expect(find.byKey(const Key('workspace-settlement')), findsNothing);
+      expect(find.text('Mahadev Fresh Mart'), findsNothing);
+      expect(work.activeWorkspace?.id, 'WK-510001');
+      expect(work.otherWorkspaces, hasLength(2));
+      await captureStoreView(tester, 'r669-selector-new-workspace-$scale');
+      final choice = find.byKey(const Key('work-profile-retailer-grocery'));
+      await tester.ensureVisible(choice);
+      await tester.pumpAndSettle();
+      expect(choice.hitTestable(), findsOneWidget);
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('workspace-benefits-retailer-grocery')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+      expect(find.text('Mahadev Fresh Mart'), findsNothing);
+      expect(
+        find.byKey(const Key('work-profile-choose-retailer-grocery')),
+        findsOneWidget,
+      );
+      await captureStoreView(tester, 'r669-selector-retailer-preview-$scale');
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('OPPO S01 inline discovery preserves the selected application', (
     tester,
