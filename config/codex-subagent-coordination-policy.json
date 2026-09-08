@@ -85,6 +85,7 @@
       "task": "/root/cursor_buy_redmi_fixes_v1_20260905",
       "role": "subagent",
       "owners": [
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_bank_transfer_pending_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_bottom_rail_action_inventory_regression_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_catalogue_copy_hierarchy_test.dart",

@@ -1695,6 +1695,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
       $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
       $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
+      $r672RegressionParent = '4e5252de8dca9e02a49358e98d2e169acac3103b'
+      & git -C $root merge-base --is-ancestor $r672RegressionParent $head
+      $r672RegressionContext = $LASTEXITCODE -eq 0
+      $r671FreezeHead = if ($r672RegressionContext) { $r672RegressionParent } else { $head }
       $r671CorrectionParent = 'a2c914539aad677f80b3a73562c3faa591e819e6'
       & git -C $root merge-base --is-ancestor $r671CorrectionParent $head
       $r671CorrectionContext = $LASTEXITCODE -eq 0
@@ -2785,8 +2789,12 @@ if ($ProductionLane -ceq 'baseline') {
         # authorized this one successor correction pass after device replay.
         $r671Owners = @($r670Owners) + @('config/codex-development-regression-registry.json')
         $r671ManifestHash = '3146E4A559B8821D98DBEF38CEF1B19A761BC9335F9647E060424306B01E9DE7'
+        if ($r672RegressionContext) {
+          $r671Manifest = Get-R66Utf8GitJson $r672RegressionParent $r670Owners[1] -AsText
+        } else {
         Assert-Coordination ((Get-Sha256 (Join-Path $root $r670Owners[1])) -ceq $r671ManifestHash) 'Device correction manifest changed.'
         $r671Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[1])
+        }
         Assert-Coordination ($r671Manifest.Replace("`r`n","`n").StartsWith($r670Manifest.Replace("`r`n","`n").TrimEnd())) 'Device correction removed historical manifest evidence.'
         $r671Match = [regex]::Matches($r671Manifest, '(?s)<!-- R671-DATA-BEGIN -->\s*(.*?)\s*<!-- R671-DATA-END -->')
         Assert-Coordination ($r671Match.Count -eq 1) 'Device correction data missing or duplicated.'
@@ -2799,11 +2807,11 @@ if ($ProductionLane -ceq 'baseline') {
         $r671RegistryAfter.entries = @($r671RegistryAfter.entries | Select-Object -First 4502)
         Assert-Coordination (($r671RegistryBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r671RegistryAfter | ConvertTo-Json -Depth 100 -Compress)) 'Device correction changed existing registry evidence.'
         $r671PolicyBefore = Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[0]
-        $r671PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r671PolicyAfter = if ($r672RegressionContext) { Get-R66Utf8GitJson $r672RegressionParent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         $r671PolicyAfter.registryBinding = $r671PolicyBefore.registryBinding
         Assert-Coordination (($r671PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r671PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Device correction changed owner claims or unrelated policy.'
         $r671ScopeBefore = Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[2]
-        $r671ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[2]) | ConvertFrom-Json
+        $r671ScopeAfter = if ($r672RegressionContext) { Get-R66Utf8GitJson $r672RegressionParent $r670Owners[2] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[2]) | ConvertFrom-Json }
         Assert-Coordination ($r671ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r671ManifestHash) 'Device correction scope hash changed.'
         $r671ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r671ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
         Assert-Coordination (($r671ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r671ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Device correction changed execution authority.'
@@ -2823,12 +2831,65 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r671Subject.Count -eq 1 -and [string]$r671Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit r66.5 device corrections') 'Device correction admission subject changed.'
           $r671Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r671Commit)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r671Committed | Sort-Object) -join '|') -ceq (@($r671Owners | Sort-Object) -join '|')) 'Device correction admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r671Commit -- @r671Owners
+          if ($r672RegressionContext) {
+            & git -C $root diff --quiet $r671Commit $r671FreezeHead -- @r671Owners
+          } else {
+            & git -C $root diff --quiet $r671Commit -- @r671Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Device correction coordination changed after admission.'
-          $r671Later = @(& git -C $root log --format=%H "${r671Commit}..$head" -- @r671Owners)
+          $r671Later = @(& git -C $root log --format=%H "${r671Commit}..$r671FreezeHead" -- @r671Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r671Later.Count -eq 0) 'Device correction admission cannot be replayed or revised.'
         }
         $r66CoordinationOwners = @($r66CoordinationOwners) + @($r671Owners[4])
+      }
+
+      if ($r672RegressionContext) {
+        $r672Owners = @($r670Owners)
+        $r672ManifestHash = '0FC04E35EF36E039EA10F38C90B80FAB2B8FB680A6E8787834B9DCC912C94511'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r672Owners[1])) -ceq $r672ManifestHash) 'Product regression manifest changed.'
+        $r672Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r672Owners[1])
+        Assert-Coordination ($r672Manifest.Replace("`r`n","`n").StartsWith($r671Manifest.Replace("`r`n","`n").TrimEnd())) 'Product regression removed historical manifest evidence.'
+        $r672Match = [regex]::Matches($r672Manifest, '(?s)<!-- R672-DATA-BEGIN -->\s*(.*?)\s*<!-- R672-DATA-END -->')
+        Assert-Coordination ($r672Match.Count -eq 1) 'Product regression data missing or duplicated.'
+        $r672Data = $r672Match[0].Groups[1].Value | ConvertFrom-Json
+        Assert-Coordination ($r672Data.parent -ceq $r672RegressionParent -and $r672Data.additionalUiOwner -ceq 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart' -and $r672Data.testRepair.path -ceq $r672Data.additionalUiOwner) 'Product regression owner changed.'
+        Assert-Coordination ($r672Data.failureEvidence.passed -eq 1656 -and $r672Data.failureEvidence.skipped -eq 27 -and $r672Data.failureEvidence.failed -eq 8 -and (Get-Sha256 $r672Data.failureEvidence.path) -ceq $r672Data.failureEvidence.sha256) 'Product regression failed evidence changed.'
+        $r672PolicyBefore = Get-R66Utf8GitJson $r672RegressionParent $r672Owners[0]
+        $r672PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r672Ui = @($r672PolicyAfter.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')[0]
+        $r672Primary = @($r672PolicyAfter.activeClaims | Where-Object task -ceq '/root')[0]
+        Assert-Coordination ($r672Ui.owners.Count -eq 66 -and $r672Primary.owners.Count -eq 45 -and @($r672Ui.owners | Where-Object { $_ -ceq $r672Data.additionalUiOwner }).Count -eq 1) 'Product regression owner claim changed.'
+        $r672Ui.owners = @($r672Ui.owners | Where-Object { $_ -cne $r672Data.additionalUiOwner })
+        Assert-Coordination (($r672PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r672PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Product regression changed unrelated policy.'
+        $r672ScopeBefore = Get-R66Utf8GitJson $r672RegressionParent $r672Owners[2]
+        $r672ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r672Owners[2]) | ConvertFrom-Json
+        Assert-Coordination ($r672ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r672ManifestHash) 'Product regression scope hash changed.'
+        $r672ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r672ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (($r672ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r672ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Product regression changed execution authority.'
+        $r672AllowedTestHashes = @($r672Data.testRepair.beforeSha256)
+        if ($head -cne $r672RegressionParent) { $r672AllowedTestHashes += $r672Data.testRepair.proposedSha256 }
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r672Data.additionalUiOwner)) -cin $r672AllowedTestHashes) 'Product regression test differs from exact proposal.'
+        if ($head -ceq $r672RegressionParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending product regression admission is not a handoff.'
+          $r672Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r672Dirty | Sort-Object) -join '|') -ceq (@($r672Owners | Sort-Object) -join '|')) 'Pending product regression must change exactly four coordination owners.'
+          $r672Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r672Untracked.Count -eq 0) 'Product regression admission cannot include untracked drafts.'
+        } else {
+          $r672Following = @(& git -C $root rev-list --first-parent --reverse "${r672RegressionParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r672Following.Count -gt 0) 'Product regression admission missing.'
+          $r672Commit = [string]$r672Following[0]
+          $r672Parents = @(& git -C $root show -s --format=%P $r672Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r672Parents.Count -eq 1 -and [string]$r672Parents[0] -ceq $r672RegressionParent) 'Product regression admission parent changed.'
+          $r672Subject = @(& git -C $root show -s --format=%s $r672Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r672Subject.Count -eq 1 -and [string]$r672Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit product fact regression update') 'Product regression admission subject changed.'
+          $r672Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r672Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r672Committed | Sort-Object) -join '|') -ceq (@($r672Owners | Sort-Object) -join '|')) 'Product regression admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r672Commit -- @r672Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Product regression coordination changed after admission.'
+          $r672Later = @(& git -C $root log --format=%H "${r672Commit}..$head" -- @r672Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r672Later.Count -eq 0) 'Product regression admission cannot be replayed or revised.'
+        }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()

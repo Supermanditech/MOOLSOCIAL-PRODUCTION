@@ -61,7 +61,7 @@
         "Shared/backend dependent states stay unqualified"
       ],
       "manifestPath": "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
-      "manifestSha256": "3146E4A559B8821D98DBEF38CEF1B19A761BC9335F9647E060424306B01E9DE7",
+      "manifestSha256": "0FC04E35EF36E039EA10F38C90B80FAB2B8FB680A6E8787834B9DCC912C94511",
       "evidencePath": "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
       "timelineImpactDays": 0,
       "reuseInventoryComplete": true,

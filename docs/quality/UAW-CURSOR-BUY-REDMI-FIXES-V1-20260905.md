@@ -668,3 +668,32 @@ Reuse the existing 65 Cursor and 45 primary owner claims. Correct Medicine confi
   "matrixSha256": "3E584EECB765AEDB41E22B0E2CC7C2B8C5BC27A8FFDC30245329FDC82775338F"
 }
 <!-- R671-DATA-END -->
+
+
+## Product-facts regression follow-through — 9 September 2026
+
+This mvp_supporting amendment admits one existing focused test owner after the complete Buy/Profile run exposed its obsolete Tomorrow/7:30 deadline assertion. The founder already authorized implementation of every registered Redmi defect and full regression verification. The runtime correction does not invent a dated delivery promise from undated seed data. Preserve the hero, seller, price, compliance and genuine purchase assertions; replace only that obsolete delivery expectation with Delivery time confirmed at checkout. No runtime behavior is added by this test-owner amendment.
+
+Cursor UI ownership increases from65 to66 by exactly the product-content test below; primary remains45. Existing REG-20260909-4541-CURSOR-R665-PAST-DELIVERY-PROMISE and REG-20260909-4545-CURSOR-R665-REPEATED-PRODUCT-FACTS retain the defect context and failed raw evidence. Registry4513 remains frozen. Preserve every historical admission against its exact historical parent, enforce the exact four-owner coordination commit, then allow only the exact proposed test bytes. No untracked or unrelated owner is admitted.
+
+The smallest complete result is that retained functional test passing with the other corrected product journeys, followed by two complete Buy/Profile cycles on unchanged source, fresh build checks, a unique non-promotable review candidate and Redmi replay. Full qualification remains failed until those checks pass. No test exclusion, golden change, accepted baseline replacement, backend activation, OPPO action, real transaction, external message, production promotion or shutdown is authorized here. Authenticated integration remains deferred as directed.
+
+The admission subject is `ui(buy-redmi-fixes-v1-20260905): admit product fact regression update`. This four-owner amendment grants no APK build or installation allowance.
+<!-- R672-DATA-BEGIN -->
+{
+  "parent": "4e5252de8dca9e02a49358e98d2e169acac3103b",
+  "additionalUiOwner": "apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart",
+  "testRepair": {
+    "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart",
+    "beforeSha256": "B2668F2ACEF098D61A0927C4D9910FA598BE79838FE7962AF1732B94BB298166",
+    "proposedSha256": "970AE17482A0317950EAB00F21B309C901B51ABFA4DE36CD101A7A97F6CB84BB"
+  },
+  "failureEvidence": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r671-whole-buy-profile-1.result.json",
+    "sha256": "8FEE7E93935412116425438B82339191141B5392CF1A95FC0FBA62A9A6ECA255",
+    "passed": 1656,
+    "skipped": 27,
+    "failed": 8
+  }
+}
+<!-- R672-DATA-END -->
