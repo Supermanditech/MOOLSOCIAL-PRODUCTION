@@ -1,15 +1,23 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/screens/work_earn_screens.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_privacy_preferences_v2.dart';
+import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
+
+import '../buy/buy_v2_screen_test.dart'
+    show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   Future<GoRouter> pumpFromWork(
@@ -56,6 +64,7 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(
       MaterialApp.router(
+        theme: MoolTheme.light(),
         routerConfig: router,
         builder: (context, child) {
           Widget withKeyboardInset(double inset) => MediaQuery(
@@ -78,11 +87,434 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('work-earn-global-profile')));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     await tester.tap(find.byKey(const Key('global-profile-preferences')));
     await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
     return router;
+  }
+
+  Future<({GoRouter router, JourneySession journey, MemoryJourneyStore store})>
+  pumpAccessibility(
+    WidgetTester tester, {
+    Future<bool> Function()? openSettings,
+    Size size = const Size(390, 844),
+    double textScale = 1,
+    GlobalProfileSurfaceTone tone = GlobalProfileSurfaceTone.light,
+    ValueListenable<({double scale, bool reducedMotion})>? deviceSettings,
+  }) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = size;
+    tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+    tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+    addTearDown(tester.view.reset);
+    final store = MemoryJourneyStore();
+    final journey = JourneySession(store: store);
+    addTearDown(journey.dispose);
+    final router = GoRouter(
+      initialLocation: globalPreferencesLocationForReturn('/app/work/earn'),
+      routes: [
+        GoRoute(
+          path: '/app/account/workspaces/preferences',
+          builder: (context, state) => GlobalPrivacyPreferencesV2(
+            session: journey,
+            surfaceTone: tone,
+            openAccessibilitySettings: openSettings,
+          ),
+        ),
+        GoRoute(
+          path: '/app/account/security',
+          builder: (context, state) =>
+              GlobalSecurityV2(session: journey, surfaceTone: tone),
+        ),
+        GoRoute(
+          path: '/app/work/earn',
+          builder: (context, state) =>
+              const Scaffold(key: Key('a11y-exact-origin')),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MaterialApp.router(
+        theme: MoolTheme.light(),
+        routerConfig: router,
+        builder: (context, child) {
+          Widget withSettings(double scale, bool reducedMotion) =>
+              r66VisualCaptureRoot(
+                MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(scale),
+                    disableAnimations: reducedMotion,
+                  ),
+                  child: child!,
+                ),
+              );
+          final settings = deviceSettings;
+          if (settings == null) return withSettings(textScale, false);
+          return ValueListenableBuilder<({double scale, bool reducedMotion})>(
+            valueListenable: settings,
+            builder: (context, value, _) =>
+                withSettings(value.scale, value.reducedMotion),
+          );
+        },
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    return (router: router, journey: journey, store: store);
+  }
+
+  Future<void> revealAccessibility(
+    WidgetTester tester, {
+    double scrollDelta = 100,
+  }) async {
+    final tile = find.byKey(const Key('global-preferences-accessibility'));
+    await tester.scrollUntilVisible(
+      tile,
+      scrollDelta,
+      scrollable: find.descendant(
+        of: find.byKey(const Key('global-preferences-content')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tile.hitTestable(), findsOneWidget);
+  }
+
+  testWidgets('A11Y-001 existing global preferences includes Accessibility', (
+    tester,
+  ) async {
+    final journey = JourneySession(store: MemoryJourneyStore());
+    final work = WorkSession();
+    addTearDown(journey.dispose);
+    addTearDown(work.dispose);
+    await pumpFromWork(
+      tester,
+      journey: journey,
+      work: work,
+      openNotifications: () async => true,
+      openPrivacy: () async => true,
+    );
+
+    expect(
+      find.byKey(const Key('global-preferences-accessibility')),
+      findsOneWidget,
+    );
+    expect(find.text('Accessibility'), findsOneWidget);
+  });
+
+  const accessibilityFailure =
+      'Device settings could not be opened. Tap Accessibility to try again.';
+  const accessibilityChannel = MethodChannel(
+    'com.moolsocial.app/accessibility',
+  );
+
+  for (final failure in ['false', 'null', 'platform-error', 'missing-plugin']) {
+    testWidgets(
+      'A11Y-001 native $failure recovers on the same page',
+      (tester) async {
+        var calls = 0;
+        final messenger = tester.binding.defaultBinaryMessenger;
+        messenger.setMockMethodCallHandler(accessibilityChannel, (call) async {
+          expect(call.method, 'openSettings');
+          expect(call.arguments, isNull);
+          calls++;
+          if (calls > 1) return true;
+          switch (failure) {
+            case 'false':
+              return false;
+            case 'null':
+              return null;
+            case 'platform-error':
+              throw PlatformException(code: 'settings_unavailable');
+            default:
+              throw MissingPluginException();
+          }
+        });
+        addTearDown(
+          () => messenger.setMockMethodCallHandler(accessibilityChannel, null),
+        );
+        final state = await pumpAccessibility(tester);
+        final originalLocation =
+            state.router.routeInformationProvider.value.uri;
+        await revealAccessibility(tester);
+        await tester.tap(
+          find.byKey(const Key('global-preferences-accessibility')),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 1);
+        expect(find.text(accessibilityFailure), findsOneWidget);
+        expect(
+          state.router.routeInformationProvider.value.uri,
+          originalLocation,
+        );
+        expect(
+          tester
+              .widget<Semantics>(
+                find.byKey(
+                  const Key('global-preferences-accessibility-status'),
+                ),
+              )
+              .properties
+              .liveRegion,
+          isTrue,
+        );
+        await tester.tap(
+          find.byKey(const Key('global-preferences-accessibility')),
+        );
+        await tester.pumpAndSettle();
+        expect(calls, 2);
+        expect(find.text(accessibilityFailure), findsNothing);
+        expect(find.textContaining('Follows device settings'), findsOneWidget);
+        expect(
+          state.router.routeInformationProvider.value.uri,
+          originalLocation,
+        );
+        expect(state.store.snapshot, isNull);
+        expect(tester.takeException(), isNull);
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+    );
+  }
+
+  testWidgets('A11Y-001 repeated tap opens once and leaving remains safe', (
+    tester,
+  ) async {
+    var calls = 0;
+    final first = Completer<bool>();
+    final state = await pumpAccessibility(
+      tester,
+      openSettings: () {
+        calls++;
+        return first.future;
+      },
+    );
+    await revealAccessibility(tester);
+    final tile = find.byKey(const Key('global-preferences-accessibility'));
+    await tester.tap(tile);
+    await tester.tap(tile);
+    await tester.pump();
+    expect(calls, 1);
+    expect(find.text('Opening device settings…'), findsOneWidget);
+    expect(tester.widget<ListTile>(tile).enabled, isFalse);
+    await tester.tap(find.byKey(const Key('global-preferences-back')));
+    await tester.pumpAndSettle();
+    expect(
+      state.router.routeInformationProvider.value.uri.path,
+      '/app/work/earn',
+    );
+    first.complete(false);
+    await tester.pumpAndSettle();
+    expect(find.text(accessibilityFailure), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('A11Y-001 timeout and late return do not strand the action', (
+    tester,
+  ) async {
+    var calls = 0;
+    final first = Completer<bool>();
+    await pumpAccessibility(
+      tester,
+      openSettings: () {
+        calls++;
+        return calls == 1 ? first.future : Future.value(true);
+      },
+    );
+    await revealAccessibility(tester);
+    final tile = find.byKey(const Key('global-preferences-accessibility'));
+    await tester.tap(tile);
+    await tester.pump(const Duration(seconds: 6));
+    await tester.pumpAndSettle();
+    expect(find.text(accessibilityFailure), findsOneWidget);
+    expect(tester.widget<ListTile>(tile).enabled, isTrue);
+    first.complete(true);
+    await tester.pumpAndSettle();
+    expect(find.text(accessibilityFailure), findsOneWidget);
+    await tester.tap(tile);
+    await tester.pumpAndSettle();
+    expect(calls, 2);
+    expect(find.text(accessibilityFailure), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'A11Y-001 unsupported platform gives truthful inline guidance',
+    (tester) async {
+      var calls = 0;
+      final messenger = tester.binding.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(accessibilityChannel, (_) async {
+        calls++;
+        return true;
+      });
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(accessibilityChannel, null),
+      );
+      final state = await pumpAccessibility(tester);
+      await revealAccessibility(tester);
+      await tester.tap(
+        find.byKey(const Key('global-preferences-accessibility')),
+      );
+      await tester.pumpAndSettle();
+      expect(calls, 0);
+      expect(
+        find.text('Open Accessibility in your device settings.'),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('global-preferences-back')));
+      await tester.pumpAndSettle();
+      expect(
+        state.router.routeInformationProvider.value.uri.path,
+        '/app/work/earn',
+      );
+      expect(tester.takeException(), isNull);
+    },
+    variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+  );
+
+  testWidgets('A11Y-001 resumed page follows device text and motion changes', (
+    tester,
+  ) async {
+    final settings = ValueNotifier((scale: 1.0, reducedMotion: false));
+    addTearDown(settings.dispose);
+    final state = await pumpAccessibility(
+      tester,
+      openSettings: () async => true,
+      deviceSettings: settings,
+    );
+    await revealAccessibility(tester);
+    expect(find.textContaining('Standard text · Standard motion'), findsOne);
+    await tester.tap(find.byKey(const Key('global-preferences-accessibility')));
+    await tester.pumpAndSettle();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.inactive);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    settings.value = (scale: 2.0, reducedMotion: true);
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pumpAndSettle();
+    await revealAccessibility(tester);
+    expect(find.textContaining('Larger text · Reduced motion'), findsOne);
+    expect(find.textContaining('Follows device settings'), findsOne);
+    expect(state.store.snapshot, isNull);
+    settings.value = (scale: .9, reducedMotion: false);
+    await tester.pumpAndSettle();
+    await revealAccessibility(tester);
+    expect(find.textContaining('Smaller text · Standard motion'), findsOne);
+    expect(state.store.snapshot, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(320, 844), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final tone in GlobalProfileSurfaceTone.values) {
+        final label =
+            '${size.width.toInt()}x${size.height.toInt()}-$scale-${tone.name}';
+        testWidgets('A11Y-001 actual settings and Security fit $label', (
+          tester,
+        ) async {
+          var opened = false;
+          final state = await pumpAccessibility(
+            tester,
+            size: size,
+            textScale: scale,
+            tone: tone,
+            openSettings: () async => opened,
+          );
+          final title = find.text('Privacy & preferences');
+          expect(tester.widget<AppBar>(find.byType(AppBar)).toolbarHeight, 64);
+          expect(
+            tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
+            isFalse,
+          );
+          expect(tester.getRect(title).top, greaterThanOrEqualTo(24));
+          expect(
+            tester.getRect(title).bottom,
+            lessThanOrEqualTo(tester.getRect(find.byType(AppBar)).bottom),
+          );
+          await captureR66Visual(tester, 'r5-a11y-$label-page');
+          await revealAccessibility(tester);
+          final tile = find.byKey(
+            const Key('global-preferences-accessibility'),
+          );
+          expect(tester.getSize(tile).height, greaterThanOrEqualTo(48));
+          final status = find.textContaining('Follows device settings');
+          expect(
+            tester.renderObject<RenderParagraph>(status).didExceedMaxLines,
+            isFalse,
+          );
+          await captureR66Visual(tester, 'r5-a11y-$label-entry');
+          await tester.scrollUntilVisible(
+            find.byKey(const Key('global-preferences-privacy-policy')),
+            100,
+            scrollable: find.descendant(
+              of: find.byKey(const Key('global-preferences-content')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final privacyDescription = find.text(
+            'How MoolSocial handles information',
+          );
+          expect(
+            tester
+                .renderObject<RenderParagraph>(privacyDescription)
+                .didExceedMaxLines,
+            isFalse,
+          );
+          expect(
+            tester.getRect(privacyDescription).bottom,
+            lessThanOrEqualTo(size.height - 34),
+          );
+          await captureR66Visual(tester, 'r5-a11y-$label-full-choices');
+          await revealAccessibility(tester, scrollDelta: -100);
+          await tester.tap(tile);
+          await tester.pumpAndSettle();
+          final failure = find.text(accessibilityFailure);
+          expect(failure, findsOneWidget);
+          expect(
+            tester.renderObject<RenderParagraph>(failure).didExceedMaxLines,
+            isFalse,
+          );
+          expect(
+            tester.getRect(failure).bottom,
+            lessThanOrEqualTo(size.height - 34),
+          );
+          await captureR66Visual(tester, 'r5-a11y-$label-recovery');
+          opened = true;
+          await tester.tap(tile);
+          await tester.pumpAndSettle();
+          expect(find.text(accessibilityFailure), findsNothing);
+          await tester.tap(find.byKey(const Key('global-preferences-back')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('a11y-exact-origin')), findsOne);
+          state.router.go(
+            Uri(
+              path: '/app/account/security',
+              queryParameters: const {'return': '/app/work/earn'},
+            ).toString(),
+          );
+          await tester.pumpAndSettle();
+          final account = find.text('MoolSocial account');
+          expect(
+            tester.renderObject<RenderParagraph>(account).didExceedMaxLines,
+            isFalse,
+          );
+          final hero = find.byKey(const Key('global-security-hero'));
+          expect(
+            tester.getRect(hero).contains(tester.getRect(account).center),
+            isTrue,
+          );
+          await captureR66Visual(tester, 'r5-a11y-$label-security');
+          await tester.tap(find.byKey(const Key('global-security-back')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('a11y-exact-origin')), findsOne);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
   }
 
   testWidgets('Work opens one global preferences screen and saves choices', (
