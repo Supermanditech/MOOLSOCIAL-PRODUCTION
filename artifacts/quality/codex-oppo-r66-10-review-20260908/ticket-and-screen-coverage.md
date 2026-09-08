@@ -1,5 +1,13 @@
 # r66.10 approved-screen coverage
 
+## Screen 3 approved; Screen 4 Contact details awaiting review
+
+Founder approved document-readiness subject to native checks; those bounded checks found no confirmed defect. Captures 099–114 now cover Contact entry, phone/email invalid-edit validation, keyboard dismissal, Cancel restoration, optional backup-field reachability and Back/re-entry preserving the existing details and review confirmations. Current OPPO view is Contact at 114. Physical accessibility, restart/account-switch persistence and production backend verification remain separate, not waived.
+
+**OPEN — OPPO-S03-02 / r66.10 validation-guidance continuation (P2):** Continue gives a confirmation instruction for an incomplete phone or malformed email; Send code then gives the correct format-specific instruction. This is one phone/email finding attached to the existing contact-validation ticket, not two new tickets or a failure of its prior layout correction. Both actions reject malformed input; no actual OTP was sent. Reproduction: 101–105 and 107–110. Cancel restores both original confirmations (106/111); Back/re-entry is correct (113/114). Required future fix: classify format before requesting confirmation and keep the existing independent verification, changed-value invalidation, optional backup, field-level error and keyboard contracts intact. Full reproduction, owner, acceptance checks and immutable capture hashes are in device-review.md. No implementation during this review phase. Founder has not yet approved Screen 4; remain on it for their review.
+
+Evidence-only checkpoint: full 001–114 inventory contains 228 PNG/XML files; SHA-256 263491E3DDD1B79AB4EF8F06BF5EAE821E002CF69D162A5E0BCFE9CB2A1DF221. Product, tests, registry, policy, APK and Cursor/Redmi are unchanged. Earlier current/awaiting statements below are historical checkpoints.
+
 ## Screen 3 current: document-readiness awaiting founder review
 
 The preview's controlled forward/Back/forward replay now passes (093–095). Preserve 090/091 as inconclusive, not passes or confirmed defects; the founder-owned Back explanation covers only 069. Document-readiness shows the selected Grocery profile, complete reachable document guidance including bank/GST, and the bottom action above native navigation. No new confirmed defect in these checks at 100%. Capture 098 is the current first view; pause for founder review before Contact. Backend validation/notifications, legal-compliance qualification, other business types and physical accessibility remain separate. No source changes.

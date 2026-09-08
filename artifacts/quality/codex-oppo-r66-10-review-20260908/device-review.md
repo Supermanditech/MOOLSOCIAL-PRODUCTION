@@ -1,5 +1,72 @@
 # r66.10 OPPO review
 
+## Founder-paced screen 4 — Contact details — 9 September 2026
+
+Founder approved Screen 3 (Documents to keep ready), subject to Codex finding no defect in OPPO checks. The bounded readiness checks passed as recorded below; production verification, other business types and physical accessibility are not waived. Capture 099 preserves that approved readiness view; 100 enters Contact. The current screen is Contact details first view at 114, awaiting founder review. Do not advance to the Business details review or implement fixes during this screen-by-screen defect-collection phase.
+
+### Confirmed finding — OPPO-S03-02 / r66.10 validation-guidance continuation
+
+Status: OPEN, frontend correction required; one issue covering phone and email, attached to the existing contact-validation ticket rather than duplicated. Priority: P2 customer correction guidance. Exact reviewed user: Grocery/Kirana applicant editing their contact details. Existing ticket's actionable field-level validation requirement also covers this inconsistency; earlier layout fixes are not being reported as failed.
+
+- Phone reproduction, 101–105: Change the confirmed contact, enter incomplete draft 123, dismiss the keyboard and tap Continue. It blocks progression but says “Confirm the phone number customers can reach you on before continuing.” Send code then says “Enter a valid 10-digit phone number.”
+- Email reproduction, 107–110: Change the confirmed email, enter malformed draft invalid, dismiss the keyboard and tap Continue. It blocks progression but says “Confirm your email address before continuing.” Send code then says “Enter a valid email address.”
+- Impact: the first action gives the wrong next-step guidance for malformed input. The customer must use another action to discover the format error. Both handlers reject the invalid values; no OTP-entry state or real send occurred. This does not establish an authentication bypass or backend security defect.
+- Read-only cause: apps/mobile/lib/features/work/work_session.dart continueToProof checks confirmation flags before classifying contact format (around 4074–4093), while send-code validation classifies malformed input separately (around 3897). No owner was edited.
+- Required correction: Continue and Send code must give the same concise format-specific instruction for malformed input; only well-formed unconfirmed values should ask for verification. Preserve changed-value invalidation, independently verified phone/email, optional backup-number semantics, field-local errors, keyboard safety and Cancel restoration.
+- Future qualification: focused tests for empty/malformed/well-formed-unconfirmed/confirmed and changed-contact cases across phone/email, with optional backup coverage; local normal/200% visual checks and matching successor-APK OPPO replay. Do not mark fixed from this registration or from existing pre-APK tests.
+
+| Check | Actual result/evidence |
+| --- | --- |
+| Prefill and correct context | 100/114 show the retained name and exact contacts, existing review confirmations, approved Grocery/Kirana-or-Speciality subtitle and authorised-person helper. No new verification request occurs simply on re-entry. |
+| Edit and keyboard | 101/107 enter their respective keyboard/edit states; 103/108 dismiss the keyboard without leaving Contact. Screenshots 107/109/112/114 inspected; the active email field and Cancel remain above the keyboard, and validation/actions remain above Android navigation when dismissed. No physical 200%/TalkBack pass is claimed. |
+| Changed-contact safeguards | 102–105 and 108–110 no longer show the edited invalid contact as confirmed, block Continue and reject Send code before OTP entry. Real OTP delivery/verification is not tested by these review fixtures. |
+| Cancel restoration | 106 and 111 restore the original contact values and review confirmation display; their native XML equals 100. No invalid test draft remains. |
+| Optional backup number | 112 reaches the empty “Backup number · optional” field and helper by scrolling while Continue stays visible. Blank-backup forward completion was not newly exercised here. |
+| Back and re-entry | 113 returns to the correct Documents to keep ready screen; 114 re-enters Contact with the same name, contacts and confirmation display, and no stale validation. This is in-session navigation, not process-death/account-switch persistence qualification. |
+
+No product/test/policy/registry edits, real SMS/email, external messages, document submission, payment or admin approval were performed. Cursor and Redmi remain untouched. Backend qualification, physical accessibility and other unplayed interruption cases remain separate. This screen is not defect-free: the validation-guidance continuation remains open.
+
+The interrupted/truncated capture-106 result was recovered by inspecting the existing PNG/XML and current foreground; Cancel was not blindly repeated and no unavailable output was counted as a pass. A later read-only source search included a nonexistent ui_v2/work directory and exited 1; only the independent, directly read work_session.dart content supports the cause above. Existing bounded-output/discovery prevention remains applicable; neither event is a product-test pass.
+
+### Screen 4 capture hashes
+
+32 new PNG/XML rows, 099–114. Full 001–114 inventory: 228 rows; canonical UTF-8/no-BOM LF-terminated SHA-256 263491E3DDD1B79AB4EF8F06BF5EAE821E002CF69D162A5E0BCFE9CB2A1DF221.
+
+```text
+F621BFE7258E343BABACB4C1461523CB1FC579F2F3AD932FACEC95E182E2E4B1  r6610-native-099-readiness-approved-checkpoint.png
+8EF7326C0A3F351ADC6BF34BD36CFA3BBEB4680EF36ABB59001E458EF1E02F26  r6610-native-099-readiness-approved-checkpoint.xml
+DAD91BD4B38D72FFE10CFD6503C2D547DD04BE2F0BEB70C990879655D067A60F  r6610-native-100-contact-review-first-view.png
+02A79D16A5AE23646A3B9A11366781C1F097769E4705225F2F1DB5842A7C13C6  r6610-native-100-contact-review-first-view.xml
+A6F16CAE6022DA8319F4B3A706CE3FEEA562D875798D46266E8821C38C18AE85  r6610-native-101-contact-change-editing.png
+27C0F3784C3A169D7B201F8BFE6ECF535281935DDC3A4526F1BD5272DB47676F  r6610-native-101-contact-change-editing.xml
+1643DC7DFDE5BC28EE3914B2FFAC4DA9EA22D5206A18FC39E9BE8735DC1DBD52  r6610-native-102-contact-invalid-draft.png
+41D48AB076A9F697241FBE1ECDFA7FF21A8FBC980F29CDB11737AB07B52D39BF  r6610-native-102-contact-invalid-draft.xml
+5A93C189857F253B777E5649CD0D53229CAEC9E3A503BD176B41A8DD4940B708  r6610-native-103-contact-invalid-keyboard-dismissed.png
+E28564CB0619F26C48FB7D261EF53DC76D29A0EC58F8BFE55E9E7AD6A7D15C68  r6610-native-103-contact-invalid-keyboard-dismissed.xml
+4F3B9FE3FE2C181BE4C750319BAE6592C2D761E404971D2F6F8EB195DF208F57  r6610-native-104-invalid-contact-blocked.png
+B2F6CA9C7D7B4ABDF8E28E1A85C005BBCBFB7209F209CFA9EA9360679603C4DB  r6610-native-104-invalid-contact-blocked.xml
+17B2E969996A4D4C3816D756FD89085435CE22DA901DD2E8E3D9B825C3BD9B44  r6610-native-105-invalid-phone-send-code.png
+2B08666A131944F1812C0B3702409381C2C22236FD2E99B30FDFE1CA3F2F2A84  r6610-native-105-invalid-phone-send-code.xml
+416A8B0E34B31A6CD66AEBFB054DC4205B5D656FEDAF3B60F0DA78DB6C929379  r6610-native-106-phone-cancel-restores-confirmation.png
+02A79D16A5AE23646A3B9A11366781C1F097769E4705225F2F1DB5842A7C13C6  r6610-native-106-phone-cancel-restores-confirmation.xml
+70FB3DC324ABD640E7C3CD17AF96B602F2633C821EC39B05555A872F3505960E  r6610-native-107-email-change-keyboard.png
+12EB5892567B9352193C07126DDB764DAFA381CE34F61F6643C0B20718C7D4CB  r6610-native-107-email-change-keyboard.xml
+41BE591084F9B0F28542FFE87DBC84ED716A9F921259A971CBB5225F99C0BDEB  r6610-native-108-invalid-email-keyboard-dismissed.png
+6634FD79A87B560E83719C074DCDDA4D2C1C8CFB73221822A3F3E52071ADD8B2  r6610-native-108-invalid-email-keyboard-dismissed.xml
+3CA79345114AD95536006B9E9E8F0D031D2D730DD0C0E84D93658D8688843F9A  r6610-native-109-invalid-email-continue-message.png
+BDA427C87D15022D836A5A2FB50B5AF923B88C7EA61A05181FDB95E63F2477E2  r6610-native-109-invalid-email-continue-message.xml
+903DD58E144EAC7F8870C43C0B975995C0D2572B0698A03A3F9245F75AFE45A7  r6610-native-110-invalid-email-send-message.png
+BB431009A033CFCE7D2F2B208D84B01AF89E94E4A8268A46B44701C531031834  r6610-native-110-invalid-email-send-message.xml
+2CE0985453389784316B5889744197ACEC993D4F6CEBED911759AC24F0C2F5BB  r6610-native-111-email-cancel-restores-confirmation.png
+02A79D16A5AE23646A3B9A11366781C1F097769E4705225F2F1DB5842A7C13C6  r6610-native-111-email-cancel-restores-confirmation.xml
+0368F05FFD76FF74ECD2E8010647B192EF9BD909457DABD5C3DF955250833546  r6610-native-112-contact-alternate-reachable.png
+B44BD5EC7693265EA5395DC2CDFE3778D08BC987571FDD56798E581D9B95CCA9  r6610-native-112-contact-alternate-reachable.xml
+E65FD01DB9B4D47147763ACEDD1D5E519AF8239D70DC60B73EDEE7DF4DC37029  r6610-native-113-contact-back-document-readiness.png
+8EF7326C0A3F351ADC6BF34BD36CFA3BBEB4680EF36ABB59001E458EF1E02F26  r6610-native-113-contact-back-document-readiness.xml
+A12B11ECF1146E875FE9214A8E5D8F4DA1A614BB4298D515B182B0F8E9BF7498  r6610-native-114-contact-reentry-retains-confirmations.png
+02A79D16A5AE23646A3B9A11366781C1F097769E4705225F2F1DB5842A7C13C6  r6610-native-114-contact-reentry-retains-confirmations.xml
+```
+
 ## Founder-paced screen 3 — Documents to keep ready — 9 September 2026
 
 Current OPPO foreground: Documents to keep ready, Grocery / Kirana Shop, first view, capture 098. Screen 3 awaits founder review. Continue setup has not been activated in this screen's current review; contact entry is the next stop after approval.

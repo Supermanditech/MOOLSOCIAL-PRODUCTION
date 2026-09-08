@@ -19,12 +19,24 @@
   "launchStatus": "ok",
   "fontScale": 1.0,
   "firstSmokeCaptures": ["r6610-native-001-retained-launch", "r6610-native-002-mool-menu", "r6610-native-003-work-entry"],
-  "fullWorkspaceDashboardReplay": "partial_native_001_through_098_remaining_cases_pending",
-  "currentNativeScreen": "document_readiness_screen_3_awaiting_founder_review",
-  "nativeCaptureCount": 98,
-  "nativeCaptureInventorySha256": "F7A4F31D44C3CB07E9E8D015BB546D78706C5C50F93EF9AA0F8A959719854254",
+  "fullWorkspaceDashboardReplay": "partial_native_001_through_114_contact_validation_finding_open",
+  "currentNativeScreen": "contact_details_screen_4_awaiting_founder_review",
+  "nativeCaptureCount": 114,
+  "nativeCaptureInventorySha256": "263491E3DDD1B79AB4EF8F06BF5EAE821E002CF69D162A5E0BCFE9CB2A1DF221",
   "screen1FounderVisualApproval": "approved_2026-09-09",
   "screen2FounderVisualApproval": "approved_subject_to_native_checks_2026-09-09",
+  "screen3FounderVisualApproval": "approved_subject_to_native_checks_2026-09-09",
+  "screen4FounderVisualApproval": "pending",
+  "openNativeReviewFindings": [
+    {
+      "ticket": "OPPO-S03-02",
+      "finding": "r66.10 validation-guidance continuation",
+      "status": "confirmed_frontend_fix_pending_review_collection_only",
+      "scope": "Continue requests confirmation instead of format correction for malformed phone and email; Send code rejects with the correct format instruction",
+      "evidenceCaptures": [104, 105, 109, 110],
+      "productionAuthenticationBypassObserved": false
+    }
+  ],
   "founderAcceptance": "pending",
   "productionBackendQualification": "not_inferred_from_review_fixtures"
 }
