@@ -1,5 +1,103 @@
 # r66.10 OPPO review
 
+## Founder-paced screen 6 — Documents — 9 September 2026
+
+Founder approved Business details subject to Codex finding no defect in native testing and directed that genuine issues be registered before moving ahead. The bounded Details checks below found no new confirmed defect; physical/backend dependencies and the separate Contact validation-guidance finding remain open. Capture 133 preserves the approved Details screen, and 134 opens Documents, Step 2 of 3. Current OPPO foreground is Documents first view at 163, awaiting founder review.
+
+Safety boundary: only the existing MoolSocial-QA-NOT-A-REAL-DOCUMENT-r665.pdf and .png fixtures were selected. The PDF explicitly says it is not an identity/bank document; the PNG is an old app screenshot serving as a file fixture. Its embedded legacy UI is not the current app's UI or a regression. No real identity, bank, authority or business document was selected; no application, external message, payment, real OTP or admin approval was submitted. The review gateway's local attachment acknowledgement does not qualify production upload/storage/verification.
+
+| Check | Actual result/evidence |
+| --- | --- |
+| First view and document scope | 134/136/163: matching business subtitle, Step 2 of 3, concise format/size guidance and Review your information above native navigation. 137/140 expose the food-business, authorization, bank and GST slots by scrolling. |
+| Optional attachments and boundary Back | 135: Review is reachable with no documents and states that none are added. No declaration or Submit is activated. Header Back at 136 returns to Documents; this is boundary testing, not founder approval of Review. |
+| Source chooser | 138: Camera, Photo gallery, PDF or image, Cloud files and Cancel are visible. Exact slot is Authorization letter; format guidance lists PDF/JPG/JPEG/PNG/WebP and up to 10 MB. Full chooser/Cancel pixels were inspected above Android navigation. |
+| Native PDF selection | 139 selects only the named QA PDF from Android DocumentsUI Downloads. 140 attaches it to Authorization letter, with the correct filename, View/Replace/Remove and row-local attached feedback. No oversized persistent success banner appears in the exercised states. |
+| PDF content and paging | 141 renders the distinct QA page-1 marker; 142 renders page 2. Native semantics disable Previous on page 1 and Next on page 2. Reopening at 148 starts at page 1 with the same PDF. |
+| Zoom/pan/Fit | 143 enlarges page 2; 144 pans it to expose the enlarged top content. 145 restores the fitted whole-page bounds. These observed touch interactions work without closing the document or switching attachment. |
+| Preview Replace and cancellation | 146 opens the source chooser from the preview; Cancel at 147 returns to the same attached PDF row. Reopen/View at 148 and Close at 149 work. |
+| Remove/Restore | 150 removes only the review-draft attachment and immediately offers Restore; 151 restores the same PDF and its actions. The original QA file and retained evidence are untouched. |
+| Image replacement via Cloud files | 152–154: Cloud files opens Android DocumentsUI; only the named QA PNG in local Downloads is selected. It replaces the same Authorization letter slot. This proves the native provider-picker wiring/local selection, not a Google/Microsoft cloud download or account connection. |
+| Image content and Back | 155 renders the selected QA image; Android Back at 156 returns to the correct row with the filename/actions retained. Actual pixels were inspected, with no attempt to interpret the embedded old screenshot as current UI. |
+| Gallery cancellation | From chooser 157, Photo gallery opens com.google.android.photopicker/com.android.photopicker.PhotopickerGetContentActivity, confirmed by dumpsys foreground readback. No gallery photo is selected or inspected and no gallery-content screenshot is retained. Android Back returns to the source chooser at 158, not directly to the row; chooser Cancel at 159 returns to the unchanged PNG attachment. The 158 filename describes the test intent; its actual captured screen is the source chooser. |
+| Draft retention and restored first view | 160 returns to Details with the business draft intact; 161 re-enters Documents at its top; 162 confirms the PNG remains in Authorization letter. 163 restores the first view. These are in-session checks, not process-death or account-isolation qualification. |
+
+No new confirmed product defect in the PDF/image/chooser/cancellation/navigation interactions exercised at OPPO 100%. Existing R669-S05-FEEDBACK gains successful row-local-feedback replay; no duplicate defect or blanket document-ticket closure is created. A failed-upload or oversized/corrupt-document path was not exercised by these successful attachments.
+
+Existing OPPO-S03-03 accessibility observation is retained, not duplicated: PDF/image footer controls appear fully above native navigation and respond to actual taps (Zoom/Fit/Close/Replace), but compressed hierarchy reports only y1412–1442 for those controls. This is not proof of a visually clipped or untappable button and not a TalkBack pass. Physical spoken focus/bounds and 200% testing remain pending.
+
+Other pending document qualifications: camera capture; actual Gallery selection/return; remote cloud-provider download; all advertised format variants; oversized/corrupt/password-protected document recovery; actual upload/network failure and service recovery; relaunch/account-change isolation; production file authorization, content validation, storage and review status. Existing local source/tests may cover subsets, but this native round does not reclassify those cases as device-passed. No settings/security permission was changed and no account was opened for those deferred paths.
+
+Picker timing was handled safely: immediate post-tap foreground remained MoolSocial for PDF/Cloud/Gallery; separate read-only foreground checks confirmed the native picker before interacting. No repeated launch tap or failed picker verdict was inferred from that transition. Source, tests, registry, policy, APK, Cursor and Redmi are untouched.
+
+### Screen 6 capture hashes
+
+62 new PNG/XML rows, 133–163. Full 001–163 inventory: 326 rows; canonical UTF-8/no-BOM LF-terminated SHA-256 11BA7E443F75EC196EB00880100FE4F16700A7C6EDFB9BA80D282BA0CD660B66.
+
+```text
+DE260FAB3A89C9ED287A5782FFA3745CCFB652FB41FEA523C93229E79AB297DA  r6610-native-133-business-founder-approved.png
+A35D098FF7C8498FE8699FB456564425C81A537E6FA9BF02847CE42087D5B6D1  r6610-native-133-business-founder-approved.xml
+2BAD88AA4C18B4786918B521A2E12B27FEB6EF2D2240AFB208D829DEC7816BD8  r6610-native-134-documents-first-view.png
+DFD86AE6A8A6E50700D70A01F063C787A3178E5F917F310B55976ADF37120F35  r6610-native-134-documents-first-view.xml
+FD4D53FF559132DF8C79D9B21C59C6E9DC699A89B5580F458A184DC64C067BEB  r6610-native-135-documents-optional-review-boundary.png
+E4778D0FD97682F07688763BA9F80A27B2D0A5102FF05E87688CBB5A3780D3D5  r6610-native-135-documents-optional-review-boundary.xml
+D69B4840AE40CD6AE01FA40FC858571B68CFA15BABE4D8037401323D56046F67  r6610-native-136-empty-review-back-documents.png
+DFD86AE6A8A6E50700D70A01F063C787A3178E5F917F310B55976ADF37120F35  r6610-native-136-empty-review-back-documents.xml
+3E256F262F5FEAF4CDBD2D311D66B1502A3083F11FE6AE889034E05761E8986A  r6610-native-137-document-list-authorisation-bank.png
+02B2149E8F398A461610E12DCDB34465CD51C4D6FFEB39E93BAB430F4B68A2E6  r6610-native-137-document-list-authorisation-bank.xml
+A7FF35964A93C40CEC9C62EC65ACEDE91D0D190F6F1F105EFF6F00DD89050112  r6610-native-138-document-source-chooser.png
+0E0200CC26522CEBF059895096E62F540B940203E33239506713B17D8B3E9782  r6610-native-138-document-source-chooser.xml
+BCE692D5C1EA63E5C7C5C4A97CEC0D555C802BD12C001450BA49B3C73F082485  r6610-native-139-android-pdf-picker.png
+98611B0C24415298E6C8EA766D68293B8B1F9E431755AE7282FEB72D641A3371  r6610-native-139-android-pdf-picker.xml
+1BD5FAAA315D6318EB1D2849CD40D7382525F8F1B51B2F58EF1BE7E37858A115  r6610-native-140-qa-pdf-attached.png
+0F8A8ECB336CD5AE0F89FC458831A4080F978C45F912CD6FBE4B6BB5E5E607B9  r6610-native-140-qa-pdf-attached.xml
+9D9C200E03F74F85BC852F10A886155445BFE92085851873CED316683A664CC8  r6610-native-141-pdf-first-page.png
+490D12F52C551D4BD24A1255CB1B7B6A1274A50BBB15D97BC8523712C19B85E3  r6610-native-141-pdf-first-page.xml
+378E8588A7E852E490ACE2625FF787A73BB59055BB7341C7FC01E2ACC01700DF  r6610-native-142-pdf-second-page.png
+9AD0393290BB1E39FCC91224C752F5FC904736DBD973DFEAFCFE6EB97C1CB217  r6610-native-142-pdf-second-page.xml
+ABCA8CDE1CCFBCDAA00C07927C2B01FCEB7F39A19FCA5F7E7A25EA15CFC61415  r6610-native-143-pdf-zoom.png
+84BB5E13E8EC93400CA923B0B58D31D7376380BB1D697372181F41DDF185B2DA  r6610-native-143-pdf-zoom.xml
+6621354ACA9F505D66A01D1764119E0DAB9ECA6E15912F75B12B64D0B0C9576F  r6610-native-144-pdf-zoomed-pan.png
+84BB5E13E8EC93400CA923B0B58D31D7376380BB1D697372181F41DDF185B2DA  r6610-native-144-pdf-zoomed-pan.xml
+A3C8EEAB94785757401A7D61D26B86F8A3293FD8D06AECCFAD333C15084DBF82  r6610-native-145-pdf-fit-restored.png
+9AD0393290BB1E39FCC91224C752F5FC904736DBD973DFEAFCFE6EB97C1CB217  r6610-native-145-pdf-fit-restored.xml
+FF24F72B794976BA1E0B1363E4B8D3D400ECE5B3ED3E093E099AB4D18FACE142  r6610-native-146-preview-replace-source-chooser.png
+66DB888A24A2CFA23988A67FE7D7C576601B01CB71C6999D338D4E6F0E9B273F  r6610-native-146-preview-replace-source-chooser.xml
+0E7C729AEC9D078B128B601D0E3F756A8413793CC261FE6724DFD7D91F981F90  r6610-native-147-replacement-cancel-preserves-pdf.png
+0F8A8ECB336CD5AE0F89FC458831A4080F978C45F912CD6FBE4B6BB5E5E607B9  r6610-native-147-replacement-cancel-preserves-pdf.xml
+04DF39E2B198ECB130D65D9A147818754EDC18F21C70013A05F045BAC24C5B0B  r6610-native-148-pdf-reopen-after-cancel.png
+490D12F52C551D4BD24A1255CB1B7B6A1274A50BBB15D97BC8523712C19B85E3  r6610-native-148-pdf-reopen-after-cancel.xml
+483CE735D9E77CE6B963B0EE2A1A94E93D9E1E35B1737BC99FACEAA5E8FF5482  r6610-native-149-pdf-close-same-document-row.png
+0F8A8ECB336CD5AE0F89FC458831A4080F978C45F912CD6FBE4B6BB5E5E607B9  r6610-native-149-pdf-close-same-document-row.xml
+A822E33917123D89619256ECEE25CC50F0F58E421F19E66CBF6554F65ED7DF11  r6610-native-150-pdf-removed-restore-available.png
+CAA73982474038DE12BC19C773595B86B9BB49FB48F421855919C0E6D2B67ADE  r6610-native-150-pdf-removed-restore-available.xml
+B715992FDF7B74888C9F1C2CE01A2E94A71E1F9390910E639EB2D51C668B02F0  r6610-native-151-pdf-restored.png
+0F8A8ECB336CD5AE0F89FC458831A4080F978C45F912CD6FBE4B6BB5E5E607B9  r6610-native-151-pdf-restored.xml
+DF181254FEC8BCB0333F5BBE2AD21ED594F0C8A703003A735D0F01088D9D363B  r6610-native-152-row-replace-source-chooser.png
+66DB888A24A2CFA23988A67FE7D7C576601B01CB71C6999D338D4E6F0E9B273F  r6610-native-152-row-replace-source-chooser.xml
+298A4A7F25ACF1728D4D0363E551802B21D2F9EB5FE19D973636986896DCCE41  r6610-native-153-cloud-files-native-picker.png
+98611B0C24415298E6C8EA766D68293B8B1F9E431755AE7282FEB72D641A3371  r6610-native-153-cloud-files-native-picker.xml
+D41B95C568C6A553C31E52FC58FE54C07A5D701554251915C52193394D33E608  r6610-native-154-qa-image-replaces-pdf.png
+23B9E6D3E90852D332EC1C9BDA97F19156FF202F956B185559ADFB288AE07B9D  r6610-native-154-qa-image-replaces-pdf.xml
+AC65D888D333B3C59070616B3677E86631A2A630728A2FC31FC704CBD4E05588  r6610-native-155-image-preview.png
+11FEED99342D49DDA2D2F7700315B68913C2EAD99781B7ECE1BB9360E8A8C4A0  r6610-native-155-image-preview.xml
+6C426A5640680AAE3A9D590290B30A933F217FE1496E1CD9F8EA8E7B5C69ACE7  r6610-native-156-image-back-same-row.png
+23B9E6D3E90852D332EC1C9BDA97F19156FF202F956B185559ADFB288AE07B9D  r6610-native-156-image-back-same-row.xml
+970CFBA2666CAD5C1A55A5C0903AAC83D5BC2017BFEA73A9FA44909EC4110594  r6610-native-157-image-replacement-chooser.png
+66DB888A24A2CFA23988A67FE7D7C576601B01CB71C6999D338D4E6F0E9B273F  r6610-native-157-image-replacement-chooser.xml
+46B393F7C565DE7B1E3EFB8FE0728E5288555837DF70C70D820F7C1341801208  r6610-native-158-gallery-cancel-preserves-image.png
+66DB888A24A2CFA23988A67FE7D7C576601B01CB71C6999D338D4E6F0E9B273F  r6610-native-158-gallery-cancel-preserves-image.xml
+F6E1988E47B2969579C5BED25072ED0F1812138ED69C830EE407DBAB9E3AEEB5  r6610-native-159-gallery-cancel-same-attachment.png
+23B9E6D3E90852D332EC1C9BDA97F19156FF202F956B185559ADFB288AE07B9D  r6610-native-159-gallery-cancel-same-attachment.xml
+458F13C9D58FEC3AB908641F6AB226F81D2D50E6F750D0F968C64CD2DE3C8914  r6610-native-160-documents-back-details-with-attachment.png
+3BA33AFD9CB15598BF4728E5B6A3840B004EF6B2B9F0781DB60768B53FBFB419  r6610-native-160-documents-back-details-with-attachment.xml
+8F78519B99F8FBC8FDFDAF76D27E03ECBB0D06C3ADEFA957B7186887FF046902  r6610-native-161-documents-reentry-top.png
+A35E7092980EE2AAE2509CE928E55C50A0FD267430642AD3169D1953994D0961  r6610-native-161-documents-reentry-top.xml
+6BF88CB5ED4AE4FC74F8D75F6189302FFA3A8204A51A23F37379CB297B425A16  r6610-native-162-document-attachment-retained-after-back.png
+30EC91543B92435AE7527289C39E7AA6D44782E21C7FED26F9DF3DA6B843845F  r6610-native-162-document-attachment-retained-after-back.xml
+684B12927DA8296880A2315EA93918AA3545B16B9E3CAD0F30E9EC44C3D3320B  r6610-native-163-documents-founder-review-first-view.png
+A35E7092980EE2AAE2509CE928E55C50A0FD267430642AD3169D1953994D0961  r6610-native-163-documents-founder-review-first-view.xml
+```
+
 ## Founder-paced screen 5 — Business details — 9 September 2026
 
 Founder approved Contact details subject to OPPO checks and explicitly instructed that genuine issues be registered before moving ahead. Its single OPPO-S03-02 validation-guidance continuation remains open; approval does not close it. Capture 115 preserves Contact before Continue; 116 opens Business details directly, with the optional backup contact left blank. Current OPPO screen: Business details, Step 1 of 3, capture 132, awaiting founder review. No additional screen review or implementation is implied by the forward/Back boundary check.
