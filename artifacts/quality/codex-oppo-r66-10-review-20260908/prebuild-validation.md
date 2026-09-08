@@ -1,5 +1,17 @@
 # r66.10 prebuild validation
 
+## Build completed — 9 September 2026
+
+Exactly one guarded build completed with exit 0 from 7a12f127c09798f8fd208de8a92837c6956058af. Android assembleDebug completed in 60.1 seconds. Package/plugin integrity passed for com.moolsocial.app.runtime, including registrant, firebaseCore and sharePlus; the integration-test plugin is permitted only in this non-promotable debug review build.
+
+Saved APK: artifacts/device/codex-oppo-r66-10-review-20260908/uaw-codex-oppo-r66.10-review-20260908-device-review-debug.apk; 209786681 bytes; SHA-256 8973A2655DD26DD7F9DC7B373B264DDD84638164EC2EEF58812037841773CAE7. Independent saved-artifact readback matches; all 381 source/dependency hashes remain unchanged after the guarded build. One-build authorization is consumed.
+
+Complete host/native build transcript: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r6610-guarded-apk-build-attempt1-20260909.log; SHA-256 AE344D43E5A4A80421A70A015B52A3FC99BE01383234526929BA320D4C8E3E89. The existing plugin KGP future-migration warning is retained in that transcript; dependencies were not upgraded. This is not an AAB or Play release qualification. Installation and device replay remain pending.
+
+## One-build activation
+
+Qualified HEAD 7a12f127c09798f8fd208de8a92837c6956058af is pushed and exactly remote-equal. Clean digest: 0 bytes, 0 records, SHA-256 E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855. Coordination pre_commit/handoff and incremental handoff passed. The machine state now authorizes one guarded RuntimeUiReview debug build of 1.0.0-r66.10+2026090805 from this exact HEAD and manifest 057E24CF2F0259DBE46E3363D2627990ACD5A409DD9769F417A7A9E40F6F0B5F. Only candidate evidence updates follow this seal. Post-build integrity, installation and device/founder review remain pending; no AAB, deployment or production promotion.
+
 ## Current result — host qualification passed, source seal next
 
 9 September 2026: all required host controls are complete on the unchanged 381-file manifest. Attempt2 completed accepted-commit coverage (18 accepted/2 rejected), positive/omitted/rejected coverage fixtures, approved UI locks, customer copy, full tracked-support self-tests including successful cleanup, and Android resource integrity (11 XML, no unexpected deletion, one launch owner). Attempt3 reran the failed build-foundation step with its existing command-specific EvidenceArchiveRoot parameter and completed the remaining incremental pre_build, MVP execution and guarded locked-dependency checks.

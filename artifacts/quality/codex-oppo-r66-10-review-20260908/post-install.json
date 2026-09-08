@@ -1,8 +1,25 @@
 {
   "candidateId": "UAW-CODEX-OPPO-R66.10-REVIEW-20260908",
-  "state": "pending",
+  "state": "installed_exact_checksum_device_review_pending",
   "packageId": "com.moolsocial.app.runtime",
   "deviceSerial": "2b3e0f71",
-  "apkBuilt": false,
-  "installed": false
+  "apkBuilt": true,
+  "installed": true,
+  "sourceCommit": "7a12f127c09798f8fd208de8a92837c6956058af",
+  "versionName": "1.0.0-r66.10-runtime",
+  "versionCode": 2026090805,
+  "installedAtDeviceLocal": "2026-09-09 01:00:41",
+  "apkBytes": 209786681,
+  "localAndInstalledSha256": "8973A2655DD26DD7F9DC7B373B264DDD84638164EC2EEF58812037841773CAE7",
+  "dataRetained": true,
+  "installCommandSucceeded": true,
+  "initialVerificationCommandExit": 1,
+  "initialVerificationDisposition": "Caller omitted Android double-tilde directory prefix; no reinstall or app defect",
+  "completedVerificationExit": 0,
+  "launchStatus": "ok",
+  "fontScale": 1.0,
+  "firstSmokeCaptures": ["r6610-native-001-retained-launch", "r6610-native-002-mool-menu", "r6610-native-003-work-entry"],
+  "fullWorkspaceDashboardReplay": "pending",
+  "founderAcceptance": "pending",
+  "productionBackendQualification": "not_inferred_from_review_fixtures"
 }
