@@ -18,7 +18,8 @@ import 'buy_v2_saved_clear_sheet_motion.dart';
 import 'buy_v2_supplier_sheet_motion.dart';
 import 'buy_v2_views.dart';
 
-enum BuyV2OfferPublisherType { manufacturer, wholesaler, retailer }
+export '../../features/buy/buy_v2_content_contracts.dart'
+    show BuyV2OfferPublisherType;
 
 @immutable
 class BuyV2PublishedOffer {
@@ -26,11 +27,13 @@ class BuyV2PublishedOffer {
     required this.productId,
     required this.publisherType,
     required this.headline,
+    this.publisherName,
   });
 
   final String productId;
   final BuyV2OfferPublisherType publisherType;
   final String headline;
+  final String? publisherName;
 }
 
 /// Presentation seam for the ordered offer placements published for Buy.
@@ -256,6 +259,10 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
     if (!session.catalogueAvailable) {
       return _OffersAvailabilityState(session: session);
     }
+    if (session.pagedOffersEnabled &&
+        widget.source is BuyV2CataloguePublishedOffersSource) {
+      return _PagedPublishedOffersView(session: session);
+    }
     final liveSource = widget.source is BuyV2LivePublishedOffersSource;
     if (!session.reviewDataEnabled && !liveSource) {
       return _OffersAvailabilityState(session: session);
@@ -433,6 +440,183 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
   }
 }
 
+class _PagedPublishedOffersView extends StatefulWidget {
+  const _PagedPublishedOffersView({required this.session});
+  final BuyV2Session session;
+
+  @override
+  State<_PagedPublishedOffersView> createState() =>
+      _PagedPublishedOffersViewState();
+}
+
+class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
+  static const _scope = 'published-offers';
+  BuyV2OfferPublisherType? _publisher;
+  String _category = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    _restoreSelection();
+  }
+
+  void _restoreSelection() {
+    final query = widget.session.retainedCatalogueOffersQuery(_scope);
+    _publisher = query?.offerPublisher;
+    _category = query?.categoryId ?? 'all';
+  }
+
+  @override
+  void didUpdateWidget(covariant _PagedPublishedOffersView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session) _restoreSelection();
+  }
+
+  List<BuyV2Category> get _categories => {
+    for (final destination in [
+      BuyV2Destination.shop,
+      BuyV2Destination.wholesale,
+    ])
+      for (final category in widget.session.categoriesFor(destination))
+        if (category.id != 'all') category.id: category,
+  }.values.toList(growable: false);
+
+  Future<void> _chooseCategory() async {
+    FocusScope.of(context).unfocus();
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      builder: (sheetContext) => SafeArea(
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .8,
+          child: BuyV2VerticalScrollIndicator(
+            child: ListView(
+              key: const ValueKey('buy-offers-category-list'),
+              padding: const EdgeInsets.fromLTRB(12, 6, 12, 20),
+              children: [
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text('Offer categories', style: context.buyTitle),
+                    ),
+                    IconButton(
+                      tooltip: 'Close categories',
+                      onPressed: () => Navigator.pop(sheetContext),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+                ListTile(
+                  key: const ValueKey('buy-offers-category-all'),
+                  title: const Text('All categories'),
+                  selected: _category == 'all',
+                  onTap: () => Navigator.pop(sheetContext, 'all'),
+                ),
+                for (final category in _categories)
+                  ListTile(
+                    key: ValueKey('buy-offers-category-${category.id}'),
+                    title: Text(category.label),
+                    selected: _category == category.id,
+                    onTap: () => Navigator.pop(sheetContext, category.id),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!mounted || selected == null) return;
+    setState(() => _category = selected);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.session;
+    final categoryLabel =
+        _categories.where((c) => c.id == _category).firstOrNull?.label ??
+        'Categories';
+    return BuyV2PagedProductCatalogue(
+      session: session,
+      scopeKey: _scope,
+      query: session.catalogueOffersQuery(
+        publisher: _publisher,
+        categoryId: _category,
+      ),
+      publishedOffers: true,
+      showAreaControl: true,
+      header: BuyV2CartAvoidanceRegion(
+        child: Container(
+          key: const ValueKey('buy-offers-publisher-summary'),
+          margin: const EdgeInsets.fromLTRB(8, 6, 8, 6),
+          padding: const EdgeInsets.all(10),
+          decoration: buyV2CardDecoration(
+            color: BuyV2Colors.softOrange,
+            radius: 16,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.local_offer_outlined,
+                    color: BuyV2Colors.orange,
+                    size: 22,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Offers',
+                      style: context.buyTitle.copyWith(fontSize: 17),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 5,
+                runSpacing: 5,
+                children: [
+                  for (final type in BuyV2OfferPublisherType.values)
+                    _OfferPublisherChip(
+                      type: type,
+                      count: null,
+                      selected: _publisher == type,
+                      onTap: () => setState(
+                        () => _publisher = _publisher == type ? null : type,
+                      ),
+                    ),
+                  TextButton.icon(
+                    key: const ValueKey('buy-offers-category-control'),
+                    onPressed: _chooseCategory,
+                    icon: const Icon(Icons.category_outlined, size: 17),
+                    label: Text(categoryLabel),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+      publicationFacts: (offers) => _PublishedOfferFactsRail(
+        session: session,
+        entries: [
+          for (final value in offers)
+            (
+              offer: BuyV2PublishedOffer(
+                productId: value.product.id,
+                publisherType: value.publisherType,
+                headline: value.headline,
+                publisherName: value.publisherName,
+              ),
+              product: value.product,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PublishedOfferFactsRail extends StatelessWidget {
   const _PublishedOfferFactsRail({
     required this.session,
@@ -473,7 +657,8 @@ class _PublishedOfferFactsRail extends StatelessWidget {
               ),
             ),
             (
-              text: 'Published by ${product.seller} · Available while listed',
+              text:
+                  'Published by ${entry.offer.publisherName ?? product.seller} · Available while listed',
               style: context.buyMeta.copyWith(fontSize: 8),
             ),
           ];
@@ -682,7 +867,7 @@ class _OfferPublisherChip extends StatelessWidget {
   });
 
   final BuyV2OfferPublisherType type;
-  final int count;
+  final int? count;
   final bool selected;
   final VoidCallback onTap;
 
@@ -697,7 +882,9 @@ class _OfferPublisherChip extends StatelessWidget {
       key: ValueKey('buy-offers-filter-${type.name}'),
       button: true,
       selected: selected,
-      label: '$label offers, $count available',
+      label: count == null
+          ? '$label offers'
+          : '$label offers, $count available',
       child: Material(
         color: selected
             ? BuyV2Colors.navy
@@ -716,7 +903,7 @@ class _OfferPublisherChip extends StatelessWidget {
               ),
             ),
             child: Text(
-              '$label · $count',
+              count == null ? label : '$label · $count',
               style: context.buyMeta.copyWith(
                 color: selected ? Colors.white : BuyV2Colors.navy,
                 fontSize: 8,
@@ -742,6 +929,8 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     this.storeContext = false,
     this.showAreaControl = false,
     this.usePrimaryScrollController = false,
+    this.publishedOffers = false,
+    this.publicationFacts,
   });
 
   final BuyV2Session session;
@@ -752,30 +941,36 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final bool storeContext;
   final bool showAreaControl;
   final bool usePrimaryScrollController;
+  final bool publishedOffers;
+  final Widget Function(List<BuyV2PublishedCatalogueOffer>)? publicationFacts;
 
   @override
   State<BuyV2PagedProductCatalogue> createState() =>
       _BuyV2PagedProductCatalogueState();
 }
 
-class _BuyV2PagedProductCatalogueState
-    extends State<BuyV2PagedProductCatalogue> {
-  late BuyV2CataloguePager<BuyV2Product> _pager;
+class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
+    with WidgetsBindingObserver {
+  late BuyV2CataloguePager<Object> _pager;
   late ScrollController _vertical;
   bool _ownsVertical = true;
   late List<ScrollController> _lanes;
-  BuyV2CataloguePage<BuyV2Product>? _shownPage;
+  BuyV2CataloguePage<Object>? _shownPage;
+  Timer? _publicationExpiry;
   bool _restoring = false;
   int _openSequence = 0;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _attach();
   }
 
   void _attach() {
-    _pager = widget.session.acquireCatalogueProducts(widget.scopeKey);
+    _pager = widget.publishedOffers
+        ? widget.session.acquireCatalogueOffers(widget.scopeKey)
+        : widget.session.acquireCatalogueProducts(widget.scopeKey);
     _shownPage = _pager.page;
     _vertical = ScrollController(
       initialScrollOffset: _pager.scrollOffset,
@@ -795,6 +990,7 @@ class _BuyV2PagedProductCatalogueState
     }
     _pager.addListener(_pageChanged);
     _scheduleQuery();
+    _schedulePublicationExpiry();
   }
 
   @override
@@ -858,8 +1054,13 @@ class _BuyV2PagedProductCatalogueState
   void didUpdateWidget(covariant BuyV2PagedProductCatalogue oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.session != widget.session ||
-        oldWidget.scopeKey != widget.scopeKey) {
-      _detach(oldWidget.session, oldWidget.scopeKey);
+        oldWidget.scopeKey != widget.scopeKey ||
+        oldWidget.publishedOffers != widget.publishedOffers) {
+      _detach(
+        oldWidget.session,
+        oldWidget.scopeKey,
+        publishedOffers: oldWidget.publishedOffers,
+      );
       _attach();
       _bindPrimaryController();
     } else if (oldWidget.query != widget.query) {
@@ -892,11 +1093,48 @@ class _BuyV2PagedProductCatalogueState
         _restoring = false;
       });
     }
+    _schedulePublicationExpiry();
     setState(() {});
   }
 
-  void _detach(BuyV2Session session, String scopeKey) {
+  void _schedulePublicationExpiry() {
+    _publicationExpiry?.cancel();
+    if (!widget.publishedOffers) return;
+    final now = widget.session.catalogueNow();
+    Duration? earliest;
+    for (final item in _pager.page?.items ?? const <Object>[]) {
+      final offer = item as BuyV2PublishedCatalogueOffer;
+      if (!offer.validUntil.isAfter(now)) continue;
+      final remaining = offer.validUntil.difference(now);
+      if (earliest == null || remaining < earliest) earliest = remaining;
+    }
+    if (earliest != null) {
+      _publicationExpiry = Timer(earliest, () {
+        if (!mounted) return;
+        setState(() {});
+        _schedulePublicationExpiry();
+      });
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed ||
+        !widget.publishedOffers ||
+        !mounted) {
+      return;
+    }
+    setState(() {});
+    _schedulePublicationExpiry();
+  }
+
+  void _detach(
+    BuyV2Session session,
+    String scopeKey, {
+    required bool publishedOffers,
+  }) {
     _openSequence++;
+    _publicationExpiry?.cancel();
     _saveOffsets();
     _pager.removeListener(_pageChanged);
     _vertical.removeListener(_saveOffsets);
@@ -904,12 +1142,21 @@ class _BuyV2PagedProductCatalogueState
     for (final lane in _lanes) {
       lane.dispose();
     }
-    session.releaseCatalogueProducts(scopeKey);
+    if (publishedOffers) {
+      session.releaseCatalogueOffers(scopeKey);
+    } else {
+      session.releaseCatalogueProducts(scopeKey);
+    }
   }
 
   @override
   void dispose() {
-    _detach(widget.session, widget.scopeKey);
+    WidgetsBinding.instance.removeObserver(this);
+    _detach(
+      widget.session,
+      widget.scopeKey,
+      publishedOffers: widget.publishedOffers,
+    );
     super.dispose();
   }
 
@@ -918,7 +1165,29 @@ class _BuyV2PagedProductCatalogueState
     final page = _pager.query == widget.query ? _pager.page : null;
     final loading = _pager.query != widget.query || _pager.loading;
     final message = _pager.query == widget.query ? _pager.message : null;
-    final products = page?.items ?? const <BuyV2Product>[];
+    final offers = widget.publishedOffers
+        ? page?.items.cast<BuyV2PublishedCatalogueOffer>().toList(
+                growable: false,
+              ) ??
+              const <BuyV2PublishedCatalogueOffer>[]
+        : const <BuyV2PublishedCatalogueOffer>[];
+    final publicationCurrent =
+        !widget.publishedOffers ||
+        offers.every((offer) {
+          final known = widget.session.findProduct(offer.product.id);
+          return offer.isCurrent(now: widget.session.catalogueNow()) &&
+              known != null &&
+              known.storeId == offer.product.storeId &&
+              known.destination == offer.product.destination &&
+              known.price == offer.product.price &&
+              known.pack == offer.product.pack;
+        });
+    final products = !publicationCurrent
+        ? const <BuyV2Product>[]
+        : widget.publishedOffers
+        ? offers.map((offer) => offer.product).toList(growable: false)
+        : page?.items.cast<BuyV2Product>().toList(growable: false) ??
+              const <BuyV2Product>[];
     final needsArea =
         widget.query.storeId == null &&
         widget.query.areaScope != BuyV2CatalogueAreaScope.allAreas &&
@@ -933,9 +1202,10 @@ class _BuyV2PagedProductCatalogueState
           if (widget.header != null) widget.header!,
           _CataloguePageControls(
             scopeKey: widget.scopeKey,
-            start: page?.startIndex,
+            noun: widget.publishedOffers ? 'offers' : 'products',
+            start: publicationCurrent ? page?.startIndex : null,
             count: products.length,
-            total: page?.totalCount,
+            total: publicationCurrent ? page?.totalCount : null,
             loading: loading,
             areaLabel: !widget.storeContext
                 ? widget.session.catalogueAreaLabel
@@ -943,19 +1213,33 @@ class _BuyV2PagedProductCatalogueState
             onArea: widget.showAreaControl
                 ? () => showBuyV2CatalogueArea(context, widget.session)
                 : null,
-            onPrevious: !loading && page?.previousCursor != null
+            onPrevious:
+                !loading && publicationCurrent && page?.previousCursor != null
                 ? _pager.previous
                 : null,
-            onNext: !loading && page?.nextCursor != null ? _pager.next : null,
+            onNext: !loading && publicationCurrent && page?.nextCursor != null
+                ? _pager.next
+                : null,
             onRefresh: loading ? null : _pager.refresh,
           ),
           if (loading) const LinearProgressIndicator(minHeight: 2),
+          if (publicationCurrent &&
+              offers.isNotEmpty &&
+              widget.publicationFacts != null)
+            widget.publicationFacts!(offers),
           if (needsArea)
             _CataloguePageNotice(
               title: 'Where are you shopping?',
               detail: 'Choose an area, or browse stores in any area.',
               action: 'Choose area',
               onAction: () => showBuyV2CatalogueArea(context, widget.session),
+            )
+          else if (!publicationCurrent)
+            _CataloguePageNotice(
+              title: 'Offers need refreshing',
+              detail: 'The published details have changed or expired.',
+              action: 'Refresh offers',
+              onAction: loading ? null : _pager.refresh,
             )
           else if (message != null)
             _CataloguePageNotice(
@@ -965,8 +1249,10 @@ class _BuyV2PagedProductCatalogueState
               onAction: _pager.retry,
             )
           else if (!loading && products.isEmpty)
-            const _CataloguePageNotice(
-              title: 'No matching products',
+            _CataloguePageNotice(
+              title: widget.publishedOffers
+                  ? 'No matching offers'
+                  : 'No matching products',
               detail: 'Try another search, category or area.',
             ),
           if (products.isNotEmpty)
@@ -1038,7 +1324,7 @@ class _BuyV2PagedProductCatalogueState
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               child: Text(
-                'All matching products are on this or earlier pages.',
+                'All matching ${widget.publishedOffers ? 'offers' : 'products'} are on this or earlier pages.',
                 style: context.buyMeta,
               ),
             ),
@@ -1090,57 +1376,86 @@ class _CataloguePageControls extends StatelessWidget {
         : '${_catalogueCount(start! + 1)}–${_catalogueCount(start! + count)}'
               '${total == null ? '' : ' of ${_catalogueCount(total!)}'}'
               '${noun == 'products' ? '' : ' $noun'}';
+    final rangeStyle = context.buyMeta.copyWith(fontWeight: FontWeight.w800);
+    final summary = Semantics(
+      liveRegion: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            range,
+            key: ValueKey('buy-page-range-$scopeKey'),
+            style: rangeStyle,
+          ),
+          if (areaLabel != null) Text(areaLabel!, style: context.buyMeta),
+        ],
+      ),
+    );
+    final previous = IconButton(
+      key: ValueKey('buy-page-previous-$scopeKey'),
+      tooltip: 'Previous $noun',
+      onPressed: onPrevious,
+      icon: const Icon(Icons.chevron_left_rounded),
+    );
+    final next = IconButton(
+      key: ValueKey('buy-page-next-$scopeKey'),
+      tooltip: 'Next $noun',
+      onPressed: onNext,
+      icon: const Icon(Icons.chevron_right_rounded),
+    );
+    final refresh = IconButton(
+      key: ValueKey('buy-page-refresh-$scopeKey'),
+      tooltip: 'Refresh $noun',
+      onPressed: onRefresh,
+      icon: const Icon(Icons.refresh_rounded, size: 20),
+    );
+    final area = onArea == null
+        ? null
+        : IconButton(
+            key: ValueKey('buy-page-area-$scopeKey'),
+            tooltip: 'Choose shopping area',
+            onPressed: onArea,
+            icon: const Icon(Icons.location_on_outlined, size: 20),
+          );
     return BuyV2CartAvoidanceRegion(
       key: ValueKey('buy-page-controls-protection-$scopeKey'),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-        child: Row(
-          children: [
-            IconButton(
-              key: ValueKey('buy-page-previous-$scopeKey'),
-              tooltip: 'Previous $noun',
-              onPressed: onPrevious,
-              icon: const Icon(Icons.chevron_left_rounded),
-            ),
-            Expanded(
-              child: Semantics(
-                liveRegion: true,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      range,
-                      key: ValueKey('buy-page-range-$scopeKey'),
-                      style: context.buyMeta.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    if (areaLabel != null)
-                      Text(areaLabel!, style: context.buyMeta),
-                  ],
-                ),
-              ),
-            ),
-            IconButton(
-              key: ValueKey('buy-page-next-$scopeKey'),
-              tooltip: 'Next $noun',
-              onPressed: onNext,
-              icon: const Icon(Icons.chevron_right_rounded),
-            ),
-            IconButton(
-              key: ValueKey('buy-page-refresh-$scopeKey'),
-              tooltip: 'Refresh $noun',
-              onPressed: onRefresh,
-              icon: const Icon(Icons.refresh_rounded, size: 20),
-            ),
-            if (onArea != null)
-              IconButton(
-                key: ValueKey('buy-page-area-$scopeKey'),
-                tooltip: 'Choose shopping area',
-                onPressed: onArea,
-                icon: const Icon(Icons.location_on_outlined, size: 20),
-              ),
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final labelWidth = buyV2ValueTextSize(
+              context,
+              range,
+              rangeStyle,
+              maxWidth: double.infinity,
+              maxLines: 1,
+            ).width;
+            final inlineWidth =
+                constraints.maxWidth - (area == null ? 144 : 192);
+            if (labelWidth > inlineWidth) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    child: summary,
+                  ),
+                  Row(
+                    children: [previous, next, const Spacer(), refresh, ?area],
+                  ),
+                ],
+              );
+            }
+            return Row(
+              children: [
+                previous,
+                Expanded(child: summary),
+                next,
+                refresh,
+                ?area,
+              ],
+            );
+          },
         ),
       ),
     );

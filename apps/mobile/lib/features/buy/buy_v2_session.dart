@@ -1050,6 +1050,189 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
   }
 }
 
+/// Bounded development publication feed with the same Store/SKU identities as
+/// the Shop and Wholesale development catalogues. It is never live proof.
+class BuyV2DevelopmentPublishedCatalogueSource
+    implements BuyV2PublishedCatalogueSource {
+  BuyV2DevelopmentPublishedCatalogueSource({
+    int providerCount = 100000,
+    int skusPerStore = 5000,
+    this.now = DateTime.now,
+  }) : _shop = BuyV2DevelopmentCatalogueSource(
+         destination: BuyV2Destination.shop,
+         providerCount: providerCount,
+         skusPerStore: skusPerStore,
+         now: now,
+       ),
+       _wholesale = BuyV2DevelopmentCatalogueSource(
+         destination: BuyV2Destination.wholesale,
+         providerCount: providerCount,
+         skusPerStore: skusPerStore,
+         now: now,
+       );
+
+  static const version = 'buy-published-offers-dev-v1';
+  final DateTime Function() now;
+  final BuyV2DevelopmentCatalogueSource _shop;
+  final BuyV2DevelopmentCatalogueSource _wholesale;
+  int get productObjectsCreated =>
+      _shop.productObjectsCreated + _wholesale.productObjectsCreated;
+  String get _snapshot =>
+      '$version-${_shop.providerCount}-${_shop.skusPerStore}';
+
+  BuyV2OfferPublisherType _publisher(BuyV2Destination destination, int store) =>
+      destination == BuyV2Destination.shop
+      ? BuyV2OfferPublisherType.retailer
+      : (store ~/ BuyV2DevelopmentCatalogueSource.regions.length).isEven
+      ? BuyV2OfferPublisherType.manufacturer
+      : BuyV2OfferPublisherType.wholesaler;
+
+  ({BuyV2DevelopmentCatalogueSource source, List<int> stores, List<int> skus})
+  _cohort(BuyV2DevelopmentCatalogueSource source, BuyV2CatalogueQuery query) {
+    final scoped = BuyV2CatalogueQuery(
+      destination: source.destination,
+      regionId: query.regionId,
+      areaScope: query.areaScope,
+      storeId: query.storeId,
+      query: query.query,
+      categoryId: query.categoryId,
+      sort: query.sort,
+      fulfilmentMode: query.fulfilmentMode,
+      pack: query.pack,
+      filter: query.filter,
+      brands: query.brands,
+      maximumPrice: query.maximumPrice,
+      availableOnly: query.availableOnly,
+      offersOnly: true,
+      collectionOnly: query.collectionOnly,
+      offerPublisher: query.offerPublisher,
+    );
+    var stores = source
+        ._stores(scoped, searchNames: false)
+        .where(
+          (store) =>
+              query.offerPublisher == null ||
+              _publisher(source.destination, store) == query.offerPublisher,
+        )
+        .toList(growable: false);
+    final text = query.query.trim().toLowerCase();
+    final namedStores = text.isEmpty
+        ? const <int>[]
+        : stores
+              .where(
+                (store) =>
+                    '${source._name(store)} ${source._area(store)} ${source.storeIdAt(store)}'
+                        .toLowerCase()
+                        .contains(text),
+              )
+              .toList(growable: false);
+    // Development Store names do not overlap its product titles/brands. Either
+    // Store-first or product-first search retains the same exact listing IDs.
+    if (namedStores.isNotEmpty) stores = namedStores;
+    final skus = [
+      for (var sku = 0; sku < source.skusPerStore; sku++)
+        if (source._matchesSku(sku, scoped, ignoreText: namedStores.isNotEmpty))
+          sku,
+    ];
+    return (source: source, stores: stores, skus: skus);
+  }
+
+  String _cursor(BuyV2CatalogueQuery query, int start, int size) =>
+      base64Url.encode(
+        utf8.encode(
+          jsonEncode([
+            _snapshot,
+            sha256.convert(utf8.encode(query.key)).toString(),
+            start,
+            size,
+          ]),
+        ),
+      );
+
+  int _offset(BuyV2CatalogueQuery query, String? cursor, int size, int total) {
+    if (size < 1 || size > 50) throw ArgumentError('Offers page exceeds bound');
+    if (cursor == null) return 0;
+    final value = jsonDecode(
+      utf8.decode(base64Url.decode(base64Url.normalize(cursor))),
+    );
+    if (value is! List ||
+        value.length != 4 ||
+        value[0] != _snapshot ||
+        value[1] != sha256.convert(utf8.encode(query.key)).toString() ||
+        value[2] is! int ||
+        value[3] != size ||
+        (value[2] as int) < 0 ||
+        (value[2] as int) >= total) {
+      throw const FormatException('Offers cursor does not match query');
+    }
+    return value[2] as int;
+  }
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    if (!query.offersOnly ||
+        query.sort != BuyV2ProductSort.relevance ||
+        query.shopSaleType != null ||
+        query.wholesaleSaleType != null) {
+      throw const FormatException('Unsupported development Offers query');
+    }
+    final shop = _cohort(_shop, query);
+    final wholesale = _cohort(_wholesale, query);
+    final shopCount = shop.stores.length * shop.skus.length;
+    final wholesaleCount = wholesale.stores.length * wholesale.skus.length;
+    final paired = math.min(shopCount, wholesaleCount);
+    final total = shopCount + wholesaleCount;
+    final start = _offset(query, cursor, pageSize, total);
+    final end = math.min(start + pageSize, total);
+    final observed = now();
+    BuyV2PublishedCatalogueOffer itemAt(int index) {
+      final inPair = index < paired * 2;
+      final useShop = inPair ? index.isEven : shopCount > wholesaleCount;
+      final cohort = useShop ? shop : wholesale;
+      final offset = inPair ? index ~/ 2 : index - paired;
+      final store = cohort.stores[offset ~/ cohort.skus.length];
+      final sku = cohort.skus[offset % cohort.skus.length];
+      final product = cohort.source._product(store, sku);
+      final publisher = _publisher(product.destination, store);
+      return BuyV2PublishedCatalogueOffer(
+        publicationId: '$version-${product.id}',
+        product: product,
+        publisherType: publisher,
+        publisherId: publisher == BuyV2OfferPublisherType.manufacturer
+            ? '$version-maker-${product.brand}'
+            : product.storeId!,
+        publisherName: publisher == BuyV2OfferPublisherType.manufacturer
+            ? '${product.brand} Makers'
+            : product.seller,
+        headline: switch (publisher) {
+          BuyV2OfferPublisherType.manufacturer => 'Manufacturer price',
+          BuyV2OfferPublisherType.wholesaler => 'Bulk saving',
+          BuyV2OfferPublisherType.retailer => 'Store offer',
+        },
+        sourceId: version,
+        observedAt: observed,
+        validUntil: observed.add(const Duration(minutes: 15)),
+      );
+    }
+
+    return BuyV2CataloguePage(
+      queryKey: query.key,
+      snapshotId: _snapshot,
+      items: [for (var index = start; index < end; index++) itemAt(index)],
+      startIndex: start,
+      totalCount: total,
+      previousCursor: start == 0
+          ? null
+          : _cursor(query, math.max(0, start - pageSize), pageSize),
+      nextCursor: end == total ? null : _cursor(query, end, pageSize),
+    );
+  }
+}
+
 class _BuyV2PagerLease<T> {
   _BuyV2PagerLease(this.pager);
 
@@ -1081,6 +1264,7 @@ class BuyV2Session extends ChangeNotifier {
     this.collectionPendingStore,
     this.catalogueNow = DateTime.now,
     this.cataloguePageSource,
+    this.publishedCatalogueSource,
     Map<String, String> catalogueAreas = const {},
     String? initialCatalogueRegionId,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
@@ -1142,6 +1326,10 @@ class BuyV2Session extends ChangeNotifier {
       }
       // The review cohort is explicitly based in Jodhpur; this is not GPS.
       _catalogueRegionId ??= 'jodhpur';
+      if (publishedCatalogueSource == null) {
+        _devicePublishedCatalogueSource =
+            BuyV2DevelopmentPublishedCatalogueSource(now: catalogueNow);
+      }
     }
     if (cartBenefitsAdapter is BuyV2LiveCartBenefitsAdapter) {
       cartBenefitsLoadState = BuyV2CartBenefitsLoadState.idle;
@@ -1172,6 +1360,23 @@ class BuyV2Session extends ChangeNotifier {
   bool get pagedCatalogueEnabled =>
       cataloguePageSource != null ||
       _deviceCatalogueSources.containsKey(destination);
+
+  BuyV2PublishedCatalogueSource? get _publishedCatalogueSource =>
+      publishedCatalogueSource ?? _devicePublishedCatalogueSource;
+  bool get pagedOffersEnabled => _publishedCatalogueSource != null;
+
+  BuyV2CatalogueQuery catalogueOffersQuery({
+    BuyV2OfferPublisherType? publisher,
+    String categoryId = 'all',
+  }) => BuyV2CatalogueQuery(
+    destination: BuyV2Destination.shop,
+    regionId: _catalogueRegionId,
+    areaScope: _catalogueAreaScope,
+    query: query,
+    categoryId: categoryId,
+    offersOnly: true,
+    offerPublisher: publisher,
+  );
 
   int get pagedProductCount => _pagedProducts.length;
   int get catalogueRequestsInFlight => _catalogueActiveRequests;
@@ -1394,6 +1599,78 @@ class BuyV2Session extends ChangeNotifier {
     _trimCatalogueContexts();
   }
 
+  BuyV2CataloguePager<BuyV2PublishedCatalogueOffer> acquireCatalogueOffers(
+    String scopeKey,
+  ) {
+    final existing = _catalogueOfferPagers.remove(scopeKey);
+    if (existing != null) {
+      existing.references += 1;
+      existing.lastUsed = ++_catalogueUseSequence;
+      _catalogueOfferPagers[scopeKey] = existing;
+      return existing.pager;
+    }
+    late final BuyV2CataloguePager<BuyV2PublishedCatalogueOffer> pager;
+    pager = BuyV2CataloguePager<BuyV2PublishedCatalogueOffer>(
+      identityOf: (offer) => offer.product.id,
+      load: (query, {cursor, required pageSize}) => _withCatalogueRequest(
+        () async {
+          final source = _publishedCatalogueSource;
+          if (source == null || !query.offersOnly) {
+            throw StateError('Published offers unavailable');
+          }
+          final page = await source.loadOffers(
+            query,
+            cursor: cursor,
+            pageSize: pageSize,
+          );
+          final publications = <String>{};
+          for (final offer in page.items) {
+            if (!offer.isCurrent(now: catalogueNow()) ||
+                !publications.add(offer.publicationId) ||
+                (query.offerPublisher != null &&
+                    query.offerPublisher != offer.publisherType) ||
+                pager.cachedItems.any(
+                  (previous) =>
+                      previous.publicationId == offer.publicationId &&
+                      previous.product.id != offer.product.id,
+                )) {
+              throw const FormatException('Published offer facts do not match');
+            }
+            // Only the explicit publication feed permits mixed Shop/Wholesale
+            // rows. Ordinary Store/product destination checks stay strict.
+            _validatePagedProduct(
+              offer.product,
+              BuyV2CatalogueQuery(
+                destination: offer.product.destination,
+                regionId: query.regionId,
+                storeId: query.storeId,
+              ),
+            );
+          }
+          return page;
+        },
+        isCurrent: () =>
+            !pager.isDisposed &&
+            pager.query == query &&
+            pager.requestedCursor == cursor,
+      ),
+    );
+    pager.addListener(_retainCataloguePages);
+    _catalogueOfferPagers[scopeKey] = _BuyV2PagerLease(pager)
+      ..lastUsed = ++_catalogueUseSequence;
+    return pager;
+  }
+
+  void releaseCatalogueOffers(String scopeKey) {
+    final lease = _catalogueOfferPagers.remove(scopeKey);
+    if (lease != null) {
+      if (lease.references > 0) lease.references -= 1;
+      lease.lastUsed = ++_catalogueUseSequence;
+      _catalogueOfferPagers[scopeKey] = lease;
+    }
+    _trimCatalogueContexts();
+  }
+
   void releaseCatalogueStores(String scopeKey) {
     final lease = _catalogueStorePagers.remove(scopeKey);
     if (lease != null) {
@@ -1412,6 +1689,9 @@ class BuyV2Session extends ChangeNotifier {
                 .length +
             _catalogueStorePagers.values
                 .where((v) => v.references == 0)
+                .length +
+            _catalogueOfferPagers.values
+                .where((v) => v.references == 0)
                 .length >
         4) {
       final product = _catalogueProductPagers.entries
@@ -1420,7 +1700,14 @@ class BuyV2Session extends ChangeNotifier {
       final store = _catalogueStorePagers.entries
           .where((entry) => entry.value.references == 0)
           .firstOrNull;
-      if (product != null &&
+      final offer = _catalogueOfferPagers.entries
+          .where((entry) => entry.value.references == 0)
+          .firstOrNull;
+      if (offer != null &&
+          (product == null || offer.value.lastUsed < product.value.lastUsed) &&
+          (store == null || offer.value.lastUsed < store.value.lastUsed)) {
+        _catalogueOfferPagers.remove(offer.key)?.pager.dispose();
+      } else if (product != null &&
           (store == null || product.value.lastUsed < store.value.lastUsed)) {
         _catalogueProductPagers.remove(product.key)?.pager.dispose();
       } else {
@@ -1442,6 +1729,11 @@ class BuyV2Session extends ChangeNotifier {
 
   void _retainCataloguePages({bool notify = true}) {
     if (_collectionDisposed) return;
+    for (final lease in _catalogueOfferPagers.values) {
+      for (final offer in lease.pager.cachedItems) {
+        _pagedProducts[offer.product.id] = offer.product;
+      }
+    }
     for (final lease in _catalogueProductPagers.values) {
       for (final product in lease.pager.cachedItems) {
         _pagedProducts[product.id] = product;
@@ -1467,6 +1759,8 @@ class BuyV2Session extends ChangeNotifier {
       ?_accountReturnProductId,
       ?_pendingStoreReturnAnchorId,
       ..._catalogueStoreBrowseAnchors.values,
+      for (final lease in _catalogueOfferPagers.values)
+        for (final offer in lease.pager.cachedItems) offer.product.id,
       for (final lease in _catalogueProductPagers.values)
         for (final product in lease.pager.cachedItems) product.id,
       for (final store in _pagedStores.values)
@@ -1497,6 +1791,9 @@ class BuyV2Session extends ChangeNotifier {
 
   BuyV2CatalogueQuery? retainedCatalogueQuery(String scopeKey) =>
       _catalogueProductPagers[scopeKey]?.pager.query;
+
+  BuyV2CatalogueQuery? retainedCatalogueOffersQuery(String scopeKey) =>
+      _catalogueOfferPagers[scopeKey]?.pager.query;
 
   final Map<BuyV2Destination, String> _catalogueStoreBrowseAnchors = {};
 
@@ -1605,6 +1902,9 @@ class BuyV2Session extends ChangeNotifier {
       lease.pager.dispose();
     }
     for (final lease in _catalogueStorePagers.values) {
+      lease.pager.dispose();
+    }
+    for (final lease in _catalogueOfferPagers.values) {
       lease.pager.dispose();
     }
     super.dispose();
@@ -2023,12 +2323,16 @@ class BuyV2Session extends ChangeNotifier {
   final BuyV2CollectionPendingStore? collectionPendingStore;
   final DateTime Function() catalogueNow;
   final BuyV2CataloguePageSource? cataloguePageSource;
+  final BuyV2PublishedCatalogueSource? publishedCatalogueSource;
+  BuyV2PublishedCatalogueSource? _devicePublishedCatalogueSource;
   final Map<BuyV2Destination, BuyV2CataloguePageSource>
   _deviceCatalogueSources = {};
   final Map<String, _BuyV2PagerLease<BuyV2Product>> _catalogueProductPagers =
       {};
   final Map<String, _BuyV2PagerLease<BuyV2StoreListing>> _catalogueStorePagers =
       {};
+  final Map<String, _BuyV2PagerLease<BuyV2PublishedCatalogueOffer>>
+  _catalogueOfferPagers = {};
   final Map<String, BuyV2Product> _pagedProducts = {};
   final Map<String, BuyV2StoreListing> _pagedStores = {};
   final Expando<bool> _admittedStoreListings = Expando<bool>();

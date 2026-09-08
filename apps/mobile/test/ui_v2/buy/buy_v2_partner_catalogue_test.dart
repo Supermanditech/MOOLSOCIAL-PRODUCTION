@@ -14,6 +14,331 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final size in [const Size(320, 844), const Size(640, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      final profile = '${size.width.toInt()}x${size.height.toInt()}-$scale';
+      testWidgets('R5 paged published Offers journey $profile', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+        addTearDown(tester.view.reset);
+        var now = DateTime.utc(2026, 9, 8);
+        final published = _OffersJourneySource(now: () => now);
+        final catalogue = _OffersJourneyCatalogueSource(now: () => now);
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: true,
+          cataloguePageSource: catalogue,
+          publishedCatalogueSource: published,
+          catalogueNow: () => now,
+          catalogueAreas: const {'jodhpur': 'Jodhpur', 'mumbai': 'Mumbai'},
+          initialCatalogueRegionId: 'jodhpur',
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await tester.pumpWidget(_app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+        await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+        await tester.pumpAndSettle();
+        const scope = 'published-offers';
+        final range = find.byKey(const ValueKey('buy-page-range-$scope'));
+        final next = find.byKey(const ValueKey('buy-page-next-$scope'));
+        final vertical = find.byKey(const ValueKey('buy-paged-scroll-$scope'));
+        Future<void> reveal(Finder target, {bool header = false}) async {
+          // The floating Cart can cover the viewport centre. Drag the visible
+          // left gutter and verify movement instead of sending a missed hit.
+          for (
+            var attempt = 0;
+            target.evaluate().isEmpty && attempt < 45;
+            attempt++
+          ) {
+            final bounds = tester.getRect(vertical);
+            final controller = tester.widget<ListView>(vertical).controller!;
+            final before = controller.offset;
+            await tester.dragFrom(
+              Offset(bounds.left + 4, bounds.center.dy),
+              Offset(0, header ? 100 : -100),
+            );
+            await tester.pumpAndSettle();
+            expect(
+              controller.offset,
+              isNot(before),
+              reason: 'Unobscured Offers scroll must move',
+            );
+          }
+          expect(target, findsOneWidget);
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
+          // A tall lane can exceed landscape's viewport. Its actual Add/image
+          // control is checked at the subsequent tap, not its offscreen centre.
+          if (tester.getSize(target).height <=
+              tester.getSize(vertical).height) {
+            expect(target.hitTestable(), findsOneWidget);
+          }
+        }
+
+        Future<void> capture(String state) async {
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'r5-offers-$profile-$state');
+        }
+
+        await capture('header');
+        await reveal(range);
+        expect(tester.widget<Text>(range).data, '1–40 of 20,000,000 offers');
+        final countParagraph = tester.renderObject<RenderParagraph>(range);
+        final countStart = tester
+            .widget<Text>(range)
+            .data!
+            .indexOf('20,000,000');
+        final countBoxes = countParagraph.getBoxesForSelection(
+          TextSelection(baseOffset: countStart, extentOffset: countStart + 10),
+        );
+        expect(
+          countBoxes,
+          hasLength(1),
+          reason: 'The result count must not split inside its number',
+        );
+        expect(published.pages.single.items.length, 40);
+        await capture('initial');
+        final original = published.pages.single.items;
+        final retailProduct = original
+            .firstWhere(
+              (offer) => offer.product.destination == BuyV2Destination.shop,
+            )
+            .product;
+        final tradeProduct = original
+            .firstWhere(
+              (offer) =>
+                  offer.product.destination == BuyV2Destination.wholesale,
+            )
+            .product;
+        for (final product in [retailProduct, tradeProduct]) {
+          final lane = find.byKey(
+            ValueKey(
+              'buy-paged-lane-$scope-${product.destination == BuyV2Destination.shop ? 0 : 1}',
+            ),
+          );
+          await reveal(lane);
+          final add = find.byKey(ValueKey('buy-add-${product.id}'));
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(product.id), product.minimumOrder);
+        }
+        final save = find.byKey(ValueKey('buy-save-${tradeProduct.id}'));
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(session.isSaved(tradeProduct.id), isTrue);
+        await capture('products');
+        await reveal(next, header: true);
+        published.failNext = true;
+        await tester.tap(next);
+        await tester.pumpAndSettle();
+        final retry = find.widgetWithText(TextButton, 'Try again');
+        await reveal(range, header: true);
+        expect(tester.widget<Text>(range).data, '1–40 of 20,000,000 offers');
+        await reveal(retry);
+        expect(find.text('Results could not refresh'), findsOneWidget);
+        await capture('retry');
+        published.failNext = false;
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        await reveal(range, header: true);
+        expect(tester.widget<Text>(range).data, '41–80 of 20,000,000 offers');
+        final pageProduct = published.pages.last.items.first.product;
+        await reveal(find.byKey(const ValueKey('buy-paged-lane-$scope-0')));
+        final packshot = find.byKey(
+          ValueKey('buy-grid-packshot-${pageProduct.id}'),
+        );
+        await tester.ensureVisible(packshot);
+        await tester.pumpAndSettle();
+        const imageAction = Alignment(-.5, .55);
+        expect(packshot.hitTestable(at: imageAction), findsOneWidget);
+        final offset = tester.widget<ListView>(vertical).controller!.offset;
+        final requests = published.queries.length;
+        await tester.tapAt(imageAction.withinRect(tester.getRect(packshot)));
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, pageProduct.id);
+        expect(session.selectedProduct?.storeId, pageProduct.storeId);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(published.queries.length, requests);
+        expect(
+          tester.widget<ListView>(vertical).controller!.offset,
+          closeTo(offset, 1),
+        );
+        await capture('return');
+        final maker = find.byKey(
+          const ValueKey('buy-offers-filter-manufacturer'),
+        );
+        await reveal(maker, header: true);
+        await tester.tap(maker);
+        await tester.pumpAndSettle();
+        expect(
+          published.queries.last.offerPublisher,
+          BuyV2OfferPublisherType.manufacturer,
+        );
+        expect(published.pages.last.totalCount, 5000000);
+        expect(
+          published.pages.last.items.every(
+            (offer) =>
+                offer.publisherType == BuyV2OfferPublisherType.manufacturer,
+          ),
+          isTrue,
+        );
+        final makerName = published.pages.last.items.first.publisherName;
+        await reveal(find.byKey(const ValueKey('buy-published-offer-facts')));
+        expect(find.textContaining('Published by $makerName'), findsWidgets);
+        await capture('publisher');
+        final makerProduct = published.pages.last.items.first.product;
+        final makerOffer = find.byKey(
+          ValueKey('buy-published-offer-${makerProduct.id}'),
+        );
+        final makerHeadline = find.descendant(
+          of: makerOffer,
+          matching: find.text('Manufacturer price'),
+        );
+        await tester.ensureVisible(makerHeadline);
+        await tester.pumpAndSettle();
+        expect(makerHeadline.hitTestable(), findsOneWidget);
+        final filteredRequests = published.queries.length;
+        await tester.tap(makerHeadline);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, makerProduct.id);
+        final storeAction = find.byKey(
+          ValueKey('buy-wholesale-store-action-${makerProduct.id}'),
+        );
+        await _revealProductAction(tester, makerProduct.id, storeAction);
+        await tester.tap(storeAction);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<Text>(find.byKey(const ValueKey('buy-public-store-name')))
+              .data,
+          makerProduct.seller,
+        );
+        expect(
+          session.catalogueStore(makerProduct.storeId!)?.id,
+          makerProduct.storeId,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-public-store-collection-benefit')),
+          findsOneWidget,
+        );
+        await capture('store');
+        await tester.tap(
+          find.byKey(const ValueKey('buy-wholesale-supplier-sheet-close')),
+        );
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(published.queries.length, filteredRequests);
+        expect(
+          session.retainedCatalogueOffersQuery(scope)?.offerPublisher,
+          BuyV2OfferPublisherType.manufacturer,
+        );
+        await reveal(maker, header: true);
+        await tester.tap(maker);
+        await tester.pumpAndSettle();
+        expect(published.queries.last.offerPublisher, isNull);
+        final categoryControl = find.byKey(
+          const ValueKey('buy-offers-category-control'),
+        );
+        await reveal(categoryControl, header: true);
+        final originalCategory = session.selectedCategoryId;
+        await tester.tap(categoryControl);
+        await tester.pumpAndSettle();
+        await capture('categories');
+        final category = session
+            .categoriesFor(BuyV2Destination.shop)
+            .firstWhere((category) => category.id != 'all');
+        final categoryTarget = find.byKey(
+          ValueKey('buy-offers-category-${category.id}'),
+        );
+        final categoryScroll = find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-offers-category-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          categoryTarget,
+          100,
+          scrollable: categoryScroll,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(categoryTarget);
+        await tester.pumpAndSettle();
+        expect(published.queries.last.categoryId, category.id);
+        expect(published.pages.last.items, isNotEmpty);
+        expect(
+          published.pages.last.items.every(
+            (offer) => offer.product.categoryId == category.id,
+          ),
+          isTrue,
+        );
+        expect(session.selectedCategoryId, originalCategory);
+        await reveal(categoryControl, header: true);
+        await tester.tap(categoryControl);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-offers-category-all')));
+        await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('buy-search-control'));
+        await tester.ensureVisible(search);
+        await tester.pumpAndSettle();
+        await tester.tap(search);
+        await tester.pumpAndSettle();
+        final searchField = find.byKey(const ValueKey('buy-search-field'));
+        await tester.enterText(searchField, 'SKU 46');
+        tester.view.viewInsets = FakeViewPadding(
+          bottom: size.height < 400 ? 80 : 180,
+        );
+        await tester.pumpAndSettle();
+        expect(published.queries.last.query, 'SKU 46');
+        expect(published.pages.last.items, isNotEmpty);
+        await capture('search-keyboard');
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.enterText(searchField, '');
+        await tester.tap(find.byKey(const ValueKey('buy-search-close')));
+        await tester.pumpAndSettle();
+        now = now.add(const Duration(minutes: 16));
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pumpAndSettle();
+        final refresh = find.widgetWithText(TextButton, 'Refresh offers');
+        await reveal(refresh);
+        expect(find.byType(BuyV2ProductCard), findsNothing);
+        expect(find.text('Offers need refreshing'), findsOneWidget);
+        await capture('expired');
+        await tester.tap(refresh);
+        await tester.pumpAndSettle();
+        expect(
+          published.pages.last.items.every(
+            (offer) => offer.isCurrent(now: now),
+          ),
+          isTrue,
+        );
+        await reveal(find.byKey(const ValueKey('buy-paged-lane-$scope-0')));
+        expect(find.byType(BuyV2ProductCard), findsWidgets);
+        expect(
+          session.quantityFor(retailProduct.id),
+          retailProduct.minimumOrder,
+        );
+        expect(session.quantityFor(tradeProduct.id), tradeProduct.minimumOrder);
+        expect(session.isSaved(tradeProduct.id), isTrue);
+        await capture('recovered');
+      });
+    }
+  }
+
   for (final destination in [
     BuyV2Destination.shop,
     BuyV2Destination.wholesale,
@@ -1608,6 +1933,66 @@ Future<void> _revealPagedHeader(
   await tester.ensureVisible(target);
   await tester.pumpAndSettle();
   expect(target.hitTestable(), findsOneWidget);
+}
+
+class _OffersJourneySource extends BuyV2DevelopmentPublishedCatalogueSource {
+  _OffersJourneySource({required super.now});
+  bool failNext = false;
+  final queries = <BuyV2CatalogueQuery>[];
+  final pages = <BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>>[];
+  @override
+  Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    queries.add(query);
+    if (failNext && cursor != null) throw StateError('Offer page unavailable');
+    final page = await super.loadOffers(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    pages.add(page);
+    return page;
+  }
+}
+
+class _OffersJourneyCatalogueSource implements BuyV2CataloguePageSource {
+  _OffersJourneyCatalogueSource({required DateTime Function() now})
+    : shop = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.shop,
+        now: now,
+      ),
+      wholesale = BuyV2DevelopmentCatalogueSource(
+        destination: BuyV2Destination.wholesale,
+        now: now,
+      );
+  final BuyV2DevelopmentCatalogueSource shop;
+  final BuyV2DevelopmentCatalogueSource wholesale;
+  BuyV2DevelopmentCatalogueSource _source(BuyV2CatalogueQuery query) =>
+      query.destination == BuyV2Destination.shop ? shop : wholesale;
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) => _source(query).loadStores(query, cursor: cursor, pageSize: pageSize);
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) => _source(query).loadProducts(query, cursor: cursor, pageSize: pageSize);
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async => [
+    ...await shop.resolveProducts(
+      productIds.where((id) => id.contains('-shop-')).toSet(),
+    ),
+    ...await wholesale.resolveProducts(
+      productIds.where((id) => id.contains('-wholesale-')).toSet(),
+    ),
+  ];
 }
 
 class _StoreJourneySource extends BuyV2DevelopmentCatalogueSource {

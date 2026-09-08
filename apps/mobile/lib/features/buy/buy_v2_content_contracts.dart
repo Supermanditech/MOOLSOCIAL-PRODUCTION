@@ -12,6 +12,8 @@ enum BuyV2StoreOperatingState { unknown, open, closed }
 /// Geographic scope is explicit; a destination search does not claim routing.
 enum BuyV2CatalogueAreaScope { regional, national, allAreas }
 
+enum BuyV2OfferPublisherType { manufacturer, wholesaler, retailer }
+
 /// Immutable request identity shared by Store, category, Offers and Search.
 /// A response for another identity must never replace the visible results.
 @immutable
@@ -34,6 +36,7 @@ class BuyV2CatalogueQuery {
     this.availableOnly = false,
     this.offersOnly = false,
     this.collectionOnly = false,
+    this.offerPublisher,
   }) : brands = Set.unmodifiable(brands);
 
   final BuyV2Destination destination;
@@ -53,9 +56,10 @@ class BuyV2CatalogueQuery {
   final bool availableOnly;
   final bool offersOnly;
   final bool collectionOnly;
+  final BuyV2OfferPublisherType? offerPublisher;
 
   String get key => jsonEncode([
-    1,
+    2,
     destination.name,
     regionId,
     areaScope.name,
@@ -73,6 +77,7 @@ class BuyV2CatalogueQuery {
     availableOnly,
     offersOnly,
     collectionOnly,
+    offerPublisher?.name,
   ]);
 
   @override
@@ -149,6 +154,58 @@ abstract interface class BuyV2CataloguePageSource {
   /// Restore exact user-selected IDs after page eviction or process relaunch.
   /// Callers batch at most50 IDs; absent IDs remain unavailable, never guessed.
   Future<List<BuyV2Product>> resolveProducts(Set<String> productIds);
+}
+
+/// A published placement owns an exact Store listing and current source facts.
+/// Being returned by an offersOnly product filter is not publication evidence.
+@immutable
+class BuyV2PublishedCatalogueOffer {
+  const BuyV2PublishedCatalogueOffer({
+    required this.publicationId,
+    required this.product,
+    required this.publisherType,
+    required this.publisherId,
+    required this.publisherName,
+    required this.headline,
+    required this.sourceId,
+    required this.observedAt,
+    required this.validUntil,
+  });
+
+  final String publicationId;
+  final BuyV2Product product;
+  final BuyV2OfferPublisherType publisherType;
+  final String publisherId;
+  final String publisherName;
+  final String headline;
+  final String sourceId;
+  final DateTime observedAt;
+  final DateTime validUntil;
+
+  bool isCurrent({required DateTime now}) =>
+      publicationId.trim().isNotEmpty &&
+      publicationId.trim() == publicationId &&
+      publisherId.trim().isNotEmpty &&
+      publisherId.trim() == publisherId &&
+      publisherName.trim().isNotEmpty &&
+      sourceId.trim().isNotEmpty &&
+      headline.trim().isNotEmpty &&
+      product.storeId?.trim().isNotEmpty == true &&
+      (product.destination == BuyV2Destination.shop ||
+          product.destination == BuyV2Destination.wholesale) &&
+      !observedAt.isAfter(now) &&
+      observedAt.isBefore(validUntil) &&
+      now.isBefore(validUntil);
+}
+
+/// Optional bounded publication transport. Existing finite Offers adapters keep
+/// their own contract; no missing transport is replaced with published success.
+abstract interface class BuyV2PublishedCatalogueSource {
+  Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  });
 }
 
 /// A sourced Store capability, not proof of stock, payment or order readiness.

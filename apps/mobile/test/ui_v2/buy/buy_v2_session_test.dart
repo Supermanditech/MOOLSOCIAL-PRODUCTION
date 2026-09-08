@@ -345,7 +345,452 @@ class _PagingRecoverySource extends BuyV2DevelopmentCatalogueSource {
   }
 }
 
+class _PublishedFixtureSource extends BuyV2DevelopmentPublishedCatalogueSource {
+  _PublishedFixtureSource({super.now}) : super(providerCount: 1000);
+  bool fail = false;
+  Completer<void>? gate;
+  int calls = 0;
+  BuyV2PublishedCatalogueOffer Function(BuyV2PublishedCatalogueOffer)? rewrite;
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2PublishedCatalogueOffer>> loadOffers(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    calls++;
+    if (gate != null) await gate!.future;
+    if (fail) throw StateError('Publication source unavailable');
+    final page = await super.loadOffers(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    return BuyV2CataloguePage(
+      queryKey: page.queryKey,
+      snapshotId: page.snapshotId,
+      startIndex: page.startIndex,
+      totalCount: page.totalCount,
+      previousCursor: page.previousCursor,
+      nextCursor: page.nextCursor,
+      items: page.items.map((offer) => rewrite?.call(offer) ?? offer),
+    );
+  }
+}
+
+BuyV2PublishedCatalogueOffer _copyPublication(
+  BuyV2PublishedCatalogueOffer value, {
+  String? publicationId,
+  String? publisherId,
+  String? publisherName,
+  String? sourceId,
+  String? headline,
+  BuyV2Product? product,
+  BuyV2OfferPublisherType? publisher,
+  DateTime? observedAt,
+  DateTime? validUntil,
+}) => BuyV2PublishedCatalogueOffer(
+  publicationId: publicationId ?? value.publicationId,
+  product: product ?? value.product,
+  publisherType: publisher ?? value.publisherType,
+  publisherId: publisherId ?? value.publisherId,
+  publisherName: publisherName ?? value.publisherName,
+  headline: headline ?? value.headline,
+  sourceId: sourceId ?? value.sourceId,
+  observedAt: observedAt ?? value.observedAt,
+  validUntil: validUntil ?? value.validUntil,
+);
+
 void main() {
+  group('R5 published catalogue', () {
+    final now = DateTime.utc(2026, 9, 8);
+    BuyV2CatalogueQuery query({
+      BuyV2OfferPublisherType? publisher,
+      String? region = 'jodhpur',
+      BuyV2CatalogueAreaScope scope = BuyV2CatalogueAreaScope.regional,
+      String text = '',
+      String category = 'all',
+      String? storeId,
+    }) => BuyV2CatalogueQuery(
+      destination: BuyV2Destination.shop,
+      regionId: region,
+      areaScope: scope,
+      query: text,
+      categoryId: category,
+      offersOnly: true,
+      offerPublisher: publisher,
+      storeId: storeId,
+    );
+
+    test(
+      'unsupported channel filters cannot silently broaden Offers',
+      () async {
+        final source = BuyV2DevelopmentPublishedCatalogueSource(now: () => now);
+        final requests = [
+          for (final value in BuyV2ShopSaleType.values)
+            BuyV2CatalogueQuery(
+              destination: BuyV2Destination.shop,
+              regionId: 'jodhpur',
+              offersOnly: true,
+              shopSaleType: value,
+            ),
+          for (final value in BuyV2WholesaleSaleType.values)
+            BuyV2CatalogueQuery(
+              destination: BuyV2Destination.shop,
+              regionId: 'jodhpur',
+              offersOnly: true,
+              wholesaleSaleType: value,
+            ),
+        ];
+        for (final request in requests) {
+          await expectLater(
+            source.loadOffers(request, pageSize: 40),
+            throwsFormatException,
+          );
+        }
+        expect(source.productObjectsCreated, 0);
+      },
+    );
+
+    test(
+      'large mixed feed allocates only requested exact Store products',
+      () async {
+        final source = BuyV2DevelopmentPublishedCatalogueSource(now: () => now);
+        final first = await source.loadOffers(query(), pageSize: 40);
+        expect(first.totalCount, 20000000);
+        expect(first.items.length, 40);
+        expect(source.productObjectsCreated, 40);
+        expect(first.items.map((o) => o.product.destination).toSet(), {
+          BuyV2Destination.shop,
+          BuyV2Destination.wholesale,
+        });
+        expect(first.items.every((o) => o.isCurrent(now: now)), isTrue);
+        final next = await source.loadOffers(
+          query(),
+          cursor: first.nextCursor,
+          pageSize: 40,
+        );
+        expect(next.startIndex, 40);
+        expect(source.productObjectsCreated, 80);
+        expect(
+          {
+            ...first.items.map((o) => o.product.id),
+            ...next.items.map((o) => o.product.id),
+          }.length,
+          80,
+        );
+        for (final destination in [
+          BuyV2Destination.shop,
+          BuyV2Destination.wholesale,
+        ]) {
+          final catalogue = BuyV2DevelopmentCatalogueSource(
+            destination: destination,
+          );
+          final ids = first.items
+              .where((o) => o.product.destination == destination)
+              .map((o) => o.product.id)
+              .toSet();
+          final restored = await catalogue.resolveProducts(ids);
+          expect(restored.map((p) => p.id).toSet(), ids);
+          for (final product in restored) {
+            final offer = first.items.singleWhere(
+              (o) => o.product.id == product.id,
+            );
+            expect(product.storeId, offer.product.storeId);
+            expect(product.pack, offer.product.pack);
+            expect(product.price, offer.product.price);
+          }
+        }
+      },
+    );
+
+    for (final publisher in BuyV2OfferPublisherType.values) {
+      test(
+        '${publisher.name} filter has source counts and exact publisher rows',
+        () async {
+          final source = BuyV2DevelopmentPublishedCatalogueSource(
+            providerCount: 20,
+            skusPerStore: 50,
+            now: () => now,
+          );
+          final page = await source.loadOffers(
+            query(publisher: publisher),
+            pageSize: 40,
+          );
+          expect(
+            page.totalCount,
+            publisher == BuyV2OfferPublisherType.retailer ? 20 : 10,
+          );
+          expect(page.items.every((o) => o.publisherType == publisher), isTrue);
+          expect(page.nextCursor, isNull);
+          expect(
+            page.items.every(
+              (o) =>
+                  o.product.destination ==
+                  (publisher == BuyV2OfferPublisherType.retailer
+                      ? BuyV2Destination.shop
+                      : BuyV2Destination.wholesale),
+            ),
+            isTrue,
+          );
+        },
+      );
+    }
+
+    test(
+      'end/back and changed query cursors are bounded and independent',
+      () async {
+        final source = BuyV2DevelopmentPublishedCatalogueSource(
+          providerCount: 3,
+          skusPerStore: 50,
+          now: () => now,
+        );
+        final all = query(
+          region: null,
+          scope: BuyV2CatalogueAreaScope.allAreas,
+        );
+        final first = await source.loadOffers(all, pageSize: 40);
+        final last = await source.loadOffers(
+          all,
+          cursor: first.nextCursor,
+          pageSize: 40,
+        );
+        expect(last.totalCount, 60);
+        expect(last.items.length, 20);
+        expect(last.nextCursor, isNull);
+        final back = await source.loadOffers(
+          all,
+          cursor: last.previousCursor,
+          pageSize: 40,
+        );
+        expect(
+          back.items.map((o) => o.product.id),
+          first.items.map((o) => o.product.id),
+        );
+        await expectLater(
+          source.loadOffers(
+            query(publisher: BuyV2OfferPublisherType.retailer),
+            cursor: first.nextCursor,
+            pageSize: 40,
+          ),
+          throwsFormatException,
+        );
+        await expectLater(
+          source.loadOffers(all, pageSize: 51),
+          throwsArgumentError,
+        );
+        final productSource = BuyV2DevelopmentCatalogueSource(
+          destination: BuyV2Destination.shop,
+        );
+        final products = await productSource.loadProducts(all, pageSize: 40);
+        await expectLater(
+          source.loadOffers(all, cursor: products.nextCursor, pageSize: 40),
+          throwsFormatException,
+        );
+      },
+    );
+
+    test(
+      'Store name SKU category and area requests retain their own result identity',
+      () async {
+        final source = BuyV2DevelopmentPublishedCatalogueSource(
+          providerCount: 20,
+          skusPerStore: 50,
+          now: () => now,
+        );
+        final named = await source.loadOffers(
+          query(text: 'Mool Market 000011'),
+          pageSize: 40,
+        );
+        expect(named.totalCount, 20);
+        expect(
+          named.items.every((o) => o.product.storeId!.contains('store-000011')),
+          isTrue,
+        );
+        final sku = await source.loadOffers(
+          query(text: 'sku 46'),
+          pageSize: 40,
+        );
+        expect(sku.items, isNotEmpty);
+        expect(
+          sku.items.every((o) => o.product.id.endsWith('sku-0046')),
+          isTrue,
+        );
+        final region = await source.loadOffers(
+          query(region: 'mumbai'),
+          pageSize: 40,
+        );
+        expect(
+          region.items.every((o) => o.product.origin.contains('mumbai')),
+          isTrue,
+        );
+        final category = sku.items.first.product.categoryId;
+        final filtered = await source.loadOffers(
+          query(category: category),
+          pageSize: 40,
+        );
+        expect(filtered.items, isNotEmpty);
+        expect(
+          filtered.items.every((o) => o.product.categoryId == category),
+          isTrue,
+        );
+      },
+    );
+
+    test(
+      'page retry eviction and shared inactive context budget preserve Cart and Saved',
+      () async {
+        final source = _PublishedFixtureSource(now: () => now);
+        final catalogue = _PagingRecoverySource();
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          cataloguePageSource: catalogue,
+          publishedCatalogueSource: source,
+          catalogueNow: () => now,
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        final pager = session.acquireCatalogueOffers('offers');
+        await pager.open(query());
+        final first = pager.page!;
+        final cart = first.items.first.product;
+        final saved = first.items[1].product;
+        expect(session.addProduct(cart.id), isTrue);
+        session.toggleSaved(saved.id);
+        source.fail = true;
+        await pager.next();
+        expect(pager.page, same(first));
+        expect(pager.message, isNotNull);
+        source.fail = false;
+        await pager.retry();
+        expect(pager.page!.startIndex, 40);
+        for (var page = 0; page < 6; page++) {
+          await pager.next();
+        }
+        expect(session.quantityFor(cart.id), 1);
+        expect(session.isSaved(saved.id), isTrue);
+        expect(session.pagedProductCount, lessThanOrEqualTo(122));
+        session.releaseCatalogueOffers('offers');
+        for (var index = 0; index < 5; index++) {
+          final key = 'store-$index';
+          final products = session.acquireCatalogueProducts(key);
+          await products.open(
+            BuyV2CatalogueQuery(
+              destination: BuyV2Destination.shop,
+              regionId: null,
+              areaScope: BuyV2CatalogueAreaScope.allAreas,
+              storeId: catalogue.storeIdAt(index),
+            ),
+          );
+          session.releaseCatalogueProducts(key);
+        }
+        expect(pager.isDisposed, isTrue);
+        expect(session.quantityFor(cart.id), 1);
+        expect(session.product(saved.id).storeId, saved.storeId);
+        expect(session.pagedProductCount, lessThanOrEqualTo(162));
+      },
+    );
+
+    for (final invalid in [
+      'source',
+      'publisher-id',
+      'publisher-name',
+      'headline',
+      'expired',
+      'future',
+      'publisher',
+      'duplicate',
+      'store',
+    ]) {
+      test(
+        'rejects $invalid publication facts before product admission',
+        () async {
+          final source = _PublishedFixtureSource(now: () => now);
+          source.rewrite = (offer) => switch (invalid) {
+            'source' => _copyPublication(offer, sourceId: ' '),
+            'publisher-id' => _copyPublication(offer, publisherId: ' '),
+            'publisher-name' => _copyPublication(offer, publisherName: ' '),
+            'headline' => _copyPublication(offer, headline: ' '),
+            'expired' => _copyPublication(offer, validUntil: now),
+            'future' => _copyPublication(
+              offer,
+              observedAt: now.add(const Duration(minutes: 1)),
+            ),
+            'publisher' => _copyPublication(
+              offer,
+              publisher: BuyV2OfferPublisherType.wholesaler,
+            ),
+            'duplicate' => _copyPublication(
+              offer,
+              publicationId: 'duplicate-publication',
+            ),
+            _ => _copyPublication(
+              offer,
+              product: offer.product.copyWith(storeId: ' '),
+            ),
+          };
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            publishedCatalogueSource: source,
+            catalogueNow: () => now,
+            reviewDataEnabled: false,
+          );
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          final pager = session.acquireCatalogueOffers('offers');
+          await pager.open(query(publisher: BuyV2OfferPublisherType.retailer));
+          expect(pager.page, isNull);
+          expect(pager.message, isNotNull);
+          expect(session.pagedProductCount, 0);
+        },
+      );
+    }
+
+    test(
+      'pending publications share two request slots and cannot admit after disposal',
+      () async {
+        final source = _PublishedFixtureSource(now: () => now)
+          ..gate = Completer<void>();
+        final catalogue = _PagingRecoverySource()..holdProducts = true;
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          cataloguePageSource: catalogue,
+          publishedCatalogueSource: source,
+          catalogueNow: () => now,
+        );
+        addTearDown(core.dispose);
+        final offers = session.acquireCatalogueOffers('offers');
+        final other = session.acquireCatalogueOffers('other');
+        final products = session.acquireCatalogueProducts('shop');
+        final pending = offers.open(query());
+        final productPending = products.open(
+          BuyV2CatalogueQuery(
+            destination: BuyV2Destination.shop,
+            regionId: 'jodhpur',
+          ),
+        );
+        final queued = other.open(
+          query(publisher: BuyV2OfferPublisherType.retailer),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(session.catalogueRequestsInFlight, 2);
+        expect(source.calls, 1);
+        expect(catalogue.active, 1);
+        session.dispose();
+        source.gate!.complete();
+        catalogue.productGates.single.complete();
+        await Future.wait([pending, productPending, queued]);
+        expect(session.catalogueRequestsInFlight, 0);
+        expect(session.pagedProductCount, 0);
+        expect(source.calls, 1);
+        expect(offers.isDisposed, isTrue);
+      },
+    );
+  });
+
   group('R5 catalogue session', () {
     BuyV2CatalogueQuery storeQuery(_PagingRecoverySource source, int store) =>
         BuyV2CatalogueQuery(
