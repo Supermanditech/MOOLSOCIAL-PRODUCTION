@@ -1,6 +1,19 @@
 {
-  "state": "not_built_not_installed",
+  "state": "installed_exact_checksum_native_pdf_replayed",
   "deviceSerial": "2b3e0f71",
   "candidateId": "UAW-CODEX-OPPO-R66.9-REVIEW-20260908",
-  "packageId": "com.moolsocial.app.runtime"
+  "packageId": "com.moolsocial.app.runtime",
+  "sourceCommit": "ac19156695918e4b226fac95557180ce0e3aef9c",
+  "versionName": "1.0.0-r66.9-runtime",
+  "versionCode": 2026090804,
+  "installedAtDeviceLocal": "2026-09-08 16:54:20",
+  "apkBytes": 209753505,
+  "localAndInstalledSha256": "92E7D302CEE91EA54F889FDB71C9A73E60231918F76CA3C37A923018683C9550",
+  "installExitCode": 0,
+  "fontScale": 1.0,
+  "captures": { "png": 66, "xml": 66 },
+  "deviceEvidence": "artifacts/quality/codex-oppo-r66-9-review-20260908/device-review.md",
+  "lastView": "Approved test case: private, off Store dashboard; no real application approved",
+  "nativePdfChild": "AUDIT-R668-01 resolved on OPPO",
+  "productionBackendAndFounderAcceptance": "not_qualified_by_review_fixtures"
 }

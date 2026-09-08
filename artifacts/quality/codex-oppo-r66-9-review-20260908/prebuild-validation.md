@@ -1,5 +1,11 @@
 # r66.9 prebuild validation
 
+## Source seal and one-build activation
+
+Qualified source commit ac19156695918e4b226fac95557180ce0e3aef9c is pushed and exactly equal to origin/work/codex-ui/codex-oppo-review-v1-20260905. Clean digest:0bytes/0records, SHA256E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855, stderr0,exit0. Coordination pre_commit, regression memory, coordination handoff and incremental handoff passed in their proper phases. An earlier premature incremental handoff against staged files correctly rejected dirty state; its recorded phase-order incident required no gate or application change.
+
+The machine state now authorizes one guarded RuntimeUiReview debug build from this exact source and381-file fingerprint. Only candidate evidence updates follow the clean seal. The historical pre-seal note below is superseded for build authority only. Native PDF and all post-build/device gates remain pending; no production promotion is authorized.
+
 Native transport correction implemented. Actual native compilation and all23 executable transport tests pass. Full Flutter analysis completed with zero issues. Both exact39-file serialized connected cycles completed:1367 passed,83 existing reported skips,0 failed,exit0 each. Five historical protected-reference tag exclusions are separate and unchanged. Complete raw outputs, exact commands and SHA256 values are in local-validation.md. Exact source381 manifest SHA256831D5C40921C2F523622BF240DDE1E3C2D86C51A11697C153384DF30B318DFCC is stable. All378 unaffected pre-existing source/test/dependency blobs match r66.8; only the two Android PDF owners differ, plus the focused native test.
 
 Prebuild controls attempt2 completed with exit0: approved commit coverage18/rejected2; positive/omission/rejection coverage fixtures; approved UI locks; customer copy; Flutter tracked-support success/failure/concurrency restoration fixtures including cleanup; Android resource integrity; build-foundation self-tests; incremental pre_build; MVP; guarded locked dependency resolution. All381 source hashes remained identical after resolution. Raw log: C:\GUARANTEED OUTCOME\MOOLSOCIAL-POST-UI-AUDIT-20260905\r669-prebuild-controls2-20260908.log; SHA25647CCB6D8EEC18D6D0C3115B4D578BB914BC88E08627CFAB47B57D350AC859B54. No dependency update or generated support drift accepted.
