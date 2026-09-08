@@ -1,5 +1,31 @@
 # r66.10 approved-screen coverage
 
+## Current standing-review checkpoint — Dashboard reached, two open frontend findings
+
+Founder granted standing conditional approval through Dashboard and allowed continued bounded first-tap inspection. Prior visual approval is retained; no approved design was changed and no further per-screen permission was assumed necessary. The earlier awaiting-founder statements below are historical. OPPO is left on the correct OPPO Review Store Dashboard at 266, without a keyboard or popup.
+
+New captures 193–266 cover Review/local submission, pending reference and background return, explicit review-only clarification, targeted QA PDF correction, submitted-versus-unsent snapshot separation, both attachment previews, declaration and same-application correction acknowledgement, reasoned rejection/support return, explicit test approval directly to Dashboard, two same-type approved-workspace switches, new-workspace/Back recovery and the following first-tap controls:
+
+- Statement and period filter; honest empty dues; disabled zero-balance settlement.
+- Empty Customer orders and Stock; blank counter bill; invalid customer phone and cancellation.
+- Store-context Restock, Buy Direct and empty Group Bulk Buying.
+- Blocked private-store link, non-publishable promotion and compact requirement category/form entry.
+- Setup alert → setup → correct Alerts return; profile/operations/settings with no saved change.
+- Inline search, visible no-match recovery, Clear/Finish search and ordinary background return.
+
+**Confirmed open frontend findings (2):**
+
+1. OPPO-S03-02: earlier phone/email Continue guidance gives a confirmation instruction before the format-specific correction. No OTP bypass observed.
+2. OPPO-S07-04 / R6610-SUPPORT-DRAFT-SCOPE-01 (new P2): current application -2 header in support Chat restores an unsent generated request for previous application -1. Registered before continuing; no message was sent or draft discarded. Correct application-scoped draft handling must preserve intentional unsent edits and existing Chat/Buy behavior.
+
+No further confirmed defect in the exercised 100% controls; this does not approve populated order/payment journeys, all first-tap destination designs, physical accessibility or unexecuted cases. Restock Back at 248 actually returned to Dashboard, not Sell; settings Back at 261 returned to Dashboard, not Store tools. Their exact originating-draft/intermediate-panel restoration is not qualified by an unchanged/empty fixture.
+
+Backend acceptance extensions are attached to existing OPPO-S03-01, OPPO-S07-01/02/03/04 and OPPO-S08-01 in device-review.md. In particular, real clarification resubmission is not complete: AuthenticatedWorkGateway.submitCorrection explicitly reports unavailable and inline correction actions remain review-gateway restricted. A native fixture correction is not proof of an implemented live endpoint. OTP, document storage/security, admin decisions and notification delivery, public links, catalogue/financial/order/collection authority remain explicit dependencies.
+
+Process-death/account isolation, pending-application recovery alongside an approved workspace, remaining document providers/error cases, physical 200%/TalkBack, populated central-order states/capacity, huge amounts and complete real delivery/collection/procurement/publication journeys remain unqualified in this round. Do not discard earlier test failures or treat visual approval as a waiver.
+
+Only local review fixtures and named QA files were used. No real OTP, application/admin approval, external message, payment, invoice/share, public publication or live settings change occurred. No source/test, registry/policy, APK, Cursor or Redmi changes. Full 001–266 evidence contains 532 PNG/XML files; canonical SHA-256 27A8C592AA3FF00F2C1C8C2DB23AD64C71FF494A6226A0BD8D4EC9B7901550AF. Exact per-action results, open-ticket acceptance criteria and new capture hashes are in device-review.md.
+
 ## Screen 6 approved; Screen 7 Review and submit awaiting review
 
 Founder approved Documents subject to native checks and asked to register genuine findings before advancing. Its bounded checks found no new confirmed defect, with the documented provider/error/accessibility/backend cases still pending. Captures 164–192 now cover Review entry and scrolling, unchecked-submit blocking, QA attachment View/Back, section-specific document Edit, removal/restoration reflected in the summary, declaration reset after a document change, business Edit/keyboard/save/reflection/restoration, and Contact Edit with both Android Back and Save returning to Review. Current OPPO view is Review and submit at 192, first view, awaiting founder review before submission.

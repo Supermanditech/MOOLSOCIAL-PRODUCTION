@@ -1,5 +1,232 @@
 # r66.10 OPPO review
 
+## Standing conditional approval — journey through Dashboard and bounded first-tap checks — 9 September 2026
+
+Founder extended the previously given visual approval into standing conditional approval: continue OPPO testing without another per-screen permission, register genuine defects, and do not treat untested states or backend fixtures as defect-free production. This supersedes the earlier awaiting-founder checkpoints below. No approved design was changed.
+
+This continuation adds 74 native actions/captures, 193–266 (148 PNG/XML files). Current OPPO screen is the approved review store's Dashboard at 266, with no keyboard or popup. The application under test is the new OPPO Review Store review application ending -2; the earlier Review Clarification QA2 application ends -1. These are explicit local review fixtures, not live customer applications.
+
+### Actual native results
+
+| Area | Actions and result | Evidence |
+| --- | --- | --- |
+| Review and local submission | Rechecked the existing summary, scrolled to the declaration, selected it, and submitted once. Application received remains pending rather than automatically approved. | 193–196 |
+| Pending reference and ordinary background return | Expanded the exact application reference; HOME and normal foreground return preserved the same pending application and reference. Collapsing it did not change the review state. This is not process-death/relaunch proof. | 197–199 |
+| Clarification entry | Explicit review-only scenario selection produced More information needed with the exact supplied business/document reason and correction actions. | 200–203 |
+| Targeted document correction | Selected only the named NOT-A-REAL-DOCUMENT QA PDF from native Android Downloads for Shop address. The earlier Authorization letter QA PNG remained attached. No personal document was selected. | 204–206 |
+| Unsent versus submitted information | Android Back returned to the clarification state with Changes not submitted. The submitted summary still had one attachment; Review changes showed the draft with two. This exercised correction preserved the acknowledged snapshot rather than claiming an unsent upload had been submitted. | 207–209 |
+| Correct attachment previews and return | First View opened the Shop address two-page QA PDF; second View opened the separate Authorization letter QA PNG. Each Back returned to the exact correction review. Legacy UI inside the QA image is attachment content, not a current app defect. | 210–213 |
+| Correction declaration and same-application acknowledgement | Verified the correction declaration initially unchecked, selected it, then sent the local correction once. Application received showed two attachments; the expanded reference exactly matched 197 (same application ending -2). No automatic approval or pending edit/upload prompt appeared. | 213–217 |
+| Rejection and support | Explicit test rejection showed the supplied reason and Contact MoolSocial, without a dashboard-forward action. Support opened the correct current application's header but restored the previous application's unsent draft: confirmed finding R6610-SUPPORT-DRAFT-SCOPE-01 below. Keyboard dismissal and Android Back returned to the current rejection; nothing was sent or discarded. | 218–223 |
+| Approval boundary | Only an explicitly selected review-only Approved scenario opened the correct Dashboard directly. Store remained Off/private with setup incomplete. Approval did not itself publish the store or enable orders. A transient welcome was not captured, so its timing is not qualified here. | 224–225 |
+| Inert status popup | Status opened a compact Off/private explanation. Back dismissed it without changing either state. Physical TalkBack semantics remain unqualified. | 226–227 |
+| Two same-type approved workspaces | Chooser identified both businesses and the selected workspace. Switching each way opened its correct Dashboard directly, not the onboarding journey. Request another Workspace opened Grow with MoolSocial; Back restored the existing approved Dashboard unchanged. | 228–234 |
+| Statement | First tap opened the correct store statement. The compact period menu worked; Financial year remained readable and retained an honest empty result. No financial transaction was created. | 235–237 |
+| Dues and settlement | Empty dues distinguished unpaid invoices from paid purchases retained in the statement. Zero-balance settlement showed readable adjustments and a disabled Review payout action (native enabled/clickable false); no payout was requested. | 238–239 |
+| Customer orders and Stock | Orders showed zero active orders and reachable state filters/Create bill. Stock opened the empty store catalogue plus shared-catalogue suggestions. These are empty-state entry checks, not populated order execution, simultaneous-order capacity or large-amount qualification. | 240–241 |
+| Counter bill and customer phone | Sell opened the blank bill directly. Add customer opened a compact native sheet; entering 123 and confirming kept the full ten-digit correction visible above the numeric keyboard. Close returned to the unchanged zero-item bill without accepting the invalid customer or creating an invoice. | 242–246 |
+| Restock store context | Restock opened existing Wholesale/Bulk with Store purchase and the exact store identity, preserving the store perimeter. Android Back actually returned to Dashboard, not Sell. Capture 248's filename describes the attempted origin, not a passing exact-Sell return assertion. No populated bill draft was used; exact draft/origin restoration remains unqualified. Wholesale/Bulk content is provisional pending the separate Cursor lineage and is excluded from the product-content verdict. | 247–248 |
+| Buy Direct and Group Bulk Buying | Direct-buy entry retained store context and listed the available manufacturer source data. Group buying showed an honest empty state without invented deadlines/commitments. No product, commitment or payment was selected. | 249–250 |
+| Store link and promotion | Private/unconfigured store-link action explained why sharing was unavailable and opened no external app. Promotion exposed no fabricated public product or opted-in audience; Publish remained disabled. No campaign was sent. | 251–252 |
+| Post requirement | Compact native selector showed the ten existing categories above Android navigation; Product sourcing opened the relevant form with the saved postal PIN and Not posted state. No requirement fields or publication were submitted. | 253–254 |
+| Alerts and setup return | The one setup alert matched the current store. Continue opened this store's setup; Android Back returned to Alerts. No product, fulfilment, price or open/public setting was changed. | 255–257 |
+| Profile and store settings | Profile showed the current active workspace. Operations opened Store tools and Store settings. Settings displayed existing Off/private state, capacity and hours; no Save or toggle was used. Android Back from settings actually returned to Dashboard, not Store tools; no assertion of exact intermediate-panel restoration is made. | 258–261 |
+| Inline Search and keyboard | Search stayed in the header; focus made room for the keyboard by hiding operating controls. A no-match query showed a clear empty result, Clear restored empty search, and Finish search restored the dashboard controls without changing store data. | 262–265 |
+| Final ordinary background return | HOME and normal foreground return preserved the same Dashboard and Off/private, zero-setup state. No force-stop, reinstall, account switch or server refresh is claimed. | 266 |
+
+Images 238, 240 and 263 were re-opened individually after a combined read-only display exceeded the output budget; no device action was repeated. The support and final-dashboard images were also inspected directly. A retained-log read restricted to this runtime PID contained 129 lines and zero matches for the checked fatal/unhandled/RenderFlex/error signatures. That limited log window is not a full-session or absence-of-crashes guarantee; no full raw diagnostic log artifact was created in this evidence-only scope.
+
+### Findings and approval disposition
+
+- **Open frontend finding OPPO-S03-02:** the earlier malformed phone/email Continue guidance still requires its bounded correction. No actual OTP authentication bypass was observed.
+- **New open frontend child OPPO-S07-04 / R6610-SUPPORT-DRAFT-SCOPE-01:** old application support draft under the new application's correct header. Detailed reproduction, owner assessment and acceptance criteria immediately follow this checkpoint.
+- No additional confirmed defect in the exercised pending/clarification snapshot and local correction, rejection-reason display, direct approved entry, workspace switching, status, empty-state first taps, customer-phone validation or inline-search controls at OPPO font scale 1.0. Do not extend this result to the two open findings, untested populated states or genuine backend behavior.
+- Founder visual approval through Dashboard is retained, conditional on technical defects being fixed. First-tap tests above are bounded technical evidence, not blanket founder approval for all destination designs or all subsequent actions.
+- Earlier native observations and historical failures remain preserved below. This checkpoint does not silently close pending application re-entry after process death, account isolation, physical 200%/TalkBack, camera/gallery/cloud completion, other business-type journeys, or remaining file/error variants.
+
+### Backend readiness — extend existing tickets, do not create duplicate frameworks
+
+These are registered acceptance extensions to existing parents, not new service implementation and not production passes from a fixture:
+
+| Existing parent / boundary | Required implementation or verification before production acceptance |
+| --- | --- |
+| OPPO-S03-01 — contact verification | Await authenticated server outcomes; distinguish wrong/expired code, throttling and unavailable transport without inventing success. Preserve changed-value verification invalidation and account-scoped resumable details. No live OTP was requested in this continuation. |
+| OPPO-S07-01 — pending application / authoritative review | Bind every refresh to the signed-in account, exact application and monotonic server decision revision. Preserve acknowledged details across stale/out-of-order responses, offline retry, background/relaunch and another active workspace. Publish the 24-working-hour expectation only with an operationally supported review process; no actual SLA was measured here. |
+| OPPO-S07-02 / OPPO-S07-03 — clarification draft and resubmission | Native local draft/snapshot separation and same-reference acknowledgement passed. Production is still blocked: work_services.dart AuthenticatedWorkGateway.submitCorrection currently explicitly reports unavailable, and the inline correction controls are review-gateway restricted. A bounded frontend-to-authenticated-service completion must preserve exact application, revision, document ownership, idempotency and the acknowledged snapshot; only a real acknowledgement may return the case to pending. Retry/network uncertainty must not lose corrections or create another application. Fixture success does not close this dependency. |
+| OPPO-S07-04 — review communications and contextual support | Real admin status delivery through configured, consented MoolSocial Chat/WhatsApp/email/call channels remains pending. Return the supplied customer-safe reason, not internal risk notes. Bind support draft and attachments to the same account/application; the newly confirmed native draft mismatch is the frontend child below, separate from notification delivery. No notification/message was sent. |
+| OPPO-S08-01 — decision and workspace access | Only authoritative approval may unlock the account-scoped workspace. Clarification and rejection must retain exact readable reasons and permitted actions; unavailable reasons must remain honest. Approved entry must go directly to Dashboard while public visibility/order availability remain independently controlled. Verify revoked/stale decisions and cross-workspace authorization; debug scenario selection is not production approval evidence. |
+| Existing document-upload boundary | Confirm server-side ownership, allowed size/type/content checks and immutable submitted proof references; retain draft/retry behavior through failed uploads and review corrections. Local PDF/image preview is not proof of secure storage, PAN/business matching or live document review. No additional identity-verification vendor is introduced. |
+| Existing Store/Buy/collection dependencies | Live catalogue facts, purchase/order events, payments/settlement authority, public-store link and post-sign-in resumption, delivery/capacity updates, consented invoice sharing/publication and customer collection authorization remain tracked production dependencies. This empty-store first-tap pass cannot qualify them. Preserve the existing versioned collection contract and Cursor-owned consumer work; do not create local-success handover/payment bypasses. |
+
+No backend infrastructure, shared contract, product/test source, registry, policy, build, APK, Cursor or Redmi change was made. No real OTP, admin approval, payment, invoice, public link/share, publication or message was triggered. Existing user-edited support work and all original QA/evidence files were preserved.
+
+### Standing-review capture hashes
+
+148 new PNG/XML rows, 193–266. Full 001–266 inventory: 532 rows; canonical UTF-8/no-BOM LF-terminated SHA-256 27A8C592AA3FF00F2C1C8C2DB23AD64C71FF494A6226A0BD8D4EC9B7901550AF.
+
+```text
+06160D97D0A5D113FFC7D63FCF053D12BEBE8B2991496D3F25126802E8716329  r6610-native-193-standing-approval-review-checkpoint.png
+3A56BE1C2C5E629A1A74F0F1AB1A348AA625542D268B6923530638F59EC4E8BC  r6610-native-193-standing-approval-review-checkpoint.xml
+A1690E3C58128E53C85B7818573C7918DD0401669892E08C1CE047870BF320C0  r6610-native-194-review-declaration-ready.png
+0676916943BEDCEBE9BA1C6C8507D7B6BEC793D7C4DAC477F7844AFEDCC1081E  r6610-native-194-review-declaration-ready.xml
+250B4B5E561E75704E5ECA87E1749297C6E74F5FDD88D8AA3ACD8DDC597B478E  r6610-native-195-review-local-declaration-confirmed.png
+BB59DAE3895CA6D9F131C81BAC3C2D0B536B3C9884789A5C4C9A04EA456F90E7  r6610-native-195-review-local-declaration-confirmed.xml
+7BA302B0F426478E64C18428497D4EE76D5E75F1BDEC602FFBECA1A806978A64  r6610-native-196-application-received-standing-review.png
+43F8F6CC260ACEF970A965EB5F725F5FC443937CEAF4EEF4A5C2991B8A57720F  r6610-native-196-application-received-standing-review.xml
+AAAC633949B3C3AC2955167A6A2D4E478E1745D040B6631445F356520D0094D0  r6610-native-197-pending-reference-expanded.png
+9ADBDC6C3DBDD944A1949DB7185214A931AD98844770FACBD339A113647DDB96  r6610-native-197-pending-reference-expanded.xml
+20A8DE6AA8BACFAD0CD8916B8035B545487B8B3DFF698D4CE870CF7C7A8AA81E  r6610-native-198-pending-background-return.png
+9ADBDC6C3DBDD944A1949DB7185214A931AD98844770FACBD339A113647DDB96  r6610-native-198-pending-background-return.xml
+FC1A8FE2D923A53BFA51C6F87636635501137AD010315EBC985C889C5B8923B5  r6610-native-199-pending-reference-collapsed.png
+43F8F6CC260ACEF970A965EB5F725F5FC443937CEAF4EEF4A5C2991B8A57720F  r6610-native-199-pending-reference-collapsed.xml
+53F7BC50041616A9FF2946DF9A2926C768468D1056E38CCCBFD44987EA85AE83  r6610-native-200-review-only-scenario-chooser.png
+BA390DDED0610F870A21FB58DCAF859689818852CC019097AF722E8E3F7578A9  r6610-native-200-review-only-scenario-chooser.xml
+D1C77372EDFCD096DF5110EF5B7ED4456DF7CAECAEF6CE60E3B48AA732A6CEE5  r6610-native-201-clarification-standing-review.png
+18FA585FEED18084750BFE50D370C2B90134C510E0E8AA29827BB42748F885EC  r6610-native-201-clarification-standing-review.xml
+B6B0EEEAA4DDA3316067035FDB1C2FDF3142D4A86C121684697A54DFCC8057A1  r6610-native-202-clarification-document-correction-entry.png
+06D7D2215CF4D95FB2AFDADB086A234B2B9B3DE2B433B61ABFDCA63D09F9D28D  r6610-native-202-clarification-document-correction-entry.xml
+01461727A625754862FDDBE79BBF8CE696E3F48D7CF915BE8D122698AB39A14F  r6610-native-203-clarification-address-slot.png
+558423E06AC128EF770221F25F1E971F4116C85CD94E8D4BEBEEEA83D72E5F0C  r6610-native-203-clarification-address-slot.xml
+3F41084A33D23B13C8758DEB3045C0D9D7785628574D6C05DEE55405F2A4C98C  r6610-native-204-clarification-address-source-chooser.png
+CA4531DF0905251FB44FD6A56F3C7C35311F8E6BA0DFC90B3A2438AC464616FD  r6610-native-204-clarification-address-source-chooser.xml
+C0390CAE3648FB918745D14397CD449B6A9FD0A8F21CC3C6E1C48279B03A9444  r6610-native-205-clarification-native-qa-picker.png
+98611B0C24415298E6C8EA766D68293B8B1F9E431755AE7282FEB72D641A3371  r6610-native-205-clarification-native-qa-picker.xml
+F112784851F0A67851C24AF83613BFBF4F8E396BDDA3E650704A0DC7D18B6318  r6610-native-206-clarification-address-qa-attached.png
+573B9F9B38017DD2D2BFC03C97E14322780CC4269C7B6EF8637ABA5FB7235D76  r6610-native-206-clarification-address-qa-attached.xml
+CA7A7AB7433A7B317097EAEDD461A148F5BA5498D5793AFE44C4289D8AF9EA21  r6610-native-207-clarification-unsent-document-return.png
+6522048D3FB9F5CB876E29E9372F55E21BC31026B5EFE5A194C9E08EF6EE35B9  r6610-native-207-clarification-unsent-document-return.xml
+4F5DC7E3B410D7D2094F919055304A1DC754C421E1F6F512E83EBE05C939D2DB  r6610-native-208-clarification-review-two-attachments.png
+BD4DCEB814385CACD6B428D6CECF85322F55D7D8C88EDDB32B32F2AF756E7801  r6610-native-208-clarification-review-two-attachments.xml
+6A7BD922AA4C812372FEBF5DAB70A24390B308B871892EA3A9CF44CC9213CD76  r6610-native-209-correction-review-document-details.png
+2E968351D936CCA6BA1ABB7136096558409D8359D089DC6187B1164200C84E34  r6610-native-209-correction-review-document-details.xml
+3A18B1232B3FE1670807664518512A75186ED96DFAAD3BAFCA7C1DFF1D16B737  r6610-native-210-correction-address-pdf-preview.png
+E6DBA6EC785400134BBD86660B9EC2C97FAD28574940D25930D1ED3362A362B7  r6610-native-210-correction-address-pdf-preview.xml
+D71DC2B51C750AA5758C473DAF6353A7F1208B042894840B574E873878A9A580  r6610-native-211-correction-pdf-back-review.png
+2E968351D936CCA6BA1ABB7136096558409D8359D089DC6187B1164200C84E34  r6610-native-211-correction-pdf-back-review.xml
+DE1C8246D32C1E4B3A997F28759DC79D0A61E2830949DD9F6A4BFB976F8DEA42  r6610-native-212-correction-authorisation-image-preview.png
+11FEED99342D49DDA2D2F7700315B68913C2EAD99781B7ECE1BB9360E8A8C4A0  r6610-native-212-correction-authorisation-image-preview.xml
+1F26122FDA11D160FD40183C14465D81B093AA7D82C29563B7ABB0C2E94ED3B0  r6610-native-213-correction-declaration-before-resubmit.png
+3CD58CB5574E17417E258CF142EBA4B25764B7B7FB1D9D3B4095916332DE618A  r6610-native-213-correction-declaration-before-resubmit.xml
+65F51C814A8FF8FB9E510057B2E74A9243454E0D8730D82B4EAEC7B946B63E44  r6610-native-214-correction-local-confirmation.png
+78137C60B5049A315B4E05775EB72EB258DBA17898D53F97C39DC29FB1C0DCEB  r6610-native-214-correction-local-confirmation.xml
+681CB0757132D0FA7C90C65364139E1155E514BF994B7C8F0D96CD907C136705  r6610-native-215-corrections-resubmitted-state.png
+09C5F760DAF2816253A5177376BA7601E6A6A1B58FEC61FBE4616B073582F4A9  r6610-native-215-corrections-resubmitted-state.xml
+EC4EA7B819313DB77592B8D8ED009F3BFE72C90F0F381EB7DD9B34731095D975  r6610-native-216-correction-same-application-reference.png
+BB130C7E188C3101CAF8ADDE6758D5CF266100C1959364466C5D8A7A2C02C496  r6610-native-216-correction-same-application-reference.xml
+9BBA04773F6216651801FC9CD1E16E4834F0140AC529C542E233B4EDCD6200FA  r6610-native-217-corrected-pending-status.png
+09C5F760DAF2816253A5177376BA7601E6A6A1B58FEC61FBE4616B073582F4A9  r6610-native-217-corrected-pending-status.xml
+4D12579BA6B9D3DAA69B6F3B1F51E328A7B8BACB5F1D8F65647E66BA729D4487  r6610-native-218-review-only-rejection-selector.png
+37032F10F90AB3D6FD7A7138B66934EF422E615ED19B78E770BA457D4C20261C  r6610-native-218-review-only-rejection-selector.xml
+7C4A1F3786774BCAAB1F273A9987074EC706D7CCA5D6BEBD3655F5E8125BA4CE  r6610-native-219-rejection-reason-standing-review.png
+7C9A93D0D76AEDC7D22DE2651312EC8FBD2F729E3645591D462FC2F828C88ED5  r6610-native-219-rejection-reason-standing-review.xml
+D460C2DB5F191837B466E7EFFF7F3B44466B50D0A01CF2DE05290AFC7CC7641B  r6610-native-220-rejection-support-unsent-context.png
+AB10C06549097AE3B392FC62405540A61DDB5F2D7C4B26B02F7677F1DD50E6D4  r6610-native-220-rejection-support-unsent-context.xml
+D257B41D17FC85FE7444496585E7AD92B21D81DDF20BD5B8577AA311F4FAE235  r6610-native-221-support-draft-keyboard-context-mismatch.png
+38B5E7A7056E8CB07DB75D310B52D5B5D3677BA5F5694C60E9845478BE811AC3  r6610-native-221-support-draft-keyboard-context-mismatch.xml
+686A74BC19C9513730246F5B9462EE5FAF760CD8F9E23ADB91C9C16B0972CF6B  r6610-native-222-support-keyboard-dismissed-no-send.png
+ED41C84B0039127407C391B8123F79F2E7EAFEAED1BD816A3C6EADF139C18F89  r6610-native-222-support-keyboard-dismissed-no-send.xml
+78EF5093DDB641097E7CEE50F138CB29F0F01D1CA01A3ACBE36882DABD3AA6D7  r6610-native-223-support-back-exact-rejected-application.png
+42E9E33E74438F081642C14F667BC0F358706A1E026D1497DE0B11D6380BC9D5  r6610-native-223-support-back-exact-rejected-application.xml
+A048486C28D8BF42B13BCD0046F8C80A8521F69887DACCBC9EF9ECE7E2E0EECF  r6610-native-224-review-only-approval-selector.png
+BA390DDED0610F870A21FB58DCAF859689818852CC019097AF722E8E3F7578A9  r6610-native-224-review-only-approval-selector.xml
+52A6ACDC1C0A6173829384D506D7D2A6BB33252EB7D9E873B0097C1E29C90343  r6610-native-225-approved-direct-dashboard.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-225-approved-direct-dashboard.xml
+9B3C82361647DE8176717979E3EA762F29213BEF24E62BFA18AD2705627E0596  r6610-native-226-dashboard-inert-status-popover.png
+54ADE9420B19AA8E3F89C1872F3F8A8ED6244FDE06A141193AB0251561EB8FF7  r6610-native-226-dashboard-inert-status-popover.xml
+6F32F71E1B4F2668C67F40DCEF7813BEB049200750E2559FD994EF484957306C  r6610-native-227-status-dismissal-no-mutation.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-227-status-dismissal-no-mutation.xml
+00E32B9A633CB9481D0C5129182BC78A8598F75C75CA7AD0CACAA3EFD2F539D8  r6610-native-228-approved-workspace-switcher.png
+7635514BE4B2AF420F089E3CE5DA24DD35C14006A648B0562210681EFF16E2E1  r6610-native-228-approved-workspace-switcher.xml
+55E77B068204D165AEBCEB09F890B9948FBE5DF74F60E22759A031296ED934EB  r6610-native-229-switch-existing-approved-store.png
+F55D50C5507F06D0EFC9BBA7463C27191B9392F87FC14067B7020494EC549A0C  r6610-native-229-switch-existing-approved-store.xml
+190930E9ED692B795E5D0AAAEFA5A2AA1A07B92449A53C84297C23415A2B71B3  r6610-native-230-workspace-switcher-old-selection.png
+D0794019417F19D6C5D0188C9F373BC7F90B7FC1A676EA4270539936D8CAE2F3  r6610-native-230-workspace-switcher-old-selection.xml
+AA7FDA72D7F071348186437B2FB5BEFDC83E41CBD7BBD879BF441CE8584736CD  r6610-native-231-switch-back-new-approved-store.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-231-switch-back-new-approved-store.xml
+6DA5460C49B812EB6E4F7E77B6CE5BE2CC901DA374CA9A58DA514849C2F58832  r6610-native-232-new-workspace-request-entry.png
+7635514BE4B2AF420F089E3CE5DA24DD35C14006A648B0562210681EFF16E2E1  r6610-native-232-new-workspace-request-entry.xml
+FDFC6257034F4007B10384743456BE6696EEEE68F7833236072F11C9596C58A9  r6610-native-233-new-workspace-selector-no-existing-card.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-233-new-workspace-selector-no-existing-card.xml
+54A7F885274B55DEA0D0F608849168A600C05FF405EB3DF2B15055452124FC38  r6610-native-234-new-workspace-back-approved-dashboard.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-234-new-workspace-back-approved-dashboard.xml
+E5A787EB9110209BF03E0A6C99F94052DC109F9CA2B6618BECBE1655D60EBA31  r6610-native-235-dashboard-statement-first-tap.png
+08D4E8FD360F439A97D3D2E84ED24771879640776124C21A75183CC7B963A8E1  r6610-native-235-dashboard-statement-first-tap.xml
+07C536C2FAEBFA699E394991D7925A623CEA07E7EE64F109F863A8144EE71498  r6610-native-236-statement-period-selector.png
+52773F63544CC9D2CB80AE86E1402D56A3F89C87F7CBE5EF88871D974C1B6E3B  r6610-native-236-statement-period-selector.xml
+EA730D3965112DDDC77036D9C69688B1701E6EC13F91A4693BC0509C05BCA077  r6610-native-237-statement-financial-year-selected.png
+00C4BBCD533D3F36C22B2AFF2C0E19B55A12A1A6B5E7924CEA28E53D072640FE  r6610-native-237-statement-financial-year-selected.xml
+81ECC412C041E29D9EFF2E6BF8BDE3DD810A7BDF6211C393513BAE76EF00B0C2  r6610-native-238-dashboard-dues-first-tap.png
+B6E87D3FE1E52E54577030A7CE96F289E2232657F87D1311EDF8096281BD848C  r6610-native-238-dashboard-dues-first-tap.xml
+B3ABA2D8BE076D9DBA500975E14E7E10913D28A2933784BA709B066B812E578E  r6610-native-239-dashboard-settlement-first-tap.png
+BF1FD492C37E786133F7D0244BD20BCACB365FF380E0497073CF67A1316427CC  r6610-native-239-dashboard-settlement-first-tap.xml
+2E50FC364B0860328BF3D8B3BFC950ECA8897CA6CA5ADCB781D5A8E7BD6B8B8F  r6610-native-240-dashboard-orders-first-tap.png
+CB2775206FA86D6AB9C6EAE255C68FB658FEA1124AA3C0B5EF41279D7F6FF5C7  r6610-native-240-dashboard-orders-first-tap.xml
+54537BE0E7F7CA425CA5E82E990B9D93EAFFC32064C553BEC090DA224AFFA8EC  r6610-native-241-dashboard-stock-first-tap.png
+E36A73924CF68000FF6359E91C3CE783A31D8CFFEC2F68FAE4068E461B3179A4  r6610-native-241-dashboard-stock-first-tap.xml
+F4DAC2190CB1D91E906A24C4C704098A9E1C9C30377707E249655E18351CD790  r6610-native-242-dashboard-sell-first-tap.png
+C3A187001909C9D56CE676CDD330EF323236CC5A769252FEFAA6CB0B71D977CD  r6610-native-242-dashboard-sell-first-tap.xml
+423F63540F353529EF31F9A1949B102C7DFBEA8BB23D4715EAEA71632AE5C26F  r6610-native-243-sell-customer-sheet.png
+C5B6B42560C24FDB805BBA6F76BC64258F3F74DBBBB71FAE69943FCAA2A06E5B  r6610-native-243-sell-customer-sheet.xml
+01473CD7D32F9254ABF9DFFE889A2C69BF062EC52162338E5104A5AD601D9EC2  r6610-native-244-customer-phone-keyboard-invalid-input.png
+1A33629E10726EC5938D2A77AED80E995E3628A496041A1EA6C7EA77D6AD25EC  r6610-native-244-customer-phone-keyboard-invalid-input.xml
+9A7BF2295D40B4284F8DCC920CBBA90DFE964A462995ACDD359D7980108981A9  r6610-native-245-customer-phone-validation-keyboard-safe.png
+D88AFAE7F4B35148BB3B364FF23D18595BB7ABB82A96A82DD86B0ABF5FE25119  r6610-native-245-customer-phone-validation-keyboard-safe.xml
+400C838938E464D22C69364013A43EC11BB57852EAA468ACE757BBC058824CDD  r6610-native-246-customer-cancel-bill-unchanged.png
+C3A187001909C9D56CE676CDD330EF323236CC5A769252FEFAA6CB0B71D977CD  r6610-native-246-customer-cancel-bill-unchanged.xml
+AE35F3448218A15CAC06A3D46C95FBCDB3EAA70797676119DC09CDD769EE2DB1  r6610-native-247-store-restock-first-tap.png
+6376BB61242DBA59053529277FC8761935004B0681F0362871EB2116BD74DDE0  r6610-native-247-store-restock-first-tap.xml
+888B41008173D89A7A5F6B571C60B09582D32B91A31F640C21C30D47677AA0F7  r6610-native-248-restock-back-origin-sell.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-248-restock-back-origin-sell.xml
+827640C763385014C7B1029B5BA2B2F676F6D501586E1514113BBD9A2FFEC36E  r6610-native-249-dashboard-buy-direct-first-tap.png
+3DAEBE12FA7041DD424108468B55972545E213963C1586819E0FC6F56069701A  r6610-native-249-dashboard-buy-direct-first-tap.xml
+62962633859BDFBB975DE096947E703A47E5501CE61D16F2DDB57EFEA238CA9D  r6610-native-250-dashboard-group-bulk-first-tap.png
+966F6B71804BB238E3B0860EBE8B10E694BA4CED2690A9D0B25E9DD5E39D42E3  r6610-native-250-dashboard-group-bulk-first-tap.xml
+354CBAFB5D72005225752BD35ECBF436CCCD68659A796A3A6C92BEAC4E8921E4  r6610-native-251-private-store-link-first-tap.png
+12E849ABDC691D7E5630F6C2C0196C78ACB6FAF206DFE6B699F3A52CA9FA4AA6  r6610-native-251-private-store-link-first-tap.xml
+09CBEB4BC47F9EEC43A4E8C0BA421D431E362A6663E07ADFF1560ADC2BA44B9D  r6610-native-252-dashboard-promote-first-tap.png
+A1E056D6AF6015228D9B369CD8C6D43DD337323543A3815EDA121EEBB1D7C48A  r6610-native-252-dashboard-promote-first-tap.xml
+02FC5E92710B3E7E628F522547130B4DEF63EFE8DB307F7E684558D314218518  r6610-native-253-dashboard-requirement-first-tap.png
+BD3E7EC8EC48D874354116187E1AE1A7D5844F0C18B0AB6A47AFFEDDF7935CD1  r6610-native-253-dashboard-requirement-first-tap.xml
+EAE4F17E57AA8C669C3EFB3ABC2343DC2E201C08881BFEADC18C357931F29A8F  r6610-native-254-requirement-product-sourcing-form.png
+2ED231FFFDB164CCFC2FC1F4841E8F974BA81A9118D97FE11711B972C1C1A852  r6610-native-254-requirement-product-sourcing-form.xml
+06C9CDCB20E36F19D45D80C4F16DE050B3905E525517D778C0DF309F37BBFB6A  r6610-native-255-dashboard-alerts-first-tap.png
+BE0D379DB38CB3066276622B5137C982E6D418706AC9D6E7693A18D47D703E87  r6610-native-255-dashboard-alerts-first-tap.xml
+E487DE47FBBB781CBFC1A929912681FA96213B9012E8945DE8D7E0664BBB3A0C  r6610-native-256-alert-store-setup-destination.png
+F275769989D88C983ECC95B6CBFEC981DBE8C5EEAC159754BBAB5B087F9D53E3  r6610-native-256-alert-store-setup-destination.xml
+63CB0C658C1962573AC9D48C5BA51BB50A13B8E081A09B0BD456B4565BC0951E  r6610-native-257-setup-back-without-publication.png
+BE0D379DB38CB3066276622B5137C982E6D418706AC9D6E7693A18D47D703E87  r6610-native-257-setup-back-without-publication.xml
+5E7A932233A6DD59B5AB60694FD0EB27770A43FF05B0370B47AB15336B00C57A  r6610-native-258-dashboard-profile-first-tap.png
+D140A53034DF636F2773E51DB537191BD6C03267D82190D298C341DF73E94E2B  r6610-native-258-dashboard-profile-first-tap.xml
+71A01084B5D86E089A57F56616180095940C7220A096F63971A48E9157A85B0A  r6610-native-259-profile-operations-destination.png
+A0746BA6DD2B1DC398B5C671C7825B3BB992C7C46D4FF2479D5D3A7ECD395BBD  r6610-native-259-profile-operations-destination.xml
+92FA2B3216269AB53257AC0DF5752C24C619923D8ED9F144CA357EF598E433D1  r6610-native-260-contextual-store-settings.png
+6847ADBCA0B091B99AB43937A8DC7D6B0531ACC6282EF487FFAC996E972B6345  r6610-native-260-contextual-store-settings.xml
+C067C530D928FEDA246B787A79F28B7604F9104F0DE5F4628BCC1D79C3F174AD  r6610-native-261-settings-back-no-save.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-261-settings-back-no-save.xml
+B9EEEEE945FDA2C224FE1766AF68F4080FF311017440541F8A885CF75062C688  r6610-native-262-dashboard-inline-search-keyboard.png
+433E530A39A9AD60544A6A9EA05A9F05A8D037445D030F81665537F2FA6AD3F0  r6610-native-262-dashboard-inline-search-keyboard.xml
+56ECD0EDC2C6260049FB435DE49A7C46CE374200EB451B5F9AF1ED7677648C9E  r6610-native-263-dashboard-search-empty-result.png
+85809D1D9935DF097846F99CBD48B60D047B8A73B409BDC307CFEFA04A3AF3E8  r6610-native-263-dashboard-search-empty-result.xml
+4D1C7B449201807164C59A22160E9336FC9C1B49DCF7E5D365AB6AA39A6382DA  r6610-native-264-dashboard-search-clear-recovery.png
+433E530A39A9AD60544A6A9EA05A9F05A8D037445D030F81665537F2FA6AD3F0  r6610-native-264-dashboard-search-clear-recovery.xml
+77D308A19BFB49BE7B8969DECA7A73AC615C673D1644BA1A3904141B66A8119E  r6610-native-265-dashboard-search-finish-restores-rails.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-265-dashboard-search-finish-restores-rails.xml
+F408C998A38933A7EFA83DF328B86C5818DD320064B9696BE090E39063778927  r6610-native-266-dashboard-final-background-return.png
+FAA3382B1956A84D9442A60F3E6F01E446988E3C01EC542D870F998CB7E77C35  r6610-native-266-dashboard-final-background-return.xml
+```
+
+## OPEN — OPPO-S07-04 / R6610-SUPPORT-DRAFT-SCOPE-01 — stale application in support draft
+
+Status: confirmed native frontend context defect; registered 9 September 2026 before continuing the device journey. Priority P2. Parent is the existing application-support/communication requirement OPPO-S07-04; this is not a duplicate of backend notification delivery.
+
+Reproduction: retain an unsent support draft for the earlier review application ending -1 (business Review Clarification QA2), then open Contact MoolSocial from the newly rejected OPPO Review Store application ending -2. Capture 219 is the correct rejected application. Capture 220 shows current application -2 in the contextual header, while the composer restores text requesting help for application -1 / the previous business. No message was sent, and the old draft was not discarded or edited. Exact full review-only references are retained in the native XML, not treated as real customer identifiers.
+
+Source classification: chat_thread_screen.dart initState restores the thread draft before applying the route's initial draft. _applyInitialDraftIfEmpty refuses to replace nonempty text. _workspaceApplicationContext updates the header independently. chat_session.dart stores drafts by thread ID; both applications use workspace-support. This explains the observed mismatch without proving a sent-message or cross-account leak.
+
+Required bounded correction: preserve intentional unsent work, but bind generated application-support drafts and attachment context to the authenticated session plus exact application identity. Switching applications must not silently present/send the previous application's generated request beneath the new header. Use exact-context restoration or an explicit safe draft-resolution action; do not indiscriminately overwrite user-edited drafts. Keep ordinary Chat, Buy contextual drafts and exact Back URI behavior unchanged.
+
+Acceptance: two different same-type applications and businesses, empty/generated/user-edited drafts, repeat entry, Back/forward, account change, attachments, keyboard/large text and send-confirmation context; no external message required for local qualification. Verify existing Chat draft preservation regressions plus Workspace support routing. Shared Chat owner coordination is required before implementation if the exact owners are claimed elsewhere. This is review collection only; no source/test, backend, registry, policy, APK or Cursor change is made.
+
 ## Founder-paced screen 7 — Review and submit — 9 September 2026
 
 Founder approved Documents subject to Codex finding no defect during OPPO real-user checks and directed that genuine issues be registered before advancing. Its bounded native attachment/navigation checks found no new confirmed defect; earlier document, accessibility and backend limitations remain open. Capture 164 preserves the approved Documents view; 165 enters Review, Step 3 of 3. Current OPPO foreground is Review and submit first view at 192, awaiting founder review. No application has been submitted in this screen-7 round.

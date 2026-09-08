@@ -1,6 +1,6 @@
 {
   "candidateId": "UAW-CODEX-OPPO-R66.10-REVIEW-20260908",
-  "state": "installed_exact_checksum_device_review_pending",
+  "state": "installed_exact_checksum_partial_native_review_two_frontend_findings_open",
   "packageId": "com.moolsocial.app.runtime",
   "deviceSerial": "2b3e0f71",
   "apkBuilt": true,
@@ -19,10 +19,11 @@
   "launchStatus": "ok",
   "fontScale": 1.0,
   "firstSmokeCaptures": ["r6610-native-001-retained-launch", "r6610-native-002-mool-menu", "r6610-native-003-work-entry"],
-  "fullWorkspaceDashboardReplay": "partial_native_001_through_192_contact_validation_finding_open",
-  "currentNativeScreen": "review_and_submit_screen_7_awaiting_founder_review",
-  "nativeCaptureCount": 192,
-  "nativeCaptureInventorySha256": "CBFC65D7B5718178C3AFEDA553F5830C294268BCF05117576302392FA3C96999",
+  "fullWorkspaceDashboardReplay": "bounded_native_001_through_266_dashboard_and_first_tap_controls_two_frontend_findings_open",
+  "currentNativeScreen": "oppo_review_store_dashboard_266_no_keyboard_or_popup",
+  "nativeCaptureCount": 266,
+  "nativeCaptureInventorySha256": "27A8C592AA3FF00F2C1C8C2DB23AD64C71FF494A6226A0BD8D4EC9B7901550AF",
+  "standingApproval": "previous_visual_approval_retained_conditional_on_technical_defects_2026-09-09",
   "screen1FounderVisualApproval": "approved_2026-09-09",
   "screen2FounderVisualApproval": "approved_subject_to_native_checks_2026-09-09",
   "screen3FounderVisualApproval": "approved_subject_to_native_checks_2026-09-09",
@@ -31,17 +32,66 @@
   "screen5BoundedNativeResult": "no_new_confirmed_defect_in_exercised_in_session_100_percent_checks",
   "screen6FounderVisualApproval": "approved_subject_to_native_checks_2026-09-09",
   "screen6BoundedNativeResult": "no_new_confirmed_defect_in_exercised_pdf_image_cancel_and_navigation_checks",
-  "screen7FounderVisualApproval": "pending",
-  "screen7BoundedNativeResult": "no_new_confirmed_defect_in_exercised_summary_preview_edit_return_and_declaration_reset_checks",
-  "screen7FinalDeclarationChecked": false,
-  "screen7ApplicationSubmitted": false,
+  "screen7FounderVisualApproval": "approved_subject_to_native_checks_under_standing_authority_2026-09-09",
+  "screen7BoundedNativeResult": "no_new_confirmed_defect_in_exercised_summary_preview_edit_return_declaration_reset_and_local_submission",
+  "screen7FinalDeclarationChecked": true,
+  "screen7ApplicationSubmitted": true,
+  "screen7SubmissionScope": "explicit_local_review_gateway_fixture_only_captures_195_196_not_live_submission",
   "screen7NativePending": [
-    "submission_and_retry_outcomes_after_founder_review",
+    "production_submission_failure_duplicate_retry_and_network_uncertainty",
     "relaunch_and_account_change_isolation",
     "long_data_variants",
     "physical_200_percent_and_talkback",
     "production_backend_authorization_and_document_review"
   ],
+  "reviewDecisionBoundedResults": {
+    "scope": "explicit_debug_review_scenarios_only",
+    "pending": "retained_exact_reference_and_submitted_snapshot_no_automatic_approval",
+    "clarification": "targeted_qa_document_draft_visible_before_same_reference_local_acknowledgement",
+    "rejected": "reason_visible_no_dashboard_forward_action_support_draft_context_defect_registered",
+    "approved": "explicit_test_decision_opens_correct_dashboard_directly_off_private_unchanged",
+    "welcomeTimingQualified": false,
+    "productionApplicationSubmitted": false,
+    "productionApprovalExercised": false
+  },
+  "dashboardBoundedNativeResult": "no_new_confirmed_defect_in_exercised_empty_store_100_percent_controls",
+  "sameTypeApprovedWorkspaceSwitching": "two_review_workspaces_correct_direct_dashboard_and_new_workspace_back",
+  "firstTapBoundedCoverage": [
+    "statement_and_period_filter",
+    "empty_dues_and_disabled_zero_balance_settlement",
+    "empty_orders_and_stock",
+    "blank_counter_bill_invalid_customer_phone_and_cancel",
+    "restock_store_context_only_wholesale_content_provisional",
+    "buy_direct_entry_and_empty_group_bulk_buying",
+    "private_store_link_block_and_non_publishable_promotion",
+    "compact_requirement_selector_and_product_sourcing_form_entry",
+    "setup_alert_setup_back_to_alerts",
+    "profile_operations_settings_no_saved_changes",
+    "inline_search_keyboard_no_match_clear_finish",
+    "ordinary_background_return_no_process_kill"
+  ],
+  "firstTapExactReturnLimitations": [
+    "capture_248_restock_back_returned_dashboard_not_sell_no_populated_draft_test",
+    "capture_261_settings_back_returned_dashboard_not_store_tools"
+  ],
+  "additionalNativePending": [
+    "process_death_and_account_change_isolation",
+    "pending_application_reentry_alongside_approved_workspace_after_relaunch",
+    "other_business_types",
+    "populated_central_order_states_capacity_and_large_amounts",
+    "actual_invoice_sharing_requirement_and_promotion_publication",
+    "complete_procurement_payment_delivery_and_collection_journeys",
+    "physical_200_percent_and_talkback"
+  ],
+  "existingBackendTicketExtensions": [
+    "OPPO-S03-01",
+    "OPPO-S07-01",
+    "OPPO-S07-02",
+    "OPPO-S07-03",
+    "OPPO-S07-04",
+    "OPPO-S08-01"
+  ],
+  "authenticatedCorrectionQualification": "pending_submitCorrection_explicitly_unavailable_and_inline_actions_review_gateway_restricted",
   "documentNativePending": [
     "camera_capture",
     "actual_gallery_selection_completion",
@@ -60,8 +110,19 @@
       "scope": "Continue requests confirmation instead of format correction for malformed phone and email; Send code rejects with the correct format instruction",
       "evidenceCaptures": [104, 105, 109, 110],
       "productionAuthenticationBypassObserved": false
+    },
+    {
+      "ticket": "OPPO-S07-04",
+      "child": "R6610-SUPPORT-DRAFT-SCOPE-01",
+      "priority": "P2",
+      "status": "confirmed_frontend_fix_pending_review_collection_only",
+      "scope": "Current application support header restores generated unsent draft for previous application on workspace-support thread",
+      "evidenceCaptures": [219, 220, 221, 222, 223],
+      "externalMessageSent": false,
+      "retainedDraftDiscarded": false,
+      "crossAccountLeakProven": false
     }
   ],
-  "founderAcceptance": "pending",
+  "founderAcceptance": "visual_approval_through_dashboard_retained_conditional_on_open_defects_not_blanket_production_qualification",
   "productionBackendQualification": "not_inferred_from_review_fixtures"
 }
