@@ -1,5 +1,73 @@
 # r66.9 exact child coverage
 
+## Separate-application recovery — implementation in progress
+
+Connected attempt1 added whole journey01_test.dart and Buy router to the established ten-file batch. It ends1023 passed/81 unchanged skips/12failed,exit1; cycle2 never launched. All12 failures are in the added legacy journey01 suite (full names/assertions/stacks remain in the raw log); the ten current Work/Chat files complete1013 passed before that suite, and Buy router passes8. This is not a successful combined qualification. Its boot helper advances four seconds without the initial frame used by the current interruption suite, so setup-v4 targets are absent; separate legacy account expectations also fail. This contract diagnosis is not an executed parent comparison. No locked setup/sign-in source/test may be modified here. Retain this expanded-suite failure explicitly; run the exact connected Work return case plus the current first-open interruption suite as separate boundary checks and keep the historical legacy-suite disposition outstanding rather than silently skipping or claiming it passed.
+
+Manual retry-state inspection finds the new Workspaces loader inheriting WorkPageScaffold's default Earn Today selection. Set only its activeLocalAction to workspace and assert that state in both retry layouts. Preserve the captured incorrect states and the approved Dashboard geometry.
+
+R669-S01-ADD-SWITCH review-fixture child: retained applications now outlive a ReviewWorkGateway instance, but its case and Workspace counters restart at fixed IDs. A new review-only submission could collide with a retained case and be correctly refused by the new identity guard. Give device-review-only generated IDs a per-instance random prefix; preserve ordinary fixture IDs, unknown-case controls and all production gateway contracts. Test two gateway lifetimes and stable repeated approval of each case. This is test-APK isolation, not backend identity or approval qualification.
+
+Gateway attempt3 raw log reports200 passed; visual attempt1 reports8 passed and14 captures. The terminal completion response was truncated and the process is now closed; do not invent missing terminal metadata. Final-source qualification will record fresh complete exits. Manual inspection of the200% chooser exposes fixed heading/footer compression of the scrollable application list despite the title fit assertion passing. Scroll the existing whole sheet as one surface and strengthen full-tile visibility checks. Full analysis attempt1 exits1 with two braces-style infos (Dashboard1623 and WorkSession3718); fix these without changing behavior. Retain all original logs/captures.
+
+Parent71b035d5cc4c1ce8a6092eca98767a728a7b6294 is committed, clean and remote-equal; support qualification below is sealed. Existing R669-S01-ADD-SWITCH remains MVP-required. Reuse the existing chooser and encrypted account-scoped contact-draft store to keep each business application independent of approved Store operations. Same-type businesses need different draft/case identities. Preserve document references and submitted snapshots, with document bytes/contact confirmation in memory only. Cached data must never approve a Workspace; current status is refreshed through the existing gateway. Explicit new-Workspace navigation must remain distinct from ordinary entry, which waits for existing Workspaces before choosing onboarding or Dashboard.
+
+Application focused attempt1:11 passed,1failed,exit1. `R669 approval promotes only the reviewed application and retains existing Store` found a stale Continue setup entry after approval. Cause: submitProfile's pre-request guard correctly stops matching once the acknowledged case replaces null, so its guarded finally did not save the acknowledged case into the memento. Save that validated response inside its synchronous success block and remove the exact draft ID on approval as well as its case ID. Preserve the full raw s01-applications-focused-attempt1.log; this attempt is not qualification. No new product screen, backend authority, Cursor changes or APK is implied.
+
+Dependencies remain explicit: authoritative full-application/document retrieval, actual approval events and cross-device synchronization are backend work. The existing list/review gateway can supply current metadata; local restoration alone cannot qualify these services. Native document-preview recovery must not invent missing bytes.
+
+Gateway attempt2:197 passed,2failed,exit1; full analysis did not start. Two older tests assume superseded behavior: one switches the business through the UI setter while a review request is busy, and another expects a same-type server case to overwrite an unrelated unsubmitted local business. Keep UI switching blocked, explicitly simulate external rebinding in the stale-response test and retain all no-approval assertions. Test first-load clarification from a fresh session, plus a separate regression proving an unsent same-type business is preserved and the server case remains independently resumable. Do not weaken identity or reference assertions; both raw failures remain in s01-applications-gateway-attempt2.log.
+
+### Separate-application local qualification
+
+Final-source eleven-file cycles2 and3 each pass1021/81 unchanged intentional skips/0failed,exit0 (4m22s and4m14s). Full analysis attempt3 reports zero issues,exit0. The exact original ten Work/Chat owners are retained, plus test/ui_v2/buy/buy_v2_router_test.dart; the failed expanded attempt1 is separately preserved above, not counted as qualification. Additional current Work connected-chooser Back test passes1 and first-open interruption suite passes4, each exit0.
+
+Exact final command: `flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference test/ui_v2/work/work_main_v2_test.dart test/ui_v2/work/work_opportunity_home_c24g_test.dart test/work_production_gateway_test.dart test/work_store_atomic_operations_test.dart test/work_vertical_slice_test.dart test/work_workspace_layout_safety_test.dart test/chat_flow_test.dart test/chat_settings_hub_test.dart test/global_contextual_chat_shell_test.dart test/universal_intent_completion_test.dart test/ui_v2/buy/buy_v2_router_test.dart`.
+
+Visual attempt3 passes8 cases,exit0 and produces14 PNGs. Twelve are SHA-identical to the individually inspected attempt2 images; the two changed retry images were inspected directly and select Workspace correctly. At200%, the whole chooser scrolls; full application tile and Add Workspace reachability are asserted. The large-text Dashboard finance rail intentionally scrolls horizontally; a partially offscreen neighboring action is not treated as missing data. No Dashboard first-view redesign, reduced text scale or new skip was used.
+
+Application recovery uses existing encrypted account-scoped draft storage. Persist business fields, references and submitted snapshots, never local approval or OTP authority. In-memory files and confirmed channels remain separate; missing document bytes are not fabricated. Backend full-application/document retrieval and cross-device/approval synchronization remain explicit dependencies. Device-review-only IDs are collision-resistant across gateway lifetimes; production gateway contracts are unchanged. This is local implementation qualification only: new guarded APK, exact installed checksum and OPPO replay remain pending.
+
+Source/test hashes captured during final cycle2 and to be verified again before commit (no source edit during either final cycle):
+- `apps/mobile/lib/features/work/work_session.dart`: ECE9A865E3C119480E4420FB9FD22BFA0FE78D75E7B8271C445A3F993675FAB6
+- `apps/mobile/lib/features/work/work_services.dart`: 9544EF7CB381BABDA97BB87A22D3DBD5AB4A641952323E0977B713858A161745
+- `apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart`: 4B3483E73C376CBA334E6EE3D7CCD6C35549AF9FAC94CC64BDDCB63780DBEB14
+- `apps/mobile/lib/features/work/screens/work_onboarding_screens.dart`: 7DABC2C232A7A71D62BCD8C51C5B7DC056EB33A20736258188EF957A0543AB43
+- `apps/mobile/lib/features/journey01/journey_router.dart`: 92BA27EA180CA5602721B436467DF632824DA79BD6719B44C9283BD844EDDF4A
+- `apps/mobile/test/work_production_gateway_test.dart`: 8B5624E99361D7D119A5B10F47DB9FEF8715B39C32FD8FFB3AE65796C0940975
+- `apps/mobile/test/work_workspace_layout_safety_test.dart`: A3FDAB8F7ACBD652F0C8AB3D8D6A0215924C8A01E44166532807A66E153B663C
+
+Raw log and final visual SHA256 inventory under `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r669-approved-fix-cycle-20260908`; PNGs are in `s01-applications-visual-attempt3`:
+- `s01-applications-analysis-attempt1.log` (504bytes): 18F61BA0D859894CE7345AB259CFEF46ADCF4CAC94A85D923EDE73C1856BF344
+- `s01-applications-analysis-attempt2.log` (99bytes): 8E5FECC237C5B85F0D44AE5CA7BCA4B71D1774969F2072C3732023E3296D38C8
+- `s01-applications-analysis-attempt3.log` (99bytes): EA72B88EA0FEFA08C92E8C61DB97C9B67DD3829288755F67CD0237981B4704F5
+- `s01-applications-connected-cycle1.log` (381208bytes): F8B54B87997232D543337EE63094B40D388E6539C1D288DB423BD07C6DABC196
+- `s01-applications-connected-cycle2.log` (349464bytes): B0140A9B47E07B48B30C50E4FC5AE4D0F4608A89FAAB5A620D85B252B21E4B86
+- `s01-applications-connected-cycle3.log` (349464bytes): 34697B177970E92C75B3A167D559E3F7DC513F8F0523E179F62EFF8C880D8F91
+- `s01-applications-entry-boundary-attempt1.log` (372bytes): 3C525A23A7317C7E571FAA0A4E98755FFF2AFD37D00A969F72732FE1086AE8E6
+- `s01-applications-focused-attempt1.log` (2062bytes): E0E0AA75A9D8CEB2CC259F982B12622284524B027E618BAAC4E51B71660097E7
+- `s01-applications-gateway-attempt2.log` (18357bytes): 82FF328ADB6C3B04B30789BDCCB13E13F5039F3068BABC07B69D5F8E2C7E546F
+- `s01-applications-gateway-attempt3.log` (16985bytes): 8D828D02121F6F375EA87D2EF10E060DFF7AF007AF8CE3976D57FFF4825C25E9
+- `s01-applications-gateway-attempt4.log` (17092bytes): F1EDC9DF970D0028A1400EE5C4DBCDEA207FFBD39A2FC7493949202D65C3ED15
+- `s01-applications-interruption-boundary-attempt1.log` (1314bytes): F314A175FD67CDBA8BF0DD3AB9E259829CAE7A21A26A5308CB18ECAA05A41D44
+- `s01-applications-visual-attempt1.log` (1784bytes): 199ADA7D2DEFA129BB2D7656B730C07DA9BF017FEA39897A3F2001C94E9EB920
+- `s01-applications-visual-attempt2.log` (1784bytes): 073B3C8AF657D0BEA4279D4B311F48893391D54BBAF890C636148D73BA307284
+- `s01-applications-visual-attempt3.log` (1784bytes): C1394F83E28D6E8DAEC92558BE0436A5959916FF9A746EB8CE7C387A7A799F87
+- `r669-application-chooser-retailer-grocery-1.0.png` (64734bytes): 1188BA6E93DCE0BEC513C4FC0328634FDDAF04281A44BEB5558AC9E70FEC501A
+- `r669-application-chooser-retailer-grocery-2.0.png` (35245bytes): 39F9CD8758C25B5BEA0088BEDB81ADCEA461C34EF379616EA4ACFAC533DA8E75
+- `r669-application-chooser-retailer-speciality-1.0.png` (64397bytes): BE5978A3DC9D563449551DA6A66A4F8251190A88D02873D0A1FBBBE7F2B391ED
+- `r669-application-chooser-retailer-speciality-2.0.png` (35312bytes): 6BF4BED7B002AB96B0E02DAEECA67D89A9D36EF952F36B5BF2C93A9F35B7765F
+- `r669-approved-store-with-application-retailer-grocery-1.0.png` (60474bytes): 2AEC9A47AC6BD24CCD2C174ADE47F137D1035068EC2D9AD1E4446730BE04E138
+- `r669-approved-store-with-application-retailer-grocery-2.0.png` (45420bytes): 2960ED1C81CB3E5C0FEF22218D9131D321E4B12CCCD2CDAFE11B69781D720B10
+- `r669-approved-store-with-application-retailer-speciality-1.0.png` (60474bytes): 2AEC9A47AC6BD24CCD2C174ADE47F137D1035068EC2D9AD1E4446730BE04E138
+- `r669-approved-store-with-application-retailer-speciality-2.0.png` (45420bytes): 2960ED1C81CB3E5C0FEF22218D9131D321E4B12CCCD2CDAFE11B69781D720B10
+- `r669-resumed-application-retailer-grocery-1.0.png` (45797bytes): 07DE916C5C389BBBD4AD1E84FC3F37A8D8FA3A64E3E07A71FA34FA6DDC009FB9
+- `r669-resumed-application-retailer-grocery-2.0.png` (37982bytes): EAAFD16F866B0C67398AAE7D1978A40D536342C7DB9060844E311F6BDEE3BBEC
+- `r669-resumed-application-retailer-speciality-1.0.png` (45797bytes): 07DE916C5C389BBBD4AD1E84FC3F37A8D8FA3A64E3E07A71FA34FA6DDC009FB9
+- `r669-resumed-application-retailer-speciality-2.0.png` (37982bytes): EAAFD16F866B0C67398AAE7D1978A40D536342C7DB9060844E311F6BDEE3BBEC
+- `r669-workspace-entry-retry-1.0.png` (14882bytes): BF3ED23AC102FE1D7FDC58FB907138FD221CE77A139C41D2DAE97B1E6F3FBC9E
+- `r669-workspace-entry-retry-2.0.png` (19840bytes): 3B80A2C19F1D5C87C99660E941E5D52D152CA798CBB2AEDD6AFA3BD550A2D8C7
+
 ## Application-support correction — current local qualification
 
 Parent ad4f1cb8238910466884e60941cd89515208ae7a is clean, committed, pushed and remote-equal. Existing R669-S07/S08 support defect: Contact MoolSocial must open the existing Workspace support thread directly, show the acknowledged application reference/business, preserve an existing editable draft, send nothing automatically, and return to the same review state. The application context is display-only, not authority to read or decide an application. No Cursor, backend, Dashboard design or device changes.

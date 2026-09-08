@@ -4561,6 +4561,176 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    for (final profile in ['retailer-grocery', 'retailer-speciality']) {
+      testWidgets('R669 saved application chooser $profile $scale', (
+        tester,
+      ) async {
+        final gateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final work = storeViewFixture(gateway);
+        final existing = work.activeWorkspace;
+        final balance = work.workspaceSettlementBalance;
+        work.startAnotherWork();
+        work.selectProfile(profile);
+        work.saveDetails(
+          name: 'New Kirana',
+          area: '302001',
+          activity: 'Groceries',
+        );
+        work.authorizedPersonName = 'Asha Sharma';
+        work.businessRelationship = 'Owner';
+        work.primaryMobile = '9829012321';
+        work.contactEmail = 'asha@example.com';
+        work.primaryMobileVerified = work.contactEmailVerified = true;
+        expect(
+          await tester.runAsync(
+            () => work.addProof('personal-kyc', WorkProofSource.upload),
+          ),
+          isTrue,
+        );
+        work.declarationAccepted = true;
+        expect(await tester.runAsync(work.submitProfile), isTrue);
+        final caseId = work.reviewCaseId;
+        final submitted = work.submittedProfile;
+        final proofs = Map.of(work.addedProofs);
+        final id = work.savedWorkspaceApplications.single.id;
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        expect(find.text('New Kirana'), findsNothing);
+        await captureStoreView(
+          tester,
+          'r669-approved-store-with-application-$profile-$scale',
+        );
+        await tester.tap(
+          find.byKey(const Key('work-dashboard-workspace-switcher')),
+        );
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(const Key('work-workspace-switcher-sheet'));
+        final entry = find.byKey(ValueKey('work-resume-$id'));
+        final scrollable = find.descendant(
+          of: sheet,
+          matching: find.byType(Scrollable),
+        );
+        await tester.scrollUntilVisible(entry, 120, scrollable: scrollable);
+        await Scrollable.ensureVisible(tester.element(entry), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(entry.hitTestable(), findsOneWidget);
+        await captureStoreView(
+          tester,
+          'r669-application-chooser-$profile-$scale',
+        );
+        final viewport = tester.getRect(scrollable);
+        expect(
+          tester.getRect(entry).top,
+          greaterThanOrEqualTo(viewport.top - 1),
+        );
+        expect(
+          tester.getRect(entry).bottom,
+          lessThanOrEqualTo(viewport.bottom + 1),
+        );
+        final addWorkspace = find.byKey(const Key('work-switch-add-workspace'));
+        await tester.ensureVisible(addWorkspace);
+        await tester.pumpAndSettle();
+        expect(addWorkspace.hitTestable(), findsOneWidget);
+        expect(
+          tester.getRect(addWorkspace).bottom,
+          lessThanOrEqualTo(viewport.bottom + 1),
+        );
+        await Scrollable.ensureVisible(tester.element(entry), alignment: .5);
+        await tester.pumpAndSettle();
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-inline-review-status')),
+          findsOneWidget,
+        );
+        expect(work.reviewCaseId, caseId);
+        expect(work.submittedProfile, same(submitted));
+        expect(work.addedProofs, proofs);
+        expect(work.activeWorkspace, same(existing));
+        await captureStoreView(
+          tester,
+          'r669-resumed-application-$profile-$scale',
+        );
+        await tester.tap(find.byKey(const Key('work-back')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-workspace-dashboard')),
+          findsOneWidget,
+        );
+        expect(work.workspaceSettlementBalance, balance);
+        expect(gateway.submissionCalls, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+    testWidgets('R669 ordinary workspace entry resumes approved Store $scale', (
+      tester,
+    ) async {
+      final gateway = _WorkspaceEntryFixtureGateway();
+      final work = WorkSession(gateway: gateway);
+      await mount(
+        tester,
+        route: '/app/work/my-work',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(find.byKey(const Key('work-choose-screen')), findsNothing);
+      expect(work.activeWorkspace?.name, 'Approved Kirana');
+      expect(work.startAnotherWork(), isTrue);
+      tester
+          .element(find.byKey(const Key('work-workspace-dashboard')))
+          .go('/app/work/workspace/choose');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+    testWidgets(
+      'R669 workspace entry retries without an onboarding detour $scale',
+      (tester) async {
+        final gateway = _WorkspaceEntryFixtureGateway()..failOnce = true;
+        final work = WorkSession(gateway: gateway);
+        await mount(
+          tester,
+          route: '/app/work/my-work',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        expect(find.byKey(const Key('work-choose-screen')), findsNothing);
+        expect(
+          find.text('Your Workspaces could not be loaded.'),
+          findsOneWidget,
+        );
+        final retry = find.byKey(const Key('work-entry-retry'));
+        expect(
+          tester
+              .widget<WorkPageScaffold>(find.byType(WorkPageScaffold))
+              .activeLocalAction,
+          'workspace',
+        );
+        expect(retry.hitTestable(), findsOneWidget);
+        await captureStoreView(tester, 'r669-workspace-entry-retry-$scale');
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-workspace-dashboard')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final decision in [
     WorkRemoteReviewStatus.rejected,
     WorkRemoteReviewStatus.suspended,
@@ -13518,6 +13688,28 @@ void main() {
       );
     },
   );
+}
+
+class _WorkspaceEntryFixtureGateway extends ReviewWorkGateway {
+  bool failOnce = false;
+  @override
+  Future<List<WorkReviewResult>> loadFeed() async {
+    if (failOnce) {
+      failOnce = false;
+      throw const WorkGatewayException('Workspaces could not be loaded.');
+    }
+    return const [
+      WorkReviewResult(
+        caseId: 'approved-case',
+        status: WorkRemoteReviewStatus.approved,
+        plan: 'free',
+        workspaceId: 'approved-store',
+        profileId: 'retailer-grocery',
+        name: 'Approved Kirana',
+        area: '302001',
+      ),
+    ];
+  }
 }
 
 class _ContactDraftFixtureStore implements WorkPendingProofStore {

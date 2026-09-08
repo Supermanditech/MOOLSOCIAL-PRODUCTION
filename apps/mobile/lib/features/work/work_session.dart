@@ -396,6 +396,33 @@ class _StoreOperationalData {
   int pendingOperationalRequests = 0;
 }
 
+/// Editable application data is separate from an approved Store's operations.
+/// Document bytes and contact confirmation are memory-only and account-bound.
+class _WorkspaceApplicationDraft {
+  const _WorkspaceApplicationDraft({
+    required this.id,
+    required this.scope,
+    required this.details,
+    this.submitted,
+    this.files = const {},
+    this.confirmed = const {},
+    this.status,
+    this.reason,
+    this.needsStatusRefresh = false,
+  });
+
+  final String id;
+  final String? scope;
+  final Map<String, Object?> details;
+  final WorkProfileSubmission? submitted;
+  final Map<String, WorkPickedProof> files;
+  final Set<WorkContactChannel> confirmed;
+  final WorkRemoteReviewStatus? status;
+  final String? reason;
+  final bool needsStatusRefresh;
+  String? get caseId => details['caseId'] as String?;
+}
+
 class WorkSession extends ChangeNotifier {
   WorkSession({
     WorkGateway? gateway,
@@ -612,6 +639,9 @@ class WorkSession extends ChangeNotifier {
   String? reviewReason;
   WorkRemoteReviewStatus? remoteReviewStatus;
   bool reviewCorrectionDraft = false;
+  bool reviewStatusNeedsRefresh = false;
+  String? _workspaceApplicationId;
+  final Map<String, _WorkspaceApplicationDraft> _workspaceApplications = {};
   bool get hasUnsubmittedReviewChanges {
     final submitted = submittedProfile;
     if (!reviewCorrectionDraft ||
@@ -1846,6 +1876,8 @@ class WorkSession extends ChangeNotifier {
       showNotice('Finishing this store update. Please wait before switching.');
       return;
     }
+    _rememberWorkspaceApplication();
+    _clearWorkspaceApplication();
     _clearCollection();
     otherWorkspaces.removeWhere((item) => item.id == workspace.id);
     otherWorkspaces.add(current);
@@ -1856,6 +1888,10 @@ class WorkSession extends ChangeNotifier {
     selectedProfile = workProfiles
         .where((profile) => profile.id == workspace.profileId)
         .firstOrNull;
+    selectedFamilyId = selectedProfile?.familyId;
+    reviewStage = WorkReviewStage.approved;
+    remoteReviewStatus = WorkRemoteReviewStatus.approved;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
@@ -2991,6 +3027,7 @@ class WorkSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _workspaceApplications.clear();
     _clearCollection();
     _storeDataById.clear();
     _storeData = _StoreOperationalData();
@@ -3145,7 +3182,201 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void startAnotherWork() {
+  Map<String, Object?> _applicationDetails() => {
+    'profileId': selectedProfile?.id,
+    'personName': authorizedPersonName,
+    'relationship': businessRelationship,
+    'phone': primaryMobile,
+    'email': contactEmail,
+    'alternate': alternateMobile,
+    'name': workName,
+    'area': workArea,
+    'activity': primaryActivity,
+    'proofs': Map<String, String>.unmodifiable(addedProofs),
+    'caseId': reviewCaseId,
+    'plan': subscriptionPlan,
+    'correction': reviewCorrectionDraft,
+    'submissionKey': _profileSubmissionKey,
+    'editedFields': _editedDraftFields.toList(),
+    'gstin': gstin,
+    'gstReference': gstProofReference,
+    'gstReminder': gstReminder,
+  };
+
+  void _rememberWorkspaceApplication() {
+    if (_disposed ||
+        selectedProfile == null ||
+        remoteReviewStatus == WorkRemoteReviewStatus.approved ||
+        remoteReviewStatus == WorkRemoteReviewStatus.live ||
+        (_workspaceApplicationId == null &&
+            {
+              WorkReviewStage.approved,
+              WorkReviewStage.live,
+              WorkReviewStage.setup,
+            }.contains(reviewStage))) {
+      return;
+    }
+    _workspaceApplicationId ??=
+        'draft-${DateTime.now().microsecondsSinceEpoch}-${Random.secure().nextInt(1 << 32)}';
+    _workspaceApplications[_workspaceApplicationId!] =
+        _WorkspaceApplicationDraft(
+          id: _workspaceApplicationId!,
+          scope: _contactAccountScope,
+          details: Map.unmodifiable(_applicationDetails()),
+          submitted: submittedProfile,
+          files: Map.unmodifiable(pickedProofs),
+          confirmed: {
+            for (final channel in WorkContactChannel.values)
+              if (workspaceContactVerified(channel)) channel,
+          },
+          status: remoteReviewStatus,
+          reason: reviewReason,
+          needsStatusRefresh: reviewStatusNeedsRefresh,
+        );
+  }
+
+  /// Called before opening the existing chooser; does not grant Store access.
+  void retainWorkspaceApplication() => _queueContactDraft();
+
+  List<({String id, String name, String status, String profileLabel})>
+  get savedWorkspaceApplications => [
+    for (final application in _workspaceApplications.values.toList().reversed)
+      if (application.scope == _contactAccountScope)
+        (
+          id: application.id,
+          name:
+              (application.details['name'] as String?)?.trim().isNotEmpty ==
+                  true
+              ? application.details['name'] as String
+              : 'Your Workspace',
+          profileLabel:
+              workProfiles
+                  .where(
+                    (profile) => profile.id == application.details['profileId'],
+                  )
+                  .firstOrNull
+                  ?.label ??
+              'Workspace',
+          status: application.caseId == null
+              ? 'Continue setup'
+              : application.needsStatusRefresh
+              ? 'Application saved'
+              : switch (application.status) {
+                  WorkRemoteReviewStatus.rejected => 'Not approved',
+                  WorkRemoteReviewStatus.suspended => 'Workspace unavailable',
+                  _ =>
+                    application.reason?.trim().isNotEmpty == true
+                        ? 'More information needed'
+                        : 'Under review',
+                },
+        ),
+  ];
+
+  bool get _canChangeWorkspaceApplication =>
+      !busy &&
+      !workspaceOperationsSyncing &&
+      !workspaceHandoverBusy &&
+      !hasPendingOrderTime &&
+      _collection?.busy != true &&
+      _collection?.needsReconciliation != true;
+
+  bool resumeWorkspaceApplication(String id) {
+    final application = _workspaceApplications[id];
+    if (application == null || application.scope != _contactAccountScope) {
+      showError('This application is unavailable. Refresh your Workspaces.');
+      return false;
+    }
+    if (!_canChangeWorkspaceApplication) {
+      showNotice('Finishing your current update. Please wait.');
+      return false;
+    }
+    _rememberWorkspaceApplication();
+    _restoreWorkspaceApplication(application);
+    _queueContactDraft();
+    clearMessages();
+    notifyListeners();
+    return true;
+  }
+
+  String get workspaceApplicationRoute =>
+      reviewCaseId != null || workspaceContactsReady
+      ? '/app/work/workspace/proof'
+      : '/app/work/workspace/contact';
+
+  void _restoreWorkspaceApplication(_WorkspaceApplicationDraft application) {
+    final data = application.details;
+    String value(String key) => data[key] is String ? data[key] as String : '';
+    _clearWorkspaceApplication();
+    _workspaceApplicationId = application.id;
+    selectedProfile = workProfiles
+        .where((profile) => profile.id == data['profileId'])
+        .firstOrNull;
+    selectedFamilyId = selectedProfile?.familyId;
+    authorizedPersonName = value('personName');
+    businessRelationship = value('relationship');
+    primaryMobile = value('phone');
+    contactEmail = value('email');
+    alternateMobile = value('alternate');
+    workName = value('name');
+    workArea = value('area');
+    primaryActivity = value('activity');
+    final allowed = selectedWorkspaceDocuments.map((proof) => proof.id).toSet();
+    if (data['proofs'] case final Map proofs) {
+      for (final entry in proofs.entries) {
+        if (entry.key is String &&
+            entry.value is String &&
+            allowed.contains(entry.key)) {
+          addedProofs[entry.key as String] = entry.value as String;
+        }
+      }
+    }
+    pickedProofs.addEntries(
+      application.files.entries.where(
+        (entry) => addedProofs.containsKey(entry.key),
+      ),
+    );
+    primaryMobileVerified = application.confirmed.contains(
+      WorkContactChannel.primaryMobile,
+    );
+    contactEmailVerified = application.confirmed.contains(
+      WorkContactChannel.email,
+    );
+    alternateVerified = application.confirmed.contains(
+      WorkContactChannel.alternateMobile,
+    );
+    _editedDraftFields
+      ..clear()
+      ..addAll((data['editedFields'] as List? ?? const []).whereType<String>());
+    submittedProfile = application.submitted;
+    reviewCaseId = application.caseId;
+    subscriptionPlan = value('plan').isEmpty ? 'free' : value('plan');
+    reviewCorrectionDraft = data['correction'] == true && reviewCaseId != null;
+    _profileSubmissionKey = value('submissionKey').isEmpty
+        ? null
+        : value('submissionKey');
+    remoteReviewStatus = application.status;
+    reviewReason = application.reason;
+    reviewStatusNeedsRefresh = application.needsStatusRefresh;
+    reviewStage = reviewCaseId == null
+        ? WorkReviewStage.drafting
+        : WorkReviewStage.gstPending;
+    gstin = value('gstin');
+    gstProofReference = value('gstReference').isEmpty
+        ? null
+        : value('gstReference');
+    gstAttachmentAdded = gstProofReference != null;
+    gstReminder = data['gstReminder'] == true;
+  }
+
+  void _clearWorkspaceApplication() {
+    _workspaceApplicationId = null;
+    _removedProofs.clear();
+    _contactEditOrigins.clear();
+    for (final channel in WorkContactChannel.values) {
+      _invalidateContactChallenge(channel);
+    }
+    recoveredDocumentStep = false;
+    reviewStatusNeedsRefresh = false;
     documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
     selectedProfile = null;
@@ -3167,16 +3398,28 @@ class WorkSession extends ChangeNotifier {
     remoteReviewStatus = null;
     reviewCorrectionDraft = false;
     _profileSubmissionKey = null;
-    if (activeWorkspace == null) reviewStage = WorkReviewStage.drafting;
+    reviewStage = WorkReviewStage.drafting;
     gstReminder = false;
     gstin = '';
     gstAttachmentAdded = false;
     gstProofReference = null;
+  }
+
+  bool startAnotherWork() {
+    if (!_canChangeWorkspaceApplication) {
+      showNotice('Finishing your current update. Please wait.');
+      return false;
+    }
+    _rememberWorkspaceApplication();
+    _clearWorkspaceApplication();
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
+    return true;
   }
 
   void selectFamily(String familyId) {
+    if (busy) return;
     _removedProofs.clear();
     if (selectedFamilyId != familyId) {
       documentRecoveryMessage = _documentRecoveryProofId = null;
@@ -3189,10 +3432,12 @@ class WorkSession extends ChangeNotifier {
   }
 
   void selectProfile(String profileId) {
+    if (busy) return;
     final nextProfile = workProfiles.firstWhere(
       (profile) => profile.id == profileId,
     );
     if (selectedProfile?.id != nextProfile.id) {
+      if (reviewCaseId == null) _profileSubmissionKey = null;
       _removedProofs.clear();
       documentRecoveryMessage = _documentRecoveryProofId = null;
       addedProofs.removeWhere((id, _) => id != 'personal-kyc');
@@ -3205,6 +3450,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void changeFamily() {
+    if (busy) return;
     _removedProofs.clear();
     documentRecoveryMessage = _documentRecoveryProofId = null;
     selectedFamilyId = null;
@@ -3277,6 +3523,10 @@ class WorkSession extends ChangeNotifier {
   void _queueContactDraft() {
     final store = contactDraftStore;
     final scope = store?.accountScope;
+    if (_disposed || (_contactDraftScopeKnown && scope != _contactDraftScope)) {
+      return;
+    }
+    _rememberWorkspaceApplication();
     if (store == null || scope == null || _disposed) return;
     if (_contactDraftScopeKnown && scope != _contactDraftScope) return;
     _contactDraftScopeKnown = true;
@@ -3285,7 +3535,7 @@ class WorkSession extends ChangeNotifier {
     _queuedContactDraft = (
       scope: scope,
       draft: {
-        'version': 1,
+        'version': 2,
         'savedAt': DateTime.now().toUtc().toIso8601String(),
         'profileId': selectedProfile?.id,
         'personName': authorizedPersonName,
@@ -3298,9 +3548,64 @@ class WorkSession extends ChangeNotifier {
         'activity': primaryActivity,
         'editedFields': _editedDraftFields.toList(),
         'dismissedWorkspaceWelcomes': _seenApprovalMessages.toList(),
+        'workspaceApplicationId': _workspaceApplicationId,
+        'applications': [
+          for (final application in _workspaceApplications.values)
+            if (application.scope == scope)
+              {
+                'id': application.id,
+                'details': application.details,
+                if (application.submitted != null)
+                  'submitted': _savedSubmission(application.submitted!),
+              },
+        ],
       },
     );
     unawaited(flushContactDraft());
+  }
+
+  Map<String, Object?> _savedSubmission(WorkProfileSubmission value) => {
+    'profileId': value.profileId,
+    'personName': value.authorizedPersonName,
+    'relationship': value.businessRelationship,
+    'phone': value.primaryMobile,
+    'email': value.email,
+    'alternate': value.alternateMobile,
+    'name': value.name,
+    'area': value.area,
+    'activity': value.primaryActivity,
+    'proofs': value.proofReferences,
+    'submissionKey': value.idempotencyKey,
+  };
+
+  WorkProfileSubmission? _readSavedSubmission(Object? raw, String profileId) {
+    if (raw is! Map || raw['profileId'] != profileId) return null;
+    final profile = workProfiles.where((p) => p.id == profileId).firstOrNull;
+    if (profile == null) return null;
+    String value(String key) => raw[key] is String ? raw[key] as String : '';
+    final proofs = <String, String>{};
+    if (raw['proofs'] case final Map references) {
+      for (final entry in references.entries) {
+        if (entry.key is String && entry.value is String) {
+          proofs[entry.key as String] = entry.value as String;
+        }
+      }
+    }
+    return WorkProfileSubmission(
+      familyId: profile.familyId,
+      profileId: profile.id,
+      authorizedPersonName: value('personName'),
+      businessRelationship: value('relationship'),
+      name: value('name'),
+      area: value('area'),
+      primaryActivity: value('activity'),
+      primaryMobile: value('phone'),
+      email: value('email'),
+      alternateMobile: value('alternate'),
+      alternateMobileVerified: false,
+      proofReferences: Map.unmodifiable(proofs),
+      idempotencyKey: value('submissionKey'),
+    );
   }
 
   /// Coalesces edits without blocking typing. Verification secrets are excluded.
@@ -3345,6 +3650,9 @@ class WorkSession extends ChangeNotifier {
     final scope = accountReady ? store.accountScope : null;
     if (!_contactDraftScopeKnown || scope != _contactDraftScope) {
       if (_contactDraftScopeKnown) {
+        _workspaceApplications.clear();
+        _workspaceApplicationId = null;
+        reviewStatusNeedsRefresh = false;
         _clearCollection();
         authorizedPersonName = businessRelationship = '';
         accountDisplayName = connectedProviderLabel = connectedProviderAccount =
@@ -3406,7 +3714,9 @@ class WorkSession extends ChangeNotifier {
         revision == _contactDraftRevision;
     try {
       final draft = await store.read(scope);
-      if (draft == null || !current() || draft['version'] != 1) return;
+      if (draft == null || !current() || !{1, 2}.contains(draft['version'])) {
+        return;
+      }
       if (draft['dismissedWorkspaceWelcomes'] case final List messages) {
         _seenApprovalMessages.addAll(messages.whereType<String>());
       }
@@ -3437,6 +3747,33 @@ class WorkSession extends ChangeNotifier {
       primaryMobileVerified = contactEmailVerified = alternateVerified = false;
       primaryMobileOtpSent = contactEmailOtpSent = alternateOtpSent = false;
       declarationAccepted = false;
+      if (draft['version'] == 2 && draft['applications'] is List) {
+        for (final raw in draft['applications'] as List) {
+          if (raw is! Map || raw['details'] is! Map || raw['id'] is! String) {
+            continue;
+          }
+          final id = raw['id'] as String;
+          final details = Map<String, Object?>.from(raw['details'] as Map);
+          final profile = workProfiles
+              .where((p) => p.id == details['profileId'])
+              .firstOrNull;
+          if (id.isEmpty ||
+              profile == null ||
+              (details['caseId'] != null && details['caseId'] is! String)) {
+            continue;
+          }
+          _workspaceApplications[id] = _WorkspaceApplicationDraft(
+            id: id,
+            scope: scope,
+            details: Map.unmodifiable(details),
+            submitted: _readSavedSubmission(raw['submitted'], profile.id),
+            needsStatusRefresh: details['caseId'] != null,
+          );
+        }
+        final application =
+            _workspaceApplications[draft['workspaceApplicationId']];
+        if (application != null) _restoreWorkspaceApplication(application);
+      }
     } on Object {
       if (current()) {
         contactDraftMessage =
@@ -3868,6 +4205,7 @@ class WorkSession extends ChangeNotifier {
     WorkProofSource source,
   ) => {
     'version': 1,
+    'workspaceApplicationId': _workspaceApplicationId,
     'savedAt': DateTime.now().toUtc().toIso8601String(),
     'profileId': selectedProfile?.id,
     'proofId': proofId,
@@ -3899,6 +4237,11 @@ class WorkSession extends ChangeNotifier {
     }
     final scope = accountReady ? store.accountScope : null;
     if (_pendingProofScope != scope) {
+      if (_pendingProofScope != null) {
+        _workspaceApplications.clear();
+        _workspaceApplicationId = null;
+        reviewStatusNeedsRefresh = false;
+      }
       _pendingProofGeneration++;
       _pendingProofScope = scope;
       _pendingProofRecovery = null;
@@ -3949,6 +4292,13 @@ class WorkSession extends ChangeNotifier {
     try {
       final draft = await store.read(scope);
       if (draft == null || !current()) return;
+      final applicationId = draft['workspaceApplicationId'];
+      if (applicationId is String &&
+          _workspaceApplicationId != null &&
+          applicationId != _workspaceApplicationId) {
+        // An old picker checkpoint must not replace a newer application.
+        return;
+      }
       final timestamp = DateTime.tryParse(draft['savedAt'] as String? ?? '');
       final age = timestamp == null
           ? null
@@ -3970,6 +4320,7 @@ class WorkSession extends ChangeNotifier {
       }
       String field(String name) =>
           draft[name] is String ? draft[name] as String : '';
+      if (applicationId is String) _workspaceApplicationId = applicationId;
       selectedProfile = profile;
       selectedFamilyId = profile.familyId;
       authorizedPersonName = field('personName');
@@ -4043,7 +4394,10 @@ class WorkSession extends ChangeNotifier {
           noticeMessage = 'Document restored. Review it before submitting.';
         }
       }
-      if (current()) await store.clear(scope);
+      if (current()) {
+        _queueContactDraft();
+        await store.clear(scope);
+      }
     } on WorkGatewayException catch (error) {
       if (current()) {
         documentRecoveryMessage = null;
@@ -4063,6 +4417,15 @@ class WorkSession extends ChangeNotifier {
 
   Future<bool> addProof(String proofId, WorkProofSource source) async {
     if (busy) return false;
+    _rememberWorkspaceApplication();
+    final applicationId = _workspaceApplicationId;
+    final accountScope = _contactAccountScope;
+    final profileId = selectedProfile?.id;
+    bool current() =>
+        !_disposed &&
+        applicationId == _workspaceApplicationId &&
+        accountScope == _contactAccountScope &&
+        profileId == selectedProfile?.id;
     busy = true;
     clearMessages();
     notifyListeners();
@@ -4076,15 +4439,15 @@ class WorkSession extends ChangeNotifier {
           );
         }
         await store.save(scope, _pendingDocumentDraft(proofId, source));
-        if (scope != store.accountScope) return false;
+        if (!current() || scope != store.accountScope) return false;
       }
       final proof = await proofPicker.pick(source);
-      if (_disposed || (store != null && scope != store.accountScope)) {
+      if (!current() || (store != null && scope != store.accountScope)) {
         return false;
       }
       if (proof == null) return false;
       final reference = await gateway.saveProof(proofId, proof);
-      if (_disposed || (store != null && scope != store.accountScope)) {
+      if (!current() || (store != null && scope != store.accountScope)) {
         return false;
       }
       addedProofs[proofId] = reference;
@@ -4098,21 +4461,29 @@ class WorkSession extends ChangeNotifier {
       noticeMessage = null;
       return true;
     } on WorkGatewayException catch (error) {
-      if (!error.cancelled) errorMessage = error.message;
+      if (current() && !error.cancelled) errorMessage = error.message;
       return false;
     } on Object {
-      errorMessage = 'The document could not be added. Please try again.';
+      if (current()) {
+        errorMessage = 'The document could not be added. Please try again.';
+      }
       return false;
     } finally {
-      if (store != null && scope != null && scope == store.accountScope) {
+      if (current() &&
+          store != null &&
+          scope != null &&
+          scope == store.accountScope) {
         try {
           await store.clear(scope);
         } on Object {
           /* Retain recovery until storage is available. */
         }
       }
-      busy = false;
-      notifyListeners();
+      if (current()) {
+        _queueContactDraft();
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -4132,6 +4503,7 @@ class WorkSession extends ChangeNotifier {
     addedProofs.remove(proofId);
     pickedProofs.remove(proofId);
     declarationAccepted = false;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
   }
@@ -4160,6 +4532,7 @@ class WorkSession extends ChangeNotifier {
     addedProofs[proofId] = removed.reference;
     if (removed.file != null) pickedProofs[proofId] = removed.file!;
     declarationAccepted = false;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
     return true;
@@ -4172,6 +4545,12 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool beginReviewCorrection() {
+    if (reviewStatusNeedsRefresh) {
+      showError(
+        'Wait for the current application update before making changes.',
+      );
+      return false;
+    }
     if (remoteReviewStatus == WorkRemoteReviewStatus.suspended) {
       errorMessage =
           'This Workspace is unavailable. Contact MoolSocial Support for the next step.';
@@ -4213,6 +4592,7 @@ class WorkSession extends ChangeNotifier {
     }
     reviewCorrectionDraft = true;
     declarationAccepted = false;
+    _queueContactDraft();
     clearMessages();
     notifyListeners();
     return true;
@@ -4242,6 +4622,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> submitProfile() async {
+    if (reviewStatusNeedsRefresh && reviewCaseId != null) {
+      showError('Check your application update before submitting changes.');
+      return false;
+    }
     if (!validateDetails()) return false;
     if (!workspaceContactsReady) {
       errorMessage =
@@ -4265,8 +4649,11 @@ class WorkSession extends ChangeNotifier {
     if (busy) return false;
     final requestedScope = _contactAccountScope;
     final submission = _currentProfileSubmission();
+    _queueContactDraft();
+    final requestedApplication = _workspaceApplicationId;
     bool current() =>
         !_disposed &&
+        requestedApplication == _workspaceApplicationId &&
         requestedScope == _contactAccountScope &&
         selectedProfile?.id == submission.profileId &&
         reviewCaseId == existingCaseId;
@@ -4279,6 +4666,11 @@ class WorkSession extends ChangeNotifier {
           : await gateway.submitCorrection(existingCaseId, submission);
       if (!current()) return false;
       if (result.caseId.trim().isEmpty ||
+          _workspaceApplications.values.any(
+            (application) =>
+                application.id != requestedApplication &&
+                application.caseId == result.caseId,
+          ) ||
           (existingCaseId != null && result.caseId != existingCaseId) ||
           (result.profileId != null &&
               result.profileId != submission.profileId)) {
@@ -4291,8 +4683,12 @@ class WorkSession extends ChangeNotifier {
       subscriptionPlan = result.plan;
       reviewReason = result.reason;
       remoteReviewStatus = result.status;
+      reviewStatusNeedsRefresh = false;
       reviewStage = WorkReviewStage.gstPending;
       reviewCorrectionDraft = false;
+      // The acknowledged case changes the pre-request guard. Save the exact
+      // validated result here, before leaving this synchronous success block.
+      _queueContactDraft();
       noticeMessage = existingCaseId == null
           ? 'Application submitted.'
           : 'Your updated information was submitted.';
@@ -4302,6 +4698,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     } finally {
       busy = false;
+      if (current()) _queueContactDraft();
       if (!_disposed) notifyListeners();
     }
   }
@@ -4381,8 +4778,10 @@ class WorkSession extends ChangeNotifier {
     final requestedCase = reviewCaseId!;
     final requestedScope = _contactAccountScope;
     final requestedProfile = selectedProfile?.id;
+    final requestedApplication = _workspaceApplicationId;
     bool current() =>
         !_disposed &&
+        requestedApplication == _workspaceApplicationId &&
         reviewCaseId == requestedCase &&
         requestedScope == _contactAccountScope &&
         requestedProfile == selectedProfile?.id;
@@ -4406,6 +4805,7 @@ class WorkSession extends ChangeNotifier {
       subscriptionPlan = result.plan;
       reviewReason = result.reason;
       remoteReviewStatus = result.status;
+      reviewStatusNeedsRefresh = false;
       switch (result.status) {
         case WorkRemoteReviewStatus.pending:
           reviewStage = WorkReviewStage.gstPending;
@@ -4423,6 +4823,11 @@ class WorkSession extends ChangeNotifier {
         case WorkRemoteReviewStatus.live:
           final approvedWorkspaceId = result.workspaceId!;
           workspaceId = approvedWorkspaceId;
+          _workspaceApplications.removeWhere(
+            (_, application) =>
+                application.id == requestedApplication ||
+                application.caseId == requestedCase,
+          );
           reviewCorrectionDraft = false;
           reviewStage = result.status == WorkRemoteReviewStatus.live
               ? WorkReviewStage.live
@@ -4468,6 +4873,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     } finally {
       busy = false;
+      if (current()) _queueContactDraft();
       if (!_disposed) notifyListeners();
     }
   }
@@ -4813,6 +5219,74 @@ class WorkSession extends ChangeNotifier {
   }
 
   void _restoreWorkspaceState(List<WorkReviewResult> records) {
+    if (records.isEmpty) return;
+    _rememberWorkspaceApplication();
+    final currentApplication = _workspaceApplicationId;
+    for (final record in records) {
+      if (record.caseId.trim().isEmpty) continue;
+      if (record.status == WorkRemoteReviewStatus.approved ||
+          record.status == WorkRemoteReviewStatus.live) {
+        // Only the gateway's approved records can create accessible Workspaces.
+        if (record.workspaceId?.trim().isNotEmpty == true &&
+            record.name != null &&
+            record.area != null &&
+            workProfiles.any((profile) => profile.id == record.profileId)) {
+          _workspaceApplications.removeWhere(
+            (_, value) => value.caseId == record.caseId,
+          );
+        }
+        continue;
+      }
+      final previous = _workspaceApplications.values
+          .where(
+            (application) =>
+                application.scope == _contactAccountScope &&
+                application.caseId == record.caseId,
+          )
+          .firstOrNull;
+      final profileId = previous?.details['profileId'] ?? record.profileId;
+      if (!workProfiles.any((profile) => profile.id == profileId)) continue;
+      if (record.profileId != null && record.profileId != profileId) continue;
+      final id = previous?.id ?? 'application-${record.caseId}';
+      _workspaceApplications[id] = _WorkspaceApplicationDraft(
+        id: id,
+        scope: _contactAccountScope,
+        details: Map.unmodifiable({
+          if (previous != null)
+            ...previous.details
+          else ...{
+            'profileId': profileId,
+            'name': record.name ?? '',
+            'area': record.area ?? '',
+            'activity': record.primaryActivity ?? '',
+          },
+          'caseId': record.caseId,
+          'plan': record.plan,
+        }),
+        submitted: previous?.submitted,
+        files: previous?.files ?? const {},
+        confirmed: previous?.confirmed ?? const {},
+        status: record.status,
+        reason: record.reason,
+      );
+    }
+    _restoreWorkspaceRecords(records);
+    final application =
+        _workspaceApplications[currentApplication] ??
+        (activeWorkspace == null
+            ? _workspaceApplications.values
+                  .where((value) => value.caseId == reviewCaseId)
+                  .firstOrNull
+            : null);
+    if (application != null) {
+      _restoreWorkspaceApplication(application);
+    } else {
+      _workspaceApplicationId = null;
+    }
+    _queueContactDraft();
+  }
+
+  void _restoreWorkspaceRecords(List<WorkReviewResult> records) {
     if (records.isEmpty) return;
     final preferredId = activeWorkspace?.id;
     WorkWorkspace? restoredActive;

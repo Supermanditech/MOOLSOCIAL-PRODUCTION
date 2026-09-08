@@ -880,6 +880,334 @@ void main() {
     ..contactEmailVerified = true
     ..declarationAccepted = true;
 
+  Future<String> addWorkspaceApplication(
+    WorkSession work,
+    String name, {
+    String profile = 'retailer-grocery',
+  }) async {
+    expect(work.startAnotherWork(), isTrue);
+    work.selectProfile(profile);
+    work.saveDetails(name: name, area: '302001', activity: 'Retail trade');
+    work.authorizedPersonName = 'Asha Sharma';
+    work.businessRelationship = 'Owner';
+    work.primaryMobile = '9829012321';
+    work.contactEmail = 'asha@example.com';
+    work.primaryMobileVerified = work.contactEmailVerified = true;
+    expect(await work.addProof('personal-kyc', WorkProofSource.upload), isTrue);
+    work.declarationAccepted = true;
+    expect(await work.submitProfile(), isTrue);
+    return work.savedWorkspaceApplications
+        .singleWhere((entry) => entry.name == name)
+        .id;
+  }
+
+  const existingStore = WorkWorkspace(
+    id: 'existing-store',
+    name: 'Existing Kirana',
+    profileId: 'retailer-grocery',
+    profileLabel: 'Grocery / Kirana Shop',
+    area: '302001',
+    verified: true,
+  );
+
+  for (final profile in ['retailer-grocery', 'retailer-speciality', 'salon']) {
+    test(
+      'R669 separate applications retain exact business and documents $profile',
+      () async {
+        final gateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final work = WorkSession(gateway: gateway)
+          ..activeWorkspace = existingStore;
+        addTearDown(work.dispose);
+        work.workspaceSettlementBalance = 98765;
+        final first = await addWorkspaceApplication(work, 'First shop');
+        final firstCase = work.reviewCaseId;
+        final firstSubmission = work.submittedProfile;
+        final firstProof = work.addedProofs['personal-kyc'];
+        final firstFile = work.pickedProofs['personal-kyc'];
+        expect(work.startAnotherWork(), isTrue);
+        expect(work.addedProofs, isEmpty);
+        expect(work.pickedProofs, isEmpty);
+        expect(work.submittedProfile, isNull);
+        expect(work.reviewCaseId, isNull);
+        final second = await addWorkspaceApplication(
+          work,
+          'Second business',
+          profile: profile,
+        );
+        final secondCase = work.reviewCaseId;
+        final secondProof = work.addedProofs['personal-kyc'];
+        expect(second, isNot(first));
+        expect(work.savedWorkspaceApplications, hasLength(2));
+        expect(work.resumeWorkspaceApplication(first), isTrue);
+        expect(work.workName, 'First shop');
+        expect(work.selectedProfile?.id, 'retailer-grocery');
+        expect(work.reviewCaseId, firstCase);
+        expect(work.submittedProfile, same(firstSubmission));
+        expect(work.addedProofs['personal-kyc'], firstProof);
+        expect(work.pickedProofs['personal-kyc'], same(firstFile));
+        expect(work.resumeWorkspaceApplication(second), isTrue);
+        expect(work.workName, 'Second business');
+        expect(work.selectedProfile?.id, profile);
+        expect(work.reviewCaseId, secondCase);
+        expect(work.addedProofs['personal-kyc'], secondProof);
+        expect(work.activeWorkspace, same(existingStore));
+        expect(work.workspaceSettlementBalance, 98765);
+        expect(gateway.submissionCalls, 2);
+      },
+    );
+  }
+
+  for (final status in [
+    WorkRemoteReviewStatus.pending,
+    WorkRemoteReviewStatus.rejected,
+    WorkRemoteReviewStatus.suspended,
+  ]) {
+    test(
+      'R669 separate application keeps exact review decision $status',
+      () async {
+        final gateway = ReviewWorkGateway(initialReviewStatus: status)
+          ..reviewResultReason = 'Please confirm the business address.';
+        final work = WorkSession(gateway: gateway)
+          ..activeWorkspace = existingStore;
+        addTearDown(work.dispose);
+        final id = await addWorkspaceApplication(work, 'Review Kirana');
+        final caseId = work.reviewCaseId;
+        expect(await work.checkReview(), isFalse);
+        expect(work.startAnotherWork(), isTrue);
+        expect(work.resumeWorkspaceApplication(id), isTrue);
+        expect(work.reviewCaseId, caseId);
+        expect(work.remoteReviewStatus, status);
+        expect(work.reviewReason, gateway.reviewResultReason);
+        expect(work.reviewStatusNeedsRefresh, isFalse);
+        expect(work.activeWorkspace, same(existingStore));
+      },
+    );
+  }
+
+  test(
+    'R669 separate applications survive restart without cached authority or document bytes',
+    () async {
+      final memory = _PendingProofMemory();
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.pending,
+      );
+      final work = WorkSession(gateway: gateway, contactDraftStore: memory);
+      await work.recoverPendingProof(accountReady: true);
+      work.activeWorkspace = existingStore;
+      final first = await addWorkspaceApplication(work, 'First Kirana');
+      final firstCase = work.reviewCaseId;
+      final proof = work.addedProofs['personal-kyc'];
+      await addWorkspaceApplication(work, 'Second Kirana');
+      await work.flushContactDraft();
+      work.dispose();
+      final restored = WorkSession(gateway: gateway, contactDraftStore: memory);
+      addTearDown(restored.dispose);
+      await restored.recoverPendingProof(accountReady: true);
+      expect(restored.hasVerifiedWorkspace, isFalse);
+      expect(restored.savedWorkspaceApplications, hasLength(2));
+      expect(restored.resumeWorkspaceApplication(first), isTrue);
+      expect(restored.reviewCaseId, firstCase);
+      expect(restored.workName, 'First Kirana');
+      expect(restored.submittedProfile?.name, 'First Kirana');
+      expect(restored.addedProofs['personal-kyc'], proof);
+      expect(restored.pickedProofs, isEmpty);
+      expect(restored.workspaceContactsReady, isFalse);
+      expect(restored.primaryMobileOtpSent, isFalse);
+      expect(restored.declarationAccepted, isFalse);
+      expect(restored.remoteReviewStatus, isNull);
+      expect(restored.reviewStatusNeedsRefresh, isTrue);
+      expect(restored.beginReviewCorrection(), isFalse);
+      expect(await restored.checkReview(), isFalse);
+      expect(restored.reviewStatusNeedsRefresh, isFalse);
+      expect(restored.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+      expect(restored.hasVerifiedWorkspace, isFalse);
+      await restored.flushContactDraft();
+      memory.accountScope = 'another-account';
+      await restored.recoverPendingProof(accountReady: true);
+      expect(restored.savedWorkspaceApplications, isEmpty);
+      expect(restored.workName, isEmpty);
+      expect(restored.addedProofs, isEmpty);
+      expect(restored.resumeWorkspaceApplication(first), isFalse);
+    },
+  );
+
+  test(
+    'R669 approval promotes only the reviewed application and retains existing Store',
+    () async {
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.pending,
+      );
+      final work = WorkSession(gateway: gateway)
+        ..activeWorkspace = existingStore;
+      addTearDown(work.dispose);
+      await addWorkspaceApplication(work, 'New Kirana');
+      gateway.reviewResultStatus = WorkRemoteReviewStatus.approved;
+      expect(await work.checkReview(), isTrue);
+      final approved = work.activeWorkspace!;
+      expect(approved.id, isNot(existingStore.id));
+      expect(approved.name, 'New Kirana');
+      expect(work.savedWorkspaceApplications, isEmpty);
+      expect(work.otherWorkspaces.single, existingStore);
+      work.activateWorkspace(existingStore);
+      expect(work.activeWorkspace, existingStore);
+      expect(work.savedWorkspaceApplications, isEmpty);
+      work.activateWorkspace(approved);
+      expect(work.activeWorkspace, approved);
+    },
+  );
+
+  test('R669 application and approved Store switching stay separate', () async {
+    final work = WorkSession(
+      gateway: ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.pending,
+      ),
+    )..activeWorkspace = existingStore;
+    addTearDown(work.dispose);
+    const other = WorkWorkspace(
+      id: 'other-store',
+      name: 'Other shop',
+      profileId: 'retailer-speciality',
+      profileLabel: 'Speciality Retail Shop',
+      area: '302002',
+      verified: true,
+    );
+    work.otherWorkspaces.add(other);
+    final id = await addWorkspaceApplication(work, 'Pending Kirana');
+    final caseId = work.reviewCaseId;
+    work.activateWorkspace(other);
+    expect(work.workName, 'Other shop');
+    expect(work.reviewCaseId, isNull);
+    expect(work.addedProofs, isEmpty);
+    expect(work.resumeWorkspaceApplication(id), isTrue);
+    expect(work.workName, 'Pending Kirana');
+    expect(work.reviewCaseId, caseId);
+    expect(work.activeWorkspace, other);
+  });
+
+  test('R669 application context cannot change during submission', () async {
+    final gateway = _DeferredSubmissionGateway();
+    final work = application(gateway: gateway)..activeWorkspace = existingStore;
+    addTearDown(work.dispose);
+    final sending = work.submitProfile();
+    expect(work.busy, isTrue);
+    expect(work.startAnotherWork(), isFalse);
+    expect(work.workName, 'Sharma Stores');
+    gateway.result.complete(
+      const WorkReviewResult(
+        caseId: 'new-case',
+        status: WorkRemoteReviewStatus.pending,
+        plan: 'free',
+      ),
+    );
+    expect(await sending, isTrue);
+    expect(work.reviewCaseId, 'new-case');
+    expect(work.savedWorkspaceApplications.single.name, 'Sharma Stores');
+  });
+
+  test(
+    'R669 application feed retains pending documents alongside an approved Store',
+    () async {
+      final gateway = _ApplicationFeedGateway();
+      final work = WorkSession(gateway: gateway)
+        ..activeWorkspace = existingStore;
+      addTearDown(work.dispose);
+      final id = await addWorkspaceApplication(work, 'Pending Kirana');
+      final caseId = work.reviewCaseId!;
+      final submitted = work.submittedProfile;
+      final proofs = Map.of(work.addedProofs);
+      gateway.records = [
+        const WorkReviewResult(
+          caseId: 'existing-case',
+          status: WorkRemoteReviewStatus.live,
+          plan: 'free',
+          workspaceId: 'existing-store',
+          profileId: 'retailer-grocery',
+          name: 'Existing Kirana',
+          area: '302001',
+        ),
+        WorkReviewResult(
+          caseId: caseId,
+          status: WorkRemoteReviewStatus.pending,
+          plan: 'free',
+          profileId: 'retailer-grocery',
+          name: 'Pending Kirana',
+          area: '302002',
+          reason: 'Please clarify the address.',
+        ),
+      ];
+      await work.refreshFeed();
+      expect(work.activeWorkspace?.id, existingStore.id);
+      expect(work.reviewCaseId, caseId);
+      expect(work.workName, 'Pending Kirana');
+      expect(work.submittedProfile, same(submitted));
+      expect(work.addedProofs, proofs);
+      expect(work.reviewReason, 'Please clarify the address.');
+      expect(work.startAnotherWork(), isTrue);
+      await work.refreshFeed();
+      expect(work.savedWorkspaceApplications.single.id, id);
+      expect(work.resumeWorkspaceApplication(id), isTrue);
+      expect(work.addedProofs, proofs);
+      expect(work.submittedProfile, same(submitted));
+    },
+  );
+
+  test(
+    'R669 application feed recovers every case of the same type without approval from cache',
+    () async {
+      final gateway = _ApplicationFeedGateway()
+        ..records = const [
+          WorkReviewResult(
+            caseId: 'existing-case',
+            status: WorkRemoteReviewStatus.live,
+            plan: 'free',
+            workspaceId: 'existing-store',
+            profileId: 'retailer-grocery',
+            name: 'Existing Kirana',
+            area: '302001',
+          ),
+          WorkReviewResult(
+            caseId: 'case-a',
+            status: WorkRemoteReviewStatus.pending,
+            plan: 'free',
+            profileId: 'retailer-grocery',
+            name: 'First application',
+            area: '302002',
+          ),
+          WorkReviewResult(
+            caseId: 'case-b',
+            status: WorkRemoteReviewStatus.rejected,
+            plan: 'free',
+            profileId: 'retailer-grocery',
+            name: 'Second application',
+            area: '302003',
+            reason: 'The address could not be verified.',
+          ),
+        ];
+      final work = WorkSession(gateway: gateway);
+      addTearDown(work.dispose);
+      await work.refreshFeed();
+      expect(work.activeWorkspace?.id, 'existing-store');
+      expect(work.savedWorkspaceApplications, hasLength(2));
+      final first = work.savedWorkspaceApplications.singleWhere(
+        (entry) => entry.name == 'First application',
+      );
+      final second = work.savedWorkspaceApplications.singleWhere(
+        (entry) => entry.name == 'Second application',
+      );
+      expect(work.resumeWorkspaceApplication(first.id), isTrue);
+      expect(work.reviewCaseId, 'case-a');
+      expect(work.resumeWorkspaceApplication(second.id), isTrue);
+      expect(work.reviewCaseId, 'case-b');
+      expect(work.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
+      expect(work.reviewReason, 'The address could not be verified.');
+      expect(work.addedProofs, isEmpty);
+      expect(work.primaryMobileVerified, isFalse);
+      expect(work.activeWorkspace?.id, 'existing-store');
+    },
+  );
+
   test(
     'R669 correction cue tracks actual changes until acknowledgement',
     () async {
@@ -950,6 +1278,35 @@ void main() {
     const enabled =
         bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
         bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+
+    test(
+      'R669 device review identities survive separate gateway lifetimes',
+      () async {
+        final caseIds = <String>{};
+        final workspaceIds = <String>{};
+        for (var instance = 0; instance < 2; instance++) {
+          final gateway = _DeviceReviewIdentityGateway();
+          final work = application(gateway: gateway);
+          addTearDown(work.dispose);
+          expect(await work.submitProfile(), isTrue);
+          final caseId = work.reviewCaseId!;
+          expect(caseIds.add(caseId), isTrue);
+          expect(caseId, isNot('WP-240701'));
+          expect(gateway.canSelectDeviceReviewCase(caseId), isTrue);
+          gateway.selectDeviceReviewCase(caseId, WorkReviewTestCase.approved);
+          final result = await gateway.checkReview(caseId);
+          expect(workspaceIds.add(result.workspaceId!), isTrue);
+          expect(
+            (await gateway.checkReview(caseId)).workspaceId,
+            result.workspaceId,
+          );
+          expect(
+            (await gateway.checkReview('unknown-case')).workspaceId,
+            isNull,
+          );
+        }
+      },
+    );
 
     test('requires both flags and refuses unknown application IDs', () {
       final gateway = ReviewWorkGateway();
@@ -1087,6 +1444,12 @@ void main() {
           work.reviewCaseId = 'case-b';
         case 'business':
           work.selectProfile('retailer-speciality');
+          expect(work.selectedProfile?.id, 'retailer-grocery');
+          // UI switching is blocked while busy. Simulate an external rebind
+          // separately so the stale-response identity guard remains covered.
+          work.selectedProfile = workProfiles.firstWhere(
+            (profile) => profile.id == 'retailer-speciality',
+          );
       }
       gateway.result.complete(
         const WorkReviewResult(
@@ -1201,7 +1564,7 @@ void main() {
     'S07 restored clarification retains its exact service request',
     () async {
       final gateway = _DeferredFeedGateway();
-      final work = application(gateway: gateway);
+      final work = WorkSession(gateway: gateway);
       addTearDown(work.dispose);
       final pending = work.refreshFeed();
       gateway.result.complete(const [
@@ -1217,6 +1580,37 @@ void main() {
       expect(work.reviewReason, 'Please resend the readable bank document.');
       expect(work.reviewCaseId, 'case-a');
       expect(work.hasVerifiedWorkspace, isFalse);
+    },
+  );
+
+  test(
+    'R669 unsubmitted business is not replaced by a same-type server case',
+    () async {
+      final gateway = _ApplicationFeedGateway()
+        ..records = const [
+          WorkReviewResult(
+            caseId: 'other-case',
+            status: WorkRemoteReviewStatus.pending,
+            plan: 'free',
+            profileId: 'retailer-grocery',
+            name: 'Other business',
+            area: '302002',
+            reason: 'Please clarify the address.',
+          ),
+        ];
+      final work = application(gateway: gateway);
+      addTearDown(work.dispose);
+      await work.refreshFeed();
+      expect(work.workName, 'Sharma Stores');
+      expect(work.reviewCaseId, isNull);
+      expect(work.reviewReason, isNull);
+      expect(work.savedWorkspaceApplications, hasLength(2));
+      final other = work.savedWorkspaceApplications.singleWhere(
+        (entry) => entry.name == 'Other business',
+      );
+      expect(work.resumeWorkspaceApplication(other.id), isTrue);
+      expect(work.reviewCaseId, 'other-case');
+      expect(work.reviewReason, 'Please clarify the address.');
     },
   );
 
@@ -3162,6 +3556,14 @@ class _AccountSettlementGateway extends ReviewWorkGateway {
   }
 }
 
+class _ApplicationFeedGateway extends ReviewWorkGateway {
+  _ApplicationFeedGateway()
+    : super(initialReviewStatus: WorkRemoteReviewStatus.pending);
+  List<WorkReviewResult> records = [];
+  @override
+  Future<List<WorkReviewResult>> loadFeed() async => List.unmodifiable(records);
+}
+
 class _MultiStoreFeedGateway extends ReviewWorkGateway {
   @override
   Future<List<WorkReviewResult>> loadFeed() async => const [
@@ -3379,6 +3781,14 @@ class _RecordingProofUpload implements WorkProofUploadTransport {
     expect(url.host, 'storage.googleapis.com');
     expect(headers['content-type'], 'application/pdf');
   }
+}
+
+class _DeviceReviewIdentityGateway extends ReviewWorkGateway {
+  _DeviceReviewIdentityGateway()
+    : super(initialReviewStatus: WorkRemoteReviewStatus.pending);
+
+  @override
+  bool get deviceReviewControlsEnabled => true;
 }
 
 SocialContentResponse _ok(Object? data) => SocialContentResponse(

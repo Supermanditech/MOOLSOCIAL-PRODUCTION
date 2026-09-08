@@ -1719,7 +1719,7 @@ GoRouter createJourneyRouter(
         path: '/app/work/my-work',
         redirect: (context, state) => workSession.hasVerifiedWorkspace
             ? '/app/work/workspace/dashboard'
-            : '/app/work/workspace/choose',
+            : '/app/work/workspace/choose?entry=workspaces',
       ),
       GoRoute(
         path: '/app/work/workspace/choose',

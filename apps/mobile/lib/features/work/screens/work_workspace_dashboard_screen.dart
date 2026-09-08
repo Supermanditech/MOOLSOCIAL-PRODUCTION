@@ -679,8 +679,9 @@ class _WorkWorkspaceDashboardScreenState
                     child: OutlinedButton.icon(
                       key: const Key('work-dashboard-add-workspace'),
                       onPressed: () {
-                        session.startAnotherWork();
-                        context.push('/app/work/workspace/choose');
+                        if (session.startAnotherWork()) {
+                          context.push('/app/work/workspace/choose');
+                        }
                       },
                       icon: const Icon(Icons.add_business_outlined),
                       label: const Text('Add Workspace'),
@@ -1533,6 +1534,8 @@ class _WorkWorkspaceDashboardScreenState
   Future<void> _showWorkspaceSwitcher(BuildContext context) async {
     final current = session.activeWorkspace;
     if (current == null) return;
+    session.retainWorkspaceApplication();
+    final applications = session.savedWorkspaceApplications;
     final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
     final choices = [current, ...session.otherWorkspaces];
     await showModalBottomSheet<void>(
@@ -1547,10 +1550,10 @@ class _WorkWorkspaceDashboardScreenState
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(sheetContext).height * .76,
           ),
-          child: Column(
+          child: ListView(
             key: const Key('work-workspace-switcher-sheet'),
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            shrinkWrap: true,
+            padding: EdgeInsets.zero,
             children: [
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
@@ -1563,36 +1566,60 @@ class _WorkWorkspaceDashboardScreenState
                   ),
                 ),
               ),
-              Flexible(
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  children: [
-                    for (final workspace in choices)
-                      ListTile(
-                        key: ValueKey('work-switch-${workspace.id}'),
-                        leading: Icon(
-                          workspace.id == current.id
-                              ? Icons.check_circle_rounded
-                              : Icons.storefront_outlined,
-                          color: MoolColors.navy,
-                        ),
-                        title: Text(workspace.name),
-                        subtitle: Text(
-                          '${workspace.profileLabel} · ${workspace.area}',
-                        ),
-                        selected: workspace.id == current.id,
-                        onTap: workspace.id == current.id
-                            ? null
-                            : () {
-                                session.activateWorkspace(workspace);
-                                Navigator.of(sheetContext).pop();
-                                _showDashboard();
-                              },
-                      ),
-                  ],
+              for (final workspace in choices)
+                ListTile(
+                  key: ValueKey('work-switch-${workspace.id}'),
+                  leading: Icon(
+                    workspace.id == current.id
+                        ? Icons.check_circle_rounded
+                        : Icons.storefront_outlined,
+                    color: MoolColors.navy,
+                  ),
+                  title: Text(workspace.name),
+                  subtitle: Text(
+                    '${workspace.profileLabel} · ${workspace.area}',
+                  ),
+                  selected: workspace.id == current.id,
+                  onTap: workspace.id == current.id
+                      ? null
+                      : () {
+                          session.activateWorkspace(workspace);
+                          Navigator.of(sheetContext).pop();
+                          _showDashboard();
+                        },
                 ),
-              ),
+              if (applications.isNotEmpty) ...[
+                const Divider(),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(16, 4, 16, 8),
+                  child: Text(
+                    'Applications',
+                    style: TextStyle(
+                      color: MoolColors.navy,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                for (final application in applications)
+                  ListTile(
+                    key: ValueKey('work-resume-${application.id}'),
+                    leading: const Icon(
+                      Icons.description_outlined,
+                      color: MoolColors.navy,
+                    ),
+                    title: Text(application.name),
+                    subtitle: Text(
+                      '${application.profileLabel} · ${application.status}',
+                    ),
+                    onTap: () {
+                      if (!session.resumeWorkspaceApplication(application.id)) {
+                        return;
+                      }
+                      Navigator.of(sheetContext).pop();
+                      context.push(session.workspaceApplicationRoute);
+                    },
+                  ),
+              ],
               const Divider(height: 16),
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16),
@@ -1606,9 +1633,10 @@ class _WorkWorkspaceDashboardScreenState
                 child: OutlinedButton.icon(
                   key: const Key('work-switch-add-workspace'),
                   onPressed: () {
-                    Navigator.of(sheetContext).pop();
-                    session.startAnotherWork();
-                    context.push('/app/work/workspace/choose');
+                    if (session.startAnotherWork()) {
+                      Navigator.of(sheetContext).pop();
+                      context.push('/app/work/workspace/choose');
+                    }
                   },
                   icon: const Icon(Icons.add_business_outlined, size: 18),
                   label: const Text('Request another Workspace'),
@@ -8299,8 +8327,9 @@ class _WorkspaceOperationSurface extends StatelessWidget {
             'Create a separate Workspace for another business, profession or service.',
         actionLabel: 'Choose another Workspace',
         onPressed: () {
-          session.startAnotherWork();
-          onOpenRoute('/app/work/workspace/choose');
+          if (session.startAnotherWork()) {
+            onOpenRoute('/app/work/workspace/choose');
+          }
         },
       ),
     ],

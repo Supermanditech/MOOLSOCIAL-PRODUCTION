@@ -37,6 +37,7 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
   final _searchFocus = FocusNode();
   final _choicesScroll = ScrollController();
   double _choicesOffset = 0;
+  bool _entryRedirectQueued = false;
 
   bool _matches(WorkProfileOption option) {
     final query = _workspaceQuery.replaceAll('saloon', 'salon');
@@ -68,6 +69,58 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
     return AnimatedBuilder(
       animation: widget.session,
       builder: (context, _) {
+        final ordinaryEntry =
+            GoRouterState.of(context).uri.queryParameters['entry'] ==
+            'workspaces';
+        if (ordinaryEntry &&
+            (!widget.session.initialWorkspaceStateLoaded ||
+                widget.session.hasVerifiedWorkspace)) {
+          if (widget.session.hasVerifiedWorkspace && !_entryRedirectQueued) {
+            _entryRedirectQueued = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+                context.go('/app/work/workspace/dashboard');
+              }
+            });
+          }
+          final failed =
+              widget.session.errorMessage != null && !widget.session.busy;
+          return WorkPageScaffold(
+            session: widget.session,
+            title: 'Workspaces',
+            subtitle: '',
+            activeLocalAction: 'workspace',
+            showHeaderChat: false,
+            showTrailingAction: false,
+            showMessageBanner: false,
+            body: Center(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!failed) const CircularProgressIndicator(),
+                      const SizedBox(height: 12),
+                      Text(
+                        failed
+                            ? 'Your Workspaces could not be loaded.'
+                            : 'Opening your Workspaces…',
+                        textAlign: TextAlign.center,
+                      ),
+                      if (failed)
+                        TextButton(
+                          key: const Key('work-entry-retry'),
+                          onPressed: widget.session.loadInitialWorkspaceState,
+                          child: const Text('Retry'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
         final family = widget.session.selectedFamilyId;
         final resumeApplication =
             widget.session.reviewCaseId != null &&
@@ -1253,7 +1306,9 @@ class _WorkspaceApplicationSummary extends StatelessWidget {
     final accent = rejected || suspended
         ? const Color(0xFFB42318)
         : MoolColors.orange;
-    final title = rejected
+    final title = session.reviewStatusNeedsRefresh
+        ? 'Application saved'
+        : rejected
         ? 'Application declined'
         : suspended
         ? 'Workspace unavailable'
@@ -1761,8 +1816,9 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
     final status = widget.session.remoteReviewStatus;
     if (!_redirectQueued &&
         widget.session.reviewCaseId != null &&
-        status != WorkRemoteReviewStatus.rejected &&
-        status != WorkRemoteReviewStatus.suspended) {
+        (widget.session.reviewStatusNeedsRefresh ||
+            (status != WorkRemoteReviewStatus.rejected &&
+                status != WorkRemoteReviewStatus.suspended))) {
       if (_reviewPolls < 20) {
         _reviewPolls += 1;
         if (_reviewPolls == 20) {
@@ -2996,16 +3052,24 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
     final status = session.remoteReviewStatus;
     final rejected = status == WorkRemoteReviewStatus.rejected;
     final suspended = status == WorkRemoteReviewStatus.suspended;
-    final reason = session.reviewReason?.trim() ?? '';
+    final reason = session.reviewStatusNeedsRefresh
+        ? ''
+        : session.reviewReason?.trim() ?? '';
     final clarification = !rejected && !suspended && reason.isNotEmpty;
-    final title = rejected
+    final title = session.reviewStatusNeedsRefresh
+        ? session.errorMessage == null
+              ? 'Checking your application'
+              : 'Application update unavailable'
+        : rejected
         ? 'Application not approved'
         : suspended
         ? 'Workspace unavailable'
         : clarification
         ? 'More information needed'
         : 'Application received';
-    final detail = reason.isNotEmpty
+    final detail = session.reviewStatusNeedsRefresh
+        ? 'Your saved application is safe. We will show the latest update here.'
+        : reason.isNotEmpty
         ? reason
         : rejected
         ? 'Contact MoolSocial for the reason and the available next step.'
@@ -3055,7 +3119,10 @@ class _InlineWorkspaceReviewStatus extends StatelessWidget {
               ),
             ],
           ),
-          if (!rejected && !suspended && !clarification) ...[
+          if (!session.reviewStatusNeedsRefresh &&
+              !rejected &&
+              !suspended &&
+              !clarification) ...[
             const SizedBox(height: 12),
             const Text(
               'No action needed now. Review updates appear here automatically.',

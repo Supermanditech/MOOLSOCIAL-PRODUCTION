@@ -972,6 +972,9 @@ class ReviewWorkGateway implements WorkGateway {
   final Map<String, String> _reviewWorkspaceIds = {};
   final Set<String> _submittedReviewCases = {};
   final Map<String, WorkReviewTestCase> _selectedReviewCases = {};
+  late final String _deviceReviewIdentity =
+      '${DateTime.now().microsecondsSinceEpoch.toRadixString(36)}-'
+      '${Random.secure().nextInt(1 << 32).toRadixString(36)}';
 
   bool get deviceReviewControlsEnabled =>
       kDebugMode &&
@@ -1109,7 +1112,9 @@ class ReviewWorkGateway implements WorkGateway {
         'Workspace profile was not submitted. Your details and documents remain saved.',
       );
     }
-    final caseId = 'WP-${240700 + submissionCalls}';
+    final caseId = deviceReviewControlsEnabled
+        ? 'WP-$_deviceReviewIdentity-$submissionCalls'
+        : 'WP-${240700 + submissionCalls}';
     _submittedReviewCases.add(caseId);
     return WorkReviewResult(
       caseId: caseId,
@@ -1178,7 +1183,9 @@ class ReviewWorkGateway implements WorkGateway {
               status == WorkRemoteReviewStatus.live
           ? _reviewWorkspaceIds.putIfAbsent(
               caseId,
-              () => 'WK-${510001 + _reviewWorkspaceIds.length}',
+              () => deviceReviewControlsEnabled
+                  ? 'WK-$_deviceReviewIdentity-${_reviewWorkspaceIds.length + 1}'
+                  : 'WK-${510001 + _reviewWorkspaceIds.length}',
             )
           : null,
     );
