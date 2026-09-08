@@ -1544,7 +1544,8 @@ void main() {
       find.byKey(const ValueKey('buy-shop-seller-sheet-s-eggs')),
       findsOneWidget,
     );
-    expect(find.text('More from Safe Protein Store'), findsWidgets);
+    expect(find.text('Safe Protein Store'), findsWidgets);
+    expect(find.text('Store products'), findsOneWidget);
     expect(
       find.byKey(const ValueKey('buy-horizontal-product-grid')),
       findsOneWidget,
@@ -1725,7 +1726,16 @@ void main() {
         const ValueKey('buy-shop-seller-full-catalogue-list'),
       );
       expect(fullCatalogue, findsOneWidget);
-      expect(tester.getSize(fullCatalogue).height, lessThan(650));
+      final catalogueBounds = tester.getRect(fullCatalogue);
+      expect(catalogueBounds.top, greaterThanOrEqualTo(0));
+      expect(catalogueBounds.bottom, lessThanOrEqualTo(844));
+      expect(catalogueBounds.height, greaterThan(0));
+      expect(
+        find
+            .byKey(const ValueKey('buy-shop-seller-full-catalogue-close'))
+            .hitTestable(),
+        findsOneWidget,
+      );
       expect(find.text('Safe Protein Store'), findsWidgets);
       final fullEggs = find
           .descendant(
@@ -1758,7 +1768,14 @@ void main() {
         find.byKey(const ValueKey('buy-shop-seller-sheet-s-tomato')),
         findsOneWidget,
       );
-      expect(find.text('More from Shree Balaji Fresh'), findsWidgets);
+      expect(find.text('Shree Balaji Fresh'), findsWidgets);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-shop-seller-sheet-s-tomato')),
+          matching: find.text('Store products'),
+        ),
+        findsOneWidget,
+      );
       expect(tester.takeException(), isNull);
     },
   );

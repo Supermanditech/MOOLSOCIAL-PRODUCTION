@@ -3408,7 +3408,10 @@ void main() {
     await tester.pump();
     expectConnectedOwner(tester, session, BuyV2Destination.shop);
     expect(session.destination, BuyV2Destination.medicine);
-    expect(find.textContaining('Shop delivery ·'), findsOneWidget);
+    expect(session.checkoutStep, BuyV2CheckoutStep.address);
+    expect(find.text('Delivery address'), findsOneWidget);
+    expect(find.text('Receiving address'), findsNothing);
+    expect(tester.binding.transientCallbackCount, 0);
     expect(tester.takeException(), isNull);
     semantics.dispose();
   });
