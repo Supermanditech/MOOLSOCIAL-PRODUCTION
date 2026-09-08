@@ -1693,6 +1693,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r665CollectionParent = '7ef7711e119a4c4d7691423538a91ecc0499c2f2'
       $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
       $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
+      $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
+      & git -C $root merge-base --is-ancestor $r670SourceParent $head
+      $r670SourceContext = $LASTEXITCODE -eq 0
+      $r669FreezeHead = if ($r670SourceContext) { $r670SourceParent } else { $head }
       $r669RegressionParent = '99eeaabba897300320b2b19646d1efce44c57cba'
       & git -C $root merge-base --is-ancestor $r669RegressionParent $head
       $r669RegressionContext = $LASTEXITCODE -eq 0
@@ -2635,14 +2639,20 @@ if ($ProductionLane -ceq 'baseline') {
         $r669Owners = @($r667Owners)
         $r669ManifestHash = '0A63C6D63BB9AACC65BBB86F4CDE8BB0E71E64D1AC339BC9B6B6B0699C9B593B'
         $r669Subject = 'ui(buy-redmi-fixes-v1-20260905): admit full regression and portable tooling'
-        Assert-Coordination ((Get-Sha256 (Join-Path $root $r669Owners[1])) -ceq $r669ManifestHash) 'Full regression manifest changed.'
+        if (-not $r670SourceContext) {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r669Owners[1])) -ceq $r669ManifestHash) 'Full regression manifest changed.'
+        }
         $r669Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[1])
         $r669Match = [regex]::Matches($r669Manifest, '(?s)<!-- R669-DATA-BEGIN -->\s*(.*?)\s*<!-- R669-DATA-END -->')
         Assert-Coordination ($r669Match.Count -eq 1) 'Full regression exact owner data is missing or duplicated.'
         $r669Data = $r669Match[0].Groups[1].Value | ConvertFrom-Json
         Assert-Coordination ($r669Data.parent -ceq $r669RegressionParent -and $r669Data.tests.Count -eq 16 -and $r669Data.tools.Count -eq 30) 'Full regression owner data changed.'
         $r669Before = Get-R66Utf8GitJson $r669RegressionParent $r669Owners[0]
-        $r669After = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[0]) | ConvertFrom-Json
+        $r669After = if ($r670SourceContext) {
+          Get-R66Utf8GitJson $r670SourceParent $r669Owners[0]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[0]) | ConvertFrom-Json
+        }
         $r669Ui = @($r669After.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')[0]
         $r669Primary = @($r669After.activeClaims | Where-Object task -ceq '/root')[0]
         Assert-Coordination ($r669Ui.owners.Count -eq 65 -and $r669Primary.owners.Count -eq 44) 'Full regression ownership counts changed.'
@@ -2656,7 +2666,11 @@ if ($ProductionLane -ceq 'baseline') {
         $r669Primary.owners = @($r669Primary.owners | Where-Object { $_ -cnotin @($r669Data.tools.path) })
         Assert-Coordination (($r669Before | ConvertTo-Json -Depth 100 -Compress) -ceq ($r669After | ConvertTo-Json -Depth 100 -Compress)) 'Full regression admission changed unrelated policy.'
         $r669ScopeBefore = Get-R66Utf8GitJson $r669RegressionParent $r669Owners[2]
-        $r669ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[2]) | ConvertFrom-Json
+        $r669ScopeAfter = if ($r670SourceContext) {
+          Get-R66Utf8GitJson $r670SourceParent $r669Owners[2]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r669Owners[2]) | ConvertFrom-Json
+        }
         Assert-Coordination ($r669ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r669ManifestHash) 'Full regression scope hash changed.'
         $r669ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r669ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
         Assert-Coordination (($r669ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r669ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Full regression admission changed execution authority.'
@@ -2690,12 +2704,68 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r669ActualSubject.Count -eq 1 -and [string]$r669ActualSubject[0] -ceq $r669Subject) 'Full regression admission subject changed.'
           $r669Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r669Commit)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r669Committed | Sort-Object) -join '|') -ceq (@($r669Owners | Sort-Object) -join '|')) 'Full regression admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r669Commit -- @r669Owners
+          if ($r670SourceContext) {
+            & git -C $root diff --quiet $r669Commit $r669FreezeHead -- @r669Owners
+          } else {
+            & git -C $root diff --quiet $r669Commit -- @r669Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Full regression coordination changed after admission.'
-          $r669Later = @(& git -C $root log --format=%H "${r669Commit}..$head" -- @r669Owners)
+          $r669Later = @(& git -C $root log --format=%H "${r669Commit}..$r669FreezeHead" -- @r669Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r669Later.Count -eq 0) 'Full regression admission cannot be replayed or revised.'
         }
         $r66CoordinationOwners = @($r66CoordinationOwners) + @($r669Data.tools.path)
+      }
+
+      if ($r670SourceContext) {
+        $r670Owners = @($r667Owners)
+        $r670ManifestHash = '12EE0EDB708E805E6E2129BDD5C98B66397E7512C3B0F842C35C6AAA24AAB35D'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r670Owners[1])) -ceq $r670ManifestHash) 'Qualified source manifest changed.'
+        $r670Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[1])
+        $r670Match = [regex]::Matches($r670Manifest, '(?s)<!-- R670-DATA-BEGIN -->\s*(.*?)\s*<!-- R670-DATA-END -->')
+        Assert-Coordination ($r670Match.Count -eq 1) 'Qualified source data missing or duplicated.'
+        $r670Data = $r670Match[0].Groups[1].Value | ConvertFrom-Json
+        Assert-Coordination ($r670Data.parent -ceq $r670SourceParent -and $r670Data.implementation.Count -eq 2 -and $r670Data.runtimeDelta.Count -eq 16 -and $r670Data.additionalPrimaryOwner -ceq 'scripts/check-windows-powershell-compatibility.ps1') 'Qualified source data changed.'
+        $r670EvidencePath = 'C:\GUARANTEED OUTCOME\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\SINGLECHAT-FULL-REGRESSION-BINDING-V1.json'
+        Assert-Coordination ($r670Data.fullRegressionEvidence.path -ceq $r670EvidencePath -and $r670Data.fullRegressionEvidence.cycles -eq 2 -and $r670Data.fullRegressionEvidence.passedPerCycle -eq 1640 -and $r670Data.fullRegressionEvidence.skippedPerCycle -eq 27 -and (Get-Sha256 $r670EvidencePath) -ceq $r670Data.fullRegressionEvidence.sha256) 'Qualified source regression evidence changed.'
+        $r670Before = Get-R66Utf8GitJson $r670SourceParent $r670Owners[0]
+        $r670After = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[0]) | ConvertFrom-Json
+        $r670Primary = @($r670After.activeClaims | Where-Object task -ceq '/root')[0]
+        $r670Ui = @($r670After.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')[0]
+        Assert-Coordination ($r670Ui.owners.Count -eq 65 -and $r670Primary.owners.Count -eq 45 -and @($r670Primary.owners | Where-Object { $_ -ceq $r670Data.additionalPrimaryOwner }).Count -eq 1) 'Qualified source ownership changed.'
+        $r670Primary.owners = @($r670Primary.owners | Where-Object { $_ -cne $r670Data.additionalPrimaryOwner })
+        Assert-Coordination (($r670Before | ConvertTo-Json -Depth 100 -Compress) -ceq ($r670After | ConvertTo-Json -Depth 100 -Compress)) 'Qualified source changed unrelated policy.'
+        $r670ScopeBefore = Get-R66Utf8GitJson $r670SourceParent $r670Owners[2]
+        $r670ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r670Owners[2]) | ConvertFrom-Json
+        Assert-Coordination ($r670ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r670ManifestHash) 'Qualified source scope hash changed.'
+        $r670ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r670ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (($r670ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r670ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Qualified source changed execution authority.'
+        foreach ($item in $r670Data.implementation) {
+          $allowed = @($item.beforeSha256)
+          if ($head -cne $r670SourceParent) { $allowed += $item.proposedSha256 }
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $item.path)) -cin $allowed) 'Qualified checker differs from exact reviewed proposal.'
+        }
+        if ($head -ceq $r670SourceParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending qualified source admission is not a handoff.'
+          $r670Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r670Dirty | Sort-Object) -join '|') -ceq (@($r670Owners | Sort-Object) -join '|')) 'Pending qualified source must change exactly four coordination owners.'
+          $r670Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r670Untracked.Count -eq 0) 'Qualified source admission cannot include untracked drafts.'
+        } else {
+          $r670Following = @(& git -C $root rev-list --first-parent --reverse "${r670SourceParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r670Following.Count -gt 0) 'Qualified source admission missing.'
+          $r670Commit = [string]$r670Following[0]
+          $r670Parents = @(& git -C $root show -s --format=%P $r670Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r670Parents.Count -eq 1 -and [string]$r670Parents[0] -ceq $r670SourceParent) 'Qualified source admission parent changed.'
+          $r670Subject = @(& git -C $root show -s --format=%s $r670Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r670Subject.Count -eq 1 -and [string]$r670Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit qualified Redmi build checks') 'Qualified source admission subject changed.'
+          $r670Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r670Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r670Committed | Sort-Object) -join '|') -ceq (@($r670Owners | Sort-Object) -join '|')) 'Qualified source admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r670Commit -- @r670Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Qualified source coordination changed after admission.'
+          $r670Later = @(& git -C $root log --format=%H "${r670Commit}..$head" -- @r670Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r670Later.Count -eq 0) 'Qualified source admission cannot be replayed or revised.'
+        }
+        $r66CoordinationOwners = @($r66CoordinationOwners) + @($r670Data.additionalPrimaryOwner)
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()

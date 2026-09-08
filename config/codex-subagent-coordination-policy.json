@@ -34,6 +34,7 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "scripts/check-windows-powershell-compatibility.ps1",
         "scripts/check-buy-approved-reference.ps1",
         "scripts/check-personal-android-navigation-device-matrix-c28d.ps1",
         "scripts/check-personal-approved-navigation-device-matrix-c26h.ps1",

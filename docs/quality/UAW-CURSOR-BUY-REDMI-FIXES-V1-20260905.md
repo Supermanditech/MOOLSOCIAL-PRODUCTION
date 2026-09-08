@@ -594,3 +594,55 @@ Machine-bound exact owner/preimage data follows. The failed run and external por
   ]
 }
 <!-- R669-DATA-END -->
+
+
+## Qualified Redmi source and Windows compatibility forwarding — 8 September 2026
+
+This mvp_supporting continuation binds the complete locally tested Buy/Shop source for the founder-directed Redmi review. Cross-worktree/backend integration remains deferred until Redmi qualification. Add exactly the existing Windows compatibility checker to primary (44 to45); Cursor remains65. Its optional explicit RedmiReviewSourceCommit argument is forwarded to the actual backend, egress and protected Buy gates. Defaults, self-tests, compatibility detection and rejection rules remain unchanged. Every supplied source must pass the existing exact-source qualifier; do not replace accepted baselines or permit deployment.
+
+The existing admitted protected Buy checker adds only the sealed implementation commit below and its exact16-owner runtime/native delta. Branch, accepted ancestry, source ancestry,51-owner Buy inventory, exact current boundary bytes and untracked-runtime rejection remain mandatory. Existing source cases remain unchanged. Native Accessibility and shared Scan/Pick pins remain governed by prior admissions. No source implementation occurs during this four-owner coordination admission. Afterward only the two exact proposed checker hashes below are allowed. Test actual positive and adverse cases on PowerShell7 and5.1, then run qualified protection and compatibility gates. This amendment grants no APK build, device installation, accepted-baseline replacement, backend activation, OPPO action, real transaction, external message or shutdown authority.
+
+Require clean sealed parent, exactly policy/manifest/scope-hash/coordination changes, exact first-parent admission subject `ui(buy-redmi-fixes-v1-20260905): admit qualified Redmi build checks`, unchanged authority, historical freezes and post-admission freeze. A later unique machine-authorized candidate and full checksum-bound Redmi replay remain required. All87 records remain retained and open for acceptance.
+<!-- R670-DATA-BEGIN -->
+{
+  "parent": "d7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2",
+  "additionalPrimaryOwner": "scripts/check-windows-powershell-compatibility.ps1",
+  "implementation": [
+    {
+      "path": "scripts/check-windows-powershell-compatibility.ps1",
+      "beforeSha256": "19F34860A672DEDDE246F42A424859385738A6ACD29A2752FBDDE3AF80B615CF",
+      "proposedSha256": "B22803995D5FFA78C2BF336C6BF178E6F9D4C154B0E9B01211A25776C496C41A"
+    },
+    {
+      "path": "scripts/check-buy-protected-baseline.ps1",
+      "beforeSha256": "05038827E395C3A119C0CF50BC5EA8B3F52CD53889FB9ECEDE57E43A889D41CB",
+      "proposedSha256": "F904F465D8C4F1600AF87286A2BF84D61801472A37976028FA38E728B686049F"
+    }
+  ],
+  "runtimeDelta": [
+    "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
+    "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+    "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
+    "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+  ],
+  "fullRegressionEvidence": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\SINGLECHAT-FULL-REGRESSION-BINDING-V1.json",
+    "sha256": "D455C0DEF317A2BDEEA74C914014FB725FCEC8D7C5D546FD8B37C791102DEAE8",
+    "passedPerCycle": 1640,
+    "skippedPerCycle": 27,
+    "cycles": 2
+  }
+}
+<!-- R670-DATA-END -->
