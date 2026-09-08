@@ -1,7 +1,9 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
+import '../work/scan_and_pick_contract.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_models.dart';
 
@@ -610,6 +612,321 @@ abstract interface class BuyV2CollectionPendingStore {
   /// False or a storage error leaves reconciliation pending.
   Future<bool> clear(BuyV2CollectionPendingIntent intent);
 }
+
+/// The buyer's checkout context. Product IDs identify the product family;
+/// listing IDs identify the exact purchased Store SKU and pack.
+@immutable
+class BuyV2CollectionBasket {
+  BuyV2CollectionBasket({
+    required this.identity,
+    required this.store,
+    required Iterable<BuyV2CartLine> lines,
+    required this.paymentMethod,
+  }) : lines = List.unmodifiable(lines) {
+    if (!_collectionText(identity.accountId) ||
+        !_collectionText(identity.sessionId) ||
+        !_collectionText(store.id) ||
+        store.name.trim().isEmpty ||
+        store.address.trim().isEmpty ||
+        paymentMethod.trim().isEmpty ||
+        const {'Cash on Delivery', 'Purchase order'}.contains(paymentMethod) ||
+        this.lines.isEmpty ||
+        this.lines.map((line) => line.product.id).toSet().length !=
+            this.lines.length ||
+        this.lines.any((line) {
+          final product = line.product;
+          return product.storeId != store.id ||
+              !_collectionText(product.id) ||
+              !_collectionText(product.canonicalId) ||
+              product.pack.trim().isEmpty ||
+              product.title.trim().isEmpty ||
+              product.price < 0 ||
+              product.minimumOrder < 1 ||
+              line.quantity < 1 ||
+              line.quantity < product.minimumOrder ||
+              BigInt.from(product.price) *
+                      BigInt.from(line.quantity) *
+                      BigInt.from(100) >
+                  BigInt.from(9007199254740991) ||
+              product.requiresPrescription ||
+              (product.destination != BuyV2Destination.shop &&
+                  product.destination != BuyV2Destination.wholesale);
+        })) {
+      throw const FormatException('Invalid collection basket');
+    }
+  }
+
+  final BuyV2CollectionIdentity identity;
+  final BuyV2StoreListing store;
+  final List<BuyV2CartLine> lines;
+  final String paymentMethod;
+
+  /// Stable under row reordering, sensitive to account/session, branch, SKU,
+  /// quantity, displayed price and payment changes. It is correlation, not auth.
+  String get fingerprint {
+    final ordered = [...lines]
+      ..sort((a, b) => a.product.id.compareTo(b.product.id));
+    return sha256
+        .convert(
+          utf8.encode(
+            jsonEncode([
+              'buy-collection-checkout-v1',
+              identity.accountId,
+              identity.sessionId,
+              store.id,
+              paymentMethod,
+              for (final line in ordered)
+                [
+                  line.product.canonicalId,
+                  line.product.id,
+                  line.product.destination.name,
+                  line.product.pack,
+                  line.product.variant,
+                  line.product.price,
+                  line.quantity,
+                ],
+            ]),
+          ),
+        )
+        .toString();
+  }
+
+  bool collectionAvailableAt(DateTime now) =>
+      store.collection?.isSupportedFor(store.id, now: now) == true;
+}
+
+@immutable
+class BuyV2CollectionCheckoutQuote {
+  BuyV2CollectionCheckoutQuote({
+    required this.id,
+    required this.sourceId,
+    required this.basketFingerprint,
+    required this.issuedAt,
+    required this.validUntil,
+    required Map<String, int> lineAmountsMinor,
+    required this.totalMinor,
+    this.currency = 'INR',
+    this.taxMinor = 0,
+    this.paymentChargeMinor = 0,
+    this.discountMinor = 0,
+  }) : lineAmountsMinor = Map.unmodifiable(lineAmountsMinor);
+
+  final String id;
+  final String sourceId;
+  final String basketFingerprint;
+  final DateTime issuedAt;
+  final DateTime validUntil;
+  final Map<String, int> lineAmountsMinor;
+  final String currency;
+  final int totalMinor;
+  final int taxMinor;
+  final int paymentChargeMinor;
+  final int discountMinor;
+
+  /// A changed unit price must refresh the basket before another quote. Taxes,
+  /// payment fees and savings retain their exact minor-unit values for review.
+  bool matches(BuyV2CollectionBasket basket) =>
+      _collectionText(id) &&
+      _collectionText(sourceId) &&
+      basketFingerprint == basket.fingerprint &&
+      currency == 'INR' &&
+      issuedAt.isBefore(validUntil) &&
+      lineAmountsMinor.length == basket.lines.length &&
+      basket.lines.every(
+        (line) => lineAmountsMinor[line.product.id] == line.total * 100,
+      ) &&
+      taxMinor >= 0 &&
+      paymentChargeMinor >= 0 &&
+      discountMinor >= 0 &&
+      totalMinor > 0 &&
+      totalMinor <= 9007199254740991 &&
+      BigInt.from(totalMinor) ==
+          lineAmountsMinor.values.fold<BigInt>(
+                BigInt.zero,
+                (sum, value) => sum + BigInt.from(value),
+              ) +
+              BigInt.from(taxMinor) +
+              BigInt.from(paymentChargeMinor) -
+              BigInt.from(discountMinor);
+
+  bool isCurrentFor(BuyV2CollectionBasket basket, DateTime now) =>
+      matches(basket) &&
+      !issuedAt.isAfter(now) &&
+      now.isBefore(validUntil) &&
+      basket.collectionAvailableAt(now);
+}
+
+/// Reserve this entire immutable request durably before attempting payment.
+/// A new session may reconcile it for the same account, never rewrite it.
+@immutable
+class BuyV2CollectionPurchaseIntent {
+  BuyV2CollectionPurchaseIntent({
+    required this.operationId,
+    required this.basket,
+    required this.quote,
+  }) {
+    if (!_collectionText(operationId) || !quote.matches(basket)) {
+      throw const FormatException('Invalid collection purchase intent');
+    }
+  }
+
+  final String operationId;
+  final BuyV2CollectionBasket basket;
+  final BuyV2CollectionCheckoutQuote quote;
+
+  String get fingerprint => sha256
+      .convert(
+        utf8.encode(
+          jsonEncode([
+            operationId,
+            basket.fingerprint,
+            quote.id,
+            quote.sourceId,
+            quote.issuedAt.toUtc().toIso8601String(),
+            quote.validUntil.toUtc().toIso8601String(),
+            quote.currency,
+            quote.totalMinor,
+            quote.taxMinor,
+            quote.paymentChargeMinor,
+            quote.discountMinor,
+          ]),
+        ),
+      )
+      .toString();
+}
+
+enum BuyV2CollectionPurchaseState {
+  actionRequired,
+  pending,
+  paid,
+  notCharged,
+  unknown,
+}
+
+/// Authenticated transport outcome. Local construction is never payment proof.
+@immutable
+class BuyV2CollectionPurchaseResult {
+  const BuyV2CollectionPurchaseResult({
+    required this.operationId,
+    required this.intentFingerprint,
+    required this.state,
+    this.orderId,
+    this.purchaseId,
+    this.paymentReference,
+    this.paymentActionUri,
+    this.paidAmountMinor,
+    this.currency,
+  });
+
+  final String operationId;
+  final String intentFingerprint;
+  final BuyV2CollectionPurchaseState state;
+  final String? orderId;
+  final String? purchaseId;
+  final String? paymentReference;
+  final Uri? paymentActionUri;
+  final int? paidAmountMinor;
+  final String? currency;
+
+  bool matches(BuyV2CollectionPurchaseIntent intent) {
+    if (operationId != intent.operationId ||
+        intentFingerprint != intent.fingerprint) {
+      return false;
+    }
+    if (state == BuyV2CollectionPurchaseState.paid) {
+      return _collectionText(orderId) &&
+          _collectionText(purchaseId) &&
+          _collectionText(paymentReference) &&
+          paymentActionUri == null &&
+          currency == intent.quote.currency &&
+          paidAmountMinor == intent.quote.totalMinor;
+    }
+    if (state == BuyV2CollectionPurchaseState.actionRequired) {
+      final uri = paymentActionUri;
+      return _collectionText(paymentReference) &&
+          uri != null &&
+          (uri.scheme == 'https' || uri.scheme == 'upi') &&
+          uri.host.isNotEmpty &&
+          uri.userInfo.isEmpty &&
+          paidAmountMinor == null;
+    }
+    return paymentActionUri == null &&
+        paidAmountMinor == null &&
+        (state != BuyV2CollectionPurchaseState.notCharged || orderId == null);
+  }
+
+  /// The existing shared collection read independently supplies the paid order.
+  /// No delivery order, different branch/SKU, QR token or rounded total qualifies.
+  bool matchesPaidOrder(
+    BuyV2CollectionPurchaseIntent intent,
+    ScanPickSnapshot snapshot,
+  ) =>
+      state == BuyV2CollectionPurchaseState.paid &&
+      matches(intent) &&
+      snapshot.orderId == orderId &&
+      snapshot.storeId == intent.basket.store.id &&
+      snapshot.purchaserAccountId == intent.basket.identity.accountId &&
+      snapshot.currency == intent.quote.currency &&
+      snapshot.totalMinor == intent.quote.totalMinor &&
+      snapshot.payment == ScanPickPayment.paid &&
+      snapshot.state != ScanPickState.cancelled &&
+      snapshot.challenge?.qrPayload == null &&
+      snapshot.lines.length == intent.basket.lines.length &&
+      intent.basket.lines.every((line) {
+        final matches = snapshot.lines.where(
+          (value) =>
+              value.skuId == line.product.id &&
+              value.productId == line.product.canonicalId &&
+              value.pack == line.product.pack &&
+              RegExp(
+                '^${line.quantity}(?:\\.0+)?\$',
+              ).hasMatch(value.quantity) &&
+              value.amountMinor ==
+                  intent.quote.lineAmountsMinor[line.product.id],
+        );
+        return matches.length == 1;
+      });
+}
+
+/// Optional buyer checkout transport; the existing delivery adapter is intact.
+/// The adapter must authenticate the current caller, enforce the quoted Store,
+/// stock and amount, and make place/reconcile idempotent by operationId.
+/// It must validate provider handoff origins, never trust a returned URL alone.
+abstract interface class BuyV2CollectionCheckoutGateway {
+  Future<BuyV2CollectionCheckoutQuote> quote(BuyV2CollectionBasket basket);
+  Future<BuyV2CollectionPurchaseResult> place(
+    BuyV2CollectionPurchaseIntent intent,
+  );
+  Future<BuyV2CollectionPurchaseResult> reconcile(
+    BuyV2CollectionPurchaseIntent intent,
+  );
+}
+
+/// Dedicated durable payment journal, distinct from the QR-authorisation store.
+/// There is no in-memory or review-mode production default.
+abstract interface class BuyV2CollectionPurchaseStore {
+  /// Linearizable after prior reserve/settle operations, including timed-out
+  /// writes. Missing/corrupt storage must throw, not look like an empty account.
+  Future<BuyV2CollectionPurchaseIntent?> read(String accountId);
+
+  /// Atomic compare-and-set: at most one unresolved purchase for this account.
+  /// True is returned only after the entire intent is durably committed.
+  Future<bool> reserve(BuyV2CollectionPurchaseIntent intent);
+
+  /// Remove only this exact intent, atomically with durable admission of the
+  /// validated paid order into account order history and an idempotent Cart
+  /// reconciliation checkpoint for its original quantities. Repeating the same
+  /// settlement succeeds. notCharged has no snapshot; paid requires its exact
+  /// validated snapshot. Pending/unknown results must never clear a reservation.
+  Future<bool> settle(
+    BuyV2CollectionPurchaseIntent intent,
+    BuyV2CollectionPurchaseResult result, {
+    ScanPickSnapshot? paidOrder,
+  });
+}
+
+bool _collectionText(String? value) =>
+    value != null && value.isNotEmpty && value.trim() == value;
 
 @immutable
 class BuyV2CommerceSnapshot {

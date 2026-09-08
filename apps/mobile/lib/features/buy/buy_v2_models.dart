@@ -481,6 +481,7 @@ class BuyV2Order {
     required this.destinationLabel,
     required this.progress,
     required this.status,
+    this.totalMinor,
     this.collection,
     this.purchaseId,
     this.promisedByLabel,
@@ -522,7 +523,11 @@ class BuyV2Order {
   final BuyV2Destination destination;
   final String title;
   final String itemSummary;
+
+  /// Legacy whole-rupee compatibility value. Collection amounts are exact in
+  /// totalMinor and validated against the authenticated collection snapshot.
   final int total;
+  final int? totalMinor;
   final String partner;
   final String partnerType;
   final String promise;

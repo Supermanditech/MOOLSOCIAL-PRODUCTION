@@ -2,13 +2,19 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_catalogue_data.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
   final promises = <BuyV2Destination, (String, String)>{
@@ -401,7 +407,1138 @@ BuyV2PublishedCatalogueOffer _copyPublication(
   validUntil: validUntil ?? value.validUntil,
 );
 
+class _CollectionPurchaseHarness
+    implements
+        BuyV2CollectionCheckoutGateway,
+        BuyV2CollectionPurchaseStore,
+        ScanPickGateway {
+  final identity = ValueNotifier<BuyV2CollectionIdentity?>(
+    const BuyV2CollectionIdentity(accountId: 'buyer-a', sessionId: 'session-a'),
+  );
+  DateTime clock = DateTime.utc(2026, 9, 8);
+  BuyV2CollectionPurchaseIntent? pending;
+  BuyV2CollectionPurchaseIntent? lastRequest;
+  ScanPickSnapshot? admittedOrder;
+  int quotes = 0, placements = 0, reconciliations = 0, settlements = 0;
+  bool failRead = false, rejectReserve = false, rejectSettle = false;
+  bool wrongOperation = false;
+  String paidOrderId = 'order-a';
+  String quoteFault = '';
+  BuyV2CollectionPurchaseState outcome = BuyV2CollectionPurchaseState.paid;
+  Completer<bool>? reservationGate;
+  Completer<void>? placementGate;
+  Future<bool>? _reservation;
+  void Function(Map<String, Object?>)? mutateSnapshot;
+
+  BuyV2CollectionBasket basket({
+    int quantity = 1,
+    String storeId = 'store-a',
+    String? sku,
+    String payment = 'PhonePe',
+  }) {
+    final product = BuyV2Catalogue.allProducts
+        .firstWhere((p) => p.destination == BuyV2Destination.shop)
+        .copyWith(
+          id: sku ?? 'sku-a',
+          canonicalId: 'product-a',
+          storeId: storeId,
+          minimumOrder: 1,
+          price: 100,
+        );
+    return BuyV2CollectionBasket(
+      identity: identity.value!,
+      paymentMethod: payment,
+      store: BuyV2StoreListing(
+        id: storeId,
+        name: storeId == 'store-c' ? 'City Wholesale' : 'Market Store',
+        area: switch (storeId) {
+          'store-b' => 'Station branch',
+          'store-c' => 'Industrial Area',
+          _ => 'West branch',
+        },
+        address: switch (storeId) {
+          'store-b' => '48 Station Road',
+          'store-c' => '7 Industrial Road',
+          _ => '12 Market Road',
+        },
+        regionId: 'jodhpur',
+        collection: BuyV2StoreCollectionCapability(
+          storeId: storeId,
+          supportsCollection: true,
+          sourceId: 'store-capability',
+          observedAt: clock.subtract(const Duration(minutes: 1)),
+          validUntil: clock.add(const Duration(minutes: 15)),
+        ),
+      ),
+      lines: [BuyV2CartLine(product: product, quantity: quantity)],
+    );
+  }
+
+  BuyV2CollectionCheckoutController controller({Duration? timeout}) =>
+      BuyV2CollectionCheckoutController(
+        identity: identity,
+        gateway: this,
+        pendingStore: this,
+        collectionGateway: this,
+        now: () => clock,
+        timeout: timeout ?? const Duration(seconds: 15),
+      );
+
+  @override
+  Future<BuyV2CollectionCheckoutQuote> quote(
+    BuyV2CollectionBasket basket,
+  ) async {
+    quotes++;
+    final amounts = {
+      for (final line in basket.lines)
+        line.product.id: line.total * 100 + (quoteFault == 'price' ? 1 : 0),
+    };
+    return BuyV2CollectionCheckoutQuote(
+      id: 'quote-1',
+      sourceId: 'quote-service',
+      basketFingerprint: quoteFault == 'basket'
+          ? 'another'
+          : basket.fingerprint,
+      issuedAt: clock.subtract(const Duration(seconds: 1)),
+      validUntil: quoteFault == 'expiry'
+          ? clock
+          : clock.add(const Duration(minutes: 2)),
+      lineAmountsMinor: amounts,
+      totalMinor: amounts.values.fold<int>(0, (sum, value) => sum + value) + 25,
+      taxMinor: 25,
+    );
+  }
+
+  BuyV2CollectionPurchaseResult response(
+    BuyV2CollectionPurchaseIntent intent,
+  ) => BuyV2CollectionPurchaseResult(
+    operationId: wrongOperation ? 'other-operation' : intent.operationId,
+    intentFingerprint: intent.fingerprint,
+    state: outcome,
+    orderId: outcome == BuyV2CollectionPurchaseState.paid ? paidOrderId : null,
+    purchaseId: outcome == BuyV2CollectionPurchaseState.paid
+        ? 'purchase-a'
+        : null,
+    paymentReference: 'payment-a',
+    paymentActionUri: outcome == BuyV2CollectionPurchaseState.actionRequired
+        ? Uri.parse('upi://pay?tr=payment-a')
+        : null,
+    paidAmountMinor: outcome == BuyV2CollectionPurchaseState.paid
+        ? intent.quote.totalMinor
+        : null,
+    currency: outcome == BuyV2CollectionPurchaseState.paid ? 'INR' : null,
+  );
+
+  @override
+  Future<BuyV2CollectionPurchaseResult> place(
+    BuyV2CollectionPurchaseIntent intent,
+  ) async {
+    placements++;
+    lastRequest = intent;
+    if (placementGate != null) await placementGate!.future;
+    return response(intent);
+  }
+
+  @override
+  Future<BuyV2CollectionPurchaseResult> reconcile(
+    BuyV2CollectionPurchaseIntent intent,
+  ) async {
+    reconciliations++;
+    lastRequest = intent;
+    return response(intent);
+  }
+
+  @override
+  Future<BuyV2CollectionPurchaseIntent?> read(String accountId) async {
+    if (_reservation != null) await _reservation;
+    if (failRead) throw StateError('storage unavailable');
+    return pending?.basket.identity.accountId == accountId ? pending : null;
+  }
+
+  @override
+  Future<bool> reserve(BuyV2CollectionPurchaseIntent intent) {
+    return _reservation = () async {
+      if (reservationGate != null && !await reservationGate!.future) {
+        return false;
+      }
+      if (rejectReserve || pending != null) return false;
+      pending = intent;
+      return true;
+    }();
+  }
+
+  @override
+  Future<bool> settle(
+    BuyV2CollectionPurchaseIntent intent,
+    BuyV2CollectionPurchaseResult result, {
+    ScanPickSnapshot? paidOrder,
+  }) async {
+    settlements++;
+    if (rejectSettle || pending?.fingerprint != intent.fingerprint) {
+      return false;
+    }
+    admittedOrder = paidOrder;
+    pending = null;
+    return true;
+  }
+
+  @override
+  Future<ScanPickResult> execute(ScanPickRequest request) async {
+    final intent = lastRequest!;
+    final snapshot = <String, Object?>{
+      'purpose': scanPickPurpose,
+      'orderId': request.orderId,
+      'storeId': intent.basket.store.id,
+      'purchaserAccountId': intent.basket.identity.accountId,
+      'customerName': 'Customer',
+      'storeName': intent.basket.store.name,
+      'revision': 'revision-1',
+      'serverTime': clock.toIso8601String(),
+      'state': 'preparing',
+      'payment': 'paid',
+      'readiness': 'preparing',
+      'currency': 'INR',
+      'totalMinor': intent.quote.totalMinor,
+      'lines': [
+        for (final line in intent.basket.lines)
+          <String, Object?>{
+            'lineId': line.product.id,
+            'skuId': line.product.id,
+            'productId': line.product.canonicalId,
+            'name': line.product.title,
+            'pack': line.product.pack,
+            'quantity': line.quantity.toString(),
+            'amountMinor': intent.quote.lineAmountsMinor[line.product.id],
+          },
+      ],
+    };
+    mutateSnapshot?.call(snapshot);
+    return ScanPickResult.fromJson({
+      'protocolVersion': scanPickProtocolVersion,
+      'requestId': request.requestId,
+      'operation': 'read',
+      'outcome': 'snapshot',
+      'snapshot': snapshot,
+    });
+  }
+}
+
+class _CollectionScannerPending implements BuyV2CollectionPendingStore {
+  BuyV2CollectionPendingIntent? pending;
+  @override
+  Future<BuyV2CollectionPendingIntent?> read({
+    required String accountId,
+    required String orderId,
+    required String storeId,
+  }) async => pending;
+  @override
+  Future<bool> reserve(BuyV2CollectionPendingIntent intent) async {
+    if (pending != null) return false;
+    pending = intent;
+    return true;
+  }
+
+  @override
+  Future<bool> clear(BuyV2CollectionPendingIntent intent) async {
+    if (pending != null && pending!.operationId != intent.operationId) {
+      return false;
+    }
+    pending = null;
+    return true;
+  }
+}
+
+class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
+  _CollectionPurchaseCatalogueSource(this.harness);
+  final _CollectionPurchaseHarness harness;
+  List<BuyV2Product> get products => [
+    harness.basket().lines.single.product,
+    harness.basket(storeId: 'store-b', sku: 'sku-b').lines.single.product,
+    BuyV2Catalogue.allProducts
+        .firstWhere((p) => p.destination == BuyV2Destination.wholesale)
+        .copyWith(
+          id: 'wholesale-sku',
+          canonicalId: 'whole-product',
+          storeId: 'store-c',
+          minimumOrder: 2,
+        ),
+  ];
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    final items = products
+        .where(
+          (p) =>
+              p.destination == query.destination &&
+              (query.storeId == null || query.storeId == p.storeId),
+        )
+        .toList();
+    return BuyV2CataloguePage(
+      queryKey: query.key,
+      snapshotId: 'checkout-products',
+      items: items,
+      startIndex: 0,
+      totalCount: items.length,
+    );
+  }
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    final ids = products
+        .where(
+          (p) =>
+              p.destination == query.destination &&
+              (query.storeId == null || query.storeId == p.storeId),
+        )
+        .map((p) => p.storeId!)
+        .toSet();
+    return BuyV2CataloguePage(
+      queryKey: query.key,
+      snapshotId: 'checkout-stores',
+      items: ids.map((id) => harness.basket(storeId: id).store),
+      startIndex: 0,
+      totalCount: ids.length,
+    );
+  }
+
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async =>
+      products.where((p) => productIds.contains(p.id)).toList();
+}
+
 void main() {
+  group('R5 collection purchase', () {
+    late _CollectionPurchaseHarness harness;
+    late BuyV2CollectionCheckoutController checkout;
+    setUp(() {
+      harness = _CollectionPurchaseHarness();
+      checkout = harness.controller();
+    });
+    tearDown(() {
+      checkout.dispose();
+      harness.identity.dispose();
+    });
+
+    Future<BuyV2Session> checkoutSession({
+      bool openCheckout = true,
+      bool purchaseServices = true,
+    }) async {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: true,
+        cataloguePageSource: _CollectionPurchaseCatalogueSource(harness),
+        catalogueNow: () => harness.clock,
+        collectionIdentity: harness.identity,
+        collectionGateway: harness,
+        collectionPendingStore: _CollectionScannerPending(),
+        collectionCheckoutGateway: purchaseServices ? harness : null,
+        collectionPurchaseStore: purchaseServices ? harness : null,
+      );
+      addTearDown(() {
+        session.dispose();
+        core.dispose();
+      });
+      for (final destination in [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+      ]) {
+        final pager = session.acquireCatalogueProducts(
+          'collection-${destination.name}',
+        );
+        await pager.open(
+          session.catalogueQuery(catalogueDestination: destination),
+        );
+      }
+      for (final product in _CollectionPurchaseCatalogueSource(
+        harness,
+      ).products) {
+        await session.refreshCatalogueStore(
+          product.storeId!,
+          product.destination,
+        );
+        expect(session.addProduct(product.id), isTrue);
+      }
+      session.openCart();
+      if (openCheckout) expect(session.openCheckout(), isTrue);
+      return session;
+    }
+
+    Future<void> mountCheckout(
+      WidgetTester tester,
+      BuyV2Session session, {
+      required Size size,
+      required double scale,
+    }) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+      tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+      addTearDown(tester.view.reset);
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: r66VisualCaptureRoot(child!),
+          ),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: session.destination,
+            initialView: session.view,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+    }
+
+    for (final fault in ['services', 'identity', 'capability', 'quote']) {
+      testWidgets('checkout failure recovery visual $fault', (tester) async {
+        final session = await checkoutSession(
+          purchaseServices: fault != 'services',
+        );
+        session.chooseCheckoutCollection(true, storeId: 'store-a');
+        session.continueCheckoutFromAddress();
+        final orderCount = session.orders.length;
+        if (fault == 'identity') harness.identity.value = null;
+        if (fault == 'capability') {
+          harness.clock = harness.clock.add(const Duration(minutes: 16));
+        }
+        if (fault == 'quote') harness.quoteFault = 'expiry';
+        await mountCheckout(
+          tester,
+          session,
+          size: const Size(320, 844),
+          scale: 2,
+        );
+        final primary = find.byKey(
+          const ValueKey('buy-checkout-primary-payment'),
+        );
+        if (fault == 'services' || fault == 'identity') {
+          expect(tester.widget<FilledButton>(primary).onPressed, isNull);
+        } else {
+          expect(primary.hitTestable(), findsOneWidget);
+          await tester.tap(primary);
+          await tester.pumpAndSettle();
+        }
+        final expectedMessage = switch (fault) {
+          'services' =>
+            'Store collection is unavailable right now. Your Cart has not changed.',
+          'identity' => 'Sign in to place a store collection order.',
+          'capability' =>
+            'Check this store’s collection availability to continue.',
+          _ =>
+            'The collection total could not be checked. Your Cart has not changed.',
+        };
+        expect(find.text(expectedMessage), findsOneWidget);
+        await tester.ensureVisible(find.text(expectedMessage));
+        await tester.pumpAndSettle();
+        expect(find.text(expectedMessage).hitTestable(), findsOneWidget);
+        expect(harness.placements, 0);
+        expect(harness.pending, isNull);
+        expect(session.orders.length, orderCount);
+        await captureR66Visual(tester, 'r5-collection-checkout-failure-$fault');
+        final back = find.byKey(const ValueKey('buy-checkout-back'));
+        if (back.evaluate().isEmpty) {
+          await tester.scrollUntilVisible(
+            back,
+            -180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-checkout-payment')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+            maxScrolls: 20,
+          );
+        }
+        await tester.ensureVisible(back);
+        await tester.pumpAndSettle();
+        expect(back.hitTestable(), findsOneWidget);
+        await tester.tap(back);
+        await tester.pumpAndSettle();
+        expect(session.checkoutStep, BuyV2CheckoutStep.address);
+        final cart = find.byKey(const ValueKey('buy-checkout-return-cart'));
+        await tester.ensureVisible(cart);
+        await tester.pumpAndSettle();
+        expect(cart.hitTestable(), findsOneWidget);
+        await tester.tap(cart);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.cart);
+        expect(session.quantityFor('sku-a'), 1);
+        expect(session.quantityFor('sku-b'), 1);
+        expect(session.quantityFor('wholesale-sku'), 2);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    test(
+      'existing delivery order ID cannot admit a collection payment',
+      () async {
+        final session = await checkoutSession();
+        final originalOrder = session.orders.first;
+        harness.paidOrderId = originalOrder.id;
+        session.chooseCheckoutCollection(true, storeId: 'store-a');
+        session.continueCheckoutFromAddress();
+        await session.prepareCollectionCheckout();
+        expect(await session.submitOrder(), isFalse);
+        expect(harness.settlements, 0);
+        expect(session.quantityFor('sku-a'), 1);
+        expect(session.collectionCheckout!.unresolved, isTrue);
+        expect(session.orders.first, same(originalOrder));
+        expect(session.view, BuyV2View.checkout);
+      },
+    );
+
+    test(
+      'late paid completion preserves navigation away from checkout',
+      () async {
+        final session = await checkoutSession();
+        session.chooseCheckoutCollection(true, storeId: 'store-a');
+        session.continueCheckoutFromAddress();
+        await session.prepareCollectionCheckout();
+        harness.placementGate = Completer<void>();
+        final placing = session.submitOrder();
+        await Future<void>.delayed(Duration.zero);
+        session.openOrders();
+        harness.placementGate!.complete();
+        expect(await placing, isTrue);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.destination, BuyV2Destination.orders);
+        expect(
+          session.orders.where((order) => order.id == 'order-a'),
+          hasLength(1),
+        );
+        expect(session.quantityFor('sku-a'), 0);
+        expect(session.quantityFor('sku-b'), 1);
+      },
+    );
+
+    test(
+      'admission changing during settlement keeps payment blocked from retry',
+      () async {
+        checkout.dispose();
+        var admissions = 0;
+        checkout = BuyV2CollectionCheckoutController(
+          identity: harness.identity,
+          gateway: harness,
+          pendingStore: harness,
+          collectionGateway: harness,
+          now: () => harness.clock,
+          acceptPaidOrder: (_, _) => ++admissions == 1,
+        );
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        expect(await checkout.place(basket), isFalse);
+        expect(checkout.paidOrder, isNull);
+        expect(checkout.unresolved, isTrue);
+        expect(await checkout.place(basket), isFalse);
+        expect(await checkout.prepare(basket), isFalse);
+        expect(harness.placements, 1);
+      },
+    );
+
+    test('overflowing fee arithmetic cannot produce a small payable total', () {
+      final basket = harness.basket();
+      final quote = BuyV2CollectionCheckoutQuote(
+        id: 'q',
+        sourceId: 'source',
+        basketFingerprint: basket.fingerprint,
+        issuedAt: harness.clock,
+        validUntil: harness.clock.add(const Duration(minutes: 1)),
+        lineAmountsMinor: const {'sku-a': 10000},
+        totalMinor: 9998,
+        taxMinor: 9223372036854775807,
+        paymentChargeMinor: 9223372036854775807,
+      );
+      expect(quote.matches(basket), isFalse);
+    });
+
+    for (final size in [const Size(320, 844), const Size(640, 360)]) {
+      for (final scale in [1.0, 2.0]) {
+        final profile = '${size.width.toInt()}x${size.height.toInt()}-$scale';
+        testWidgets('checkout taps and visual $profile', (tester) async {
+          final session = await checkoutSession(openCheckout: false);
+          await mountCheckout(tester, session, size: size, scale: scale);
+          Future<void> tap(Finder target) async {
+            expect(target, findsOneWidget);
+            await tester.ensureVisible(target);
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOneWidget);
+            await tester.tap(target);
+            await tester.pumpAndSettle();
+            expect(tester.takeException(), isNull);
+          }
+
+          Future<void> capture(String state) async {
+            expect(tester.takeException(), isNull);
+            await captureR66Visual(
+              tester,
+              'r5-collection-checkout-$profile-$state',
+            );
+          }
+
+          final cartReview = find.descendant(
+            of: find.byKey(const ValueKey('buy-cart-action-bar')),
+            matching: find.widgetWithText(FilledButton, 'Review order'),
+          );
+          if (cartReview.evaluate().isEmpty) {
+            final cartScroll = find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-cart-all')),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            await tester.scrollUntilVisible(
+              cartReview,
+              160,
+              scrollable: cartScroll,
+              maxScrolls: 40,
+            );
+            await tester.pumpAndSettle();
+          }
+          await tap(cartReview);
+          await capture('delivery-choice');
+          await tap(
+            find.byKey(const ValueKey('buy-checkout-collection-choice')),
+          );
+          expect(find.text('Market Store · West branch'), findsOneWidget);
+          expect(find.text('Market Store · Station branch'), findsOneWidget);
+          expect(find.text('City Wholesale · Industrial Area'), findsOneWidget);
+          final secondStore = find.byKey(
+            const ValueKey('buy-checkout-collection-store-store-b'),
+          );
+          await tap(
+            find.descendant(of: secondStore, matching: find.byType(Icon)).first,
+          );
+          expect(session.collectionCheckoutStore!.id, 'store-b');
+          await capture('other-branch');
+          final firstStore = find.byKey(
+            const ValueKey('buy-checkout-collection-store-store-a'),
+          );
+          await tap(
+            find.descendant(of: firstStore, matching: find.byType(Icon)).first,
+          );
+          expect(session.collectionCheckoutStore!.id, 'store-a');
+          await capture('store-choice');
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-address')));
+          await tap(find.byKey(const ValueKey('buy-payment-Paytm')));
+          expect(session.selectedPayment, 'Paytm');
+          await capture('payment-choice');
+          expect(find.text('Cash on Delivery'), findsNothing);
+          expect(find.text('Purchase order'), findsNothing);
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-payment')));
+          expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+          expect(find.text('₹100.25'), findsWidgets);
+          await capture('review');
+          final reviewedLine = find.byKey(
+            const ValueKey('buy-checkout-collection-line-sku-a'),
+          );
+          await tester.ensureVisible(
+            find
+                .descendant(of: reviewedLine, matching: find.byType(Icon))
+                .first,
+          );
+          await tester.pumpAndSettle();
+          await capture('review-items');
+          harness.clock = harness.clock.add(const Duration(minutes: 3));
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-confirm')));
+          expect(harness.placements, 0);
+          expect(harness.pending, isNull);
+          expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+          expect(find.text('Update total'), findsOneWidget);
+          final expiredNotice = find.text(
+            'Your total needs updating. Review it before paying.',
+          );
+          await tester.ensureVisible(expiredNotice);
+          await tester.pumpAndSettle();
+          expect(expiredNotice.hitTestable(), findsOneWidget);
+          await capture('expired-total');
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-confirm')));
+          expect(find.text('Place order'), findsOneWidget);
+          expect(harness.quotes, 2);
+          harness.outcome = BuyV2CollectionPurchaseState.unknown;
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-confirm')));
+          expect(session.quantityFor('sku-a'), 1);
+          expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+          await capture('payment-pending');
+          expect(
+            find.byKey(const ValueKey('buy-payment-PhonePe')),
+            findsNothing,
+          );
+          expect(find.byKey(const ValueKey('buy-payment-Paytm')), findsNothing);
+          expect(
+            find.byKey(const ValueKey('buy-payment-Pine Labs')),
+            findsNothing,
+          );
+          final recoveryText = find.descendant(
+            of: find.byKey(const ValueKey('buy-checkout-collection-notice')),
+            matching: find.byType(Text),
+          );
+          final recoveryViewport = tester.getRect(
+            find.byKey(const PageStorageKey('buy-checkout-payment-recovery')),
+          );
+          final recoveryRect = tester.getRect(recoveryText);
+          expect(recoveryRect.top, greaterThanOrEqualTo(recoveryViewport.top));
+          expect(
+            recoveryRect.bottom,
+            lessThanOrEqualTo(recoveryViewport.bottom),
+          );
+          await capture('payment-recovery');
+          harness.outcome = BuyV2CollectionPurchaseState.paid;
+          await tap(find.byKey(const ValueKey('buy-checkout-primary-payment')));
+          expect(session.view, BuyV2View.tracking);
+          expect(session.selectedOrderOrNull!.id, 'order-a');
+          expect(session.quantityFor('sku-a'), 0);
+          expect(session.quantityFor('sku-b'), 1);
+          expect(session.quantityFor('wholesale-sku'), 2);
+          expect(harness.placements, 1);
+          expect(harness.lastRequest!.basket.paymentMethod, 'Paytm');
+          await capture('same-paid-order');
+          await tester.ensureVisible(find.text('Paid ₹100.25'));
+          await tester.pumpAndSettle();
+          expect(find.text('Paid ₹100.25').hitTestable(), findsOneWidget);
+          await capture('same-paid-order-amount');
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        });
+      }
+    }
+
+    test(
+      'existing checkout creates one collection order and preserves other carts',
+      () async {
+        final session = await checkoutSession();
+        expect(
+          session.chooseCheckoutCollection(true, storeId: 'store-a'),
+          isTrue,
+        );
+        expect(session.checkoutLines.single.product.id, 'sku-a');
+        expect(session.continueCheckoutFromAddress(), isTrue);
+        expect(await session.prepareCollectionCheckout(), isTrue);
+        expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+        expect(session.confirmOrder(), isFalse);
+        expect(await session.submitOrder(), isTrue);
+        expect(session.view, BuyV2View.tracking);
+        expect(session.selectedOrderOrNull!.id, 'order-a');
+        expect(session.selectedOrderOrNull!.totalMinor, 10025);
+        expect(session.selectedOrderOrNull!.collection!.storeId, 'store-a');
+        expect(session.quantityFor('sku-a'), 0);
+        expect(session.quantityFor('sku-b'), 1);
+        expect(session.quantityFor('wholesale-sku'), 2);
+        expect(harness.placements, 1);
+      },
+    );
+
+    test(
+      'unresolved collection cannot switch branch delivery or payment',
+      () async {
+        final session = await checkoutSession();
+        session.chooseCheckoutCollection(true, storeId: 'store-a');
+        session.continueCheckoutFromAddress();
+        await session.prepareCollectionCheckout();
+        harness.outcome = BuyV2CollectionPurchaseState.unknown;
+        expect(await session.submitOrder(), isFalse);
+        expect(session.chooseCheckoutCollection(false), isFalse);
+        expect(
+          session.chooseCheckoutCollection(true, storeId: 'store-b'),
+          isFalse,
+        );
+        expect(session.choosePayment('Paytm'), isFalse);
+        expect(session.addProduct('sku-b'), isFalse);
+        expect(session.confirmOrder(), isFalse);
+        expect(session.quantityFor('sku-a'), 1);
+        harness.outcome = BuyV2CollectionPurchaseState.paid;
+        expect(await session.reconcilePayment(), isTrue);
+        expect(session.quantityFor('sku-b'), 1);
+        expect(harness.placements, 1);
+      },
+    );
+
+    test(
+      'switching a ready collection branch withdraws the earlier amount',
+      () async {
+        final session = await checkoutSession();
+        session.chooseCheckoutCollection(true, storeId: 'store-a');
+        session.continueCheckoutFromAddress();
+        await session.prepareCollectionCheckout();
+        expect(session.collectionCheckoutQuote, isNotNull);
+        session.chooseCheckoutCollection(true, storeId: 'store-b');
+        expect(session.collectionCheckoutQuote, isNull);
+        expect(session.checkoutLines.single.product.id, 'sku-b');
+        expect(harness.placements, 0);
+        session.chooseCheckoutCollection(false);
+        expect(session.checkoutLines, hasLength(3));
+      },
+    );
+
+    test(
+      'timed-out reservation serializes before recovery and never charges',
+      () async {
+        checkout.dispose();
+        checkout = harness.controller(
+          timeout: const Duration(milliseconds: 30),
+        );
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.reservationGate = Completer<bool>();
+        expect(await checkout.place(basket), isFalse);
+        expect(checkout.unresolved, isTrue);
+        expect(harness.pending, isNull);
+        expect(harness.placements, 0);
+        final checking = checkout.checkPayment();
+        harness.outcome = BuyV2CollectionPurchaseState.notCharged;
+        harness.reservationGate!.complete(true);
+        expect(await checking, isFalse);
+        expect(harness.reconciliations, 1);
+        expect(harness.placements, 0);
+        expect(harness.pending, isNull);
+        expect(checkout.unresolved, isFalse);
+      },
+    );
+
+    test(
+      'late placement after timeout reconciles its original operation',
+      () async {
+        checkout.dispose();
+        checkout = harness.controller(
+          timeout: const Duration(milliseconds: 30),
+        );
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.placementGate = Completer<void>();
+        expect(await checkout.place(basket), isFalse);
+        final original = harness.pending!;
+        harness.placementGate!.complete();
+        await Future<void>.delayed(Duration.zero);
+        expect(checkout.paidOrder, isNull);
+        expect(await checkout.checkPayment(), isTrue);
+        expect(harness.lastRequest, same(original));
+        expect(harness.placements, 1);
+      },
+    );
+
+    test('disposed coordinator cannot expose a late paid reply', () async {
+      final basket = harness.basket();
+      await checkout.prepare(basket);
+      harness.placementGate = Completer<void>();
+      final placing = checkout.place(basket);
+      await Future<void>.delayed(Duration.zero);
+      final disposed = checkout;
+      disposed.dispose();
+      checkout = harness.controller();
+      harness.placementGate!.complete();
+      expect(await placing, isFalse);
+      expect(disposed.paidOrder, isNull);
+      expect(harness.pending, isNotNull);
+      expect(await checkout.checkPayment(), isTrue);
+    });
+
+    test('another operation cannot settle this payment', () async {
+      final basket = harness.basket();
+      await checkout.prepare(basket);
+      harness.wrongOperation = true;
+      expect(await checkout.place(basket), isFalse);
+      expect(checkout.paidOrder, isNull);
+      expect(harness.settlements, 0);
+      expect(harness.pending, isNotNull);
+    });
+
+    test('paid order matches exact branch SKU and retains 25 paise', () async {
+      final basket = harness.basket();
+      expect(await checkout.prepare(basket), isTrue);
+      expect(checkout.quote!.totalMinor, 10025);
+      expect(await checkout.place(basket), isTrue);
+      expect(checkout.phase, BuyV2CollectionCheckoutPhase.paid);
+      expect(checkout.paidOrder!.totalMinor, 10025);
+      expect(harness.admittedOrder, same(checkout.paidOrder));
+      expect(harness.pending, isNull);
+      expect(harness.placements, 1);
+      expect(await checkout.place(basket), isFalse);
+      expect(await checkout.prepare(basket), isTrue);
+      expect(checkout.intent, isNull);
+    });
+
+    test(
+      'basket is immutable and cannot combine branches or deferred payment',
+      () {
+        final first = harness.basket();
+        final lines = [...first.lines];
+        final copied = BuyV2CollectionBasket(
+          identity: first.identity,
+          store: first.store,
+          paymentMethod: first.paymentMethod,
+          lines: lines,
+        );
+        lines.clear();
+        expect(copied.lines, hasLength(1));
+        expect(() => copied.lines.clear(), throwsUnsupportedError);
+        expect(
+          () => BuyV2CollectionBasket(
+            identity: first.identity,
+            store: first.store,
+            paymentMethod: first.paymentMethod,
+            lines: [
+              ...first.lines,
+              ...harness.basket(storeId: 'other', sku: 'sku-b').lines,
+            ],
+          ),
+          throwsFormatException,
+        );
+        for (final payment in ['Cash on Delivery', 'Purchase order']) {
+          expect(() => harness.basket(payment: payment), throwsFormatException);
+        }
+        expect(() => harness.basket(quantity: 0), throwsFormatException);
+      },
+    );
+
+    test(
+      'fingerprints retain exact quantity session branch and pack identity',
+      () {
+        final first = harness.basket();
+        expect(first.fingerprint, harness.basket().fingerprint);
+        for (final changed in [
+          harness.basket(quantity: 2),
+          harness.basket(storeId: 'b'),
+          harness.basket(sku: 'sku-b'),
+          harness.basket(payment: 'Paytm'),
+        ]) {
+          expect(changed.fingerprint, isNot(first.fingerprint));
+        }
+        harness.identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'new',
+        );
+        expect(harness.basket().fingerprint, isNot(first.fingerprint));
+      },
+    );
+
+    for (final fault in ['basket', 'expiry', 'price']) {
+      test('rejects $fault quote before payment', () async {
+        harness.quoteFault = fault;
+        expect(await checkout.prepare(harness.basket()), isFalse);
+        expect(await checkout.place(harness.basket()), isFalse);
+        expect(harness.placements, 0);
+        expect(harness.pending, isNull);
+      });
+    }
+
+    test('missing capability and storage failure never submit', () async {
+      final unavailable = BuyV2CollectionCheckoutController(
+        identity: harness.identity,
+      );
+      expect(await unavailable.prepare(harness.basket()), isFalse);
+      unavailable.dispose();
+      harness.failRead = true;
+      expect(await checkout.prepare(harness.basket()), isFalse);
+      expect(harness.quotes, 0);
+      expect(harness.placements, 0);
+    });
+
+    test('changed cart and expired quote cannot place', () async {
+      final basket = harness.basket();
+      await checkout.prepare(basket);
+      expect(await checkout.place(harness.basket(quantity: 2)), isFalse);
+      harness.clock = harness.clock.add(const Duration(minutes: 3));
+      expect(await checkout.place(basket), isFalse);
+      expect(harness.placements, 0);
+    });
+
+    test(
+      'duplicate taps wait for one durable reservation and one payment',
+      () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.reservationGate = Completer<bool>();
+        final placing = checkout.place(basket);
+        expect(await checkout.place(basket), isFalse);
+        expect(await checkout.prepare(harness.basket(quantity: 2)), isFalse);
+        expect(harness.placements, 0);
+        harness.reservationGate!.complete(true);
+        expect(await placing, isTrue);
+        expect(harness.placements, 1);
+      },
+    );
+
+    test(
+      'expired during reservation requires recovery without charging',
+      () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.reservationGate = Completer<bool>();
+        final placing = checkout.place(basket);
+        harness.clock = harness.clock.add(const Duration(minutes: 3));
+        harness.reservationGate!.complete(true);
+        expect(await placing, isFalse);
+        expect(harness.placements, 0);
+        expect(checkout.unresolved, isTrue);
+        harness.outcome = BuyV2CollectionPurchaseState.notCharged;
+        expect(await checkout.checkPayment(), isFalse);
+        expect(checkout.unresolved, isFalse);
+        expect(harness.pending, isNull);
+      },
+    );
+
+    test(
+      'unknown payment recovers original basket after cart changes and restart',
+      () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.outcome = BuyV2CollectionPurchaseState.unknown;
+        expect(await checkout.place(basket), isFalse);
+        final original = harness.pending!;
+        checkout.dispose();
+        checkout = harness.controller();
+        harness.outcome = BuyV2CollectionPurchaseState.paid;
+        expect(
+          await checkout.prepare(harness.basket(quantity: 3, storeId: 'other')),
+          isTrue,
+        );
+        expect(harness.lastRequest, same(original));
+        expect(checkout.paidOrder!.storeId, 'store-a');
+        expect(checkout.paidOrder!.lines.single.quantity, '1');
+        expect(harness.quotes, 1);
+        expect(harness.placements, 1);
+        expect(harness.reconciliations, 1);
+      },
+    );
+
+    test(
+      'account/session change discards late payment but keeps durable intent',
+      () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.placementGate = Completer<void>();
+        final placing = checkout.place(basket);
+        await Future<void>.delayed(Duration.zero);
+        harness.identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-b',
+          sessionId: 'b',
+        );
+        harness.placementGate!.complete();
+        expect(await placing, isFalse);
+        expect(checkout.paidOrder, isNull);
+        expect(harness.pending!.basket.identity.accountId, 'buyer-a');
+        harness.identity.value = const BuyV2CollectionIdentity(
+          accountId: 'buyer-a',
+          sessionId: 'new',
+        );
+        expect(await checkout.checkPayment(), isTrue);
+        expect(harness.lastRequest!.basket.identity.sessionId, 'session-a');
+        expect(harness.placements, 1);
+      },
+    );
+
+    test(
+      'settlement failure retains payment and does not expose a paid order',
+      () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.rejectSettle = true;
+        expect(await checkout.place(basket), isFalse);
+        expect(checkout.paidOrder, isNull);
+        expect(harness.pending, isNotNull);
+        harness.rejectSettle = false;
+        expect(await checkout.checkPayment(), isTrue);
+        expect(harness.placements, 1);
+      },
+    );
+
+    for (final fault in [
+      'store',
+      'account',
+      'sku',
+      'pack',
+      'quantity',
+      'lineAmount',
+      'total',
+      'unpaid',
+      'token',
+    ]) {
+      test('paid response with $fault mismatch stays unconfirmed', () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.mutateSnapshot = (snapshot) {
+          final line =
+              (snapshot['lines']! as List).single as Map<String, Object?>;
+          switch (fault) {
+            case 'store':
+              snapshot['storeId'] = 'another';
+            case 'account':
+              snapshot['purchaserAccountId'] = 'another';
+            case 'sku':
+              line['skuId'] = 'another';
+            case 'pack':
+              line['pack'] = 'another';
+            case 'quantity':
+              line['quantity'] = '2';
+            case 'lineAmount':
+              line['amountMinor'] = 10001;
+            case 'total':
+              snapshot['totalMinor'] = 10026;
+            case 'unpaid':
+              snapshot['payment'] = 'unpaid';
+            case 'token':
+              snapshot['state'] = 'awaitingCustomer';
+              snapshot['readiness'] = 'ready';
+              snapshot['challenge'] = {
+                'id': 'qr-1',
+                'qrPayload': 'private-token',
+                'expiresAt': harness.clock
+                    .add(const Duration(seconds: 30))
+                    .toIso8601String(),
+              };
+          }
+        };
+        expect(await checkout.place(basket), isFalse);
+        expect(checkout.paidOrder, isNull);
+        expect(harness.pending, isNotNull);
+        expect(harness.settlements, 0);
+      });
+    }
+
+    test(
+      'equivalent decimal quantity is accepted without floating point',
+      () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.mutateSnapshot = (snapshot) {
+          ((snapshot['lines']! as List).single
+                  as Map<String, Object?>)['quantity'] =
+              '1.000';
+        };
+        expect(await checkout.place(basket), isTrue);
+      },
+    );
+
+    test(
+      'failed external handoff reconciles same operation without a new charge',
+      () async {
+        final basket = harness.basket();
+        await checkout.prepare(basket);
+        harness.outcome = BuyV2CollectionPurchaseState.actionRequired;
+        expect(await checkout.place(basket), isFalse);
+        final operation = harness.pending!.operationId;
+        harness.outcome = BuyV2CollectionPurchaseState.paid;
+        expect(await checkout.continuePayment((uri) async => false), isTrue);
+        expect(harness.lastRequest!.operationId, operation);
+        expect(harness.placements, 1);
+      },
+    );
+  });
+
   group('R5 published catalogue', () {
     final now = DateTime.utc(2026, 9, 8);
     BuyV2CatalogueQuery query({

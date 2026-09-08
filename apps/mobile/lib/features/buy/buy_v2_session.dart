@@ -1241,6 +1241,376 @@ class _BuyV2PagerLease<T> {
   int lastUsed = 0;
 }
 
+enum BuyV2CollectionCheckoutPhase {
+  idle,
+  checking,
+  ready,
+  pending,
+  paid,
+  blocked,
+}
+
+/// Buyer purchase coordinator for the existing checkout view. Missing shared
+/// transports remain unavailable, including in device-review builds.
+class BuyV2CollectionCheckoutController extends ChangeNotifier {
+  BuyV2CollectionCheckoutController({
+    required this.identity,
+    this.gateway,
+    this.pendingStore,
+    this.collectionGateway,
+    this.acceptPaidOrder,
+    this.now = DateTime.now,
+    this.timeout = const Duration(seconds: 15),
+  }) {
+    identity.addListener(_identityChanged);
+  }
+
+  final ValueListenable<BuyV2CollectionIdentity?> identity;
+  final BuyV2CollectionCheckoutGateway? gateway;
+  final BuyV2CollectionPurchaseStore? pendingStore;
+  final ScanPickGateway? collectionGateway;
+  final bool Function(BuyV2CollectionPurchaseIntent, ScanPickSnapshot)?
+  acceptPaidOrder;
+  final DateTime Function() now;
+  final Duration timeout;
+  BuyV2CollectionCheckoutPhase phase = BuyV2CollectionCheckoutPhase.idle;
+  BuyV2CollectionBasket? basket;
+  BuyV2CollectionCheckoutQuote? quote;
+  BuyV2CollectionPurchaseIntent? intent;
+  BuyV2CollectionPurchaseResult? result;
+  ScanPickSnapshot? paidOrder;
+  String? message;
+  final Stopwatch _quoteElapsed = Stopwatch();
+  DateTime? _quoteReceivedAt;
+  int _epoch = 0;
+  bool _disposed = false;
+  bool _busy = false;
+
+  bool get busy => _busy;
+  bool get available =>
+      gateway != null && pendingStore != null && collectionGateway != null;
+  bool get unresolved =>
+      intent != null && phase != BuyV2CollectionCheckoutPhase.paid;
+  Uri? get paymentActionUri =>
+      result?.state == BuyV2CollectionPurchaseState.actionRequired
+      ? result?.paymentActionUri
+      : null;
+
+  bool _current(int epoch, BuyV2CollectionIdentity original) {
+    final current = identity.value;
+    return !_disposed &&
+        _epoch == epoch &&
+        current?.accountId == original.accountId &&
+        current?.sessionId == original.sessionId;
+  }
+
+  void _identityChanged() {
+    _epoch++;
+    _busy = false;
+    basket = null;
+    quote = null;
+    intent = null;
+    result = null;
+    paidOrder = null;
+    message = null;
+    phase = BuyV2CollectionCheckoutPhase.idle;
+    _quoteElapsed.stop();
+    if (!_disposed) notifyListeners();
+  }
+
+  void _begin() {
+    _busy = true;
+    phase = BuyV2CollectionCheckoutPhase.checking;
+    message = null;
+    notifyListeners();
+  }
+
+  void _unknown() {
+    phase = BuyV2CollectionCheckoutPhase.pending;
+    result = null;
+    message = 'Payment needs checking. Do not pay again.';
+  }
+
+  void requireReconciliation() {
+    if (_disposed || intent == null) return;
+    paidOrder = null;
+    _unknown();
+    notifyListeners();
+  }
+
+  void _finish(int epoch, BuyV2CollectionIdentity original) {
+    if (!_current(epoch, original)) return;
+    _busy = false;
+    notifyListeners();
+  }
+
+  /// An outstanding durable purchase takes precedence over the new basket.
+  Future<bool> prepare(BuyV2CollectionBasket requested) async {
+    if (_busy || _disposed) return false;
+    final original = identity.value;
+    if (original == null ||
+        original.accountId != requested.identity.accountId ||
+        original.sessionId != requested.identity.sessionId) {
+      return false;
+    }
+    final epoch = _epoch;
+    if (!available) {
+      phase = BuyV2CollectionCheckoutPhase.blocked;
+      message =
+          'Store collection is unavailable right now. Your Cart has not changed.';
+      notifyListeners();
+      return false;
+    }
+    if (unresolved) return checkPayment();
+    intent = null;
+    basket = requested;
+    quote = null;
+    paidOrder = null;
+    result = null;
+    _begin();
+    try {
+      final retained = await pendingStore!
+          .read(original.accountId)
+          .timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      if (retained != null) {
+        if (retained.basket.identity.accountId != original.accountId) {
+          throw const FormatException('Purchase account mismatch');
+        }
+        intent = retained;
+        basket = retained.basket;
+        quote = retained.quote;
+        return await _reconcile(epoch, original);
+      }
+      if (!requested.collectionAvailableAt(now())) {
+        phase = BuyV2CollectionCheckoutPhase.blocked;
+        message = 'Check this store’s collection availability to continue.';
+        return false;
+      }
+      final received = await gateway!.quote(requested).timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      final receivedAt = now();
+      if (!received.isCurrentFor(requested, receivedAt)) {
+        throw const FormatException('Collection quote changed');
+      }
+      quote = received;
+      _quoteReceivedAt = receivedAt;
+      _quoteElapsed
+        ..reset()
+        ..start();
+      phase = BuyV2CollectionCheckoutPhase.ready;
+      return true;
+    } on Object {
+      if (_current(epoch, original)) {
+        if (intent != null) {
+          _unknown();
+        } else {
+          phase = BuyV2CollectionCheckoutPhase.blocked;
+          message =
+              'The collection total could not be checked. Your Cart has not changed.';
+        }
+      }
+      return false;
+    } finally {
+      _finish(epoch, original);
+    }
+  }
+
+  bool canPlace(BuyV2CollectionBasket currentBasket) {
+    final received = quote;
+    final receivedAt = _quoteReceivedAt;
+    final current = identity.value;
+    return !_busy &&
+        !_disposed &&
+        available &&
+        !unresolved &&
+        phase == BuyV2CollectionCheckoutPhase.ready &&
+        received != null &&
+        receivedAt != null &&
+        current?.accountId == currentBasket.identity.accountId &&
+        current?.sessionId == currentBasket.identity.sessionId &&
+        received.isCurrentFor(currentBasket, now()) &&
+        received.isCurrentFor(
+          currentBasket,
+          receivedAt.add(_quoteElapsed.elapsed),
+        );
+  }
+
+  Future<bool> place(BuyV2CollectionBasket currentBasket) async {
+    if (!canPlace(currentBasket)) return false;
+    final original = identity.value!;
+    final epoch = _epoch;
+    final random = math.Random.secure();
+    final operationId = base64Url.encode(
+      List<int>.generate(24, (_) => random.nextInt(256)),
+    );
+    final reserved = BuyV2CollectionPurchaseIntent(
+      operationId: operationId,
+      basket: currentBasket,
+      quote: quote!,
+    );
+    intent = reserved;
+    _begin();
+    try {
+      final accepted = await pendingStore!.reserve(reserved).timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      if (!accepted) {
+        _unknown();
+        return false;
+      }
+      if (!reserved.quote.isCurrentFor(reserved.basket, now()) ||
+          !reserved.quote.isCurrentFor(
+            reserved.basket,
+            _quoteReceivedAt!.add(_quoteElapsed.elapsed),
+          )) {
+        _unknown();
+        return false;
+      }
+      final received = await gateway!.place(reserved).timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      return await _accept(received, epoch, original);
+    } on Object {
+      if (_current(epoch, original)) _unknown();
+      return false;
+    } finally {
+      _finish(epoch, original);
+    }
+  }
+
+  Future<bool> checkPayment() async {
+    if (_busy || _disposed || !available) return false;
+    final original = identity.value;
+    if (original == null) return false;
+    final epoch = _epoch;
+    _begin();
+    try {
+      final retained = await pendingStore!
+          .read(original.accountId)
+          .timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      if (retained == null ||
+          retained.basket.identity.accountId != original.accountId) {
+        _unknown();
+        message = 'Check Orders for this payment. Do not pay again.';
+        return false;
+      }
+      intent = retained;
+      basket = retained.basket;
+      quote = retained.quote;
+      return await _reconcile(epoch, original);
+    } on Object {
+      if (_current(epoch, original)) _unknown();
+      return false;
+    } finally {
+      _finish(epoch, original);
+    }
+  }
+
+  Future<bool> _reconcile(int epoch, BuyV2CollectionIdentity original) async {
+    final received = await gateway!.reconcile(intent!).timeout(timeout);
+    if (!_current(epoch, original)) return false;
+    return _accept(received, epoch, original);
+  }
+
+  Future<bool> _accept(
+    BuyV2CollectionPurchaseResult received,
+    int epoch,
+    BuyV2CollectionIdentity original,
+  ) async {
+    final pending = intent!;
+    if (!received.matches(pending)) {
+      _unknown();
+      return false;
+    }
+    result = received;
+    if (received.state == BuyV2CollectionPurchaseState.paid) {
+      final request = ScanPickRequest.read(
+        requestId:
+            '${pending.operationId}-${DateTime.now().microsecondsSinceEpoch}',
+        orderId: received.orderId!,
+        storeId: pending.basket.store.id,
+      );
+      final read = await collectionGateway!.execute(request).timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      read.validateFor(
+        request,
+        client: ScanPickClient.consumer,
+        purchaserAccountId: original.accountId,
+      );
+      final snapshot = read.snapshot;
+      if (read.outcome != ScanPickOutcome.snapshot ||
+          snapshot == null ||
+          !received.matchesPaidOrder(pending, snapshot) ||
+          acceptPaidOrder?.call(pending, snapshot) == false) {
+        _unknown();
+        return false;
+      }
+      final settled = await pendingStore!
+          .settle(pending, received, paidOrder: snapshot)
+          .timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      if (!settled || acceptPaidOrder?.call(pending, snapshot) == false) {
+        _unknown();
+        return false;
+      }
+      paidOrder = snapshot;
+      phase = BuyV2CollectionCheckoutPhase.paid;
+      message = null;
+      return true;
+    }
+    if (received.state == BuyV2CollectionPurchaseState.notCharged) {
+      final settled = await pendingStore!
+          .settle(pending, received)
+          .timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      if (!settled) {
+        _unknown();
+        return false;
+      }
+      intent = null;
+      quote = null;
+      phase = BuyV2CollectionCheckoutPhase.blocked;
+      message = 'Payment was not taken. Review your order to try again.';
+      return false;
+    }
+    phase = BuyV2CollectionCheckoutPhase.pending;
+    message = received.state == BuyV2CollectionPurchaseState.actionRequired
+        ? 'Complete payment to place this collection order.'
+        : 'Payment needs checking. Do not pay again.';
+    return false;
+  }
+
+  Future<bool> continuePayment(BuyV2PaymentHandoff handoff) async {
+    final uri = paymentActionUri;
+    final original = identity.value;
+    if (_busy || _disposed || uri == null || original == null || !unresolved) {
+      return false;
+    }
+    final epoch = _epoch;
+    _begin();
+    try {
+      // Even an unsuccessful/uncertain app handoff keeps the same payment.
+      await handoff(uri).timeout(timeout);
+      if (!_current(epoch, original)) return false;
+      return await _reconcile(epoch, original);
+    } on Object {
+      if (_current(epoch, original)) _unknown();
+      return false;
+    } finally {
+      _finish(epoch, original);
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _epoch++;
+    identity.removeListener(_identityChanged);
+    _quoteElapsed.stop();
+    super.dispose();
+  }
+}
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
@@ -1262,6 +1632,8 @@ class BuyV2Session extends ChangeNotifier {
     this.collectionGateway,
     this.collectionIdentity,
     this.collectionPendingStore,
+    this.collectionCheckoutGateway,
+    this.collectionPurchaseStore,
     this.catalogueNow = DateTime.now,
     this.cataloguePageSource,
     this.publishedCatalogueSource,
@@ -1309,6 +1681,17 @@ class BuyV2Session extends ChangeNotifier {
                ? const BuyV2UiReviewShoppingAlertsAdapter()
                : const BuyV2UnavailableShoppingAlertsAdapter()) {
     collectionIdentity?.addListener(_onCollectionIdentityChanged);
+    final buyerIdentity = collectionIdentity;
+    if (buyerIdentity != null) {
+      collectionCheckout = BuyV2CollectionCheckoutController(
+        identity: buyerIdentity,
+        gateway: collectionCheckoutGateway,
+        pendingStore: collectionPurchaseStore,
+        collectionGateway: collectionGateway,
+        acceptPaidOrder: _canAdmitCollectionPurchase,
+        now: catalogueNow,
+      )..addListener(_onCollectionCheckoutChanged);
+    }
     _catalogueAreas.addAll(catalogueAreas);
     _catalogueRegionId = initialCatalogueRegionId;
     if (cataloguePageSource == null && buyV2DeviceReviewBenefitSeedsEnabled) {
@@ -1877,6 +2260,12 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void _onCollectionIdentityChanged() {
+    // Public fulfilment/branch choices must not silently become delivery when
+    // authentication changes. The checkout controller clears payment authority.
+    if (view != BuyV2View.checkout) {
+      _collectionCheckoutSelected = false;
+      _collectionCheckoutStoreId = null;
+    }
     _collectionEpoch++;
     for (final state in _collectionStates.values) {
       state.elapsed.stop();
@@ -1894,6 +2283,8 @@ class BuyV2Session extends ChangeNotifier {
   void dispose() {
     _collectionDisposed = true;
     _collectionEpoch++;
+    collectionCheckout?.removeListener(_onCollectionCheckoutChanged);
+    collectionCheckout?.dispose();
     collectionIdentity?.removeListener(_onCollectionIdentityChanged);
     for (final state in _collectionStates.values) {
       state.elapsed.stop();
@@ -2321,6 +2712,11 @@ class BuyV2Session extends ChangeNotifier {
   final ScanPickGateway? collectionGateway;
   final ValueListenable<BuyV2CollectionIdentity?>? collectionIdentity;
   final BuyV2CollectionPendingStore? collectionPendingStore;
+  final BuyV2CollectionCheckoutGateway? collectionCheckoutGateway;
+  final BuyV2CollectionPurchaseStore? collectionPurchaseStore;
+  BuyV2CollectionCheckoutController? collectionCheckout;
+  bool _collectionCheckoutSelected = false;
+  String? _collectionCheckoutStoreId;
   final DateTime Function() catalogueNow;
   final BuyV2CataloguePageSource? cataloguePageSource;
   final BuyV2PublishedCatalogueSource? publishedCatalogueSource;
@@ -2396,9 +2792,11 @@ class BuyV2Session extends ChangeNotifier {
   bool get addressRequestsAvailable => reviewDataEnabled;
 
   bool get checkoutBusy =>
+      (collectionCheckout?.busy ?? false) ||
       checkoutSubmissionState == BuyV2CheckoutSubmissionState.submitting;
 
   bool get checkoutRequiresResolution =>
+      (collectionCheckout?.unresolved ?? false) ||
       checkoutSubmissionState ==
           BuyV2CheckoutSubmissionState.paymentActionRequired ||
       checkoutSubmissionState == BuyV2CheckoutSubmissionState.paymentPending ||
@@ -4130,8 +4528,279 @@ class BuyV2Session extends ChangeNotifier {
     _cartScrollOffsets[scope] = offset < 0 ? 0 : offset;
   }
 
-  List<BuyV2CartLine> get checkoutLines =>
-      List.unmodifiable(_linesForScope(checkoutScope));
+  List<BuyV2CartLine> get checkoutLines {
+    final pending = collectionCheckout?.intent;
+    if (collectionCheckoutSelected &&
+        collectionCheckout?.unresolved == true &&
+        pending != null) {
+      return pending.basket.lines;
+    }
+    return List.unmodifiable(
+      _linesForScope(checkoutScope).where(
+        (line) =>
+            !collectionCheckoutSelected ||
+            line.product.storeId == _collectionCheckoutStoreId,
+      ),
+    );
+  }
+
+  bool get collectionCheckoutSelected => _collectionCheckoutSelected;
+
+  List<BuyV2StoreListing> get collectionCheckoutStores => [
+    for (final id in _linesForScope(
+      checkoutScope,
+    ).map((line) => line.product.storeId).whereType<String>().toSet())
+      if (_pagedStores[id] case final store?)
+        if (store.collection?.isSupportedFor(id, now: catalogueNow()) == true)
+          store,
+  ];
+
+  BuyV2StoreListing? get collectionCheckoutStore =>
+      collectionCheckout?.unresolved == true
+      ? collectionCheckout?.intent?.basket.store
+      : _pagedStores[_collectionCheckoutStoreId];
+
+  BuyV2CollectionCheckoutQuote? get collectionCheckoutQuote {
+    final value = collectionCheckout?.quote;
+    if (collectionCheckout?.unresolved == true) return value;
+    final basket = currentCollectionBasket;
+    return value != null && basket != null && value.matches(basket)
+        ? value
+        : null;
+  }
+
+  String? get collectionCheckoutMessage {
+    if (!collectionCheckoutSelected) return null;
+    if (collectionCheckout?.message case final value?) return value;
+    if (collectionIdentity?.value == null) {
+      return 'Sign in to place a store collection order.';
+    }
+    if (collectionCheckout?.available != true) {
+      return 'Store collection is unavailable right now. Your Cart has not changed.';
+    }
+    if (collectionCheckoutStore == null) {
+      return 'Choose the store where you will collect.';
+    }
+    if (collectionCheckoutStore!.collection?.isSupportedFor(
+          collectionCheckoutStore!.id,
+          now: catalogueNow(),
+        ) !=
+        true) {
+      return 'Check this store’s collection availability to continue.';
+    }
+    final quote = collectionCheckout?.quote;
+    final basket = currentCollectionBasket;
+    if (quote != null &&
+        basket != null &&
+        quote.matches(basket) &&
+        !quote.isCurrentFor(basket, catalogueNow())) {
+      return 'Your total needs updating. Review it before paying.';
+    }
+    return null;
+  }
+
+  void _onCollectionCheckoutChanged() {
+    if (_collectionDisposed) return;
+    final pending = collectionCheckout?.intent;
+    if (collectionCheckout?.unresolved == true && pending != null) {
+      _collectionCheckoutSelected = true;
+      _collectionCheckoutStoreId = pending.basket.store.id;
+    }
+    notifyListeners();
+  }
+
+  bool chooseCheckoutCollection(bool selected, {String? storeId}) {
+    if (view != BuyV2View.checkout ||
+        checkoutBusy ||
+        checkoutRequiresResolution) {
+      return false;
+    }
+    final stores = collectionCheckoutStores;
+    if (selected && stores.isEmpty) return false;
+    if (storeId != null && !stores.any((store) => store.id == storeId)) {
+      return false;
+    }
+    _collectionCheckoutSelected = selected;
+    _collectionCheckoutStoreId = selected
+        ? storeId ?? (stores.length == 1 ? stores.single.id : null)
+        : null;
+    checkoutStep = BuyV2CheckoutStep.address;
+    notice = null;
+    notifyListeners();
+    return true;
+  }
+
+  BuyV2CollectionBasket? get currentCollectionBasket {
+    final buyer = collectionIdentity?.value;
+    final store = collectionCheckoutStore;
+    if (!collectionCheckoutSelected || buyer == null || store == null) {
+      return null;
+    }
+    try {
+      return BuyV2CollectionBasket(
+        identity: buyer,
+        store: store,
+        lines: checkoutLines,
+        paymentMethod: selectedPayment,
+      );
+    } on FormatException {
+      return null;
+    }
+  }
+
+  Future<bool> prepareCollectionCheckout() async {
+    if (view != BuyV2View.checkout ||
+        checkoutBusy ||
+        !collectionCheckoutSelected) {
+      return false;
+    }
+    final basket = currentCollectionBasket;
+    final controller = collectionCheckout;
+    if (basket == null ||
+        controller == null ||
+        !availablePaymentMethods.contains(selectedPayment)) {
+      notice =
+          collectionCheckoutMessage ??
+          'Choose an available payment method to continue.';
+      notifyListeners();
+      return false;
+    }
+    final ready = await controller.prepare(basket);
+    if (_collectionDisposed) return false;
+    if (controller.phase == BuyV2CollectionCheckoutPhase.paid) {
+      return _completeCollectionPurchase();
+    }
+    if (ready &&
+        view == BuyV2View.checkout &&
+        collectionCheckoutSelected &&
+        currentCollectionBasket?.fingerprint == basket.fingerprint) {
+      checkoutStep = BuyV2CheckoutStep.confirm;
+      notifyListeners();
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> submitCollectionPurchase() async {
+    if (view != BuyV2View.checkout ||
+        checkoutStep != BuyV2CheckoutStep.confirm ||
+        checkoutBusy) {
+      return false;
+    }
+    final basket = currentCollectionBasket;
+    if (basket == null || collectionCheckout == null) return false;
+    final paid = await collectionCheckout!.place(basket);
+    if (_collectionDisposed) return false;
+    if (paid) return _completeCollectionPurchase();
+    if (view == BuyV2View.checkout && collectionCheckoutSelected) {
+      if (collectionCheckout!.unresolved) {
+        checkoutStep = BuyV2CheckoutStep.payment;
+      }
+      notifyListeners();
+    }
+    return false;
+  }
+
+  Future<bool> reconcileCollectionPurchase() async {
+    final paid = await collectionCheckout?.checkPayment() ?? false;
+    return !_collectionDisposed && paid && _completeCollectionPurchase();
+  }
+
+  Future<bool> continueCollectionPayment(BuyV2PaymentHandoff handoff) async {
+    final paid = await collectionCheckout?.continuePayment(handoff) ?? false;
+    return !_collectionDisposed && paid && _completeCollectionPurchase();
+  }
+
+  bool _canAdmitCollectionPurchase(
+    BuyV2CollectionPurchaseIntent intent,
+    ScanPickSnapshot snapshot,
+  ) {
+    final existing = _orders
+        .where((order) => order.id == snapshot.orderId)
+        .firstOrNull;
+    return existing == null ||
+        (existing.collection?.storeId == snapshot.storeId &&
+            existing.collection?.purchaserAccountId ==
+                snapshot.purchaserAccountId &&
+            (existing.totalMinor ?? existing.total * 100) ==
+                snapshot.totalMinor);
+  }
+
+  bool _completeCollectionPurchase() {
+    final controller = collectionCheckout;
+    final snapshot = controller?.paidOrder;
+    final intent = controller?.intent;
+    final result = controller?.result;
+    if (controller?.phase != BuyV2CollectionCheckoutPhase.paid ||
+        snapshot == null ||
+        intent == null ||
+        result == null ||
+        collectionIdentity?.value?.accountId != snapshot.purchaserAccountId ||
+        !result.matchesPaidOrder(intent, snapshot) ||
+        !_canAdmitCollectionPurchase(intent, snapshot)) {
+      controller?.requireReconciliation();
+      return false;
+    }
+    final newlyAdmitted = !_orders.any((order) => order.id == snapshot.orderId);
+    if (newlyAdmitted) {
+      final lines = intent.basket.lines;
+      _orders.insert(
+        0,
+        BuyV2Order(
+          id: snapshot.orderId,
+          destination: lines.first.product.destination,
+          title: snapshot.storeName,
+          itemSummary: '${lines.length} products',
+          total: snapshot.totalMinor ~/ 100,
+          totalMinor: snapshot.totalMinor,
+          partner: snapshot.storeName,
+          partnerType: lines.first.product.partnerRole,
+          promise: 'Collect at store',
+          destinationLabel: intent.basket.store.address,
+          progress: 0,
+          status: BuyV2OrderStatus.preparing,
+          collection: BuyV2CollectionOrderReference(
+            storeId: snapshot.storeId,
+            purchaserAccountId: snapshot.purchaserAccountId,
+          ),
+          purchaseId: result.purchaseId,
+          productIds: List.unmodifiable(lines.map((line) => line.product.id)),
+          lines: lines,
+          paymentMethod: intent.basket.paymentMethod,
+          paymentStatusLabel: 'Paid',
+          invoiceAvailable: false,
+        ),
+      );
+      for (final line in lines) {
+        final current = _cart[line.product.id];
+        if (current == null ||
+            current.product.storeId != line.product.storeId ||
+            current.product.canonicalId != line.product.canonicalId ||
+            current.product.pack != line.product.pack) {
+          continue;
+        }
+        final remaining = current.quantity - line.quantity;
+        if (remaining > 0) {
+          _cart[line.product.id] = current.copyWith(quantity: remaining);
+        } else {
+          _cart.remove(line.product.id);
+        }
+      }
+      _pruneCartSelections();
+    }
+    _collectionStates[snapshot.orderId] = _BuyV2CollectionState()
+      ..snapshot = snapshot
+      ..refreshRequired = true
+      ..elapsed.start();
+    final shouldOpen = view == BuyV2View.checkout && collectionCheckoutSelected;
+    _collectionCheckoutSelected = false;
+    _collectionCheckoutStoreId = null;
+    checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+    _persistCustomerState();
+    if (shouldOpen) return openTracking(snapshot.orderId);
+    notifyListeners();
+    return true;
+  }
 
   List<BuyV2CartLine> _linesForScope(BuyV2CartScope scope) =>
       _cart.values.where((line) {
@@ -6360,6 +7029,13 @@ class BuyV2Session extends ChangeNotifier {
 
   bool continueCheckoutFromAddress() {
     if (view != BuyV2View.checkout || checkoutBusy) return false;
+    if (collectionCheckoutSelected) {
+      if (collectionCheckoutStore == null) return false;
+      checkoutStep = BuyV2CheckoutStep.payment;
+      notice = null;
+      notifyListeners();
+      return true;
+    }
     if (selectedAddressOrNull == null) {
       notice = 'Choose a delivery address to continue.';
       notifyListeners();
@@ -6374,6 +7050,7 @@ class BuyV2Session extends ChangeNotifier {
 
   bool continueCheckoutFromPayment() {
     if (view != BuyV2View.checkout || checkoutBusy) return false;
+    if (collectionCheckoutSelected) return false;
     if (!availablePaymentMethods.contains(selectedPayment)) {
       notice = 'Choose an available payment method to continue.';
       notifyListeners();
@@ -6410,7 +7087,8 @@ class BuyV2Session extends ChangeNotifier {
   bool showCheckoutStep(BuyV2CheckoutStep step) {
     if (view != BuyV2View.checkout || checkoutBusy) return false;
     if (step == BuyV2CheckoutStep.confirm &&
-        (selectedAddressOrNull == null || checkoutRequiresResolution)) {
+        ((!collectionCheckoutSelected && selectedAddressOrNull == null) ||
+            checkoutRequiresResolution)) {
       return false;
     }
     checkoutStep = step;
@@ -8008,11 +8686,22 @@ class BuyV2Session extends ChangeNotifier {
 
   bool choosePayment(String value) {
     if (_holdCartForPaymentResolution()) return false;
+    if (collectionCheckoutSelected &&
+        const {'Cash on Delivery', 'Purchase order'}.contains(value)) {
+      return false;
+    }
     if (!paymentMethods.contains(value) ||
         !availablePaymentMethods.contains(value)) {
       notice = 'This payment method is not available.';
       notifyListeners();
       return false;
+    }
+    if (collectionCheckoutSelected) {
+      selectedPayment = value;
+      notice = null;
+      _persistCustomerState();
+      notifyListeners();
+      return true;
     }
     if (value == 'Purchase order' &&
         view == BuyV2View.checkout &&
@@ -8051,6 +8740,9 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool confirmOrder() {
+    if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
+      return false;
+    }
     if (!reviewDataEnabled) {
       checkoutSubmissionState = BuyV2CheckoutSubmissionState.unavailable;
       notice = 'Ordering is unavailable right now. Your Cart has not changed.';
@@ -8135,6 +8827,9 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
+      return submitCollectionPurchase();
+    }
     if (selectedPayment == 'Purchase order' &&
         !purchaseOrderEligibleForCheckout) {
       notice = purchaseOrderEligibilityMessage;
@@ -8574,6 +9269,9 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> reconcilePayment() async {
+    if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
+      return reconcileCollectionPurchase();
+    }
     if (checkoutBusy) return false;
     final idempotencyKey = _checkoutIdempotencyKey;
     final paymentReference = _paymentReference;

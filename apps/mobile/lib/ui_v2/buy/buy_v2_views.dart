@@ -6452,34 +6452,55 @@ class BuyV2CheckoutView extends StatelessWidget {
           gstInvoiceController: gstInvoiceController,
           paymentHandoff: paymentHandoff,
         );
+        final compactHeader = MediaQuery.sizeOf(context).height < 500;
+        final returnAction = _ReturnAffordance(
+          label: switch (step) {
+            BuyV2CheckoutStep.address => 'Cart',
+            BuyV2CheckoutStep.payment =>
+              session.collectionCheckoutSelected ? 'Collection' : 'Address',
+            BuyV2CheckoutStep.confirm => 'Payment',
+          },
+          onTap: session.checkoutBusy
+              ? () => session.showNotice(
+                  'Please wait while your payment status is checked.',
+                )
+              : session.goBack,
+          tightHitOwner: true,
+          hitOwnerKey: ValueKey(
+            step == BuyV2CheckoutStep.address
+                ? 'buy-checkout-return-cart'
+                : 'buy-checkout-back',
+          ),
+          minimumHeight: 44,
+        );
+        final progress = _CheckoutProgressHeader(
+          activeStep: step,
+          collection: session.collectionCheckoutSelected,
+          compact: compactHeader,
+        );
         return Column(
           children: [
             Expanded(
               child: ListView(
-                key: PageStorageKey('buy-checkout-${step.name}'),
+                key: PageStorageKey(
+                  'buy-checkout-${step.name}'
+                  '${session.collectionCheckoutSelected && session.checkoutRequiresResolution ? '-recovery' : ''}',
+                ),
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 20),
                 children: [
-                  _ReturnAffordance(
-                    label: switch (step) {
-                      BuyV2CheckoutStep.address => 'Cart',
-                      BuyV2CheckoutStep.payment => 'Address',
-                      BuyV2CheckoutStep.confirm => 'Payment',
-                    },
-                    onTap: session.checkoutBusy
-                        ? () => session.showNotice(
-                            'Please wait while your payment status is checked.',
-                          )
-                        : session.goBack,
-                    tightHitOwner: true,
-                    hitOwnerKey: ValueKey(
-                      step == BuyV2CheckoutStep.address
-                          ? 'buy-checkout-return-cart'
-                          : 'buy-checkout-back',
-                    ),
-                    minimumHeight: 44,
-                  ),
-                  const SizedBox(height: 4),
-                  _CheckoutProgressHeader(activeStep: step),
+                  if (compactHeader)
+                    Row(
+                      children: [
+                        Flexible(child: returnAction),
+                        const SizedBox(width: 12),
+                        Expanded(child: progress),
+                      ],
+                    )
+                  else ...[
+                    returnAction,
+                    const SizedBox(height: 4),
+                    progress,
+                  ],
                   const SizedBox(height: 12),
                   AnimatedSwitcher(
                     duration: BuyV2Motion.resolved(
@@ -6544,6 +6565,42 @@ class BuyV2CheckoutView extends StatelessWidget {
   required BuyV2PaymentHandoff? paymentHandoff,
 }) {
   if (session.checkoutBusy) return ('Checking payment…', null);
+  if (session.collectionCheckoutSelected) {
+    final controller = session.collectionCheckout;
+    if (step == BuyV2CheckoutStep.address) {
+      return (
+        'Continue to payment',
+        session.collectionCheckoutStore == null
+            ? null
+            : session.continueCheckoutFromAddress,
+      );
+    }
+    if (controller?.unresolved == true) {
+      if (controller?.paymentActionUri != null && paymentHandoff != null) {
+        return (
+          'Pay ${_collectionCheckoutAmount(session)}',
+          () => session.continueCollectionPayment(paymentHandoff),
+        );
+      }
+      return ('Check payment', session.reconcileCollectionPurchase);
+    }
+    if (step == BuyV2CheckoutStep.payment) {
+      return (
+        'Review order',
+        controller?.available == true && session.currentCollectionBasket != null
+            ? session.prepareCollectionCheckout
+            : null,
+      );
+    }
+    final basket = session.currentCollectionBasket;
+    if (basket != null && controller?.canPlace(basket) == true) {
+      return ('Place order', session.submitCollectionPurchase);
+    }
+    return (
+      'Update total',
+      controller?.available == true ? session.prepareCollectionCheckout : null,
+    );
+  }
   final selectedPaymentAvailable = _buyV2CustomerPaymentChoices(
     session,
   ).any((choice) => choice.$1 == session.selectedPayment);
@@ -6607,14 +6664,24 @@ class BuyV2CheckoutView extends StatelessWidget {
 }
 
 class _CheckoutProgressHeader extends StatelessWidget {
-  const _CheckoutProgressHeader({required this.activeStep});
+  const _CheckoutProgressHeader({
+    required this.activeStep,
+    this.collection = false,
+    this.compact = false,
+  });
 
   final BuyV2CheckoutStep activeStep;
+  final bool collection;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final activeIndex = BuyV2CheckoutStep.values.indexOf(activeStep);
-    const labels = ['Address', 'Payment', 'Confirm order'];
+    final labels = [
+      collection ? 'Store' : 'Address',
+      'Payment',
+      'Confirm order',
+    ];
     return Semantics(
       key: ValueKey('buy-checkout-progress-${activeStep.name}'),
       container: true,
@@ -6626,6 +6693,13 @@ class _CheckoutProgressHeader extends StatelessWidget {
               fontSize: 9,
               fontWeight: FontWeight.w900,
             );
+            if (compact) {
+              return Text(
+                '${labels[activeIndex]} · ${activeIndex + 1}/3',
+                textAlign: TextAlign.end,
+                style: labelStyle.copyWith(color: BuyV2Colors.navy),
+              );
+            }
             final cellWidth = (constraints.maxWidth - 10) / 3;
             final contentWidth = cellWidth - 14;
             final iconsAbove = labels.any(
@@ -6726,6 +6800,167 @@ class _CheckoutProgressHeader extends StatelessWidget {
   }
 }
 
+String _collectionCheckoutAmount(BuyV2Session session) {
+  final quote = session.collectionCheckoutQuote;
+  return quote == null ? 'Check total' : _collectionMoney(quote.totalMinor);
+}
+
+String _buyV2OrderMoney(BuyV2Order order) => order.totalMinor == null
+    ? buyV2Money(order.total)
+    : _collectionMoney(order.totalMinor!);
+
+class _CheckoutCollectionDetails extends StatelessWidget {
+  const _CheckoutCollectionDetails({
+    required this.session,
+    this.choosingStore = false,
+    this.reviewing = false,
+  });
+
+  final BuyV2Session session;
+  final bool choosingStore;
+  final bool reviewing;
+
+  @override
+  Widget build(BuildContext context) {
+    final store = session.collectionCheckoutStore;
+    final quote = session.collectionCheckoutQuote;
+    final message = session.collectionCheckoutMessage;
+    final resolving = session.checkoutRequiresResolution;
+    final notice = message == null
+        ? null
+        : Semantics(
+            liveRegion: true,
+            child: Container(
+              key: const ValueKey('buy-checkout-collection-notice'),
+              padding: const EdgeInsets.all(10),
+              decoration: buyV2CardDecoration(
+                color: BuyV2Colors.softBlue,
+                radius: 12,
+              ),
+              child: Text(message, style: context.buyBody),
+            ),
+          );
+    final othersRemain = session.cartLines.any(
+      (line) => line.product.storeId != store?.id,
+    );
+    return Column(
+      key: const ValueKey('buy-checkout-collection-details'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (!resolving || MediaQuery.sizeOf(context).height >= 500)
+          Text(
+            resolving
+                ? 'Payment status'
+                : reviewing
+                ? 'Review collection'
+                : 'Collect at store',
+            style: context.buyTitle.copyWith(fontSize: 21),
+          ),
+        if (!resolving) ...[
+          const SizedBox(height: 3),
+          Text('Order ahead. Scan & collect.', style: context.buyMeta),
+        ],
+        const SizedBox(height: 10),
+        if (resolving && notice != null) ...[
+          notice,
+          const SizedBox(height: 10),
+        ],
+        if (choosingStore && session.collectionCheckoutStores.length > 1)
+          for (final option in session.collectionCheckoutStores) ...[
+            Semantics(
+              selected: option.id == store?.id,
+              child: _CheckoutCard(
+                key: ValueKey('buy-checkout-collection-store-${option.id}'),
+                icon: option.id == store?.id
+                    ? Icons.radio_button_checked
+                    : Icons.radio_button_off,
+                title: '${option.name} · ${option.area}',
+                detail: option.address,
+                onTap:
+                    session.checkoutBusy || session.checkoutRequiresResolution
+                    ? null
+                    : () => session.chooseCheckoutCollection(
+                        true,
+                        storeId: option.id,
+                      ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ]
+        else if (store != null)
+          _CheckoutCard(
+            key: const ValueKey('buy-checkout-collection-store'),
+            icon: Icons.storefront_outlined,
+            title: '${store.name} · ${store.area}',
+            detail: store.address,
+            action: reviewing ? 'Change' : null,
+            onTap: reviewing && !session.checkoutRequiresResolution
+                ? () => session.showCheckoutStep(BuyV2CheckoutStep.address)
+                : null,
+          ),
+        if (store != null && !resolving) ...[
+          const SizedBox(height: 8),
+          Text(
+            'Check items at the counter, then scan the store’s QR for this order.',
+            style: context.buyMeta,
+          ),
+        ],
+        if (othersRemain) ...[
+          const SizedBox(height: 6),
+          Text('Other store items stay in your Cart.', style: context.buyMeta),
+        ],
+        if (!resolving && notice != null) ...[
+          const SizedBox(height: 10),
+          notice,
+        ],
+        if (reviewing) ...[
+          const SizedBox(height: 12),
+          for (final line in session.checkoutLines) ...[
+            _CheckoutCard(
+              key: ValueKey('buy-checkout-collection-line-${line.product.id}'),
+              icon: Icons.inventory_2_outlined,
+              title: line.product.title,
+              detail:
+                  '${line.quantity} × ${line.product.pack} · '
+                  '${_collectionMoney(quote?.lineAmountsMinor[line.product.id] ?? line.total * 100)}',
+            ),
+            const SizedBox(height: 8),
+          ],
+          if (quote != null) ...[
+            _CheckoutPaymentFact(
+              label: 'Tax',
+              value: _collectionMoney(quote.taxMinor),
+            ),
+            _CheckoutPaymentFact(
+              label: 'Payment charge',
+              value: _collectionMoney(quote.paymentChargeMinor),
+            ),
+            if (quote.discountMinor > 0)
+              _CheckoutPaymentFact(
+                label: 'Saving',
+                value: _collectionMoney(quote.discountMinor),
+              ),
+            _CheckoutPaymentFact(
+              label: 'Total',
+              value: _collectionMoney(quote.totalMinor),
+            ),
+          ],
+          const SizedBox(height: 8),
+          _CheckoutCard(
+            icon: Icons.account_balance_wallet_outlined,
+            title: 'Payment · ${session.selectedPayment}',
+            detail: 'Your order is placed after payment is confirmed.',
+            action: 'Change',
+            onTap: session.checkoutRequiresResolution
+                ? null
+                : () => session.showCheckoutStep(BuyV2CheckoutStep.payment),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
 class _CheckoutAddressStage extends StatelessWidget {
   const _CheckoutAddressStage({
     super.key,
@@ -6743,55 +6978,85 @@ class _CheckoutAddressStage extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          wholesaleReceiving ? 'Receiving address' : 'Delivery address',
-          style: context.buyTitle.copyWith(fontSize: 21),
-        ),
-        const SizedBox(height: 3),
-        Text(
-          wholesaleReceiving
-              ? 'Choose where this Wholesale or Bulk purchase will be received.'
-              : 'Choose where this order should be delivered.',
-          style: context.buyMeta,
-        ),
-        const SizedBox(height: 11),
-        if (addresses.isEmpty)
-          Container(
-            key: const ValueKey('buy-checkout-address-empty'),
-            padding: const EdgeInsets.all(14),
-            decoration: buyV2CardDecoration(
-              color: BuyV2Colors.softBlue,
-              radius: 16,
-            ),
-            child: Text(
-              'Add an address to continue.',
-              textAlign: TextAlign.center,
-              style: context.buyBody,
-            ),
-          )
-        else
-          for (final address in addresses) ...[
-            _CheckoutAddressChoice(
-              address: address,
-              selected: selectedId == address.id,
-              onSelect: () => session.chooseAddress(address.id),
-              onEdit: () => _showAddAddressSheet(
-                context,
-                session,
-                existingAddress: address,
+        if (session.collectionCheckoutStores.isNotEmpty ||
+            session.collectionCheckoutSelected) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              ChoiceChip(
+                key: const ValueKey('buy-checkout-delivery-choice'),
+                label: const Text('Delivery'),
+                selected: !session.collectionCheckoutSelected,
+                onSelected: session.checkoutRequiresResolution
+                    ? null
+                    : (_) => session.chooseCheckoutCollection(false),
               ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        SizedBox(
-          height: BuyV2Metrics.minimumTap,
-          child: OutlinedButton.icon(
-            key: const ValueKey('buy-checkout-add-address'),
-            onPressed: () => _showAddAddressSheet(context, session),
-            icon: const Icon(Icons.add_location_alt_outlined, size: 18),
-            label: const Text('Add another address'),
+              ChoiceChip(
+                key: const ValueKey('buy-checkout-collection-choice'),
+                label: const Text('Collect at store'),
+                selected: session.collectionCheckoutSelected,
+                onSelected: session.checkoutRequiresResolution
+                    ? null
+                    : (_) => session.chooseCheckoutCollection(true),
+              ),
+            ],
           ),
-        ),
+          const SizedBox(height: 10),
+        ],
+        if (session.collectionCheckoutSelected)
+          _CheckoutCollectionDetails(session: session, choosingStore: true)
+        else ...[
+          Text(
+            wholesaleReceiving ? 'Receiving address' : 'Delivery address',
+            style: context.buyTitle.copyWith(fontSize: 21),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            wholesaleReceiving
+                ? 'Choose where this Wholesale or Bulk purchase will be received.'
+                : 'Choose where this order should be delivered.',
+            style: context.buyMeta,
+          ),
+          const SizedBox(height: 11),
+          if (addresses.isEmpty)
+            Container(
+              key: const ValueKey('buy-checkout-address-empty'),
+              padding: const EdgeInsets.all(14),
+              decoration: buyV2CardDecoration(
+                color: BuyV2Colors.softBlue,
+                radius: 16,
+              ),
+              child: Text(
+                'Add an address to continue.',
+                textAlign: TextAlign.center,
+                style: context.buyBody,
+              ),
+            )
+          else
+            for (final address in addresses) ...[
+              _CheckoutAddressChoice(
+                address: address,
+                selected: selectedId == address.id,
+                onSelect: () => session.chooseAddress(address.id),
+                onEdit: () => _showAddAddressSheet(
+                  context,
+                  session,
+                  existingAddress: address,
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          SizedBox(
+            height: BuyV2Metrics.minimumTap,
+            child: OutlinedButton.icon(
+              key: const ValueKey('buy-checkout-add-address'),
+              onPressed: () => _showAddAddressSheet(context, session),
+              icon: const Icon(Icons.add_location_alt_outlined, size: 18),
+              label: const Text('Add another address'),
+            ),
+          ),
+        ],
       ],
     );
   }
@@ -6904,13 +7169,15 @@ List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
             Icons.credit_card_rounded,
             'Secure card or UPI collection by MoolSocial',
           ),
-          if (session.cashOnDeliveryEligibleForCheckout)
+          if (!session.collectionCheckoutSelected &&
+              session.cashOnDeliveryEligibleForCheckout)
             (
               'Cash on Delivery',
               Icons.payments_outlined,
               'Pay when this eligible Shop order arrives',
             ),
-          if (session.purchaseOrderEligibleForCheckout)
+          if (!session.collectionCheckoutSelected &&
+              session.purchaseOrderEligibleForCheckout)
             (
               'Purchase order',
               Icons.receipt_long_outlined,
@@ -6933,6 +7200,39 @@ class _CheckoutPaymentStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final choices = _buyV2CustomerPaymentChoices(session);
+    if (session.collectionCheckoutSelected) {
+      final locked = session.checkoutBusy || session.checkoutRequiresResolution;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _CheckoutCollectionDetails(session: session),
+          const SizedBox(height: 12),
+          Text('Payment method', style: context.buyBody),
+          const SizedBox(height: 7),
+          if (locked)
+            _CheckoutCard(
+              key: const ValueKey('buy-checkout-collection-payment-locked'),
+              icon: Icons.account_balance_wallet_outlined,
+              title: session.selectedPayment,
+              detail: 'Check this payment before starting another.',
+            )
+          else if (choices.isEmpty)
+            Text(
+              'Payment methods are unavailable right now.',
+              style: context.buyMeta,
+            )
+          else
+            for (final choice in choices) ...[
+              _BuyV2PaymentChoice(
+                choice: choice,
+                selected: session.selectedPayment == choice.$1,
+                onTap: () => session.choosePayment(choice.$1),
+              ),
+              const SizedBox(height: 8),
+            ],
+        ],
+      );
+    }
     final state = session.checkoutSubmissionState;
     final selecting = state == BuyV2CheckoutSubmissionState.idle;
     final paymentOffer = session
@@ -7040,7 +7340,7 @@ class _CheckoutPaymentStage extends StatelessWidget {
                 onChanged: session.updatePurchaseOrderReference,
                 decoration: const InputDecoration(
                   labelText: 'Purchase order reference',
-                  hintText: 'For example, PO-2026-184',
+                  hintText: 'PO-2026-184',
                   helperText:
                       'Use the reference approved in your procurement record.',
                   counterText: '',
@@ -7292,6 +7592,9 @@ class _CheckoutConfirmStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (session.collectionCheckoutSelected) {
+      return _CheckoutCollectionDetails(session: session, reviewing: true);
+    }
     final address = session.selectedAddressOrNull;
     final groups = session.checkoutFulfilmentGroups;
     final selectedBenefits = session.selectedCartBenefitsFor(
@@ -7435,7 +7738,9 @@ class _CheckoutPrimaryActionBar extends StatelessWidget {
             builder: (context, constraints) {
               final countText = _checkoutDockCountLabel(session);
               final countStyle = context.buyMeta.copyWith(fontSize: 8);
-              final amountText = buyV2Money(session.checkoutAmountDueNow);
+              final amountText = session.collectionCheckoutSelected
+                  ? _collectionCheckoutAmount(session)
+                  : buyV2Money(session.checkoutAmountDueNow);
               const amountStyle = TextStyle(
                 color: BuyV2Colors.navy,
                 fontSize: 19,
@@ -8001,7 +8306,7 @@ class _PlacedOrderCard extends StatelessWidget {
                 ),
               ),
               Text(
-                buyV2Money(order.total),
+                _buyV2OrderMoney(order),
                 style: const TextStyle(
                   color: BuyV2Colors.navy,
                   fontSize: 15,
@@ -8774,7 +9079,7 @@ class BuyV2OrderItemsView extends StatelessWidget {
               Text('Items in this order', style: context.buyTitle),
               const SizedBox(height: 3),
               Text(
-                '${order.itemSummary} · ${buyV2Money(order.total)}',
+                '${order.itemSummary} · ${_buyV2OrderMoney(order)}',
                 style: context.buyMeta,
               ),
               const SizedBox(height: 5),
@@ -17620,6 +17925,17 @@ class _CheckoutCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final stackAction = MediaQuery.textScalerOf(context).scale(1) > 1.3;
+    final actionLabel = action == null
+        ? null
+        : Text(
+            action!,
+            style: const TextStyle(
+              color: BuyV2Colors.navy,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+            ),
+          );
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
@@ -17646,18 +17962,17 @@ class _CheckoutCard extends StatelessWidget {
                   Text(title, style: context.buyBody),
                   const SizedBox(height: 2),
                   Text(detail, style: context.buyMeta.copyWith(fontSize: 9)),
+                  if (stackAction && actionLabel != null) ...[
+                    const SizedBox(height: 4),
+                    actionLabel,
+                  ],
                 ],
               ),
             ),
-            if (action != null)
-              Text(
-                action!,
-                style: const TextStyle(
-                  color: BuyV2Colors.navy,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
+            if (!stackAction && actionLabel != null) ...[
+              const SizedBox(width: 8),
+              actionLabel,
+            ],
           ],
         ),
       ),
@@ -17790,7 +18105,7 @@ class _OrderCard extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        buyV2Money(order.total),
+                        _buyV2OrderMoney(order),
                         style: const TextStyle(
                           color: BuyV2Colors.navy,
                           fontSize: 13,
