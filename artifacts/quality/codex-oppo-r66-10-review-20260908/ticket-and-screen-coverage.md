@@ -1,5 +1,19 @@
 # r66.10 approved-screen coverage
 
+## Exact historical naming correction — 9 September 2026
+
+Founder authorized the narrow production-safe disposition of the published metadata commit. The original mistake was selecting a descriptive coordination(...) prefix instead of this continuation's required ui(...). pre_commit checked staged owners; the history-subject validation ran only at clean handoff and correctly rejected the published commit. This was an assistant command-selection error, not a product regression.
+
+The correction admits only 02208bdcbdb793c387bed9f634aea9ada99f1a4c, its sole parent c82c7b8e2eeca36b425b98687cca78b9c41c90a6, original subject, exact thirteen metadata/evidence paths, exact primary/task/lane/branch/work/ticket/continuation/baseline identity and identical apps tree e619e8fd20bbb54df2450b335d63c38296a1329d. No history rewrite, force push, baseline move, new owner root, product/test edit, generic prefix exception or release-check waiver is introduced. Future commit commands explicitly validate the required ui(codex-oppo-review-v1-20260905): prefix before committing.
+
+Focused checker verification: 1 actual-Git positive case and 32 rejection cases passed; exit 0; PowerShell 7.6.5; checker parse errors 0. Rejection cases cover each changed identity, extra/missing/replaced/duplicated owner, changed/empty application trees and every missing fact. The immutable commit's thirteen paths and parent were read directly from Git. Application and test trees remain identical from c82c7b8e through current HEAD and working copy.
+
+Full exact command, actual Git facts and complete results: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/r6610-exact-prefix-admission-20260909-attempt1.log. SHA-256: 5F04997411D4BC9E703819D851F1E2883A9FED314DFE6F20385CA3020C345796. The helper was extracted from the PowerShell AST and tested in memory; no additional runner or tracked test owner was created.
+
+One tool result during correction was truncated. No omitted result was treated as a pass: actual file hashes were reread and the implementation gate was rerun with bounded output, exit 0, 148 claims and registry count 4501. The existing REG-4530 bounded-output prevention remains applicable.
+
+This local checker verification does not qualify an APK, AAB, integration or device journey. Atomic commit, exact remote equality and the full clean handoff must still pass before resuming the remaining pre-APK checks. The earlier blocked state below is retained as historical evidence.
+
 ## Candidate handoff blocked —9September2026
 
 Source correction c82c7b8e2eeca36b425b98687cca78b9c41c90a6 is locally qualified and pushed. Metadata-only admission02208bdcbdb793c387bed9f634aea9ada99f1a4c is clean and remote-equal but NOT handoff-qualified: its coordination(...) subject violates this UI lane's required ui(...) prefix. Its13 exact owners contain registry/binding/checker path inventory and ten pending evidence records; no application/test source was changed. The passed pre_commit and later implementation check do not override the failed handoff. Existing checker behavior remains unchanged for commit subjects; no amendment, force push, baseline move or source workaround was attempted.

@@ -55,6 +55,55 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+function Test-CodexOppoR6610EvidenceAdmission([hashtable]$Facts) {
+  # Founder-authorized historical naming correction only. This immutable SHA
+  # cannot authorize another commit, owner, lane or product-tree change.
+  $identity = @{
+    Commit = '02208bdcbdb793c387bed9f634aea9ada99f1a4c'
+    Parent = 'c82c7b8e2eeca36b425b98687cca78b9c41c90a6'
+    Subject = 'coordination(codex-oppo-review-v1-20260905): reserve r66.10 screen-review evidence'
+    Role = 'primary'
+    Task = '/root'
+    Lane = 'codex_ui'
+    WorkId = 'codex-oppo-review-v1-20260905'
+    TicketId = 'UAW-CODEX-OPPO-REVIEW-V1-20260905'
+    Branch = 'work/codex-ui/codex-oppo-review-v1-20260905'
+    Binding = 'codex_oppo_review_v1_20260905'
+    Baseline = '1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d'
+  }
+  foreach ($key in $identity.Keys) {
+    if (-not $Facts.ContainsKey($key) -or
+        [string]$Facts[$key] -cne [string]$identity[$key]) {
+      return $false
+    }
+  }
+  foreach ($key in @('Owners', 'AppsTree', 'ParentAppsTree')) {
+    if (-not $Facts.ContainsKey($key)) { return $false }
+  }
+  $expectedOwners = @(
+    'config/codex-development-regression-registry.json',
+    'config/codex-subagent-coordination-policy.json',
+    'scripts/check-codex-subagent-coordination-policy.ps1',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/candidate-contract.md',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/source-manifest.txt',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/local-validation.md',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/motion-disposition.md',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/apk-regression-state.json',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/uaw-codex-oppo-r66.10-review-20260908-build-provenance.txt',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/post-install.json',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/device-review.md',
+    'artifacts/quality/codex-oppo-r66-10-review-20260908/ticket-and-screen-coverage.md'
+  )
+  return (
+    @($Facts.Owners).Count -eq $expectedOwners.Count -and
+    (@($Facts.Owners | Sort-Object) -join '|') -ceq
+      (@($expectedOwners | Sort-Object) -join '|') -and
+    [string]$Facts.AppsTree -cmatch '^[0-9a-f]{40}$' -and
+    [string]$Facts.AppsTree -ceq [string]$Facts.ParentAppsTree
+  )
+}
+
 function Get-ExactNames($Value) {
   return @($Value.PSObject.Properties.Name)
 }
@@ -2813,9 +2862,42 @@ if ($ProductionLane -ceq 'baseline') {
     )
     foreach ($featureCommit in $featureCommits) {
       $subjectOutput = @(& git -C $root show -s --format='%s' $featureCommit)
+      $subjectExit = $LASTEXITCODE
+      $r6610EvidenceAdmission = $false
+      if ($hasContinuationBinding -and $subjectExit -eq 0 -and
+          $subjectOutput.Count -eq 1 -and
+          $featureCommit -ceq '02208bdcbdb793c387bed9f634aea9ada99f1a4c') {
+        $admissionParent = @(& git -C $root show -s --format='%P' $featureCommit)
+        $admissionParentExit = $LASTEXITCODE
+        $admissionOwners = @(& git -C $root diff-tree --no-commit-id --name-only -r $featureCommit)
+        $admissionOwnersExit = $LASTEXITCODE
+        $admissionTrees = @(& git -C $root rev-parse "${featureCommit}:apps" 'c82c7b8e2eeca36b425b98687cca78b9c41c90a6:apps')
+        $admissionTreesExit = $LASTEXITCODE
+        if ($admissionParentExit -eq 0 -and $admissionOwnersExit -eq 0 -and
+            $admissionTreesExit -eq 0 -and $admissionParent.Count -eq 1 -and
+            $admissionTrees.Count -eq 2) {
+          $r6610EvidenceAdmission = Test-CodexOppoR6610EvidenceAdmission @{
+            Commit = [string]$featureCommit
+            Parent = [string]$admissionParent[0]
+            Subject = [string]$subjectOutput[0]
+            Owners = $admissionOwners
+            AppsTree = [string]$admissionTrees[0]
+            ParentAppsTree = [string]$admissionTrees[1]
+            Role = $AgentRole
+            Task = $AgentTask
+            Lane = $ProductionLane
+            WorkId = $ProductionWorkId
+            TicketId = $ProductionTicketId
+            Branch = $branch
+            Binding = [string]$selectedContinuationBinding.id
+            Baseline = [string]$selectedContinuationBinding.baselineHead
+          }
+        }
+      }
       Assert-Coordination (
-        $LASTEXITCODE -eq 0 -and $subjectOutput.Count -eq 1 -and
-        [string]$subjectOutput[0] -cmatch $subjectPattern
+        $subjectExit -eq 0 -and $subjectOutput.Count -eq 1 -and
+        ([string]$subjectOutput[0] -cmatch $subjectPattern -or
+          $r6610EvidenceAdmission)
       ) "production feature commit subject is not atomic: $featureCommit"
     }
     if ($ProductionLane -ceq 'integration_repair') {
