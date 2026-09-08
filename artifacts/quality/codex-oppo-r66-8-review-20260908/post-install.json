@@ -1,6 +1,21 @@
 {
-  "state": "not_built_not_installed",
+  "state": "installed_checksum_verified_native_child_open",
   "deviceSerial": "2b3e0f71",
   "candidateId": "UAW-CODEX-OPPO-R66.8-REVIEW-20260908",
-  "packageId": "com.moolsocial.app.runtime"
+  "packageId": "com.moolsocial.app.runtime",
+  "sourceHead": "519e0637c862f9c5e663b08b60f60bc0fb6205c0",
+  "versionName": "1.0.0-r66.8-runtime",
+  "versionCode": 2026090803,
+  "lastUpdateTime": "2026-09-08 14:57:53",
+  "apkBytes": 209753497,
+  "apkSha256": "178F685C7EA215C081E00B2900ECC5EFC64C9789B0029419C61A256579C22EAB",
+  "installedBaseApkSha256": "178F685C7EA215C081E00B2900ECC5EFC64C9789B0029419C61A256579C22EAB",
+  "installCommand": "adb -s 2b3e0f71 install -r artifacts/device/codex-oppo-r66-8-review-20260908/uaw-codex-oppo-r66.8-review-20260908-device-review-debug.apk",
+  "installExitCode": 0,
+  "installLog": "artifacts/device/codex-oppo-r66-8-review-20260908/r668-install1.log",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "appDataPreserved": true,
+  "deviceDisplay": "720x1612; font 100%; physical large-text/TalkBack not qualified",
+  "nativeReview": "Pending, clarification/edit/Back, rejection/reason/support/Back and explicit review-only approval-to-dashboard replayed. Fresh Store first taps replayed without publishing, messaging or payment. Local PDF preview times out: AUDIT-R668-01 remains open.",
+  "nonPromotable": true
 }
