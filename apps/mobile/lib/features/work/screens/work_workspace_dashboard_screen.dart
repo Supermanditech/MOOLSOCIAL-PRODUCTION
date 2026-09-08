@@ -13750,8 +13750,7 @@ class _WorkspaceDeliverySurface extends StatelessWidget {
         const _OperationActionCard(
           icon: Icons.route_outlined,
           title: 'Live delivery journey',
-          detail:
-              'Track your rider from pickup to customer delivery.',
+          detail: 'Track your rider from pickup to customer delivery.',
         ),
       ],
     );
