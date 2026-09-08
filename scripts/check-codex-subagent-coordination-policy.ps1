@@ -1680,6 +1680,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r664MenuAdmissionParent = '89c7970c77629b615a6cb08c9b51946fedcb8cea'
       $r665CollectionParent = '7ef7711e119a4c4d7691423538a91ecc0499c2f2'
       $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
+      $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
+      & git -C $root merge-base --is-ancestor $r667DependenciesParent $head
+      $r667DependenciesContext = $LASTEXITCODE -eq 0
+      $r666FreezeHead = if ($r667DependenciesContext) { $r667DependenciesParent } else { $head }
       & git -C $root merge-base --is-ancestor $r666AccessibilityParent $head
       $r666AccessibilityContext = $LASTEXITCODE -eq 0
       $r665FreezeHead = if ($r666AccessibilityContext) { $r666AccessibilityParent } else { $head }
@@ -2277,8 +2281,12 @@ if ($ProductionLane -ceq 'baseline') {
         $r666Subject = 'ui(buy-redmi-fixes-v1-20260905): admit global accessibility dependency'
         $r666ManifestHash = '18F5195AAB125587F11B8E3E84FEF7A2544BE82013BF874C9CA0823931BF791C'
         $r666PolicyBefore = Get-R66Utf8GitJson $r666AccessibilityParent $r666Owners[0]
-        $r666PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r666Owners[0]) | ConvertFrom-Json
+        $r666PolicyAfter = if ($r667DependenciesContext) {
+          Get-R66Utf8GitJson $r667DependenciesParent $r666Owners[0]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r666Owners[0]) | ConvertFrom-Json
+        }
         $r666Cursor = @($r666PolicyAfter.activeClaims | Where-Object {
           $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
         })[0]
@@ -2297,12 +2305,18 @@ if ($ProductionLane -ceq 'baseline') {
           ($r666PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
           ($r666PolicyAfter | ConvertTo-Json -Depth 100 -Compress)
         ) 'Accessibility admission changed another claim, policy or registry binding.'
-        Assert-Coordination (
-          (Get-Sha256 (Join-Path $root $r666Owners[1])) -ceq $r666ManifestHash
-        ) 'Accessibility admission manifest changed.'
+        if (-not $r667DependenciesContext) {
+          Assert-Coordination (
+            (Get-Sha256 (Join-Path $root $r666Owners[1])) -ceq $r666ManifestHash
+          ) 'Accessibility admission manifest changed.'
+        }
         $r666ScopeBefore = Get-R66Utf8GitJson $r666AccessibilityParent $r666Owners[2]
-        $r666ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
-          (Join-Path $root $r666Owners[2]) | ConvertFrom-Json
+        $r666ScopeAfter = if ($r667DependenciesContext) {
+          Get-R66Utf8GitJson $r667DependenciesParent $r666Owners[2]
+        } else {
+          Get-Content -Raw -Encoding UTF8 -LiteralPath `
+            (Join-Path $root $r666Owners[2]) | ConvertFrom-Json
+        }
         Assert-Coordination (
           $r666ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq
             $r666ManifestHash
@@ -2345,13 +2359,165 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and
             (@($r666Committed | Sort-Object) -join '|') -ceq
             (@($r666Owners | Sort-Object) -join '|')) 'Accessibility admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r666Commit -- @r666Owners
+          if ($r667DependenciesContext) {
+            & git -C $root diff --quiet $r666Commit $r666FreezeHead -- @r666Owners
+          } else {
+            & git -C $root diff --quiet $r666Commit -- @r666Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Accessibility ownership binding changed after admission.'
-          $r666Later = @(& git -C $root log --format=%H "${r666Commit}..$head" -- @r666Owners)
+          $r666Later = @(& git -C $root log --format=%H "${r666Commit}..$r666FreezeHead" -- @r666Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r666Later.Count -eq 0) `
             'Accessibility admission cannot be replayed or revised.'
         }
         $r66CoordinationOwners = @($r66CoordinationOwners) + $r666Native
+      }
+      if ($r667DependenciesContext) {
+        # Exact local verification dependencies; preserve all earlier admissions.
+        $r667Owners = @($r664MenuOwners)
+        $r667UiOwners = @(
+          'apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart',
+          'apps/mobile/test/ui_v2/profile/global_security_v2_test.dart',
+          'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart',
+          'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart'
+        )
+        $r667PrimaryOwners = @(
+          'apps/mobile/.flutter-plugins-dependencies',
+          'scripts/check-approved-ui-locks.ps1'
+        )
+        $r667Subject = 'ui(buy-redmi-fixes-v1-20260905): admit local verification dependencies'
+        $r667ManifestHash = '6BC23AEDE475C2A4259BF2630EDBC14533D0ECECD9D7125504CCC3D065D101DD'
+        $r667PolicyBefore = Get-R66Utf8GitJson $r667DependenciesParent $r667Owners[0]
+        $r667PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r667Owners[0]) | ConvertFrom-Json
+        $r667Cursor = @($r667PolicyAfter.activeClaims | Where-Object {
+          $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
+        })[0]
+        $r667Primary = @($r667PolicyAfter.activeClaims | Where-Object { $_.task -ceq '/root' })[0]
+        Assert-Coordination ($r667Cursor.owners.Count -eq 49 -and $r667Primary.owners.Count -eq 14) `
+          'Local verification admission requires exactly four UI/test and two primary owners.'
+        foreach ($r667Owner in $r667UiOwners) {
+          Assert-Coordination (@($r667Cursor.owners | Where-Object { $_ -ceq $r667Owner }).Count -eq 1) `
+            "Local verification UI/test owner is missing or duplicated: $r667Owner"
+        }
+        foreach ($r667Owner in $r667PrimaryOwners) {
+          Assert-Coordination (@($r667Primary.owners | Where-Object { $_ -ceq $r667Owner }).Count -eq 1) `
+            "Local verification primary owner is missing or duplicated: $r667Owner"
+        }
+        $r667Cursor.owners = @($r667Cursor.owners | Where-Object { $_ -cnotin $r667UiOwners })
+        $r667Primary.owners = @($r667Primary.owners | Where-Object { $_ -cnotin $r667PrimaryOwners })
+        Assert-Coordination (
+          ($r667PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r667PolicyAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Local verification admission changed another claim, policy or registry binding.'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owners[1])) -ceq $r667ManifestHash) `
+          'Local verification admission manifest changed.'
+        $r667ScopeBefore = Get-R66Utf8GitJson $r667DependenciesParent $r667Owners[2]
+        $r667ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r667Owners[2]) | ConvertFrom-Json
+        Assert-Coordination (
+          $r667ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r667ManifestHash
+        ) 'Local verification scope is not bound to its exact manifest.'
+        $r667ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 =
+          $r667ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (
+          ($r667ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r667ScopeAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Local verification admission changed execution authority beyond its manifest binding.'
+        $r667CopyHashes = @{
+          $r667UiOwners[2] = @(
+            'BB6E832A9B1BB032BF9B49B4D603A35A9FDE5B1BF08D7D39CCE86E96F3E354EC',
+            '08F7006B371E1939E3B525CC375427C57C7A489C2F792AA4FD20CD8B86E85709'
+          )
+          $r667UiOwners[3] = @(
+            'C30C896CAA9A2560091B000B6D4859C1DE27971332BC526F5A4C930BD4E89C92',
+            '971518A7D413D6D6DB7148678BB33E5896E5E4BF9690326CE82FD8480EC31742'
+          )
+        }
+        foreach ($r667Owner in $r667CopyHashes.Keys) {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owner)) -cin $r667CopyHashes[$r667Owner]) `
+            "Local verification permits only the seven recorded Work copy substitutions: $r667Owner"
+        }
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r666Native)) -ceq
+          '4150F3FC71BFC1A924B7A5597C4CBFFC35D5AA42851CEFAB60B71F151FF471A1') `
+          'Local verification cannot change or remove the sealed Accessibility native bridge.'
+        $r667Packages = @{
+          'apps/mobile/pubspec.yaml' = 'FA2E683195273EE02DBFB315F88569FD2638C3FDE4E2B82B032EBC4BBE31DBB9'
+          'apps/mobile/pubspec.lock' = '4DE45D3DD966862B160102C682DA52A61213CE70B50BC90C82CC69F203E8589D'
+        }
+        foreach ($r667Owner in $r667Packages.Keys) {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owner)) -ceq $r667Packages[$r667Owner]) `
+            "Local verification cannot change dependency versions: $r667Owner"
+        }
+        $r667MetadataBefore = Get-R66Utf8GitJson $r667DependenciesParent $r667PrimaryOwners[0]
+        $r667MetadataAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath `
+          (Join-Path $root $r667PrimaryOwners[0]) | ConvertFrom-Json
+        $r667ExpectedPath = (Join-Path $root 'apps/mobile/packages/youtube_embedded_player_private_dev').Replace('\','/').TrimEnd('/')
+        $r667PathStates = @()
+        foreach ($r667Platform in @('android','ios')) {
+          $r667OldPlugin = @($r667MetadataBefore.plugins.$r667Platform | Where-Object name -ceq 'youtube_embedded_player_private_dev')
+          $r667NewPlugin = @($r667MetadataAfter.plugins.$r667Platform | Where-Object name -ceq 'youtube_embedded_player_private_dev')
+          Assert-Coordination ($r667OldPlugin.Count -eq 1 -and $r667NewPlugin.Count -eq 1) `
+            'Local verification private-player plugin identity changed.'
+          $r667NewPath = ([string]$r667NewPlugin[0].path).Replace('\','/').TrimEnd('/')
+          $r667OldPath = ([string]$r667OldPlugin[0].path).Replace('\','/').TrimEnd('/')
+          Assert-Coordination ($r667NewPath -ceq $r667OldPath -or $r667NewPath -ceq $r667ExpectedPath) `
+            'Local verification plugin path points outside its exact current package.'
+          $r667PathStates += ($r667NewPath -ceq $r667ExpectedPath)
+          $r667NewPlugin[0].path = $r667OldPlugin[0].path
+        }
+        Assert-Coordination ($r667PathStates[0] -eq $r667PathStates[1]) `
+          'Local verification plugin paths must be refreshed together.'
+        $r667PluginDate = [DateTime]::MinValue
+        Assert-Coordination ([DateTime]::TryParse([string]$r667MetadataAfter.date_created,[ref]$r667PluginDate)) `
+          'Local verification metadata creation time is invalid.'
+        $r667MetadataAfter.date_created = $r667MetadataBefore.date_created
+        Assert-Coordination (
+          ($r667MetadataBefore | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r667MetadataAfter | ConvertTo-Json -Depth 100 -Compress)
+        ) 'Local verification metadata changed beyond the two paths and creation time.'
+        if ($head -ceq $r667DependenciesParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+            'Pending local verification admission is not a handoff or acceptance.'
+          $r667Preimages = @{
+            $r667UiOwners[0] = 'F2783DC78EC2AA5ADF48045DFFCD2123B5EE42C95519BD420B1C156954D12762'
+            $r667UiOwners[1] = '681D37E1813DEE79042C92BA93E32C0B26E3DC64C567D04F278C12BFC99FE395'
+            $r667UiOwners[2] = $r667CopyHashes[$r667UiOwners[2]][0]
+            $r667UiOwners[3] = $r667CopyHashes[$r667UiOwners[3]][0]
+            $r667PrimaryOwners[0] = 'FD3BC97BAA35F8C3F272C8D31370F0545EC598FE9A28A73654ADAEFD02C0C4F5'
+            $r667PrimaryOwners[1] = '61632B18856985D52228196EB720D7FB52297F0FE8E3078A37552611936F5C28'
+          }
+          foreach ($r667Owner in $r667Preimages.Keys) {
+            Assert-Coordination ((Get-Sha256 (Join-Path $root $r667Owner)) -ceq $r667Preimages[$r667Owner]) `
+              "Local verification implementation cannot precede admission: $r667Owner"
+          }
+          $r667Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r667Dirty | Sort-Object) -join '|') -ceq (@($r667Owners | Sort-Object) -join '|')) `
+            'Pending local verification admission must change exactly four coordination owners.'
+          $r667Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r667Untracked.Count -eq 0) `
+            'Local verification admission cannot include untracked implementation drafts.'
+        } else {
+          $r667Following = @(& git -C $root rev-list --first-parent --reverse "${r667DependenciesParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r667Following.Count -gt 0) 'Local verification admission is missing.'
+          $r667Commit = [string]$r667Following[0]
+          $r667Parents = @(& git -C $root show -s --format=%P $r667Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r667Parents.Count -eq 1 -and
+            [string]$r667Parents[0] -ceq $r667DependenciesParent) 'Local verification admission parent changed.'
+          $r667ActualSubject = @(& git -C $root show -s --format=%s $r667Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r667ActualSubject.Count -eq 1 -and
+            [string]$r667ActualSubject[0] -ceq $r667Subject) 'Local verification admission subject changed.'
+          $r667Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r667Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r667Committed | Sort-Object) -join '|') -ceq (@($r667Owners | Sort-Object) -join '|')) `
+            'Local verification admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r667Commit -- @r667Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Local verification ownership binding changed after admission.'
+          $r667Later = @(& git -C $root log --format=%H "${r667Commit}..$head" -- @r667Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r667Later.Count -eq 0) `
+            'Local verification admission cannot be replayed or revised.'
+        }
+        $r66CoordinationOwners = @($r66CoordinationOwners) + $r667PrimaryOwners
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
         $_.ToLowerInvariant()

@@ -34,6 +34,8 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/.flutter-plugins-dependencies",
+        "scripts/check-approved-ui-locks.ps1",
         "config/codex-development-regression-registry.json",
         "config/codex-subagent-coordination-policy.json",
         "scripts/check-codex-subagent-coordination-policy.ps1",
@@ -52,6 +54,10 @@
       "task": "/root/cursor_buy_redmi_fixes_v1_20260905",
       "role": "subagent",
       "owners": [
+        "apps/mobile/test/ui_v2/profile/global_help_support_v2_test.dart",
+        "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart",
+        "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+        "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
         "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
         "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart",
