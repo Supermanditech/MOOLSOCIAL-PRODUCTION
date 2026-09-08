@@ -1,5 +1,46 @@
 # r66.10 OPPO review
 
+## Founder-paced screen 3 — Documents to keep ready — 9 September 2026
+
+Current OPPO foreground: Documents to keep ready, Grocery / Kirana Shop, first view, capture 098. Screen 3 awaits founder review. Continue setup has not been activated in this screen's current review; contact entry is the next stop after approval.
+
+The forward transition from the preview was not inferred from the first attempts: 090 still showed the preview, and 091 showed the selector. Those captures do not qualify a forward pass. The founder's explanation of their own Back tap applies to 069 only; do not assume it explains 090/091. The actual route/source was inspected without edits. Fresh controlled Choose this Workspace at 093 reached the correct readiness screen; Android Back at 094 returned to its preview; a repeated centred button tap at 095 reached the correct readiness screen again. Preserve the earlier attempts as inconclusive, with no confirmed reproducible route defect. If this recurs with exclusive phone control, reproduce and register its root cause before closure.
+
+| Check | Result/evidence |
+| --- | --- |
+| Selected business and destination | 093/095: Grocery / Kirana Shop has the matching Documents to keep ready title. It does not borrow the old approved store's name or send the user to its dashboard. |
+| Correct Back/forward | 094 returns to the originating preview; 095 returns to the correct readiness screen. No new application is approved or submitted by these transitions. |
+| Complete scrollable list | 095–096 expose identity proof, shop address proof, food-business licence where applicable, owner's permission where applicable, bank proof and conditional GST guidance. The bank row explains cancelled cheque or recent statement and account holder/account/IFSC fields. |
+| Layout/visibility | Actual screenshots 095 and 096 inspected at OPPO 100%. Text wraps, bank/GST content is reachable, and Continue setup remains above Android navigation. 097 was only a partial scroll return; 098 confirms the complete first view restored. |
+| Backend boundary | This is document guidance, not verification. Actual document validation, approved/clarification/rejected status and Chat/WhatsApp/email/call updates need their production integrations; none was executed or qualified here. |
+
+No new confirmed functional/visual defect in the controls exercised. No fresh legal-compliance audit, every-business document audit, physical 200%/TalkBack qualification or backend pass is claimed. The existing accessibility pending items remain. Founder approval applies only after their response to this screen; do not advance to Contact yet.
+
+### Additional capture hashes
+
+18 new PNG/XML rows, 090–098. Full 001–098 inventory: 196 rows; canonical UTF-8/no-BOM LF-terminated SHA-256 F7A4F31D44C3CB07E9E8D015BB546D78706C5C50F93EF9AA0F8A959719854254.
+
+```text
+8B5B84226E34C23767F44FA48E609B45BC23F34FD62C24609761EC12E997B480  r6610-native-090-documents-ready-entry.png
+687AE00253F60AA8AE3565290302D2A9EC457949335EB15562C02771858A0F56  r6610-native-090-documents-ready-entry.xml
+3DC7F611A07E9130E234DF9DA9AF06EEC45EC443F402F3AEBBC619B35E24AFE2  r6610-native-091-workspace-forward-retry.png
+1D6EA98AE74086D6EE529F3BB0A0BF8010B04CF40CAFF19976CD9C975E8CC42A  r6610-native-091-workspace-forward-retry.xml
+81E5B2DCF24D7FF4490207A1C9EAC13625DD8084F806F4DC36FAA0F5B36EB36E  r6610-native-092-forward-boundary-preview.png
+6B484BBF33E12338D3D50866DC5B009A53A4A40CC019B104448BF83A33F75273  r6610-native-092-forward-boundary-preview.xml
+DA4A6E268316C6F3F0D45BD6EDB19FCB038E952C8734B4DEF86A63C16F7E3708  r6610-native-093-forward-controlled-result.png
+8EF7326C0A3F351ADC6BF34BD36CFA3BBEB4680EF36ABB59001E458EF1E02F26  r6610-native-093-forward-controlled-result.xml
+7A81341BC0866338682884F2287431828C2E2FCDFDE57CEC325CEBAE2A966255  r6610-native-094-requirements-back-preview.png
+6B484BBF33E12338D3D50866DC5B009A53A4A40CC019B104448BF83A33F75273  r6610-native-094-requirements-back-preview.xml
+906F04D9CC9EBCF95CE6BFF050EC6EAC0F18E5CB55A714A1681480044739D9A5  r6610-native-095-requirements-forward-repeat.png
+8EF7326C0A3F351ADC6BF34BD36CFA3BBEB4680EF36ABB59001E458EF1E02F26  r6610-native-095-requirements-forward-repeat.xml
+8E268C3A1ECB73BD41053875E6F11C2F6C44D5270D65818C6CFC11BA8A4AA7CF  r6610-native-096-requirements-bank-and-gst.png
+81208F67BA33A8F3F0B40F52B6FDF54310A2650D6559869D581E3C7902B73A45  r6610-native-096-requirements-bank-and-gst.xml
+2D1F387DF857E5597E3B1FCB8D339B7098A277EEE9098A6C6184BFC50A87EE30  r6610-native-097-documents-ready-founder-review.png
+D48E55D155A97C0CED139E6E47E27B7A4F5C19C6656A2C67A3F6CC4F6462837A  r6610-native-097-documents-ready-founder-review.xml
+488BFE43FA66B58B3E5C073848D3CA236E274BBF1D178EAFBFA61CB781DC9235  r6610-native-098-document-readiness-first-view.png
+8EF7326C0A3F351ADC6BF34BD36CFA3BBEB4680EF36ABB59001E458EF1E02F26  r6610-native-098-document-readiness-first-view.xml
+```
+
 ## Founder-paced screen 2 — Grocery/Kirana preview — 9 September 2026
 
 At this checkpoint OPPO shows the Grocery / Kirana Shop expanded preview, Customers first page, capture 089. Founder approved screen 2 subject to Codex finding no defect in OPPO testing. No confirmed defect was found in the exercised controls below; this conditional approval does not waive physical accessibility, other business types or backend qualification. Choose this Workspace has not yet been activated in this review; its forward transition to document-readiness is the next check.

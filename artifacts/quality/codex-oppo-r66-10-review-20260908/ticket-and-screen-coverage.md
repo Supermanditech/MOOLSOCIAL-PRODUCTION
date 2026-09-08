@@ -1,5 +1,9 @@
 # r66.10 approved-screen coverage
 
+## Screen 3 current: document-readiness awaiting founder review
+
+The preview's controlled forward/Back/forward replay now passes (093–095). Preserve 090/091 as inconclusive, not passes or confirmed defects; the founder-owned Back explanation covers only 069. Document-readiness shows the selected Grocery profile, complete reachable document guidance including bank/GST, and the bottom action above native navigation. No new confirmed defect in these checks at 100%. Capture 098 is the current first view; pause for founder review before Contact. Backend validation/notifications, legal-compliance qualification, other business types and physical accessibility remain separate. No source changes.
+
 Founder subsequently approved the Grocery/Kirana preview subject to Codex finding no defect in OPPO real-user checks. The bounded checks reported no confirmed defect; physical accessibility and backend dependencies are not waived. Screen 2's forward Choose this Workspace transition remains the next test, followed by the document-readiness review. Earlier awaiting-review statements below describe their earlier checkpoints.
 
 ## Screen 1 approved; Screen 2 awaiting review
