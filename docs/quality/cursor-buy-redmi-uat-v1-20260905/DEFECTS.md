@@ -2,6 +2,10 @@
 
 ## Expanded r66.8 audit additions — 9 September 2026
 
+### R668-AUDIT-DELIVERED-PARTNER-STATUS-001 — Delivered-order address sheet says partner is not assigned yet
+
+OPEN P3, customer status clarity. Redmi r66.8 normal display: Orders/Delivered → MS-240741 View order678 → Address679. Sheet shows Delivered/25Jul/6:42pm but Delivery partner reads Not assigned yet. A completed delivery with missing historical partner data is presented as awaiting assignment. Expected: status-aware wording such as Delivery partner details unavailable for a completed order; only use not-yet-assigned for genuinely pending assignment. Source buy_v2_views.dart9438 uses order.deliveryPartnerName ?? 'Not assigned yet'. Evidence679 XML ED77549E1944A0E7577176D875FB3FA95672BAC07048BCD67E7DD856D4C4FE63. No claim of actual delivery failure or backend data loss. Missing full address/recipient is explicitly disclosed in this sheet and is not newly counted here. Implementation and delivered/pending focused retests remain open.
+
 ### R668-AUDIT-INVOICE-MISSING-LINES-001 — Historical invoice silently substitutes a summary for itemised purchase details
 
 Retail extent675: delivered MS-240741 invoice similarly substitutes 8 products/Home/Sardarpura for itemised lines while showing total2186 and an enabled Download invoice. Same missing-data disclosure defect; download was not tapped and exported-file contents are unverified. XML90EC4D0E1CE31AE9E5422D79C236DC9948AB36F1F1328D6E1D40AA08DAEBA4C9.
@@ -127,6 +131,8 @@ Related accessibility observation: `_CompactProductStepper` says Remove one even
 ### Founder delivery-icon requirement
 
 Task-local requirement `R668-AUDIT-DELIVERY-ICON-001`, recorded before implementation. Quick delivery: rider on a bike (bike plus person). Wholesale: tempo plus driver. Bulk: fleet plus driver. Use the appropriate mode consistently on Buy/Shop delivery surfaces; retain readable mode labels and accessible descriptions. These are delivery-mode illustrations, not a claim that a driver has been assigned or is currently travelling. Exact affected surfaces and current deviations remain under audit; this founder requirement is not counted as a newly reproduced runtime failure. Implementation and Redmi acceptance pending.
+
+Current r66.8 extent697–703: retail order Items bottom delivery control and expanded active MS-NEW-09 Quick delivery panel use a plain truck without a rider. Bind this surface to the existing mode-artwork requirement; no duplicate defect. The control has an accessibility description and opens the correctly identified active-order panel, so absence of a visible bottom-tab label alone is not classified as a broken destination. Capture699 XML CC8DE2DBC4C2328B5EDC82A8DBC5EFBA73A555B6B7E3D323DAF87457B8B3DB39.
 
 Fresh Redmi observations are being collected on installed r66.1, code 2026090501, APK SHA `30A71FE8B6696BF51400FBED5A90C3179E25CE0A6153A998F5A041657C9D35C3`. Audit is incomplete; no all-journey verdict yet.
 

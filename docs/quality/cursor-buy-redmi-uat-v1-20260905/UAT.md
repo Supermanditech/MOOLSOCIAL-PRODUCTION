@@ -2,6 +2,54 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Delivered address, resolution sub-actions and delivery controls — captures677–703
+
+Twenty-seven native-success PNG/XML pairs visually inspected on the same Redmi r66.8. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-677-703-V1.json SHA256 BC450056E95116CC3FFE6170968E5D181352C9B50FCB7A72D1B9C94B022B2A07. Resume677 restores Delivered list. MS-240741 detail678 → Address679 displays completed delivery alongside “Delivery partner: Not assigned yet”; registered OPEN P3 DELIVERED-PARTNER-STATUS-001 before further testing. Missing historical recipient/full address is explicitly disclosed and is not counted as another UI defect.
+
+Manage future addresses680 → Add681 → bottom682 → empty Save683 produces visible required-address validation, without saving. Truncated683 tool output was recovered from its immutable native-zero receipt and inspected PNG; input was not repeated. Android Back684 restores exact680 chooser XML D223A4D420B43C631D8FAA8B02FE56F3750DCE76C64CE1A9C5540E0768F997E3, preserving Home and selected Work. Work overflow685 → Edit686 displays existing fields; close687 restores the same chooser. Close688 restores exact678 order XML BB14D1BBAA5C9E2CCECB9D942BA0866452CBA0E3DD22AE100E67406E4018B6F6. No address added, removed or edited.
+
+Return689 → Refund690 → bottom691 exposes all eight item rows, disabled selection with explicit unknown eligibility, retry and support. Retry692 preserves the same disclosed state and exact691 XML; this proves a reachable non-crashing retry, not successful backend retrieval. Top693 → Return694 → Replacement695 each selects the intended option. Back696 restores exact688 order. Eligibility-dependent item/reason/submit branches remain unavailable; no request or support message submitted.
+
+Items697 and settled698 show the retail product list. The additional truck control has accessibility text identifying active MS-NEW-09 and “Show delivery choices”; tap699 opens its correctly identified Quick delivery panel. Do not register an invented missing-navigation defect. Quick truck artwork extends existing DELIVERY-ICON-001 scope. Arrival sound700 shows pending state;701 PNG shows enabled state and “Sounds while you use the app.” Its XML was captured before that asynchronous transition, so XML701 alone does not prove enabled state. Tap702 restores off and exact699 XML CC8DE2DBC4C2328B5EDC82A8DBC5EFBA73A555B6B7E3D323DAF87457B8B3DB39. Collapse703 restores exact697/698 XML 6B78B4A1D64561589739DBFFDDC7849739D9EBF3ECDB3A7E67DA39910B0C1B76. Actual arrival audio playback is unverified; no notification-delivery claim.
+
+Current route: Items in MS-240741, normal display, delivery panel collapsed and arrival sound restored off. Original cart and saved addresses preserved; no order/payment/report/message/download, runtime edit, build or install. One new distinct defect; no existing ticket closed.
+
+### Action-level coverage index — current audit, incomplete
+
+This index supplements the full screen-family inventory below. “Exercised” means only the stated action and visible result on the current candidate; a failing action remains exercised but not passed. Each unqualified branch stays open. Captures are in redmi-r66-8 unless explicitly identified as older evidence. Source inventory and earlier-version passes cannot fill current device gaps.
+
+| Entry → tap/sub-tap → destination/return | Current evidence and result | Remaining qualification |
+| --- | --- | --- |
+| Scheduled grid → later horizontal SKU → detail → Back | 434–442, identity/unit price and row retention exercised | Other SKU content/media fixtures; long text states |
+| Grid → Next → later-page detail → Back → Previous | 443–447, page and row retention exercised | Final page, live pagination/stale/error recovery |
+| Quick/Scheduled → filter → Available draft → Back → reopen | 435–439,575–578; cancelled draft discarded | Remaining applied filter/sort intersections and responsive layouts |
+| Area → National draft → Back/reopen; National → Jodhpur → regional restore | 405–413 state/cancellation exercised | Google Maps/PIN/permission/offline/serviceability deferred; bottom-city defect open |
+| Store preview → full catalogue → search → product → Back | 496–510; query/page retained, keyboard-return defect | Remaining search/filter intersections, live empty/error and media |
+| Store categories → search/no match/clear → final categories | 511–536; bottom clipping and keyboard defects | Fix/retest; full long-list and regional names |
+| Quick soap → Compare → same-pack supplier → Back twice | 569–574; nested return exercised; equivalence defect open | Full supplier/quantity/pack comparison contract and responsive results |
+| Scheduled milk → Compare → alternate supplier → pack selector | 599–614; 1L/500ml/2x1L prices and enlarged selector exercised | Actual variant packshots/video; delivery badge defect open |
+| Product → Report → reason → Cancel → reopen → Android Back | 615–619; correct variant context and draft reset exercised | Other reason/text validation and large-text layout; external Send excluded |
+| Wholesale oil → alternative 10L → Add → cart → Remove → nested Back | 629–638; correct pack/price and original basket restoration | Stock/quote change and authoritative backend pricing deferred |
+| Wholesale category → Stationery → Bulk empty → Best prices | 639–645, explicit empty and recovery exercised | Live channel/fulfilment eligibility deferred |
+| Bulk rice → Add MOQ4 → decrement → cart | 646–652; no sub-MOQ3 left, original cart restored | Direct bulk entry/very large quantities and accepted quote contract |
+| Saved empty → temporary save → Saved product → Back → unsave → Show all | 582–591, restore Saved0 and original catalogue | Remaining sort/search/add and enlarged/interruption variants |
+| Offers → issuer → offer product/detail → Back | 537–564; misleading offer destination and comparison cases recorded | All CTA publication/expiry/error variants and motion-media inputs |
+| Orders → query/no match → status tabs → clear → exact order ID | 449–463 exercised | Split-purchase/live pagination and interruption states |
+| Orders → seller query → Track → Back | 467,476–479; query/list context retained | Product/purchase-reference searches fail, tickets open |
+| Delivered → wholesale order → return → Replacement → scroll | 659–669; explicit unknown eligibility, enlarged bottom controls reachable | Eligible item/reason/submit branches unavailable; backend deferred |
+| Delivered → retail order → Address → Manage future addresses | 677–680; future-address context explicit; partner-status defect | Delivered partner fallback fix and pending-order regression |
+| Address chooser → Add → empty Save → Android Back | 681–684; visible validation, no save, exact chooser restored | Populated invalid phone/PIN, valid temporary CRUD, long regional text |
+| Address chooser → Work overflow → Edit → close → chooser close | 685–688; original fields and exact order restored | Removal confirmation/cancel, all address-type draft changes |
+| Retail resolution → Refund → scroll → Retry → Return → Replacement → Back | 689–696; choices/retry/dismiss exercised; no invented eligibility | Eligible selection, quantities, reasons and submitted outcomes unavailable |
+| Delivered retail/wholesale → Invoice → Back | 670–676; missing historical lines defect, return exercised | Download/export inspection; full historical-line fixture |
+| Retail order → Items → delivery control → Arrival sound on/off → collapse | 697–703; correct active order identity and restored UI | Keep/Hide/reopen paths, actual sound and background arrival |
+| Cart → payment/reference → review → Back | Earlier current-r66.8 high-total subset documented below | All payment/offer/GST/destination combinations; no real placement/payment |
+| Monthly basket → View products | 150–153; wrong ordinary catalogue, P1 child open | Correct basket listing/Add/restore after implementation |
+| Settings/recent/alerts/help shortcuts | Current-r66.8 subsets below; RECENT and HELP tickets open | Remaining nested destinations, responsive and lifecycle checks |
+| Provider photo/video → SKU/variant grid/detail | Existing catalogue images inspected; MEDIA tickets/observation documented | Real uploads, supported-format decoding, aspect/fit/failure fixtures unqualified |
+
+Completion gate remains open: reconcile every reachable control in the screen-family/source inventory with an action/result row; expand remaining safe frontend branches; retain inaccessible/backend/external-submission paths as explicit exclusions rather than passes. Capture totals are not a coverage percentage. No full-module or production-readiness claim.
+
 ### Delivered-order returns and historical invoices — captures656–676
 
 Twenty-one native-success PNG/XML pairs visually inspected on Redmi r66.8. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-656-676-V1.json SHA2561FD567A62AE651EB548193BED21B2B9AFFFA2BA45947DA2DECDC3B45ABED28A7. Resume656 matches655 Wholesale/Stationery. Orders657 opens retained scroll; top658 → Delivered659 → wholesale PO-240728660/661 → return options662 → replacement663 identifies rice25kg,oil4x5L,notebookcarton120. All eligibility explicitly unknown, selection disabled; no invented eligibility failure attributed to deferred backend. Scroll664 reaches retry/support controls. Font2/density360 portrait665–667 wraps item names, packs and disclosure, and both recovery controls are fully reachable at bottom. No retry/support/request submitted. Native Restore receipt singlechat-r668-return-restore-22 confirms font1/density320/rotation0/auto1; visually verified668. Back669 closes draft to the correct order; exact original pixel scroll not claimed after display changes.
