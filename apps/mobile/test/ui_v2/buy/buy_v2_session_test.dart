@@ -714,7 +714,174 @@ class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
       products.where((p) => productIds.contains(p.id)).toList();
 }
 
+Future<BuyV2Session> _openOrderSearchFixture() async {
+  final tomato = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
+  final milk = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-milk');
+  BuyV2Order order(
+    String id,
+    BuyV2Product product, {
+    String? purchaseId = 'BUY-SPLIT-04',
+    BuyV2OrderStatus status = BuyV2OrderStatus.preparing,
+    BuyV2Destination destination = BuyV2Destination.shop,
+    bool hasLines = true,
+  }) => BuyV2Order(
+    id: id,
+    destination: destination,
+    title: 'Shop order',
+    itemSummary: '1 product · 2 items',
+    total: product.price * 2,
+    partner: product.seller,
+    partnerType: product.partnerRole,
+    promise: 'Delivery time unavailable',
+    destinationLabel: 'Sardarpura',
+    progress: status == BuyV2OrderStatus.delivered ? 1 : .2,
+    status: status,
+    purchaseId: purchaseId,
+    purchaseOrderReference: 'PO-BUYER-047',
+    productIds: hasLines ? [product.id] : const [],
+    lines: hasLines ? [BuyV2CartLine(product: product, quantity: 2)] : const [],
+  );
+  final core = BuySession();
+  final session = BuyV2Session(
+    core: core,
+    reviewDataEnabled: false,
+    commerceAdapter: _ShopCommerceAdapter(
+      snapshot: BuyV2CommerceSnapshot(
+        state: BuyV2CommerceLoadState.ready,
+        // Historical titles must not come from a renamed live listing.
+        products: [
+          tomato.copyWith(title: 'Seasonal produce'),
+          milk,
+        ],
+        orders: [
+          order('MS-SEARCH-TOMATO', tomato),
+          order('MS-SEARCH-MILK', milk),
+          order(
+            'MS-SEARCH-DELIVERED',
+            tomato,
+            status: BuyV2OrderStatus.delivered,
+          ),
+          order('MS-SEARCH-OTHER', milk, purchaseId: 'BUY-OTHER-05'),
+          order(
+            'RX-SEARCH-HIDDEN',
+            tomato,
+            destination: BuyV2Destination.medicine,
+          ),
+          order('MS-SEARCH-LEGACY', tomato, purchaseId: null, hasLines: false),
+        ],
+      ),
+      placement: const BuyV2OrderPlacementResult(
+        outcome: BuyV2OrderPlacementOutcome.unavailable,
+        customerMessage: 'Test ordering is disabled.',
+      ),
+    ),
+  );
+  addTearDown(core.dispose);
+  addTearDown(session.dispose);
+  await session.restoreCommerce();
+  session.openDestination(BuyV2Destination.orders);
+  return session;
+}
+
 void main() {
+  test(
+    'R669 order search uses historical titles and split purchase references',
+    () async {
+      final session = await _openOrderSearchFixture();
+      final ordersBefore = session.visibleOrders.map((o) => o.id).toList();
+      session.updateQuery('  ToMaTo  ');
+      expect(session.visibleOrders.map((o) => o.id), ['MS-SEARCH-TOMATO']);
+      session.updateQuery('seasonal produce');
+      expect(session.visibleOrders, isEmpty);
+      session.updateQuery('buy-split-04');
+      expect(session.visibleOrders.map((o) => o.id), [
+        'MS-SEARCH-TOMATO',
+        'MS-SEARCH-MILK',
+      ]);
+      session.showOrdersTab(BuyV2OrdersTab.delivered);
+      expect(session.query, 'buy-split-04');
+      expect(session.visibleOrders.map((o) => o.id), ['MS-SEARCH-DELIVERED']);
+      session.updateQuery('tomato');
+      expect(session.visibleOrders.map((o) => o.id), ['MS-SEARCH-DELIVERED']);
+      session.showOrdersTab(BuyV2OrdersTab.active);
+      session.updateQuery('SPLIT-04');
+      expect(session.visibleOrders.length, 2);
+      session.updateQuery('po-buyer-047');
+      expect(session.visibleOrders.map((o) => o.id), ordersBefore);
+      session.updateQuery('no-such-purchase');
+      expect(session.visibleOrders, isEmpty);
+      session.updateQuery('');
+      expect(session.visibleOrders.map((o) => o.id), ordersBefore);
+      expect(session.itemCount, 0);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'R669 order search opens the matching purchase and returns $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 711);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final session = await _openOrderSearchFixture();
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: BuyV2Destination.orders,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+        await tester.pumpAndSettle();
+        final field = find.byKey(const ValueKey('buy-search-field'));
+        await tester.enterText(field, 'tomato');
+        await tester.pumpAndSettle();
+        expect(session.visibleOrders.map((o) => o.id), ['MS-SEARCH-TOMATO']);
+        final card = find.byKey(
+          const ValueKey('buy-order-card-MS-SEARCH-TOMATO'),
+        );
+        await tester.ensureVisible(card);
+        await tester.pumpAndSettle();
+        expect(card.hitTestable(), findsOneWidget);
+        expect(find.text('No orders match this search'), findsNothing);
+        await tester.tap(card);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.tracking);
+        expect(session.selectedOrder.id, 'MS-SEARCH-TOMATO');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.destination, BuyV2Destination.orders);
+        expect(session.query, 'tomato');
+        expect(card, findsOneWidget);
+        expect(field, findsNothing);
+        final search = find.byKey(const ValueKey('buy-search-control'));
+        expect(search.hitTestable(), findsOneWidget);
+        await tester.tap(search);
+        await tester.pumpAndSettle();
+        await tester.enterText(field, 'BUY-SPLIT-04');
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-purchase-group-BUY-SPLIT-04')),
+          findsOneWidget,
+        );
+        expect(session.visibleOrders.map((o) => o.id), [
+          'MS-SEARCH-TOMATO',
+          'MS-SEARCH-MILK',
+        ]);
+        session.showOrdersTab(BuyV2OrdersTab.delivered);
+        await tester.pumpAndSettle();
+        expect(session.visibleOrders.single.id, 'MS-SEARCH-DELIVERED');
+        expect(session.itemCount, 0);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   test(
     'R669 bulk quantity entry enforces the published minimum pack order',
     () {

@@ -6389,10 +6389,13 @@ class BuyV2Session extends ChangeNotifier {
               normalizedQuery.isEmpty ||
               [
                 order.id,
+                order.purchaseId ?? '',
+                order.purchaseOrderReference ?? '',
                 order.title,
                 order.partner,
                 order.partnerType,
                 order.itemSummary,
+                ...order.lines.map((line) => line.product.title),
               ].any((value) => value.toLowerCase().contains(normalizedQuery)),
         )
         .toList(growable: false);
