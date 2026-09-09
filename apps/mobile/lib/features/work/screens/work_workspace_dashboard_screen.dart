@@ -443,6 +443,9 @@ class _WorkWorkspaceDashboardScreenState
   final _workspaceMessengerKey = GlobalKey<ScaffoldMessengerState>();
   late final TextEditingController _searchController;
   final FocusNode _searchFocus = FocusNode(debugLabel: 'workspace-search');
+  final ScrollController _searchScroll = ScrollController();
+  double _searchReturnOffset = 0;
+  String? _focusedOrderId, _focusedCustomerId;
   final _catalogueKey = GlobalKey<_WorkspaceCatalogueSurfaceState>();
   final _counterKey = GlobalKey<_CounterOrderSurfaceState>();
   final _saleSearchController = TextEditingController();
@@ -518,6 +521,7 @@ class _WorkWorkspaceDashboardScreenState
     _saleSearchController.dispose();
     _procurementRevealTimer?.cancel();
     _searchController.dispose();
+    _searchScroll.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
@@ -964,7 +968,10 @@ class _WorkWorkspaceDashboardScreenState
               onSearch: saleOpen ? _searchFocus.requestFocus : _showSearch,
               onSearchChanged: saleOpen
                   ? (_) => setState(() {})
-                  : session.updateWorkspaceSearch,
+                  : (query) {
+                      if (_searchScroll.hasClients) _searchScroll.jumpTo(0);
+                      session.updateWorkspaceSearch(query);
+                    },
               onCloseSearch: saleOpen ? _searchFocus.unfocus : _finishSearch,
               onScan: () {
                 if (saleOpen) {
@@ -1090,8 +1097,10 @@ class _WorkWorkspaceDashboardScreenState
           _WorkspaceControlView.search => _WorkspaceSearchSurface(
             session: session,
             query: session.workspaceSearchQuery,
+            scrollController: _searchScroll,
             onClear: _clearSearch,
-            onOpenRoute: openScopedRoute,
+            onOpenRecord: (record) =>
+                _openSearchRecord(record, workspace.id, openScopedRoute),
           ),
           _WorkspaceControlView.status => _WorkspaceStatusSurface(
             acceptingOrders: _draftAcceptingOrders,
@@ -1166,6 +1175,8 @@ class _WorkWorkspaceDashboardScreenState
           ),
           _WorkspaceControlView.operation => _WorkspaceOperationSurface(
             operation: _operation,
+            focusedOrderId: _focusedOrderId,
+            focusedCustomerId: _focusedCustomerId,
             session: session,
             procurementSession: widget.procurementSession,
             catalogueKey: _catalogueKey,
@@ -1190,6 +1201,8 @@ class _WorkWorkspaceDashboardScreenState
     setState(() {
       _counterOrderOrigin = null;
       _reviewedOrder = null;
+      _focusedOrderId = null;
+      _focusedCustomerId = null;
       _view = _WorkspaceControlView.dashboard;
     });
   }
@@ -1268,6 +1281,58 @@ class _WorkWorkspaceDashboardScreenState
     });
   }
 
+  void _openSearchRecord(
+    _WorkspaceSearchRecord record,
+    String storeId,
+    ValueChanged<String> openRoute,
+  ) {
+    if (!mounted || session.activeWorkspace?.id != storeId) return;
+    _searchFocus.unfocus();
+    _searchReturnOffset = _searchScroll.hasClients ? _searchScroll.offset : 0;
+    switch (record.kind) {
+      case _WorkspaceSearchKind.order:
+        if (!session.visibleWorkspaceOrders.any(
+          (item) => item.id == record.entityId,
+        )) {
+          session.showError('This order is no longer available. Search again.');
+          return;
+        }
+        _showOperation(
+          _WorkspaceOperation.orders,
+          focusedOrderId: record.entityId,
+          returnView: _WorkspaceControlView.search,
+        );
+      case _WorkspaceSearchKind.customer:
+        if (!session.workspaceCustomerBook.any(
+          (item) => item.id == record.entityId,
+        )) {
+          session.showError(
+            'This customer record is no longer available. Search again.',
+          );
+          return;
+        }
+        _showOperation(
+          _WorkspaceOperation.customers,
+          focusedCustomerId: record.entityId,
+          returnView: _WorkspaceControlView.search,
+        );
+      case _WorkspaceSearchKind.invoice:
+        final invoice = session.workspaceInvoices
+            .where((item) => item.id == record.entityId)
+            .firstOrNull;
+        if (invoice == null) {
+          session.showError(
+            'This invoice is no longer available. Search again.',
+          );
+          return;
+        }
+        unawaited(_showWorkspaceInvoiceSheet(context, session, invoice));
+      case _WorkspaceSearchKind.product:
+      case _WorkspaceSearchKind.activity:
+        openRoute(record.route);
+    }
+  }
+
   void _showStatus() {
     _searchFocus.unfocus();
     setState(() {
@@ -1293,6 +1358,9 @@ class _WorkWorkspaceDashboardScreenState
   void _showOperation(
     _WorkspaceOperation operation, {
     bool retainDirectFilter = false,
+    String? focusedOrderId,
+    String? focusedCustomerId,
+    _WorkspaceControlView? returnView,
   }) {
     _searchFocus.unfocus();
     final createBillFromOrders =
@@ -1330,7 +1398,12 @@ class _WorkWorkspaceDashboardScreenState
       _releaseDirectFilter();
     }
     setState(() {
-      if (_view == _WorkspaceControlView.status) {
+      _focusedOrderId = focusedOrderId;
+      _focusedCustomerId = focusedCustomerId;
+      if (returnView != null) {
+        _operationReturnView = returnView;
+        _operationReturnOperation = null;
+      } else if (_view == _WorkspaceControlView.status) {
         _operationReturnView = _WorkspaceControlView.status;
         _operationReturnOperation = null;
       } else if (_view == _WorkspaceControlView.operation &&
@@ -1455,6 +1528,22 @@ class _WorkWorkspaceDashboardScreenState
 
   Future<void> _leaveOperation() async {
     if (!await _confirmDiscardCounterOrder() || !mounted) return;
+    if (_operationReturnView == _WorkspaceControlView.search) {
+      setState(() => _view = _WorkspaceControlView.search);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _view == _WorkspaceControlView.search &&
+            _searchScroll.hasClients) {
+          _searchScroll.jumpTo(
+            _searchReturnOffset.clamp(
+              0,
+              _searchScroll.position.maxScrollExtent,
+            ),
+          );
+        }
+      });
+      return;
+    }
     if (_operationReturnView == _WorkspaceControlView.status) {
       _showStatus();
       return;
@@ -7365,6 +7454,7 @@ class _WorkspaceNavigationRow extends StatelessWidget {
     required this.detail,
     required this.onTap,
     this.amount,
+    this.amountLabel = 'Price',
   });
 
   final String keyName;
@@ -7373,6 +7463,7 @@ class _WorkspaceNavigationRow extends StatelessWidget {
   final String detail;
   final VoidCallback onTap;
   final String? amount;
+  final String amountLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -7426,9 +7517,9 @@ class _WorkspaceNavigationRow extends StatelessWidget {
           if (amount != null) ...[
             const SizedBox(height: 6),
             _StoreMoneyLine(
-              leading: const Text(
-                'Price',
-                style: TextStyle(color: MoolColors.muted, fontSize: 11),
+              leading: Text(
+                amountLabel,
+                style: const TextStyle(color: MoolColors.muted, fontSize: 11),
               ),
               value: amount!,
               style: const TextStyle(
@@ -7448,14 +7539,16 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   const _WorkspaceSearchSurface({
     required this.session,
     required this.query,
+    required this.scrollController,
     required this.onClear,
-    required this.onOpenRoute,
+    required this.onOpenRecord,
   });
 
   final WorkSession session;
   final String query;
+  final ScrollController scrollController;
   final VoidCallback onClear;
-  final ValueChanged<String> onOpenRoute;
+  final ValueChanged<_WorkspaceSearchRecord> onOpenRecord;
 
   @override
   Widget build(BuildContext context) {
@@ -7463,47 +7556,54 @@ class _WorkspaceSearchSurface extends StatelessWidget {
     final results = _workspaceSearchRecords(session, normalized);
     return AnimatedSwitcher(
       key: const Key('work-dashboard-search-screen'),
-      duration: const Duration(milliseconds: 220),
+      duration: MediaQuery.of(context).disableAnimations
+          ? Duration.zero
+          : const Duration(milliseconds: 160),
       child: results.isEmpty
           ? Center(
               key: const Key('work-dashboard-search-empty'),
-              child: Padding(
-                padding: const EdgeInsets.all(MoolSpacing.lg),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(
-                      Icons.manage_search_rounded,
-                      size: 46,
-                      color: MoolColors.muted,
-                    ),
-                    const SizedBox(height: MoolSpacing.sm),
-                    Text(
-                      normalized.isEmpty
-                          ? 'Search products, orders, customers or records'
-                          : 'No matching store record',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
+              child: SingleChildScrollView(
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
+                child: Padding(
+                  padding: const EdgeInsets.all(MoolSpacing.lg),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.manage_search_rounded,
+                        size: 46,
+                        color: MoolColors.muted,
                       ),
-                    ),
-                    if (normalized.isNotEmpty) ...[
                       const SizedBox(height: MoolSpacing.sm),
-                      TextButton.icon(
-                        key: const Key('work-dashboard-search-clear'),
-                        onPressed: onClear,
-                        icon: const Icon(Icons.close_rounded),
-                        label: const Text('Clear search'),
+                      Text(
+                        normalized.isEmpty
+                            ? 'Search products, orders, customers or records'
+                            : 'No matching store record',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: MoolColors.navy,
+                          fontSize: 17,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
+                      if (normalized.isNotEmpty) ...[
+                        const SizedBox(height: MoolSpacing.sm),
+                        TextButton.icon(
+                          key: const Key('work-dashboard-search-clear'),
+                          onPressed: onClear,
+                          icon: const Icon(Icons.close_rounded),
+                          label: const Text('Clear search'),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
             )
           : ListView.separated(
               key: const Key('work-dashboard-search-results'),
+              controller: scrollController,
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
               padding: EdgeInsets.fromLTRB(
                 MediaQuery.textScalerOf(context).scale(1) >= 2
@@ -7526,7 +7626,12 @@ class _WorkspaceSearchSurface extends StatelessWidget {
                   title: destination.title,
                   detail: destination.detail,
                   amount: destination.amount,
-                  onTap: () => onOpenRoute(destination.route),
+                  amountLabel: switch (destination.kind) {
+                    _WorkspaceSearchKind.order => 'Order total',
+                    _WorkspaceSearchKind.invoice => 'Invoice total',
+                    _ => 'Price',
+                  },
+                  onTap: () => onOpenRecord(destination),
                 );
               },
             ),
@@ -8042,6 +8147,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onOpenStore,
     required this.onOpenOperation,
     required this.onOpenRoute,
+    this.focusedOrderId,
+    this.focusedCustomerId,
   });
 
   final _WorkspaceOperation operation;
@@ -8054,6 +8161,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final VoidCallback onOpenStore;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
+  final String? focusedOrderId, focusedCustomerId;
 
   @override
   Widget build(BuildContext context) {
@@ -8138,6 +8246,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     if (operation == _WorkspaceOperation.orders) {
       return _OrdersDestinationSurface(
         session: session,
+        orderId: focusedOrderId,
         onOpenCollection: onOpenStore,
         onCreateOrder: () => onOpenOperation(_WorkspaceOperation.counterOrder),
         onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
@@ -8218,6 +8327,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     if (operation == _WorkspaceOperation.customers) {
       return _CustomersDestinationSurface(
         session: session,
+        customerId: focusedCustomerId,
         onRepeatBasket: (customerId) {
           if (session.prepareRepeatWorkspaceOrderFor(customerId: customerId)) {
             onOpenOperation(_WorkspaceOperation.counterOrder);
@@ -12836,12 +12946,14 @@ class _OrdersDestinationSurface extends StatefulWidget {
     required this.onOpenCollection,
     required this.onCreateOrder,
     required this.onOpenDelivery,
+    this.orderId,
   });
 
   final WorkSession session;
   final VoidCallback onOpenCollection;
   final VoidCallback onCreateOrder;
   final VoidCallback onOpenDelivery;
+  final String? orderId;
 
   @override
   State<_OrdersDestinationSurface> createState() =>
@@ -12891,10 +13003,12 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       for (final filter in filterLabels.keys) {
         if (!matches(order, filter)) continue;
         counts[filter] = counts[filter]! + 1;
-        if (filter == _filter) {
-          indices[order.id] = visibleOrders.length;
-          visibleOrders.add(order);
-        }
+      }
+      if (widget.orderId != null
+          ? order.id == widget.orderId
+          : matches(order, _filter)) {
+        indices[order.id] = visibleOrders.length;
+        visibleOrders.add(order);
       }
     }
     int countFor(String filter) => counts[filter] ?? 0;
@@ -12913,7 +13027,9 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
               children: [
                 Expanded(
                   child: Text(
-                    'Customer orders',
+                    widget.orderId == null
+                        ? 'Customer orders'
+                        : 'Order details',
                     style: TextStyle(
                       color: MoolColors.ink,
                       fontSize: compactText ? 16 : 20,
@@ -12921,7 +13037,9 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                     ),
                   ),
                 ),
-                if (compactText)
+                if (widget.orderId != null)
+                  const SizedBox.shrink()
+                else if (compactText)
                   IconButton.filled(
                     key: const Key('work-orders-create'),
                     tooltip: 'Create bill',
@@ -12954,32 +13072,43 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
               ],
             ),
           ),
-          SingleChildScrollView(
-            key: const Key('work-orders-filter-strip'),
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-            child: Row(
-              children: [
-                for (final filter in filterLabels.keys.where(
-                  (value) =>
-                      value != 'Attention' ||
-                      countFor(value) > 0 ||
-                      _filter == value,
-                )) ...[
-                  ChoiceChip(
-                    key: Key('work-orders-filter-${filter.toLowerCase()}'),
-                    label: Text('${filterLabels[filter]} ${countFor(filter)}'),
-                    selected: _filter == filter,
-                    onSelected: (_) {
-                      widget.session.setWorkspaceOrderFilter(filter);
-                      setState(() => _filter = filter);
-                    },
-                  ),
-                  const SizedBox(width: 7),
-                ],
-              ],
+          if (widget.orderId != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Text(
+                widget.orderId!,
+                key: const Key('work-focused-order-id'),
+              ),
             ),
-          ),
+          if (widget.orderId == null)
+            SingleChildScrollView(
+              key: const Key('work-orders-filter-strip'),
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+              child: Row(
+                children: [
+                  for (final filter in filterLabels.keys.where(
+                    (value) =>
+                        value != 'Attention' ||
+                        countFor(value) > 0 ||
+                        _filter == value,
+                  )) ...[
+                    ChoiceChip(
+                      key: Key('work-orders-filter-${filter.toLowerCase()}'),
+                      label: Text(
+                        '${filterLabels[filter]} ${countFor(filter)}',
+                      ),
+                      selected: _filter == filter,
+                      onSelected: (_) {
+                        widget.session.setWorkspaceOrderFilter(filter);
+                        setState(() => _filter = filter);
+                      },
+                    ),
+                    const SizedBox(width: 7),
+                  ],
+                ],
+              ),
+            ),
           Expanded(
             child: visibleOrders.isNotEmpty
                 ? ListView.builder(
@@ -12987,6 +13116,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                       'work-orders-queue',
                       storeId,
                       _filter,
+                      widget.orderId,
                     )),
                     padding: const EdgeInsets.fromLTRB(14, 10, 14, 100),
                     itemCount: visibleOrders.length,
@@ -13061,7 +13191,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                     ),
                   ),
           ),
-          if (!compactText)
+          if (!compactText && widget.orderId == null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
               child: SizedBox(
@@ -13570,11 +13700,13 @@ class _CustomersDestinationSurface extends StatefulWidget {
     required this.session,
     required this.onRepeatBasket,
     required this.onOffer,
+    this.customerId,
   });
 
   final WorkSession session;
   final ValueChanged<String> onRepeatBasket;
   final VoidCallback onOffer;
+  final String? customerId;
 
   @override
   State<_CustomersDestinationSurface> createState() =>
@@ -13910,8 +14042,15 @@ class _CustomersDestinationSurfaceState
 
   @override
   Widget build(BuildContext context) {
-    final customers = widget.session.visibleWorkspaceCustomers;
-    final allCustomers = widget.session.workspaceCustomerBook;
+    final allCustomers = widget.session.workspaceCustomerBook
+        .where(
+          (customer) =>
+              widget.customerId == null || customer.id == widget.customerId,
+        )
+        .toList(growable: false);
+    final customers = widget.customerId == null
+        ? widget.session.visibleWorkspaceCustomers
+        : allCustomers;
     final repeat = allCustomers
         .where((customer) => customer.repeatCustomer)
         .length;
@@ -13933,9 +14072,9 @@ class _CustomersDestinationSurfaceState
           _StoreScaledPair(
             forceStack:
                 due >= 10000000 || MediaQuery.sizeOf(context).width < 380,
-            first: const Text(
-              'Customers',
-              style: TextStyle(
+            first: Text(
+              widget.customerId == null ? 'Customers' : 'Customer record',
+              style: const TextStyle(
                 color: MoolColors.ink,
                 fontSize: 21,
                 fontWeight: FontWeight.w900,
@@ -13958,44 +14097,46 @@ class _CustomersDestinationSurfaceState
             ),
           ),
           const SizedBox(height: 8),
-          TextField(
-            key: const Key('work-customer-search'),
-            controller: _search,
-            onChanged: widget.session.updateWorkspaceCustomerSearch,
-            textInputAction: TextInputAction.search,
-            decoration: const InputDecoration(
-              hintText: 'Search name or mobile',
-              prefixIcon: Icon(Icons.search_rounded),
-              isDense: true,
+          if (widget.customerId == null)
+            TextField(
+              key: const Key('work-customer-search'),
+              controller: _search,
+              onChanged: widget.session.updateWorkspaceCustomerSearch,
+              textInputAction: TextInputAction.search,
+              decoration: const InputDecoration(
+                hintText: 'Search name or mobile',
+                prefixIcon: Icon(Icons.search_rounded),
+                isDense: true,
+              ),
             ),
-          ),
           const SizedBox(height: 6),
-          SizedBox(
-            height: 28 + MediaQuery.textScalerOf(context).scale(20),
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              itemCount: 5,
-              separatorBuilder: (_, _) => const SizedBox(width: 6),
-              itemBuilder: (context, index) {
-                final filter = const [
-                  'Recent',
-                  'Repeat',
-                  'Payment due',
-                  'Following Store',
-                  'Messages allowed',
-                ][index];
-                return ChoiceChip(
-                  key: Key(
-                    'work-customer-filter-${filter.toLowerCase().replaceAll(' ', '-')}',
-                  ),
-                  label: Text(filter),
-                  selected: widget.session.workspaceCustomerFilter == filter,
-                  onSelected: (_) =>
-                      widget.session.setWorkspaceCustomerFilter(filter),
-                );
-              },
+          if (widget.customerId == null)
+            SizedBox(
+              height: 28 + MediaQuery.textScalerOf(context).scale(20),
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: 5,
+                separatorBuilder: (_, _) => const SizedBox(width: 6),
+                itemBuilder: (context, index) {
+                  final filter = const [
+                    'Recent',
+                    'Repeat',
+                    'Payment due',
+                    'Following Store',
+                    'Messages allowed',
+                  ][index];
+                  return ChoiceChip(
+                    key: Key(
+                      'work-customer-filter-${filter.toLowerCase().replaceAll(' ', '-')}',
+                    ),
+                    label: Text(filter),
+                    selected: widget.session.workspaceCustomerFilter == filter,
+                    onSelected: (_) =>
+                        widget.session.setWorkspaceCustomerFilter(filter),
+                  );
+                },
+              ),
             ),
-          ),
           const SizedBox(height: 7),
           if (customers.isEmpty)
             const _StoreEmptyPanel(
@@ -18771,8 +18912,12 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
   }
 }
 
+enum _WorkspaceSearchKind { product, order, customer, invoice, activity }
+
 typedef _WorkspaceSearchRecord = ({
   String id,
+  String entityId,
+  _WorkspaceSearchKind kind,
   String title,
   String detail,
   String? amount,
@@ -18795,34 +18940,72 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
     }
     records.add((
       id: 'product-${product.id}',
+      entityId: product.id,
+      kind: _WorkspaceSearchKind.product,
       title: product.title,
       detail: '${product.brand} · ${product.pack} · ${product.stock} available',
       amount: '₹${_formatStoreAmount(product.sellingPrice)}',
-      route: '/app/retailer/home?view=stock&product=${product.id}',
+      route: Uri(
+        path: '/app/retailer/home',
+        queryParameters: {'view': 'stock', 'product': product.id},
+      ).toString(),
       icon: Icons.inventory_2_outlined,
     ));
   }
-  if (session.workspaceOrderCustomer.isNotEmpty &&
-      matches(
-        '${session.workspaceOrderCustomer} ${session.workspaceOrderSource} ${session.workspaceOrderItems} ${session.workspaceOrderAmount} ${session.currentWorkspaceOrderStageLabel}',
-      )) {
+  for (final order in session.visibleWorkspaceOrders) {
+    final stage = session.workspaceOrderStageLabel(order);
+    if (!matches(
+      '${order.id} ${order.customer} ${order.source} ${order.items} ${order.amount} ${_formatStoreAmount(order.amount)} $stage',
+    )) {
+      continue;
+    }
     records.add((
-      id: 'order-current',
-      title:
-          '${session.workspaceOrderSource} order · ${session.workspaceOrderCustomer}',
-      detail:
-          '${session.currentWorkspaceOrderStageLabel} · ₹${session.workspaceOrderAmount} · ${session.workspaceOrderItems}',
-      amount: null,
-      route: '/app/retailer/orders',
+      id: 'order-${order.id}',
+      entityId: order.id,
+      kind: _WorkspaceSearchKind.order,
+      title: '${order.id} · ${order.customer}',
+      detail: '$stage · ${order.items}',
+      amount: '₹${_formatStoreAmount(order.amount)}',
+      route: Uri(
+        path: '/app/retailer/orders',
+        queryParameters: {'order': order.id},
+      ).toString(),
       icon: Icons.receipt_long_outlined,
     ));
+  }
+  for (final customer in session.workspaceCustomerBook) {
+    if (!matches('${customer.id} ${customer.name} ${customer.mobile}')) {
+      continue;
+    }
     records.add((
-      id: 'customer-current',
-      title: session.workspaceOrderCustomer,
-      detail: 'Customer purchase and payment record',
+      id: 'customer-${customer.id}',
+      entityId: customer.id,
+      kind: _WorkspaceSearchKind.customer,
+      title: customer.name,
+      detail: '${customer.mobile} · ${customer.orderCount} orders',
       amount: null,
-      route: '/app/retailer/customers',
+      route: Uri(
+        path: '/app/retailer/customers',
+        queryParameters: {'customer': customer.id},
+      ).toString(),
       icon: Icons.person_outline_rounded,
+    ));
+  }
+  for (final invoice in session.workspaceInvoices) {
+    if (!matches(
+      '${invoice.id} ${invoice.orderId} ${invoice.customer} ${invoice.items} ${invoice.amount} ${_formatStoreAmount(invoice.amount)} ${invoice.payment}',
+    )) {
+      continue;
+    }
+    records.add((
+      id: 'invoice-${invoice.id}',
+      entityId: invoice.id,
+      kind: _WorkspaceSearchKind.invoice,
+      title: invoice.id,
+      detail: '${invoice.customer} · ${invoice.orderId} · ${invoice.payment}',
+      amount: '₹${_formatStoreAmount(invoice.amount)}',
+      route: '/app/retailer/books',
+      icon: Icons.description_outlined,
     ));
   }
   for (var index = 0; index < session.workspaceActivity.length; index++) {
@@ -18830,6 +19013,8 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
     if (!matches(activity.message)) continue;
     records.add((
       id: 'activity-$index',
+      entityId: '$index',
+      kind: _WorkspaceSearchKind.activity,
       title: activity.message,
       detail:
           'Store activity · ${activity.time.hour.toString().padLeft(2, '0')}:${activity.time.minute.toString().padLeft(2, '0')}',

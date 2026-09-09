@@ -151,6 +151,8 @@ Local qualification update:
 
 #### DASH-LOAD-01 — P1 · Visible workload and direct central actions
 
+- Founder checkpoint: the workload/dashboard and packing first-tap slice at `ad69956f5a91d28eb981d430acca3d59d924a465` is visually accepted. Technical approval remains conditional on internal real-use-case tests and the final OPPO batch. Founder confirms OPPO testing is deferred until implementation of the 27 tracked items; no new APK/device action is authorised as an intermediate shortcut.
+
 - Users: Grocery/Kirana and Speciality Retail; shared dashboard.
 - Gap: one selected task hides other queues; non-selected rows need Open order before action (evidence 1–3).
 - Smallest correction: compact Accept/Pack/Hand over/Track counts inside existing centre; selected group opens exact actionable rows, not a new landing page. Include oldest due/overdue and user-retained selection; separate collection/rider readiness within the selected group. No automatic carousel, bulk accept or button relocation.
@@ -158,6 +160,11 @@ Local qualification update:
 - Owners: Dashboard, Session, existing layout/atomic tests; depends on 05/14 authoritative timing/state definitions.
 
 #### DASH-LOAD-02 — P1 · Search every order, customer and invoice
+
+- IN PROGRESS: all scoped order/customer/invoice records, typed identity on selection, exact-record first-tap views and retained search query/scroll on Back. Supplier purchase projection remains dependent on DASH-LOAD-07, and unloaded server history remains dependent on DASH-LOAD-14. No closure from local fixtures alone.
+- 2026-09-10 local verification: nine focused Search checks passed; two historical capture-only checks remained skipped. Coverage includes 1,000-record closed-order search at normal/200% text, same-name customers with distinct phone identities, exact invoice without sending, stale record and Store-switch rejection, and Back/query/scroll/packing-selection preservation. A genuine six-pixel empty-search overflow at 320x568/200% with a 240px keyboard was reproduced and corrected with content scrolling; the focused regression passes. Initial same-name test data collided with an existing seeded customer's phone and was corrected without changing customer identity behavior. Raw attempts are retained, not counted as qualification passes.
+- Actual Flutter captures: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/dashboard-search-local-review-20260909-v4/`. Founder is reviewing views 1 Search, 2 exact order, 3 exact customer and 4 exact invoice and will provide changes by number; these four views are **not visually approved yet**. Full layout regression: 631 passed / 79 skipped / 0 failed. Full analysis: zero issues. Existing implementation coordination and regression-memory gates passed. No new APK, OPPO replay, live messaging or backend verification has occurred.
+- Evidence under `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/dashboard-load-implementation-20260909/`: `search-focused-final.log` SHA-256 `419F1075407D782E3FD6533EE4F3CA500A7913685F7A59EBBBEE9373D38DF21C`; `search-layout-full.log` SHA-256 `DF20AEC9E5F1C6F5B162E63C21BB1BFDC712AEC9C3AEFEA4F4504E0DBE61EB44`; `search-full-analysis.log` SHA-256 `D679D835CB12DCC5F1C6ACD2B599BEE03BDEDBF9C210A70AE3A1BA427A210791`. The 79 opt-in historical capture skips are not production passes; final physical checks remain open.
 
 - Gap: current-order-only search and generic return target (evidence 4).
 - Correction: reuse existing inline search with all scoped order/customer/invoice records, stable exact IDs and typed result intent; retain catalogue behavior and supplier-purchase search once07 supplies its projection.

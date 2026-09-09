@@ -8455,7 +8455,8 @@ void main() {
           final row = find.byKey(
             Key(switch (surface) {
               'product' => 'work-search-product-${product.id}',
-              'order' => 'work-search-order-current',
+              'order' =>
+                'work-search-order-${work.currentWorkspaceOrderId ?? 'current-store-order'}',
               _ => 'work-alert-customer-order',
             }),
           );
@@ -9019,6 +9020,360 @@ void main() {
     needsDelivery: false,
     createdAt: createdAt,
   );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Store search exact historical order preserves packing $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      work.workspaceOrders.addAll(
+        List.generate(
+          1000,
+          (index) => customerOrder(
+            id: 'HISTORY-${index.toString().padLeft(4, '0')}',
+            customer:
+                'History customer $index · 900000${index.toString().padLeft(4, '0')}',
+            createdAt: DateTime(2026, 9, 1).add(Duration(minutes: index)),
+          ),
+        ),
+      );
+      work.workspaceOrderFilter = 'Packing';
+      work.workspacePackedProductIds.add('summary-0');
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 640),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-dashboard-search-field')),
+        'HISTORY-0999',
+      );
+      await tester.pumpAndSettle();
+      final result = find.byKey(const Key('work-search-order-HISTORY-0999'));
+      expect(result, findsOneWidget);
+      await captureStoreView(tester, 'search-history-result-$scale');
+      await tester.ensureVisible(result);
+      await tester.tap(result);
+      await tester.pumpAndSettle();
+      expect(find.text('Order details'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(find.byKey(const Key('work-focused-order-id')))
+            .data,
+        'HISTORY-0999',
+      );
+      expect(
+        find.byKey(const Key('work-order-stage-label-HISTORY-0999')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-order-stage-label-APP-1043')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('work-orders-filter-strip')), findsNothing);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspacePackedProductIds, contains('summary-0'));
+      await captureStoreView(tester, 'search-history-first-tap-$scale');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(result, findsOneWidget);
+      expect(work.workspaceSearchQuery, 'HISTORY-0999');
+      expect(work.workspaceOrderFilter, 'Packing');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('Store search empty state fits compact 200% keyboard', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(320, 568),
+      textScale: 2,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final field = find.byKey(const Key('work-dashboard-search-field'));
+    await tester.enterText(field, 'No matching record');
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    final clear = find.descendant(
+      of: find.byKey(const Key('work-dashboard-search-empty')),
+      matching: find.byKey(const Key('work-dashboard-search-clear')),
+    );
+    await tester.ensureVisible(clear);
+    await tester.pumpAndSettle();
+    expect(clear.hitTestable(), findsOneWidget);
+    await captureStoreView(tester, 'search-empty-compact-keyboard-2.0');
+    await tester.tap(clear);
+    await tester.pumpAndSettle();
+    expect(work.workspaceSearchQuery, isEmpty);
+    expect(tester.takeException(), isNull);
+    tester.view.viewInsets = FakeViewPadding.zero;
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Store search stale order cannot open another record', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'APP-1043',
+    );
+    await tester.pumpAndSettle();
+    final retainedTap = tester
+        .widget<MoolCardSurface>(
+          find.byKey(const Key('work-search-order-APP-1043')),
+        )
+        .onTap!;
+    work.workspaceOrders.removeWhere((order) => order.id == 'APP-1043');
+    retainedTap();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-orders-destination')), findsNothing);
+    expect(
+      find.text('This order is no longer available. Search again.'),
+      findsOneWidget,
+    );
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Store search same-name customers open the exact mobile record', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    for (final phone in ['9001234510', '9001234511']) {
+      work.workspaceOrders.add(
+        customerOrder(
+          id: 'CUSTOMER-$phone',
+          customer: 'Ramesh · $phone',
+          createdAt: DateTime(2026, 9, 9),
+        ),
+      );
+    }
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'Ramesh',
+    );
+    await tester.pumpAndSettle();
+    final results = find.byKey(const Key('work-dashboard-search-results'));
+    final resultScroll = find
+        .descendant(of: results, matching: find.byType(Scrollable))
+        .first;
+    final first = find.byKey(const Key('work-search-customer-9001234510'));
+    expect(
+      work.workspaceCustomerBook.map((customer) => customer.id),
+      containsAll(['9001234510', '9001234511']),
+    );
+    expect(
+      work.workspaceCustomerBook
+          .where((customer) => customer.name == 'Ramesh')
+          .map((customer) => customer.id),
+      containsAll(['9001234510', '9001234511']),
+      reason: work.workspaceCustomerBook
+          .map((customer) => '${customer.id}: ${customer.name}')
+          .join(', '),
+    );
+    await captureStoreView(tester, 'search-same-name-results');
+    await tester.scrollUntilVisible(first, 250, scrollable: resultScroll);
+    expect(first, findsOneWidget);
+    final target = find.byKey(const Key('work-search-customer-9001234511'));
+    await tester.scrollUntilVisible(target, 250, scrollable: resultScroll);
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-customer-9001234511')), findsOneWidget);
+    expect(find.byKey(const Key('work-customer-9001234510')), findsNothing);
+    expect(find.byKey(const Key('work-customer-search')), findsNothing);
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    await captureStoreView(tester, 'search-exact-customer');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(work.workspaceSearchQuery, 'Ramesh');
+    expect(target, findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Store search opens the exact invoice without sharing it', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceInvoices.addAll([
+      WorkspaceCustomerInvoice(
+        id: 'INV-OTHER',
+        orderId: 'ORDER-OTHER',
+        customer: 'Test customer',
+        items: 'Oil × 1',
+        amount: 264,
+        payment: 'Paid online',
+        issuedAt: DateTime(2026, 9, 9),
+      ),
+      WorkspaceCustomerInvoice(
+        id: 'INV-0999',
+        orderId: 'ORDER-0999',
+        customer: 'Test customer',
+        items: 'Atta × 2',
+        amount: 1200,
+        payment: 'Paid online',
+        issuedAt: DateTime(2026, 9, 9),
+      ),
+    ]);
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'INV-0999',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-search-invoice-INV-0999')));
+    await tester.pumpAndSettle();
+    expect(find.text('Send customer invoice'), findsOneWidget);
+    expect(find.textContaining('INV-0999'), findsWidgets);
+    expect(find.textContaining('INV-OTHER'), findsNothing);
+    await captureStoreView(tester, 'search-exact-invoice');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-search-invoice-INV-0999')),
+      findsOneWidget,
+    );
+    expect(
+      work.workspaceInvoices.every((invoice) => invoice.sharedChannels.isEmpty),
+      isTrue,
+    );
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Store search Back restores scrolled results', (tester) async {
+    final work = storeViewFixture();
+    work.workspaceOrders.addAll(
+      List.generate(
+        100,
+        (index) => customerOrder(
+          id: 'SEARCH-$index',
+          customer: 'Customer $index',
+          createdAt: DateTime(2026, 9, 9),
+        ),
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'SEARCH-',
+    );
+    await tester.pumpAndSettle();
+    final results = find.byKey(const Key('work-dashboard-search-results'));
+    final target = find.byKey(const Key('work-search-order-SEARCH-40'));
+    await tester.scrollUntilVisible(
+      target,
+      400,
+      scrollable: find
+          .descendant(of: results, matching: find.byType(Scrollable))
+          .first,
+      maxScrolls: 50,
+    );
+    await tester.pumpAndSettle();
+    final before = tester.widget<ListView>(results).controller!.offset;
+    expect(before, greaterThan(0));
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<ListView>(results).controller!.offset,
+      closeTo(before, .5),
+    );
+    expect(target.hitTestable(), findsOneWidget);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Store search retained result cannot cross stores', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'APP-1043',
+    );
+    await tester.pumpAndSettle();
+    final oldTap = tester
+        .widget<MoolCardSurface>(
+          find.byKey(const Key('work-search-order-APP-1043')),
+        )
+        .onTap!;
+    final store = work.activeWorkspace!;
+    work.activateWorkspace(
+      WorkWorkspace(
+        id: 'SEARCH-OTHER-STORE',
+        name: 'Second Store',
+        profileLabel: store.profileLabel,
+        profileId: store.profileId,
+        area: store.area,
+        verified: true,
+      ),
+    );
+    oldTap();
+    await tester.pumpAndSettle();
+    expect(work.currentWorkspaceOrderId, isNull);
+    expect(work.visibleWorkspaceOrders, isEmpty);
+    expect(find.byKey(const Key('work-orders-destination')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
 
   for (final scale in [1.0, 1.4, 2.0]) {
     testWidgets('Store queue 1000 local records and first action $scale', (
@@ -10795,48 +11150,46 @@ void main() {
       },
     );
 
-    testWidgets(
-      'store search keeps text stable with keyboard and native Back',
-      (tester) async {
-        final work = WorkSession()..seedVerifiedWorkspace();
-        await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    testWidgets('store search keeps text stable with keyboard and native Back', (
+      tester,
+    ) async {
+      final work = WorkSession()..seedVerifiedWorkspace();
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
 
-        await tester.tap(find.byKey(const Key('work-dashboard-search')));
-        await tester.pumpAndSettle();
-        final field = find.byKey(const Key('work-dashboard-search-field'));
-        expect(field, findsOneWidget);
-        await tester.enterText(field, 'fortune');
-        tester.view.viewInsets = const FakeViewPadding(bottom: 300);
-        await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-dashboard-search-field'));
+      expect(field, findsOneWidget);
+      await tester.enterText(field, 'fortune');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.pumpAndSettle();
 
-        expect(work.workspaceSearchQuery, 'fortune');
-        expect(
-          find.byKey(const Key('work-search-product-oil-fortune-1l')),
-          findsOneWidget,
-        );
-        expect(
-          find.byKey(const Key('work-search-order-current')),
-          findsNothing,
-        );
-        expect(
-          tester.getBottomRight(field).dy,
-          lessThanOrEqualTo(
-            tester
-                .getTopRight(find.byKey(const Key('work-local-navigation')))
-                .dy,
+      expect(work.workspaceSearchQuery, 'fortune');
+      expect(
+        find.byKey(const Key('work-search-product-oil-fortune-1l')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          Key(
+            'work-search-order-${work.currentWorkspaceOrderId ?? 'current-store-order'}',
           ),
-        );
-        expect(tester.takeException(), isNull);
+        ),
+        findsNothing,
+      );
+      expect(
+        tester.getBottomRight(field).dy,
+        lessThanOrEqualTo(
+          tester.getTopRight(find.byKey(const Key('work-local-navigation'))).dy,
+        ),
+      );
+      expect(tester.takeException(), isNull);
 
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(
-          find.byKey(const Key('work-workspace-dashboard')),
-          findsOneWidget,
-        );
-        expect(work.workspaceSearchQuery, 'fortune');
-      },
-    );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(work.workspaceSearchQuery, 'fortune');
+    });
 
     testWidgets(
       'availability saves customer-facing state and Back discards draft',
