@@ -29,6 +29,30 @@ Founder instruction: enumerate journeys, test on Redmi, register each real custo
 
 No entire screen family is declared production-ready by this planning inventory. Record pass/failure/blocked reasons against concrete routes and captures; evaluate whitespace/features by purchase relevance and usability, not personal taste. Confirmed defects are appended to DEFECTS before implementation; observations stay separate until reproduced.
 
+### Expanded execution checkpoint, captures333–351
+
+Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-333-351-V1.json`, SHA256 `951BFD532C0FCAB829D55828FFC26BFCB7CBAD4820718E5C162FE2AE346E0B43`, rehashes19 PNG/XML pairs; all19 visually inspected. Shop333 → profile334 → Back335 exactly restores333 XML. Sort/filter336 → Shopping tools337/338 → Shopping settings339. Font2/density360 settings340–341 remains scrollable and readable; Recent342 exposes the already-registered global10 versus Shop5 discrepancy, not a new ticket. Recent343 scrolls; landscape344–345 retains a scrollable product area with reachable Add, although the fixed header takes substantial height. No new functional failure inferred from whitespace or partial cards while scrolling. Back346 restores Shopping settings;347 reaches its lower settings. Display helper restore-5 returned1.0/320/0/1;348 normal settings retained original preferences.
+
+Help348 →349 advertises shopping/order help but offers account-only topics: R668-AUDIT-HELP-CONTEXT-001 registered before implementation. Back350 exactly restores348 XML. Back351 restores333 Shop XML3CA005D48078E94BFEB2A94D059949FC886D17F5DCEC98572779A20F6CB6C9A5. Original basket, payment, GST, address, saved list and notification selection unchanged. No Chat opened/message sent; shared private/account descendants remain deferred. The enlarged Shopping settings/Recent pending subset in earlier notes is now exercised as described, not a blanket responsive-family pass.
+
+### Expanded execution checkpoint, captures251–332
+
+Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-251-332-V1.json`, SHA256 `8EE5D91EA5793FD17234D7280F721A29A124E39D1C160B6C4D214BB14235C877`, independently rehashes82 PNG/XML pairs;57 were visually inspected. Installed r66.8/2026090903 remains unchanged. No source/build/install or live order/payment action.
+
+Payment251–260: Pine Labs selection/review253 retained the full100001280 amount and original address. Back254 restored252 XML; PhonePe255 restored251 XML. Font2/density360 portrait256–259 made all four methods and the footer reachable; landscape260 retained the complete amount and Review. Address261–273 exposed the separate ADDRESS-KEYBOARD-001: Edit Work264, scroll265, focus266 and settled267 hid the recipient field/caret. A short scroll268 did not reveal it. Portrait270–271 did show the recipient text/caret above the keyboard; no text was changed. Cancel273 preserved the original address. Do not generalize this failure to every field.
+
+Offers274 truthfully requested refresh;275 recovered. Enlarged category list276, Dairy277 and All279 worked;279 restored275 XML. Enlarged Shop grid280–281 retained pack/price/seller/Add access. Profile drawer282 is not Shopping settings qualification. Orders283–293: no-match query, keyboard dismissal, clear, exact order-ID match, Delivered no-match and Continue shopping were exercised. Continue shopping cleared the query and returned to Shop; no order was submitted.
+
+Cart294–306: Supplier coupon300 reduced the footer to100000980 but left100001280 labelled as Total in the persistent header; CART-TOTAL-LABEL-001 registered. Address302, Payment303 and Review306 retained the correct discounted amount. PhonePe payment offer remained explicitly pending with savings excluded; choosing Paytm304 showed ineligibility; restoring PhonePe305 restored303 XML. No provider eligibility or settlement success claimed.
+
+GST307–323: blank form308, draft legal name UAT Test, short GSTIN12345 and malformed15-digit123456789012345 were exercised.313/315 rejected format. Existing test fixture08ABCDE1234F1Z5 then exposed missing billing-address validation318; this is not tax-identity verification. Cancel320 discarded the draft; reopening321 exactly restored blank308 XML. GST off323 restored306 XML. No GST details saved.
+
+Restoration324–332: Back through payment/address/cart, remove PhonePe offer328, remove supplier coupon330 and return331.332 independently confirms original28736 notebook packs /100001280, no coupon/payment offer, PhonePe selected, GST off, original Work address. Display restored font1.0/density320/rotation0/automatic rotation1.331/332 XML64E8664FE012FBB4AE831A62C26B561A2133ECF8DDDA24680A54D0D5B6BE1746. New tickets remain open and unimplemented.
+
+Inventory reconciliation: the earlier table's pending Offers, Shop store expansion, address edit/invalid phone/PIN, Pine Labs, GST validation and Orders search/empty routes are superseded by the concrete204–332 subsets. These do not certify entire families. Remaining enlarged Shopping settings/Recent, uncovered responsive routes, actual provider variant/media formats/failures and eligible post-purchase fixtures remain unqualified; backend/auth/shared external outcomes remain deferred. No exhaustive all-defects claim.
+
+Tooling recovery under existing REG4547: nonexistent GST test path was recovered by bounded discovery of the actual ui_v2/buy tests; oversized RESULTS44-line read recovered with first8 lines and identified as historical r66.4 text. External recovery notes retained. Neither is an app defect.
+
 ### Expanded execution checkpoint, captures204–250
 
 Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-204-250-V1.json`, SHA256 `2698427807A92A47CE81CFD0225847B801B7C5E302A83B6B6B3FE81C032DB607`, independently rehashes47 PNG/XML pairs;31 are explicitly visually inspected. Runtime remains r66.8/2026090903; no source/build/install change. These results supplement the inventory above rather than declaring entire families complete.
