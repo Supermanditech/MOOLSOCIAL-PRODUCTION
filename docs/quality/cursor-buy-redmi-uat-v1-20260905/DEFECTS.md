@@ -2,7 +2,13 @@
 
 ## Expanded r66.8 audit additions — 9 September 2026
 
+### R668-AUDIT-VARIANT-DELIVERY-BADGE-001 — Milk option claims Quick local while delivery details say standard courier
+
+OPEN P2 customer promise consistency. Real Redmi r66.8, Scheduled Shop → milk8 → Compare601 → Family Dairy & Bake milk602 → pack selector603 →500ml604. Price correctly changes from66/1L to35/500ml/70perL. However604 shows Quick local choice badge while arrival remains Delivery time confirmed at checkout; lower605 explicitly says Standard/courier delivery. Buyer choosing milk for quick delivery receives conflicting fulfilment information. Expected: product/variant badges derive from the current serviceable fulfilment facts and agree with arrival/dispatch details; do not advertise quick delivery without qualified eligibility. Source support: buy_v2_models.dart838–857 hardcodes Quick local choice for s-milk-500ml; current phone details contradict that claim. XML60418538E96D53D08A41044E1987EC6033F7865FD98847A3A86B57257F436D69F55; XML605276569F8B123A9952FB2D5031B7E61C0AB7ADA281AA66AC0C75D7B8816561626. No actual delayed delivery, order or backend result asserted. Registered before further testing; implementation and focused Redmi retest pending.
+
 ### R668-AUDIT-COMPARE-EQUIVALENCE-001 — Compare mixes different goods and lacks quantity-normalized supplier results
+
+Scheduled oil/milk extension596/601/608: sunflower oil comparison includes mustard oil, groundnut oil and ghee; milk comparison includes curd and paneer alongside same-pack milk. Same non-equivalent-product selection defect; no duplicate ticket or arithmetic-failure claim. Returning from the selected milk product607 restored original milk8 view correctly in this bounded route.
 
 Quick Shop extension571: Herbal bathing soap5 Compare includes750ml liquid handwash and toothbrushes beside a second supplier's pack-of4 soap. The non-equivalent handwash precedes the same-pack soap. Quick-origin results also include an unknown delivery promise, with no buyer-selectable delivery eligibility. XML1443BD698EF1B3085D8EB45F1093184CDA0C8D0B7661CEE1508FA2AE65FF4975. Same existing comparison defect, not a new duplicate.
 
