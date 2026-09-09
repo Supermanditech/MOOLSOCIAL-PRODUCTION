@@ -483,16 +483,21 @@ class BuyV2ProductView extends StatelessWidget {
       }
     }
 
-    final storeAction = shop && onOpenPartnerCatalogue != null
+    final storeAction = automaticFulfilment && onOpenPartnerCatalogue != null
         ? OutlinedButton.icon(
-            key: ValueKey('buy-shop-seller-action-${product.id}'),
+            key: ValueKey(
+              '${wholesale ? 'buy-wholesale-store-action' : 'buy-shop-seller-action'}-${product.id}',
+            ),
             style: OutlinedButton.styleFrom(
               minimumSize: const Size(0, 44),
               padding: const EdgeInsets.symmetric(horizontal: 10),
             ),
             onPressed: () => onOpenPartnerCatalogue!(product),
             icon: const Icon(Icons.storefront_outlined, size: 16),
-            label: const Text('Visit store', style: TextStyle(fontSize: 11)),
+            label: Text(
+              wholesale ? 'Visit supplier' : 'Visit store',
+              style: const TextStyle(fontSize: 11),
+            ),
           )
         : null;
 
@@ -672,6 +677,7 @@ class BuyV2ProductView extends StatelessWidget {
                           icon: Icons.storefront_outlined,
                           value:
                               '${facts.partner} · ${_sellerTypeLabel(product.sellerType)}',
+                          trailing: storeAction,
                         ),
                         const SizedBox(height: 5),
                         _ProductHeroFact(
@@ -702,7 +708,6 @@ class BuyV2ProductView extends StatelessWidget {
                             product: product,
                             quantity: quantity,
                             showPurchaseFacts: false,
-                            leadingAction: storeAction,
                             deliveryDecision: buyerPromise,
                             rxBlocked: rxBlocked,
                             onAdd: addProduct,
@@ -714,9 +719,6 @@ class BuyV2ProductView extends StatelessWidget {
                             onDecrease: () => session.decrease(product.id),
                             onIncrease: () => session.increase(product.id),
                           ),
-                        ] else if (storeAction != null) ...[
-                          const SizedBox(height: 9),
-                          storeAction,
                         ],
                       ],
                     ),
@@ -1071,12 +1073,6 @@ class BuyV2ProductView extends StatelessWidget {
                     session: session,
                     product: product,
                     trust: trust,
-                    onViewSeller:
-                        product.destination == BuyV2Destination.wholesale &&
-                            onOpenPartnerCatalogue != null
-                        ? () => onOpenPartnerCatalogue!(product)
-                        : null,
-                    sellerProductCount: partnerProducts.length,
                   ),
                   const SizedBox(height: 10),
                   _ProductReviewsPanel(
@@ -1243,34 +1239,51 @@ class _ProductHeroFact extends StatelessWidget {
     required this.icon,
     required this.value,
     this.color = BuyV2Colors.ink,
+    this.trailing,
     super.key,
   });
 
   final IconData icon;
   final String value;
   final Color color;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
-    return BuyV2CartAvoidanceRegion(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 17, color: color),
-          const SizedBox(width: 7),
-          Expanded(
-            child: Text(
-              value,
-              style: context.buyBody.copyWith(
-                color: color,
-                fontSize: 10,
-                height: 1.25,
-                fontWeight: FontWeight.w800,
-              ),
+    final fact = Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 17, color: color),
+        const SizedBox(width: 7),
+        Expanded(
+          child: Text(
+            value,
+            style: context.buyBody.copyWith(
+              color: color,
+              fontSize: 10,
+              height: 1.25,
+              fontWeight: FontWeight.w800,
             ),
           ),
-        ],
-      ),
+        ),
+      ],
+    );
+    final action = trailing;
+    return BuyV2CartAvoidanceRegion(
+      child: action == null
+          ? fact
+          : MediaQuery.textScalerOf(context).scale(1) > 1.25
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [fact, const SizedBox(height: 6), action],
+            )
+          : Row(
+              children: [
+                Expanded(child: fact),
+                const SizedBox(width: 8),
+                action,
+              ],
+            ),
     );
   }
 }
@@ -3677,15 +3690,11 @@ class _MarketplaceTrustPanel extends StatelessWidget {
     required this.session,
     required this.product,
     required this.trust,
-    required this.onViewSeller,
-    required this.sellerProductCount,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final BuyV2MarketplaceTrustSnapshot trust;
-  final VoidCallback? onViewSeller;
-  final int sellerProductCount;
 
   @override
   Widget build(BuildContext context) {
@@ -3757,23 +3766,6 @@ class _MarketplaceTrustPanel extends StatelessWidget {
             label: 'Seller',
             value:
                 '${trust.partnerName} · ${_sellerTypeLabel(product.sellerType)}',
-          ),
-        if (onViewSeller != null)
-          _DecisionActionRow(
-            key: ValueKey(
-              '${product.destination == BuyV2Destination.wholesale ? 'buy-wholesale-store-action' : 'buy-shop-seller-action'}-${product.id}',
-            ),
-            icon: Icons.storefront_outlined,
-            label: product.destination == BuyV2Destination.wholesale
-                ? 'Visit supplier'
-                : 'Visit store',
-            value: trust.partnerName,
-            detail:
-                '$sellerProductCount available ${sellerProductCount == 1 ? 'product' : 'products'} from this ${product.destination == BuyV2Destination.wholesale ? 'supplier' : 'store'}',
-            semanticLabel:
-                'Visit ${trust.partnerName} for $sellerProductCount available ${sellerProductCount == 1 ? 'product' : 'products'}',
-            emphasized: true,
-            onTap: onViewSeller!,
           ),
         if (partnerRating case final rating?)
           _DecisionRow(
@@ -14862,7 +14854,6 @@ class _DecisionActionRow extends StatelessWidget {
     required this.detail,
     required this.semanticLabel,
     required this.onTap,
-    this.emphasized = false,
   });
 
   final IconData icon;
@@ -14871,7 +14862,6 @@ class _DecisionActionRow extends StatelessWidget {
   final String detail;
   final String semanticLabel;
   final VoidCallback onTap;
-  final bool emphasized;
 
   @override
   Widget build(BuildContext context) {
@@ -14879,9 +14869,9 @@ class _DecisionActionRow extends StatelessWidget {
     final labelText = Text(
       label,
       style: context.buyMeta.copyWith(
-        color: emphasized ? BuyV2Colors.navy : BuyV2Colors.muted,
+        color: BuyV2Colors.muted,
         fontSize: 8,
-        fontWeight: emphasized ? FontWeight.w900 : FontWeight.w700,
+        fontWeight: FontWeight.w700,
       ),
     );
     final values = Column(
@@ -14900,7 +14890,7 @@ class _DecisionActionRow extends StatelessWidget {
       ],
     );
     final actionIcon = Icon(
-      emphasized ? Icons.storefront_rounded : Icons.arrow_forward_rounded,
+      Icons.arrow_forward_rounded,
       color: BuyV2Colors.navy,
       size: 18,
     );
@@ -14912,7 +14902,7 @@ class _DecisionActionRow extends StatelessWidget {
         onTap: onTap,
         child: ExcludeSemantics(
           child: Material(
-            color: emphasized ? BuyV2Colors.softBlue : Colors.transparent,
+            color: Colors.transparent,
             borderRadius: BorderRadius.circular(12),
             child: InkWell(
               onTap: onTap,
@@ -14922,9 +14912,7 @@ class _DecisionActionRow extends StatelessWidget {
                   minHeight: BuyV2Metrics.minimumTap,
                 ),
                 child: Padding(
-                  padding: emphasized
-                      ? const EdgeInsets.all(9)
-                      : const EdgeInsets.symmetric(vertical: 3),
+                  padding: const EdgeInsets.symmetric(vertical: 3),
                   child: largeText
                       ? Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -14984,7 +14972,6 @@ class _ProductOwnedActionPanel extends StatelessWidget {
     required this.quantity,
     this.deliveryDecision,
     this.showPurchaseFacts = true,
-    this.leadingAction,
     required this.rxBlocked,
     required this.onAdd,
     required this.onEdit,
@@ -14996,7 +14983,6 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   final int quantity;
   final String? deliveryDecision;
   final bool showPurchaseFacts;
-  final Widget? leadingAction;
   final bool rxBlocked;
   final VoidCallback onAdd;
   final VoidCallback onEdit;
@@ -15092,7 +15078,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
             crossAxisAlignment: WrapCrossAlignment.center,
             spacing: 8,
             runSpacing: 8,
-            children: [?leadingAction, action],
+            children: [action],
           ),
         ),
       );
