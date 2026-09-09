@@ -4,6 +4,8 @@
 
 ### R668-AUDIT-COMPARE-EQUIVALENCE-001 — Compare mixes different goods and lacks quantity-normalized supplier results
 
+Quick Shop extension571: Herbal bathing soap5 Compare includes750ml liquid handwash and toothbrushes beside a second supplier's pack-of4 soap. The non-equivalent handwash precedes the same-pack soap. Quick-origin results also include an unknown delivery promise, with no buyer-selectable delivery eligibility. XML1443BD698EF1B3085D8EB45F1093184CDA0C8D0B7661CEE1508FA2AE65FF4975. Same existing comparison defect, not a new duplicate.
+
 OPEN P2; real Redmi r66.8 normal display. Shop atta2 Compare540 contains atta, rice and sugar. Manufacturer tomato offer Compare549 contains tomatoes, potatoes and onions. These are different goods, not comparable supplier prices for the buyer's intended product. No visible requested-quantity, exact-pack, local/national, fastest-delivery or retail/wholesale comparison controls; four entries only. XML540 09E81DF0EE10810D77EF7BCF155F3FE8507E50D70F5527F917676AD158A125B4; XML549 FF5A688862DE51067AAFFAF96194110ED8A0C451107C176D9E330A9DEA580EBC. Source confirms views1293 collects current product, same-destination variants and related continuations, deduplicates and stops at4. Session6078 matches variants by canonicalId AND destination; session6137 ranks same-destination continuations by category/brand then raw pack price, without same-product equivalence. Comparison card displays pack price/promise/partner; no requested-quantity quotation. This is a comparison-selection defect, distinct from existing image and navigation tickets. No claim that displayed pack prices are arithmetically wrong.
 
 ### R668-REQ-COMPARE-SUPPLIER-001 — Shared comparison contract for actual serviceable supplier offers
