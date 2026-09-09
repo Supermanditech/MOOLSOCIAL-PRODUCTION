@@ -258,3 +258,113 @@ Current qualification remains exactly the 11 focused local queue tests recorded 
 3. Reuse Buy for 07/11; complete 09/10 and 12/13 in their scoped destinations. Exact shared ownership must be confirmed before edits; no Cursor dirty worktree or integration mutation.
 4. Run 15 and the carried-forward pre-dashboard checks; combine qualified fixes into the agreed next APK, not one APK per ticket. Review only is permitted on current r66.13.
 5. All 15 audit children are open. They are a mixture of confirmed frontend shortcomings, coverage work and explicit backend/consumer dependencies. Do not represent them as 15 reproduced OPPO crashes, silently close old pending checks, or claim all current dashboard journeys are production ready.
+
+## OPPO dashboard / first-tap audit — 2026-09-09, bounded round completed
+
+Founder limits this round to the dashboard, its states and first-tap destinations. The prior DASH-LOAD inventory is the complete requirement map, not permission to implement deeper checkout, external sending, money movement, backend deployment or later screens. For each ticket, implement only its dashboard projection, exact first-tap action/state, recovery and frontend contract in this round; retain deeper execution as a named dependency.
+
+Device: OPPO 2b3e0f71 only, r66.13 runtime 2026090903. Installed base.apk SHA-256 independently re-read: 51CCCCEDA86C1DA803B4919467C3CF7BFAC9B5A1A6E40CD3A76B2E23143B3C10. Redmi untouched. Source unchanged. QA Store OPPO-QA-r6612-Document-Test is off/private with no recorded orders, stock or customer dues; populated/live/large-load states cannot be qualified from its empty state.
+
+Native evidence continues without overwriting earlier captures: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-13-native-20260909, starting 041.
+
+Bounded checks through capture 077:
+
+- 041–043: dashboard and compact read-only status panel. Both statuses are visible; Android Back restores the same Store.
+- 044–052: statement first view, Purchases tab, period menu/Month, Collect dues and zero-balance Settle; correct return each time. No populated statement, eligible payout or payment transaction tested. Purchases adapter remains DASH-LOAD-07/08.
+- 053–058: setup alert, inline Search, nonmatching ZZQA1000 query, keyboard dismissal then dashboard return. Keyboard field and feedback fit. No all-order search qualification; DASH-LOAD-02/03 remains open.
+- 059–064: Store-context Restock, manufacturer offer list and empty Group Bulk Buying, each with dashboard return. Do not treat older embedded Buy content as latest Cursor acceptance. Store wrapper/offer decision information remains DASH-LOAD-07/11/13.
+- 065–068: Orders empty view, Packing filter and horizontal reveal of Ready/History. No delivery/exception bucket appears; deduplicate into DASH-LOAD-01/06. No 100-order native test claimed.
+- 069–075: Sell empty bill; customer editor; keyboard; short-number error for 123; Close cancels and preserves the blank bill; Back restores dashboard. No customer saved or invoice created.
+- 076–077: Stock first view and More product tools sheet. A new bottom-inset defect is visible, below.
+
+### DASH-FIRST-TAP-02 — Product-tools sheet bottom inset
+
+Durable incident: REG4558. No source fix yet.
+
+- State: OPEN; OPPO-confirmed on 077-stock-tools-state.png/XML, normal font.
+- User/outcome: Grocery/Kirana retailer can read and reach every product tool from the Stock first-tap destination; the same shared presentation also serves Speciality Retail.
+- Reproduction: dashboard → Stock → More product tools; the last Open stock statement description reaches the Android navigation boundary and is visibly clipped. Do not confuse this with the visually fitting read-only Store status panel.
+- Correction scope: existing Work sheet layout only; content-sized height with actual bottom inset, bounded scrolling when necessary, accessible dismissal and full final-row touch area. No new destination or duplicate stock statement.
+- Verify normal/large text, keyboard transitions if reused by an input sheet, both Back mechanisms, final-row scroll/reach and original Store context. Do not relabel existing shared Files defect REG4556 as closed; its owner is distinct unless source tracing proves a common fix.
+
+### DASH-FIRST-TAP-03 — Counter-bill customer mobile validation
+
+Durable incident: REG4559. No source fix yet.
+
+- State: OPEN source-confirmed validation gap; native short-number rejection passes on 073. Overlength/alphabetic acceptance has not been exercised by saving a customer.
+- Owner: existing _StoreSaleCustomerSheetState._confirm in work_workspace_dashboard_screen.dart (around 17580); it strips nondigits and tests only length < 10.
+- User/outcome: Grocery/Kirana retailer adds the correct customer contact to the counter bill; the shared Speciality Retail flow gets the same correction.
+- Correction scope: reuse existing canonical mobile validation/normalisation; accept supported country-prefix formatting, reject excess digits, letters and invalid supported numbering forms. Show field-specific correction, retain input and allow Cancel without saving. Never treat format validity as verified identity or send an OTP automatically.
+- Verify malformed/valid formatted contacts, correction/retry, recent-customer selection, keyboard/large text, unsent bill retention and Back. No actual message, invoice publication or payment required for this first-tap ticket.
+
+Audit-runner incident REG4557: capture 084 succeeded, but a guard then expected the off-screen Bring customers back heading after keyboard dismissal. Promotion fields, selected shortcut and the same Store remained visible; retained scroll is not a navigation failure. The guarded subsequent 085/086 actions did not run in that invocation; they were performed only after registration and refreshed passing gates. An overbroad registry inspection truncated unrelated historical output. A later source lookup included an absent ui_v2/chat path; the existing features/chat owner was subsequently read directly. No missing output or partial failed lookup is qualification evidence.
+
+### DASH-FIRST-TAP-04 — Shared Chat first-view inline search
+
+- State: OPEN, native presentation confirmed on 092; durable REG4560. This is a child of existing DASH-LOAD-12/13, not a new Chat implementation.
+- User/outcome: Grocery/Kirana retailer enters contextual Chat without a boxed/truncated search or duplicated idle search symbols. Speciality Retail reuses the same shared Chat.
+- Evidence: Search conversati... is clipped in a pill-like wrapper, with both leading and trailing search icons. Existing chat_inbox_screen.dart around 695–731 declares both icons; InputBorder.none alone does not establish the actual rendered inline treatment.
+- Scope: exact existing shared Chat search/wrapper and focused tests, subject to current owner check; retain compact New conversation, filters, query, drafts and Store return. Do not change thread sending or Cursor Buy. Coordinate with REG4549/4550 rather than duplicating their error/recovery scope.
+- Acceptance: full professional search label, one clear search affordance, query/clear/close/keyboard states, 100%/200%, touch targets, focus/semantics and exact Back. Current native Chat entry/Back passes; this is not all-Chat acceptance.
+
+### DASH-FIRST-TAP-05 — Select the retailer's actual first product
+
+- State: OPEN; native102 plus source-confirmed; durable REG4561. Reuse DASH-LOAD-10/13 catalogue work.
+- User/outcome: Grocery/Kirana retailer chooses the product/pack actually sold before setting price and quantity; Speciality Retail must not be forced through an unrelated grocery default.
+- Current Continue store setup chooses existing catalogue.firstOrNull or workspaceMasterCatalogue.first; the QA first view displays Fortune Sunflower Oil with Add but no in-view chooser. Dashboard Add products instead reaches the already-existing Stock catalogue.
+- Scope: reuse the existing catalogue selector/editor inside this same first-tap setup surface; retain exact SKU/pack/private cost/public selling-price mapping, deliberate selection, cancellation and existing Store return. Do not build another catalogue, reintroduce pre-dashboard documentation or change business type approval.
+- Acceptance: empty/existing catalogue, actual chosen SKU rather than default substitution, long labels, unavailable product, Back/cancel/draft and large text. Keep pricing-validation review linked to DASH-LOAD-08: this setup uses int.tryParse(... ) ?? 0; verify supported decimal/minor-unit rules and reject malformed amounts without silent zero substitution before any live save. No product or price was saved in this OPPO audit.
+
+### Native round completion and evidence
+
+Captured **63 PNG/XML/log sets, 041–103** across **23 dashboard controls/entries and their bounded states/returns**, not 63 separate screens. The extra entries include multiple ways to reach the same existing destination; they do not authorise duplicate pages.
+
+Manifest: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-13-native-20260909/dashboard-first-tap-audit-041-103-manifest.json.
+Manifest SHA-256: 73D45BFC1F68C519AEA0434184A4BAE3B3BC525351F4E6EB1864D7FCBBF446E1.
+The manifest binds all 189 files and their byte sizes/hashes (9,534,775 bytes total). Prior001–040 evidence and manifest-v1 are untouched.
+
+| Dashboard entry / state | OPPO evidence | Bounded result / ticket |
+| --- | --- | --- |
+| Store status | 041–043 | Taking orders Off and Storefront Private both visible; compact read-only panel; Back retains Store. No state toggled. |
+| View statement | 044–048 | Sales/Purchases entry, period menu and Month selection fit and respond; Back retains Store. Populated data/linked purchase ledger remain DASH-LOAD-07/08. |
+| Collect dues | 049–050 | Honest no-dues view and Back. No reminder, collection or paid-account history exercised. |
+| Settle | 051–052 | Zero recorded balance, breakdown and disabled Review payout; Back. No eligibility/payment qualification. |
+| Alerts | 053–054 | One setup alert matches this QA Store; Back. Multi-order/exception addressing remains DASH-LOAD-03. |
+| Inline Search | 055–058 | Focus/keyboard, ZZQA1000 no-result response and two-stage Android Back work. No record search success in empty Store; DASH-LOAD-02 remains open. |
+| Restock | 059–060 | Existing Store-scoped embedded procurement opens and returns. Large wrapper/shortcut height is a first-view compaction review under DASH-LOAD-13, not permission to redesign Cursor Buy. |
+| Buy Direct | 061–062 | Manufacturer offer list opens/returns. Product/pack/price/dispatch shown; unit comparison, minimum total, fees and supportable saving need DASH-LOAD-11/13. Do not fabricate missing comparison data. |
+| Group Bulk Buying | 063–064 | Honest empty view and Back. Multiple live deals/commitments/arrivals remain DASH-LOAD-11; no payment or subscription tested. |
+| Orders | 065–068 | Empty active queue, Packing filter, horizontal Ready/History reveal and Back. Missing dedicated delivery/exception overview maps to DASH-LOAD-01/06, not another duplicate ticket. |
+| Sell | 069–075 | Blank bill, customer editor, keyboard, short contact error, Close without saving and dashboard return. REG4559 covers remaining format gap. |
+| Stock | 076–079 | Catalogue entry, tools sheet and Back; REG4558 records clipped final subtitle. No SKU imported/published/changed. |
+| Send store link | 080–081 | Correct unavailable/setup prerequisite state for off/private Store; Back. No WhatsApp, share, public link or auth-resume test. |
+| Promote store | 082–085 | No-public-products/no-opt-in state and disabled publication; field focus, keyboard dismissal, retained scroll and dashboard return. No offer saved or published. |
+| Post requirement | 086–087 | Compact ten-choice selector is visible and Close restores dashboard. Category selection/submission beyond this selector was not executed. Service fee/entitlement and posting states remain dependencies. |
+| Choose Workspace | 088–089 | Active QA Store separated from saved application; Request another Workspace visible; Back. No switch to another account/application or new request made. |
+| Profile | 090–091 | Contextual drawer shows current Store and access/settings; Back preserves dashboard. No nested account/security/provider action. |
+| Chat | 092–093 | Inbox shows two support threads and returns correctly. REG4560 records first-view search presentation; no thread/message/send tested in this round. |
+| Central Delivery or pickup | 094–095 | Inline choices expand/collapse within dashboard; no setting changed. Normal-size centre and actions fit. |
+| Scanner | 096–097 | Scanner entry has Scan now/Enter code and Close returns to Store. UI XML reports both actions enabled. Camera image is black in capture; lens scene and image-read pipeline were not controlled, so this is neither a camera-failure finding nor scan-success evidence. Manual entry/product decoding remain untested; Cursor-owned implementation unchanged. |
+| Mool | 098–099 | Global menu opens in place and Android Back closes it. No other module opened. |
+| Central Add products | 100–101 | Reuses Stock first view and returns; no new product added. |
+| Continue store setup | 102–103 | Existing setup first view and Back; REG4561 records fixed-first-product gap. No Finish setup, price or availability mutation. |
+
+Final device state: same OPPO QA Store dashboard, off/private, setup0/2, zero orders/stock/dues. No messaging, calling, payment, publication, real order change, account clear, device setting change, APK installation or Redmi action.
+
+### Implementation scope lock — dashboard, states, first tap only
+
+**19 open dashboard acceptance children:** DASH-LOAD-01–15 plus DASH-FIRST-TAP-02–05. These are not 19 reproduced native crashes. REG4557 is an audit-runner incident and is not included as a product ticket. Older carried-forward Files/support/accessibility/regression checks remain in DASH-FIRST-TAP-01 without duplication.
+
+| Existing ticket(s) | Implement within this round | Explicitly held beyond this round |
+| --- | --- | --- |
+| DASH-LOAD-01/02/03 | Dashboard counts/priority/freshness; selected queue/central state; exact search/alert-to-item addressing and Back | New deeper order-detail journeys unrelated to the central/first-tap work |
+| DASH-LOAD-04/05/06/14 | Order-scoped frontend state/recovery; typed readiness, timing, payment, rider/collection and load contracts; safe disabled/pending/unknown states | Server capacity/assignment/security enforcement and live consumer/rider integration; no fixture qualifies them |
+| DASH-LOAD-07/11 | Incoming-supply and deal previews/counts; exact first-tap tracking/offer state; thin accepted Buy return/identity adapter | New cart/checkout/payment/receiving completion backend or copied Buy screens |
+| DASH-LOAD-08/09/10 | Exact money/stock/return summaries, transaction/stock first view, validated first-view fields, pagination contract and exception entry | Actual settlement/refund/ledger execution, tax work and full downstream return journeys |
+| DASH-LOAD-12/13 | Existing first-tap wording/label fit, relevant actions, Chat/link context and honest unavailable/entitlement states | Real external sends, promotion/requirement publishing, filing/credit service execution and unrelated shared-screen redesign |
+| DASH-LOAD-15 | Controlled local mixed-state fixture replay/captures and subsequent OPPO UI qualification for the above | Production/server throughput claims or claims that one retailer can fulfil 1,000 concurrent orders |
+| DASH-FIRST-TAP-02–05 | Exact sheet inset, sale-contact validation, shared Chat first-view search, and setup product selection corrections | New onboarding flows, duplicate catalogue or broader product redesign |
+
+Pending scenarios must remain explicit: populated active/overdue/exception customer queues; 100/1,000 simultaneous mixed-state replay and larger daily history; real supplier/GPS events; approved/denied/unknown timing changes; order-specific collection authorisation; loaded dues/settlements/returns; populated search/alert identity; interruption/relaunch and multi-counter updates; physical200%/TalkBack, remaining cloud/support recovery and genuine barcode decoding. Empty QA views cannot close these.
+
+The approved main dashboard geometry is preserved. Correct first-tap fit/decision hierarchy through existing components, not additional rail layers, giant hero cards, new landing pages or duplicated business logic. Implement only after exact current owner checks and focused regression plans; no product/test source was changed by this audit.

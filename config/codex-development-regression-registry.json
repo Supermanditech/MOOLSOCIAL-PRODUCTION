@@ -10,6 +10,101 @@
   },
   "entries": [
     {
+      "id": "REG-20260909-4560-CHAT-FIRST-TAP-INLINE-SEARCH-PRESENTATION",
+      "status": "registered_native_shared_first_tap_followup_pending",
+      "appliesTo": [
+        "primary",
+        "chat",
+        "work",
+        "accessibility",
+        "testing"
+      ],
+      "mistake": "Store > Chat on OPPO r66.13 shows Search conversati... within a pill-like filled wrapper and two search icons in the same idle field. Native092 retains the exact first-tap image. This conflicts with the approved inline-search/no-duplicated-affordance requirement; it is not a message-send or backend failure.",
+      "rootCause": "chat_inbox_screen.dart renders both a prefix search icon and an idle suffix search action within ChatSearchFocusMotion. The source input border is none, but that alone does not qualify its rendered wrapper and available label width.",
+      "prevention": "DASH-FIRST-TAP-04: coordinate the existing shared Chat owner; reuse one inline search treatment and compact start-conversation action, preserve draft/filter/query/return semantics, test rendered normal/200% and keyboard, and keep REG4549/4550 as distinct recovery checks. Do not redesign all Chat or edit Cursor Buy.",
+      "gates": [
+        "apps/mobile/test/shared_vertical_slice_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md"
+      ]
+    },
+    {
+      "id": "REG-20260909-4561-STORE-SETUP-FIXED-FIRST-PRODUCT",
+      "status": "registered_native_and_source_first_tap_gap_pending",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing"
+      ],
+      "mistake": "Dashboard Continue store setup opens a first-product view that defaults to Fortune Sunflower Oil in an empty QA Store and offers Add but no product chooser on this first view. Native102; source selects workspaceCatalogueItems.firstOrNull or workspaceMasterCatalogue.first and invokes addRetailerProduct.",
+      "rootCause": "The older shop-setup first-product path remains separate from the existing catalogue-selection workflow reached through dashboard Add products/Stock. It assumes the first catalogue product instead of an explicit retailer choice.",
+      "prevention": "DASH-FIRST-TAP-05: reuse the existing scoped catalogue selector in the first-tap setup surface, require deliberate product/pack choice, preserve draft and public SKU data, and do not add a duplicate catalogue or new onboarding journey. Test empty and existing catalogues, cancellation, Back and retailer category relevance; no product was added during this audit.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md"
+      ]
+    },
+    {
+      "id": "REG-20260909-4557-NATIVE-AUDIT-VIEWPORT-PREDICATE",
+      "status": "registered_test_check_correction_before_continuation",
+      "appliesTo": [
+        "primary",
+        "testing",
+        "work"
+      ],
+      "mistake": "The r66.13 OPPO audit stopped after successful capture084 because the orchestration expected Bring customers back to remain in the XML viewport after keyboard dismissal. The correct Promote store view remained open with retained scroll, offer fields and Store shortcuts; no app navigation defect was proven. A subsequent 71-line registry inspection was output-truncated; no missing content is qualification evidence.",
+      "rootCause": "The test predicate used a scrollable heading instead of stable current destination and field identity. Diagnostic output selection also included oversized unrelated historical registry entries. A later bounded source lookup included the absent apps/mobile/lib/ui_v2/chat directory; a following Get-Date masked its rg exit2. Read the discovered existing features/chat owner directly; that failed lookup is not qualification evidence.",
+      "prevention": "Before the next tap, verify the observed destination using stable in-view controls and correct Store identity, allowing expected retained scroll. Preserve084 PNG/XML/log and do not count the guard as an app failure or run its unexecuted subsequent steps. Read only bounded relevant registry entries or parsed identity/count projections.",
+      "gates": [
+        "scripts/check-codex-subagent-coordination-policy.ps1"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md"
+      ]
+    },
+    {
+      "id": "REG-20260909-4558-WORK-PRODUCT-TOOLS-SHEET-SAFE-AREA",
+      "status": "registered_native_first_tap_defect_pending",
+      "appliesTo": [
+        "primary",
+        "work",
+        "accessibility",
+        "testing"
+      ],
+      "mistake": "On r66.13 OPPO normal text, Stock > More product tools displays the final Open stock statement subtitle across the Android navigation boundary; its ending is clipped. Native077 PNG/XML retains the evidence.",
+      "rootCause": "Existing Work product-tools bottom sheet does not keep the complete final content within the actual bottom safe area. Exact shared layout owner is to be traced before implementation; do not equate it with Files REG4556.",
+      "prevention": "DASH-FIRST-TAP-02: correct existing sheet content/inset/scroll fit only, retain all actions and dismissal, assert the complete last row and minimum target above Android navigation at normal and200% text, and replay OPPO. No product source has been fixed by this registration.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md"
+      ]
+    },
+    {
+      "id": "REG-20260909-4559-WORK-SALE-CUSTOMER-CONTACT-VALIDATION",
+      "status": "registered_source_confirmed_first_tap_gap_pending",
+      "appliesTo": [
+        "primary",
+        "work",
+        "testing"
+      ],
+      "mistake": "Counter-bill customer _StoreSaleCustomerSheetState._confirm strips all nondigits and rejects only length less than10, allowing malformed overlength or letter-containing values past this editor. OPPO073 proves correct short-number rejection only; no malformed customer was saved or invoice sent.",
+      "rootCause": "This separate sale editor uses an ad hoc lower-bound digit count instead of the existing canonical supported mobile-format validation.",
+      "prevention": "DASH-FIRST-TAP-03: reuse canonical normalisation and field-specific validation, preserving supported country prefixes, original input, cancellation and bill draft. Test excess digits, letters, valid formatting and recent-customer selection. Format checks never grant identity verification. No OTP, message, real invoice or payment needed.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/work_store_atomic_operations_test.dart"
+      ],
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md"
+      ]
+    },
+    {
       "id": "REG-20260909-4556-SHARED-FILES-SHEET-CANCEL-SAFE-AREA",
       "status": "registered_native_first_tap_defect_pending",
       "appliesTo": ["primary", "profile", "accessibility", "testing"],
