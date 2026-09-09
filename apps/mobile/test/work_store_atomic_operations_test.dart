@@ -29,6 +29,48 @@ class _OrderTimeGateway extends ReviewWorkGateway
 }
 
 void main() {
+  for (final entry in {
+    '9829012345': '9829012345',
+    ' 9829012345 ': '9829012345',
+    '98290 12345': '9829012345',
+    '98290-12345': '9829012345',
+    '+91 98290 12345': '9829012345',
+    '91-98290-12345': '9829012345',
+    '919829012345': '9829012345',
+    '+919829012345': '9829012345',
+    '6123456789': '6123456789',
+    '9123456789': '9123456789',
+  }.entries) {
+    test('REG4559 supported mobile ${entry.key}', () {
+      expect(normalizeWorkspaceMobile(entry.key), entry.value);
+    });
+  }
+  for (final value in [
+    '',
+    '12345',
+    '98290123456',
+    '0000000000',
+    '5123456789',
+    'x9829012345',
+    '9829012345x',
+    'Rakesh · 9829012345',
+    '+1 9829012345',
+    '00919829012345',
+    '+91+9829012345',
+    '98290--12345',
+    '98290\n12345',
+    '98290.12345',
+    '९८२९०१२३४५',
+    '9829012345 / 9876543210',
+  ]) {
+    test(
+      'REG4559 rejects entire malformed mobile ${value.replaceAll('\n', 'newline')}',
+      () {
+        expect(normalizeWorkspaceMobile(value), isNull);
+      },
+    );
+  }
+
   WorkSession liveSession([ReviewWorkGateway? gateway]) {
     final session = WorkSession(gateway: gateway ?? ReviewWorkGateway())
       ..activeWorkspace = const WorkWorkspace(

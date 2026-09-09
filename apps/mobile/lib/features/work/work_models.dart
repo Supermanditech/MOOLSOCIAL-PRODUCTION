@@ -3,6 +3,17 @@ import 'package:flutter/material.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 
+/// Format validation only, using the existing supported Indian mobile range.
+/// This does not establish customer identity, consent or OTP verification.
+String? normalizeWorkspaceMobile(String value) {
+  final input = value.trim();
+  if (!RegExp(r'^(?:\+?91[ -]?)?[6-9]\d(?:[ -]?\d){8}$').hasMatch(input)) {
+    return null;
+  }
+  final digits = input.replaceAll(RegExp(r'[ +\-]'), '');
+  return digits.length == 12 ? digits.substring(2) : digits;
+}
+
 enum WorkFeedFilter { forYou, jobs, freelance, campaigns, nearby }
 
 extension WorkFeedFilterLabel on WorkFeedFilter {

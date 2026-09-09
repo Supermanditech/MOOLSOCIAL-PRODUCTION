@@ -17762,6 +17762,16 @@ class _CounterOrderSurface extends StatefulWidget {
   State<_CounterOrderSurface> createState() => _CounterOrderSurfaceState();
 }
 
+// Older customer history may contain a display name followed by a mobile.
+// Only history/draft display values use this; typed input is validated whole.
+String? _storedCounterCustomerMobile(String customer) {
+  final parts = customer.split('·');
+  if (parts.length > 2 || (parts.length == 2 && parts.first.trim().isEmpty)) {
+    return null;
+  }
+  return normalizeWorkspaceMobile(parts.last);
+}
+
 class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   late final TextEditingController _customer = TextEditingController(
     text: widget.session.workspaceOrderCustomer,
@@ -17812,9 +17822,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   };
 
   void _save() {
-    final phone = _customer.text.replaceAll(RegExp(r'\D'), '');
-    final error = phone.length < 10
-        ? 'Enter the customer’s 10-digit mobile number.'
+    final error = _storedCounterCustomerMobile(_customer.text) == null
+        ? 'Enter a valid 10-digit customer mobile number.'
         : widget.session.workspaceOrderItemCount == 0
         ? 'Add at least one product from your store catalogue.'
         : _fulfilment != 'At the shop' && _address.text.trim().isEmpty
@@ -18032,7 +18041,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       showDragHandle: false,
       backgroundColor: Colors.white,
       builder: (_) => _StoreSaleCustomerSheet(
-        initialValue: _customer.text,
+        initialValue:
+            _storedCounterCustomerMobile(_customer.text) ?? _customer.text,
         recentCustomers: _recentCustomers,
       ),
     );
@@ -18124,8 +18134,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
 
   @override
   Widget build(BuildContext context) {
-    final validPhone =
-        _customer.text.replaceAll(RegExp(r'\D'), '').length >= 10;
+    final validPhone = _storedCounterCustomerMobile(_customer.text) != null;
     final query = widget.query.trim().toLowerCase();
     final products = widget.session.workspaceCatalogueItems
         .where(
@@ -18137,194 +18146,219 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         )
         .toList(growable: false);
     final selectedCustomer = _customer.text.trim();
+    final controls = Container(
+      key: const Key('work-sale-compact-controls'),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: Color(0xFFE9EDF5))),
+      ),
+      child: _StoreScaledPair(
+        gap: 0,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        first: TextButton.icon(
+          key: const Key('work-sale-customer'),
+          onPressed: _editCustomer,
+          style: TextButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+            alignment: Alignment.centerLeft,
+          ),
+          icon: const Icon(Icons.person_outline_rounded, size: 20),
+          label: Text(
+            selectedCustomer.isEmpty
+                ? 'Add customer'
+                : selectedCustomer.split('·').first.trim(),
+            key: const Key('work-sale-customer-label'),
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
+          ),
+        ),
+        second: Row(
+          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            Flexible(
+              child: TextButton(
+                key: const Key('work-sale-delivery'),
+                onPressed: () => _chooseSaleOption(delivery: true),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 6,
+                    vertical: 10,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        _fulfilmentLabel(_fulfilment),
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ),
+                    const SizedBox(width: 3),
+                    const Icon(Icons.expand_more_rounded, size: 18),
+                  ],
+                ),
+              ),
+            ),
+            IconButton(
+              key: const Key('work-sale-source'),
+              tooltip: 'Order received: $_source',
+              onPressed: () => _chooseSaleOption(delivery: false),
+              icon: const Icon(Icons.more_horiz_rounded, size: 22),
+            ),
+          ],
+        ),
+      ),
+    );
+    final emptyProducts = Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (query.isEmpty) ...[
+              OutlinedButton.icon(
+                onPressed: widget.onOpenCatalogue,
+                icon: const Icon(Icons.add_rounded),
+                label: const Text('Add products'),
+              ),
+              const SizedBox(height: 8),
+            ],
+            Text(
+              query.isNotEmpty
+                  ? 'No products match your search'
+                  : 'Start with your store catalogue.',
+              style: const TextStyle(color: MoolColors.muted, fontSize: 13),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+    final productList = ListView.separated(
+      key: const Key('work-sale-products'),
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      itemCount: products.length,
+      separatorBuilder: (_, _) =>
+          const Divider(height: 1, color: Color(0xFFE9EDF5)),
+      itemBuilder: (context, index) =>
+          _SaleProductTile(product: products[index], session: widget.session),
+    );
+    final error = _error == null
+        ? null
+        : Padding(
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            child: Semantics(
+              liveRegion: true,
+              child: Text(
+                _error!,
+                key: const Key('work-order-error'),
+                style: const TextStyle(color: Color(0xFFB42318)),
+              ),
+            ),
+          );
+    final total = Container(
+      key: const Key('work-sale-total-bar'),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Color(0xFFE9EDF5))),
+      ),
+      child: _StoreScaledPair(
+        forceStack: widget.session.workspaceOrderTotal >= 10000000,
+        first: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
+              style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+            ),
+            _StoreMoneyText(
+              '₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
+              style: const TextStyle(
+                color: MoolColors.navy,
+                fontSize: 23,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+        second: FilledButton(
+          key: const Key('work-order-review'),
+          onPressed: _selectedUnits == 0
+              ? null
+              : validPhone
+              ? _review
+              : _editCustomer,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+          child: Text(
+            _selectedUnits == 0
+                ? 'Review bill'
+                : validPhone
+                ? 'Review bill'
+                : 'Add customer',
+            textAlign: TextAlign.center,
+          ),
+        ),
+      ),
+    );
     return Material(
       key: const Key('work-dashboard-counter-order-screen'),
       color: Colors.white,
-      child: Column(
-        children: [
-          Container(
-            key: const Key('work-sale-compact-controls'),
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFE9EDF5))),
-            ),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextButton.icon(
-                    key: const Key('work-sale-customer'),
-                    onPressed: _editCustomer,
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 10,
-                      ),
-                      alignment: Alignment.centerLeft,
-                    ),
-                    icon: const Icon(Icons.person_outline_rounded, size: 20),
-                    label: Text(
-                      selectedCustomer.isEmpty
-                          ? 'Add customer'
-                          : selectedCustomer.split('·').first.trim(),
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Flexible(
-                  child: TextButton(
-                    key: const Key('work-sale-delivery'),
-                    onPressed: () => _chooseSaleOption(delivery: true),
-                    style: TextButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
-                        vertical: 10,
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Flexible(
-                          child: Text(
-                            _fulfilmentLabel(_fulfilment),
-                            style: const TextStyle(fontSize: 13),
-                          ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // When fixed controls would crowd out products, keep one native scroll
+          // surface instead of clipping content or reducing the chosen text size.
+          final scaledLine = MediaQuery.textScalerOf(context).scale(14);
+          final minimumWorkingHeight = products.isEmpty
+              ? scaledLine * 4 + 190
+              : scaledLine * 8 + 160;
+          if (constraints.maxHeight < minimumWorkingHeight) {
+            return CustomScrollView(
+              key: const Key('work-sale-short-scroll'),
+              keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+              slivers: [
+                SliverToBoxAdapter(child: controls),
+                if (products.isEmpty)
+                  SliverToBoxAdapter(child: emptyProducts)
+                else
+                  SliverPadding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    sliver: SliverList(
+                      key: const Key('work-sale-products'),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) => _SaleProductTile(
+                          product: products[index],
+                          session: widget.session,
                         ),
-                        const SizedBox(width: 3),
-                        const Icon(Icons.expand_more_rounded, size: 18),
-                      ],
-                    ),
-                  ),
-                ),
-                IconButton(
-                  key: const Key('work-sale-source'),
-                  tooltip: 'Order received: $_source',
-                  onPressed: () => _chooseSaleOption(delivery: false),
-                  icon: const Icon(Icons.more_horiz_rounded, size: 22),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: products.isEmpty
-                ? Center(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.all(12),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (query.isEmpty) ...[
-                            OutlinedButton.icon(
-                              onPressed: widget.onOpenCatalogue,
-                              icon: const Icon(Icons.add_rounded),
-                              label: const Text('Add products'),
-                            ),
-                            const SizedBox(height: 8),
-                          ],
-                          Text(
-                            query.isNotEmpty
-                                ? 'No products match your search'
-                                : 'Start with your store catalogue.',
-                            style: const TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 13,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ],
+                        childCount: products.length,
                       ),
                     ),
-                  )
-                : ListView.separated(
-                    key: const Key('work-sale-products'),
-                    keyboardDismissBehavior:
-                        ScrollViewKeyboardDismissBehavior.onDrag,
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
-                    itemCount: products.length,
-                    separatorBuilder: (_, _) =>
-                        const Divider(height: 1, color: Color(0xFFE9EDF5)),
-                    itemBuilder: (context, index) => _SaleProductTile(
-                      product: products[index],
-                      session: widget.session,
-                    ),
                   ),
-          ),
-          if (_error != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Semantics(
-                liveRegion: true,
-                child: Text(
-                  _error!,
-                  key: const Key('work-order-error'),
-                  style: const TextStyle(color: Color(0xFFB42318)),
-                ),
-              ),
-            ),
-          Container(
-            key: const Key('work-sale-total-bar'),
-            padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: Color(0xFFE9EDF5))),
-            ),
-            child: _StoreScaledPair(
-              forceStack: widget.session.workspaceOrderTotal >= 10000000,
-              first: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '$_selectedUnits ${_selectedUnits == 1 ? 'unit' : 'units'}',
-                    style: const TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                  _StoreMoneyText(
-                    '₹${_formatStoreAmount(widget.session.workspaceOrderTotal)}',
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 23,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ],
-              ),
-              second: FilledButton(
-                key: const Key('work-order-review'),
-                onPressed: _selectedUnits == 0
-                    ? null
-                    : validPhone
-                    ? _review
-                    : _editCustomer,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 12,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                child: Text(
-                  _selectedUnits == 0
-                      ? 'Review bill'
-                      : validPhone
-                      ? 'Review bill'
-                      : 'Add customer',
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-          ),
-        ],
+                if (error != null) SliverToBoxAdapter(child: error),
+                SliverToBoxAdapter(child: total),
+              ],
+            );
+          }
+          return Column(
+            children: [
+              controls,
+              Expanded(child: products.isEmpty ? emptyProducts : productList),
+              ?error,
+              total,
+            ],
+          );
+        },
       ),
     );
   }
@@ -18354,9 +18388,9 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
   }
 
   void _confirm() {
-    final value = _controller.text.trim();
-    if (value.replaceAll(RegExp(r'\D'), '').length < 10) {
-      setState(() => _error = 'Enter the customer’s 10-digit mobile number.');
+    final value = normalizeWorkspaceMobile(_controller.text);
+    if (value == null) {
+      setState(() => _error = 'Enter a valid 10-digit customer mobile number.');
       return;
     }
     Navigator.pop(context, value);
@@ -18412,9 +18446,13 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                 if (_error != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(color: Color(0xFFB42318)),
+                    child: Semantics(
+                      liveRegion: true,
+                      child: Text(
+                        _error!,
+                        key: const Key('work-sale-customer-error'),
+                        style: const TextStyle(color: Color(0xFFB42318)),
+                      ),
                     ),
                   ),
                 if (widget.recentCustomers.isNotEmpty) ...[
@@ -18432,8 +18470,19 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                         style: const TextStyle(fontSize: 14),
                       ),
                       onTap: () {
-                        _controller.text = customer;
-                        _confirm();
+                        final mobile = _storedCounterCustomerMobile(customer);
+                        if (mobile == null) {
+                          _controller.text = customer;
+                          _confirm();
+                          return;
+                        }
+                        final parts = customer.split('·');
+                        Navigator.pop(
+                          context,
+                          parts.length == 2
+                              ? '${parts.first.trim()} · $mobile'
+                              : mobile,
+                        );
                       },
                     ),
                 ],

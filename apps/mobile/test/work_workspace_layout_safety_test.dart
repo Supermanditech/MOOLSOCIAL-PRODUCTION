@@ -14150,6 +14150,173 @@ void main() {
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
   });
 
+  for (final (width, height, scale) in [
+    (412.0, 915.0, 1.0),
+    (412.0, 915.0, 2.0),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('REG4559 customer correction keyboard Back fit $width $scale', (
+      tester,
+    ) async {
+      Future<void> revealCounter(
+        Finder target, {
+        bool towardStart = false,
+      }) async {
+        final short = find.byKey(const Key('work-sale-short-scroll'));
+        if (short.evaluate().isNotEmpty) {
+          await tester.scrollUntilVisible(
+            target,
+            towardStart ? -160 : 160,
+            scrollable: find
+                .descendant(of: short, matching: find.byType(Scrollable))
+                .first,
+            maxScrolls: 20,
+          );
+        }
+        await reveal(tester, target);
+      }
+
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(width, height),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      await revealCounter(
+        find.byKey(const Key('work-order-add-oil-fortune-1l')),
+      );
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.pumpAndSettle();
+      await revealCounter(
+        find.byKey(const Key('work-sale-customer')),
+        towardStart: true,
+      );
+      await tester.tap(find.byKey(const Key('work-sale-customer')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-order-customer'));
+      final confirm = find.byKey(const Key('work-sale-customer-confirm'));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pumpAndSettle();
+      for (final invalid in [
+        '98290123456',
+        'x9829012345',
+        '9829012345x',
+        '5123456789',
+        '+1 9829012345',
+      ]) {
+        await tester.enterText(field, invalid);
+        await reveal(tester, confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-sale-customer-sheet')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('work-sale-customer-error')),
+          findsOneWidget,
+        );
+        expect(tester.widget<TextField>(field).controller!.text, invalid);
+        expect(work.workspaceOrderCustomer, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        expect(tester.takeException(), isNull);
+      }
+      await reveal(tester, find.byKey(const Key('work-sale-customer-error')));
+      await captureStoreView(tester, 'customer-invalid-$width-$scale');
+      await tester.enterText(field, '+91 98290 12345');
+      await reveal(tester, confirm);
+      await tester.tap(confirm);
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderCustomer, '9829012345');
+      expect(work.workspaceInvoices, isEmpty);
+      await revealCounter(
+        find.byKey(const Key('work-sale-customer')),
+        towardStart: true,
+      );
+      final label = find.byKey(const Key('work-sale-customer-label'));
+      final paragraph = tester.renderObject<RenderParagraph>(label);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      expect(
+        paragraph.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 10),
+        ),
+        hasLength(1),
+      );
+      final tile = find.byKey(const Key('work-sale-product-oil-fortune-1l'));
+      if (scale == 2 && height > 600) {
+        final title = find.descendant(
+          of: tile,
+          matching: find.text('Fortune Sunflower Oil'),
+        );
+        final amount = find.descendant(of: tile, matching: find.text('₹264'));
+        expect(
+          tester.getTopLeft(amount).dy - tester.getBottomLeft(title).dy,
+          greaterThanOrEqualTo(6),
+        );
+      }
+      await captureStoreView(tester, 'customer-corrected-$width-$scale');
+      await revealCounter(find.byKey(const Key('work-order-review')));
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-order-review-summary')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await revealCounter(
+        find.byKey(const Key('work-sale-customer')),
+        towardStart: true,
+      );
+      await tester.tap(find.byKey(const Key('work-sale-customer')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, '9829012345');
+      await tester.enterText(field, 'not-a-number');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderCustomer, '9829012345');
+      expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'REG4559 retained malformed draft requests correction not review',
+    (tester) async {
+      final work = liveStore();
+      work.workspaceOrderCustomer = '982901234567';
+      work.workspaceOrderQuantities['oil-fortune-1l'] = 1;
+      // Mount once with a retained, previously accepted malformed draft.
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard?section=sell',
+        work: work,
+      );
+      expect(
+        find.byKey(const Key('work-dashboard-counter-order-screen')),
+        findsOneWidget,
+      );
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-sale-customer-sheet')), findsOneWidget);
+      expect(find.byKey(const Key('work-order-review-summary')), findsNothing);
+      final field = find.byKey(const Key('work-order-customer'));
+      expect(tester.widget<TextField>(field).controller!.text, '982901234567');
+      await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-sale-customer-error')), findsOneWidget);
+      expect(work.workspaceOrderCustomer, '982901234567');
+      expect(work.workspaceInvoices, isEmpty);
+    },
+  );
+
   for (final scale in [1.0, 2.0]) {
     testWidgets(
       'counter isolation keeps pending handover on dashboard $scale',
