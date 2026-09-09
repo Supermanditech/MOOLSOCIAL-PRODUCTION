@@ -5,6 +5,27 @@ import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
+class _CommandAccountStore implements WorkPendingProofStore {
+  _CommandAccountStore([this.accountScope = 'account-A']);
+  @override
+  String? accountScope;
+  @override
+  Future<Map<String, Object?>?> read(String scope) async => null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> draft) async {}
+  @override
+  Future<void> clear(String scope) async {}
+}
+
+const _commandStore = WorkWorkspace(
+  id: 'store-A',
+  name: 'Store A',
+  profileLabel: 'Grocery / Kirana Shop',
+  profileId: 'retailer-grocery',
+  area: 'Jodhpur',
+  verified: true,
+);
+
 class _CommandGateway implements WorkOrderCommandGateway {
   final submitted = <WorkOrderCommand>[];
   final reconciled = <WorkOrderCommand>[];
@@ -94,7 +115,197 @@ void main() {
         gateway: gateway,
       );
     });
-    tearDown(() => operations.dispose());
+    tearDown(() {
+      if (!operations.isDisposed) operations.dispose();
+    });
+
+    WorkSession commandSession([ReviewWorkGateway? legacy]) {
+      final work =
+          WorkSession(
+              gateway: legacy,
+              contactDraftStore: _CommandAccountStore(),
+            )
+            ..activeWorkspace = _commandStore
+            ..workspaceId = 'store-A';
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      addTearDown(work.dispose);
+      return work;
+    }
+
+    test(
+      'session scoped order cannot use legacy timing pickup or delivery effects',
+      () async {
+        final legacy = _OrderTimeGateway();
+        final work = commandSession(legacy);
+        operations.observe(_commandReply('A'));
+        work.selectWorkspaceOrder('A');
+        expect(work.orderTimeServiceAvailable, isFalse);
+        expect(await work.requestWorkspaceOrderTime('A', 2), isFalse);
+        expect(legacy.requests, isEmpty);
+        operations.observe(
+          _commandReply('A', revision: 2, stage: 'Delivery requested'),
+        );
+        expect(await work.verifyWorkspaceHandover('123456'), isFalse);
+        await work.retryWorkspaceDeliveryAssignment();
+        operations.observe(
+          _commandReply('A', revision: 3, stage: 'Ready for pickup'),
+        );
+        expect(await work.verifyWorkspacePickup('123456'), isFalse);
+        expect(legacy.handoverCalls, 0);
+        expect(legacy.deliveryAssignmentCalls, 0);
+        expect(legacy.operationalSaveCalls, 0);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceSalesToday, 0);
+      },
+    );
+
+    test(
+      'session A reply cannot replace selected B or replay stock and money',
+      () async {
+        final legacy = ReviewWorkGateway();
+        final work = commandSession(legacy);
+        operations.observe(_commandReply('A'));
+        operations.observe(_commandReply('B'));
+        expect(work.currentWorkspaceOrderId, isNull);
+        expect(work.selectWorkspaceOrder('A'), isTrue);
+        final a = work.submitWorkspaceOrderAction('A', WorkOrderAction.accept);
+        expect(work.selectWorkspaceOrder('B'), isTrue);
+        final b = work.submitWorkspaceOrderAction('B', WorkOrderAction.accept);
+        gateway.responses.first.complete(
+          _commandReply(
+            'A',
+            command: gateway.submitted.first,
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await a, isTrue);
+        expect(work.currentWorkspaceOrderId, 'B');
+        expect(work.workspaceOrderStage, 'Confirmed');
+        expect(work.workspaceOrderCustomer, 'Customer B');
+        gateway.responses.last.complete(
+          _commandReply(
+            'B',
+            command: gateway.submitted.last,
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await b, isTrue);
+        expect(work.workspaceOrderStage, 'Preparing');
+        expect(
+          work.workspaceOrders.every((o) => o.stage == 'Preparing'),
+          isTrue,
+        );
+        expect(work.workspaceSalesToday, 0);
+        expect(work.workspaceSettlementBalance, 0);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(legacy.operationalSaveCalls, 0);
+      },
+    );
+
+    test(
+      'session uncertain A remains retryable while B continues packing',
+      () async {
+        final work = commandSession();
+        operations.observe(_commandReply('A'));
+        operations.observe(_commandReply('B', stage: 'Preparing'));
+        work.selectWorkspaceOrder('A');
+        final a = work.submitWorkspaceOrderAction('A', WorkOrderAction.accept);
+        gateway.responses.single.completeError(StateError('unknown'));
+        expect(await a, isFalse);
+        expect(work.selectWorkspaceOrder('B'), isTrue);
+        expect(work.workspacePackingLines, isNotEmpty);
+        for (final line in work.workspacePackingLines) {
+          expect(
+            work.setWorkspaceOrderPackingLine(
+              storeId: 'store-A',
+              orderId: 'B',
+              lineId: line.id,
+              quantity: line.quantity,
+              packed: true,
+            ),
+            isTrue,
+          );
+        }
+        expect(work.workspacePackingComplete, isTrue);
+        final b = work.submitWorkspaceOrderAction('B', WorkOrderAction.ready);
+        gateway.responses.last.complete(
+          _commandReply(
+            'B',
+            command: gateway.submitted.last,
+            revision: 2,
+            stage: 'Ready',
+          ),
+        );
+        expect(await b, isTrue);
+        final retry = work.retryWorkspaceOrderAction('A');
+        gateway.replies.single.complete(
+          _commandReply(
+            'A',
+            command: gateway.reconciled.single,
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await retry, isTrue);
+        expect(work.currentWorkspaceOrderId, 'B');
+        expect(work.workspaceOrderStage, 'Ready');
+        expect(work.errorMessage, isNull);
+      },
+    );
+
+    test(
+      'session hidden Store updates restore exact selection on return',
+      () async {
+        final work = commandSession();
+        operations.observe(_commandReply('A'));
+        work.selectWorkspaceOrder('A');
+        final a = work.submitWorkspaceOrderAction('A', WorkOrderAction.accept);
+        work.activateWorkspace(_scopeSecondStore);
+        expect(work.activeWorkspace?.id, _scopeSecondStore.id);
+        gateway.responses.single.complete(
+          _commandReply(
+            'A',
+            command: gateway.submitted.single,
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await a, isTrue);
+        expect(work.workspaceOrders, isEmpty);
+        work.activateWorkspace(_commandStore);
+        expect(work.currentWorkspaceOrderId, 'A');
+        expect(work.workspaceOrderStage, 'Preparing');
+      },
+    );
+
+    test(
+      'session refuses cross-account binding and legacy full-store overwrite',
+      () {
+        final wrong = WorkSession(
+          contactDraftStore: _CommandAccountStore('account-B'),
+        )..activeWorkspace = _commandStore;
+        addTearDown(wrong.dispose);
+        expect(wrong.bindWorkspaceOrderOperations(operations), isFalse);
+        final legacy = ReviewWorkGateway();
+        final work = commandSession(legacy);
+        operations.observe(_commandReply('A'));
+        work.saveWorkspaceAvailability(
+          acceptingOrders: true,
+          fulfilmentMode: 'Pickup',
+          busyMinutes: 0,
+          reopensAt: '',
+        );
+        expect(legacy.operationalSaveCalls, 0);
+        expect(
+          work.workspaceOperationsSyncError,
+          contains('remain on this device'),
+        );
+        expect(operations.order('A')!.revision, 1);
+      },
+    );
 
     test('order snapshots freeze quantities and reject invalid counts', () {
       final quantities = <String, int>{'sku-A': 2};

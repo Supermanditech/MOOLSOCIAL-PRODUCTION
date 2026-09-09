@@ -22,6 +22,28 @@ import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 
+class _OrderCommandFixtureGateway implements WorkOrderCommandGateway {
+  final submitted = <WorkOrderCommand>[];
+  final reconciled = <WorkOrderCommand>[];
+  final responses = <Completer<WorkOrderReply>>[];
+  final replies = <Completer<WorkOrderReply>>[];
+  @override
+  Future<WorkOrderReply> submitOrderCommand(WorkOrderCommand command) {
+    submitted.add(command);
+    final response = Completer<WorkOrderReply>();
+    responses.add(response);
+    return response.future;
+  }
+
+  @override
+  Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command) {
+    reconciled.add(command);
+    final reply = Completer<WorkOrderReply>();
+    replies.add(reply);
+    return reply.future;
+  }
+}
+
 class _TimingFixtureGateway extends ReviewWorkGateway
     implements WorkOrderTimeGateway {
   final requests = <WorkOrderTimeRequest>[];
@@ -331,8 +353,11 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  WorkSession storeViewFixture([WorkGateway? gateway]) {
-    final work = WorkSession(gateway: gateway)
+  WorkSession storeViewFixture([
+    WorkGateway? gateway,
+    WorkPendingProofStore? contactStore,
+  ]) {
+    final work = WorkSession(gateway: gateway, contactDraftStore: contactStore)
       ..seedVerifiedWorkspace()
       ..retailerSetupSaved = true
       ..reviewStage = WorkReviewStage.live
@@ -7818,6 +7843,97 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final (width, height, scale) in [
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('DASH04 scoped order card submit retry $scale', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final gateway = _OrderCommandFixtureGateway();
+      final storeId = work.activeWorkspace!.id;
+      final operations = WorkOrderOperations(
+        accountScope: 'review-draft-account',
+        workspaceId: storeId,
+        gateway: gateway,
+      );
+      final original = work.currentWorkspaceOrder!;
+      WorkOrderReply reply({
+        WorkOrderCommand? command,
+        int revision = 1,
+        String stage = 'Confirmed',
+      }) => WorkOrderReply(
+        accountScope: 'review-draft-account',
+        workspaceId: storeId,
+        orderId: original.id,
+        operationId: command?.operationId ?? '',
+        revision: revision,
+        state: WorkOrderReplyState.applied,
+        order: original.copyWith(stage: stage),
+      );
+      operations.observe(reply());
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(width, height),
+        textScale: scale,
+      );
+      final accept = find.byKey(const Key('work-activity-order-accept'));
+      await tester.ensureVisible(accept);
+      await tester.pumpAndSettle();
+      expect(accept.hitTestable(), findsOneWidget);
+      await tester.tap(accept);
+      await tester.pumpAndSettle();
+      expect(gateway.submitted.length, 1);
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(find.text('Sending update…'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(find.byKey(const Key('work-order-more-time')))
+            .onPressed,
+        isNull,
+      );
+      expect(find.byKey(const Key('work-activity-order-accept')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'scoped-order-sending-$scale');
+      gateway.responses.single.completeError(StateError('response unknown'));
+      await tester.pumpAndSettle();
+      final retry = find.byKey(
+        Key('work-order-operation-retry-${original.id}'),
+      );
+      await tester.ensureVisible(retry);
+      await tester.pumpAndSettle();
+      expect(retry.hitTestable(), findsOneWidget);
+      expect(tester.getSize(retry).height, greaterThanOrEqualTo(48));
+      expect(find.text('Update not confirmed'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'scoped-order-uncertain-$scale');
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(find.text('Checking update…'), findsOneWidget);
+      expect(gateway.reconciled.single, same(gateway.submitted.single));
+      gateway.replies.single.complete(
+        reply(
+          command: gateway.reconciled.single,
+          revision: 2,
+          stage: 'Preparing',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Preparing');
+      expect(
+        find.byKey(Key('work-order-operation-${original.id}')),
+        findsNothing,
+      );
+      expect(work.workspaceSalesToday, 28450);
+      expect(work.workspaceSettlementBalance, 17820);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'scoped-order-preparing-$scale');
+    });
   }
 
   Future<void> openStoreTools(WidgetTester tester) async {

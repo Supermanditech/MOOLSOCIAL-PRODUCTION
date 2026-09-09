@@ -468,6 +468,16 @@ class WorkOrderOperations extends ChangeNotifier {
   final Map<String, WorkOrderCommand> _pending = {};
   final Map<String, WorkOrderOperationState> _states = {};
   bool _disposed = false;
+  String? _changedOrderId;
+
+  bool get isDisposed => _disposed;
+  String? get changedOrderId => _changedOrderId;
+  List<WorkOrderReply> get orders => List.unmodifiable(_orders.values);
+
+  void _emit(String orderId) {
+    _changedOrderId = orderId;
+    notifyListeners();
+  }
 
   WorkOrderReply? order(String id) => _orders[id];
   WorkOrderCommand? pending(String id) => _pending[id];
@@ -496,7 +506,7 @@ class WorkOrderOperations extends ChangeNotifier {
     }
     _pending[command.orderId] = command;
     _states[command.orderId] = WorkOrderOperationState.uncertain;
-    notifyListeners();
+    _emit(command.orderId);
     return true;
   }
 
@@ -524,7 +534,7 @@ class WorkOrderOperations extends ChangeNotifier {
       return false;
     }
     _orders[snapshot.orderId] = snapshot;
-    notifyListeners();
+    _emit(snapshot.orderId);
     return true;
   }
 
@@ -579,7 +589,7 @@ class WorkOrderOperations extends ChangeNotifier {
     _states[command.orderId] = reconcile
         ? WorkOrderOperationState.reconciling
         : WorkOrderOperationState.submitting;
-    notifyListeners();
+    _emit(command.orderId);
     bool current() =>
         !_disposed && identical(_pending[command.orderId], command);
     try {
@@ -616,7 +626,7 @@ class WorkOrderOperations extends ChangeNotifier {
       if (current()) {
         _states[command.orderId] = WorkOrderOperationState.uncertain;
       }
-      if (!_disposed) notifyListeners();
+      if (!_disposed) _emit(command.orderId);
     }
   }
 
@@ -626,6 +636,7 @@ class WorkOrderOperations extends ChangeNotifier {
     _orders.clear();
     _pending.clear();
     _states.clear();
+    _changedOrderId = null;
     super.dispose();
   }
 }

@@ -306,6 +306,8 @@ class StoreCollectionController extends ChangeNotifier {
 /// Existing Store fields partitioned by workspace, within this signed-in session.
 /// This cache is not authoritative persistence or backend membership validation.
 class _StoreOperationalData {
+  WorkOrderOperations? orderOperations;
+  final Map<String, int> projectedOrderRevisions = {};
   bool retailerProductAdded = false;
   int retailerQuantity = 0;
   int retailerBuyPrice = 0;
@@ -692,6 +694,10 @@ class WorkSession extends ChangeNotifier {
       }
     }
     _activeWorkspace = value;
+    if (_scopedOrderOperations != null) {
+      final order = currentWorkspaceOrder;
+      if (order != null) _projectSelectedWorkspaceOrder(order);
+    }
   }
 
   final List<WorkWorkspace> otherWorkspaces = <WorkWorkspace>[];
@@ -699,6 +705,158 @@ class WorkSession extends ChangeNotifier {
   bool initialWorkspaceStateLoaded = false;
   _StoreOperationalData _storeData = _StoreOperationalData();
   final Map<String, _StoreOperationalData> _storeDataById = {};
+
+  WorkOrderOperations? get _scopedOrderOperations {
+    final operations = _storeData.orderOperations;
+    return operations != null &&
+            !operations.isDisposed &&
+            operations.accountScope == _contactAccountScope &&
+            operations.workspaceId == (activeWorkspace?.id ?? workspaceId)
+        ? operations
+        : null;
+  }
+
+  bool hasScopedWorkspaceOrder(String orderId) =>
+      _storeData.projectedOrderRevisions.containsKey(orderId);
+
+  WorkOrderOperationState? workspaceOrderOperationState(String orderId) =>
+      _scopedOrderOperations?.state(orderId);
+
+  /// Called by the authenticated Store adapter, not by a route or a review
+  /// status label. Session owns the controller after successful binding.
+  bool bindWorkspaceOrderOperations(WorkOrderOperations operations) {
+    final storeId = activeWorkspace?.id ?? workspaceId;
+    if (_disposed ||
+        operations.isDisposed ||
+        _contactAccountScope == null ||
+        operations.accountScope != _contactAccountScope ||
+        operations.workspaceId != storeId ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        hasPendingOrderTime ||
+        _collection?.needsReconciliation == true ||
+        _storeData.orderOperations != null) {
+      return false;
+    }
+    final data = _storeData;
+    data.orderOperations = operations;
+    void project(String orderId) {
+      if (_disposed ||
+          operations.accountScope != _contactAccountScope ||
+          !identical(data.orderOperations, operations)) {
+        return;
+      }
+      final snapshot = operations.order(orderId);
+      if (snapshot != null &&
+          snapshot.revision > (data.projectedOrderRevisions[orderId] ?? -1)) {
+        final order = snapshot.order!;
+        // Collection authorisation stays with the collection controller.
+        if (order.isCustomerCollection) return;
+        final index = data.workspaceOrders.indexWhere(
+          (item) => item.id == orderId,
+        );
+        if (index >= 0) {
+          if (data.workspaceOrders[index].isCustomerCollection) return;
+          data.workspaceOrders[index] = order;
+        } else {
+          data.workspaceOrders.insert(0, order);
+        }
+        data.projectedOrderRevisions[orderId] = snapshot.revision;
+        if (identical(data, _storeData) && currentWorkspaceOrderId == orderId) {
+          _projectSelectedWorkspaceOrder(order);
+        }
+      }
+      if (identical(data, _storeData)) notifyListeners();
+    }
+
+    operations.addListener(() {
+      final orderId = operations.changedOrderId;
+      if (orderId != null) project(orderId);
+    });
+    for (final snapshot in operations.orders) {
+      project(snapshot.orderId);
+    }
+    notifyListeners();
+    return true;
+  }
+
+  void _projectSelectedWorkspaceOrder(WorkspaceOrderRecord order) {
+    _preparePackingContents(order, workspacePackedProductIds);
+    workspaceOrderCustomer = order.customer;
+    workspaceOrderItems = order.items;
+    workspaceOrderQuantities
+      ..clear()
+      ..addAll(order.quantities);
+    workspaceOrderAmount = order.amount.toString();
+    workspaceOrderSource = order.source;
+    workspaceOrderFulfilment = order.fulfilment;
+    workspaceOrderPayment = order.payment;
+    workspaceOrderAddress = order.address;
+    workspaceOrderStage = order.stage;
+    workspaceOrderNeedsDelivery = order.needsDelivery;
+    workspaceOrderActionDeadline = order.actionDeadline;
+    // No stock, invoice, payout or sales total is derived from this projection.
+  }
+
+  Future<bool> submitWorkspaceOrderAction(
+    String orderId,
+    WorkOrderAction action, {
+    String? reason,
+  }) async {
+    final operations = _scopedOrderOperations;
+    final order = operations?.order(orderId)?.order;
+    if (operations == null ||
+        order == null ||
+        currentWorkspaceOrderId != orderId ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        hasPendingOrderTime ||
+        _collection?.needsReconciliation == true) {
+      return false;
+    }
+    if (action == WorkOrderAction.ready && !workspacePackingComplete) {
+      showError('Mark every product packed before the order is ready.');
+      return false;
+    }
+    if (action == WorkOrderAction.accept &&
+        order.actionDeadline != null &&
+        !order.actionDeadline!.isAfter(DateTime.now())) {
+      showError('Acceptance time ended. Waiting for an order update.');
+      return false;
+    }
+    if (action == WorkOrderAction.reject &&
+        (reason == null || reason.trim().isEmpty)) {
+      showError('Choose a reason before rejecting the order.');
+      return false;
+    }
+    final applied = await operations.act(orderId, action, reason: reason);
+    _showScopedOrderResolution(operations, orderId, applied);
+    return applied;
+  }
+
+  Future<bool> retryWorkspaceOrderAction(String orderId) async {
+    final operations = _scopedOrderOperations;
+    if (operations == null) return false;
+    final applied = await operations.retry(orderId);
+    _showScopedOrderResolution(operations, orderId, applied);
+    return applied;
+  }
+
+  void _showScopedOrderResolution(
+    WorkOrderOperations operations,
+    String orderId,
+    bool applied,
+  ) {
+    if (!applied &&
+        operations.pending(orderId) == null &&
+        identical(_scopedOrderOperations, operations) &&
+        currentWorkspaceOrderId == orderId) {
+      showError('This change was not approved. Review the current order.');
+    }
+  }
+
   Object? _busyStoreOperation;
   WorkOrderTimeRequest? _pendingOrderTime;
   _StoreOperationalData? _orderTimeData;
@@ -713,12 +871,20 @@ class WorkSession extends ChangeNotifier {
   int? get pendingOrderTimeMinutes =>
       hasPendingOrderTime ? _pendingOrderTime!.additionalMinutes : null;
 
-  bool get orderTimeServiceAvailable => gateway is WorkOrderTimeGateway;
+  bool get orderTimeServiceAvailable =>
+      gateway is WorkOrderTimeGateway &&
+      !hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '');
 
   Future<bool> requestWorkspaceOrderTime(
     String orderId,
     int additionalMinutes,
   ) async {
+    if (hasScopedWorkspaceOrder(orderId)) {
+      showError(
+        'More time is not available for this order yet. The current time still applies.',
+      );
+      return false;
+    }
     if (busy) return false;
     final order = currentWorkspaceOrder;
     final storeId = activeWorkspace?.id ?? workspaceId;
@@ -2044,6 +2210,14 @@ class WorkSession extends ChangeNotifier {
   };
 
   void _persistOperationalState(String reason) {
+    if (_storeData.orderOperations != null) {
+      // Never send a legacy whole-Store overwrite over authoritative per-order
+      // data. Other operational domains require their scoped adapters first.
+      workspaceOperationsSyncError =
+          'These changes remain on this device. Store sync is not available yet.';
+      notifyListeners();
+      return;
+    }
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty) return;
     final data = _storeData;
@@ -2543,6 +2717,18 @@ class WorkSession extends ChangeNotifier {
   }
 
   void advanceWorkspaceOrder() {
+    final scopedId = currentWorkspaceOrderId;
+    if (scopedId != null && hasScopedWorkspaceOrder(scopedId)) {
+      final action = switch (currentWorkspaceOrder?.stage) {
+        'Confirmed' => WorkOrderAction.accept,
+        'Preparing' => WorkOrderAction.ready,
+        _ => null,
+      };
+      if (action != null) {
+        unawaited(submitWorkspaceOrderAction(scopedId, action));
+      }
+      return;
+    }
     if (hasPendingOrderTime) {
       showError('Confirm the time request before accepting this order.');
       return;
@@ -2661,6 +2847,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> _requestWorkspaceDeliveryAssignment(String orderId) async {
+    if (hasScopedWorkspaceOrder(orderId)) {
+      showError('Delivery updates for this order are not available yet.');
+      return;
+    }
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty) return;
     final data = _storeData;
@@ -2700,6 +2890,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> verifyWorkspaceHandover(String otp) async {
+    if (hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')) {
+      showError('Handover confirmation for this order is not available yet.');
+      return false;
+    }
     if (currentWorkspaceOrder?.isCustomerCollection == true) return false;
     final id = activeWorkspace?.id ?? workspaceId;
     final order = currentWorkspaceOrder;
@@ -2743,6 +2937,10 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<bool> verifyWorkspacePickup(String code) async {
+    if (hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')) {
+      showError('Collection confirmation for this order is not available yet.');
+      return false;
+    }
     if (currentWorkspaceOrder?.isCustomerCollection == true) return false;
     final id = activeWorkspace?.id ?? workspaceId;
     final order = currentWorkspaceOrder;
@@ -2933,6 +3131,17 @@ class WorkSession extends ChangeNotifier {
   }
 
   void cancelWorkspaceOrder({String? reason}) {
+    final scopedId = currentWorkspaceOrderId;
+    if (scopedId != null && hasScopedWorkspaceOrder(scopedId)) {
+      unawaited(
+        submitWorkspaceOrderAction(
+          scopedId,
+          WorkOrderAction.reject,
+          reason: reason,
+        ),
+      );
+      return;
+    }
     if (hasPendingOrderTime) {
       showError('Confirm the time request before changing this order.');
       return;
@@ -3188,6 +3397,10 @@ class WorkSession extends ChangeNotifier {
     _disposed = true;
     _workspaceApplications.clear();
     _clearCollection();
+    for (final data in {..._storeDataById.values, _storeData}) {
+      final operations = data.orderOperations;
+      if (operations != null && !operations.isDisposed) operations.dispose();
+    }
     _storeDataById.clear();
     _storeData = _StoreOperationalData();
     _busyStoreOperation = null;

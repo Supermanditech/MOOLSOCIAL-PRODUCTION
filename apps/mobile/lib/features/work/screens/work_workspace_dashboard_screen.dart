@@ -18,6 +18,7 @@ import '../../buy/buy_v2_session.dart';
 import '../../journey01/journey_services.dart';
 import '../widgets/work_widgets.dart';
 import '../work_models.dart';
+import '../work_services.dart';
 import '../work_session.dart';
 
 String _formatStoreAmount(int value) {
@@ -3759,6 +3760,50 @@ void _advanceDeskOrder(WorkSession session, {String? expectedOrderId}) {
   }
 }
 
+class _OrderOperationStatus extends StatelessWidget {
+  const _OrderOperationStatus({required this.session, required this.orderId});
+  final WorkSession session;
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = session.workspaceOrderOperationState(orderId);
+    if (state == null) return const SizedBox.shrink();
+    final uncertain = state == WorkOrderOperationState.uncertain;
+    return Semantics(
+      key: Key('work-order-operation-$orderId'),
+      liveRegion: true,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: _StoreScaledPair(
+          flexibleSecond: false,
+          first: Text(switch (state) {
+            WorkOrderOperationState.submitting => 'Sending update…',
+            WorkOrderOperationState.reconciling => 'Checking update…',
+            WorkOrderOperationState.uncertain => 'Update not confirmed',
+          }, style: const TextStyle(fontSize: 13, color: MoolColors.ink)),
+          second: uncertain
+              ? TextButton(
+                  key: Key('work-order-operation-retry-$orderId'),
+                  style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                  onPressed: () => session.retryWorkspaceOrderAction(orderId),
+                  child: const Text('Check status'),
+                )
+              : const SizedBox(
+                  width: 48,
+                  height: 48,
+                  child: Icon(
+                    Icons.sync_rounded,
+                    size: 20,
+                    color: MoolColors.navy,
+                  ),
+                ),
+        ),
+      ),
+    );
+  }
+}
+
 class _IncomingOrderActivityCard extends StatelessWidget {
   const _IncomingOrderActivityCard({
     required this.session,
@@ -3917,7 +3962,12 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                     ? const SizedBox.shrink()
                     : TextButton(
                         key: const Key('work-order-more-time'),
-                        onPressed: session.busy
+                        onPressed:
+                            session.busy ||
+                                session.workspaceOrderOperationState(
+                                      session.currentWorkspaceOrderId ?? '',
+                                    ) !=
+                                    null
                             ? null
                             : () => _showOrderTimeRequest(context, session),
                         style: TextButton.styleFrom(
@@ -3974,11 +4024,20 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                 ),
               ),
             ),
-            _OrderDecisionButtons(
-              busy: session.busy || session.hasPendingOrderTime || expired,
-              onAccept: () => _advanceDeskOrder(session),
-              onReject: onReject,
-            ),
+            if (session.workspaceOrderOperationState(
+                  session.currentWorkspaceOrderId ?? '',
+                ) !=
+                null)
+              _OrderOperationStatus(
+                session: session,
+                orderId: session.currentWorkspaceOrderId!,
+              )
+            else
+              _OrderDecisionButtons(
+                busy: session.busy || session.hasPendingOrderTime || expired,
+                onAccept: () => _advanceDeskOrder(session),
+                onReject: onReject,
+              ),
           ],
         ),
       ),
@@ -4521,7 +4580,9 @@ class _StoreOrderDetails extends StatelessWidget {
           ),
         ),
         const Divider(height: 1),
-        if (awaiting)
+        if (session.workspaceOrderOperationState(order.id) != null)
+          _OrderOperationStatus(session: session, orderId: order.id)
+        else if (awaiting)
           _OrderDecisionButtons(
             busy: session.busy || session.hasPendingOrderTime,
             onAccept: () {
@@ -4709,24 +4770,34 @@ class _PackingActivityCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: FilledButton(
-                  key: const Key('work-activity-mark-ready'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(44, 48),
-                    backgroundColor: MoolColors.navy,
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: !session.busy && session.workspacePackingComplete
-                      ? () => _advanceDeskOrder(session)
-                      : null,
-                  child: const Text(
-                    'Mark ready',
-                    style: TextStyle(fontSize: 13),
-                  ),
-                ),
+                child:
+                    session.workspaceOrderOperationState(
+                          session.currentWorkspaceOrderId ?? '',
+                        ) !=
+                        null
+                    ? _OrderOperationStatus(
+                        session: session,
+                        orderId: session.currentWorkspaceOrderId!,
+                      )
+                    : FilledButton(
+                        key: const Key('work-activity-mark-ready'),
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(44, 48),
+                          backgroundColor: MoolColors.navy,
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        onPressed:
+                            !session.busy && session.workspacePackingComplete
+                            ? () => _advanceDeskOrder(session)
+                            : null,
+                        child: const Text(
+                          'Mark ready',
+                          style: TextStyle(fontSize: 13),
+                        ),
+                      ),
               ),
             ],
           ),
@@ -13871,6 +13942,8 @@ class _LiveOrderTicket extends StatelessWidget {
                     ),
                   ),
                 )
+              else if (session.workspaceOrderOperationState(order.id) != null)
+                _OrderOperationStatus(session: session, orderId: order.id)
               else if (active ||
                   (detailed && !order.isClosed && stage != 'Preparing')) ...[
                 const SizedBox(height: 10),
