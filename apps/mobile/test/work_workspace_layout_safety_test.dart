@@ -7934,6 +7934,113 @@ void main() {
     );
   }
 
+  for (final (width, height, scale, bottom, keyboard) in [
+    (412.0, 915.0, 1.0, 44.0, 0.0),
+    (412.0, 915.0, 2.0, 44.0, 0.0),
+    (320.0, 568.0, 2.0, 80.0, 0.0),
+    (320.0, 568.0, 1.4, 24.0, 0.0),
+    (412.0, 915.0, 2.0, 24.0, 200.0),
+    (320.0, 568.0, 2.0, 44.0, 200.0),
+  ]) {
+    testWidgets(
+      'REG4554 REG4556 Files heading and Cancel fit $width $height $scale $bottom $keyboard',
+      (tester) async {
+        final work = storeViewFixture();
+        final storeId = work.activeWorkspace!.id;
+        final orderId = work.currentWorkspaceOrderId;
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(width, height),
+          textScale: scale,
+          bottomInset: bottom,
+        );
+        final dashboard = find.byType(WorkWorkspaceDashboardScreen);
+        final dashboardState = tester.state(dashboard);
+        await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+        await tester.pumpAndSettle();
+        final documents = find.byKey(
+          const Key('global-profile-quick-documents'),
+        );
+        await tester.ensureVisible(documents);
+        await tester.tap(documents);
+        await tester.pumpAndSettle();
+        final files = find.byKey(const Key('shared-screen-160'));
+        final filesState = tester.state(files);
+        final heading = find.byKey(const Key('shared-files-title'));
+        final appBar = find.byType(AppBar);
+        final headingRect = tester.getRect(heading);
+        final barRect = tester.getRect(appBar);
+        expect(
+          tester.renderObject<RenderParagraph>(heading).didExceedMaxLines,
+          isFalse,
+        );
+        expect(headingRect.top, greaterThanOrEqualTo(barRect.top));
+        expect(headingRect.bottom, lessThanOrEqualTo(barRect.bottom));
+        final add = find.byKey(const Key('shared-160-top-action'));
+        expect(headingRect.right, lessThanOrEqualTo(tester.getRect(add).left));
+        expect(add.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await captureStoreView(tester, 'files-heading-$width-$scale-$bottom');
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        for (final (source, label) in const [
+          ('camera', 'Camera'),
+          ('scan', 'Scan document'),
+          ('gallery', 'Gallery'),
+          ('file', 'Choose file'),
+        ]) {
+          final row = find.byKey(Key('shared-file-add-$source'));
+          final text = find.descendant(of: row, matching: find.text(label));
+          final paragraph = tester.renderObject<RenderParagraph>(text);
+          expect(
+            paragraph.getMinIntrinsicWidth(double.infinity),
+            lessThanOrEqualTo(paragraph.size.width + 0.01),
+            reason: '$label must not split inside a word',
+          );
+          expect(tester.getSize(row).height, greaterThanOrEqualTo(48));
+        }
+        if (keyboard > 0) {
+          tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+          await tester.pumpAndSettle();
+        }
+        final cancel = find.byKey(const Key('shared-file-add-cancel'));
+        await reveal(tester, cancel);
+        final boundary = height - (keyboard > 0 ? keyboard : bottom);
+        expect(cancel.hitTestable(), findsOneWidget);
+        expect(tester.getSize(cancel).height, greaterThanOrEqualTo(48));
+        expect(
+          tester.getBottomRight(cancel).dy,
+          lessThanOrEqualTo(boundary - 8),
+        );
+        expect(tester.takeException(), isNull);
+        await captureStoreView(
+          tester,
+          'files-cancel-$width-$scale-$bottom-$keyboard',
+        );
+        await tester.tap(cancel);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('shared-file-add-sheet')), findsNothing);
+        expect(tester.state(files), same(filesState));
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('shared-file-add-sheet')), findsNothing);
+        expect(tester.state(files), same(filesState));
+        await tester.tap(find.byKey(const Key('shared-160-back')));
+        await tester.pumpAndSettle();
+        expect(tester.state(dashboard), same(dashboardState));
+        expect(work.activeWorkspace!.id, storeId);
+        expect(work.currentWorkspaceOrderId, orderId);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets('REG4551 Files preserves an unsubmitted counter-sale draft', (
     tester,
   ) async {
