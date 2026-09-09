@@ -776,3 +776,70 @@ This is exactly a three-owner coordination amendment: this manifest, its scope h
   ]
 }
 <!-- R673-DATA-END -->
+
+
+## r66.7 exact featured Medicine correction source — 9 September 2026
+
+This mvp_supporting continuation qualifies the full featured Medicine name fix for the founder-directed Redmi test-and-fix routine. A customer must see the dosage form before choosing a medicine at enlarged text. The actual Pharmacy picks card now measures the added title lines and reserves their height while keeping usable product actions. Its exact source commit below passed two complete1666-test Buy/Profile cycles with27 unchanged historical capture-only skips. The existing protected-reference comparisons remain separately tagged and immutable.
+
+The smallest build-support change adds this sealed source commit to the protected Buy review allowlist with the existing16-owner boundary. The only runtime difference from the previously qualified source is the catalogue owner. Both Windows hosts pass64 proposal source/boundary/egress/brand cases, including rejection of both older qualified sources. The dependency is the bound two-cycle source proof; after admission apply the one exact checker proposal, repeat the actual checks and prepare the unique one-build candidate state before Redmi installation.
+
+This exact three-control admission appends this manifest, updates its scope hash and extends the coordination checker. It preserves UI66/primary45, registry4513, runtime/backend authority and every historical admission. The first-parent subject is `ui(buy-redmi-fixes-v1-20260905): admit r66.7 qualified review source`. Authenticated/backend/shared integration remains deferred. App source, native/dependency configuration, accepted references and the backend checker stay at their already recorded source; this source admission grants no build/install action by itself. A fresh machine state and checksum-matched Redmi replay remain required. Existing local UI finding closures remain separate from full matrix, parent Git and production acceptance.
+<!-- R675-DATA-BEGIN -->
+{
+  "parent": "6de5f0c82a57a66dd3172f0ad6080949ca09b5f0",
+  "implementation": [
+    {
+      "path": "scripts/check-buy-protected-baseline.ps1",
+      "beforeSha256": "E9CC76AADEB0592D1C0DF3055E0D5039D563C6F7796F555098E90EF83A6A8E11",
+      "proposedSha256": "4565F7095F1DC6D3DACCC1BBD478E2697A2536F9A449B2F654B27CA581755DA2"
+    }
+  ],
+  "runtimeDelta": [
+    "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
+    "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+    "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
+    "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+  ],
+  "correctionRuntimeDelta": [
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"
+  ],
+  "proposalBinding": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r675-source-proposal-v1\\binding.json",
+    "sha256": "7371FED1A951623470A6C2C253057213FCDD1F7DF50EB4DBD542C9B7FDDC9E62"
+  },
+  "fullRegressionEvidence": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\SINGLECHAT-R674-FULL-REGRESSION-BINDING-V1.json",
+    "sha256": "37B221951C5D7528DE2E5382D6D1003C41FE03F992774360260DF350B7C28ED8",
+    "cycles": 2,
+    "passedPerCycle": 1666,
+    "skippedPerCycle": 27,
+    "sourceCommit": "6de5f0c82a57a66dd3172f0ad6080949ca09b5f0",
+    "mobileTreeSha256": "FC4C6CB9701ABB83953D6CFE101E37B65AD788C0B70563331505BD80A92EA49D"
+  },
+  "sourceBoundaryProposalEvidence": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r675-proposed-boundaries7-1.result.json",
+      "sha256": "CA410AE9F552C6158BDA534FE16D535D99FDCDD66C6DE30F25FF178A9CB5959A",
+      "cases": 64
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r675-proposed-boundaries51-1.result.json",
+      "sha256": "B9CA1900DA86DE9B93967482E70DB682243CE027037E9B39C33B17D97F742631",
+      "cases": 64
+    }
+  ]
+}
+<!-- R675-DATA-END -->
