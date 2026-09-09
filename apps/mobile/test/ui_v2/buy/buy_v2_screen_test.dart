@@ -3430,83 +3430,193 @@ void main() {
     expect(find.text('Buy now'), findsNothing);
   });
 
-  for (final viewport in [const Size(320, 711), const Size(711, 320)]) {
-    testWidgets(
-      'R665 D04 enlarged report actions fit safe viewport $viewport',
-      (tester) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = viewport;
-        addTearDown(tester.view.reset);
-        final core = BuySession();
-        final session = BuyV2Session(core: core);
-        addTearDown(core.dispose);
-        addTearDown(session.dispose);
-        await tester.pumpWidget(
-          app(
-            session,
-            textScale: 2,
-            safePadding: const EdgeInsets.only(top: 24, bottom: 24),
-          ),
-        );
-        await tester.pumpAndSettle();
-        const productId = 's-tomato';
-        session.openProduct(productId);
-        await tester.pumpAndSettle();
-        final report = find.byKey(
-          const ValueKey('buy-report-product-s-tomato'),
-        );
-        await tester.scrollUntilVisible(
-          report,
-          250,
-          scrollable: scrollableWithin(
-            const PageStorageKey('buy-product-s-tomato'),
-          ),
-          maxScrolls: 50,
-        );
-        await tester.ensureVisible(report);
-        await tester.pumpAndSettle();
-        await tester.tap(report);
-        await tester.pumpAndSettle();
-        final cancel = find.byKey(const ValueKey('buy-cancel-product-report'));
-        final send = find.byKey(const ValueKey('buy-submit-report-s-tomato'));
-        for (final keyboard in [0.0, 100.0, 0.0]) {
-          tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+  for (final scale in [1.0, 2.0]) {
+    for (final name in ['', 'Aarav Shah']) {
+      testWidgets(
+        'R669 address request preserves manual recipient $scale ${name.isEmpty ? 'blank' : 'named'}',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 711);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          final originalAddresses = session.addresses.toList();
+          final selected = session.selectedAddressId;
+          await tester.pumpWidget(app(session, textScale: scale));
           await tester.pumpAndSettle();
-          expect(tester.takeException(), isNull);
-          expect(cancel.hitTestable(), findsOneWidget);
-          expect(tester.widget<FilledButton>(send).onPressed, isNull);
-          for (final action in [cancel, send]) {
-            final rect = tester.getRect(action);
-            expect(rect.top, greaterThanOrEqualTo(24));
-            expect(
-              rect.bottom,
-              lessThanOrEqualTo(viewport.height - keyboard - 24),
+          unawaited(
+            showBuyV2AddressSheet(
+              tester.element(find.byType(BuyV2Screen)),
+              session,
+            ),
+          );
+          await tester.pumpAndSettle();
+          Future<void> reveal(
+            String target,
+            String list, {
+            double delta = 200,
+          }) async {
+            await tester.scrollUntilVisible(
+              find.byKey(ValueKey(target)),
+              delta,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(ValueKey(list)),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+              maxScrolls: 40,
             );
-            for (final paragraph in tester.renderObjectList<RenderParagraph>(
-              find.descendant(of: action, matching: find.byType(RichText)),
-            )) {
-              final text = TextPainter(
-                text: paragraph.text,
-                textDirection: paragraph.textDirection,
-                textScaler: paragraph.textScaler,
-              )..layout(maxWidth: paragraph.size.width);
+            await tester.pumpAndSettle();
+            expect(find.byKey(ValueKey(target)).hitTestable(), findsOneWidget);
+          }
+
+          await reveal('buy-address-request', 'buy-address-sheet-list');
+          await tester.tap(find.byKey(const ValueKey('buy-address-request')));
+          await tester.pumpAndSettle();
+          await reveal(
+            'buy-address-request-recipient',
+            'buy-address-request-form-list',
+          );
+          final requestName = find.byKey(
+            const ValueKey('buy-address-request-recipient'),
+          );
+          await tester.enterText(requestName, name);
+          await tester.testTextInput.receiveAction(TextInputAction.done);
+          await tester.pumpAndSettle();
+          await reveal(
+            'buy-address-request-enter-manually',
+            'buy-address-request-form-list',
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('buy-address-request-enter-manually')),
+          );
+          await tester.pumpAndSettle();
+          await reveal(
+            'buy-address-add-recipient',
+            'buy-address-add-form-list',
+          );
+          final manualName = find.byKey(
+            const ValueKey('buy-address-add-recipient'),
+          );
+          expect(tester.widget<TextField>(manualName).controller!.text, name);
+          if (name.isNotEmpty) {
+            await captureR66Visual(tester, 'r669-address-recipient-$scale');
+          }
+          await tester.enterText(manualName, 'Changed draft');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await reveal(
+            'buy-address-request-recipient',
+            'buy-address-request-form-list',
+            delta: -200,
+          );
+          expect(tester.widget<TextField>(requestName).controller!.text, name);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.addresses, originalAddresses);
+          expect(session.selectedAddressId, selected);
+          expect(session.itemCount, 0);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final viewport in [const Size(320, 711), const Size(711, 320)]) {
+    testWidgets('R665 D04 enlarged report actions fit safe viewport $viewport', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = viewport;
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await tester.pumpWidget(
+        app(
+          session,
+          textScale: 2,
+          safePadding: const EdgeInsets.only(top: 24, bottom: 24),
+        ),
+      );
+      await tester.pumpAndSettle();
+      const productId = 's-tomato';
+      session.openProduct(productId);
+      await tester.pumpAndSettle();
+      final report = find.byKey(const ValueKey('buy-report-product-s-tomato'));
+      await tester.scrollUntilVisible(
+        report,
+        250,
+        scrollable: scrollableWithin(
+          const PageStorageKey('buy-product-s-tomato'),
+        ),
+        maxScrolls: 50,
+      );
+      await tester.ensureVisible(report);
+      await tester.pumpAndSettle();
+      await tester.tap(report);
+      await tester.pumpAndSettle();
+      final cancel = find.byKey(const ValueKey('buy-cancel-product-report'));
+      final send = find.byKey(const ValueKey('buy-submit-report-s-tomato'));
+      for (final keyboard in [0.0, 100.0, 0.0]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(cancel.hitTestable(), findsOneWidget);
+        expect(tester.widget<FilledButton>(send).onPressed, isNull);
+        for (final action in [cancel, send]) {
+          final rect = tester.getRect(action);
+          expect(rect.top, greaterThanOrEqualTo(24));
+          expect(
+            rect.bottom,
+            lessThanOrEqualTo(viewport.height - keyboard - 24),
+          );
+          for (final paragraph in tester.renderObjectList<RenderParagraph>(
+            find.descendant(of: action, matching: find.byType(RichText)),
+          )) {
+            final text = TextPainter(
+              text: paragraph.text,
+              textDirection: paragraph.textDirection,
+              textScaler: paragraph.textScaler,
+            )..layout(maxWidth: paragraph.size.width);
+            expect(
+              paragraph.size.height,
+              greaterThanOrEqualTo(text.height - .1),
+            );
+            if (identical(action, cancel)) {
               expect(
-                paragraph.size.height,
-                greaterThanOrEqualTo(text.height - .1),
+                text.computeLineMetrics(),
+                hasLength(1),
+                reason:
+                    'Cancel must remain an intact word at the chosen text size.',
               );
-              text.dispose();
+              expect(tester.getSize(cancel).height, greaterThanOrEqualTo(48));
             }
+            text.dispose();
           }
         }
-        await tester.tap(cancel);
-        await tester.pumpAndSettle();
-        expect(session.hasReportedProduct(productId), isFalse);
-        expect(session.selectedProduct?.id, productId);
-        expect(session.view, BuyV2View.product);
-        expect(report.hitTestable(), findsOneWidget);
-        expect(tester.takeException(), isNull);
-      },
-    );
+      }
+      final reason = find.byKey(const ValueKey('buy-report-reason-0'));
+      await tester.ensureVisible(reason);
+      await tester.pumpAndSettle();
+      await tester.tap(reason);
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(send).onPressed, isNotNull);
+      await captureR66Visual(tester, 'r669-report-cancel-${viewport.width}');
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(session.hasReportedProduct(productId), isFalse);
+      expect(session.selectedProduct?.id, productId);
+      expect(session.view, BuyV2View.product);
+      expect(report.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets(

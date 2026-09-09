@@ -4659,14 +4659,15 @@ class _ProductReportSheetState extends State<_ProductReportSheet> {
               const SizedBox(height: 10),
               Row(
                 children: [
-                  Expanded(
-                    child: TextButton(
-                      key: const ValueKey('buy-cancel-product-report'),
-                      onPressed: _submitting
-                          ? null
-                          : () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
+                  TextButton(
+                    key: const ValueKey('buy-cancel-product-report'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(48, 48),
                     ),
+                    onPressed: _submitting
+                        ? null
+                        : () => Navigator.of(context).pop(),
+                    child: const Text('Cancel'),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
@@ -14162,6 +14163,7 @@ Future<void> _showAddAddressSheet(
   BuildContext context,
   BuyV2Session session, {
   BuyV2Address? existingAddress,
+  String initialRecipient = '',
 }) {
   final destination = session.destination;
   final view = session.view;
@@ -14198,6 +14200,7 @@ Future<void> _showAddAddressSheet(
     routeSettings: const RouteSettings(name: 'buy-address-add-form'),
     builder: (sheetContext) => _BuyV2AddAddressForm(
       existingAddress: existingAddress,
+      initialRecipient: initialRecipient,
       onSubmit: saveToExistingOwner,
     ),
   );
@@ -14350,8 +14353,11 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
                 height: BuyV2Metrics.minimumTap,
                 child: OutlinedButton(
                   key: const ValueKey('buy-address-request-enter-manually'),
-                  onPressed: () =>
-                      _showAddAddressSheet(context, widget.session),
+                  onPressed: () => _showAddAddressSheet(
+                    context,
+                    widget.session,
+                    initialRecipient: recipientController.text,
+                  ),
                   child: const Text('Add it myself'),
                 ),
               ),
@@ -14364,10 +14370,15 @@ class _BuyV2AddressRequestFormState extends State<_BuyV2AddressRequestForm> {
 }
 
 class _BuyV2AddAddressForm extends StatefulWidget {
-  const _BuyV2AddAddressForm({required this.onSubmit, this.existingAddress});
+  const _BuyV2AddAddressForm({
+    required this.onSubmit,
+    this.existingAddress,
+    this.initialRecipient = '',
+  });
 
   final bool Function(BuyV2Address address) onSubmit;
   final BuyV2Address? existingAddress;
+  final String initialRecipient;
 
   @override
   State<_BuyV2AddAddressForm> createState() => _BuyV2AddAddressFormState();
@@ -14388,7 +14399,9 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
   void initState() {
     super.initState();
     final address = widget.existingAddress;
-    recipientController = TextEditingController(text: address?.recipient);
+    recipientController = TextEditingController(
+      text: address?.recipient ?? widget.initialRecipient,
+    );
     phoneController = TextEditingController(text: address?.phone);
     lineController = TextEditingController(text: address?.line);
     pinController = TextEditingController(text: address?.pinCode);
