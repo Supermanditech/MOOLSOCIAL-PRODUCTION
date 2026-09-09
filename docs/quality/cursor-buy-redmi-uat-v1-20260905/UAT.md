@@ -2,6 +2,14 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Latest Orders search and recovery audit — captures448–463
+
+Fourteen successful native PNG/XML pairs visually inspected; external ledger R66-8-EXPANDED-AUDIT-CAPTURES-448-463-V1.json SHA256 BD20859418B66CC9ADCB3B18C79DDDCBE4D70865D71E330565FE7BBDE89E9E00. Redmi r66.8 candidate and normal display retained. Orders449 shows twelve Active and two Delivered orders. Query zzqnomatch451 produces explicit no-match guidance; Android Back452 hides the keyboard and retains the query. Delivered453 retains the same query and empty state. Clear454 restores both Delivered orders. Exact query MS-240741455 returns only the matching delivered order, with its expected INR2,186 amount; keyboard Back456 retains it. Active457 correctly excludes that delivered ID.
+
+Continue shopping461 returns to Scheduled/Jodhpur with blank product search and exact initial448 XML 5C4CF0172A8BDE18665C5E6A1F84861DD9A71DA308A7C7983C89B7BED9BA7418. Reopening Orders462 restores blank search, twelve Active/two Delivered and exact449 XML43B98A90E9D0AFF3CDA62B1DFE440CABC828BFAA6D2EED302BD2E9D4B29C97B1. Shop463 visually restored. No cart/address/order/payment changes, new distinct defect, source edit or APK build. Product/seller query matches and live order outcomes remain unqualified; backend/auth integration remains deferred.
+
+Capture numbers458/459 are excluded: the installed PowerShell interpreter changed from7.6.5 to7.6.6 and both attempts failed before any device input. External replacement wrapper changes only that interpreter path; Capture460 recovered the exact457 XML before continuing. The truncated463 tool response was recovered from its immutable native-exit-zero receipt and existing PNG, without repeating the tap. These are tooling incidents, not app defects.
+
 ### Latest Scheduled filter, later-SKU and pagination audit — captures433–447
 
 Fifteen successful native PNG/XML pairs visually inspected; external ledger R66-8-EXPANDED-AUDIT-CAPTURES-433-447-V1.json SHA256AB8290F07C55C42C97779B5D503DFA09201E36A7C015D2D016B5A1447D4A5D15. Exact Redmi r66.8 candidate and normal display retained. From initial433, first-row horizontal swipe434 reaches Cumin14/Pasta18/Juice22. Sort/filter435 Available to order initially off, draft436 on, Back437 cancels with exact434 XML E20C94834EE677A1A367A7AECF3AA89D2E3519798112D23D23365F1C81C2F0E5. Reopen438 confirms off/disabled Clear and equals435 XMLF5E734B14EA4E8CE9EE94AF61B299D2F1C64ECD749073FC0444A1451833EB90B. Close439 retains later-row position.
@@ -43,7 +51,7 @@ Founder instruction: enumerate journeys, test on Redmi, register each real custo
 | Address | selection; add/edit; required/invalid input; keyboard; Cancel/Back; return context | high-total selection passed; blank form rejection/keyboard reachability/Cancel passed134–145; populated invalid phone/PIN and edit remain pending |
 | Checkout payment | method selection; contextual PO; invalid/missing reference; offers/fees; review/Back | high-total local selection/PO validation passed; remaining states pending |
 | Confirmation | shipments/units/totals/GST; change payment/address; Back; action visibility | high-total normal review passed; no order submitted |
-| Orders list | filters; empty state; order identity; scrolling; detail/Back | Active/Delivered and exact Back context passed091–108; empty/search remaining |
+| Orders list | filters; empty state; order identity; scrolling; detail/Back | Active/Delivered and exact Back context passed091–108; no-match, clear, exact ID/status scoping and Continue shopping query isolation passed449–463; seller/product query matches and live outcomes remain unqualified |
 | Tracking | compact/expanded status; address/items; refresh/unavailable; alerts; Help/Back | active/delivered details and Back passed092–108; alert-origin Back passed128–130; live tracking not available in fixture |
 | Invoice | totals/identity; view/scroll; Back; download availability | retained MS-NEW-09 local invoice099 shows2x37=74 and correct identity; Back100 restored tracking; fresh external download not exercised |
 | Resolution | cancellation/return/replacement/refund eligibility; item/reason selection; validation; Cancel/Back | cancellation required reason and dismissal094–098 passed; delivered unknown-eligibility blocks selection105–107; eligible fixture and accepted outcomes unqualified |
