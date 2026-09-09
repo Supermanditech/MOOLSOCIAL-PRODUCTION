@@ -2,6 +2,18 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Resumed Shopping tools and populated address validation — captures716–745
+
+Thirty native-success PNG/XML pairs visually inspected on the same Redmi r66.8, normal display throughout. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-716-745-V1.json SHA256 90FEDBFADEA53F279C43E2EE5B21C5B5062098B2A80D931E2B1FF768EFD399C6. Attempt715 is excluded: foreground guard stopped before input/capture because the review app was not foreground. Founder then reported the app ready;716 confirms Scheduled Shop. No app defect is inferred from that guard. Truncated721 output was recovered from its immutable native-zero receipt and existing PNG without repeating the swipe.
+
+Profile717 opens the global account drawer; Android Back718 restores exact716 XML648AB0D71D92B63507BC62EAA5A12D537BB06EBAAB3F6AA7438B832C410FB3CA. No account sub-action entered. Filter719 → Shopping tools720 → scroll721 exposes Shopping settings;722 opens it,723 Delivery addresses shows original Home and selected Work. Add724 opens empty fields. Captures725–734 enter an unsaved synthetic draft: literal recipient `Audit%20Recipient` (the percent sequence remained literal; no space-normalisation claim), street `12`, locality `Basni`, phone `12345`, PIN `342`. Phone keyboard Next729 moves to the visible street field; locality/PIN focus scrolls each field above the keyboard. No name-format or real deliverability qualification is inferred from this synthetic draft.
+
+Save735 rejects the short phone with visible `Enter a 10-digit phone number.` and retains draft values. Capture736 includes asynchronous viewport movement and is not proof that phone focus succeeded; settled tap737 confirms focus. Appending67890 at738 makes the length-test value1234567890. Keyboard Back739 preserves the form; Save740 rejects short PIN with visible `Enter a valid 6-digit PIN code.` These prove length rejection only, not valid Indian-number allocation, PIN existence or backend serviceability. No address saved.
+
+Android Back741 cancels the draft and restores original Home/selected Work. Reopen742 shows empty fields; X743 returns the same chooser, exact741 XML D223A4D420B43C631D8FAA8B02FE56F3750DCE76C64CE1A9C5540E0768F997E3. Back744 restores Shopping settings with Basni342005, PhonePe and notifications on; Back745 returns Scheduled Shop. Exact pixel/semantic-tree equality with716 is not asserted for745. Original basket, addresses, display and preferences were not changed; no order/payment/report/message/backend action, source edit, build or install.
+
+No new distinct defect confirmed in this batch and no ticket closed. Populated phone/PIN length validation, keyboard Next, cancel and empty-reopen paths are now exercised on r66.8. Valid temporary CRUD, removal confirmation/cancel, address-type drafts, regional text, interruption and responsive variants remain open. Full-module enumeration and supplier-media/backend qualification remain incomplete.
+
 ### Delivery Keep/Hide recovery — captures704–714
 
 Eleven native-success PNG/XML pairs visually inspected. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-704-714-V1.json SHA256 14A3FB05BAA01473F76DDC164B5B2C6731F7977F51F3D1621851DFD40E24B4E6. Same Redmi r66.8 and normal display. Reopen704 restores exact699 panel; Keep705 visibly becomes Kept; tap706 restores Keep and exact704 XML CC8DE2DBC4C2328B5EDC82A8DBC5EFBA73A555B6B7E3D323DAF87457B8B3DB39. Hide707 removes the panel/control. Contextual Items Back708 restores correct MS-240741 order; Android Back709 returns Delivered list. Active710 → Track MS-NEW-09 at711 → top712 exposes Show delivery status. Tap713 removes that recovery action; Orders Back714 visibly restores the delivery control alongside cart, with exact earlier Active-list XML43B98A90E9D0AFF3CDA62B1DFE440CABC828BFAA6D2EED302BD2E9D4B29C97B1.
@@ -44,7 +56,7 @@ This index supplements the full screen-family inventory below. “Exercised” m
 | Orders → seller query → Track → Back | 467,476–479; query/list context retained | Product/purchase-reference searches fail, tickets open |
 | Delivered → wholesale order → return → Replacement → scroll | 659–669; explicit unknown eligibility, enlarged bottom controls reachable | Eligible item/reason/submit branches unavailable; backend deferred |
 | Delivered → retail order → Address → Manage future addresses | 677–680; future-address context explicit; partner-status defect | Delivered partner fallback fix and pending-order regression |
-| Address chooser → Add → empty Save → Android Back | 681–684; visible validation, no save, exact chooser restored | Populated invalid phone/PIN, valid temporary CRUD, long regional text |
+| Address chooser → Add → empty/populated invalid Save → correction → Back → reopen | 681–684,723–743; required/short-phone/short-PIN rejection, keyboard Next, draft reset and original addresses preserved | Valid temporary CRUD, number/PIN validity beyond length, long regional text and responsive variants |
 | Address chooser → Work overflow → Edit → close → chooser close | 685–688; original fields and exact order restored | Removal confirmation/cancel, all address-type draft changes |
 | Retail resolution → Refund → scroll → Retry → Return → Replacement → Back | 689–696; choices/retry/dismiss exercised; no invented eligibility | Eligible selection, quantities, reasons and submitted outcomes unavailable |
 | Delivered retail/wholesale → Invoice → Back | 670–676; missing historical lines defect, return exercised | Download/export inspection; full historical-line fixture |
