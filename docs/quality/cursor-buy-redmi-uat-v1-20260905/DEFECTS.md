@@ -1,6 +1,49 @@
 # Fresh Redmi defect register
 
+## Current Redmi APK onward — OPEN findings only
+
+Founder reporting boundary clarified 9 September 2026: report only unresolved findings discovered on the currently installed r66.8 Cursor Review APK (version 1.0.0-r66.8-cursorreview, code 2026090903), Redmi TG8HCYTGGQT885OF. APK SHA256 55BB5961D92E1B76784141BD8B2891483507A3A44F3466BE2D28F4C5C7614F25. Historical R66-UAT-001 through 035 records below are retained evidence and excluded from this count; their inclusion below does not reopen them. A fresh child has its own current-candidate evidence and counts once.
+
+Current open total: **25 device/visual defects + 1 source-confirmed supplier-media technical gap = 26 findings**. Separately, **7 founder change requests remain unimplemented**. No finding in this index is closed. This is a running register, not a completed full-module audit or production-readiness verdict. Update this index whenever a distinct finding is added or closed; closure requires implementation plus the original Redmi reproduction passing on an identified successor build. Additional reproductions extend the existing ID rather than inflate the count.
+
+| Open ID | Customer-visible problem / technical gap | Severity / evidence |
+| --- | --- | --- |
+| R66-UAT-028-R668-NINE-DIGIT-001 | Nine-digit cart payable truncates with doubled text | P1, Redmi |
+| R66-UAT-032-R668-PAGED-001 | Monthly basket review displays unrelated paged products | P1, Redmi |
+| R668-AUDIT-QTY-001 | Supplier grid truncates the ordered pack quantity | P2, Redmi |
+| R668-AUDIT-BULK-QTY-001 | Bulk quantity requires one tap per extra pack | P2, Redmi/source |
+| R668-AUDIT-CATALOGUE-001 | View-all sheet hides continuation despite empty space | P2, Redmi |
+| R668-AUDIT-MEDIA-001 | Category illustration appears as the actual SKU photo | P2, Redmi |
+| R668-AUDIT-MEDIA-002 | Supplier publication cannot carry SKU/variant photo-video metadata | Technical gap, source only |
+| R668-AUDIT-SELLER-001 | Visit seller/store link placement differs across products | P2, founder/Redmi/source |
+| R668-AUDIT-RECENT-001 | Recent-item count and destination list use different scopes | P2, Redmi/source |
+| R668-AUDIT-OFFER-COPY-001 | Advertised offer opens a product saying no offers | P2, Redmi |
+| R668-AUDIT-ADDRESS-KEYBOARD-001 | Enlarged landscape keyboard hides the focused address input | P2, Redmi |
+| R668-AUDIT-CART-TOTAL-LABEL-001 | Discounted and undiscounted values both labelled total | P2, Redmi |
+| R668-AUDIT-HELP-CONTEXT-001 | Shopping/order help opens account-only topics | P2, Redmi |
+| R668-AUDIT-MIXED-GST-001 | Mixed checkout shows indistinguishable GST controls | P2, Redmi |
+| R668-AUDIT-CHECKOUT-PROMISE-001 | Final review still promises delivery details at checkout | P2, Redmi |
+| R668-AUDIT-AREA-BOTTOM-001 | Last city is clipped above Android navigation | P2, Redmi |
+| R668-AUDIT-ORDER-PRODUCT-SEARCH-001 | Purchased product name cannot find its existing order | P2, Redmi |
+| R668-AUDIT-ORDER-PURCHASE-SEARCH-001 | Displayed purchase reference cannot find its deliveries | P2, Redmi |
+| R668-AUDIT-STORE-KEYBOARD-RETURN-001 | Dismissed search keyboard reopens after nested return | P3, Redmi |
+| R668-AUDIT-STORE-CATEGORY-BOTTOM-001 | Final store category remains clipped at maximum scroll | P2, Redmi |
+| R668-AUDIT-COMPARE-EQUIVALENCE-001 | Compare mixes different goods without equivalent quantities | P2, Redmi/source |
+| R668-AUDIT-VARIANT-DELIVERY-BADGE-001 | Quick-local variant badge contradicts courier details | P2, Redmi |
+| R668-AUDIT-INVOICE-MISSING-LINES-001 | Historical invoice omits itemised lines without disclosure | P2, Redmi |
+| R668-AUDIT-DELIVERED-PARTNER-STATUS-001 | Completed delivery says partner not assigned yet | P3, Redmi |
+| R668-AUDIT-ADDRESS-REQUEST-NAME-001 | Manual address fallback drops the entered recipient name | P3, Redmi |
+| R668-AUDIT-BRAND-CATEGORY-001 | Brand filter presents generic category labels as brands | P2, Redmi/source |
+
+Separate open requirements: R668-REQ-COMPARE-SUPPLIER-001; R668-REQ-STORE-CATEGORY-COMPACT-001; R668-REQ-LOCATION-INDIA-001; R668-REQ-ADDRESS-TYPE-DENSITY-001; R668-REQ-OFFERS-HEADER-001; R668-REQ-SHOP-COUNT-ROW-001; R668-AUDIT-DELIVERY-ICON-001. The delivery-icon ID is a requirement despite its AUDIT prefix. Backend/provider integration remains deferred; MEDIA-002 is not claimed as a Redmi upload failure. Detailed reproduction, expected outcome, evidence and implementation/retest status for every entry remain below.
+
 ## Expanded r66.8 audit additions — 9 September 2026
+
+### R668-AUDIT-BRAND-CATEGORY-001 — Brand filter presents product categories as brands
+
+OPEN P2, product identity and discovery content. Redmi r66.8 normal display: Scheduled Shop → Sort and filter798 → Brand799. The Brand section offers BABY CARE, BABY NUTRITION, BEAUTY & GROOMING and CHILLED FAVOURITES as selectable brands. These are generic product groupings, providing no manufacturer/brand identity for a buyer choosing a specific branded product. Evidence799 PNG23D3195F5C708A6D08EA693B44443E712CE92ECA603ED18315D457F7A96B39AD / XMLA40649A01F9BE961EE53CB2FB01900D356B540B89B2525D5F3D01067F0625E6D. Source apps/mobile/lib/features/buy/buy_v2_catalogue_data.dart30–31,36–37,68,71–72,77–78 places these group labels in the seed brand field; buy_v2_models.dart611 reads values[2] as brand and936 uppercases seed.brand. apps/mobile/lib/ui_v2/buy/buy_v2_views.dart12890–12913 exposes these values unchanged as Brand choices. This is a current review catalogue/content-contract defect, not proof that a live supplier brand service failed. It is distinct from historical014 accessibility implementation narration and from media identity/comparison defects.
+
+Expected: retain separate category and actual brand/manufacturer fields; show only substantiated brand choices, with an explicit unbranded/unknown state where appropriate. Do not invent manufacturers to populate a filter. Preserve category navigation, filter selection/clearing, result scope and Back. Source/data owner selection and corrected representative catalogue fixtures precede implementation; real supplier ingestion remains backend-stage qualification. Registered before further device input; no runtime edit or ticket closure.
 
 ### R668-AUDIT-ADDRESS-REQUEST-NAME-001 — Manual address fallback drops the recipient name already entered
 
