@@ -1,10 +1,10 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "prebuild_pending",
+  "machineState": "prebuild_controls_passed_pending_seal",
   "buildAuthorization": "not_authorized",
   "preBuildValidation": {
-    "state": "pending",
+    "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
   },
   "candidate": {
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "ded6bea60f3ba03d67ee533515630750829c1766"
+    "head": "3bbbc228138af25313ca39c4b82e8411471c1988"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-12-review-20260909/source-manifest.txt",
@@ -33,91 +33,91 @@
   "preBuildGates": [
     {
       "id": "branch-head",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
       ]
     },
     {
       "id": "source-manifest",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/source-manifest.txt"
       ]
     },
     {
       "id": "format-analysis",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/local-validation.md"
       ]
     },
     {
       "id": "focused-tests",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/local-validation.md"
       ]
     },
     {
       "id": "positive-release-gates",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
       ]
     },
     {
       "id": "protected-boundary-disposition",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/candidate-contract.md"
       ]
     },
     {
       "id": "rejected-candidate-preserved",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/candidate-contract.md"
       ]
     },
     {
       "id": "startup-config-regression-registered",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
       ]
     },
     {
       "id": "buy-regression-1",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/local-validation.md"
       ]
     },
     {
       "id": "buy-regression-2",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/local-validation.md"
       ]
     },
     {
       "id": "clean-state-regression",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
       ]
     },
     {
       "id": "wrapper-self-test",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
       ]
     },
     {
       "id": "package-isolation",
-      "state": "pending",
+      "state": "passed",
       "evidence": [
         "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
       ]
