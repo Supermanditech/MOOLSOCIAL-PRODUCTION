@@ -15,6 +15,131 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final destination in const [
+    BuyV2Destination.medicine,
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final size in const [Size(360, 800), Size(800, 360)]) {
+      for (final productIndex in const [0, 2]) {
+        testWidgets(
+          'REG4548 featured ${destination.name} item$productIndex return at $size',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = size;
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(session.dispose);
+            addTearDown(core.dispose);
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: const TextScaler.linear(2),
+                    disableAnimations: true,
+                  ),
+                  child: child!,
+                ),
+                home: BuyV2Screen(
+                  session: session,
+                  initialDestination: destination,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final rail = find.byKey(
+              const ValueKey('buy-featured-product-list'),
+            );
+            expect(rail, findsOneWidget);
+            final horizontal = find.descendant(
+              of: rail,
+              matching: find.byType(Scrollable),
+            );
+            final catalogue = find
+                .ancestor(of: rail, matching: find.byType(CustomScrollView))
+                .first;
+            final vertical = find
+                .descendant(
+                  of: catalogue,
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Scrollable &&
+                        widget.axisDirection == AxisDirection.down,
+                  ),
+                )
+                .first;
+            tester
+                .state<ScrollableState>(horizontal)
+                .position
+                .jumpTo(productIndex * 186.0);
+            await tester.pumpAndSettle();
+            final product = session.catalogueSaleTypeProducts[productIndex];
+            final card = find.byKey(
+              ValueKey('buy-featured-product-${product.id}'),
+            );
+            await tester.ensureVisible(card);
+            await tester.pumpAndSettle();
+            final verticalBefore = tester
+                .state<ScrollableState>(vertical)
+                .position
+                .pixels;
+            final horizontalBefore = tester
+                .state<ScrollableState>(horizontal)
+                .position
+                .pixels;
+            if (size.height > size.width) {
+              expect(verticalBefore, greaterThan(0));
+            }
+            expect(horizontalBefore, greaterThanOrEqualTo(0));
+            if (productIndex > 0) expect(horizontalBefore, greaterThan(100));
+            await tester.tap(
+              find.descendant(of: card, matching: find.text(product.title)),
+            );
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.product);
+            expect(session.selectedProductId, product.id);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+            expect(
+              tester.state<ScrollableState>(horizontal).position.pixels,
+              closeTo(horizontalBefore, .1),
+              reason:
+                  'Back must not restore the vertical catalogue offset horizontally',
+            );
+            expect(
+              tester.state<ScrollableState>(vertical).position.pixels,
+              closeTo(verticalBefore, .1),
+            );
+            session.openDestination(
+              destination == BuyV2Destination.medicine
+                  ? BuyV2Destination.shop
+                  : BuyV2Destination.medicine,
+            );
+            await tester.pumpAndSettle();
+            expect(
+              tester.state<ScrollableState>(horizontal).position.pixels,
+              0,
+              reason: 'An unvisited destination starts at its own first item',
+            );
+            tester.state<ScrollableState>(horizontal).position.jumpTo(230);
+            await tester.pumpAndSettle();
+            session.openDestination(destination);
+            await tester.pumpAndSettle();
+            expect(
+              tester.state<ScrollableState>(horizontal).position.pixels,
+              closeTo(horizontalBefore, .1),
+              reason: 'Another destination cannot replace this rail position',
+            );
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
   for (final fixture in [
     for (final width in [320.0, 360.0])
       for (final featured in [false, true]) (width: width, featured: featured),

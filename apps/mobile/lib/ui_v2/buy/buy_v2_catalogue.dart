@@ -8778,6 +8778,7 @@ class _FeaturedProductRail extends StatelessWidget {
           ),
         ),
         SizedBox(
+          key: PageStorageKey('buy-featured-${session.destination.name}'),
           height: cardLaneHeight,
           child: ListView.separated(
             key: const ValueKey('buy-featured-product-list'),
