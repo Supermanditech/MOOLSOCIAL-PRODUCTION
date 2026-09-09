@@ -7829,6 +7829,143 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final (width, height, scale, reduced) in [
+    (412.0, 915.0, 1.0, false),
+    (360.0, 800.0, 1.4, false),
+    (320.0, 568.0, 2.0, false),
+    (412.0, 915.0, 2.0, true),
+  ]) {
+    testWidgets(
+      'REG4560 inline Chat search $width $height $scale reduced=$reduced',
+      (tester) async {
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(disableAnimations: reduced);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        final work = storeViewFixture();
+        final storeId = work.activeWorkspace!.id;
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        chat.setDraftTextForSession('home-basket', 'Keep this unsent draft');
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          chat: chat,
+          viewport: Size(width, height),
+          textScale: scale,
+        );
+        final dashboard = find.byType(WorkWorkspaceDashboardScreen);
+        final dashboardState = tester.state(dashboard);
+        final router = GoRouter.of(tester.element(dashboard));
+        router.push<void>(
+          Uri(
+            path: '/app/chat/inbox',
+            queryParameters: {'return': '/app/work/workspace/dashboard'},
+          ).toString(),
+        );
+        await tester.pumpAndSettle();
+        final field = find.byKey(const Key('chat-search-field'));
+        final open = find.byKey(const Key('chat-open-inline-search'));
+        final motionFinder = find.byKey(const Key('chat-search-focus-motion'));
+        final motion = tester.widget<AnimatedContainer>(motionFinder);
+        final decoration = motion.decoration! as BoxDecoration;
+        expect(decoration.color, isNull);
+        expect(decoration.borderRadius, isNull);
+        expect(decoration.boxShadow, isNull);
+        if (reduced) expect(motion.duration, Duration.zero);
+        expect(
+          find.descendant(
+            of: field,
+            matching: find.byIcon(Icons.search_rounded),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.widget<TextField>(field).decoration!.suffixIcon, isNull);
+        expect(open.hitTestable(), findsOneWidget);
+        expect(tester.getSize(open).shortestSide, greaterThanOrEqualTo(48));
+        final hint = tester.widget<TextField>(field).decoration!.hintText!;
+        if (width == 412 && scale == 1) {
+          expect(hint, 'Search conversations');
+        }
+        if (hint == 'Search') {
+          expect(
+            find
+                .ancestor(of: field, matching: find.byType(Semantics))
+                .evaluate()
+                .any(
+                  (element) =>
+                      (element.widget as Semantics).properties.label ==
+                      'Search conversations',
+                ),
+            isTrue,
+          );
+        }
+        final hintFinder = find.descendant(
+          of: field,
+          matching: find.text(hint),
+        );
+        final hintParagraph = tester.renderObject<RenderParagraph>(hintFinder);
+        expect(hintParagraph.didExceedMaxLines, isFalse);
+        expect(
+          hintParagraph.getMaxIntrinsicWidth(double.infinity),
+          lessThanOrEqualTo(hintParagraph.size.width + .01),
+        );
+        await captureStoreView(
+          tester,
+          'chat-inline-idle-$width-$scale-$reduced',
+        );
+        await tester.tap(open);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+        expect(find.byKey(const Key('chat-open-inline-search')), findsNothing);
+        expect(
+          find.byKey(const Key('chat-close-inline-search')),
+          findsOneWidget,
+        );
+        tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+        await tester.enterText(field, 'zz-no-conversation-4560');
+        await tester.pumpAndSettle();
+        final clear = find.byKey(const Key('chat-clear-search'));
+        expect(clear.hitTestable(), findsOneWidget);
+        expect(
+          tester.getBottomRight(clear).dy,
+          lessThanOrEqualTo(height - 200),
+        );
+        expect(find.byKey(const Key('chat-new')), findsNothing);
+        expect(find.byKey(const Key('chat-filter-all')), findsNothing);
+        expect(
+          chat.draftTextForSession('home-basket'),
+          'Keep this unsent draft',
+        );
+        await captureStoreView(
+          tester,
+          'chat-inline-search-$width-$scale-$reduced',
+        );
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(field).controller!.text, isEmpty);
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isTrue);
+        await tester.tap(find.byKey(const Key('chat-close-inline-search')));
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        expect(open.hitTestable(), findsOneWidget);
+        expect(tester.widget<TextField>(field).focusNode!.hasFocus, isFalse);
+        await tester.tap(find.byKey(const Key('chat-inbox-back')));
+        await tester.pumpAndSettle();
+        expect(tester.state(dashboard), same(dashboardState));
+        expect(work.activeWorkspace!.id, storeId);
+        expect(
+          chat.draftTextForSession('home-basket'),
+          'Keep this unsent draft',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final hardwareBack in [false, true]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(

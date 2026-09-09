@@ -5,7 +5,7 @@
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
     "entryCount": 4514,
-    "sha256": "73567A36B1BBDF02EE70F92D3DEA0B18A2376E97FAFEE9F66C037B9FE1944847"
+    "sha256": "715A14819D6BE9C5B94CBD0A1ABA9B3D20CFFC20C5FF0F001A2B40D69793E1DF"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -152,6 +152,7 @@
         "apps/mobile/lib/features/chat/chat_entry_context.dart",
         "apps/mobile/lib/features/chat/chat_session.dart",
         "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
+        "apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart",
         "apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart",
         "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
         "apps/mobile/lib/features/chat/widgets/chat_widgets.dart",

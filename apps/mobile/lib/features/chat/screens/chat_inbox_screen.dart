@@ -682,56 +682,111 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Expanded(
-                    child: ChatSearchFocusMotion(
-                      focused: _searchFocusNode.hasFocus,
-                      child: TextField(
-                        key: const Key('chat-search-field'),
-                        focusNode: _searchFocusNode,
-                        controller: _searchController,
-                        onChanged: (_) => setState(() {}),
-                        textInputAction: TextInputAction.search,
-                        onSubmitted: (_) => _searchFocusNode.unfocus(),
-                        decoration: InputDecoration(
-                          hintText: 'Search conversations',
-                          prefixIcon: const Icon(Icons.search_rounded),
-                          filled: false,
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                          suffixIcon: IconButton(
-                            key: Key(
-                              hasSearchQuery
-                                  ? 'chat-clear-search'
-                                  : searchFocused
-                                  ? 'chat-close-inline-search'
-                                  : 'chat-open-inline-search',
-                            ),
-                            tooltip: hasSearchQuery
-                                ? 'Clear conversation search'
-                                : searchFocused
-                                ? 'Close conversation search'
-                                : 'Search conversations',
-                            onPressed: hasSearchQuery
-                                ? _clearConversationSearch
-                                : searchFocused
-                                ? _closeInlineConversationSearch
-                                : _openInlineConversationSearch,
-                            icon: ChatActionIconMotion(
-                              key: const Key('chat-search-action-icon-motion'),
-                              stateKey: hasSearchQuery
-                                  ? 'clear'
-                                  : searchFocused
-                                  ? 'close'
-                                  : 'search',
-                              icon: hasSearchQuery
-                                  ? Icons.close_rounded
-                                  : searchFocused
-                                  ? Icons.keyboard_hide_rounded
-                                  : Icons.search_rounded,
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        final searchStyle = Theme.of(
+                          context,
+                        ).textTheme.bodyLarge!.copyWith(fontSize: 16);
+                        final hintMeasure = TextPainter(
+                          text: TextSpan(
+                            text: 'Search conversations',
+                            style: searchStyle,
+                          ),
+                          textScaler: MediaQuery.textScalerOf(context),
+                          textDirection: Directionality.of(context),
+                        )..layout();
+                        final fullHintFits =
+                            hintMeasure.width <=
+                            constraints.maxWidth - (searchActive ? 96 : 48);
+                        hintMeasure.dispose();
+                        return AnimatedContainer(
+                          key: const Key('chat-search-focus-motion'),
+                          duration: ChatMotion.resolve(
+                            context,
+                            ChatMotion.focus,
+                          ),
+                          curve: MoolMotion.change,
+                          decoration: BoxDecoration(
+                            border: Border(
+                              bottom: BorderSide(
+                                color: searchFocused
+                                    ? MoolColors.navy
+                                    : Colors.transparent,
+                              ),
                             ),
                           ),
-                        ),
-                      ),
+                          child: Semantics(
+                            label: fullHintFits ? null : 'Search conversations',
+                            child: TextField(
+                              key: const Key('chat-search-field'),
+                              focusNode: _searchFocusNode,
+                              controller: _searchController,
+                              onChanged: (_) => setState(() {}),
+                              textInputAction: TextInputAction.search,
+                              onSubmitted: (_) => _searchFocusNode.unfocus(),
+                              style: searchStyle,
+                              decoration: InputDecoration(
+                                hintText: fullHintFits
+                                    ? 'Search conversations'
+                                    : 'Search',
+                                hintStyle: searchStyle.copyWith(
+                                  color: MoolColors.muted,
+                                ),
+                                contentPadding: const EdgeInsets.symmetric(
+                                  vertical: 12,
+                                ),
+                                prefixIcon: searchActive
+                                    ? const Icon(Icons.search_rounded)
+                                    : IconButton(
+                                        key: const Key(
+                                          'chat-open-inline-search',
+                                        ),
+                                        tooltip: 'Search conversations',
+                                        onPressed:
+                                            _openInlineConversationSearch,
+                                        icon: const ChatActionIconMotion(
+                                          key: Key(
+                                            'chat-search-action-icon-motion',
+                                          ),
+                                          stateKey: 'search',
+                                          icon: Icons.search_rounded,
+                                        ),
+                                      ),
+                                filled: false,
+                                border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
+                                suffixIcon: !searchActive
+                                    ? null
+                                    : IconButton(
+                                        key: Key(
+                                          hasSearchQuery
+                                              ? 'chat-clear-search'
+                                              : 'chat-close-inline-search',
+                                        ),
+                                        tooltip: hasSearchQuery
+                                            ? 'Clear conversation search'
+                                            : 'Close conversation search',
+                                        onPressed: hasSearchQuery
+                                            ? _clearConversationSearch
+                                            : _closeInlineConversationSearch,
+                                        icon: ChatActionIconMotion(
+                                          key: const Key(
+                                            'chat-search-action-icon-motion',
+                                          ),
+                                          stateKey: hasSearchQuery
+                                              ? 'clear'
+                                              : 'close',
+                                          icon: hasSearchQuery
+                                              ? Icons.close_rounded
+                                              : Icons.keyboard_hide_rounded,
+                                        ),
+                                      ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
                   ),
                   if (threads.isNotEmpty && !searchActive) ...[

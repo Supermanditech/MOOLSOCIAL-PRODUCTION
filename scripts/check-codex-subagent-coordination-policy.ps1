@@ -1683,6 +1683,7 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/lib/features/chat/chat_entry_context.dart',
           'apps/mobile/lib/features/chat/chat_session.dart',
           'apps/mobile/lib/features/chat/screens/chat_settings_screen.dart',
+          'apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart',
           'apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart',
           'apps/mobile/lib/features/chat/screens/chat_thread_screen.dart',
           'apps/mobile/lib/features/chat/widgets/chat_widgets.dart',
