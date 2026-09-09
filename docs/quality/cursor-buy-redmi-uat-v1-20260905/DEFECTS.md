@@ -43,6 +43,12 @@ Separate open requirements: R668-REQ-COMPARE-SUPPLIER-001; R668-REQ-STORE-CATEGO
 
 ## Expanded r66.8 audit additions — 9 September 2026
 
+### Implementation progress — 10 September 2026 IST
+
+**SAVED-EMPTY-FILTER-001 and SAVED-FILTER-COUNT-001: implemented in source; OPEN awaiting successor Redmi verification.** Saved preview now uses the same saved membership/query/refinements as the destination and labels its count Saved; it does not fetch a whole-catalogue preview. Changing the Saved/catalogue scope invalidates an open draft. The grid distinguishes no matching saved products from truly empty Saved and offers Clear search and filters while keeping the collection open. True empty Saved still offers Show all products. Saved membership is not deleted by refinement recovery.
+
+Qualification: singlechat-r669-saved-connected-1 completed with257 passing tests, zero failures and one pre-existing explicitly skipped screenshot-only case (R56.1 Saved-clear responsive evidence captures, skip:true). Complete538-event JSON retained, SHA256491693C673DBCA49E8A75ADD1CA94280C02334A99BA1651076B49C71BFAF8F0F; native0, empty stderr. The connected run includes all discovery-refinement, session and Saved-clear-motion tests, including three new customer-behaviour cases for paged Saved counts/drafts/live membership and Shop/Wholesale no-match/true-empty recovery. Scoped analysis and approved UI locks passed. This is host evidence only; the original839 and914–915 Redmi reproductions must pass on the separately qualified successor before either record closes. Open count remains30; all seven requests remain unimplemented.
+
 ### R668-AUDIT-SAVED-FILTER-COUNT-001 — Saved filter preview counts the entire catalogue
 
 Follow-up916–941: high-to-low sorts the two Saved products279 then210 (918); low-to-high reverses them (922). Thus destination sorting respects the shortlist, while the preview count does not. Reopening after the two saved products have been cleared still reports25000000 (938–939). Enlarged portrait horizontal scrolling926–927 reveals the second saved item, and landscape931 exposes both full Add actions; no data-loss or inaccessible-card claim. Clear confirmation fits enlarged landscape934 and portrait935; temporary items removed936, sort reset939–940, normal display restored937 and Shop941 exactly matches911. The scope-count defect remains open; successful sorting/cleanup does not close it.

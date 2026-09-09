@@ -514,6 +514,125 @@ void main() {
     },
   );
 
+  testWidgets(
+    'R668 Saved filter previews only saved matches with a paged catalogue',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final source = _R671RefinementSource();
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        cataloguePageSource: source,
+        catalogueAreas: const {'jodhpur': 'Jodhpur'},
+        initialCatalogueRegionId: 'jodhpur',
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final cheap = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.shop &&
+            product.catalogueListing &&
+            product.price <= 250,
+      );
+      final expensive = BuyV2Catalogue.products.firstWhere(
+        (product) =>
+            product.destination == BuyV2Destination.shop &&
+            product.catalogueListing &&
+            product.price > 250,
+      );
+      session.toggleSaved(cheap.id);
+      session.toggleSaved(expensive.id);
+      session.showSavedProducts(true);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final requestCount = source.requests.length;
+      await openRefinement(tester, session);
+      final count = find.byKey(
+        const ValueKey('buy-discovery-refinement-count'),
+      );
+      expect(tester.widget<Text>(count).data, 'Saved: 2 products found');
+      await tapVisible(tester, const ValueKey('buy-refine-price-250'));
+      expect(tester.widget<Text>(count).data, 'Saved: 1 product found');
+      expect(session.maximumProductPrice, isNull);
+      expect(session.savedCountFor(BuyV2Destination.shop), 2);
+      expect(source.requests.length, requestCount);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-discovery-refinement-done')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.visibleSavedProducts.map((product) => product.id), [
+        cheap.id,
+      ]);
+      await openRefinement(tester, session);
+      expect(tester.widget<Text>(count).data, 'Saved: 1 product found');
+      session.clearSavedProducts(BuyV2Destination.shop);
+      await tester.pumpAndSettle();
+      expect(tester.widget<Text>(count).data, 'Saved: 0 products found');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.text('No saved products yet'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    testWidgets(
+      'R668 Saved no-match recovery retains ${destination.name} membership',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core)..openDestination(destination);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final product = BuyV2Catalogue.products.firstWhere(
+          (product) =>
+              product.destination == destination && product.catalogueListing,
+        );
+        session.toggleSaved(product.id);
+        session.showSavedProducts(true);
+        session.updateQuery('nonexistentzzzzproduct');
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: destination,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('No matching saved products'), findsOneWidget);
+        expect(find.text('No saved products yet'), findsNothing);
+        await tester.tap(find.text('Clear search and filters'));
+        await tester.pumpAndSettle();
+        expect(session.showingSavedProducts, isTrue);
+        expect(session.savedCountFor(destination), 1);
+        expect(session.visibleSavedProducts.single.id, product.id);
+        expect(find.text('No matching saved products'), findsNothing);
+        session.clearSavedProducts(destination);
+        await tester.pumpAndSettle();
+        expect(find.text('No saved products yet'), findsOneWidget);
+        await tester.tap(find.text('Show all products'));
+        await tester.pumpAndSettle();
+        expect(session.showingSavedProducts, isFalse);
+        expect(session.destination, destination);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final check in [
     'cancel',
     'outside',

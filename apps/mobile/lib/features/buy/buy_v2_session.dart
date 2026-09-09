@@ -3923,8 +3923,14 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Product> get visibleProducts =>
       _resolveVisibleProducts(limit: true);
 
-  List<BuyV2Product> get visibleSavedProducts => _resolveVisibleProducts(
+  List<BuyV2Product> get visibleSavedProducts =>
+      previewSavedProducts(discoveryRefinements);
+
+  List<BuyV2Product> previewSavedProducts(
+    BuyV2DiscoveryRefinements refinements,
+  ) => _resolveVisibleProducts(
     limit: false,
+    refinements: refinements,
     source: savedProductsFor(destination),
   );
 

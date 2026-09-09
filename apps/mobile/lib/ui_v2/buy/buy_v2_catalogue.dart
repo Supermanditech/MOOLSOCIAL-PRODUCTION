@@ -7486,6 +7486,8 @@ class _ProductGrid extends StatelessWidget {
         session.selectedCategoryId == 'all' &&
         session.activeShoppingIntent == null;
     if (products.isEmpty) {
+      final savedCollectionEmpty =
+          savedOnly && session.savedCountFor(session.destination) == 0;
       return Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
@@ -7501,13 +7503,19 @@ class _ProductGrid extends StatelessWidget {
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  savedOnly ? 'No saved products yet' : 'No matching products',
+                  savedCollectionEmpty
+                      ? 'No saved products yet'
+                      : savedOnly
+                      ? 'No matching saved products'
+                      : 'No matching products',
                   style: context.buyTitle.copyWith(fontSize: 17),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  savedOnly
-                      ? 'Save products from this grid for instant access.'
+                  savedCollectionEmpty
+                      ? 'Save products while browsing to find them here.'
+                      : savedOnly
+                      ? 'Your products are still saved. Clear search and filters to see them.'
                       : session.query.trim().isNotEmpty
                       ? 'Check the product code or search by product name.'
                       : 'Try another category or clear the filter.',
@@ -7517,7 +7525,7 @@ class _ProductGrid extends StatelessWidget {
                 const SizedBox(height: 12),
                 TextButton(
                   onPressed: () {
-                    if (savedOnly) {
+                    if (savedCollectionEmpty) {
                       onShowAll();
                     } else {
                       session.updateQuery('');
@@ -7527,8 +7535,10 @@ class _ProductGrid extends StatelessWidget {
                     }
                   },
                   child: Text(
-                    savedOnly
+                    savedCollectionEmpty
                         ? 'Show all products'
+                        : savedOnly
+                        ? 'Clear search and filters'
                         : session.query.trim().isNotEmpty
                         ? session.hasNarrowedProductSearchScope
                               ? 'Clear search and filters'

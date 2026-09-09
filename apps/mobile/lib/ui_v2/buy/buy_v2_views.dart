@@ -12693,10 +12693,12 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
 }) async {
   final destination = session.destination;
   if (destination == BuyV2Destination.orders) return;
+  final savedOnly = session.showingSavedProducts;
   String browseScope() =>
       '${session.destination.name}|${session.saleTypeSignature}|'
       '${session.selectedCategoryId}|${session.query}|'
-      '${session.catalogueRegionId}|${session.catalogueAreaScope.name}';
+      '${session.catalogueRegionId}|${session.catalogueAreaScope.name}|'
+      '${session.showingSavedProducts}';
   final originalScope = browseScope();
   final current = session.discoveryRefinements;
   var draft = BuyV2DiscoveryRefinements(
@@ -12716,7 +12718,7 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
     ..sort();
   const packFilters = [BuyV2PackFilter.standard, BuyV2PackFilter.multipack];
   final previewScope = 'refinement-preview-${destination.name}';
-  final preview = session.pagedCatalogueEnabled
+  final preview = session.pagedCatalogueEnabled && !savedOnly
       ? session.acquireCatalogueProducts(previewScope)
       : null;
   if (preview != null) {
@@ -12742,7 +12744,9 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
           animation: Listenable.merge([session, ?preview]),
           builder: (sheetContext, _) {
             final scopeMatches = browseScope() == originalScope;
-            final productCount = preview == null
+            final productCount = savedOnly
+                ? session.previewSavedProducts(draft).length
+                : preview == null
                 ? session.previewDiscoveryProducts(draft).length
                 : preview.loading || preview.message != null
                 ? null
@@ -12783,7 +12787,7 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
                                 Text(
                                   scopeMatches
                                       ? productCount != null
-                                            ? '${_productCountLabel(productCount)} found'
+                                            ? '${savedOnly ? 'Saved: ' : ''}${_productCountLabel(productCount)} found'
                                             : preview?.loading == true
                                             ? 'Checking matching products…'
                                             : 'Count unavailable. Apply to view results.'
