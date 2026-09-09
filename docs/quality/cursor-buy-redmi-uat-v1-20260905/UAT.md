@@ -2,6 +2,20 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Address action menus, type choices and request fallback — captures746–776
+
+Thirty-one native-success PNG/XML pairs visually inspected on Redmi r66.8 with normal display throughout. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-746-776-V1.json SHA256 76522E9FECBCD401A617B413B2CC185286BE5E6785AA58A7651AA68A49B999FE. Resume746 matches prior745; filter747 → tools748/749 → settings750 → Delivery addresses751 restores original Home and selected Work.
+
+Home menu752 → Remove address753 opens a confirmation with visible Keep address and Remove actions. Keep754 restores exact751 XML D223A4D420B43C631D8FAA8B02FE56F3750DCE76C64CE1A9C5540E0768F997E3. Work menu755 → Remove address756 names Work correctly; Android Back757 restores the same chooser. Final Remove was never pressed. Source buy_v2_views.dart13809–13840 confirms removal occurs only after affirmative dialog result. Initial read-only search used nonexistent root lib; recovered by file discovery to apps/mobile/lib before inspecting the callback. That search failure is not app evidence.
+
+Add758 → Work759 → Third party760 → Other place761 → Home762 changes the single selected type correctly. Home762 exactly matches initial empty758 XML DE85A25FAB6B8BFFFFA189633BBEDDC8749520EF1F5FECEF9829B3EB524E750F. Back763 restores exact751 chooser. No address saved. Existing REQ-ADDRESS-TYPE-DENSITY-001 remains open; functioning selection does not resolve the founder's compact-layout request.
+
+Request an address764 exposes optional recipient, Share request, Copy link and Add it myself. Blank manual fallback765 opens the empty form; Android Back766 restores exact764 request XML8DFE16DBE5D8DF08AF71DE941E347A7470CFEB79781758A47590A7C5D38863B8. Focus767 and enter Aarav768 keep input/actions visible above keyboard. Add it myself769 opens a blank recipient field; settled770 confirms it remains blank. Registered OPEN P3 R668-AUDIT-ADDRESS-REQUEST-NAME-001 before proceeding: manual fallback requires repeating an already-entered recipient name. Source call14299 does not pass the request recipient. Transient keyboard769 disappears by770, so no keyboard-stuck defect is asserted.
+
+Back771 retains Aarav in the originating request sheet, exact768 XMLF4AC0B2FDA9F07E748D6C347F376961CCCD5D35A3B3EE7880B889F4FA9B7A2D3. X772 discards the request draft and restores original chooser. Reopen773 is empty and exactly matches764; Android Back774 restores chooser, Back775 settings and Back776 the original746 Shop XML2AA648B23BBCBAB3242D72610592DB1FEB8111D284361FA46B4C18A14DC99167. Work selected, Home retained, PhonePe and notifications unchanged; no cart/display changes or Share/Copy/request submission. Source/build/install/backend untouched. One new distinct defect; no ticket closed.
+
+Still unqualified: valid temporary address CRUD, long regional text and enlarged/interruption variants, actual request-link generation/recipient completion, supplier media formats and remaining full Shop action inventory. Share/Copy were inspected as controls but not executed. Full-module enumeration remains incomplete.
+
 ### Resumed Shopping tools and populated address validation — captures716–745
 
 Thirty native-success PNG/XML pairs visually inspected on the same Redmi r66.8, normal display throughout. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-716-745-V1.json SHA256 90FEDBFADEA53F279C43E2EE5B21C5B5062098B2A80D931E2B1FF768EFD399C6. Attempt715 is excluded: foreground guard stopped before input/capture because the review app was not foreground. Founder then reported the app ready;716 confirms Scheduled Shop. No app defect is inferred from that guard. Truncated721 output was recovered from its immutable native-zero receipt and existing PNG without repeating the swipe.
@@ -57,7 +71,10 @@ This index supplements the full screen-family inventory below. “Exercised” m
 | Delivered → wholesale order → return → Replacement → scroll | 659–669; explicit unknown eligibility, enlarged bottom controls reachable | Eligible item/reason/submit branches unavailable; backend deferred |
 | Delivered → retail order → Address → Manage future addresses | 677–680; future-address context explicit; partner-status defect | Delivered partner fallback fix and pending-order regression |
 | Address chooser → Add → empty/populated invalid Save → correction → Back → reopen | 681–684,723–743; required/short-phone/short-PIN rejection, keyboard Next, draft reset and original addresses preserved | Valid temporary CRUD, number/PIN validity beyond length, long regional text and responsive variants |
-| Address chooser → Work overflow → Edit → close → chooser close | 685–688; original fields and exact order restored | Removal confirmation/cancel, all address-type draft changes |
+| Address chooser → Work overflow → Edit → close → chooser close | 685–688; original fields and exact order restored | Valid temporary edit/save and responsive variants |
+| Home/Work overflow → Remove address → Keep/Android Back | 752–757; correct confirmations and unchanged addresses | Actual temporary-address deletion and enlarged/interruption variants |
+| Add address → Work → Third party → Other place → Home → Back | 758–763; single selection and original chooser restored | Populated type-switch draft retention, save and responsive variants |
+| Request an address → blank/named Add it myself → Back → close/reopen | 764–774; nested return and draft reset exercised; name-handoff P3 recorded | Fix/retest name handoff; Share/Copy and recipient-completion paths unexecuted |
 | Retail resolution → Refund → scroll → Retry → Return → Replacement → Back | 689–696; choices/retry/dismiss exercised; no invented eligibility | Eligible selection, quantities, reasons and submitted outcomes unavailable |
 | Delivered retail/wholesale → Invoice → Back | 670–676; missing historical lines defect, return exercised | Download/export inspection; full historical-line fixture |
 | Retail order → Items → delivery control → Arrival sound on/off → collapse | 697–703; correct active order identity and restored UI | Actual sound and background arrival |
