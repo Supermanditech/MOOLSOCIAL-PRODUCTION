@@ -3430,6 +3430,204 @@ void main() {
     expect(find.text('Buy now'), findsNothing);
   });
 
+  for (final viewport in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final editing in [false, true]) {
+        testWidgets(
+          'R669 address layout keeps focus and actions visible $viewport $scale edit $editing',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = viewport;
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            final before = session.addresses.toList();
+            final selected = session.selectedAddressId;
+            await tester.pumpWidget(
+              app(
+                session,
+                textScale: scale,
+                safePadding: const EdgeInsets.only(top: 24, bottom: 24),
+              ),
+            );
+            await tester.pumpAndSettle();
+            unawaited(
+              showBuyV2AddressSheet(
+                tester.element(find.byType(BuyV2Screen)),
+                session,
+              ),
+            );
+            await tester.pumpAndSettle();
+            Future<void> reveal(
+              String target,
+              String list, {
+              double delta = 160,
+            }) async {
+              await tester.scrollUntilVisible(
+                find.byKey(ValueKey(target)),
+                delta,
+                scrollable: find
+                    .descendant(
+                      of: find.byKey(ValueKey(list)),
+                      matching: find.byType(Scrollable),
+                    )
+                    .first,
+                maxScrolls: 50,
+              );
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(ValueKey(target)).hitTestable(),
+                findsOneWidget,
+              );
+            }
+
+            if (editing) {
+              await reveal(
+                'buy-address-actions-work',
+                'buy-address-sheet-list',
+              );
+              await tester.tap(
+                find.byKey(const ValueKey('buy-address-actions-work')),
+              );
+              await tester.pumpAndSettle();
+              await tester.tap(
+                find.byKey(const ValueKey('buy-address-edit-work')),
+              );
+            } else {
+              await reveal('buy-address-add', 'buy-address-sheet-list');
+              await tester.tap(find.byKey(const ValueKey('buy-address-add')));
+            }
+            await tester.pumpAndSettle();
+            final firstType = find.byKey(
+              const ValueKey('buy-address-add-kind-Home'),
+            );
+            final lastType = find.byKey(
+              const ValueKey('buy-address-add-kind-Other place'),
+            );
+            if (scale == 1) {
+              expect(
+                tester.getRect(firstType).top,
+                closeTo(tester.getRect(lastType).top, .1),
+              );
+            }
+            for (final type in ['Home', 'Work', 'Third party', 'Other place']) {
+              final key = 'buy-address-add-kind-$type';
+              await reveal(key, 'buy-address-add-form-list');
+              final chip = find.byKey(ValueKey(key));
+              expect(tester.getSize(chip).height, greaterThanOrEqualTo(44));
+              await tester.tap(chip);
+              await tester.pumpAndSettle();
+              expect(tester.widget<ChoiceChip>(chip).selected, isTrue);
+            }
+            if (editing) {
+              await reveal(
+                'buy-address-add-kind-Home',
+                'buy-address-add-form-list',
+                delta: -160,
+              );
+              await captureR66Visual(
+                tester,
+                'r669-address-types-${viewport.width}-$scale',
+              );
+            }
+            final keyboard = viewport.width > viewport.height ? 120.0 : 260.0;
+            for (final field in const [
+              ('recipient', 'Meera Sharma'),
+              ('phone', '9876543210'),
+              ('line', '24 Market Road'),
+              ('area', 'Basni, Jodhpur'),
+              ('pin', '342005'),
+              ('landmark', 'Near school'),
+            ]) {
+              final id = 'buy-address-add-${field.$1}';
+              await reveal(id, 'buy-address-add-form-list');
+              final input = find.byKey(ValueKey(id));
+              await tester.tap(input);
+              await tester.pump();
+              tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+              await tester.pumpAndSettle();
+              await tester.enterText(input, field.$2);
+              await tester.pumpAndSettle();
+              final editable = tester.state<EditableTextState>(
+                find.descendant(of: input, matching: find.byType(EditableText)),
+              );
+              final renderer = editable.renderEditable;
+              final caret = renderer
+                  .getLocalRectForCaret(TextPosition(offset: field.$2.length))
+                  .shift(renderer.localToGlobal(Offset.zero));
+              final visible = tester.getRect(
+                find.byKey(const ValueKey('buy-address-add-form-list')),
+              );
+              expect(
+                visible.bottom,
+                lessThanOrEqualTo(viewport.height - keyboard + .1),
+              );
+              expect(
+                caret.top,
+                greaterThanOrEqualTo(visible.top - .1),
+                reason: field.$1,
+              );
+              expect(
+                caret.bottom,
+                lessThanOrEqualTo(visible.bottom + .1),
+                reason: field.$1,
+              );
+              expect(
+                caret.bottom,
+                lessThanOrEqualTo(viewport.height - keyboard),
+                reason: field.$1,
+              );
+              if (editing && field.$1 == 'recipient') {
+                await captureR66Visual(
+                  tester,
+                  'r669-address-keyboard-${viewport.width}-$scale',
+                );
+              }
+              tester.testTextInput.hide();
+              tester.view.viewInsets = FakeViewPadding.zero;
+              await tester.pumpAndSettle();
+            }
+            await reveal('buy-address-add-submit', 'buy-address-add-form-list');
+            final save = find.byKey(const ValueKey('buy-address-add-submit'));
+            expect(tester.getSize(save).height, greaterThanOrEqualTo(44));
+            final paragraph = tester.renderObject<RenderParagraph>(
+              find.descendant(of: save, matching: find.byType(RichText)).first,
+            );
+            expect(paragraph.didExceedMaxLines, isFalse);
+            expect(
+              paragraph.localToGlobal(Offset.zero).dy + paragraph.size.height,
+              lessThanOrEqualTo(tester.getRect(save).bottom + .1),
+            );
+            if (editing) {
+              await captureR66Visual(
+                tester,
+                'r669-address-save-${viewport.width}-$scale',
+              );
+            }
+            await tester.tap(save);
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-address-add-form-route')),
+              findsNothing,
+            );
+            expect(session.addresses.length, before.length + (editing ? 0 : 1));
+            final saved = editing
+                ? session.addresses.singleWhere((a) => a.id == 'work')
+                : session.selectedAddress;
+            expect(saved.recipient, 'Meera Sharma');
+            expect(saved.phone, '9876543210');
+            expect(saved.kind, BuyV2AddressKind.other);
+            if (editing) expect(session.selectedAddressId, selected);
+            expect(session.itemCount, 0);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
   for (final scale in [1.0, 2.0]) {
     for (final name in ['', 'Aarav Shah']) {
       testWidgets(

@@ -14482,12 +14482,40 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
         ? 'Add delivery address'
         : 'Edit ${editingAddress.label} address';
     final bottomPadding =
-        18 +
-        BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context) +
-        MediaQuery.viewInsetsOf(context).bottom;
-    final fieldScrollPadding = EdgeInsets.only(
-      bottom: MediaQuery.viewInsetsOf(context).bottom + 140,
-    );
+        18 + BuyV2AddressFormSheetMotion.resolveBottomSafeInset(context);
+    final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
+    Widget input({
+      required String id,
+      required TextEditingController controller,
+      required String label,
+      TextInputType? keyboardType,
+      TextInputAction action = TextInputAction.next,
+      int minLines = 1,
+      int maxLines = 1,
+    }) {
+      final field = TextField(
+        key: ValueKey('buy-address-add-$id'),
+        controller: controller,
+        scrollPadding: const EdgeInsets.symmetric(vertical: 12),
+        keyboardType: keyboardType,
+        textInputAction: action,
+        minLines: minLines,
+        maxLines: maxLines,
+        decoration: InputDecoration(labelText: largeText ? null : label),
+      );
+      if (!largeText) return field;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(
+            child: Text(label, style: context.buyMeta.copyWith(fontSize: 12)),
+          ),
+          const SizedBox(height: 4),
+          Semantics(label: label, textField: true, child: field),
+        ],
+      );
+    }
+
     return Semantics(
       key: const ValueKey('buy-address-add-form-route'),
       container: true,
@@ -14497,161 +14525,135 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
       label: title,
       child: RepaintBoundary(
         key: const ValueKey('buy-address-add-form-repaint-boundary'),
-        child: ConstrainedBox(
-          constraints: BoxConstraints(
-            maxHeight:
-                MediaQuery.sizeOf(context).height *
-                BuyV2AddressFormSheetMotion.addMaxHeightFactor,
+        child: Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(context).bottom,
           ),
-          child: ListView(
-            key: const ValueKey('buy-address-add-form-list'),
-            padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
-            children: [
-              _AddressFormHeader(
-                title: title,
-                body: editingAddress == null
-                    ? 'Save where this order should arrive.'
-                    : 'Update the delivery details for this saved place.',
-                closeKey: const ValueKey('buy-address-add-form-close'),
-              ),
-              const SizedBox(height: 12),
-              Text('Address type', style: context.buyEyebrow),
-              const SizedBox(height: 7),
-              Wrap(
-                spacing: 6,
-                runSpacing: 6,
-                children: [
-                  for (final option in const [
-                    (BuyV2AddressKind.home, 'Home'),
-                    (BuyV2AddressKind.work, 'Work'),
-                    (BuyV2AddressKind.thirdParty, 'Third party'),
-                    (BuyV2AddressKind.other, 'Other place'),
-                  ])
-                    ChoiceChip(
-                      key: ValueKey('buy-address-add-kind-${option.$2}'),
-                      label: Text(option.$2),
-                      selected: kind == option.$1,
-                      onSelected: (_) => setState(() => kind = option.$1),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: buyV2CardDecoration(
-                  color: BuyV2Colors.softBlue,
-                  radius: 14,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight:
+                  MediaQuery.sizeOf(context).height *
+                  BuyV2AddressFormSheetMotion.addMaxHeightFactor,
+            ),
+            child: ListView(
+              key: const ValueKey('buy-address-add-form-list'),
+              padding: EdgeInsets.fromLTRB(16, 0, 16, bottomPadding),
+              children: [
+                _AddressFormHeader(
+                  title: title,
+                  body:
+                      'Enter the complete address below. You can review it before placing the order.',
+                  closeKey: const ValueKey('buy-address-add-form-close'),
                 ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.pin_drop_outlined,
-                      color: BuyV2Colors.navy,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Text(
-                        'Enter the complete address below. You can review it before placing the order.',
-                        style: context.buyMeta.copyWith(color: BuyV2Colors.ink),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text('Delivery contact', style: context.buyEyebrow),
-              const SizedBox(height: 7),
-              TextField(
-                key: const ValueKey('buy-address-add-recipient'),
-                controller: recipientController,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(labelText: 'Recipient name'),
-              ),
-              const SizedBox(height: 9),
-              TextField(
-                key: const ValueKey('buy-address-add-phone'),
-                controller: phoneController,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: '10-digit phone number',
-                ),
-              ),
-              const SizedBox(height: 14),
-              Text('Address details', style: context.buyEyebrow),
-              const SizedBox(height: 7),
-              TextField(
-                key: const ValueKey('buy-address-add-line'),
-                controller: lineController,
-                scrollPadding: fieldScrollPadding,
-                minLines: 2,
-                maxLines: 3,
-                textInputAction: TextInputAction.newline,
-                decoration: const InputDecoration(
-                  labelText: 'House, building and street',
-                ),
-              ),
-              const SizedBox(height: 9),
-              TextField(
-                key: const ValueKey('buy-address-add-area'),
-                controller: areaController,
-                scrollPadding: fieldScrollPadding,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: 'Area or locality',
-                ),
-              ),
-              const SizedBox(height: 9),
-              TextField(
-                key: const ValueKey('buy-address-add-pin'),
-                controller: pinController,
-                scrollPadding: fieldScrollPadding,
-                keyboardType: TextInputType.number,
-                textInputAction: TextInputAction.next,
-                decoration: const InputDecoration(
-                  labelText: '6-digit PIN code',
-                ),
-              ),
-              const SizedBox(height: 9),
-              TextField(
-                key: const ValueKey('buy-address-add-landmark'),
-                controller: landmarkController,
-                scrollPadding: fieldScrollPadding,
-                textInputAction: TextInputAction.done,
-                decoration: const InputDecoration(
-                  labelText: 'Nearby landmark (optional)',
-                ),
-              ),
-              if (validationMessage != null) ...[
-                const SizedBox(height: 10),
-                Container(
-                  key: const ValueKey('buy-address-add-validation'),
-                  padding: const EdgeInsets.all(12),
-                  decoration: buyV2CardDecoration(
-                    color: BuyV2Colors.softOrange,
-                    border: BuyV2Colors.orange,
-                    radius: 14,
+                const SizedBox(height: 12),
+                Semantics(
+                  label: 'Address type',
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final option in const [
+                        (BuyV2AddressKind.home, 'Home'),
+                        (BuyV2AddressKind.work, 'Work'),
+                        (BuyV2AddressKind.thirdParty, 'Third party'),
+                        (BuyV2AddressKind.other, 'Other place'),
+                      ])
+                        ChoiceChip(
+                          key: ValueKey('buy-address-add-kind-${option.$2}'),
+                          label: Text(option.$2),
+                          labelStyle: context.buyBody.copyWith(
+                            color: kind == option.$1
+                                ? Colors.white
+                                : BuyV2Colors.ink,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                          showCheckmark: false,
+                          padding: EdgeInsets.zero,
+                          labelPadding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                          ),
+                          materialTapTargetSize: MaterialTapTargetSize.padded,
+                          visualDensity: VisualDensity.standard,
+                          selected: kind == option.$1,
+                          onSelected: (_) => setState(() => kind = option.$1),
+                        ),
+                    ],
                   ),
-                  child: Text(validationMessage!, style: context.buyMeta),
+                ),
+                const SizedBox(height: 12),
+                input(
+                  id: 'recipient',
+                  controller: recipientController,
+                  label: 'Recipient name',
+                ),
+                const SizedBox(height: 9),
+                input(
+                  id: 'phone',
+                  controller: phoneController,
+                  keyboardType: TextInputType.phone,
+                  label: '10-digit phone number',
+                ),
+                const SizedBox(height: 9),
+                input(
+                  id: 'line',
+                  controller: lineController,
+                  minLines: 2,
+                  maxLines: 3,
+                  action: TextInputAction.newline,
+                  label: 'House, building and street',
+                ),
+                const SizedBox(height: 9),
+                input(
+                  id: 'area',
+                  controller: areaController,
+                  label: 'Area or locality',
+                ),
+                const SizedBox(height: 9),
+                input(
+                  id: 'pin',
+                  controller: pinController,
+                  keyboardType: TextInputType.number,
+                  label: '6-digit PIN code',
+                ),
+                const SizedBox(height: 9),
+                input(
+                  id: 'landmark',
+                  controller: landmarkController,
+                  action: TextInputAction.done,
+                  label: 'Nearby landmark (optional)',
+                ),
+                if (validationMessage != null) ...[
+                  const SizedBox(height: 10),
+                  Container(
+                    key: const ValueKey('buy-address-add-validation'),
+                    padding: const EdgeInsets.all(12),
+                    decoration: buyV2CardDecoration(
+                      color: BuyV2Colors.softOrange,
+                      border: BuyV2Colors.orange,
+                      radius: 14,
+                    ),
+                    child: Text(validationMessage!, style: context.buyMeta),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    key: const ValueKey('buy-address-add-submit'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(0, BuyV2Metrics.minimumTap),
+                    ),
+                    onPressed: submit,
+                    child: Text(
+                      editingAddress == null
+                          ? 'Save and deliver here'
+                          : 'Save changes',
+                    ),
+                  ),
                 ),
               ],
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity,
-                height: BuyV2Metrics.minimumTap,
-                child: FilledButton(
-                  key: const ValueKey('buy-address-add-submit'),
-                  onPressed: submit,
-                  child: Text(
-                    editingAddress == null
-                        ? 'Save and deliver here'
-                        : 'Save changes',
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),
