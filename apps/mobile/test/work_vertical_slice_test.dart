@@ -434,6 +434,62 @@ void main() {
     },
   );
 
+  for (final entry in [
+    (
+      WorkContactChannel.primaryMobile,
+      '123',
+      '9999999901',
+      'Enter a valid 10-digit phone number.',
+      'Confirm the phone number customers can reach you on before continuing.',
+    ),
+    (
+      WorkContactChannel.email,
+      'not-an-email',
+      'changed@example.com',
+      'Enter a valid email address.',
+      'Confirm your email address before continuing.',
+    ),
+    (
+      WorkContactChannel.alternateMobile,
+      '123',
+      '9999999902',
+      'Enter a valid 10-digit alternate mobile number.',
+      'Confirm or remove the alternate contact number.',
+    ),
+  ]) {
+    test(
+      'r6611 contact Continue separates format and confirmation ${entry.$1}',
+      () {
+        final work = WorkSession()
+          ..selectFamily('products-trade')
+          ..selectProfile('retailer-grocery');
+        addTearDown(work.dispose);
+        confirmWorkspaceContacts(work);
+        expect(work.workspaceContactsReady, isTrue);
+        work.beginWorkspaceContactEdit(entry.$1);
+        for (final invalid in [
+          entry.$2,
+          if (entry.$1 != WorkContactChannel.alternateMobile) '',
+        ]) {
+          work.editWorkspaceContact(entry.$1, invalid);
+          expect(work.continueToProof(), isFalse);
+          expect(work.errorMessage, entry.$4);
+          expect(work.workspaceContactVerified(entry.$1), isFalse);
+        }
+        work.editWorkspaceContact(entry.$1, entry.$3);
+        expect(work.continueToProof(), isFalse);
+        expect(work.errorMessage, entry.$5);
+        expect(work.workspaceContactVerified(entry.$1), isFalse);
+        work.cancelWorkspaceContactEdit(entry.$1);
+        expect(work.continueToProof(), isTrue);
+        expect(work.errorMessage, isNull);
+        expect(work.primaryMobileVerified, isTrue);
+        expect(work.contactEmailVerified, isTrue);
+        expect(work.alternateMobile, isEmpty);
+      },
+    );
+  }
+
   testWidgets(
     'unsupported profile request validates and creates no workspace',
     (tester) async {

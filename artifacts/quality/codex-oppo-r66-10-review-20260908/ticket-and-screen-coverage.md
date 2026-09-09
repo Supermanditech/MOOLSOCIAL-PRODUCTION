@@ -1,5 +1,11 @@
 # r66.10 approved-screen coverage
 
+## Fix cycle — Contact locally qualified; support draft and successor OPPO pending
+
+Founder authorized the two confirmed corrections and requested supervised acceleration. Contact OPPO-S03-02 now checks each field's format before asking for verification, without altering the approved layout or verification controls. Nine focused tests pass, including full error visibility above simulated keyboards at412/100% and320/200%; six connected Work/Store suites pass905 with81 unchanged existing skips and0 failures. Full analysis has zero issues. Six new local renders were individually inspected. Exact commands, failure disposition and hashes are in local-validation.md.
+
+The installed r66.10 is unchanged, so the native contact ticket remains open pending the corrected APK and OPPO replay. Support draft child R6610-SUPPORT-DRAFT-SCOPE-01 is registered as REG-20260909-4549 and remains next for implementation; its existing Codex Chat owners are disjoint from Cursor Buy. Two supervised agents performed reasoning-only reviews, with no repository/device action or parallel edit. Preserve all earlier review findings and unqualified backend/accessibility cases. No new dashboard redesign or first-tap approval is inferred.
+
 ## Current standing-review checkpoint — Dashboard reached, two open frontend findings
 
 Founder granted standing conditional approval through Dashboard and allowed continued bounded first-tap inspection. Prior visual approval is retained; no approved design was changed and no further per-screen permission was assumed necessary. The earlier awaiting-founder statements below are historical. OPPO is left on the correct OPPO Review Store Dashboard at 266, without a keyboard or popup.

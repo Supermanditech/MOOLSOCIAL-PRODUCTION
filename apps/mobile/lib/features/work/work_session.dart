@@ -4077,14 +4077,30 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
+    if (primaryMobile.replaceAll(RegExp(r'\D'), '').length != 10) {
+      errorMessage = 'Enter a valid 10-digit phone number.';
+      notifyListeners();
+      return false;
+    }
     if (!primaryMobileVerified) {
       errorMessage =
           'Confirm the phone number customers can reach you on before continuing.';
       notifyListeners();
       return false;
     }
+    if (!_validEmail(contactEmail)) {
+      errorMessage = 'Enter a valid email address.';
+      notifyListeners();
+      return false;
+    }
     if (!contactEmailVerified) {
       errorMessage = 'Confirm your email address before continuing.';
+      notifyListeners();
+      return false;
+    }
+    if (alternateMobile.isNotEmpty &&
+        alternateMobile.replaceAll(RegExp(r'\D'), '').length != 10) {
+      errorMessage = 'Enter a valid 10-digit alternate mobile number.';
       notifyListeners();
       return false;
     }

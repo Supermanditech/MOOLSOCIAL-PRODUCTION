@@ -9303,6 +9303,96 @@ void main() {
     },
   );
 
+  for (final width in [412.0, 320.0]) {
+    for (final entry in [
+      ('work-primary-contact', '123', 'Enter a valid 10-digit phone number.'),
+      ('work-contact-email', 'not-an-email', 'Enter a valid email address.'),
+      (
+        'work-alternate-contact',
+        '123',
+        'Enter a valid 10-digit alternate mobile number.',
+      ),
+    ]) {
+      testWidgets(
+        'r6611 contact format correction stays visible ${entry.$1} $width',
+        (tester) async {
+          final work = selectedRetailer()
+            ..hydrateAccountSnapshot(
+              const WorkAccountSnapshot(
+                displayName: 'Asha Sharma',
+                email: 'asha@example.com',
+                mobile: '+91 98290 12321',
+                providerLabel: 'Google',
+                providerAccount: 'asha@example.com',
+                emailConfirmed: true,
+                mobileConfirmed: true,
+              ),
+            );
+          final height = width == 412 ? 915.0 : 568.0;
+          await mount(
+            tester,
+            route: '/app/work/workspace/contact',
+            work: work,
+            viewport: Size(width, height),
+            textScale: width == 412 ? 1 : 2,
+          );
+          expect(work.workspaceContactsReady, isTrue);
+          if (entry.$1 != 'work-alternate-contact') {
+            final change = find.byKey(Key('${entry.$1}-change'));
+            await reveal(tester, change);
+            await tester.tap(change);
+            await tester.pumpAndSettle();
+          }
+          final field = find.byKey(Key('${entry.$1}-field'));
+          await reveal(tester, field);
+          await tester.enterText(field, entry.$2);
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          final next = find.byKey(const Key('work-contact-continue'));
+          await reveal(tester, next);
+          await tester.tap(next);
+          await tester.pumpAndSettle();
+          expect(work.errorMessage, entry.$3);
+          expect(find.text(entry.$3), findsOneWidget);
+          expect(find.byKey(const Key('work-contact-screen')), findsOneWidget);
+          tester.view.viewInsets = FakeViewPadding(
+            bottom: width == 412 ? 330 : 244,
+          );
+          await tester.pumpAndSettle();
+          expect(field.hitTestable(), findsOneWidget);
+          expect(find.byKey(const Key('work-error')), findsOneWidget);
+          final errorBounds = tester.getRect(find.text(entry.$3));
+          expect(errorBounds.top, greaterThanOrEqualTo(0));
+          expect(
+            errorBounds.bottom,
+            lessThanOrEqualTo(height - (width == 412 ? 330 : 244)),
+          );
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'r6611-${entry.$1}-format-${width.toInt()}',
+          );
+          tester.view.viewInsets = const FakeViewPadding();
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          if (entry.$1 == 'work-alternate-contact') {
+            await reveal(tester, field);
+            await tester.enterText(field, '');
+            FocusManager.instance.primaryFocus?.unfocus();
+          } else {
+            final cancel = find.byKey(Key('${entry.$1}-cancel'));
+            await reveal(tester, cancel);
+            await tester.tap(cancel);
+          }
+          await tester.pumpAndSettle();
+          expect(work.errorMessage, isNull);
+          expect(work.workspaceContactsReady, isTrue);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final width in [360.0, 320.0]) {
     for (final contact in [
       'work-primary-contact',
