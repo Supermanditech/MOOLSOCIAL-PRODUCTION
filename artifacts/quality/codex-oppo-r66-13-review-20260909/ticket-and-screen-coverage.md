@@ -333,13 +333,25 @@ Bounded checks through capture 077:
 
 ### DASH-FIRST-TAP-02 — Product-tools sheet bottom inset
 
-Durable incident: REG4558. No source fix yet.
+Durable incident: REG4558. Frontend implemented and locally inspected 2026-09-10; final OPPO replay pending.
 
-- State: OPEN; OPPO-confirmed on 077-stock-tools-state.png/XML, normal font.
+- State: IMPLEMENTED / LOCAL QUALIFICATION; original OPPO defect confirmed on 077-stock-tools-state.png/XML, normal font. Device closure requires the final batch APK.
 - User/outcome: Grocery/Kirana retailer can read and reach every product tool from the Stock first-tap destination; the same shared presentation also serves Speciality Retail.
 - Reproduction: dashboard → Stock → More product tools; the last Open stock statement description reaches the Android navigation boundary and is visibly clipped. Do not confuse this with the visually fitting read-only Store status panel.
 - Correction scope: existing Work sheet layout only; content-sized height with actual bottom inset, bounded scrolling when necessary, accessible dismissal and full final-row touch area. No new destination or duplicate stock statement.
 - Verify normal/large text, keyboard transitions if reused by an input sheet, both Back mechanisms, final-row scroll/reach and original Store context. Do not relabel existing shared Files defect REG4556 as closed; its owner is distinct unless source tracing proves a common fix.
+
+Local implementation and evidence:
+
+- Reuse the existing sheet and destinations. The sheet now respects the system bottom inset, bounds its height and scrolls at constrained sizes instead of clipping the final subtitle. It retains the drag handle and adds an accessible Close button. Stock statement navigation occurs after dismissal and only if the original Store remains active; a changed Store produces an honest notice, not a destination for the wrong Store. Product-add/import redesign remains held.
+- Seven focused tests pass: six layout/input-inset configurations spanning 412x915 and 320x568/640, 100%/200% text, 0/24/44/80px bottom insets and simulated keyboard changes, plus a changed-Store guard. Assertions cover full final-row/subtitle reach, no text ellipsis, minimum touch targets, Android Back, Close, stock-statement entry/return, and unchanged catalogue/Store identity.
+- Actual Flutter captures were inspected at normal text, 320x568/200% with 80px system inset, and 320x568/200% with a simulated 200px keyboard inset. Large-text captures show the scrolled final action, not a claim that all tools fit simultaneously. Synthetic insets are not physical OPPO keyboard/TalkBack proof.
+- Evidence root: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/`. Focused command from `apps/mobile`: `flutter test --no-pub test/work_workspace_layout_safety_test.dart --plain-name REG4558 --reporter expanded --concurrency=1 --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=dashboard-product-tools-local-review-20260910-v1 --update-goldens`. Only these focused captures were refreshed; no historical golden was changed.
+- `dashboard-load-implementation-20260909/product-tools-focused-attempt1.log`: 7 passed, exit 0; SHA-256 `E1FB4560D36FA10BAEBE71D673FAE31BB5A4A67ACAECE8FC384DD59C288A59E0`.
+- Final combined replay: `flutter test --no-pub test/work_store_atomic_operations_test.dart test/work_workspace_layout_safety_test.dart --reporter expanded --concurrency=1`; 760 passed, 79 skipped, 0 failed, terminal exit 0 verified from retained session 93203. `dashboard-load-implementation-20260909/product-tools-combined-verified.log`, SHA-256 `757458CF0C4F644FE420D0FC1F15EDC429A82FBF0635D7274BAF9F08DB022596`. Existing skipped evidence cases are not qualified by this pass; final device checks remain pending.
+- `dashboard-load-implementation-20260909/product-tools-analysis-attempt1.log`: full `flutter analyze --no-pub`, zero issues, exit 0; SHA-256 `82208E43657C6482359090E540D8B8F90DE4C82326E9208266465EB9BA473C0F`.
+- Capture hashes under `dashboard-product-tools-local-review-20260910-v1`: `product-tools-412.0-915.0-1.0-44.0-0.0.png` = `49B00DE0D3D5D57066C2A92FC564FA7DC85F9D444BE496388919B0D2DD7D0DAD`; `product-tools-320.0-568.0-2.0-80.0-0.0.png` = `23227F533A6BBCBEB3039ECB8C0492EF88FA7A91C157C8F7378165BB79B87533`; `product-tools-320.0-568.0-2.0-44.0-200.0.png` = `4502FCA5D4EDED9A147D0DE92B6F42956EE5B9ABA24667DC55BB6712EB5C827A`.
+- REG4557 inspection/output recurrence: a combined three-image/tool response was truncated and hid the combined test session metadata. A read-only process/log check confirmed no corresponding test remained active; its complete retained log reports 760 passed, 79 skipped, no failures (`product-tools-combined-final.log`, SHA-256 `2DFC101EB7B8B4EE0F191E8A1024D4FDE7EE1B122073E26CA0A969C4127E1963`). Its lost process exit is not reconstructed. Captures were re-read individually, and a fresh uniquely named combined replay was started with the session handle retained for terminal exit verification. A subsequent overbroad AGENTS inspection was replaced by three non-overlapping complete pages. These are evidence-handling incidents, not additional product defects or grounds to change policy.
 
 ### DASH-FIRST-TAP-03 — Counter-bill customer mobile validation
 

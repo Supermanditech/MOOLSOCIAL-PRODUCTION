@@ -13661,6 +13661,138 @@ void main() {
     tester.view.viewInsets = FakeViewPadding.zero;
   });
 
+  for (final (width, height, scale, bottom, keyboard) in [
+    (412.0, 915.0, 1.0, 0.0, 0.0),
+    (412.0, 915.0, 1.0, 44.0, 0.0),
+    (320.0, 640.0, 2.0, 44.0, 0.0),
+    (320.0, 568.0, 2.0, 80.0, 0.0),
+    (412.0, 915.0, 2.0, 24.0, 200.0),
+    (320.0, 568.0, 2.0, 44.0, 200.0),
+  ]) {
+    testWidgets(
+      'REG4558 product tools safe final action $width $height $scale $bottom $keyboard',
+      (tester) async {
+        final work = liveStore();
+        final storeId = work.activeWorkspace!.id;
+        final products = List.of(work.workspaceCatalogueItems);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: Size(width, height),
+          textScale: scale,
+          bottomInset: bottom,
+        );
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        final more = find.byKey(const Key('work-catalogue-more'));
+        await reveal(tester, more);
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        final close = find.byKey(const Key('work-catalogue-tools-close'));
+        expect(close.hitTestable(), findsOneWidget);
+        expect(tester.getSize(close).shortestSide, greaterThanOrEqualTo(48));
+        if (keyboard > 0) {
+          tester.view.viewInsets = FakeViewPadding(bottom: keyboard);
+          await tester.pumpAndSettle();
+        }
+        final last = find.byKey(
+          const Key('work-catalogue-open-stock-statement'),
+        );
+        await reveal(tester, last);
+        final boundary = height - (keyboard > 0 ? keyboard : bottom);
+        expect(tester.getBottomRight(last).dy, lessThanOrEqualTo(boundary - 8));
+        expect(last.hitTestable(), findsOneWidget);
+        expect(tester.getSize(last).height, greaterThanOrEqualTo(48));
+        final subtitle = find.descendant(
+          of: last,
+          matching: find.text('Available, reserved and quantity changes'),
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(subtitle);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect(
+          tester.getBottomRight(subtitle).dy,
+          lessThanOrEqualTo(boundary - 8),
+        );
+        await captureStoreView(
+          tester,
+          'product-tools-$width-$height-$scale-$bottom-$keyboard',
+        );
+        expect(tester.takeException(), isNull);
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-catalogue-tools-scroll')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('work-dashboard-catalogue-screen')),
+          findsOneWidget,
+        );
+        expect(work.activeWorkspace!.id, storeId);
+        expect(work.workspaceCatalogueItems, orderedEquals(products));
+        await reveal(tester, more);
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-catalogue-tools-scroll')),
+          findsNothing,
+        );
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        await reveal(tester, last);
+        await tester.tap(last);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-stock-statement-screen')),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-dashboard-catalogue-screen')),
+          findsOneWidget,
+        );
+        expect(work.activeWorkspace!.id, storeId);
+        expect(work.workspaceCatalogueItems, orderedEquals(products));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('REG4558 old-store tools cannot navigate in a changed store', (
+    tester,
+  ) async {
+    final work = liveStore();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-catalogue-more')));
+    await tester.pumpAndSettle();
+    final last = find.byKey(const Key('work-catalogue-open-stock-statement'));
+    await reveal(tester, last);
+    work.activeWorkspace = const WorkWorkspace(
+      id: 'different-store',
+      name: 'Second Store',
+      profileLabel: 'Grocery / Kirana Shop',
+      profileId: 'retailer-grocery',
+      area: 'Jodhpur',
+      verified: true,
+    );
+    await tester.tap(last);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-stock-statement-screen')), findsNothing);
+    expect(
+      work.noticeMessage,
+      'Your store changed. Open its product tools again.',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('catalogue keeps daily product actions direct and compact', (
     tester,
   ) async {

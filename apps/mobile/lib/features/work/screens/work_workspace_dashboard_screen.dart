@@ -9206,67 +9206,109 @@ class _WorkspaceCatalogueSurfaceState
   }
 
   Future<void> _showCatalogueTools() async {
+    final storeId =
+        widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    final systemBottom = MediaQuery.viewPaddingOf(context).bottom;
+    FocusManager.instance.primaryFocus?.unfocus();
     final action = await showModalBottomSheet<String>(
       context: context,
+      isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (context) => Padding(
-        padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const ListTile(
-              title: Text(
-                'More product tools',
-                style: TextStyle(
-                  color: MoolColors.navy,
-                  fontWeight: FontWeight.w900,
+      builder: (context) {
+        final media = MediaQuery.of(context);
+        final bottom = media.viewInsets.bottom > 0 ? 0.0 : systemBottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+          child: SafeArea(
+            top: false,
+            minimum: EdgeInsets.only(bottom: bottom),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight:
+                    (media.size.height -
+                            media.padding.top -
+                            media.viewInsets.bottom -
+                            bottom -
+                            48)
+                        .clamp(0.0, double.infinity),
+              ),
+              child: SingleChildScrollView(
+                key: const Key('work-catalogue-tools-scroll'),
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ListTile(
+                      title: const Text(
+                        'More product tools',
+                        style: TextStyle(
+                          color: MoolColors.navy,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      trailing: IconButton(
+                        key: const Key('work-catalogue-tools-close'),
+                        tooltip: 'Close product tools',
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.library_add_outlined),
+                      title: const Text('Add from MoolSocial catalogue'),
+                      subtitle: const Text(
+                        'Use product details already available',
+                      ),
+                      onTap: () => Navigator.pop(context, 'catalogue'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.upload_file_rounded),
+                      title: const Text('Import product file'),
+                      subtitle: const Text('CSV, JSON or a POS export'),
+                      onTap: () => Navigator.pop(context, 'import'),
+                    ),
+                    ListTile(
+                      leading: const Icon(Icons.warning_amber_rounded),
+                      title: Text(
+                        _lowStockOnly ? 'Show all products' : 'Show low stock',
+                      ),
+                      onTap: () => Navigator.pop(context, 'low'),
+                    ),
+                    ListTile(
+                      key: const Key('work-catalogue-open-stock-statement'),
+                      leading: const Icon(Icons.list_alt_rounded),
+                      title: const Text('Open stock statement'),
+                      subtitle: const Text(
+                        'Available, reserved and quantity changes',
+                      ),
+                      onTap: () => Navigator.pop(context, 'statement'),
+                    ),
+                  ],
                 ),
               ),
             ),
-            ListTile(
-              leading: const Icon(Icons.library_add_outlined),
-              title: const Text('Add from MoolSocial catalogue'),
-              subtitle: const Text('Use product details already available'),
-              onTap: () => Navigator.pop(context, 'catalogue'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.upload_file_rounded),
-              title: const Text('Import product file'),
-              subtitle: const Text('CSV, JSON or a POS export'),
-              onTap: () => Navigator.pop(context, 'import'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.warning_amber_rounded),
-              title: Text(
-                _lowStockOnly ? 'Show all products' : 'Show low stock',
-              ),
-              onTap: () => Navigator.pop(context, 'low'),
-            ),
-            ListTile(
-              key: const Key('work-catalogue-open-stock-statement'),
-              leading: const Icon(Icons.list_alt_rounded),
-              title: const Text('Open stock statement'),
-              subtitle: const Text('Available, reserved and quantity changes'),
-              onTap: () {
-                Navigator.pop(context);
-                widget.onOpenStockStatement();
-              },
-            ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
-    if (!mounted) return;
+    if (!mounted || action == null) return;
+    if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+        storeId) {
+      widget.session.showNotice(
+        'Your store changed. Open its product tools again.',
+      );
+      return;
+    }
     switch (action) {
+      case 'statement':
+        widget.onOpenStockStatement();
       case 'import':
         await _importCatalogue();
       case 'low':
         setState(() => _lowStockOnly = !_lowStockOnly);
       case 'catalogue':
         await _showMasterCatalogue();
-      case null:
-        break;
     }
   }
 
