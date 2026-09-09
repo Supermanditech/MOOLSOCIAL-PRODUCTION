@@ -14150,6 +14150,134 @@ void main() {
     expect(find.byKey(const Key('work-grow-destination')), findsOne);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'counter isolation keeps pending handover on dashboard $scale',
+      (tester) async {
+        final work = storeViewFixture();
+        final selected = work.currentWorkspaceOrderId;
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(412, 915),
+          textScale: scale,
+        );
+        work.workspaceHandoverBusy = true;
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        expect(work.currentWorkspaceOrderId, selected);
+        expect(
+          find.byKey(const Key('work-dashboard-counter-order-screen')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('work-store-activity-deck')),
+          findsOneWidget,
+        );
+        expect(work.noticeMessage, contains('current order update'));
+        work.workspaceHandoverBusy = false;
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-dashboard-counter-order-screen')),
+          findsOneWidget,
+        );
+        expect(work.currentWorkspaceOrderId, isNull);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'counter isolation refused save retains bill and recovers $scale',
+      (tester) async {
+        final work = liveStore();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(412, 915),
+          textScale: scale,
+        );
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        await enterSaleCustomer(tester, '9829012345');
+        await tester.tap(
+          find.byKey(const Key('work-order-add-oil-fortune-1l')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-order-review')));
+        await tester.pumpAndSettle();
+        // A late selection update must not let the open form replace that order.
+        final incoming = WorkspaceOrderRecord(
+          id: 'incoming-protected',
+          customer: 'Asha',
+          items: 'Ordered oil',
+          quantities: {'oil-fortune-1l': 2},
+          amount: 500,
+          source: 'App',
+          fulfilment: 'Mool delivery',
+          payment: 'Paid online',
+          address: 'Market road',
+          stage: 'Confirmed',
+          needsDelivery: true,
+          createdAt: DateTime(2026, 9, 10),
+        );
+        work.workspaceOrders.add(incoming);
+        work.currentWorkspaceOrderId = incoming.id;
+        await tester.tap(find.byKey(const Key('work-order-save')));
+        await tester.pumpAndSettle();
+        expect(work.currentWorkspaceOrder, same(incoming));
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceOrderCustomer, '9829012345');
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        expect(find.byKey(const Key('work-order-error')), findsOneWidget);
+        expect(find.text('Send customer invoice'), findsNothing);
+        expect(
+          find.text(
+            'Use this order’s actions. Start a new bill for a counter sale.',
+          ),
+          findsOneWidget,
+        );
+        await captureStoreView(tester, 'counter-refused-save-$scale');
+        expect(tester.takeException(), isNull);
+        // Recovery uses real controls; do not fix selection directly in tests.
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-order-keep-editing')));
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderCustomer, '9829012345');
+        expect(work.workspaceOrderQuantities['oil-fortune-1l'], 1);
+        expect(work.currentWorkspaceOrder, same(incoming));
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-order-discard')));
+        await tester.pumpAndSettle();
+        expect(work.workspaceInvoices, isEmpty);
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        await enterSaleCustomer(tester, '9829012345');
+        await tester.tap(
+          find.byKey(const Key('work-order-add-oil-fortune-1l')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-order-review')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-order-save')));
+        await tester.pumpAndSettle();
+        expect(work.workspaceInvoices, hasLength(1));
+        expect(work.workspaceInvoices.single.orderId, isNot(incoming.id));
+        expect(
+          work.workspaceOrders.firstWhere((o) => o.id == incoming.id),
+          same(incoming),
+        );
+        expect(work.workspaceOrderCustomer, isEmpty);
+        expect(find.text('Send customer invoice'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   testWidgets(
     'created counter invoice leaves an empty bill and safe Store return',
     (tester) async {

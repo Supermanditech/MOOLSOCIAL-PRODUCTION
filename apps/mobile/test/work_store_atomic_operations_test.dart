@@ -549,6 +549,166 @@ void main() {
     expect(session.latestWorkspaceInvoice?.customer, '9829012321');
   });
 
+  for (final stage in [
+    'Confirmed',
+    'Preparing',
+    'Ready',
+    'Ready for pickup',
+    'Delivering',
+    'Completed',
+    'Cancelled',
+  ]) {
+    for (final expired in [false, true]) {
+      test('counter isolation protects $stage App order expired=$expired', () {
+        final gateway = ReviewWorkGateway();
+        final session = timingSession(gateway);
+        final order = session.currentWorkspaceOrder!.copyWith(
+          stage: stage,
+          actionDeadline: DateTime.now().add(
+            Duration(seconds: expired ? -60 : 60),
+          ),
+        );
+        session.workspaceOrders[0] = order;
+        // A stale/mutated form must not override the stored order's origin.
+        session.workspaceOrderSource = 'Counter';
+        session.workspaceOrderStage = 'Confirmed';
+        final quantities = Map.of(session.workspaceOrderQuantities);
+        session.adjustWorkspaceOrderQuantity('atta-5kg', 1);
+        expect(session.workspaceOrderQuantities, quantities);
+        expect(
+          session.saveWorkspaceOrderDraft(
+            customer: '9829012345',
+            source: 'Counter',
+            fulfilment: 'At the shop',
+            payment: 'Cash',
+            address: '',
+          ),
+          isFalse,
+        );
+        expect(session.completeWorkspaceCounterSale(), isNull);
+        expect(session.currentWorkspaceOrder, same(order));
+        expect(session.workspaceOrderCustomer, 'Asha');
+        expect(session.workspaceInvoices, isEmpty);
+        expect(session.workspaceStockMovements, isEmpty);
+        expect(session.workspaceCatalogueItems.single.stock, 10);
+        expect(session.workspaceSalesToday, 0);
+        expect(session.workspaceCompletedSalesCount, 0);
+        expect(gateway.lastOperationalSnapshot, isNull);
+      });
+    }
+  }
+
+  test(
+    'counter isolation allows a separate sale without changing App order',
+    () {
+      final session = timingSession(ReviewWorkGateway());
+      final incoming = session.currentWorkspaceOrder!;
+      expect(
+        session.prepareWorkspaceOrder(
+          source: 'Counter',
+          fulfilment: 'At the shop',
+        ),
+        isTrue,
+      );
+      session.adjustWorkspaceOrderQuantity('atta-5kg', 2);
+      expect(
+        session.saveWorkspaceOrderDraft(
+          customer: '9829012345',
+          source: 'Counter',
+          fulfilment: 'At the shop',
+          payment: 'Cash',
+          address: '',
+        ),
+        isTrue,
+      );
+      final invoice = session.completeWorkspaceCounterSale();
+      expect(invoice, isNotNull);
+      expect(invoice!.orderId, isNot(incoming.id));
+      expect(
+        session.workspaceOrders.firstWhere((o) => o.id == incoming.id),
+        same(incoming),
+      );
+      expect(session.workspaceOrders, hasLength(2));
+      expect(session.workspaceInvoices, hasLength(1));
+      expect(session.workspaceCatalogueItems.single.stock, 8);
+    },
+  );
+
+  test(
+    'counter isolation retains uncertain time request and selected order',
+    () async {
+      final gateway = _OrderTimeGateway();
+      final reply = Completer<WorkOrderTimeResult>();
+      gateway.respond = (_) => reply.future;
+      final session = timingSession(gateway);
+      final incoming = session.currentWorkspaceOrder!;
+      final request = session.requestWorkspaceOrderTime(incoming.id, 2);
+      expect(session.startNewWorkspaceOrder(), isFalse);
+      expect(
+        session.prepareWorkspaceOrder(
+          source: 'Phone',
+          fulfilment: 'Own delivery',
+        ),
+        isFalse,
+      );
+      expect(session.prepareRepeatWorkspaceOrder(), isFalse);
+      expect(session.currentWorkspaceOrder, same(incoming));
+      expect(session.workspaceOrderSource, 'App');
+      expect(session.workspaceOrderFulfilment, 'Mool delivery');
+      reply.completeError(StateError('Uncertain response'));
+      expect(await request, isFalse);
+      expect(session.hasPendingOrderTime, isTrue);
+      expect(session.startNewWorkspaceOrder(), isFalse);
+      expect(session.currentWorkspaceOrder, same(incoming));
+      expect(gateway.requests, hasLength(1));
+    },
+  );
+
+  test('counter isolation cannot revive a cancelled or missing saved bill', () {
+    final gateway = ReviewWorkGateway();
+    final session = liveSession(gateway);
+    session.workspaceCatalogueItems.add(_product(stock: 10));
+    session.adjustWorkspaceOrderQuantity('atta-5kg', 1);
+    session.saveWorkspaceOrderDraft(
+      customer: '9829012345',
+      source: 'Counter',
+      fulfilment: 'At the shop',
+      payment: 'Cash',
+      address: '',
+    );
+    session.cancelWorkspaceOrder();
+    final cancelled = session.currentWorkspaceOrder!;
+    final snapshot = gateway.lastOperationalSnapshot;
+    expect(session.completeWorkspaceCounterSale(), isNull);
+    expect(
+      session.saveWorkspaceOrderDraft(
+        customer: '9829012346',
+        source: 'Counter',
+        fulfilment: 'At the shop',
+        payment: 'Cash',
+        address: '',
+      ),
+      isFalse,
+    );
+    expect(session.currentWorkspaceOrder, same(cancelled));
+    session.workspaceOrders.clear();
+    expect(session.completeWorkspaceCounterSale(), isNull);
+    expect(
+      session.saveWorkspaceOrderDraft(
+        customer: '9829012346',
+        source: 'Counter',
+        fulfilment: 'At the shop',
+        payment: 'Cash',
+        address: '',
+      ),
+      isFalse,
+    );
+    expect(session.workspaceOrders, isEmpty);
+    expect(session.workspaceInvoices, isEmpty);
+    expect(session.workspaceCatalogueItems.single.stock, 10);
+    expect(gateway.lastOperationalSnapshot, same(snapshot));
+  });
+
   test('counter sale posts stock money and customer invoice together', () {
     final session = liveSession();
     session.addOrUpdateWorkspaceProduct(_product(stock: 10));

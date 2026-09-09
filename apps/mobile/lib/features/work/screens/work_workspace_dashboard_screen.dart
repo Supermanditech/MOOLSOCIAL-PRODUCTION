@@ -906,10 +906,12 @@ class _WorkWorkspaceDashboardScreenState
         onPressed: storeActiveId == 'sell'
             ? null
             : () {
-                session.prepareWorkspaceOrder(
+                if (!session.prepareWorkspaceOrder(
                   source: 'Counter',
                   fulfilment: 'At the shop',
-                );
+                )) {
+                  return;
+                }
                 _saleSearchController.clear();
                 _showOperation(_WorkspaceOperation.counterOrder);
               },
@@ -1107,10 +1109,12 @@ class _WorkWorkspaceDashboardScreenState
             },
             onCloseOrder: _closeOrderDetails,
             onNewSale: () {
-              session.prepareWorkspaceOrder(
+              if (!session.prepareWorkspaceOrder(
                 source: 'Counter',
                 fulfilment: 'At the shop',
-              );
+              )) {
+                return;
+              }
               _showOperation(_WorkspaceOperation.counterOrder);
             },
             onDeliverOrder: () => _showOperation(_WorkspaceOperation.storeLink),
@@ -1393,14 +1397,17 @@ class _WorkWorkspaceDashboardScreenState
         _operation == _WorkspaceOperation.orders &&
         operation == _WorkspaceOperation.counterOrder;
     if (createBillFromOrders) {
-      _counterOrderOrigin = (
+      final origin = (
         workspaceId: session.activeWorkspace?.id,
         orderId: session.currentWorkspaceOrderId,
       );
-      session.prepareWorkspaceOrder(
+      if (!session.prepareWorkspaceOrder(
         source: 'Counter',
         fulfilment: 'At the shop',
-      );
+      )) {
+        return;
+      }
+      _counterOrderOrigin = origin;
       _saleSearchController.clear();
     }
     if (operation == _WorkspaceOperation.paidWork) {
@@ -1547,8 +1554,7 @@ class _WorkWorkspaceDashboardScreenState
         ],
       ),
     );
-    if (discard == true) session.startNewWorkspaceOrder();
-    return discard == true;
+    return discard == true && session.startNewWorkspaceOrder();
   }
 
   Future<void> _leaveOperation() async {
@@ -17456,8 +17462,9 @@ class _WorkspaceOrdersSurfaceState extends State<_WorkspaceOrdersSurface> {
                 _LiveWorkspaceOrderCard(
                   session: session,
                   onCreateOrder: () {
-                    session.startNewWorkspaceOrder();
-                    widget.onCreateOrder();
+                    if (session.startNewWorkspaceOrder()) {
+                      widget.onCreateOrder();
+                    }
                   },
                   onOpenDelivery: widget.onOpenDelivery,
                 ),
@@ -17817,26 +17824,38 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       setState(() => _error = error);
       return;
     }
-    widget.session.saveWorkspaceOrderDraft(
+    final saved = widget.session.saveWorkspaceOrderDraft(
       customer: _customer.text,
       source: _source,
       fulfilment: _fulfilment,
       payment: _payment,
       address: _address.text,
     );
+    if (!saved) {
+      setState(
+        () => _error =
+            widget.session.errorMessage ??
+            widget.session.noticeMessage ??
+            'This bill could not be saved.',
+      );
+      // Keep recovery next to this bill; do not repeat it in the shared banner.
+      widget.session.clearMessages();
+      return;
+    }
     setState(() => _error = null);
     FocusManager.instance.primaryFocus?.unfocus();
     if (_fulfilment == 'At the shop') {
       final invoice = widget.session.completeWorkspaceCounterSale();
       if (invoice != null) {
-        widget.session.startNewWorkspaceOrder();
-        setState(() {
-          _customer.clear();
-          _address.clear();
-          _source = widget.session.workspaceOrderSource;
-          _fulfilment = widget.session.workspaceOrderFulfilment;
-          _payment = widget.session.workspaceOrderPayment;
-        });
+        if (widget.session.startNewWorkspaceOrder()) {
+          setState(() {
+            _customer.clear();
+            _address.clear();
+            _source = widget.session.workspaceOrderSource;
+            _fulfilment = widget.session.workspaceOrderFulfilment;
+            _payment = widget.session.workspaceOrderPayment;
+          });
+        }
         unawaited(
           Future<void>.delayed(const Duration(milliseconds: 240), () {
             if (mounted) {
@@ -18238,10 +18257,13 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
-              child: Text(
-                _error!,
-                key: const Key('work-order-error'),
-                style: const TextStyle(color: Color(0xFFB42318)),
+              child: Semantics(
+                liveRegion: true,
+                child: Text(
+                  _error!,
+                  key: const Key('work-order-error'),
+                  style: const TextStyle(color: Color(0xFFB42318)),
+                ),
               ),
             ),
           Container(

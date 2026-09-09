@@ -1867,7 +1867,7 @@ class WorkSession extends ChangeNotifier {
       );
       return false;
     }
-    startNewWorkspaceOrder();
+    if (!startNewWorkspaceOrder()) return false;
     workspaceOrderSource = 'Repeat order';
     workspaceOrderFulfilment = source.needsDelivery
         ? source.fulfilment
@@ -2254,8 +2254,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   WorkspaceCustomerInvoice? completeWorkspaceCounterSale() {
-    if (currentWorkspaceOrder?.isCustomerCollection == true) {
-      showError('Use the collection card for this paid order.');
+    if (!_canEditCounterOrder()) {
       return null;
     }
     final completedInvoice = workspaceInvoices
@@ -2342,22 +2341,19 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
-  void saveWorkspaceOrderDraft({
+  bool saveWorkspaceOrderDraft({
     required String customer,
     required String source,
     required String fulfilment,
     required String payment,
     required String address,
   }) {
-    if (currentWorkspaceOrder?.isCustomerCollection == true) {
-      showNotice('This paid order cannot be replaced by a counter bill.');
-      return;
-    }
+    if (!_canEditCounterOrder()) return false;
     if (workspaceInvoices.any(
       (invoice) => invoice.orderId == currentWorkspaceOrderId,
     )) {
       showNotice('This sale is complete. Start a new bill for another sale.');
-      return;
+      return false;
     }
     workspaceOrderCustomer = customer.trim();
     workspaceOrderSource = source;
@@ -2417,6 +2413,46 @@ class WorkSession extends ChangeNotifier {
           : 'Counter order saved for customer confirmation.',
     );
     _persistOperationalState('order-created');
+    return true;
+  }
+
+  // Counter editing must never rewrite an incoming order's purchased facts.
+  // Inspect the stored order, not the mutable composer source/stage fields.
+  bool _canEditCounterOrder({bool allowCompletedInvoice = true}) {
+    if (hasPendingOrderTime ||
+        busy ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true ||
+        _collection?.needsReconciliation == true) {
+      showError('Wait for the current order update before changing this bill.');
+      return false;
+    }
+    final order = currentWorkspaceOrder;
+    if (currentWorkspaceOrderId != null && order == null) {
+      showError(
+        'This order is unavailable. Start a new bill for a counter sale.',
+      );
+      return false;
+    }
+    if (order == null) return true;
+    if (order.source == 'App' || order.isCustomerCollection) {
+      showError(
+        'Use this order’s actions. Start a new bill for a counter sale.',
+      );
+      return false;
+    }
+    if (allowCompletedInvoice &&
+        order.stage == 'Completed' &&
+        workspaceInvoices.any((invoice) => invoice.orderId == order.id)) {
+      return true; // A duplicate completion may return its existing invoice.
+    }
+    if (order.stage != 'Confirmed' || order.stockReserved) {
+      showError(
+        'This order cannot be edited. Start a new bill for another sale.',
+      );
+      return false;
+    }
+    return true;
   }
 
   WorkspaceOrderRecord _ensureCurrentOrderRecord() {
@@ -2917,8 +2953,19 @@ class WorkSession extends ChangeNotifier {
     _persistOperationalState('order-cancelled');
   }
 
-  void startNewWorkspaceOrder() {
+  bool startNewWorkspaceOrder() {
+    if (hasPendingOrderTime ||
+        busy ||
+        workspaceHandoverBusy ||
+        _collection?.busy == true ||
+        _collection?.needsReconciliation == true) {
+      showNotice(
+        'Wait for the current order update before starting a new bill.',
+      );
+      return false;
+    }
     _rememberActiveOrder();
+    _clearCollection();
     workspaceOrderCustomer = '';
     workspaceOrderItems = '';
     workspaceOrderAmount = '';
@@ -2936,6 +2983,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderQuantities.clear();
     clearMessages();
     notifyListeners();
+    return true;
   }
 
   void _recordWorkspaceStockMovement({
@@ -3096,6 +3144,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void adjustWorkspaceOrderQuantity(String productId, int change) {
+    if (!_canEditCounterOrder(allowCompletedInvoice: false)) return;
     final product = workspaceCatalogueItems
         .where((item) => item.id == productId)
         .firstOrNull;
@@ -5068,11 +5117,11 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void prepareWorkspaceOrder({
+  bool prepareWorkspaceOrder({
     required String source,
     required String fulfilment,
   }) {
-    startNewWorkspaceOrder();
+    if (!startNewWorkspaceOrder()) return false;
     workspaceOrderSource = source;
     workspaceOrderFulfilment = fulfilment;
     workspaceOrderNeedsDelivery = const {
@@ -5080,6 +5129,7 @@ class WorkSession extends ChangeNotifier {
       'Own delivery',
     }.contains(fulfilment);
     notifyListeners();
+    return true;
   }
 
   void applyConfirmedWorkspaceGroupBuyPayment({
