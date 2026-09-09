@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "prebuild_controls_passed_pending_seal",
-  "buildAuthorization": "not_authorized",
+  "machineState": "installed_device_review_incomplete",
+  "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-12-review-20260909/prebuild-validation.md"
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "3bbbc228138af25313ca39c4b82e8411471c1988"
+    "head": "26b193f8d5ee4a285d4398ec4d2257d0d6d63ab0"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-12-review-20260909/source-manifest.txt",
@@ -150,17 +150,18 @@
   "postBuildGates": [
     {
       "id": "apk-integrity",
-      "state": "pending",
+      "state": "passed",
       "evidence": "artifacts/quality/codex-oppo-r66-12-review-20260909/uaw-codex-oppo-r66.12-review-20260909-build-provenance.txt"
     },
     {
       "id": "oppo-install",
-      "state": "pending",
+      "state": "passed",
       "evidence": "artifacts/quality/codex-oppo-r66-12-review-20260909/post-install.json"
     },
     {
       "id": "oppo-real-user-review",
       "state": "pending",
+      "disposition": "REG4552/4553 bounded frontend fixes passed local and exact r66.12 OPPO replay and are closed in ticket-and-screen-coverage.md. Pre-dashboard QA review states reached dashboard directly. Global candidate review is not complete: physical200%/TalkBack, private cloud, dashboard first-tap REG4551 and previously retained exploratory checks remain explicitly unqualified. No backend or production release acceptance.",
       "evidence": "artifacts/quality/codex-oppo-r66-12-review-20260909/device-review.md"
     },
     {

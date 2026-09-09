@@ -1,9 +1,15 @@
 {
-  "state": "pending",
+  "state": "passed",
   "packageId": "com.moolsocial.app.runtime",
   "versionName": "1.0.0-r66.12-runtime",
   "versionCode": 2026090902,
   "deviceSerial": "2b3e0f71",
-  "apkSha256": null,
-  "installedApkSha256": null
+  "apkSha256": "D1A9E9C4A0FE190F64C9BE862B4FD324A810BD5EE90ABC71EC56D1A7F991C973",
+  "installedApkSha256": "D1A9E9C4A0FE190F64C9BE862B4FD324A810BD5EE90ABC71EC56D1A7F991C973",
+  "apkBytes": 209790729,
+  "sourceHead": "26b193f8d5ee4a285d4398ec4d2257d0d6d63ab0",
+  "installMode": "adb install -r; no data clear",
+  "installLog": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6612-install-checksum-attempt1.log",
+  "installLogSha256": "7BC28480B10F713142EE2921F9084D0E12A915FE08D9830ACA217FD10CEB7D98",
+  "scope": "OPPO review package only. Not Redmi, release, AAB or backend qualification."
 }

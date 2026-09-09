@@ -1,1 +1,15 @@
-Pending: no r66.12 APK has been built. The existing guarded wrapper must produce exact version, source fingerprint, APK size and SHA-256 before this record is replaced with observed provenance.
+CandidateId=UAW-CODEX-OPPO-R66.12-REVIEW-20260909
+RuntimeProfile=RuntimeUiReview
+RuntimeDefines=RuntimeUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-CODEX-OPPO-R66.12-REVIEW-20260909;AndroidDebugPackage=runtime;Promotable=false
+Version=1.0.0-r66.12
+VersionCode=2026090902
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\quality\codex-oppo-r66-12-review-20260909\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\quality\codex-oppo-r66-12-review-20260909\apk-regression-state.json
+Branch=work/codex-ui/codex-oppo-review-v1-20260905
+HEAD=26b193f8d5ee4a285d4398ec4d2257d0d6d63ab0
+SourceFingerprint=30B5B560F4FA3556B98B9AAB3AB19925329AAFA4F6CC1812240219F3A9AD300E
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\artifacts\device\codex-oppo-r66-12-review-20260909\uaw-codex-oppo-r66.12-review-20260909-device-review-debug.apk
+Bytes=209790729
+SHA256=D1A9E9C4A0FE190F64C9BE862B4FD324A810BD5EE90ABC71EC56D1A7F991C973
+BuiltAt=2026-09-09T18:33:51.5467493+05:30
