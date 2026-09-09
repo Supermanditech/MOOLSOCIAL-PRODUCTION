@@ -149,6 +149,7 @@ class WorkspaceOrderRecord {
     String? stage,
     bool? needsDelivery,
     DateTime? actionDeadline,
+    bool clearActionDeadline = false,
     DateTime? fulfilmentDeadline,
     int? extraMinutes,
     bool? stockReserved,
@@ -167,7 +168,9 @@ class WorkspaceOrderRecord {
     stage: stage ?? this.stage,
     needsDelivery: needsDelivery ?? this.needsDelivery,
     createdAt: createdAt,
-    actionDeadline: actionDeadline ?? this.actionDeadline,
+    actionDeadline: clearActionDeadline
+        ? null
+        : actionDeadline ?? this.actionDeadline,
     fulfilmentDeadline: fulfilmentDeadline ?? this.fulfilmentDeadline,
     extraMinutes: extraMinutes ?? this.extraMinutes,
     stockReserved: stockReserved ?? this.stockReserved,

@@ -7456,15 +7456,145 @@ void main() {
       bottomInset: 34,
     );
     expect(find.text('Time ended'), findsOneWidget);
-    await tester.tap(find.byKey(const Key('work-activity-order-accept')));
-    await tester.pumpAndSettle();
-    expect(work.workspaceOrderStage, 'Confirmed');
+    expect(find.text('Order update pending'), findsOneWidget);
     expect(
-      work.errorMessage,
-      'Acceptance time ended. Waiting for an order update.',
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('work-activity-order-accept')),
+          )
+          .onPressed,
+      isNull,
     );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.byKey(const Key('work-activity-order-reject')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(work.workspaceOrderStage, 'Confirmed');
+    expect(work.errorMessage, isNull);
     expect(find.text('Order reassigned to another retailer'), findsNothing);
+    await captureStoreView(
+      tester,
+      'order-deadline-initially-expired-dashboard-1.0',
+    );
     expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Order deadline controls expire without another tap $scale', (
+      tester,
+    ) async {
+      final gateway = _TimingFixtureGateway();
+      final work = storeViewFixture(gateway);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      final index = work.workspaceOrders.indexWhere(
+        (order) => order.id == 'APP-1043',
+      );
+      final deadline = DateTime.now().add(const Duration(milliseconds: 500));
+      work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
+        actionDeadline: deadline,
+      );
+      work.workspaceOrderActionDeadline = deadline;
+      work.notifyListeners();
+      await tester.pump();
+      final accept = find.byKey(const Key('work-activity-order-accept'));
+      expect(tester.widget<FilledButton>(accept).onPressed, isNotNull);
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 550)),
+      );
+      await tester.pump(const Duration(seconds: 1));
+      expect(tester.widget<FilledButton>(accept).onPressed, isNull);
+      expect(find.text('Order update pending'), findsOneWidget);
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(work.workspaceInvoices, isEmpty);
+      await captureStoreView(tester, 'order-deadline-expired-dashboard-$scale');
+      await tester.ensureVisible(find.byKey(const Key('work-order-more-time')));
+      await tester.tap(find.byKey(const Key('work-order-more-time')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Acceptance time ended. Waiting for an order update.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-order-time-request')), findsNothing);
+      expect(find.byType(ChoiceChip), findsNothing);
+      expect(find.text('Order status'), findsOneWidget);
+      expect(gateway.requests, isEmpty);
+      await captureStoreView(
+        tester,
+        'order-deadline-expired-time-panel-$scale',
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      final renewed = DateTime.now().add(const Duration(seconds: 60));
+      work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
+        actionDeadline: renewed,
+      );
+      work.workspaceOrderActionDeadline = renewed;
+      work.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(tester.widget<FilledButton>(accept).onPressed, isNotNull);
+      expect(find.text('Order update pending'), findsNothing);
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  testWidgets('Order deadline exact first tap stays readonly after expiry', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    final index = work.workspaceOrders.indexWhere(
+      (order) => order.id == 'APP-1043',
+    );
+    final expired = DateTime.now().subtract(const Duration(seconds: 1));
+    work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
+      actionDeadline: expired,
+    );
+    work.workspaceOrderActionDeadline = expired;
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(320, 568),
+      textScale: 2,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-dashboard-search-field')),
+      'APP-1043',
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-search-order-APP-1043')));
+    await tester.pumpAndSettle();
+    final accept = find.ancestor(
+      of: find.text('Accept'),
+      matching: find.byWidgetPredicate((widget) => widget is FilledButton),
+    );
+    expect(tester.widget<FilledButton>(accept).onPressed, isNull);
+    final reject = find.ancestor(
+      of: find.text('Reject'),
+      matching: find.byType(TextButton),
+    );
+    expect(tester.widget<TextButton>(reject).onPressed, isNull);
+    expect(find.text('Order update pending'), findsOneWidget);
+    expect(work.currentWorkspaceOrder!.stage, 'Confirmed');
+    await captureStoreView(tester, 'order-deadline-expired-exact-2.0');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(work.workspaceSearchQuery, 'APP-1043');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
   });
 
   testWidgets('Store Review - global Chat first tap and exact Store return', (
@@ -7919,10 +8049,16 @@ void main() {
   });
 
   testWidgets(
-    'Store Review - acceptance keeps the original ten-minute fulfilment target',
+    'Store Review - acceptance keeps the supplied ten-minute fulfilment target',
     (tester) async {
       final work = storeViewFixture();
       final created = work.currentWorkspaceOrder!.createdAt;
+      final index = work.workspaceOrders.indexWhere(
+        (order) => order.id == 'APP-1043',
+      );
+      work.workspaceOrders[index] = work.currentWorkspaceOrder!.copyWith(
+        fulfilmentDeadline: created.add(const Duration(minutes: 10)),
+      );
       await mount(
         tester,
         route: '/app/work/workspace/dashboard',

@@ -270,6 +270,104 @@ void main() {
     },
   );
 
+  test(
+    'Order deadline session guard rejects 100 expired orders without effects',
+    () async {
+      final gateway = _OrderTimeGateway();
+      final session = timingSession(gateway);
+      final expired = DateTime.now().subtract(const Duration(seconds: 1));
+      final original = session.currentWorkspaceOrder!;
+      for (var i = 0; i < 100; i++) {
+        session.workspaceOrders.add(
+          WorkspaceOrderRecord(
+            id: 'EXPIRED-$i',
+            customer: 'Customer $i',
+            items: original.items,
+            quantities: original.quantities,
+            amount: original.amount,
+            source: original.source,
+            fulfilment: original.fulfilment,
+            payment: original.payment,
+            address: original.address,
+            stage: 'Confirmed',
+            needsDelivery: true,
+            createdAt: original.createdAt,
+            actionDeadline: expired,
+          ),
+        );
+        expect(session.selectWorkspaceOrder('EXPIRED-$i'), isTrue);
+        session.advanceWorkspaceOrder();
+        expect(session.currentWorkspaceOrder!.stage, 'Confirmed');
+        expect(session.currentWorkspaceOrder!.stockReserved, isFalse);
+        expect(
+          session.errorMessage,
+          'Acceptance time ended. Waiting for an order update.',
+        );
+      }
+      await Future<void>.delayed(Duration.zero);
+      expect(session.workspaceCatalogueItems.single.stock, 10);
+      expect(session.workspaceInvoices, isEmpty);
+      expect(session.workspaceStockMovements, isEmpty);
+      expect(gateway.operationalSaveCalls, 0);
+      expect(gateway.requests, isEmpty);
+    },
+  );
+
+  test('Order deadline missing target is not replaced by a local promise', () {
+    final session = timingSession(ReviewWorkGateway());
+    session.advanceWorkspaceOrder();
+    expect(session.workspaceOrderStage, 'Preparing');
+    expect(session.workspaceOrderActionDeadline, isNull);
+    expect(session.currentWorkspaceOrder!.actionDeadline, isNull);
+    expect(session.currentWorkspaceOrder!.fulfilmentDeadline, isNull);
+    expect(session.workspaceCatalogueItems.single.stock, 9);
+    for (final line in session.workspacePackingLines) {
+      session.setWorkspacePackingLine(line.id, true);
+    }
+    session.advanceWorkspaceOrder();
+    expect(session.workspaceOrderStage, 'Ready');
+    expect(session.currentWorkspaceOrder!.actionDeadline, isNull);
+    expect(session.currentWorkspaceOrder!.fulfilmentDeadline, isNull);
+  });
+
+  test(
+    'Order deadline preserves supplied target and rejects a stale stage',
+    () {
+      final session = timingSession(ReviewWorkGateway());
+      final target = DateTime.now().add(const Duration(minutes: 10));
+      session.workspaceOrders[0] = session.currentWorkspaceOrder!.copyWith(
+        fulfilmentDeadline: target,
+      );
+      session.advanceWorkspaceOrder();
+      expect(session.workspaceOrderActionDeadline, target);
+      expect(session.currentWorkspaceOrder!.actionDeadline, target);
+      final changed = session.currentWorkspaceOrder!.copyWith(
+        stage: 'Reassigned',
+      );
+      session.workspaceOrders[0] = changed;
+      session.advanceWorkspaceOrder();
+      expect(session.currentWorkspaceOrder, same(changed));
+      expect(
+        session.errorMessage,
+        'This order has changed. Review its current status.',
+      );
+      expect(session.workspaceCatalogueItems.single.stock, 9);
+      expect(session.workspaceInvoices, isEmpty);
+    },
+  );
+
+  test('Order deadline clear preserves identity and purchased information', () {
+    final session = timingSession(ReviewWorkGateway());
+    final original = session.currentWorkspaceOrder!;
+    final changed = original.copyWith(clearActionDeadline: true);
+    expect(changed.id, original.id);
+    expect(changed.createdAt, original.createdAt);
+    expect(changed.quantities, original.quantities);
+    expect(changed.amount, original.amount);
+    expect(changed.actionDeadline, isNull);
+    expect(original.copyWith().actionDeadline, original.actionDeadline);
+  });
+
   test('orders reserve stock once and cancellation restores it', () async {
     final gateway = ReviewWorkGateway();
     final session = liveSession(gateway);
@@ -286,6 +384,8 @@ void main() {
 
     expect(session.workspaceOrders, hasLength(1));
     expect(session.workspaceOrders.single.stage, 'Confirmed');
+    expect(session.workspaceOrderActionDeadline, isNull);
+    expect(session.workspaceOrders.single.actionDeadline, isNull);
     session.advanceWorkspaceOrder();
     expect(session.workspaceOrderStage, 'Preparing');
     expect(session.workspaceCatalogueItems.single.stock, 8);

@@ -2379,9 +2379,8 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderStage = 'Confirmed';
     workspaceOrderExtraMinutes = 0;
     workspacePackedProductIds.clear();
-    workspaceOrderActionDeadline = DateTime.now().add(
-      const Duration(seconds: 60),
-    );
+    // A locally recorded sale is not a server-assigned acceptance window.
+    workspaceOrderActionDeadline = null;
     final orderId =
         currentWorkspaceOrderId ??
         'ORD-${DateTime.now().microsecondsSinceEpoch}';
@@ -2517,6 +2516,28 @@ class WorkSession extends ChangeNotifier {
       return;
     }
     final previous = workspaceOrderStage;
+    final current = currentWorkspaceOrder;
+    if (current != null && current.stage != previous) {
+      showError('This order has changed. Review its current status.');
+      return;
+    }
+    if (!const {
+      'Confirmed',
+      'Preparing',
+      'Ready',
+      'Ready for pickup',
+      'Delivery requested',
+    }.contains(previous)) {
+      return;
+    }
+    final acceptanceDeadline =
+        current?.actionDeadline ?? workspaceOrderActionDeadline;
+    if (previous == 'Confirmed' &&
+        acceptanceDeadline != null &&
+        !acceptanceDeadline.isAfter(DateTime.now())) {
+      showError('Acceptance time ended. Waiting for an order update.');
+      return;
+    }
     var order = _ensureCurrentOrderRecord();
     if (previous == 'Confirmed' && !order.stockReserved) {
       if (!_reserveOrderStock(order)) return;
@@ -2549,28 +2570,17 @@ class WorkSession extends ChangeNotifier {
       'Delivery requested' => 'Delivery requested',
       _ => workspaceOrderStage,
     };
-    final quickStoreOrder =
-        order.source == 'App' &&
-        const {
-          'retailer-grocery',
-          'retailer-speciality',
-        }.contains(activeWorkspace?.profileId);
-    final fulfilmentTarget =
-        order.fulfilmentDeadline ??
-        order.createdAt.add(const Duration(minutes: 10));
+    // Keep an authoritative target when supplied. Accepting or packing an
+    // order must not manufacture a new delivery promise or reset the clock.
     workspaceOrderActionDeadline = switch (workspaceOrderStage) {
-      'Preparing' ||
-      'Ready' ||
-      'Ready for pickup' when quickStoreOrder => fulfilmentTarget,
-      'Preparing' => DateTime.now().add(const Duration(minutes: 15)),
-      'Ready' => DateTime.now().add(const Duration(minutes: 10)),
-      'Ready for pickup' => DateTime.now().add(const Duration(minutes: 10)),
+      'Preparing' || 'Ready' || 'Ready for pickup' => order.fulfilmentDeadline,
       'Delivery requested' => workspaceDeliveryAssignment?.eta,
       _ => null,
     };
     order = order.copyWith(
       stage: workspaceOrderStage,
       actionDeadline: workspaceOrderActionDeadline,
+      clearActionDeadline: workspaceOrderActionDeadline == null,
       stockReserved: order.stockReserved || previous == 'Confirmed',
     );
     final orderIndex = workspaceOrders.indexWhere(

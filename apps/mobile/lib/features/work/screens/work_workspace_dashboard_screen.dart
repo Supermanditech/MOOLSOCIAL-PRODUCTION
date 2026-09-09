@@ -3775,195 +3775,206 @@ class _IncomingOrderActivityCard extends StatelessWidget {
     final amount =
         '₹${_formatStoreAmount(int.tryParse(session.workspaceOrderAmount) ?? 0)}';
     final compact = MediaQuery.sizeOf(context).height < 650;
-    return GestureDetector(
-      key: const Key('work-activity-incoming-order'),
-      onHorizontalDragEnd: (details) {
-        final velocity = details.primaryVelocity ?? 0;
-        if (velocity > 380 && !session.busy) {
-          _advanceDeskOrder(session);
-        } else if (velocity < -380 && !session.busy) {
-          onReject();
-        }
-      },
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(14, compact ? 8 : 14, 14, 8),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  if (!compact)
-                    Row(
-                      children: [
-                        const Icon(
-                          Icons.receipt_long_outlined,
-                          size: 15,
-                          color: MoolColors.navy,
-                        ),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            origin,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: MoolColors.navy,
-                              letterSpacing: .1,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  SizedBox(height: compact ? 0 : 14),
-                  _StoreMoneyLine(
-                    leading: Text(
-                      session.workspaceOrderCustomer.split('·').first.trim(),
-                      style: TextStyle(
-                        fontSize: compact ? 14 : 18,
-                        height: 1.25,
-                        fontWeight: FontWeight.w800,
-                        color: const Color(0xFF141633),
-                      ),
-                    ),
-                    value: amount,
-                    orderReference: session.currentWorkspaceOrderId ?? 'Order',
-                    style: TextStyle(
-                      fontSize: compact ? 18 : 24,
-                      height: 1.15,
-                      fontWeight: FontWeight.w800,
-                      color: MoolColors.navy,
-                      fontFeatures: const [FontFeature.tabularFigures()],
-                    ),
-                  ),
-                  const SizedBox(height: 7),
-                  _StoreScaledPair(
-                    gap: 10,
-                    first: Text(
-                      collection,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        height: 1.35,
-                        color: MoolColors.muted,
-                      ),
-                    ),
-                    second: Text(
-                      session.workspaceOrderPayment,
-                      textAlign: TextAlign.right,
-                      style: const TextStyle(
-                        fontSize: 11,
-                        height: 1.35,
-                        fontWeight: FontWeight.w600,
-                        color: MoolColors.navy,
-                      ),
-                    ),
-                  ),
-                  const Divider(height: 25, color: Color(0xFFE6E9F2)),
-                  Text(
-                    lines.isEmpty
-                        ? 'Items not supplied'
-                        : '${lines.length} ${lines.length == 1 ? 'product' : 'products'} · $units ${units == 1 ? 'unit' : 'units'}',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: MoolColors.muted,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  for (final line in lines)
-                    _DeskItemLine(label: line.label, quantity: line.quantity),
-                ],
-              ),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-            color: const Color(0xFFF3F5FD),
-            child: _StoreScaledPair(
-              gap: 5,
-              first: const Row(
-                children: [
-                  Icon(Icons.circle, size: 5, color: MoolColors.navy),
-                  SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      'Awaiting acceptance',
-                      style: TextStyle(
-                        fontSize: 10,
-                        height: 1.2,
-                        fontWeight: FontWeight.w600,
-                        color: MoolColors.navy,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              second: session.workspaceOrderActionDeadline == null
-                  ? const SizedBox.shrink()
-                  : TextButton(
-                      key: const Key('work-order-more-time'),
-                      onPressed: session.busy
-                          ? null
-                          : () => _showOrderTimeRequest(context, session),
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(48, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisSize: MainAxisSize.min,
+    return _OrderDeadlineBoundary(
+      deadline:
+          session.currentWorkspaceOrder?.actionDeadline ??
+          session.workspaceOrderActionDeadline,
+      builder: (expired) => GestureDetector(
+        key: const Key('work-activity-incoming-order'),
+        onHorizontalDragEnd: (details) {
+          if (expired) return;
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity > 380 && !session.busy) {
+            _advanceDeskOrder(session);
+          } else if (velocity < -380 && !session.busy) {
+            onReject();
+          }
+        },
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(14, compact ? 8 : 14, 14, 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (!compact)
+                      Row(
                         children: [
-                          _LiveCountdownText(
-                            deadline: session.workspaceOrderActionDeadline,
-                            fallback: 'Review now',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w800,
-                              color: MoolColors.navy,
-                            ),
+                          const Icon(
+                            Icons.receipt_long_outlined,
+                            size: 15,
+                            color: MoolColors.navy,
                           ),
-                          Text(
-                            session.hasPendingOrderTime
-                                ? 'Check request'
-                                : 'More time',
-                            style: const TextStyle(fontSize: 11),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              origin,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: MoolColors.navy,
+                                letterSpacing: .1,
+                              ),
+                            ),
                           ),
                         ],
                       ),
+                    SizedBox(height: compact ? 0 : 14),
+                    _StoreMoneyLine(
+                      leading: Text(
+                        session.workspaceOrderCustomer.split('·').first.trim(),
+                        style: TextStyle(
+                          fontSize: compact ? 14 : 18,
+                          height: 1.25,
+                          fontWeight: FontWeight.w800,
+                          color: const Color(0xFF141633),
+                        ),
+                      ),
+                      value: amount,
+                      orderReference:
+                          session.currentWorkspaceOrderId ?? 'Order',
+                      style: TextStyle(
+                        fontSize: compact ? 18 : 24,
+                        height: 1.15,
+                        fontWeight: FontWeight.w800,
+                        color: MoolColors.navy,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: _StoreScaledPair(
-              gap: 0,
-              flexibleSecond: false,
-              first: TextButton(
-                key: const Key('work-activity-order-review'),
-                onPressed: onReview,
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(44, 44),
-                  padding: const EdgeInsets.symmetric(horizontal: 3),
-                ),
-                child: const Text(
-                  'View details',
-                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    const SizedBox(height: 7),
+                    _StoreScaledPair(
+                      gap: 10,
+                      first: Text(
+                        collection,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.35,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                      second: Text(
+                        session.workspaceOrderPayment,
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          height: 1.35,
+                          fontWeight: FontWeight.w600,
+                          color: MoolColors.navy,
+                        ),
+                      ),
+                    ),
+                    const Divider(height: 25, color: Color(0xFFE6E9F2)),
+                    Text(
+                      lines.isEmpty
+                          ? 'Items not supplied'
+                          : '${lines.length} ${lines.length == 1 ? 'product' : 'products'} · $units ${units == 1 ? 'unit' : 'units'}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: MoolColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    for (final line in lines)
+                      _DeskItemLine(label: line.label, quantity: line.quantity),
+                  ],
                 ),
               ),
-              second: _DeskCustomerActions(
-                customer: session.workspaceOrderCustomer,
-                orderId:
-                    session.currentWorkspaceOrderId ?? 'current-store-order',
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              color: const Color(0xFFF3F5FD),
+              child: _StoreScaledPair(
+                gap: 5,
+                first: Row(
+                  children: [
+                    const Icon(Icons.circle, size: 5, color: MoolColors.navy),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        expired
+                            ? 'Order update pending'
+                            : 'Awaiting acceptance',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          height: 1.2,
+                          fontWeight: FontWeight.w600,
+                          color: MoolColors.navy,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                second: session.workspaceOrderActionDeadline == null
+                    ? const SizedBox.shrink()
+                    : TextButton(
+                        key: const Key('work-order-more-time'),
+                        onPressed: session.busy
+                            ? null
+                            : () => _showOrderTimeRequest(context, session),
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(48, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 4),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _LiveCountdownText(
+                              deadline: session.workspaceOrderActionDeadline,
+                              fallback: 'Review now',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w800,
+                                color: MoolColors.navy,
+                              ),
+                            ),
+                            Text(
+                              session.hasPendingOrderTime
+                                  ? 'Check request'
+                                  : expired
+                                  ? 'View status'
+                                  : 'More time',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ],
+                        ),
+                      ),
               ),
             ),
-          ),
-          _OrderDecisionButtons(
-            busy: session.busy || session.hasPendingOrderTime,
-            onAccept: () => _advanceDeskOrder(session),
-            onReject: onReject,
-          ),
-        ],
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: _StoreScaledPair(
+                gap: 0,
+                flexibleSecond: false,
+                first: TextButton(
+                  key: const Key('work-activity-order-review'),
+                  onPressed: onReview,
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(44, 44),
+                    padding: const EdgeInsets.symmetric(horizontal: 3),
+                  ),
+                  child: const Text(
+                    'View details',
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                  ),
+                ),
+                second: _DeskCustomerActions(
+                  customer: session.workspaceOrderCustomer,
+                  orderId:
+                      session.currentWorkspaceOrderId ?? 'current-store-order',
+                ),
+              ),
+            ),
+            _OrderDecisionButtons(
+              busy: session.busy || session.hasPendingOrderTime || expired,
+              onAccept: () => _advanceDeskOrder(session),
+              onReject: onReject,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -3971,6 +3982,12 @@ class _IncomingOrderActivityCard extends StatelessWidget {
 
 Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
   final orderId = session.currentWorkspaceOrderId;
+  final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+  bool sameOrder() =>
+      storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+      orderId != null &&
+      orderId == session.currentWorkspaceOrderId &&
+      session.currentWorkspaceOrder?.stage == 'Confirmed';
   var minutes = session.pendingOrderTimeMinutes ?? 2;
   String? feedback;
   var confirmed = false;
@@ -3982,136 +3999,177 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
     builder: (sheetContext) => StatefulBuilder(
       builder: (context, setSheetState) => AnimatedBuilder(
         animation: session,
-        builder: (context, _) => SafeArea(
-          top: false,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              maxHeight: MediaQuery.sizeOf(context).height * .72,
-            ),
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
-              child: Column(
-                key: const Key('work-order-time-sheet'),
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          confirmed ? 'Time confirmed' : 'More time',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w800,
-                            color: MoolColors.navy,
-                          ),
-                        ),
-                      ),
-                      IconButton(
-                        tooltip: 'Close',
-                        onPressed: () => Navigator.pop(sheetContext),
-                        icon: const Icon(Icons.close, color: MoolColors.navy),
-                      ),
-                    ],
-                  ),
-                  if (confirmed) ...[
-                    for (final value in [
-                      (
-                        'Accept by',
-                        session.currentWorkspaceOrder?.actionDeadline,
-                      ),
-                      (
-                        session.currentWorkspaceOrder?.needsDelivery == true
-                            ? 'Delivery by'
-                            : 'Ready by',
-                        session.currentWorkspaceOrder?.fulfilmentDeadline,
-                      ),
-                    ])
-                      if (value.$2 != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
+        builder: (context, _) => _OrderDeadlineBoundary(
+          deadline: session.currentWorkspaceOrder?.actionDeadline,
+          builder: (expired) => SafeArea(
+            top: false,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * .72,
+              ),
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 16),
+                child: Column(
+                  key: const Key('work-order-time-sheet'),
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
                           child: Text(
-                            '${value.$1} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(value.$2!.toLocal()))}',
+                            expired && !session.hasPendingOrderTime
+                                ? 'Order status'
+                                : confirmed
+                                ? 'Time confirmed'
+                                : 'More time',
                             style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
                               color: MoolColors.navy,
-                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ),
-                  ] else ...[
-                    const Text(
-                      'The current time applies until your request is confirmed.',
-                      style: TextStyle(color: MoolColors.muted),
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 6,
-                      children: [
-                        for (final choice in [2, 5])
-                          ChoiceChip(
-                            label: Text('+$choice min'),
-                            selected: minutes == choice,
-                            onSelected:
-                                session.busy || session.hasPendingOrderTime
-                                ? null
-                                : (_) => setSheetState(() => minutes = choice),
-                          ),
+                        IconButton(
+                          tooltip: 'Close',
+                          onPressed: () => Navigator.pop(sheetContext),
+                          icon: const Icon(Icons.close, color: MoolColors.navy),
+                        ),
                       ],
                     ),
-                    if (!session.orderTimeServiceAvailable)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          'Cannot request more time right now. The current time still applies.',
-                          style: TextStyle(color: MoolColors.navy),
+                    if (orderId != null) ...[
+                      Text(
+                        orderId,
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 12,
                         ),
                       ),
-                    if (feedback != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Semantics(
-                          liveRegion: true,
+                      const SizedBox(height: 8),
+                    ],
+                    if (!sameOrder()) ...[
+                      const Text(
+                        'This order changed. Close this panel and review its latest status.',
+                        style: TextStyle(color: MoolColors.navy),
+                      ),
+                    ] else if (confirmed && !expired) ...[
+                      for (final value in [
+                        (
+                          'Accept by',
+                          session.currentWorkspaceOrder?.actionDeadline,
+                        ),
+                        (
+                          session.currentWorkspaceOrder?.needsDelivery == true
+                              ? 'Delivery by'
+                              : 'Ready by',
+                          session.currentWorkspaceOrder?.fulfilmentDeadline,
+                        ),
+                      ])
+                        if (value.$2 != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Text(
+                              '${value.$1} · ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(value.$2!.toLocal()))}',
+                              style: const TextStyle(
+                                color: MoolColors.navy,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                    ] else ...[
+                      Text(
+                        expired
+                            ? 'Acceptance time ended. Waiting for an order update.'
+                            : 'The current time applies until your request is confirmed.',
+                        style: const TextStyle(color: MoolColors.muted),
+                      ),
+                      if (!expired) ...[
+                        const SizedBox(height: 12),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 6,
+                          children: [
+                            for (final choice in [2, 5])
+                              ChoiceChip(
+                                label: Text('+$choice min'),
+                                selected: minutes == choice,
+                                onSelected:
+                                    expired ||
+                                        session.busy ||
+                                        session.hasPendingOrderTime
+                                    ? null
+                                    : (_) =>
+                                          setSheetState(() => minutes = choice),
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (!session.orderTimeServiceAvailable && !expired)
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 12),
                           child: Text(
-                            feedback!,
-                            style: const TextStyle(color: MoolColors.navy),
+                            'Cannot request more time right now. The current time still applies.',
+                            style: TextStyle(color: MoolColors.navy),
                           ),
                         ),
-                      ),
-                    const SizedBox(height: 10),
-                    FilledButton(
-                      key: const Key('work-order-time-request'),
-                      style: FilledButton.styleFrom(
-                        disabledForegroundColor: MoolColors.navy,
-                        disabledBackgroundColor: const Color(0xFFE6E9F2),
-                      ),
-                      onPressed:
-                          session.busy ||
-                              !session.orderTimeServiceAvailable ||
-                              orderId == null
-                          ? null
-                          : () async {
-                              final result = await session
-                                  .requestWorkspaceOrderTime(orderId, minutes);
-                              if (!sheetContext.mounted) return;
-                              final message =
-                                  session.errorMessage ?? session.noticeMessage;
-                              session.dismissMessages();
-                              setSheetState(() {
-                                confirmed = result;
-                                feedback = message;
-                              });
-                            },
-                      child: Text(
-                        session.busy
-                            ? 'Checking request…'
-                            : session.hasPendingOrderTime
-                            ? 'Retry request'
-                            : 'Request time',
-                      ),
-                    ),
+                      if (feedback != null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              feedback!,
+                              style: const TextStyle(color: MoolColors.navy),
+                            ),
+                          ),
+                        ),
+                      if (!expired || session.hasPendingOrderTime) ...[
+                        const SizedBox(height: 10),
+                        FilledButton(
+                          key: const Key('work-order-time-request'),
+                          style: FilledButton.styleFrom(
+                            disabledForegroundColor: MoolColors.navy,
+                            disabledBackgroundColor: const Color(0xFFE6E9F2),
+                          ),
+                          onPressed:
+                              session.busy ||
+                                  !sameOrder() ||
+                                  !session.orderTimeServiceAvailable ||
+                                  (expired && !session.hasPendingOrderTime) ||
+                                  orderId == null
+                              ? null
+                              : () async {
+                                  final result = await session
+                                      .requestWorkspaceOrderTime(
+                                        orderId,
+                                        minutes,
+                                      );
+                                  if (!sheetContext.mounted) return;
+                                  if (!sameOrder()) {
+                                    setSheetState(() => confirmed = false);
+                                    return;
+                                  }
+                                  final message =
+                                      session.errorMessage ??
+                                      session.noticeMessage;
+                                  session.dismissMessages();
+                                  setSheetState(() {
+                                    confirmed = result;
+                                    feedback = message;
+                                  });
+                                },
+                          child: Text(
+                            session.busy
+                                ? 'Checking request…'
+                                : session.hasPendingOrderTime
+                                ? 'Retry request'
+                                : 'Request time',
+                          ),
+                        ),
+                      ],
+                    ],
                   ],
-                ],
+                ),
               ),
             ),
           ),
@@ -6137,6 +6195,67 @@ class _LiveDot extends StatelessWidget {
   }
 }
 
+/// Rebuilds actions once at the deadline, independently of the digit ticker.
+/// Expiry is not evidence of rejection, reassignment or any server outcome.
+class _OrderDeadlineBoundary extends StatefulWidget {
+  const _OrderDeadlineBoundary({required this.deadline, required this.builder});
+  final DateTime? deadline;
+  final Widget Function(bool expired) builder;
+
+  @override
+  State<_OrderDeadlineBoundary> createState() => _OrderDeadlineBoundaryState();
+}
+
+class _OrderDeadlineBoundaryState extends State<_OrderDeadlineBoundary>
+    with WidgetsBindingObserver {
+  Timer? _timer;
+  bool _expired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _schedule();
+  }
+
+  void _schedule() {
+    _timer?.cancel();
+    final remaining = widget.deadline?.difference(DateTime.now());
+    _expired = remaining != null && remaining <= Duration.zero;
+    if (remaining != null && !_expired) {
+      _timer = Timer(remaining, () {
+        if (mounted) setState(() => _expired = true);
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _OrderDeadlineBoundary oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.deadline != widget.deadline) _schedule();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _schedule();
+      setState(() {});
+    } else if (state == AppLifecycleState.paused) {
+      _timer?.cancel();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.builder(_expired);
+}
+
 class _LiveCountdownText extends StatefulWidget {
   const _LiveCountdownText({
     required this.deadline,
@@ -6215,8 +6334,6 @@ class _LiveCountdownTextState extends State<_LiveCountdownText>
       value: label,
       child: Text(
         label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
         style: widget.style.copyWith(
           fontFeatures: const [FontFeature.tabularFigures()],
         ),
@@ -13508,306 +13625,324 @@ class _LiveOrderTicket extends StatelessWidget {
       'Delivery requested' => 'Track delivery',
       _ => 'Review',
     };
-    return Material(
-      key: const Key('work-live-order-ticket'),
-      color: Colors.white,
-      elevation: 0,
-      shadowColor: const Color(0x16001B4D),
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: EdgeInsets.symmetric(
-          horizontal:
-              MediaQuery.sizeOf(context).width < 360 &&
-                  MediaQuery.textScalerOf(context).scale(1) >= 2
-              ? 6
-              : 13,
-          vertical: 13,
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (order.isCustomerCollection)
-              Text(
-                '${order.id} · ${session.workspaceOrderStageLabel(order)}',
-                key: Key('work-order-stage-label-${order.id}'),
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: MoolColors.navy,
-                  fontWeight: FontWeight.w700,
-                ),
-              )
-            else
-              _StoreMoneyLine(
-                leading: Wrap(
-                  spacing: 8,
-                  runSpacing: 2,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    Text(
-                      stage == 'Confirmed'
-                          ? order.actionDeadline != null
-                                ? 'Accept within'
-                                : 'Awaiting acceptance'
-                          : stage,
-                      key: Key('work-order-stage-label-${order.id}'),
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    if (order.actionDeadline case final deadline?)
-                      _LiveCountdownText(
-                        deadline: deadline,
-                        fallback: 'Review',
+    return _OrderDeadlineBoundary(
+      deadline: stage == 'Confirmed' ? order.actionDeadline : null,
+      builder: (expired) => Material(
+        key: const Key('work-live-order-ticket'),
+        color: Colors.white,
+        elevation: 0,
+        shadowColor: const Color(0x16001B4D),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal:
+                MediaQuery.sizeOf(context).width < 360 &&
+                    MediaQuery.textScalerOf(context).scale(1) >= 2
+                ? 6
+                : 13,
+            vertical: 13,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (order.isCustomerCollection)
+                Text(
+                  '${order.id} · ${session.workspaceOrderStageLabel(order)}',
+                  key: Key('work-order-stage-label-${order.id}'),
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: MoolColors.navy,
+                    fontWeight: FontWeight.w700,
+                  ),
+                )
+              else
+                _StoreMoneyLine(
+                  leading: Wrap(
+                    spacing: 8,
+                    runSpacing: 2,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: [
+                      Text(
+                        stage == 'Confirmed'
+                            ? expired
+                                  ? 'Order update pending'
+                                  : order.actionDeadline != null
+                                  ? 'Accept within'
+                                  : 'Awaiting acceptance'
+                            : stage,
+                        key: Key('work-order-stage-label-${order.id}'),
                         style: const TextStyle(
                           color: MoolColors.navy,
                           fontSize: 10,
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                  ],
+                      if (order.actionDeadline case final deadline?)
+                        _LiveCountdownText(
+                          deadline: deadline,
+                          fallback: 'Review',
+                          style: const TextStyle(
+                            color: MoolColors.navy,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                    ],
+                  ),
+                  value: '₹${_formatStoreAmount(order.amount)}',
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 19,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
-                value: '₹${_formatStoreAmount(order.amount)}',
+              const SizedBox(height: 8),
+              Text(
+                order.customer,
                 style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontSize: 19,
+                  color: MoolColors.ink,
+                  fontSize: 16,
                   fontWeight: FontWeight.w900,
                 ),
               ),
-            const SizedBox(height: 8),
-            Text(
-              order.customer,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 16,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            if (!detailed)
-              Text(
-                order.isCustomerCollection
-                    ? '${order.payment} · Collect at store'
-                    : '${order.source} · ${order.payment} · ${order.fulfilment}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
-              ),
-            const SizedBox(height: 7),
-            if (detailed)
-              _ExactOrderInformation(
-                order: order,
-                showItems: packingLines.isEmpty,
-              ),
-            if (!detailed && packingLines.isEmpty)
-              Text(
-                order.items,
-                style: const TextStyle(
-                  color: MoolColors.ink,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
+              if (!detailed)
+                Text(
+                  order.isCustomerCollection
+                      ? '${order.payment} · Collect at store'
+                      : '${order.source} · ${order.payment} · ${order.fulfilment}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10.5,
+                  ),
                 ),
-              ),
-            if (packingLines.isNotEmpty) ...[
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(
-                    child: LinearProgressIndicator(
-                      value: totalUnits == 0 ? 0 : packedUnits / totalUnits,
-                      minHeight: 7,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
+              const SizedBox(height: 7),
+              if (detailed)
+                _ExactOrderInformation(
+                  order: order,
+                  showItems: packingLines.isEmpty,
+                ),
+              if (!detailed && packingLines.isEmpty)
+                Text(
+                  order.items,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                   ),
-                  const SizedBox(width: 10),
-                  Text(
-                    '$packedUnits/$totalUnits packed',
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 5),
-              for (final line in packingLines)
-                Material(
-                  color: const Color(0xFFF4F6FF),
-                  borderRadius: BorderRadius.circular(12),
-                  child: CheckboxListTile(
-                    key: Key(
-                      active
-                          ? 'work-order-pack-${line.id}'
-                          : 'work-order-pack-${order.id}-${line.id}',
-                    ),
-                    dense: true,
-                    visualDensity: VisualDensity.compact,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 8),
-                    controlAffinity: ListTileControlAffinity.trailing,
-                    value: line.packed,
-                    onChanged: (value) {
-                      if (!sameStore() || (active && !currentActionIsValid())) {
-                        return;
-                      }
-                      session.setWorkspaceOrderPackingLine(
-                        storeId: storeId,
-                        orderId: order.id,
-                        lineId: line.id,
-                        quantity: line.quantity,
-                        packed: value == true,
-                      );
-                    },
-                    title: Text(
-                      detailed && itemSnapshots.containsKey(line.id)
-                          ? '${itemSnapshots[line.id]!.name} · '
-                                '${itemSnapshots[line.id]!.pack} × ${line.quantity}'
-                          : '${line.label} × ${line.quantity}',
-                      style: const TextStyle(
-                        color: MoolColors.ink,
-                        fontSize: 10.5,
-                        fontWeight: FontWeight.w800,
+                ),
+              if (packingLines.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: LinearProgressIndicator(
+                        value: totalUnits == 0 ? 0 : packedUnits / totalUnits,
+                        minHeight: 7,
+                        borderRadius: BorderRadius.circular(999),
                       ),
                     ),
-                    subtitle: detailed && itemSnapshots.containsKey(line.id)
-                        ? Text(
-                            'Each ${_ExactOrderInformation._price(itemSnapshots[line.id]!.unitPricePaise)} · '
-                            'Total ${_ExactOrderInformation._price(itemSnapshots[line.id]!.lineTotalPaise)}',
-                            style: const TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 12,
-                            ),
-                          )
-                        : null,
-                  ),
+                    const SizedBox(width: 10),
+                    Text(
+                      '$packedUnits/$totalUnits packed',
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ],
                 ),
-            ],
-            if (order.isCustomerCollection)
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  key: Key('work-order-collection-open-${order.id}'),
-                  onPressed: () {
-                    if (sameStore() && session.selectWorkspaceOrder(order.id)) {
-                      onOpenCollection();
-                    }
-                  },
-                  child: Text(
-                    order.isClosed ? 'View collection' : 'Open collection',
+                const SizedBox(height: 5),
+                for (final line in packingLines)
+                  Material(
+                    color: const Color(0xFFF4F6FF),
+                    borderRadius: BorderRadius.circular(12),
+                    child: CheckboxListTile(
+                      key: Key(
+                        active
+                            ? 'work-order-pack-${line.id}'
+                            : 'work-order-pack-${order.id}-${line.id}',
+                      ),
+                      dense: true,
+                      visualDensity: VisualDensity.compact,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 8),
+                      controlAffinity: ListTileControlAffinity.trailing,
+                      value: line.packed,
+                      onChanged: (value) {
+                        if (!sameStore() ||
+                            (active && !currentActionIsValid())) {
+                          return;
+                        }
+                        session.setWorkspaceOrderPackingLine(
+                          storeId: storeId,
+                          orderId: order.id,
+                          lineId: line.id,
+                          quantity: line.quantity,
+                          packed: value == true,
+                        );
+                      },
+                      title: Text(
+                        detailed && itemSnapshots.containsKey(line.id)
+                            ? '${itemSnapshots[line.id]!.name} · '
+                                  '${itemSnapshots[line.id]!.pack} × ${line.quantity}'
+                            : '${line.label} × ${line.quantity}',
+                        style: const TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 10.5,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      subtitle: detailed && itemSnapshots.containsKey(line.id)
+                          ? Text(
+                              'Each ${_ExactOrderInformation._price(itemSnapshots[line.id]!.unitPricePaise)} · '
+                              'Total ${_ExactOrderInformation._price(itemSnapshots[line.id]!.lineTotalPaise)}',
+                              style: const TextStyle(
+                                color: MoolColors.muted,
+                                fontSize: 12,
+                              ),
+                            )
+                          : null,
+                    ),
                   ),
-                ),
-              )
-            else if (active ||
-                (detailed && !order.isClosed && stage != 'Preparing')) ...[
-              const SizedBox(height: 10),
-              Wrap(
-                alignment: WrapAlignment.end,
-                spacing: 12,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                children: [
-                  if (stage == 'Confirmed')
-                    TextButton(
+              ],
+              if (order.isCustomerCollection)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    key: Key('work-order-collection-open-${order.id}'),
+                    onPressed: () {
+                      if (sameStore() &&
+                          session.selectWorkspaceOrder(order.id)) {
+                        onOpenCollection();
+                      }
+                    },
+                    child: Text(
+                      order.isClosed ? 'View collection' : 'Open collection',
+                    ),
+                  ),
+                )
+              else if (active ||
+                  (detailed && !order.isClosed && stage != 'Preparing')) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  spacing: 12,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    if (stage == 'Confirmed')
+                      TextButton(
+                        onPressed:
+                            expired ||
+                                session.busy ||
+                                session.workspaceOperationsSyncing
+                            ? null
+                            : () {
+                                if (currentActionIsValid()) {
+                                  _showRejectOrderSheet(context, session);
+                                }
+                              },
+                        child: const Text('Reject'),
+                      ),
+                    FilledButton.icon(
                       onPressed:
-                          session.busy || session.workspaceOperationsSyncing
+                          expired ||
+                              session.busy ||
+                              session.workspaceOperationsSyncing ||
+                              session.workspaceHandoverBusy ||
+                              (stage == 'Preparing' &&
+                                  !session.workspacePackingComplete)
                           ? null
                           : () {
-                              if (currentActionIsValid()) {
-                                _showRejectOrderSheet(context, session);
+                              if (!currentActionIsValid() ||
+                                  (stage == 'Preparing' &&
+                                      !session.workspacePackingComplete)) {
+                                return;
+                              }
+                              if (stage == 'Ready for pickup') {
+                                _showWorkspacePickupSheet(context, session);
+                              } else if (stage == 'Delivery requested') {
+                                onOpenDelivery();
+                              } else if (stage == 'Ready' &&
+                                  order.needsDelivery) {
+                                session.advanceWorkspaceOrder();
+                                onOpenDelivery();
+                              } else {
+                                _advanceDeskOrder(
+                                  session,
+                                  expectedOrderId: order.id,
+                                );
                               }
                             },
-                      child: const Text('Reject'),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(48, 48),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                      ),
+                      icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                      label: Text(nextAction),
                     ),
-                  FilledButton.icon(
+                  ],
+                ),
+              ] else if (stage == 'Preparing') ...[
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    key: Key('work-order-ready-${order.id}'),
                     onPressed:
                         session.busy ||
                             session.workspaceOperationsSyncing ||
                             session.workspaceHandoverBusy ||
-                            (stage == 'Preparing' &&
-                                !session.workspacePackingComplete)
+                            packingLines.isEmpty ||
+                            packingLines.any((line) => !line.packed)
                         ? null
                         : () {
-                            if (!currentActionIsValid() ||
-                                (stage == 'Preparing' &&
-                                    !session.workspacePackingComplete)) {
+                            final current = session.visibleWorkspaceOrders
+                                .where((record) => record.id == order.id)
+                                .firstOrNull;
+                            final currentLines = current == null
+                                ? const <WorkspacePackingLine>[]
+                                : session.workspacePackingLinesForOrder(
+                                    current,
+                                  );
+                            if (!sameStore() ||
+                                current?.stage != 'Preparing' ||
+                                current?.isCustomerCollection == true ||
+                                currentLines.isEmpty ||
+                                currentLines.any((line) => !line.packed) ||
+                                !session.selectWorkspaceOrder(order.id) ||
+                                !currentActionIsValid()) {
                               return;
                             }
-                            if (stage == 'Ready for pickup') {
-                              _showWorkspacePickupSheet(context, session);
-                            } else if (stage == 'Delivery requested') {
-                              onOpenDelivery();
-                            } else if (stage == 'Ready' &&
-                                order.needsDelivery) {
-                              session.advanceWorkspaceOrder();
-                              onOpenDelivery();
-                            } else {
-                              _advanceDeskOrder(
-                                session,
-                                expectedOrderId: order.id,
-                              );
+                            _advanceDeskOrder(
+                              session,
+                              expectedOrderId: order.id,
+                            );
+                          },
+                    child: const Text('Order ready'),
+                  ),
+                ),
+              ] else if (!const ['Completed', 'Cancelled'].contains(stage)) ...[
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    key: Key('work-order-open-${order.id}'),
+                    onPressed:
+                        session.busy ||
+                            session.workspaceOperationsSyncing ||
+                            session.workspaceHandoverBusy
+                        ? null
+                        : () {
+                            if (sameStore()) {
+                              session.selectWorkspaceOrder(order.id);
                             }
                           },
-                    style: FilledButton.styleFrom(
-                      minimumSize: const Size(48, 48),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                    ),
-                    icon: const Icon(Icons.arrow_forward_rounded, size: 17),
-                    label: Text(nextAction),
+                    child: const Text('Open order'),
                   ),
-                ],
-              ),
-            ] else if (stage == 'Preparing') ...[
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(
-                  key: Key('work-order-ready-${order.id}'),
-                  onPressed:
-                      session.busy ||
-                          session.workspaceOperationsSyncing ||
-                          session.workspaceHandoverBusy ||
-                          packingLines.isEmpty ||
-                          packingLines.any((line) => !line.packed)
-                      ? null
-                      : () {
-                          final current = session.visibleWorkspaceOrders
-                              .where((record) => record.id == order.id)
-                              .firstOrNull;
-                          final currentLines = current == null
-                              ? const <WorkspacePackingLine>[]
-                              : session.workspacePackingLinesForOrder(current);
-                          if (!sameStore() ||
-                              current?.stage != 'Preparing' ||
-                              current?.isCustomerCollection == true ||
-                              currentLines.isEmpty ||
-                              currentLines.any((line) => !line.packed) ||
-                              !session.selectWorkspaceOrder(order.id) ||
-                              !currentActionIsValid()) {
-                            return;
-                          }
-                          _advanceDeskOrder(session, expectedOrderId: order.id);
-                        },
-                  child: const Text('Order ready'),
                 ),
-              ),
-            ] else if (!const ['Completed', 'Cancelled'].contains(stage)) ...[
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  key: Key('work-order-open-${order.id}'),
-                  onPressed:
-                      session.busy ||
-                          session.workspaceOperationsSyncing ||
-                          session.workspaceHandoverBusy
-                      ? null
-                      : () {
-                          if (sameStore()) {
-                            session.selectWorkspaceOrder(order.id);
-                          }
-                        },
-                  child: const Text('Open order'),
-                ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
@@ -18858,8 +18993,10 @@ class _WorkspaceStatusSurface extends StatelessWidget {
               const Divider(height: 1, indent: 16, endIndent: 16),
               const ListTile(
                 leading: Icon(Icons.layers_outlined),
-                title: Text('Maximum active orders'),
-                subtitle: Text('Pause new orders when this limit is reached'),
+                title: Text('Active-order preference'),
+                subtitle: Text(
+                  'This does not pause orders automatically. Pause your store when needed.',
+                ),
               ),
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
