@@ -48,13 +48,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   bool _applyingDraftText = false;
   String? _boundCommerceRoute;
   ChatWorkspaceApplicationContext? _workspaceApplicationContext;
+  bool _draftBound = false;
+  String? get _applicationId => _workspaceApplicationContext?.applicationId;
 
   @override
   void initState() {
     super.initState();
     _messageController.addListener(_handleDraftTextChanged);
-    _restoreDraft(widget.threadId);
-    _applyInitialDraftIfEmpty(widget.initialMessageDraft);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         unawaited(_recoverInterruptedPhoto(widget.threadId));
@@ -74,7 +74,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     super.didUpdateWidget(oldWidget);
     if (!identical(oldWidget.session, widget.session) ||
         oldWidget.threadId != widget.threadId) {
-      _restoreDraft(widget.threadId);
+      _draftBound = false;
       if (_messageScrollController.hasClients) {
         _messageScrollController.jumpTo(0);
       }
@@ -85,8 +85,11 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       _applyInitialDraftIfEmpty(widget.initialMessageDraft);
       unawaited(_recoverInterruptedPhoto(widget.threadId));
       unawaited(_loadThread(widget.threadId));
-    } else if (oldWidget.initialMessageDraft != widget.initialMessageDraft) {
-      _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+    } else {
+      _bindCommerceContextFromRoute();
+      if (oldWidget.initialMessageDraft != widget.initialMessageDraft) {
+        _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+      }
     }
   }
 
@@ -95,23 +98,38 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     try {
       uri = GoRouterState.of(context).uri;
     } on Object {
-      return;
+      // Directly mounted ordinary Chat still uses its generic draft.
     }
     final signature = '${widget.threadId}|$uri';
-    if (_boundCommerceRoute == signature) return;
+    if (_boundCommerceRoute == signature && _draftBound) return;
     _boundCommerceRoute = signature;
-    _workspaceApplicationContext = ChatWorkspaceApplicationContext.maybeFromUri(
-      uri,
-    );
-    widget.session.bindCommerceContext(
-      widget.threadId,
-      ChatCommerceContext.maybeFromUri(uri),
-    );
+    final previousApplication = _applicationId;
+    _workspaceApplicationContext = uri == null
+        ? null
+        : ChatWorkspaceApplicationContext.maybeFromUri(uri);
+    if (!_draftBound || previousApplication != _applicationId) {
+      _restoreDraft(widget.threadId);
+      _draftBound = true;
+      _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+    }
+    if (uri != null) {
+      widget.session.bindCommerceContext(
+        widget.threadId,
+        ChatCommerceContext.maybeFromUri(uri),
+      );
+    }
   }
 
   void _applyInitialDraftIfEmpty(String? initialDraft) {
     final draft = initialDraft?.trim();
-    if (draft == null || draft.isEmpty || _messageController.text.isNotEmpty) {
+    if (draft == null ||
+        draft.isEmpty ||
+        _messageController.text.isNotEmpty ||
+        (_applicationId != null &&
+            widget.session.hasSavedDraftForSession(
+              widget.threadId,
+              workspaceApplicationId: _applicationId,
+            ))) {
       return;
     }
     _messageController.value = TextEditingValue(
@@ -121,15 +139,19 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   }
 
   void _handleDraftTextChanged() {
-    if (_applyingDraftText) return;
+    if (_applyingDraftText || !_draftBound) return;
     widget.session.setDraftTextForSession(
       widget.threadId,
       _messageController.text,
+      workspaceApplicationId: _applicationId,
     );
   }
 
   void _restoreDraft(String threadId) {
-    final draft = widget.session.draftTextForSession(threadId);
+    final draft = widget.session.draftTextForSession(
+      threadId,
+      workspaceApplicationId: _applicationId,
+    );
     _applyingDraftText = true;
     try {
       _messageController.value = TextEditingValue(
@@ -145,18 +167,36 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final session = widget.session;
     final threadId = widget.threadId;
     final draft = _messageController.text;
+    final applicationId = _applicationId;
+    final generation = session.draftSessionGeneration;
+    final revision = session.draftRevision(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
     if (!await _confirmSendReview(draft: draft, includesPhoto: false)) {
       return;
     }
-    final sent = await session.send(threadId, draft);
-    if (!sent || !identical(session, widget.session)) return;
-    if (session.draftTextForSession(threadId) == draft) {
-      session.setDraftTextForSession(threadId, '');
+    if (!mounted ||
+        !identical(session, widget.session) ||
+        threadId != widget.threadId ||
+        applicationId != _applicationId ||
+        !session.isDraftSessionCurrent(generation)) {
+      return;
     }
-    if (mounted &&
-        threadId == widget.threadId &&
-        _messageController.text == draft) {
-      _messageController.clear();
+    final sent = await session.send(
+      threadId,
+      draft,
+      workspaceApplicationId: applicationId,
+    );
+    if (sent) {
+      _clearSentDraft(
+        session,
+        threadId,
+        applicationId,
+        generation,
+        revision,
+        draft,
+      );
     }
   }
 
@@ -164,20 +204,41 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final session = widget.session;
     final threadId = widget.threadId;
     final draft = _messageController.text;
-    final selected = session.selectedPhoto(threadId);
+    final applicationId = _applicationId;
+    final generation = session.draftSessionGeneration;
+    final revision = session.draftRevision(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
+    final selected = session.selectedPhoto(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
     if (selected == null) return;
     if (!await _confirmSendReview(draft: draft, includesPhoto: true)) {
       return;
     }
-    final sent = await session.sendSelectedPhoto(threadId, draft);
-    if (!sent || !identical(session, widget.session)) return;
-    if (session.draftTextForSession(threadId) == draft) {
-      session.setDraftTextForSession(threadId, '');
+    if (!mounted ||
+        !identical(session, widget.session) ||
+        threadId != widget.threadId ||
+        applicationId != _applicationId ||
+        !session.isDraftSessionCurrent(generation)) {
+      return;
     }
-    if (mounted &&
-        threadId == widget.threadId &&
-        _messageController.text == draft) {
-      _messageController.clear();
+    final sent = await session.sendSelectedPhoto(
+      threadId,
+      draft,
+      workspaceApplicationId: applicationId,
+    );
+    if (sent) {
+      _clearSentDraft(
+        session,
+        threadId,
+        applicationId,
+        generation,
+        revision,
+        draft,
+      );
     }
   }
 
@@ -185,7 +246,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     final session = widget.session;
     final threadId = widget.threadId;
     final draft = _messageController.text;
-    final selected = session.selectedAttachment(threadId);
+    final applicationId = _applicationId;
+    final generation = session.draftSessionGeneration;
+    final revision = session.draftRevision(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
+    final selected = session.selectedAttachment(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
     if (selected == null) return;
     final label = switch (selected.kind) {
       ChatAttachmentKind.document => 'Document',
@@ -199,13 +269,61 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     )) {
       return;
     }
-    final sent = await session.sendSelectedAttachment(threadId, draft);
-    if (!sent || !identical(session, widget.session)) return;
-    if (session.draftTextForSession(threadId) == draft) {
-      session.setDraftTextForSession(threadId, '');
+    if (!mounted ||
+        !identical(session, widget.session) ||
+        threadId != widget.threadId ||
+        applicationId != _applicationId ||
+        !session.isDraftSessionCurrent(generation)) {
+      return;
+    }
+    final sent = await session.sendSelectedAttachment(
+      threadId,
+      draft,
+      workspaceApplicationId: applicationId,
+    );
+    if (sent) {
+      _clearSentDraft(
+        session,
+        threadId,
+        applicationId,
+        generation,
+        revision,
+        draft,
+      );
+    }
+  }
+
+  void _clearSentDraft(
+    ChatSession session,
+    String threadId,
+    String? applicationId,
+    int generation,
+    int revision,
+    String draft,
+  ) {
+    if (!session.isDraftSessionCurrent(generation) ||
+        session.draftRevision(
+              threadId,
+              workspaceApplicationId: applicationId,
+            ) !=
+            revision) {
+      return;
+    }
+    if (session.draftTextForSession(
+          threadId,
+          workspaceApplicationId: applicationId,
+        ) ==
+        draft) {
+      session.setDraftTextForSession(
+        threadId,
+        '',
+        workspaceApplicationId: applicationId,
+      );
     }
     if (mounted &&
+        identical(session, widget.session) &&
         threadId == widget.threadId &&
+        applicationId == _applicationId &&
         _messageController.text == draft) {
       _messageController.clear();
     }
@@ -219,14 +337,33 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
         .where((message) => message.id == messageId);
     if (failed.isEmpty) return;
     final failedText = failed.single.text;
+    final applicationId = _applicationId;
+    final generation = session.draftSessionGeneration;
+    final revision = session.draftRevision(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
+    final ownsDraft = session.retryDraftMatchesApplication(
+      messageId,
+      applicationId,
+    );
+    if (!mounted ||
+        !identical(session, widget.session) ||
+        threadId != widget.threadId ||
+        applicationId != _applicationId ||
+        !session.isDraftSessionCurrent(generation)) {
+      return;
+    }
     final sent = await session.retry(threadId, messageId);
-    if (!sent || !identical(session, widget.session)) return;
-    if (mounted &&
-        threadId == widget.threadId &&
-        _messageController.text == failedText &&
-        session.draftTextForSession(threadId) == failedText) {
-      _messageController.clear();
-      session.discardDraftForSession(threadId);
+    if (sent && ownsDraft) {
+      _clearSentDraft(
+        session,
+        threadId,
+        applicationId,
+        generation,
+        revision,
+        failedText,
+      );
     }
   }
 
@@ -237,11 +374,16 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   }) async {
     final session = widget.session;
     final threadId = widget.threadId;
+    final applicationId = _applicationId;
+    final generation = session.draftSessionGeneration;
     if (!session.reviewBeforeSendingForSession(threadId)) return true;
 
     FocusManager.instance.primaryFocus?.unfocus();
     final thread = session.thread(threadId);
-    final reply = session.replyTarget(threadId);
+    final reply = session.replyTarget(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
     final trimmedDraft = draft.trim();
     final confirmed = await showDialog<bool>(
       context: context,
@@ -326,7 +468,9 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     return confirmed == true &&
         mounted &&
         identical(session, widget.session) &&
-        threadId == widget.threadId;
+        threadId == widget.threadId &&
+        applicationId == _applicationId &&
+        session.isDraftSessionCurrent(generation);
   }
 
   void _applySuggestedPrompt(String prompt) {
@@ -344,7 +488,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
 
   Future<void> _recoverInterruptedPhoto(String threadId) async {
     final session = widget.session;
-    if (!session.photoSharingAvailable ||
+    if (_applicationId != null ||
+        !session.photoSharingAvailable ||
         session.selectedPhoto(threadId) != null) {
       return;
     }
@@ -625,6 +770,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
             ],
           ),
           messageThreadId: thread.id,
+          boundMessageText: true,
+          workspaceApplicationId: _applicationId,
           body:
               widget.session.loadingMessageThreads.contains(thread.id) &&
                   widget.session.messages(thread.id).isEmpty
@@ -668,6 +815,7 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                         ),
                       _Composer(
                         key: _composerKey,
+                        workspaceApplicationId: _applicationId,
                         session: widget.session,
                         threadId: thread.id,
                         controller: _messageController,
@@ -1673,6 +1821,8 @@ class _ThreadBody extends StatelessWidget {
               threadId: thread.id,
               session: session,
               highlighted: message.id == highlightedMessageId,
+              workspaceApplicationId:
+                  workspaceApplicationContext?.applicationId,
               onRetry: onRetryMessage,
             ),
           ),
@@ -1834,6 +1984,7 @@ class _MessageBubble extends StatelessWidget {
     required this.session,
     required this.highlighted,
     required this.onRetry,
+    this.workspaceApplicationId,
   });
 
   final ChatMessage message;
@@ -1841,6 +1992,7 @@ class _MessageBubble extends StatelessWidget {
   final ChatSession session;
   final bool highlighted;
   final Future<void> Function(String messageId) onRetry;
+  final String? workspaceApplicationId;
 
   @override
   Widget build(BuildContext context) {
@@ -1858,6 +2010,7 @@ class _MessageBubble extends StatelessWidget {
                 session: session,
                 threadId: threadId,
                 message: message,
+                workspaceApplicationId: workspaceApplicationId,
               )
             : null,
         child: AnimatedContainer(
@@ -2266,6 +2419,7 @@ Future<void> _showMessageActions(
   required ChatSession session,
   required String threadId,
   required ChatMessage message,
+  String? workspaceApplicationId,
 }) {
   final copyValue = _copyableMessageValue(message);
   final forwardableContent =
@@ -2326,7 +2480,11 @@ Future<void> _showMessageActions(
               title: const Text('Reply'),
               onTap: () {
                 Navigator.of(sheetContext).pop();
-                session.startReply(threadId, message.id);
+                session.startReply(
+                  threadId,
+                  message.id,
+                  workspaceApplicationId: workspaceApplicationId,
+                );
               },
             ),
             ListTile(
@@ -2769,11 +2927,13 @@ class _Composer extends StatefulWidget {
     required this.onSend,
     required this.onSendPhoto,
     required this.onSendAttachment,
+    this.workspaceApplicationId,
     super.key,
   });
 
   final ChatSession session;
   final String threadId;
+  final String? workspaceApplicationId;
   final TextEditingController controller;
   final Future<void> Function() onSend;
   final Future<void> Function() onSendPhoto;
@@ -2804,6 +2964,31 @@ class _ComposerState extends State<_Composer> {
     _inputFocus.dispose();
     super.dispose();
   }
+
+  @override
+  void didUpdateWidget(covariant _Composer oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.session, widget.session) ||
+        oldWidget.threadId != widget.threadId ||
+        oldWidget.workspaceApplicationId != widget.workspaceApplicationId) {
+      _attachmentsOpen = false;
+      _attachmentNotice = null;
+      _inputFocus.unfocus();
+    }
+  }
+
+  String? get applicationId => widget.workspaceApplicationId;
+  bool _sameOrigin(
+    ChatSession origin,
+    String thread,
+    String? application,
+    int generation,
+  ) =>
+      mounted &&
+      identical(origin, session) &&
+      thread == threadId &&
+      application == applicationId &&
+      origin.isDraftSessionCurrent(generation);
 
   ChatSession get session => widget.session;
   String get threadId => widget.threadId;
@@ -2848,7 +3033,10 @@ class _ComposerState extends State<_Composer> {
   void _discardDraft() {
     if (session.busy) return;
     controller.clear();
-    session.discardDraftForSession(threadId);
+    session.discardDraftForSession(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
     setState(() {
       _attachmentsOpen = false;
       _attachmentNotice = null;
@@ -2859,6 +3047,10 @@ class _ComposerState extends State<_Composer> {
     BuildContext context,
     _ChatAttachmentChoice choice,
   ) async {
+    final origin = session;
+    final originThread = threadId;
+    final originApplication = applicationId;
+    final generation = session.draftSessionGeneration;
     switch (choice) {
       case _ChatAttachmentChoice.document:
         if (!session.attachmentSelectionAvailable) {
@@ -2871,13 +3063,19 @@ class _ComposerState extends State<_Composer> {
         final selected = await session.selectAttachment(
           threadId,
           ChatAttachmentKind.document,
+          workspaceApplicationId: originApplication,
         );
-        if (!mounted) return;
+        if (!_sameOrigin(origin, originThread, originApplication, generation)) {
+          return;
+        }
         setState(() {
           _attachmentsOpen = !selected;
           _attachmentNotice = selected
               ? null
-              : session.threadActionError(threadId) ??
+              : session.threadActionError(
+                      threadId,
+                      workspaceApplicationId: applicationId,
+                    ) ??
                     'No document was selected. Choose a document or continue with a message.';
         });
         return;
@@ -2899,13 +3097,19 @@ class _ComposerState extends State<_Composer> {
         final selected = await session.selectAttachment(
           threadId,
           ChatAttachmentKind.video,
+          workspaceApplicationId: originApplication,
         );
-        if (!mounted) return;
+        if (!_sameOrigin(origin, originThread, originApplication, generation)) {
+          return;
+        }
         setState(() {
           _attachmentsOpen = !selected;
           _attachmentNotice = selected
               ? null
-              : session.threadActionError(threadId) ??
+              : session.threadActionError(
+                      threadId,
+                      workspaceApplicationId: applicationId,
+                    ) ??
                     'No video was selected. Choose a video or continue with a message.';
         });
         return;
@@ -2926,13 +3130,26 @@ class _ComposerState extends State<_Composer> {
       });
       return;
     }
-    final selected = await session.selectPhoto(threadId, source);
-    if (!mounted) return;
+    final origin = session;
+    final originThread = threadId;
+    final originApplication = applicationId;
+    final generation = session.draftSessionGeneration;
+    final selected = await origin.selectPhoto(
+      originThread,
+      source,
+      workspaceApplicationId: originApplication,
+    );
+    if (!_sameOrigin(origin, originThread, originApplication, generation)) {
+      return;
+    }
     setState(() {
       _attachmentsOpen = !selected && keepTrayOpenOnFailure;
       _attachmentNotice = selected || !keepTrayOpenOnFailure
           ? null
-          : session.threadActionError(threadId) ??
+          : session.threadActionError(
+                  threadId,
+                  workspaceApplicationId: applicationId,
+                ) ??
                 (source == ChatPhotoSource.camera
                     ? 'Camera did not return a photo. Try again or choose Photos.'
                     : 'No photo was selected. Try again or continue with a message.');
@@ -2941,9 +3158,18 @@ class _ComposerState extends State<_Composer> {
 
   @override
   Widget build(BuildContext context) {
-    final reply = session.replyTarget(threadId);
-    final photo = session.selectedPhoto(threadId);
-    final attachment = session.selectedAttachment(threadId);
+    final reply = session.replyTarget(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
+    final photo = session.selectedPhoto(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
+    final attachment = session.selectedAttachment(
+      threadId,
+      workspaceApplicationId: applicationId,
+    );
     final compactEmpty =
         !_inputFocus.hasFocus &&
         controller.text.isEmpty &&
@@ -3147,6 +3373,7 @@ class _ComposerState extends State<_Composer> {
                                       ? null
                                       : () => session.cancelSelectedPhoto(
                                           threadId,
+                                          workspaceApplicationId: applicationId,
                                         ),
                                   icon: const Icon(Icons.close_rounded),
                                 ),
@@ -3218,8 +3445,10 @@ class _ComposerState extends State<_Composer> {
                                 IconButton(
                                   key: const Key('chat-cancel-reply'),
                                   tooltip: 'Cancel reply',
-                                  onPressed: () =>
-                                      session.cancelReply(threadId),
+                                  onPressed: () => session.cancelReply(
+                                    threadId,
+                                    workspaceApplicationId: applicationId,
+                                  ),
                                   icon: const Icon(Icons.close_rounded),
                                 ),
                               ],
@@ -3298,6 +3527,7 @@ class _ComposerState extends State<_Composer> {
                                       ? null
                                       : () => session.cancelSelectedAttachment(
                                           threadId,
+                                          workspaceApplicationId: applicationId,
                                         ),
                                   icon: const Icon(Icons.close_rounded),
                                 ),
@@ -3451,7 +3681,10 @@ class _ComposerState extends State<_Composer> {
                     valueListenable: controller,
                     builder: (context, value, _) {
                       final hasMessage = value.text.trim().isNotEmpty;
-                      final recording = session.isRecordingVoice(threadId);
+                      final recording = session.isRecordingVoice(
+                        threadId,
+                        workspaceApplicationId: applicationId,
+                      );
                       final sendsContent =
                           photo != null || attachment != null || hasMessage;
                       return SizedBox.square(
@@ -3500,8 +3733,14 @@ class _ComposerState extends State<_Composer> {
                                               'Voice messages are not available right now. You can type a message instead.',
                                         )
                                       : recording
-                                      ? session.stopVoiceRecording(threadId)
-                                      : session.startVoiceRecording(threadId),
+                                      ? session.stopVoiceRecording(
+                                          threadId,
+                                          workspaceApplicationId: applicationId,
+                                        )
+                                      : session.startVoiceRecording(
+                                          threadId,
+                                          workspaceApplicationId: applicationId,
+                                        ),
                                 ),
                           icon: session.busy
                               ? const SizedBox.square(

@@ -172,6 +172,17 @@ void main() {
       );
 
       final more = find.byKey(const Key('chat-thread-more-rasoi'));
+      await tester.scrollUntilVisible(
+        more,
+        200,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const PageStorageKey('chat-inbox-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
       expect(tester.getSize(more).width, greaterThanOrEqualTo(44));
       expect(tester.getSize(more).height, greaterThanOrEqualTo(44));
 

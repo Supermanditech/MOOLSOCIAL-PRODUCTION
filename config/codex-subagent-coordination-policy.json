@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4502,
-    "sha256": "3E62692484001BB9F2314287BE4B5D58ECF00E73D1DF1A46022CBFF7DF2255CB"
+    "entryCount": 4503,
+    "sha256": "CF95FA4CE18049E304A7CD7C50977A94E98A7431E21E517E23D71F0B10FE84A4"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -123,7 +123,9 @@
         "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
         "apps/mobile/lib/features/chat/screens/chat_shared_content_screen.dart",
         "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
+        "apps/mobile/lib/features/chat/widgets/chat_widgets.dart",
         "apps/mobile/test/chat_flow_test.dart",
+        "apps/mobile/test/chat_inbox_controls_test.dart",
         "apps/mobile/test/chat_settings_hub_test.dart",
         "apps/mobile/test/global_contextual_chat_shell_test.dart",
         "apps/mobile/lib/features/book/widgets/book_widgets.dart",

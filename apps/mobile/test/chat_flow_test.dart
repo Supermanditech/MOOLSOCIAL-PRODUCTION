@@ -16,6 +16,391 @@ import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 
 void main() {
+  test(
+    'r6611 support drafts preserve applications, generic text and explicit empty',
+    () {
+      final chat = ChatSession();
+      addTearDown(chat.dispose);
+      const thread = 'workspace-support';
+      chat.setDraftTextForSession(thread, 'Existing unsent support draft');
+      chat.setDraftTextForSession(
+        thread,
+        'Application A notes',
+        workspaceApplicationId: 'A',
+      );
+      chat.setDraftTextForSession(
+        thread,
+        'Application B notes',
+        workspaceApplicationId: 'B',
+      );
+      expect(chat.draftTextForSession(thread), 'Existing unsent support draft');
+      expect(
+        chat.draftTextForSession(thread, workspaceApplicationId: 'A'),
+        'Application A notes',
+      );
+      expect(
+        chat.draftTextForSession(thread, workspaceApplicationId: 'B'),
+        'Application B notes',
+      );
+      chat.setDraftTextForSession(thread, '', workspaceApplicationId: 'A');
+      expect(
+        chat.hasSavedDraftForSession(thread, workspaceApplicationId: 'A'),
+        isTrue,
+      );
+      expect(
+        chat.hasDraftForSession(thread, workspaceApplicationId: 'A'),
+        isFalse,
+      );
+      chat.discardDraftForSession(thread, workspaceApplicationId: 'B');
+      expect(chat.draftTextForSession(thread), 'Existing unsent support draft');
+      expect(
+        chat.hasSavedDraftForSession(thread, workspaceApplicationId: 'B'),
+        isTrue,
+      );
+      // Application parameters cannot fork an unrelated Buy conversation.
+      chat.setDraftTextForSession(
+        'mahadev',
+        'Buy draft',
+        workspaceApplicationId: 'A',
+      );
+      expect(chat.draftTextForSession('mahadev'), 'Buy draft');
+    },
+  );
+
+  test(
+    'r6611 support pending document and reply belong to their initiating application',
+    () async {
+      final picker = _R6611AttachmentPicker();
+      final gateway = _R6611DraftGateway();
+      final chat = ChatSession.production(
+        gateway: gateway,
+        attachmentPicker: picker,
+      );
+      addTearDown(chat.dispose);
+      const thread = 'workspace-support';
+      await chat.loadMessages(thread);
+      expect(
+        chat.startReply(
+          thread,
+          'support-question',
+          workspaceApplicationId: 'A',
+        ),
+        isTrue,
+      );
+      final pending = chat.selectAttachment(
+        thread,
+        ChatAttachmentKind.document,
+        workspaceApplicationId: 'A',
+      );
+      chat.setDraftTextForSession(
+        thread,
+        'B remains untouched',
+        workspaceApplicationId: 'B',
+      );
+      picker.result.complete(_r6611Document());
+      expect(await pending, isTrue);
+      expect(
+        chat.selectedAttachment(thread, workspaceApplicationId: 'A')?.name,
+        'application-proof.pdf',
+      );
+      expect(
+        chat.replyTarget(thread, workspaceApplicationId: 'A')?.id,
+        'support-question',
+      );
+      expect(
+        chat.selectedAttachment(thread, workspaceApplicationId: 'B'),
+        isNull,
+      );
+      expect(chat.replyTarget(thread, workspaceApplicationId: 'B'), isNull);
+      expect(chat.selectedAttachment(thread), isNull);
+      chat.discardDraftForSession(thread, workspaceApplicationId: 'B');
+      expect(
+        chat.hasDraftForSession(thread, workspaceApplicationId: 'A'),
+        isTrue,
+      );
+      chat.cancelSelectedAttachment(thread, workspaceApplicationId: 'A');
+      chat.cancelReply(thread, workspaceApplicationId: 'A');
+      expect(
+        chat.hasDraftForSession(thread, workspaceApplicationId: 'A'),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'r6611 support late photo stays scoped and unknown native recovery is not assigned',
+    () async {
+      final picker = _R6611PhotoPicker();
+      final chat = ChatSession.production(
+        gateway: _R6611DraftGateway(),
+        photoPicker: picker,
+      );
+      addTearDown(chat.dispose);
+      final pending = chat.selectPhoto(
+        'workspace-support',
+        ChatPhotoSource.gallery,
+        workspaceApplicationId: 'A',
+      );
+      picker.result.complete(
+        ChatPickedPhoto(
+          name: 'proof.jpg',
+          contentType: 'image/jpeg',
+          bytes: Uint8List.fromList([1, 2]),
+        ),
+      );
+      expect(await pending, isTrue);
+      expect(
+        chat
+            .selectedPhoto('workspace-support', workspaceApplicationId: 'A')
+            ?.name,
+        'proof.jpg',
+      );
+      expect(
+        chat.selectedPhoto('workspace-support', workspaceApplicationId: 'B'),
+        isNull,
+      );
+      expect(
+        await chat.recoverInterruptedPhotoSelection(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        isFalse,
+      );
+      expect(picker.recoveryCalls, 0);
+      chat.cancelSelectedPhoto(
+        'workspace-support',
+        workspaceApplicationId: 'B',
+      );
+      expect(
+        chat.selectedPhoto('workspace-support', workspaceApplicationId: 'A'),
+        isNotNull,
+      );
+    },
+  );
+
+  for (final reset in [true, false]) {
+    test(
+      'r6611 support stale document completion is suppressed after ${reset ? 'account reset' : 'disposal'}',
+      () async {
+        final picker = _R6611AttachmentPicker();
+        final chat = ChatSession.production(
+          gateway: _R6611DraftGateway(),
+          attachmentPicker: picker,
+        );
+        final pending = chat.selectAttachment(
+          'workspace-support',
+          ChatAttachmentKind.document,
+          workspaceApplicationId: 'A',
+        );
+        if (reset) {
+          chat.resetForAuthenticationBoundary();
+          chat.setDraftTextForSession(
+            'workspace-support',
+            'New account',
+            workspaceApplicationId: 'A',
+          );
+        } else {
+          chat.dispose();
+        }
+        picker.result.complete(_r6611Document());
+        expect(await pending, isFalse);
+        expect(
+          chat.selectedAttachment(
+            'workspace-support',
+            workspaceApplicationId: 'A',
+          ),
+          isNull,
+        );
+        if (reset) {
+          expect(
+            chat.draftTextForSession(
+              'workspace-support',
+              workspaceApplicationId: 'A',
+            ),
+            'New account',
+          );
+          chat.dispose();
+        }
+      },
+    );
+  }
+
+  test(
+    'r6611 support late send after account reset cannot insert old messages',
+    () async {
+      final gateway = _R6611DraftGateway();
+      final chat = ChatSession.production(gateway: gateway);
+      addTearDown(chat.dispose);
+      final send = chat.send(
+        'workspace-support',
+        'Application A',
+        workspaceApplicationId: 'A',
+      );
+      chat.resetForAuthenticationBoundary();
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'New account draft',
+        workspaceApplicationId: 'A',
+      );
+      gateway.sendResult.complete(
+        const ChatMessage(
+          id: 'sent-old',
+          sender: 'You',
+          text: 'Application A',
+          timeLabel: 'Now',
+          mine: true,
+        ),
+      );
+      expect(await send, isFalse);
+      expect(chat.messages('workspace-support'), isEmpty);
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'New account draft',
+      );
+      expect(gateway.sentThreads, ['workspace-support']);
+    },
+  );
+
+  test(
+    'r6611 support failed send preserves draft and records retry origin',
+    () async {
+      final gateway = _R6611DraftGateway();
+      final chat = ChatSession.production(gateway: gateway);
+      addTearDown(chat.dispose);
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'A unsent',
+        workspaceApplicationId: 'A',
+      );
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'B unsent',
+        workspaceApplicationId: 'B',
+      );
+      final send = chat.send(
+        'workspace-support',
+        'A unsent',
+        workspaceApplicationId: 'A',
+      );
+      gateway.sendResult.completeError(
+        const ChatServiceException('Connection interrupted.'),
+      );
+      expect(await send, isFalse);
+      final failed = chat.messages('workspace-support').single;
+      expect(chat.retryDraftMatchesApplication(failed.id, 'A'), isTrue);
+      expect(chat.retryDraftMatchesApplication(failed.id, 'B'), isFalse);
+      expect(
+        chat.threadActionError(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'Connection interrupted.',
+      );
+      expect(
+        chat.threadActionError(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        isNull,
+      );
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'A unsent',
+      );
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        'B unsent',
+      );
+    },
+  );
+
+  for (final application in <String?>[null, 'A']) {
+    test(
+      'r6611 support retry preserves a newer draft and reply $application',
+      () async {
+        final gateway = _R6611DraftGateway();
+        final chat = ChatSession.production(gateway: gateway);
+        addTearDown(chat.dispose);
+        const thread = 'workspace-support';
+        await chat.loadMessages(thread);
+        chat.setDraftTextForSession(
+          thread,
+          'Original words',
+          workspaceApplicationId: application,
+        );
+        final first = chat.send(
+          thread,
+          'Original words',
+          workspaceApplicationId: application,
+        );
+        gateway.sendResult.completeError(
+          const ChatServiceException('Try again.'),
+        );
+        expect(await first, isFalse);
+        final failed = chat.messages(thread).last;
+        expect(
+          chat.retryDraftMatchesApplication(failed.id, application),
+          isTrue,
+        );
+        chat.setDraftTextForSession(
+          thread,
+          '',
+          workspaceApplicationId: application,
+        );
+        chat.setDraftTextForSession(
+          thread,
+          'Original words',
+          workspaceApplicationId: application,
+        );
+        expect(
+          chat.startReply(
+            thread,
+            'support-question',
+            workspaceApplicationId: application,
+          ),
+          isTrue,
+        );
+        expect(
+          chat.retryDraftMatchesApplication(failed.id, application),
+          isFalse,
+        );
+        gateway.sendResult = Completer<ChatMessage>();
+        final retry = chat.retry(thread, failed.id);
+        gateway.sendResult.complete(
+          const ChatMessage(
+            id: 'confirmed-retry',
+            sender: 'You',
+            text: 'Original words',
+            timeLabel: 'Now',
+            mine: true,
+          ),
+        );
+        expect(await retry, isTrue);
+        expect(
+          gateway.sentReplies,
+          [null, null],
+          reason: 'A retry must not borrow a newly selected reply.',
+        );
+        expect(
+          chat.replyTarget(thread, workspaceApplicationId: application)?.id,
+          'support-question',
+        );
+        expect(
+          chat.draftTextForSession(thread, workspaceApplicationId: application),
+          'Original words',
+        );
+      },
+    );
+  }
   Future<JourneySession> readyJourney() async {
     final session = JourneySession(
       store: MemoryJourneyStore(
@@ -1579,6 +1964,71 @@ SocialPublishedItem _post(
   audience: 'Public',
   publishedAt: DateTime.utc(2026, 8, 24),
 );
+
+ChatPickedAttachment _r6611Document() => ChatPickedAttachment(
+  kind: ChatAttachmentKind.document,
+  name: 'application-proof.pdf',
+  contentType: 'application/pdf',
+  bytes: Uint8List.fromList([37, 80, 68, 70]),
+);
+
+class _R6611AttachmentPicker implements ChatAttachmentPicker {
+  final result = Completer<ChatPickedAttachment?>();
+  @override
+  Future<ChatPickedAttachment?> pick(ChatAttachmentKind kind) => result.future;
+}
+
+class _R6611PhotoPicker implements ChatPhotoPicker {
+  final result = Completer<ChatPickedPhoto?>();
+  int recoveryCalls = 0;
+  @override
+  Future<ChatPickedPhoto?> pick(ChatPhotoSource source) => result.future;
+  @override
+  Future<ChatPickedPhoto?> recoverInterruptedSelection() async {
+    recoveryCalls += 1;
+    return null;
+  }
+}
+
+class _R6611DraftGateway extends _PeopleChatGateway
+    implements ChatPhotoGateway {
+  var sendResult = Completer<ChatMessage>();
+  final List<String> sentThreads = [];
+  final List<String?> sentReplies = [];
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) async => const [
+    ChatMessage(
+      id: 'support-question',
+      sender: 'MoolSocial',
+      text: 'Please confirm your application.',
+      timeLabel: 'Now',
+      mine: false,
+    ),
+  ];
+  @override
+  Future<ChatMessage> sendMessage({
+    required String threadId,
+    required String text,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) {
+    sentThreads.add(threadId);
+    sentReplies.add(replyToMessageId);
+    return sendResult.future;
+  }
+
+  @override
+  Future<ChatMessage> sendPhoto({
+    required String threadId,
+    required ChatPickedPhoto photo,
+    required String caption,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) => Future.error(UnsupportedError('Not sent by this test.'));
+}
 
 class _PeopleChatGateway implements ChatGateway {
   final List<String> createdTargets = [];

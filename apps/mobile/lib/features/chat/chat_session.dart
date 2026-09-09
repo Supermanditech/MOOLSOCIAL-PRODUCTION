@@ -265,22 +265,52 @@ class ChatSession extends ChangeNotifier {
   final List<ChatThread> _threads = [];
   final Map<String, List<ChatMessage>> _messages = {};
   final Map<String, String> _messageLoadErrors = {};
-  final Map<String, String> _threadActionErrors = {};
-  final Map<String, String> _threadActionNotices = {};
+  final Map<Object, String> _threadActionErrors = {};
+  final Map<Object, String> _threadActionNotices = {};
   final Map<String, ChatCommerceContext> _commerceContexts = {};
   final Map<String, Set<String>> _hiddenMessageIdsByThread = {};
-  final Map<String, String> _draftTextByThread = {};
+  final Map<Object, String> _draftTextByThread = {};
+  final Map<Object, int> _draftRevisions = {};
   final Set<String> _readThreads = {};
   final Set<String> _markedUnreadThreads = {};
   final Set<String> _pinnedThreadIds = {'shop-assist'};
   final Set<String> _reducedAttentionThreadIds = {};
   final Set<String> _archivedThreadIds = {};
   final Map<String, String> _retryKeys = {};
+  final Map<String, String?> _retryDraftApplications = {};
+  final Map<String, (Object, int)> _retryDraftRevisions = {};
+  int _draftGeneration = 0;
+  bool _disposed = false;
+
+  int get draftSessionGeneration => _draftGeneration;
+  int draftRevision(String threadId, {String? workspaceApplicationId}) =>
+      _draftRevisions[_draftKey(threadId, workspaceApplicationId)] ?? 0;
+  bool isDraftSessionCurrent(int generation) =>
+      !_disposed && generation == _draftGeneration;
+
+  // Application scope is local composer identity, never a server thread ID.
+  Object _draftKey(String threadId, String? workspaceApplicationId) {
+    final applicationId = workspaceApplicationId?.trim();
+    return threadId == 'workspace-support' &&
+            applicationId != null &&
+            applicationId.isNotEmpty
+        ? (threadId, applicationId)
+        : threadId;
+  }
+
+  bool retryDraftMatchesApplication(String messageId, String? applicationId) {
+    final saved = _retryDraftRevisions[messageId];
+    return saved != null &&
+        _retryDraftApplications.containsKey(messageId) &&
+        _retryDraftApplications[messageId] == applicationId &&
+        (_draftRevisions[saved.$1] ?? 0) == saved.$2;
+  }
+
   final Map<String, String> _forwardRetryKeys = {};
-  final Map<String, ChatMessage> _replyTargets = {};
-  final Map<String, _PendingChatPhoto> _pendingPhotos = {};
-  final Map<String, _PendingChatAttachment> _pendingAttachments = {};
-  final Set<String> _recordingThreads = {};
+  final Map<Object, ChatMessage> _replyTargets = {};
+  final Map<Object, _PendingChatPhoto> _pendingPhotos = {};
+  final Map<Object, _PendingChatAttachment> _pendingAttachments = {};
+  final Set<Object> _recordingThreads = {};
   final Map<String, bool> _chatAvailableForSession = {};
   final Map<String, bool> _voiceCallsAvailableForSession = {};
   final Map<String, bool> _videoCallsAvailableForSession = {};
@@ -720,52 +750,89 @@ class ChatSession extends ChangeNotifier {
 
   String? messageLoadError(String threadId) => _messageLoadErrors[threadId];
 
-  String? threadActionError(String threadId) => _threadActionErrors[threadId];
+  String? threadActionError(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) =>
+      _threadActionErrors[_draftKey(threadId, workspaceApplicationId)] ??
+      _threadActionErrors[threadId];
 
-  String? threadActionNotice(String threadId) => _threadActionNotices[threadId];
+  String? threadActionNotice(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) =>
+      _threadActionNotices[_draftKey(threadId, workspaceApplicationId)] ??
+      _threadActionNotices[threadId];
 
-  ChatMessage? replyTarget(String threadId) => _replyTargets[threadId];
+  ChatMessage? replyTarget(String threadId, {String? workspaceApplicationId}) =>
+      _replyTargets[_draftKey(threadId, workspaceApplicationId)];
 
-  String draftTextForSession(String threadId) =>
-      _draftTextByThread[threadId] ?? '';
+  String draftTextForSession(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) => _draftTextByThread[_draftKey(threadId, workspaceApplicationId)] ?? '';
 
-  bool hasDraftForSession(String threadId) =>
-      draftTextForSession(threadId).trim().isNotEmpty ||
-      replyTarget(threadId) != null ||
-      selectedPhoto(threadId) != null;
+  bool hasSavedDraftForSession(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) => _draftTextByThread.containsKey(
+    _draftKey(threadId, workspaceApplicationId),
+  );
 
-  String? draftSummaryForSession(String threadId) {
-    final text = draftTextForSession(threadId).trim();
-    if (text.isNotEmpty) {
-      return text.replaceAll(RegExp(r'\s+'), ' ');
-    }
-    if (selectedPhoto(threadId) != null) return 'Photo ready to send';
-    if (selectedAttachment(threadId) case final attachment?) {
+  bool hasDraftForSession(String threadId, {String? workspaceApplicationId}) =>
+      draftSummaryForSession(
+        threadId,
+        workspaceApplicationId: workspaceApplicationId,
+      ) !=
+      null;
+
+  String? draftSummaryForSession(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) {
+    final key = _draftKey(threadId, workspaceApplicationId);
+    final text = (_draftTextByThread[key] ?? '').trim();
+    if (text.isNotEmpty) return text.replaceAll(RegExp(r'\s+'), ' ');
+    if (_pendingPhotos[key] != null) return 'Photo ready to send';
+    if (_pendingAttachments[key]?.attachment case final attachment?) {
       return attachment.kind == ChatAttachmentKind.voice
           ? 'Voice message ready to send'
           : '${attachment.kind == ChatAttachmentKind.video ? 'Video' : 'Document'} ready to send';
     }
-    if (replyTarget(threadId) != null) return 'Reply ready to send';
+    if (_replyTargets[key] != null) return 'Reply ready to send';
     return null;
   }
 
-  void setDraftTextForSession(String threadId, String value) {
-    final changed = value.isEmpty
-        ? _draftTextByThread.remove(threadId) != null
-        : _draftTextByThread[threadId] != value;
-    if (value.isNotEmpty) {
-      _draftTextByThread[threadId] = value;
+  void setDraftTextForSession(
+    String threadId,
+    String value, {
+    String? workspaceApplicationId,
+  }) {
+    final key = _draftKey(threadId, workspaceApplicationId);
+    // An intentionally cleared application draft must not be seeded again.
+    final retainEmpty = key is! String;
+    final changed = value.isEmpty && !retainEmpty
+        ? _draftTextByThread.remove(key) != null
+        : _draftTextByThread[key] != value;
+    if (value.isNotEmpty || retainEmpty) _draftTextByThread[key] = value;
+    if (changed) {
+      _draftRevisions[key] = (_draftRevisions[key] ?? 0) + 1;
+      notifyListeners();
     }
-    if (changed) notifyListeners();
   }
 
-  void discardDraftForSession(String threadId) {
-    final hadText = _draftTextByThread.remove(threadId) != null;
-    final hadReply = _replyTargets.remove(threadId) != null;
-    final hadPhoto = _pendingPhotos.remove(threadId) != null;
-    final hadAttachment = _pendingAttachments.remove(threadId) != null;
-    final changed = hadText || hadReply || hadPhoto || hadAttachment;
-    if (changed) notifyListeners();
+  void discardDraftForSession(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) {
+    final key = _draftKey(threadId, workspaceApplicationId);
+    final hadText = _draftTextByThread.remove(key) != null;
+    _draftRevisions[key] = (_draftRevisions[key] ?? 0) + 1;
+    if (key is! String) _draftTextByThread[key] = '';
+    final hadReply = _replyTargets.remove(key) != null;
+    final hadPhoto = _pendingPhotos.remove(key) != null;
+    final hadAttachment = _pendingAttachments.remove(key) != null;
+    if (hadText || hadReply || hadPhoto || hadAttachment) notifyListeners();
   }
 
   bool get globalChatAvailableForSession => _globalChatAvailableForSession;
@@ -785,137 +852,181 @@ class ChatSession extends ChangeNotifier {
 
   bool get showSuggestedPromptsForSession => _showSuggestedPromptsForSession;
 
-  ChatPickedAttachment? selectedAttachment(String threadId) =>
-      _pendingAttachments[threadId]?.attachment;
+  ChatPickedAttachment? selectedAttachment(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) => _pendingAttachments[_draftKey(threadId, workspaceApplicationId)]
+      ?.attachment;
 
   bool get attachmentSelectionAvailable => _attachmentPicker != null;
   bool get voiceRecordingAvailable => _voiceRecorder != null;
 
-  bool isRecordingVoice(String threadId) =>
-      _recordingThreads.contains(threadId);
+  bool isRecordingVoice(String threadId, {String? workspaceApplicationId}) =>
+      _recordingThreads.contains(_draftKey(threadId, workspaceApplicationId));
 
   Future<bool> selectAttachment(
     String threadId,
-    ChatAttachmentKind kind,
-  ) async {
+    ChatAttachmentKind kind, {
+    String? workspaceApplicationId,
+  }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
     final picker = _attachmentPicker;
     if (busy || picker == null || kind == ChatAttachmentKind.voice) {
-      _threadActionErrors[threadId] =
+      _threadActionErrors[key] =
           'Attachment selection is unavailable right now.';
       notifyListeners();
       return false;
     }
     busy = true;
-    _threadActionErrors.remove(threadId);
+    _threadActionErrors.remove(key);
     notifyListeners();
     try {
       final picked = await picker.pick(kind);
+      if (!isDraftSessionCurrent(generation)) return false;
       if (picked == null) return false;
-      _pendingAttachments[threadId] = _PendingChatAttachment(
+      _pendingAttachments[key] = _PendingChatAttachment(
         attachment: picked,
         idempotencyKey:
             'chat-attachment-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
       );
-      _pendingPhotos.remove(threadId);
-      _threadActionNotices[threadId] =
+      _pendingPhotos.remove(key);
+      _threadActionNotices[key] =
           '${kind == ChatAttachmentKind.video ? 'Video' : 'Document'} ready to send.';
       return true;
     } on ChatServiceException catch (error) {
-      _threadActionErrors[threadId] = error.userMessage;
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = error.userMessage;
       return false;
     } on Object {
-      _threadActionErrors[threadId] = 'That attachment could not be opened.';
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = 'That attachment could not be opened.';
       return false;
     } finally {
-      busy = false;
-      notifyListeners();
+      if (isDraftSessionCurrent(generation)) {
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<bool> startVoiceRecording(String threadId) async {
+  Future<bool> startVoiceRecording(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
     final recorder = _voiceRecorder;
     if (busy || recorder == null || _recordingThreads.isNotEmpty) {
-      _threadActionErrors[threadId] =
-          'Voice recording is unavailable right now.';
+      _threadActionErrors[key] = 'Voice recording is unavailable right now.';
       notifyListeners();
       return false;
     }
     try {
       await recorder.start();
-      _recordingThreads.add(threadId);
-      _threadActionErrors.remove(threadId);
-      _threadActionNotices[threadId] = 'Recording voice message…';
+      if (!isDraftSessionCurrent(generation)) return false;
+      _recordingThreads.add(key);
+      _threadActionErrors.remove(key);
+      _threadActionNotices[key] = 'Recording voice message…';
       notifyListeners();
       return true;
     } on ChatServiceException catch (error) {
-      _threadActionErrors[threadId] = error.userMessage;
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = error.userMessage;
       notifyListeners();
       return false;
     } on Object {
-      _threadActionErrors[threadId] = 'Voice recording could not start.';
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = 'Voice recording could not start.';
       notifyListeners();
       return false;
     }
   }
 
-  Future<bool> stopVoiceRecording(String threadId) async {
+  Future<bool> stopVoiceRecording(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
     final recorder = _voiceRecorder;
-    if (recorder == null || !_recordingThreads.contains(threadId)) return false;
+    if (recorder == null || !_recordingThreads.contains(key)) return false;
     busy = true;
     notifyListeners();
     try {
       final picked = await recorder.stop();
-      _pendingAttachments[threadId] = _PendingChatAttachment(
+      if (!isDraftSessionCurrent(generation)) return false;
+      _pendingAttachments[key] = _PendingChatAttachment(
         attachment: picked,
         idempotencyKey:
             'chat-voice-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
       );
-      _pendingPhotos.remove(threadId);
-      _threadActionNotices[threadId] = 'Voice message ready to send.';
+      _pendingPhotos.remove(key);
+      _threadActionNotices[key] = 'Voice message ready to send.';
       return true;
     } on ChatServiceException catch (error) {
-      _threadActionErrors[threadId] = error.userMessage;
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = error.userMessage;
       return false;
     } on Object {
-      _threadActionErrors[threadId] = 'Voice recording could not be completed.';
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = 'Voice recording could not be completed.';
       return false;
     } finally {
-      _recordingThreads.remove(threadId);
-      busy = false;
-      notifyListeners();
+      if (isDraftSessionCurrent(generation)) {
+        _recordingThreads.remove(key);
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<void> cancelVoiceRecording(String threadId) async {
-    if (!_recordingThreads.remove(threadId)) return;
+  Future<void> cancelVoiceRecording(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
+    if (!_recordingThreads.remove(key)) return;
     await _voiceRecorder?.cancel();
-    _threadActionNotices.remove(threadId);
+    if (!isDraftSessionCurrent(generation)) return;
+    _threadActionNotices.remove(key);
     notifyListeners();
   }
 
-  void cancelSelectedAttachment(String threadId) {
-    if (_pendingAttachments.remove(threadId) != null) notifyListeners();
+  void cancelSelectedAttachment(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) {
+    final key = _draftKey(threadId, workspaceApplicationId);
+    if (_pendingAttachments.remove(key) != null) notifyListeners();
   }
 
-  Future<bool> sendSelectedAttachment(String threadId, String caption) async {
+  Future<bool> sendSelectedAttachment(
+    String threadId,
+    String caption, {
+    String? workspaceApplicationId,
+  }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
     if (busy) return false;
-    final pending = _pendingAttachments[threadId];
+    final pending = _pendingAttachments[key];
     final gateway = _gateway is ChatAttachmentGateway
         ? _gateway as ChatAttachmentGateway
         : null;
     if (pending == null || gateway == null) {
-      _threadActionErrors[threadId] = 'Choose an attachment first.';
+      _threadActionErrors[key] = 'Choose an attachment first.';
       notifyListeners();
       return false;
     }
     if (!pending.sendLocked) {
       pending
         ..caption = caption.trim()
-        ..replyTo = _replyReference(_replyTargets[threadId])
+        ..replyTo = _replyReference(_replyTargets[key])
         ..sendLocked = true;
     }
     busy = true;
-    _threadActionErrors.remove(threadId);
+    _threadActionErrors.remove(key);
     notifyListeners();
     try {
       final delivered = await gateway.sendAttachment(
@@ -925,28 +1036,36 @@ class ChatSession extends ChangeNotifier {
         idempotencyKey: pending.idempotencyKey,
         replyToMessageId: pending.replyTo?.messageId,
       );
+
+      if (!isDraftSessionCurrent(generation)) return false;
       if (delivered.attachment == null) {
         throw const ChatServiceException(
           'Chat returned an invalid attachment. Try again.',
         );
       }
       _messages.putIfAbsent(threadId, () => []).add(delivered);
-      _pendingAttachments.remove(threadId);
-      if (_replyTargets[threadId]?.id == pending.replyTo?.messageId) {
-        _replyTargets.remove(threadId);
+      if (identical(_pendingAttachments[key], pending)) {
+        _pendingAttachments.remove(key);
       }
-      _threadActionNotices.remove(threadId);
+      if (_replyTargets[key]?.id == pending.replyTo?.messageId) {
+        _replyTargets.remove(key);
+      }
+      _threadActionNotices.remove(key);
       return true;
     } on ChatServiceException catch (error) {
-      _threadActionErrors[threadId] = error.userMessage;
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = error.userMessage;
       return false;
     } on Object {
-      _threadActionErrors[threadId] =
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] =
           'Attachment was not sent. Check your connection and retry.';
       return false;
     } finally {
-      busy = false;
-      notifyListeners();
+      if (isDraftSessionCurrent(generation)) {
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -1825,18 +1944,31 @@ class ChatSession extends ChangeNotifier {
   bool get photoSharingAvailable =>
       _gateway is ChatPhotoGateway && _photoPicker != null;
 
-  ChatPickedPhoto? selectedPhoto(String threadId) =>
-      _pendingPhotos[threadId]?.photo;
+  ChatPickedPhoto? selectedPhoto(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) => _pendingPhotos[_draftKey(threadId, workspaceApplicationId)]?.photo;
 
-  Future<bool> selectPhoto(String threadId, ChatPhotoSource source) {
+  Future<bool> selectPhoto(
+    String threadId,
+    ChatPhotoSource source, {
+    String? workspaceApplicationId,
+  }) {
     return _stagePhoto(
       threadId,
       () => _photoPicker!.pick(source),
+      workspaceApplicationId: workspaceApplicationId,
       unavailableMessage: 'That photo could not be opened. Choose it again.',
     );
   }
 
-  Future<bool> recoverInterruptedPhotoSelection(String threadId) {
+  Future<bool> recoverInterruptedPhotoSelection(
+    String threadId, {
+    String? workspaceApplicationId,
+  }) {
+    // A recovered native file has no trustworthy application provenance.
+    // Preserve the file; never assign it to the application that opens next.
+    if (workspaceApplicationId != null) return Future.value(false);
     if (_pendingPhotos.containsKey(threadId)) return Future.value(true);
     return _stagePhoto(
       threadId,
@@ -1845,11 +1977,12 @@ class ChatSession extends ChangeNotifier {
     );
   }
 
-  void cancelSelectedPhoto(String threadId) {
+  void cancelSelectedPhoto(String threadId, {String? workspaceApplicationId}) {
+    final key = _draftKey(threadId, workspaceApplicationId);
     if (busy) return;
-    if (_pendingPhotos.remove(threadId) != null) {
-      _threadActionErrors.remove(threadId);
-      _threadActionNotices.remove(threadId);
+    if (_pendingPhotos.remove(key) != null) {
+      _threadActionErrors.remove(key);
+      _threadActionNotices.remove(key);
       notifyListeners();
     }
   }
@@ -1858,64 +1991,78 @@ class ChatSession extends ChangeNotifier {
     String threadId,
     Future<ChatPickedPhoto?> Function() choose, {
     required String unavailableMessage,
+    String? workspaceApplicationId,
   }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
     if (busy || !photoSharingAvailable) return false;
     busy = true;
-    _threadActionErrors.remove(threadId);
-    _threadActionNotices.remove(threadId);
+    _threadActionErrors.remove(key);
+    _threadActionNotices.remove(key);
     notifyListeners();
     try {
       final photo = await choose();
+      if (!isDraftSessionCurrent(generation)) return false;
       if (photo == null) return false;
-      _pendingPhotos[threadId] = _PendingChatPhoto(
+      _pendingPhotos[key] = _PendingChatPhoto(
         photo: photo,
         idempotencyKey:
             'chat-photo-${DateTime.now().microsecondsSinceEpoch}-${++_messageSequence}',
       );
-      _pendingAttachments.remove(threadId);
-      _threadActionNotices[threadId] = 'Photo ready to send.';
+      _pendingAttachments.remove(key);
+      _threadActionNotices[key] = 'Photo ready to send.';
       return true;
     } on ChatServiceException catch (error) {
-      _threadActionErrors[threadId] = error.userMessage;
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = error.userMessage;
       return false;
     } on Object {
-      _threadActionErrors[threadId] = unavailableMessage;
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = unavailableMessage;
       return false;
     } finally {
-      busy = false;
-      notifyListeners();
+      if (isDraftSessionCurrent(generation)) {
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
-  Future<bool> sendSelectedPhoto(String threadId, String caption) async {
+  Future<bool> sendSelectedPhoto(
+    String threadId,
+    String caption, {
+    String? workspaceApplicationId,
+  }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
     if (busy) return false;
-    final pending = _pendingPhotos[threadId];
+    final pending = _pendingPhotos[key];
     final photoGateway = _gateway is ChatPhotoGateway
         ? _gateway as ChatPhotoGateway
         : null;
     if (pending == null || photoGateway == null) {
-      _threadActionErrors[threadId] = 'Choose a photo first.';
-      _threadActionNotices.remove(threadId);
+      _threadActionErrors[key] = 'Choose a photo first.';
+      _threadActionNotices.remove(key);
       notifyListeners();
       return false;
     }
     final requestedCaption = caption.trim();
     if (pending.sendLocked && requestedCaption != pending.caption) {
-      _threadActionErrors[threadId] =
+      _threadActionErrors[key] =
           'This retry keeps the original caption. Remove the photo to change it.';
-      _threadActionNotices.remove(threadId);
+      _threadActionNotices.remove(key);
       notifyListeners();
       return false;
     }
     if (!pending.sendLocked) {
       pending
         ..caption = requestedCaption
-        ..replyTo = _replyReference(_replyTargets[threadId])
+        ..replyTo = _replyReference(_replyTargets[key])
         ..sendLocked = true;
     }
     busy = true;
-    _threadActionErrors.remove(threadId);
-    _threadActionNotices.remove(threadId);
+    _threadActionErrors.remove(key);
+    _threadActionNotices.remove(key);
     notifyListeners();
     try {
       final delivered = await photoGateway.sendPhoto(
@@ -1925,6 +2072,8 @@ class ChatSession extends ChangeNotifier {
         idempotencyKey: pending.idempotencyKey,
         replyToMessageId: pending.replyTo?.messageId,
       );
+
+      if (!isDraftSessionCurrent(generation)) return false;
       if (delivered.photo == null) {
         throw const ChatServiceException(
           'Chat returned an invalid photo. Try again.',
@@ -1936,24 +2085,28 @@ class ChatSession extends ChangeNotifier {
       if (!values.any((message) => message.id == delivered.id)) {
         values.add(delivered);
       }
-      if (identical(_pendingPhotos[threadId], pending)) {
-        _pendingPhotos.remove(threadId);
+      if (identical(_pendingPhotos[key], pending)) {
+        _pendingPhotos.remove(key);
       }
-      if (_replyTargets[threadId]?.id == pending.replyTo?.messageId) {
-        _replyTargets.remove(threadId);
+      if (_replyTargets[key]?.id == pending.replyTo?.messageId) {
+        _replyTargets.remove(key);
       }
-      _threadActionNotices.remove(threadId);
+      _threadActionNotices.remove(key);
       return true;
     } on ChatServiceException catch (error) {
-      _threadActionErrors[threadId] = error.userMessage;
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] = error.userMessage;
       return false;
     } on Object {
-      _threadActionErrors[threadId] =
+      if (!isDraftSessionCurrent(generation)) return false;
+      _threadActionErrors[key] =
           'Photo was not sent. Check your connection and try again.';
       return false;
     } finally {
-      busy = false;
-      notifyListeners();
+      if (isDraftSessionCurrent(generation)) {
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -2097,25 +2250,32 @@ class ChatSession extends ChangeNotifier {
     String threadId,
     String value, {
     String? retryKey,
+    int? retryDraftRevision,
+    bool retrying = false,
+    String? workspaceApplicationId,
     ChatReplyReference? replyOverride,
   }) async {
+    final generation = _draftGeneration;
+    final key = _draftKey(threadId, workspaceApplicationId);
+    final revision = retryDraftRevision ?? (_draftRevisions[key] ?? 0);
     if (busy) return false;
     final text = value.trim();
     if (text.isEmpty) {
-      _threadActionErrors[threadId] = 'Write a message.';
-      _threadActionNotices.remove(threadId);
+      _threadActionErrors[key] = 'Write a message.';
+      _threadActionNotices.remove(key);
       notifyListeners();
       return false;
     }
     busy = true;
-    _threadActionErrors.remove(threadId);
-    _threadActionNotices.remove(threadId);
+    _threadActionErrors.remove(key);
+    _threadActionNotices.remove(key);
     _messageSequence += 1;
     final idempotencyKey =
         retryKey ??
         'chat-${DateTime.now().microsecondsSinceEpoch}-$_messageSequence';
-    final selectedReply =
-        replyOverride ?? _replyReference(_replyTargets[threadId]);
+    final selectedReply = retrying
+        ? replyOverride
+        : replyOverride ?? _replyReference(_replyTargets[key]);
     final message = ChatMessage(
       id: 'm$_messageSequence',
       sender: 'You',
@@ -2138,6 +2298,8 @@ class ChatSession extends ChangeNotifier {
               idempotencyKey: idempotencyKey,
               replyToMessageId: selectedReply?.messageId,
             );
+
+      if (!isDraftSessionCurrent(generation)) return false;
       if (gateway == null) {
         final reviewSendGateway = _reviewSendGateway;
         if (reviewSendGateway == null) {
@@ -2145,6 +2307,8 @@ class ChatSession extends ChangeNotifier {
         }
         await reviewSendGateway.send(threadId: threadId, text: message.text);
       }
+
+      if (!isDraftSessionCurrent(generation)) return false;
       _replaceMessage(
         threadId,
         message.id,
@@ -2152,33 +2316,44 @@ class ChatSession extends ChangeNotifier {
             message.copyWith(deliveryState: ChatDeliveryState.delivered),
       );
       _retryKeys.remove(message.id);
-      if (_replyTargets[threadId]?.id == selectedReply?.messageId) {
-        _replyTargets.remove(threadId);
+      _retryDraftApplications.remove(message.id);
+      _retryDraftRevisions.remove(message.id);
+      if ((_draftRevisions[key] ?? 0) == revision &&
+          _replyTargets[key]?.id == selectedReply?.messageId) {
+        _replyTargets.remove(key);
       }
-      _threadActionNotices.remove(threadId);
+      _threadActionNotices.remove(key);
       return true;
     } on ChatServiceException catch (error) {
+      if (!isDraftSessionCurrent(generation)) return false;
       _replaceMessage(
         threadId,
         message.id,
         message.copyWith(deliveryState: ChatDeliveryState.failed),
       );
       _retryKeys[message.id] = idempotencyKey;
-      _threadActionErrors[threadId] = error.userMessage;
+      _retryDraftApplications[message.id] = workspaceApplicationId;
+      _retryDraftRevisions[message.id] = (key, revision);
+      _threadActionErrors[key] = error.userMessage;
       return false;
     } on Object {
+      if (!isDraftSessionCurrent(generation)) return false;
       _replaceMessage(
         threadId,
         message.id,
         message.copyWith(deliveryState: ChatDeliveryState.failed),
       );
       _retryKeys[message.id] = idempotencyKey;
-      _threadActionErrors[threadId] =
+      _retryDraftApplications[message.id] = workspaceApplicationId;
+      _retryDraftRevisions[message.id] = (key, revision);
+      _threadActionErrors[key] =
           'Message was not sent. Check your connection and retry.';
       return false;
     } finally {
-      busy = false;
-      notifyListeners();
+      if (isDraftSessionCurrent(generation)) {
+        busy = false;
+        notifyListeners();
+      }
     }
   }
 
@@ -2189,31 +2364,46 @@ class ChatSession extends ChangeNotifier {
     if (index < 0) return false;
     final failed = values[index];
     final retryKey = _retryKeys.remove(messageId);
+    final applicationId = _retryDraftApplications.remove(messageId);
+    final originalDraft = _retryDraftRevisions.remove(messageId);
     values.removeAt(index);
     return send(
       threadId,
       failed.text,
       retryKey: retryKey,
+      retryDraftRevision: originalDraft?.$2 ?? -1,
+      retrying: true,
+      workspaceApplicationId: applicationId,
       replyOverride: failed.replyTo,
     );
   }
 
-  bool startReply(String threadId, String messageId) {
+  bool startReply(
+    String threadId,
+    String messageId, {
+    String? workspaceApplicationId,
+  }) {
+    final key = _draftKey(threadId, workspaceApplicationId);
     if (busy) return false;
     final values = _messages[threadId] ?? [];
     final index = values.indexWhere((message) => message.id == messageId);
     if (index < 0 || !values[index].isSettled) {
       return false;
     }
-    _replyTargets[threadId] = values[index];
-    _threadActionErrors.remove(threadId);
-    _threadActionNotices.remove(threadId);
+    _replyTargets[key] = values[index];
+    _draftRevisions[key] = (_draftRevisions[key] ?? 0) + 1;
+    _threadActionErrors.remove(key);
+    _threadActionNotices.remove(key);
     notifyListeners();
     return true;
   }
 
-  void cancelReply(String threadId) {
-    if (_replyTargets.remove(threadId) != null) notifyListeners();
+  void cancelReply(String threadId, {String? workspaceApplicationId}) {
+    final key = _draftKey(threadId, workspaceApplicationId);
+    if (_replyTargets.remove(key) != null) {
+      _draftRevisions[key] = (_draftRevisions[key] ?? 0) + 1;
+      notifyListeners();
+    }
   }
 
   Future<bool> toggleReaction(String threadId, String messageId) async {
@@ -2394,6 +2584,9 @@ class ChatSession extends ChangeNotifier {
   }
 
   void resetForAuthenticationBoundary() {
+    _draftGeneration += 1;
+    _retryDraftApplications.clear();
+    _retryDraftRevisions.clear();
     _threads.clear();
     _messages.clear();
     _messageLoadErrors.clear();
@@ -2402,6 +2595,7 @@ class ChatSession extends ChangeNotifier {
     _commerceContexts.clear();
     _hiddenMessageIdsByThread.clear();
     _draftTextByThread.clear();
+    _draftRevisions.clear();
     _readThreads.clear();
     _markedUnreadThreads.clear();
     _pinnedThreadIds
@@ -2463,9 +2657,12 @@ class ChatSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  void clearThreadMessages(String threadId) {
-    final hadError = _threadActionErrors.remove(threadId) != null;
-    final hadNotice = _threadActionNotices.remove(threadId) != null;
+  void clearThreadMessages(String threadId, {String? workspaceApplicationId}) {
+    final key = _draftKey(threadId, workspaceApplicationId);
+    final errorKey = _threadActionErrors.containsKey(key) ? key : threadId;
+    final noticeKey = _threadActionNotices.containsKey(key) ? key : threadId;
+    final hadError = _threadActionErrors.remove(errorKey) != null;
+    final hadNotice = _threadActionNotices.remove(noticeKey) != null;
     if (hadError || hadNotice) notifyListeners();
   }
 
@@ -2501,6 +2698,8 @@ class ChatSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _disposed = true;
+    _draftGeneration += 1;
     _voiceRecorder?.dispose();
     _attachmentPlayback?.dispose();
     super.dispose();

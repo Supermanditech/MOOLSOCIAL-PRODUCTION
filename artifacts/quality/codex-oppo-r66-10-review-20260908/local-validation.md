@@ -1,6 +1,66 @@
 # r66.10 local validation
 
+## Successor application-support correction — r66.11 host verification passed
+
+9 September 2026. REG-4549/R6610-SUPPORT-DRAFT-SCOPE-01 corrects the confirmed r66.10 application-header/composer mismatch. Contact input remains sealed at00995b0c9755c3a74ee91b678572e24f2f65441f. The support correction is not yet committed or OPPO-qualified. This section records successor work; it does not rewrite the historical r66.10 APK result below.
+
+The existing workspace-support conversation keeps its real thread identity. Only application-specific local drafts, replies, pending photos/files, recording state and composer feedback use the application identity as an additional key. Deliberately empty drafts remain empty. Returning to application A does not borrow B's text; generic and other conversations remain independent. Session-generation and draft-revision checks protect newer edits against late send/retry/attachment completions and reset/disposal. Retry cleanup uses the original failed-send revision. Settings and shared-content returns preserve that application scope. No backend endpoint, production application approval, authentication, Buy code, dependency or navigation route is added.
+
+Existing focused Work fixtures now seed/read their actual application ID while asserting the unrelated generic support draft is untouched. The inbox action-size fixture first scrolls its real lazy inbox to the row before measuring; all existing pin/unread/archive/undo assertions remain. Two exact additional existing owners (chat_widgets.dart and chat_inbox_controls_test.dart) were admitted only to this continuation's literal claim; no general lane, root, lifecycle or gate behavior changed.
+
+### Additional real accessibility child
+
+REG-4550 caught error feedback overflowing with200% text and an open simulated keyboard. The existing fixed banner now bounds only its long text in a native scroll; Dismiss remains outside that scroll with Android's actual48px target. The calculation reserves that48px target instead of44px, reducing only spare vertical spacing on the shortest viewport. Message indexes/list placement, keyboard-safe composer, original feedback wording, full text scaling and application isolation remain intact. Other shared scaffold callers do not opt into the thread-specific height bound.
+
+The new error-state tests pass at412x915/100%,320x568/200% and320x536/200%, all with220px simulated keyboard. They assert no framework exception, error above the composer, full scroll reach,48px dismissal and an edge tap dismissing only B while preserving A's error and both drafts. Three real Flutter captures were inspected independently. The large-text captures are deliberately after scrolling the error to its end; they are not evidence that the entire paragraph fits simultaneously. Physical OPPO200%/TalkBack and native keyboard behavior remain separate checks.
+
+All raw evidence below is retained under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905:
+
+| Run | Complete result | SHA-256 |
+| --- | --- | --- |
+| oppo-r6611-support-banner-fixtures-attempt2.log | 23 passed,0 failed; support scope,8 Work recovery fixtures and inbox action fixture | 4F80FFF939199767F2C92B4ADC24043B68339267C21AA841629D74C414F0DEDA |
+| oppo-r6611-support-error-capture-attempt1.log | 1 passed,1 failed; real71px overflow, retained | 5252ECB78D9A5918664D0CA650D60C2B1AC133220FFD2BE362A5C18E6FCFE3AF |
+| oppo-r6611-support-error-capture-attempt2.log | 2 passed,1 failed; shortest viewport still4px overflow, retained | C1FD8890850DCC120EC1E5E04F8E593EB04CCF3FAD469C3921FD6A907819834B |
+| oppo-r6611-support-error-capture-attempt3.log | 3 passed,0 failed,exit0 after actual48px budgeting | 97BBA9226F7E43B47894684F0ABEFD5E7E1528164B0B0837E1C8976AD9ECA8B9 |
+
+Capture command: flutter test --no-pub --concurrency=1 --reporter expanded test/global_contextual_chat_shell_test.dart --plain-name 'r6611 support feedback' --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=oppo-r6611-error-local-v3-20260909 --update-goldens. Only these new external images were created; no protected/historical golden was changed.
+
+Capture directory oppo-r6611-error-local-v3-20260909:
+
+```text
+7F3CB120F7B1A907A29ADC9836E572E9E3BD24CFCD7428EC0450E107BA0BD19A  r6611-support-error-1.0-915.0.png
+DC469ADB7631F3363C3C34D8A994F0A6685F03D56D20BFB180850C04BEBAA701  r6611-support-error-2.0-568.0.png
+95C21E437E8604294CEE84D76C981074BC96C85B5B403A96B8F6835507DBCEF7  r6611-support-error-2.0-536.0.png
+```
+
+Before REG-4550's additional error/keyboard case, two44-file partitioned cycles each passed1471 tests with83 existing skips and zero failures. Those older cycles and full analysis are retained, but do not qualify the later banner change. The final post4550 two-cycle44-file qualification is now complete: each partitioned cycle1473 passed,83 unchanged reported skips,0 failed. Full analysis reports zero issues. All native/OPPO acceptance remains pending.
+
+| Final unchanged-source run | Result | SHA-256 |
+| --- | --- | --- |
+| oppo-r6611-post4550-connected16-cycle1.log | 1071 passed,81 existing skips,0 failed,exit0 | BA0840BA52A2AFD858B4814C0E756525E5447FB9A4A66DBBDFB34977C8DA7629 |
+| oppo-r6611-post4550-remaining28-cycle1.log | 402 passed,2 existing capture skips,0 failed,exit0 | 6B42C98B0C7EFCA08DF27160D9C89F1CBA9FB83A63D2AA05A8E759533516916E |
+| oppo-r6611-post4550-connected16-cycle2.log | 1071 passed,81 existing skips,0 failed,exit0 | 32250F564125323FCE226B12CDD1D4AC8FFA499793AEBC6B20187EBC260C9C04 |
+| oppo-r6611-post4550-remaining28-cycle2.log | 402 passed,2 existing capture skips,0 failed,exit0 | C044D696E3AE048C14077DEA3B0F61FF73821D77014B63241BFCAF64CEB8B451 |
+| oppo-r6611-post4550-full-analysis.log | flutter analyze --no-pub; zero issues,exit0 | 664B888889E9FB0FCD917BE7661FF79B1DA16A30488D758C1253906E155B837E |
+
+Each partition uses flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference. The connected16 list is the historical eleven exact files listed below plus test/chat_draft_continuity_test.dart, test/chat_message_controls_test.dart, test/chat_photo_attachment_test.dart, test/chat_media_voice_delivery_test.dart and test/chat_inbox_controls_test.dart. The remaining28 list is exactly the unchanged28-file list below. Five protected-reference tag exclusions remain separate from the83 reported skips. No new skip or protected golden was introduced. Product/test files were frozen through all four partition runs and analysis; only the evidence document was updated during the run.
+
+### Supplemental failures remain explicitly separate
+
+The broader exploratory12-file run oppo-r6611-chat-regressions-attempt1.log returned180 passed/7 failed, exit1, SHA256180424418F821146E6DF2A13D12BFFCBF58ABDE8C7E475FA664A2C06CBA36FC5. Do not report it as passed. Its complete failure list is:
+
+- chat_final_intent_matrix_test.dart: call voice document and video intents recover without leaving Chat — expects different sharing-notice text; the relevant current/HEAD notice implementation is unchanged.
+- uaw_personal_mvp_chat_global_dock_exact_return_c10d_test.dart: thread Back restores the exact live inbox query and filter — excludes the existing people filter.
+- uaw_r11_personal_global_chat_continuity_test.dart: Chat returns to exact buy origin; Chat returns to exact work origin; Buy contextual send preserves its draft in production Chat — historical entry keys differ from the accepted current journeys.
+- Cursor-owned buy_v2_shop_chat_test.dart: order Help stays in one supplier conversation with one composer; Medicine order Help stays on Care and returns to Care — generic Conversation title expectations differ from contextual identity.
+
+The relevant inbox, Buy screen/views, route and entry-context blobs are unchanged by this child. This is source-based contract triage, not an executed parent-baseline comparison or closure of those seven tests. Shared dependencies can affect unchanged owners, so unchanged blobs alone do not establish that a failure is inherited or stale. Keep their owner-lane disposition pending; do not edit Cursor's tests, weaken assertions or claim all-repository production readiness. The required current-contract44-file regression set remains independently required. Native review APK qualification is not production/backend acceptance.
+
+Native replay plan: retain app data; verify exact new saved/installed checksum; test malformed primary/email/alternate messages and independent existing confirmations without requesting real OTP; exercise application A/B support entry, edited drafts, Back/reentry and correct header/return; send no real support or WhatsApp message. Do not infer process-death Chat-draft persistence or live support delivery from in-memory/widget tests. Preserve original device drafts. Resume Dashboard first-tap review only after the two native fixes pass.
+
 ## Successor contact correction — local qualification, not r66.10 device closure
+
+Contact implementation commit00995b0c9755c3a74ee91b678572e24f2f65441f was pushed and independently remote-equal. Its first clean check and subsequent handoff rejected only the historical memory document's CRLF/index residue after this attempt's addition had been removed. The canonical working blob and HEAD both equal dd4b219ce580be1a4a24f5b867af4b75c4afb13e. An exact-path index refresh produced zero staged changes and a clean worktree without changing document content; remote equality was rechecked. This is retained continuation evidence for REG-4530's already-registered memory-owner recovery, not a product change or new owner allowance. Do not report the failed handoff as passing; final whole-slice handoff remains to be rerun after support qualification.
 
 9 September 2026, after standing-review commit b7049755a904cf1a370fcdcedd50fc69d36f3915: founder directed fixing both confirmed findings, local regressions, Git sealing, a corrected APK and OPPO retest before first-tap review. Contact OPPO-S03-02 is implemented first. r66.10 remains the installed earlier APK; its native finding is not closed by these host results.
 

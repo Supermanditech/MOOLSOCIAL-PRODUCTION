@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/chat/chat_entry_context.dart';
@@ -29,6 +32,335 @@ void main() {
     );
     await session.start();
     return session;
+  }
+
+  String applicationRoute(String id) => Uri(
+    path: '/app/chat/thread/workspace-support',
+    queryParameters: {
+      'return': '/app/work/workspace/proof?application=$id',
+      'directReturn': 'true',
+      'workspaceApplication': id,
+      'workspaceBusiness': 'Review Store $id',
+      'draft': 'Please help with application $id for Review Store $id.',
+    },
+  ).toString();
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'r6611 support application switching preserves header draft and keyboard $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = scale == 2
+            ? const Size(320, 568)
+            : const Size(412, 915);
+        tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final journey = await readyJourney();
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        addTearDown(journey.dispose);
+        addTearDown(chat.dispose);
+        chat.setDraftTextForSession(
+          'workspace-support',
+          'Preserved generic draft',
+        );
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('r6611-support-capture'),
+            child: MoolSocialApp(
+              session: journey,
+              chatSession: chat,
+              initialLocation: applicationRoute('A'),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final field = find.byKey(const Key('chat-message-field'));
+        String displayed() => tester.widget<TextField>(field).controller!.text;
+        final router = GoRouter.of(tester.element(field));
+        expect(displayed(), contains('application A'));
+        expect(find.text('Review Store A'), findsOneWidget);
+        await tester.enterText(field, 'A unsent review note');
+        router.go(applicationRoute('B'));
+        await tester.pumpAndSettle();
+        expect(displayed(), contains('application B'));
+        expect(find.text('Review Store B'), findsOneWidget);
+        expect(find.text('Review Store A'), findsNothing);
+        await tester.enterText(field, 'B unsent review note');
+        router.go(applicationRoute('A'));
+        await tester.pumpAndSettle();
+        expect(displayed(), 'A unsent review note');
+        await tester.tap(field);
+        tester.view.viewInsets = FakeViewPadding(
+          bottom: scale == 2 ? 220 : 300,
+        );
+        await tester.pumpAndSettle();
+        final rect = tester.getRect(field);
+        expect(rect.top, greaterThanOrEqualTo(0));
+        expect(
+          rect.bottom,
+          lessThanOrEqualTo(
+            tester.view.physicalSize.height - tester.view.viewInsets.bottom,
+          ),
+        );
+        expect(tester.takeException(), isNull);
+        if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          await expectLater(
+            find.byKey(const Key('r6611-support-capture')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/r6611-support-$scale.png',
+            ),
+          );
+        }
+        await tester.enterText(field, '');
+        FocusManager.instance.primaryFocus?.unfocus();
+        tester.view.viewInsets = const FakeViewPadding();
+        router.go(applicationRoute('B'));
+        await tester.pumpAndSettle();
+        expect(displayed(), 'B unsent review note');
+        router.go(applicationRoute('A'));
+        await tester.pumpAndSettle();
+        expect(
+          displayed(),
+          isEmpty,
+          reason: 'Respect an intentionally cleared suggested draft.',
+        );
+        expect(
+          chat.draftTextForSession('workspace-support'),
+          'Preserved generic draft',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets(
+    'r6611 support delayed send cannot erase another application or newer text',
+    (tester) async {
+      final journey = await readyJourney();
+      final gateway = _R6611DeferredSend();
+      final chat = ChatSession(sendGateway: gateway);
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      await tester.pumpWidget(
+        MoolSocialApp(
+          session: journey,
+          chatSession: chat,
+          initialLocation: applicationRoute('A'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('chat-message-field'));
+      final router = GoRouter.of(tester.element(field));
+      await tester.enterText(field, 'Submitted A text');
+      await tester.tap(find.byKey(const Key('chat-send')));
+      await tester.pump();
+      router.go(applicationRoute('B'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 400));
+      await tester.enterText(field, 'Submitted A text');
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'Newer A edit',
+        workspaceApplicationId: 'A',
+      );
+      gateway.result.complete();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        'Submitted A text',
+      );
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        'Submitted A text',
+      );
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'Newer A edit',
+      );
+      expect(gateway.thread, 'workspace-support');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('r6611 support delayed send preserves identical retyped draft', (
+    tester,
+  ) async {
+    final journey = await readyJourney();
+    final gateway = _R6611DeferredSend();
+    final chat = ChatSession(sendGateway: gateway);
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: applicationRoute('A'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('chat-message-field'));
+    await tester.enterText(field, 'Same words, new draft');
+    await tester.tap(find.byKey(const Key('chat-send')));
+    await tester.pump();
+    await tester.enterText(field, '');
+    await tester.enterText(field, 'Same words, new draft');
+    gateway.result.complete();
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<TextField>(field).controller!.text,
+      'Same words, new draft',
+    );
+    expect(
+      chat.draftTextForSession(
+        'workspace-support',
+        workspaceApplicationId: 'A',
+      ),
+      'Same words, new draft',
+    );
+    expect(tester.takeException(), isNull);
+  });
+  for (final scale in [1.0, 2.0]) {
+    for (final height in scale == 2 ? [568.0, 536.0] : [915.0]) {
+      testWidgets(
+        'r6611 support feedback belongs to the displayed application $scale h$height',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = scale == 2
+              ? Size(320, height)
+              : Size(412, height);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final journey = await readyJourney();
+          final gateway = ReviewChatSendGateway(latency: Duration.zero);
+          final chat = ChatSession(sendGateway: gateway);
+          addTearDown(journey.dispose);
+          addTearDown(chat.dispose);
+          await tester.pumpWidget(
+            MoolSocialApp(
+              session: journey,
+              chatSession: chat,
+              initialLocation: applicationRoute('A'),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final field = find.byKey(const Key('chat-message-field'));
+          final router = GoRouter.of(tester.element(field));
+          await tester.enterText(field, 'A unsent question');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+          await tester.pumpAndSettle();
+          gateway.failNextRequest = true;
+          await tester.tap(find.byKey(const Key('chat-send')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('chat-error')), findsOneWidget);
+          expect(
+            find.text('Message was not sent. Check your connection and retry.'),
+            findsOneWidget,
+          );
+          expect(
+            tester.getRect(field).bottom,
+            lessThanOrEqualTo(tester.view.physicalSize.height - 220),
+          );
+          final error = find.byKey(const Key('chat-error'));
+          expect(tester.getRect(error).top, greaterThanOrEqualTo(24));
+          expect(
+            tester.getRect(error).bottom,
+            lessThanOrEqualTo(tester.getRect(field).top),
+          );
+          expect(tester.takeException(), isNull);
+          final dismiss = find.byKey(const Key('dismiss-chat-message'));
+          expect(tester.getSize(dismiss).height, greaterThanOrEqualTo(48));
+          expect(tester.getSize(dismiss).width, greaterThanOrEqualTo(48));
+          expect(dismiss.hitTestable(), findsOneWidget);
+          final feedbackScroll = find.byKey(
+            const Key('chat-feedback-text-scroll'),
+          );
+          final scrollState = tester.state<ScrollableState>(
+            find.descendant(
+              of: feedbackScroll,
+              matching: find.byType(Scrollable),
+            ),
+          );
+          if (scale == 2) {
+            expect(scrollState.position.maxScrollExtent, greaterThan(0));
+            await tester.drag(feedbackScroll, const Offset(0, -400));
+            await tester.pumpAndSettle();
+            expect(
+              scrollState.position.pixels,
+              closeTo(scrollState.position.maxScrollExtent, 1),
+            );
+          }
+          if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+            const folder = String.fromEnvironment(
+              'MOOL_STORE_VIEW_CAPTURE_DIR',
+            );
+            await expectLater(
+              find.byKey(const Key('chat-page-surface')),
+              matchesGoldenFile(
+                '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/r6611-support-error-$scale-$height.png',
+              ),
+            );
+          }
+          router.go(applicationRoute('B'));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('chat-error')), findsNothing);
+          await tester.enterText(field, 'B unsent question');
+          gateway.failNextRequest = true;
+          await tester.tap(find.byKey(const Key('chat-send')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('chat-error')), findsOneWidget);
+          await tester.tapAt(
+            tester.getRect(dismiss).topLeft + const Offset(3, 3),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('chat-error')), findsNothing);
+          expect(
+            chat.threadActionError(
+              'workspace-support',
+              workspaceApplicationId: 'A',
+            ),
+            isNotNull,
+          );
+          expect(
+            chat.threadActionError(
+              'workspace-support',
+              workspaceApplicationId: 'B',
+            ),
+            isNull,
+          );
+          router.go(applicationRoute('A'));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('chat-error')), findsOneWidget);
+          expect(
+            tester.widget<TextField>(field).controller!.text,
+            'A unsent question',
+          );
+          await tester.tap(find.byKey(const Key('dismiss-chat-message')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('chat-error')), findsNothing);
+          expect(
+            chat.draftTextForSession(
+              'workspace-support',
+              workspaceApplicationId: 'B',
+            ),
+            'B unsent question',
+          );
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
   }
 
   for (final scale in [1.0, 1.6, 2.0]) {
@@ -1948,6 +2280,20 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+}
+
+class _R6611DeferredSend implements ChatSendGateway {
+  final result = Completer<void>();
+  String? thread;
+  @override
+  Future<void> send({
+    required String threadId,
+    required String text,
+    String? attachmentLabel,
+  }) {
+    thread = threadId;
+    return result.future;
+  }
 }
 
 class _IdentityChatGateway extends UnavailableChatGateway {

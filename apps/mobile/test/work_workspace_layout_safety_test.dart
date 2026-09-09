@@ -4765,10 +4765,15 @@ void main() {
             final chat = ChatSession(
               sendGateway: ReviewChatSendGateway(latency: Duration.zero),
             );
+            chat.setDraftTextForSession(
+              'workspace-support',
+              'My unrelated support draft',
+            );
             if (retained) {
               chat.setDraftTextForSession(
                 'workspace-support',
                 'My existing question',
+                workspaceApplicationId: caseId,
               );
             }
             await mount(
@@ -4858,8 +4863,15 @@ void main() {
             expect(work.remoteReviewStatus, decision);
             expect(gateway.submissionCalls, 1);
             expect(
-              chat.draftTextForSession('workspace-support'),
+              chat.draftTextForSession(
+                'workspace-support',
+                workspaceApplicationId: caseId,
+              ),
               '$draft Please explain the next step.',
+            );
+            expect(
+              chat.draftTextForSession('workspace-support'),
+              'My unrelated support draft',
             );
             expect(
               chat

@@ -129,12 +129,14 @@ class ChatPageScaffold extends StatelessWidget {
     this.showContentBack = false,
     this.backKeyName = 'chat-back',
     this.showMessageBanner = true,
+    this.boundMessageText = false,
     this.prominentTitle = false,
     this.titleIcon,
     this.titleAccent,
     this.onTitleTap,
     this.backgroundColor = MoolColors.canvas,
     this.messageThreadId,
+    this.workspaceApplicationId,
     this.onBlockedPop,
     this.trailing,
     this.bottom,
@@ -150,12 +152,14 @@ class ChatPageScaffold extends StatelessWidget {
   final bool showContentBack;
   final String backKeyName;
   final bool showMessageBanner;
+  final bool boundMessageText;
   final bool prominentTitle;
   final IconData? titleIcon;
   final Color? titleAccent;
   final VoidCallback? onTitleTap;
   final Color backgroundColor;
   final String? messageThreadId;
+  final String? workspaceApplicationId;
   final bool Function()? onBlockedPop;
   final Widget? trailing;
   final Widget? bottom;
@@ -331,23 +335,41 @@ class ChatPageScaffold extends StatelessWidget {
                     constraints: const BoxConstraints(
                       maxWidth: MoolMetrics.maximumContentWidth,
                     ),
-                    child: Column(
-                      children: [
-                        if (showMessageBanner)
-                          ChatMessageBanner(
-                            session: session,
-                            threadId: messageThreadId,
-                          ),
-                        if (session.incomingCalls.isNotEmpty)
-                          _ChatIncomingCallBanner(
-                            session: session,
-                            call: session.incomingCalls.first,
-                          ),
-                        if (session.activeCall case final call?
-                            when call.status == ChatCallStatus.accepted)
-                          _ChatActiveCallBanner(session: session, call: call),
-                        Expanded(child: body),
-                      ],
+                    child: LayoutBuilder(
+                      builder: (context, constraints) => Column(
+                        children: [
+                          if (showMessageBanner)
+                            ChatMessageBanner(
+                              session: session,
+                              threadId: messageThreadId,
+                              workspaceApplicationId: workspaceApplicationId,
+                              maxHeight: !boundMessageText
+                                  ? null
+                                  : constraints.maxHeight <=
+                                        kMinInteractiveDimension +
+                                            3 * MoolSpacing.xs +
+                                            2
+                                  ? constraints.maxHeight
+                                  : (constraints.maxHeight * .65)
+                                        .clamp(
+                                          kMinInteractiveDimension +
+                                              3 * MoolSpacing.xs +
+                                              2,
+                                          constraints.maxHeight,
+                                        )
+                                        .toDouble(),
+                            ),
+                          if (session.incomingCalls.isNotEmpty)
+                            _ChatIncomingCallBanner(
+                              session: session,
+                              call: session.incomingCalls.first,
+                            ),
+                          if (session.activeCall case final call?
+                              when call.status == ChatCallStatus.accepted)
+                            _ChatActiveCallBanner(session: session, call: call),
+                          Expanded(child: body),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -516,21 +538,40 @@ class _ChatPresenceLifecycleState extends State<_ChatPresenceLifecycle>
 }
 
 class ChatMessageBanner extends StatelessWidget {
-  const ChatMessageBanner({required this.session, this.threadId, super.key});
+  const ChatMessageBanner({
+    required this.session,
+    this.threadId,
+    this.workspaceApplicationId,
+    this.maxHeight,
+    super.key,
+  });
 
   final ChatSession session;
   final String? threadId;
+  final String? workspaceApplicationId;
+  final double? maxHeight;
 
   @override
   Widget build(BuildContext context) {
     final error = threadId == null
         ? session.errorMessage
-        : session.threadActionError(threadId!);
+        : session.threadActionError(
+            threadId!,
+            workspaceApplicationId: workspaceApplicationId,
+          );
     final notice = threadId == null
         ? session.noticeMessage
-        : session.threadActionNotice(threadId!);
+        : session.threadActionNotice(
+            threadId!,
+            workspaceApplicationId: workspaceApplicationId,
+          );
     if (error == null && notice == null) return const SizedBox.shrink();
     final isError = error != null;
+    final verticalSpacing = maxHeight == null
+        ? MoolSpacing.xs
+        : ((maxHeight! - kMinInteractiveDimension - 2) / 3)
+              .clamp(0.0, MoolSpacing.xs)
+              .toDouble();
     return Semantics(
       liveRegion: true,
       child: ChatFiniteIncomingMotion(
@@ -538,15 +579,15 @@ class ChatMessageBanner extends StatelessWidget {
         child: Container(
           key: Key(isError ? 'chat-error' : 'chat-notice'),
           width: double.infinity,
-          margin: const EdgeInsets.fromLTRB(
+          margin: EdgeInsets.fromLTRB(
             MoolSpacing.md,
             0,
             MoolSpacing.md,
-            MoolSpacing.xs,
+            verticalSpacing,
           ),
-          padding: const EdgeInsets.symmetric(
+          padding: EdgeInsets.symmetric(
             horizontal: MoolSpacing.sm,
-            vertical: MoolSpacing.xs,
+            vertical: verticalSpacing,
           ),
           decoration: BoxDecoration(
             color: isError ? const Color(0xFFFFEBEA) : const Color(0xFFEAF7E8),
@@ -566,14 +607,27 @@ class ChatMessageBanner extends StatelessWidget {
               ),
               const SizedBox(width: MoolSpacing.xs),
               Expanded(
-                child: Text(
-                  error ?? notice!,
-                  style: TextStyle(
-                    color: isError
-                        ? const Color(0xFF7A271A)
-                        : const Color(0xFF155B17),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxHeight: maxHeight == null
+                        ? double.infinity
+                        : (maxHeight! - 3 * verticalSpacing - 2)
+                              .clamp(0.0, double.infinity)
+                              .toDouble(),
+                  ),
+                  child: SingleChildScrollView(
+                    key: const Key('chat-feedback-text-scroll'),
+                    primary: false,
+                    child: Text(
+                      error ?? notice!,
+                      style: TextStyle(
+                        color: isError
+                            ? const Color(0xFF7A271A)
+                            : const Color(0xFF155B17),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
                   ),
                 ),
               ),
@@ -582,8 +636,15 @@ class ChatMessageBanner extends StatelessWidget {
                 tooltip: 'Dismiss message',
                 onPressed: threadId == null
                     ? session.clearMessages
-                    : () => session.clearThreadMessages(threadId!),
-                visualDensity: VisualDensity.compact,
+                    : () => session.clearThreadMessages(
+                        threadId!,
+                        workspaceApplicationId: workspaceApplicationId,
+                      ),
+                constraints: const BoxConstraints.tightFor(
+                  width: kMinInteractiveDimension,
+                  height: kMinInteractiveDimension,
+                ),
+                visualDensity: VisualDensity.standard,
                 icon: const Icon(Icons.close_rounded, size: 18),
               ),
             ],
