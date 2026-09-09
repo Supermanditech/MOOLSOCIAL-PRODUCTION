@@ -12698,7 +12698,7 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
       '${session.destination.name}|${session.saleTypeSignature}|'
       '${session.selectedCategoryId}|${session.query}|'
       '${session.catalogueRegionId}|${session.catalogueAreaScope.name}|'
-      '${session.showingSavedProducts}';
+      '${session.showingSavedProducts}|${session.activeShoppingIntent?.name}';
   final originalScope = browseScope();
   final current = session.discoveryRefinements;
   var draft = BuyV2DiscoveryRefinements(
@@ -12718,7 +12718,10 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
     ..sort();
   const packFilters = [BuyV2PackFilter.standard, BuyV2PackFilter.multipack];
   final previewScope = 'refinement-preview-${destination.name}';
-  final preview = session.pagedCatalogueEnabled && !savedOnly
+  final preview =
+      session.pagedCatalogueEnabled &&
+          !savedOnly &&
+          !session.showingMonthlyBasketProducts
       ? session.acquireCatalogueProducts(previewScope)
       : null;
   if (preview != null) {

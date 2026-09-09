@@ -1637,7 +1637,10 @@ class BuyV2CatalogueView extends StatelessWidget {
               '${session.selectedCategoryId}-${session.saleTypeSignature}',
             ),
             destination: session.destination,
-            child: session.pagedCatalogueEnabled && !savedOnly
+            child:
+                session.pagedCatalogueEnabled &&
+                    !savedOnly &&
+                    !session.showingMonthlyBasketProducts
                 ? BuyV2PagedProductCatalogue(
                     session: session,
                     query: session.catalogueQuery(),

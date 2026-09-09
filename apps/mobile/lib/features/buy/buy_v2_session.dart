@@ -3923,6 +3923,10 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2Product> get visibleProducts =>
       _resolveVisibleProducts(limit: true);
 
+  bool get showingMonthlyBasketProducts =>
+      destination == BuyV2Destination.shop &&
+      activeShoppingIntent == BuyV2ShoppingIntent.monthlyBasket;
+
   List<BuyV2Product> get visibleSavedProducts =>
       previewSavedProducts(discoveryRefinements);
 
@@ -4071,6 +4075,9 @@ class BuyV2Session extends ChangeNotifier {
     final products = _resolveVisibleProducts(
       limit: false,
       refinements: refinements,
+      source: showingMonthlyBasketProducts
+          ? monthlyBasketPlan.map((line) => line.product)
+          : null,
     );
     return products
         .where((product) {

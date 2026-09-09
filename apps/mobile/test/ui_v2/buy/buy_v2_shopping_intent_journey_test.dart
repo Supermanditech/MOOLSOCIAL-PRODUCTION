@@ -1,10 +1,14 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 
 void main() {
   Widget app(BuyV2Session session) => MaterialApp(
@@ -82,6 +86,115 @@ void main() {
         find.byKey(const ValueKey('buy-shopping-intent-bar')),
         findsNothing,
       );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'R668 paged monthly review shows exactly the plan across both delivery groups',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+          destination: BuyV2Destination.shop,
+          providerCount: 100,
+          skusPerStore: 84,
+        ),
+        catalogueAreas: const {'jodhpur': 'Jodhpur'},
+        initialCatalogueRegionId: 'jodhpur',
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
+      expect(find.byType(BuyV2PagedProductCatalogue), findsOneWidget);
+      unawaited(
+        showBuyV2HouseholdBasket(
+          tester.element(find.byType(BuyV2CatalogueView)),
+          session,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-household-see-products')),
+      );
+      await tester.pumpAndSettle();
+      final planIds = session.monthlyBasketPlan
+          .map((line) => line.product.id)
+          .toSet();
+      final reviewedIds = <String>{};
+      for (final mode in ['quick', 'courier']) {
+        await tester.tap(find.byKey(ValueKey('buy-shop-sale-type-$mode')));
+        await tester.pumpAndSettle();
+        expect(find.byType(BuyV2PagedProductCatalogue), findsNothing);
+        expect(
+          find.byKey(const ValueKey('buy-page-next-catalogue-shop')),
+          findsNothing,
+        );
+        final expected = session.monthlyBasketPlan
+            .where(
+              (line) =>
+                  session.fulfilmentModeFor(line.product) ==
+                  (mode == 'quick'
+                      ? BuyV2FulfilmentMode.quickLocal
+                      : BuyV2FulfilmentMode.standardCourier),
+            )
+            .map((line) => line.product.id)
+            .toSet();
+        expect(
+          session.catalogueSaleTypeProducts
+              .map((product) => product.id)
+              .toSet(),
+          expected,
+        );
+        final cards = tester
+            .widgetList<BuyV2ProductCard>(find.byType(BuyV2ProductCard))
+            .toList();
+        expect(cards, isNotEmpty);
+        expect(
+          cards.map((card) => card.product.id),
+          everyElement(isIn(expected)),
+        );
+        reviewedIds.addAll(expected);
+        await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<Text>(
+                find.byKey(const ValueKey('buy-discovery-refinement-count')),
+              )
+              .data,
+          '${expected.length} products found',
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        final firstCard = find.byKey(
+          ValueKey('buy-product-${cards.first.product.id}'),
+        );
+        await tester.ensureVisible(firstCard);
+        await tester.pumpAndSettle();
+        await tester.tap(firstCard);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, cards.first.product.id);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.showingMonthlyBasketProducts, isTrue);
+        expect(find.byType(BuyV2PagedProductCatalogue), findsNothing);
+      }
+      expect(reviewedIds, planIds);
+      session.addMonthlyBasket();
+      expect(session.cartLines.map((line) => line.product.id).toSet(), planIds);
+      for (final line in session.monthlyBasketPlan) {
+        expect(session.quantityFor(line.product.id), line.quantity);
+      }
+      await tester.tap(find.byKey(const ValueKey('buy-shopping-intent-clear')));
+      await tester.pumpAndSettle();
+      expect(find.byType(BuyV2PagedProductCatalogue), findsOneWidget);
+      expect(session.cartLines.map((line) => line.product.id).toSet(), planIds);
       expect(tester.takeException(), isNull);
     },
   );
