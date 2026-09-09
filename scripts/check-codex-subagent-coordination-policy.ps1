@@ -1695,6 +1695,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r666AccessibilityParent = 'a201f8ed4e8ad6abc58e4f925791fa4db501317b'
       $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
       $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
+      $r676CorrectionParent = '3542b02c914fd132e9b85a612edf7333c1db9de6'
+      & git -C $root merge-base --is-ancestor $r676CorrectionParent $head
+      $r676CorrectionContext = $LASTEXITCODE -eq 0
+      $r675FreezeHead = if ($r676CorrectionContext) { $r676CorrectionParent } else { $head }
       $r675SourceParent = '6de5f0c82a57a66dd3172f0ad6080949ca09b5f0'
       & git -C $root merge-base --is-ancestor $r675SourceParent $head
       $r675SourceContext = $LASTEXITCODE -eq 0
@@ -2813,11 +2817,14 @@ if ($ProductionLane -ceq 'baseline') {
         $r671Match = [regex]::Matches($r671Manifest, '(?s)<!-- R671-DATA-BEGIN -->\s*(.*?)\s*<!-- R671-DATA-END -->')
         Assert-Coordination ($r671Match.Count -eq 1) 'Device correction data missing or duplicated.'
         $r671Data = $r671Match[0].Groups[1].Value | ConvertFrom-Json
-        Assert-Coordination ($r671Data.parent -ceq $r671CorrectionParent -and $r671Data.registryCount -eq 4513 -and $registryEntries.Count -eq 4513 -and $registrySha -ceq $r671Data.registrySha256) 'Device correction registry generation changed.'
+        $r671RegistryFull = if ($r676CorrectionContext) { Get-R66Utf8GitJson $r676CorrectionParent 'config/codex-development-regression-registry.json' } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $registryPath | ConvertFrom-Json }
+        $r671RegistryEntries = @($r671RegistryFull.entries)
+        Assert-Coordination ($r671Data.parent -ceq $r671CorrectionParent -and $r671Data.registryCount -eq 4513 -and $r671RegistryEntries.Count -eq 4513 -and $r671Data.registrySha256 -ceq '651C8FBB852F6D26857318173C991F95A1267B88AB9D2991E1D6DB124714292C') 'Device correction registry generation changed.'
+        if (-not $r676CorrectionContext) { Assert-Coordination ($registrySha -ceq $r671Data.registrySha256) 'Device correction live registry changed.' }
         Assert-Coordination ((Get-Sha256 $r671Data.reportPath) -ceq $r671Data.reportSha256 -and (Get-Sha256 $r671Data.matrixPath) -ceq $r671Data.matrixSha256) 'Device correction evidence changed.'
         $r671RegistryBefore = Get-R66Utf8GitJson $r671CorrectionParent $r671Owners[4]
-        Assert-Coordination ($r671RegistryBefore.entries.Count -eq 4502 -and $registryEntries[4502].id -ceq $r671Data.firstAddedId -and $registryEntries[-1].id -ceq $r671Data.lastAddedId) 'Device correction registry append boundary changed.'
-        $r671RegistryAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $registryPath | ConvertFrom-Json
+        Assert-Coordination ($r671RegistryBefore.entries.Count -eq 4502 -and $r671RegistryEntries[4502].id -ceq $r671Data.firstAddedId -and $r671RegistryEntries[-1].id -ceq $r671Data.lastAddedId) 'Device correction registry append boundary changed.'
+        $r671RegistryAfter = $r671RegistryFull
         $r671RegistryAfter.entries = @($r671RegistryAfter.entries | Select-Object -First 4502)
         Assert-Coordination (($r671RegistryBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r671RegistryAfter | ConvertTo-Json -Depth 100 -Compress)) 'Device correction changed existing registry evidence.'
         $r671PolicyBefore = Get-R66Utf8GitJson $r671CorrectionParent $r670Owners[0]
@@ -2873,7 +2880,7 @@ if ($ProductionLane -ceq 'baseline') {
         Assert-Coordination ($r672Data.parent -ceq $r672RegressionParent -and $r672Data.additionalUiOwner -ceq 'apps/mobile/test/ui_v2/buy/buy_v2_product_content_test.dart' -and $r672Data.testRepair.path -ceq $r672Data.additionalUiOwner) 'Product regression owner changed.'
         Assert-Coordination ($r672Data.failureEvidence.passed -eq 1656 -and $r672Data.failureEvidence.skipped -eq 27 -and $r672Data.failureEvidence.failed -eq 8 -and (Get-Sha256 $r672Data.failureEvidence.path) -ceq $r672Data.failureEvidence.sha256) 'Product regression failed evidence changed.'
         $r672PolicyBefore = Get-R66Utf8GitJson $r672RegressionParent $r672Owners[0]
-        $r672PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r672PolicyAfter = if ($r676CorrectionContext) { Get-R66Utf8GitJson $r676CorrectionParent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         $r672Ui = @($r672PolicyAfter.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')[0]
         $r672Primary = @($r672PolicyAfter.activeClaims | Where-Object task -ceq '/root')[0]
         Assert-Coordination ($r672Ui.owners.Count -eq 66 -and $r672Primary.owners.Count -eq 45 -and @($r672Ui.owners | Where-Object { $_ -ceq $r672Data.additionalUiOwner }).Count -eq 1) 'Product regression owner claim changed.'
@@ -2936,7 +2943,7 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($evidence.cases -eq 63 -and (Get-Sha256 $evidence.path) -ceq $evidence.sha256) 'r66.6 boundary proposal evidence changed.'
         }
         $r673PolicyBefore = Get-R66Utf8GitJson $r673SourceParent $r670Owners[0]
-        $r673PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r673PolicyAfter = if ($r676CorrectionContext) { Get-R66Utf8GitJson $r676CorrectionParent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         Assert-Coordination (($r673PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r673PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.6 source changed policy or owner claims.'
         $r673ScopeBefore = Get-R66Utf8GitJson $r673SourceParent $r673Owners[1]
         $r673ScopeAfter = if ($r675SourceContext) { Get-R66Utf8GitJson $r675SourceParent $r673Owners[1] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r673Owners[1]) | ConvertFrom-Json }
@@ -2980,8 +2987,12 @@ if ($ProductionLane -ceq 'baseline') {
       if ($r675SourceContext) {
         $r675Owners = @($r670Owners[1],$r670Owners[2],$r670Owners[3])
         $r675ManifestHash = '1E6632993A7F0E470785B828EEFC05028CE53D89A79F6E301FE6B0D786254858'
-        Assert-Coordination ((Get-Sha256 (Join-Path $root $r675Owners[0])) -ceq $r675ManifestHash) 'r66.7 source manifest changed.'
-        $r675Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r675Owners[0])
+        if ($r676CorrectionContext) {
+          $r675Manifest = Get-R66Utf8GitJson $r676CorrectionParent $r675Owners[0] -AsText
+        } else {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r675Owners[0])) -ceq $r675ManifestHash) 'r66.7 source manifest changed.'
+          $r675Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r675Owners[0])
+        }
         Assert-Coordination ($r675Manifest.Replace("`r`n","`n").StartsWith($r673Manifest.Replace("`r`n","`n").TrimEnd())) 'r66.7 source removed historical manifest evidence.'
         $r675Match = [regex]::Matches($r675Manifest, '(?s)<!-- R675-DATA-BEGIN -->\s*(.*?)\s*<!-- R675-DATA-END -->')
         Assert-Coordination ($r675Match.Count -eq 1) 'r66.7 source data missing or duplicated.'
@@ -2995,10 +3006,10 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($evidence.cases -eq 64 -and (Get-Sha256 $evidence.path) -ceq $evidence.sha256) 'r66.7 boundary proposal evidence changed.'
         }
         $r675PolicyBefore = Get-R66Utf8GitJson $r675SourceParent $r670Owners[0]
-        $r675PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r675PolicyAfter = if ($r676CorrectionContext) { Get-R66Utf8GitJson $r676CorrectionParent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         Assert-Coordination (($r675PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r675PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.7 source changed policy or owner claims.'
         $r675ScopeBefore = Get-R66Utf8GitJson $r675SourceParent $r675Owners[1]
-        $r675ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r675Owners[1]) | ConvertFrom-Json
+        $r675ScopeAfter = if ($r676CorrectionContext) { Get-R66Utf8GitJson $r676CorrectionParent $r675Owners[1] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r675Owners[1]) | ConvertFrom-Json }
         Assert-Coordination ($r675ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r675ManifestHash) 'r66.7 source scope hash changed.'
         $r675ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r675ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
         Assert-Coordination (($r675ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r675ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.7 source changed execution authority.'
@@ -3023,10 +3034,63 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r675Subject.Count -eq 1 -and [string]$r675Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit r66.7 qualified review source') 'r66.7 source admission subject changed.'
           $r675Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r675Commit)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r675Committed | Sort-Object) -join '|') -ceq (@($r675Owners | Sort-Object) -join '|')) 'r66.7 source admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r675Commit -- @r675Owners
+          if ($r676CorrectionContext) {
+            & git -C $root diff --quiet $r675Commit $r675FreezeHead -- @r675Owners
+          } else {
+            & git -C $root diff --quiet $r675Commit -- @r675Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'r66.7 source coordination changed after admission.'
-          $r675Later = @(& git -C $root log --format=%H "${r675Commit}..$head" -- @r675Owners)
+          $r675Later = @(& git -C $root log --format=%H "${r675Commit}..$r675FreezeHead" -- @r675Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r675Later.Count -eq 0) 'r66.7 source admission cannot be replayed or revised.'
+        }
+      }
+      if ($r676CorrectionContext) {
+        $r676Owners = @($r670Owners) + @('config/codex-development-regression-registry.json')
+        $r676ManifestHash = '786BE82526D1668098389ECC14849EEA7AABE7A3C3EDAED6D52FDABBAA049EA4'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r676Owners[1])) -ceq $r676ManifestHash) 'Featured return manifest changed.'
+        $r676Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r676Owners[1])
+        Assert-Coordination ($r676Manifest.Replace("`r`n","`n").StartsWith($r675Manifest.Replace("`r`n","`n").TrimEnd())) 'Featured return removed historical manifest evidence.'
+        $r676Match = [regex]::Matches($r676Manifest, '(?s)<!-- R676-DATA-BEGIN -->\s*(.*?)\s*<!-- R676-DATA-END -->')
+        Assert-Coordination ($r676Match.Count -eq 1) 'Featured return data missing or duplicated.'
+        $r676Data = $r676Match[0].Groups[1].Value | ConvertFrom-Json
+        Assert-Coordination ($r676Data.parent -ceq $r676CorrectionParent -and $r676Data.registryCount -eq 4514 -and $registryEntries.Count -eq 4514 -and $registrySha -ceq $r676Data.registrySha256 -and $r676Data.ticketId -ceq 'R66-UAT-023-R667-FEATURED-RETURN-001') 'Featured return registry generation changed.'
+        Assert-Coordination ($r676Data.evidence.Count -eq 3) 'Featured return evidence missing.'
+        foreach ($evidence in $r676Data.evidence) { Assert-Coordination ((Get-Sha256 $evidence.path) -ceq $evidence.sha256) 'Featured return device evidence changed.' }
+        $r676RegistryBefore = Get-R66Utf8GitJson $r676CorrectionParent $r676Owners[4]
+        Assert-Coordination ($r676RegistryBefore.entries.Count -eq 4513 -and $registryEntries[-1].id -ceq 'REG-20260909-4548-CURSOR-R667-FEATURED-RETURN-OFFSET') 'Featured return append boundary changed.'
+        $r676RegistryAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $registryPath | ConvertFrom-Json
+        $r676RegistryAfter.entries = @($r676RegistryAfter.entries | Select-Object -First 4513)
+        Assert-Coordination (($r676RegistryBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r676RegistryAfter | ConvertTo-Json -Depth 100 -Compress)) 'Featured return changed historical registry.'
+        $r676PolicyBefore = Get-R66Utf8GitJson $r676CorrectionParent $r676Owners[0]
+        $r676PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        Assert-Coordination ($r676PolicyAfter.registryBinding.entryCount -eq 4514 -and $r676PolicyAfter.registryBinding.sha256 -ceq $registrySha) 'Featured return policy registry changed.'
+        $r676PolicyAfter.registryBinding = $r676PolicyBefore.registryBinding
+        Assert-Coordination (($r676PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r676PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Featured return changed owner claims or unrelated policy.'
+        $r676ScopeBefore = Get-R66Utf8GitJson $r676CorrectionParent $r676Owners[2]
+        $r676ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r676Owners[2]) | ConvertFrom-Json
+        Assert-Coordination ($r676ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r676ManifestHash) 'Featured return scope hash changed.'
+        $r676ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r676ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (($r676ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r676ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'Featured return changed execution authority.'
+        if ($head -ceq $r676CorrectionParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending featured return admission is not a handoff.'
+          $r676Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r676Dirty | Sort-Object) -join '|') -ceq (@($r676Owners | Sort-Object) -join '|')) 'Pending featured return must change exactly five coordination owners.'
+          $r676Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r676Untracked.Count -eq 0) 'Featured return admission cannot include untracked drafts.'
+        } else {
+          $r676Following = @(& git -C $root rev-list --first-parent --reverse "${r676CorrectionParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r676Following.Count -gt 0) 'Featured return admission missing.'
+          $r676Commit = [string]$r676Following[0]
+          $r676Parents = @(& git -C $root show -s --format=%P $r676Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r676Parents.Count -eq 1 -and [string]$r676Parents[0] -ceq $r676CorrectionParent) 'Featured return admission parent changed.'
+          $r676Subject = @(& git -C $root show -s --format=%s $r676Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r676Subject.Count -eq 1 -and [string]$r676Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): register featured return continuity child') 'Featured return admission subject changed.'
+          $r676Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r676Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r676Committed | Sort-Object) -join '|') -ceq (@($r676Owners | Sort-Object) -join '|')) 'Featured return admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r676Commit -- @r676Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Featured return coordination changed after admission.'
+          $r676Later = @(& git -C $root log --format=%H "${r676Commit}..$head" -- @r676Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r676Later.Count -eq 0) 'Featured return admission cannot be replayed or revised.'
         }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {

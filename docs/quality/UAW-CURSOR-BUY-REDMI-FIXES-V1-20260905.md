@@ -843,3 +843,36 @@ This exact three-control admission appends this manifest, updates its scope hash
   ]
 }
 <!-- R675-DATA-END -->
+
+
+## r66.7 featured return continuity child - 9 September 2026
+
+The founder-directed Redmi test/register/implement/retest routine found an operational continuation defect: an individual consumer opens the first Medicine featured product and Back shifts the horizontal list to another product. Child R66-UAT-023-R667-FEATURED-RETURN-001 is mvp_required because buyers must retain the browsing position used to compare or add an item. Register REG4548 before implementation. The bound child records the reuse inventory, necessity and failure/recovery acceptance; the smallest correction reuses the native catalogue and an already claimed focused test. No new route, screen, service, dependency or backend is required. Reproduce the shared scroll-storage hypothesis, then correct only the proven cause, run affected and two full regressions, prepare a new one-build candidate and replay on Redmi before closure.
+
+The installed r66.7 APK (SHA7C28FA4065A883A8536421634B98C50310B173D3688D2583D23C07C9FBC6937E, version2026090902) passed enlarged portrait/landscape full medicine title and add/cart recovery; REG4546 is closed for local Redmi UI only. The original 50kg rice selection/MOQ/price/cart/Back/removal replay also passed. The bound immutable device reports preserve those results separately from this new child. Eight local findings are closed; neither the full87-item matrix nor production acceptance is closed. Original Shop cart data and previous candidate evidence remain preserved.
+
+This exact five-control admission appends one registry entry, refreshes its policy generation, appends this manifest, pins the manifest and child assessment in scope, and extends the coordination checker with historical freezes. It preserves UI66/primary45 owner claims and existing execution authority. Its first-parent subject is `ui(buy-redmi-fixes-v1-20260905): register featured return continuity child`. Authenticated/backend/shared integration, OPPO, real transactions, accepted references and promotion remain deferred or excluded. Consumed r66.7 build/install authority is not reusable.
+<!-- R676-DATA-BEGIN -->
+{
+  "parent": "3542b02c914fd132e9b85a612edf7333c1db9de6",
+  "registryCount": 4514,
+  "registrySha256": "3767B01639BE3873CC53D34A733CCBC3377C3B208E35CAF60F4BFC2F321803D6",
+  "firstAddedId": "REG-20260909-4548-CURSOR-R667-FEATURED-RETURN-OFFSET",
+  "lastAddedId": "REG-20260909-4548-CURSOR-R667-FEATURED-RETURN-OFFSET",
+  "ticketId": "R66-UAT-023-R667-FEATURED-RETURN-001",
+  "evidence": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\R66-UAT-023-R667-FEATURED-RETURN-001.md",
+      "sha256": "A8D56268E30D144E1EC486C60785BFDFED5C91BAA0B0A37252036952A7E61D7C"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\R66-7-REDMI-FIRST-REPLAY-V1.json",
+      "sha256": "A624255FFBB63DCF4D99CA7DC6B236032E72756D2E4AF1FF6A07E3D3CA67DDC6"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\R66-7-REDMI-50KG-REPLAY-V1.json",
+      "sha256": "783B1DBAE53393C69186C4E944BC52A443DC9D583948D785BDBC1EA1C2500CBA"
+    }
+  ]
+}
+<!-- R676-DATA-END -->

@@ -101894,6 +101894,27 @@
     "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
     "apps/mobile/build/r66-5-prebuild-20260908/R665-REDMI-DEFECT-REPORT-V1.md"
   ]
+},
+{
+  "id": "REG-20260909-4548-CURSOR-R667-FEATURED-RETURN-OFFSET",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "coordination",
+    "evidence"
+  ],
+  "mistake": "On checksum-qualified Redmi r66.7, returning from Paracetamol detail shifts the featured Medicine rail to Metformin and loses the product position the buyer just used.",
+  "rootCause": "Device-reproduced navigation continuity defect. Shared PageStorage identity between vertical catalogue and horizontal featured list is a hypothesis pending an actual navigation reproduction test.",
+  "prevention": "Give independently restorable scroll owners distinct identities only after reproducing the cause. Verify first and later featured products, independent vertical and horizontal offsets, destination isolation and enlarged portrait/landscape; close only after fresh checksum-matched Redmi replay. Preserve prior title closure separately.",
+  "gates": [
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-codex-development-regression-memory.ps1"
+  ],
+  "evidence": [
+    "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
+    "apps/mobile/build/r66-7-prebuild-20260909/R66-UAT-023-R667-FEATURED-RETURN-001.md"
+  ]
 }
   ]
 }
