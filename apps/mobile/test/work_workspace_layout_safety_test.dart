@@ -9596,6 +9596,101 @@ void main() {
     );
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Store alerts compact right actions stay readable $scale', (
+      tester,
+    ) async {
+      final semantics = tester.ensureSemantics();
+      try {
+        final work = storeViewFixture();
+        work.workspaceOrders.add(
+          customerOrder(
+            id: 'TRACK-1053',
+            customer: 'Annapurna Narayanaswamy',
+            createdAt: DateTime.now(),
+            stage: 'Delivery requested',
+          ),
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+        await tester.pumpAndSettle();
+        final title = find.byKey(const Key('work-alert-title-order-APP-1043'));
+        final review = find.byKey(const Key('work-alert-cta-order-APP-1043'));
+        final firstRow = find.byKey(const Key('work-alert-order-APP-1043'));
+        final reviewButton = tester.widget<FilledButton>(review);
+        expect(reviewButton.onPressed, isNotNull);
+        expect(
+          reviewButton.style!.backgroundColor!.resolve({}),
+          MoolColors.navy,
+        );
+        expect(reviewButton.style!.foregroundColor!.resolve({}), Colors.white);
+        expect(tester.getSize(review).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(review).height, greaterThanOrEqualTo(48));
+        expect(
+          find.descendant(of: firstRow, matching: find.text('Review')),
+          findsOneWidget,
+        );
+        if (scale == 1) {
+          expect(
+            tester.getCenter(review).dy,
+            closeTo(tester.getCenter(title).dy, 1),
+          );
+          expect(
+            tester.getRect(review).left,
+            greaterThan(tester.getRect(title).right),
+          );
+          // The former stacked-action row was about 138 px in this fixture.
+          expect(tester.getSize(firstRow).height, lessThan(125));
+        } else {
+          final details = find.byKey(
+            const Key('work-alert-detail-order-APP-1043'),
+          );
+          expect(
+            tester.getRect(review).top,
+            greaterThan(tester.getRect(details).bottom),
+          );
+        }
+        final list = find.byKey(const Key('work-dashboard-alerts-screen'));
+        final track = find.byKey(const Key('work-alert-cta-order-TRACK-1053'));
+        final scrollable = find
+            .descendant(of: list, matching: find.byType(Scrollable))
+            .first;
+        await tester.scrollUntilVisible(track, 120, scrollable: scrollable);
+        await tester.ensureVisible(track);
+        await tester.pumpAndSettle();
+        expect(track.hitTestable(), findsOneWidget);
+        expect(tester.getSize(track).height, greaterThanOrEqualTo(48));
+        final paragraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: track, matching: find.byType(RichText)).first,
+        );
+        expect(paragraph.didExceedMaxLines, isFalse);
+        expect((paragraph.text as TextSpan).style!.fontFamily, 'Inter');
+        expect(
+          tester.getSemantics(track).getSemanticsData().label,
+          contains('Track delivery: TRACK-1053 · Annapurna Narayanaswamy'),
+        );
+        await captureStoreView(tester, 'alerts-right-action-compact-$scale');
+        await tester.tap(track);
+        await tester.pumpAndSettle();
+        expect(find.text('TRACK-1053'), findsOneWidget);
+        expect(work.currentWorkspaceOrderId, 'APP-1043');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(list, findsOneWidget);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      } finally {
+        semantics.dispose();
+      }
+    });
+  }
+
   testWidgets('Store alerts 1000 records address the last exact order', (
     tester,
   ) async {

@@ -19104,75 +19104,53 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
             const Divider(height: 1, color: Color(0xFFE5E8F1)),
         itemBuilder: (context, index) {
           final alert = alerts[index];
+          void openAlert() {
+            if (storeId !=
+                (session.activeWorkspace?.id ?? session.workspaceId)) {
+              return;
+            }
+            final current = _workspaceAlerts(
+              session,
+            ).where((item) => item.id == alert.id).firstOrNull;
+            if (current == null) {
+              session.showNotice('This alert no longer needs action.');
+              return;
+            }
+            if (current.id == 'store-paused') {
+              onOpenStatus();
+            } else if (current.operation != null) {
+              onOpenOperation(current.operation!);
+            } else {
+              onOpen(current.route!);
+            }
+          }
+
           return Material(
             key: Key('work-alert-${alert.id}'),
             color: Colors.white,
             child: InkWell(
               key: Key('work-alert-action-${alert.id}'),
-              onTap: () {
-                if (storeId !=
-                    (session.activeWorkspace?.id ?? session.workspaceId)) {
-                  return;
-                }
-                final current = _workspaceAlerts(
-                  session,
-                ).where((item) => item.id == alert.id).firstOrNull;
-                if (current == null) {
-                  session.showNotice('This alert no longer needs action.');
-                  return;
-                }
-                if (current.id == 'store-paused') {
-                  onOpenStatus();
-                } else if (current.operation != null) {
-                  onOpenOperation(current.operation!);
-                } else {
-                  onOpen(current.route!);
-                }
-              },
+              onTap: openAlert,
+              // One accessible action, even though the row also accepts taps.
+              excludeFromSemantics: true,
+              canRequestFocus: false,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  vertical: 16,
+                  vertical: 10,
                   horizontal: 4,
                 ),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.only(top: 2),
+                      padding: const EdgeInsets.only(top: 12),
                       child: Icon(alert.icon, color: MoolColors.navy, size: 24),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            alert.title,
-                            style: const TextStyle(
-                              color: MoolColors.ink,
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            alert.detail,
-                            style: const TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 12,
-                              height: 1.4,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            alert.actionLabel,
-                            style: const TextStyle(
-                              color: MoolColors.navy,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
+                      child: _WorkspaceAlertContent(
+                        alert: alert,
+                        onOpen: openAlert,
                       ),
                     ),
                     if (!alert.requiredAction)
@@ -19195,6 +19173,95 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _WorkspaceAlertContent extends StatelessWidget {
+  const _WorkspaceAlertContent({required this.alert, required this.onOpen});
+
+  final _WorkspaceAlertItem alert;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final title = Text(
+      alert.title,
+      key: Key('work-alert-title-${alert.id}'),
+      style: const TextStyle(
+        color: MoolColors.ink,
+        fontSize: 15,
+        fontWeight: FontWeight.w700,
+      ),
+    );
+    const actionStyle = TextStyle(
+      fontFamily: 'Inter',
+      fontSize: 12,
+      fontWeight: FontWeight.w700,
+    );
+    final action = FilledButton(
+      key: Key('work-alert-cta-${alert.id}'),
+      onPressed: onOpen,
+      style: FilledButton.styleFrom(
+        backgroundColor: MoolColors.navy,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(48, 36),
+        tapTargetSize: MaterialTapTargetSize.padded,
+        visualDensity: VisualDensity.standard,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        textStyle: actionStyle,
+      ),
+      child: Text(
+        alert.actionLabel,
+        textAlign: TextAlign.center,
+        semanticsLabel: '${alert.actionLabel}: ${alert.title}',
+      ),
+    );
+    final details = Text(
+      alert.detail,
+      key: Key('work-alert-detail-${alert.id}'),
+      style: const TextStyle(
+        color: MoolColors.muted,
+        fontSize: 12,
+        height: 1.4,
+      ),
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final scaler = MediaQuery.textScalerOf(context);
+        final label = TextPainter(
+          text: TextSpan(text: alert.actionLabel, style: actionStyle),
+          textDirection: Directionality.of(context),
+          textScaler: scaler,
+        )..layout();
+        final actionWidth = (label.width + 20).clamp(48.0, double.infinity);
+        label.dispose();
+        final inline =
+            scaler.scale(12) <= 16 &&
+            constraints.maxWidth - actionWidth - 10 >= 130;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (inline)
+              Row(
+                children: [
+                  Expanded(child: title),
+                  const SizedBox(width: 10),
+                  action,
+                ],
+              )
+            else
+              title,
+            const SizedBox(height: 3),
+            details,
+            if (!inline) ...[
+              const SizedBox(height: 4),
+              Align(alignment: AlignmentDirectional.centerEnd, child: action),
+            ],
+          ],
+        );
+      },
     );
   }
 }
@@ -19412,7 +19479,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
           '${order.items} · ₹${_formatStoreAmount(order.amount)}\n'
           '${order.payment} · $status\n$when',
       actionLabel: switch (group) {
-        'New' => 'Review order',
+        'New' => 'Review',
         'Packing' => 'Pack order',
         'Ready' =>
           order.isCustomerCollection ? 'View collection' : 'Check pickup',
