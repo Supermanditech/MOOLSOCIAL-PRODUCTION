@@ -2019,3 +2019,55 @@ REG-20260909-4548-CURSOR-R667-FEATURED-RETURN-OFFSET / R66-UAT-023-R667-FEATURED
 Retained Shop Frozen potato fries315 quantity1/INR225 cart hierarchy002 exactly matches the predecessor; no cart quantity changed during this replay. Phone restored to font1/density320/rotation0/automatic1. Nine local findings now have Redmi closure evidence; full87 accepted closures remain zero and broader device operations continue. Candidate state preserves its prior bytes and consumes exactly one build/install; installed checksum/first frame pass while catalogue/operational/founder gates remain pending. No real order, payment or report was submitted; shared/authenticated integration and OPPO remain deferred.
 
 Existing REG4547 tooling recurrences remain preserved: singlechat-r668-receipt-discovery-recovery-v1.md records a guessed historical launch receipt read and exact-name recovery. singlechat-r668-resume-transport-recovery-v1.md records capture013 failing before input because Redmi was disconnected, plus its newly spawned ADB server retaining the wrapper output stream. The exact capture-spawned server PID was verified and stopped, allowing the original native1 receipt to close; no success was inferred. Reconnected gate passed before subsequent test input. Failed013 is explicitly excluded from the33 successful captures, and no failure evidence was deleted.
+
+### Founder-authorized local Redmi baseline r66.8 — 9 September 2026
+
+Founder reviewed the nine-digit cart, accepted the reported local test results and requested a baseline within this worktree before expanded Redmi testing. This evidence baseline records the nine previously closed local UI findings and the exact verified scenarios below. It does not change the historical87-item matrix to fully accepted, qualify payment settlement, or promote production/integration. Baseline parent53292bcd06ce54a6df2860cd576d05d12becf9ee; installed APK/source remain the r66.8 identities above. No runtime code changed.
+
+External evidence root C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905: R66-8-REDMI-CART-EXPANSION-V1.json SHA9F9BEAC7D2DB43E62DBA95228EDF0265E8768209B907525537F441FDD30DB207 verifies seven captures038–044: Shop quantity1/INR225 to2/INR450, product detail/Back, browse/reopen, and exact baseline restoration. Founder subsequently deleted that old cart; do not recreate it.
+
+R66-8-NINE-DIGIT-USER-TEST-V1.json SHA3C99BF5351EBEDB681F1887316248963BD85B1546D71D20D453F4745716CE340 verifies19 captures046–064. Founder-reviewed basket is28,736 wholesale notebook packs atINR3,480, totalINR100,001,280 (INR10,00,01,280). Initial quantity was debug-seeded for display review; subsequent tests used normal controls. Plus/minus produced the exactINR3,480 difference; address/payment/confirmation retained quantity and totals; missing purchase-order reference blocked progression with visible transient guidance; original PhonePe selection restored; Back through payment/address/cart and force-stop/relaunch restored exact hierarchies. No order or payment submitted. Normal portrait checks passed; no new confirmed defect in that round.
+
+Current cart retains the founder-reviewed nine-digit basket. Unresolved follow-up: direct bulk quantity entry (cart quantity tap did not open an editor), plus further text-scale/orientation and real-operation expansion. Initial bulk creation through normal controls, provider limits, real inventory/backend pricing and settlement remain unverified. Prior full Buy/Profile host cycles remain1678 passes/27 unchanged historical skips/zero failures each. All screenshots, hashes, failed tooling receipts and previous closures are preserved. This is a local review baseline only; OPPO and deferred integration remain separate.
+
+#### Durable cart evidence index
+
+Raw screenshots/XML/APK remain preserved in the external evidence root. The following exact capture identities and checksums are tracked here so local-only files cannot silently substitute different evidence. This index is not a remote backup of binary artifacts.
+
+Proof: R66-8-REDMI-CART-EXPANSION-V1.json SHA256 9F9BEAC7D2DB43E62DBA95228EDF0265E8768209B907525537F441FDD30DB207
+
+| Capture | PNG SHA256 | XML SHA256 |
+| --- | --- | --- |
+| 038-cart-before | 54A4C961B12B805E697AB7C958609F7611A65860B51147CE6BE7D65E8177D68E | 06DF9822292546525EBF958F26A8D15EA56FADF25562BD145162355764E93971 |
+| 039-cart-two | 0200ED8240D96C03EA44DCD07D81AA2F452DA0FBB2AF5983356543B8BAD5AD5A | 0C4506FC94EBAFCF0744F1B5362ECB8981A94F3A32070D91374ED619DA1CD365 |
+| 040-cart-product | 0D71E7B8BF4C4B9890AB15D3912071CC6A3D7F728097585EC32A88D926267B19 | 83AB4B6E9F525A05D4CBED3A42FE262AA652D61F7B73C8EF2B9E2E508C4EF82B |
+| 041-cart-return | 137C737356725C8ECBF4BF66CD4748A076B1448B04B5FFA47EA05463DCCE0C57 | 0C4506FC94EBAFCF0744F1B5362ECB8981A94F3A32070D91374ED619DA1CD365 |
+| 042-cart-browse | 1A5B38BB11337BE6864CD039752ADDF8926C8C91CB87A07251FB4B986045EE69 | 47D46AACCE9FC74B2CB3AA82BA85E6696D4B19CF90387F439056D15A5366C356 |
+| 043-cart-reopen | 0E2811A4BE6D64C8AEAE0318EA5EDEC5745590D459E3A15F1D69AD6A664E6905 | 0C4506FC94EBAFCF0744F1B5362ECB8981A94F3A32070D91374ED619DA1CD365 |
+| 044-cart-restored | 517DB02D1001C95A9FD6D9D106EFEEB7A97ECD4113922E40D9A25E943823E18B | 06DF9822292546525EBF958F26A8D15EA56FADF25562BD145162355764E93971 |
+
+Proof: R66-8-NINE-DIGIT-USER-TEST-V1.json SHA256 3C99BF5351EBEDB681F1887316248963BD85B1546D71D20D453F4745716CE340
+
+| Capture | PNG SHA256 | XML SHA256 |
+| --- | --- | --- |
+| 046-nine-digit-start | 56028A56C00B2FCDB1EF325E8876062264B4EBB46B807317950DD88DCCD6A1EA | 71CA273C18D2316066CF5834D5417715C3F5B648520C5BA3891F96229618A7CA |
+| 047-nine-digit-cart | 13F2AA4B52FB65F68D3AA8920D0258BB501A28E430E7D14E224085828DB3AB8D | 81F731CC6CBFBA5FBCB82E5E1E6532687EB64BE3CE1927914A9D1B9D0D25821A |
+| 048-nine-digit-increase | 37D58A175D3462EAE9E273D5147BE69BF3F88444D6BF3C946EB662C8C7EA7BBF | DD3C935B1488E5960419EA227430E52AE0EC1E9476B3F96DD2323AD06497C875 |
+| 049-nine-digit-decrease | C35BD7ED6580F43801001BDBD887AC506571B1F29982899C2D1C9A600FADB318 | 81F731CC6CBFBA5FBCB82E5E1E6532687EB64BE3CE1927914A9D1B9D0D25821A |
+| 050-nine-digit-checkout | AEF43064F6814FF756C4BF3FF3E531A4CC2E8663D02877CCB4B9EA43A6D6B03B | C1E598DF7C31CB595BEDAD38D827F37DA8B921594C5F7D566AA846C45CB533AC |
+| 051-nine-digit-payment-options | A268024DCF3C02ED909F87072D76686D5A1BC63C617519D6280CB35E7C36289E | 561246B7CB94BBEE205B4352023EBFB6E0CB151CC6D9C2F4662AEBEE9D66B68F |
+| 052-nine-digit-purchase-order | 272C9ED819F48D18C04F143031AEF2697F4AD42A47CE3805D2919479A03A3CCC | A592C85D96D717BD74001609D68A4786A9A9809BEF87515FD4DC26BAB60015F2 |
+| 053-nine-digit-review | 1A9E564FEC263586F3DE6CBC74A50B56E95FB6A949E9A989DE8104326B3A74BB | A592C85D96D717BD74001609D68A4786A9A9809BEF87515FD4DC26BAB60015F2 |
+| 054-nine-digit-po-fields | 8DB90B6CCD2B342537498DBF5DB6742B112E3F42EF87B85E24760471336C5500 | FEB30CF8E99F76D299E9AC74E0676CB2FBEAAF66448BE218AC62D98A0D1DAADE |
+| 055-nine-digit-po-validation | B921BBDAD4E736FA2DF38C6DE03C3163C988E4C6B9A024FD79D87E75938BE918 | FEB30CF8E99F76D299E9AC74E0676CB2FBEAAF66448BE218AC62D98A0D1DAADE |
+| 056-nine-digit-payment-restored | 805DC4459E6816538922A6F386DA4EE6AA462BCF1D1F4A07C1DECA3B6F4E5E70 | 561246B7CB94BBEE205B4352023EBFB6E0CB151CC6D9C2F4662AEBEE9D66B68F |
+| 057-nine-digit-confirm-review | 841033C84FEC58E227FE93146BA8852E041A940D7CB772E7B893EA4B22192285 | A2D63A6CDB283BF6D06F7FFBB797DC93CCA790E9C2CA4417A113F8D244B7E8EF |
+| 058-nine-digit-review-bill | 7CC40F359A6761486BA3A694975F9375CE1F5F123342E3C66090AABAC37E3F68 | DE76817652F69BD7A8C46E8354FEC6B3986C1F38FC9BBB3FDA960A035BD6E27C |
+| 059-nine-digit-back | 65B36C2FC4BD664E16F5FC881EF7EF8C655B8355F6E9C96ACF1730A7778E6897 | 561246B7CB94BBEE205B4352023EBFB6E0CB151CC6D9C2F4662AEBEE9D66B68F |
+| 060-nine-digit-back-address | 00403F95B6B0A1C96B37162B387970130405B66FFD2CB104A6B9166044FE9A25 | C1E598DF7C31CB595BEDAD38D827F37DA8B921594C5F7D566AA846C45CB533AC |
+| 061-nine-digit-back-cart | 90C7D995857BFD7C74B6C6C9496875E5A4E0D43B1575CAF06CB8BA86185B75C1 | 81F731CC6CBFBA5FBCB82E5E1E6532687EB64BE3CE1927914A9D1B9D0D25821A |
+| 062-nine-digit-restarted | 37B78D899D045336671701AFC43288932BC502CB246F24C5A998650FB1038160 | 71CA273C18D2316066CF5834D5417715C3F5B648520C5BA3891F96229618A7CA |
+| 063-nine-digit-persisted-cart | E4C70206CCE784D87CE05701D2B677C66C2567437329E5243051AE7B73E99486 | 81F731CC6CBFBA5FBCB82E5E1E6532687EB64BE3CE1927914A9D1B9D0D25821A |
+| 064-nine-digit-quantity-entry | B3590B3C486EB892B5E91E68AF58923004337842C8F87B7F2C1ED17760DA1E7E | 81F731CC6CBFBA5FBCB82E5E1E6532687EB64BE3CE1927914A9D1B9D0D25821A |
+
+Git audit at baseline: live origin branch is a2c914539aad677f80b3a73562c3faa591e819e6 (singlechat-r668-baseline-remote-read-1). Before this evidence commit, HEAD53292bcd is14 commits ahead, zero behind; those source/admission/closure commits are local-only. Starting worktree was clean, with no omitted unstaged/staged/untracked source. The only baseline change is this RESULTS owner. Source fixes are committed, but remote equality and integration ticket closure are not yet achieved. No push or promotion performed.
