@@ -1017,6 +1017,78 @@ class _ThreadCard extends StatelessWidget {
   final VoidCallback onMore;
   final VoidCallback onTap;
 
+  Widget _identity(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final titleStyle = Theme.of(context).textTheme.bodyMedium!.copyWith(
+        color: MoolColors.ink,
+        fontSize: 15.5,
+        fontWeight: FontWeight.w800,
+      );
+      final timeStyle = Theme.of(context).textTheme.bodySmall!.copyWith(
+        color: MoolColors.muted,
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+      );
+      double textWidth(String text, TextStyle style) {
+        final painter = TextPainter(
+          text: TextSpan(text: text, style: style),
+          textScaler: MediaQuery.textScalerOf(context),
+          textDirection: Directionality.of(context),
+        )..layout();
+        final width = painter.width;
+        painter.dispose();
+        return width;
+      }
+
+      final metadataWidth =
+          textWidth(thread.timeLabel, timeStyle) +
+          (thread.verified ? 20 : 0) +
+          (pinned ? 19 : 0) +
+          8;
+      final inline =
+          textWidth(thread.title, titleStyle) + metadataWidth <=
+          constraints.maxWidth;
+      final title = Text(
+        thread.title,
+        key: Key('chat-thread-title-${thread.id}'),
+        style: titleStyle,
+      );
+      final metadata = Wrap(
+        key: Key('chat-thread-metadata-${thread.id}'),
+        spacing: 4,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          if (thread.verified)
+            const Icon(
+              Icons.verified_rounded,
+              size: 16,
+              color: MoolColors.success,
+            ),
+          if (pinned)
+            const Icon(
+              Icons.push_pin_rounded,
+              size: 15,
+              color: MoolColors.navy,
+            ),
+          Text(thread.timeLabel, style: timeStyle),
+        ],
+      );
+      return inline
+          ? Row(
+              children: [
+                Expanded(child: title),
+                const SizedBox(width: 8),
+                metadata,
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [title, const SizedBox(height: 4), metadata],
+            );
+    },
+  );
+
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -1046,47 +1118,7 @@ class _ThreadCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            thread.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: MoolColors.ink,
-                              fontSize: 15.5,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                        if (thread.verified) ...[
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.verified_rounded,
-                            size: 16,
-                            color: MoolColors.success,
-                          ),
-                        ],
-                        if (pinned) ...[
-                          const SizedBox(width: 4),
-                          const Icon(
-                            Icons.push_pin_rounded,
-                            size: 15,
-                            color: MoolColors.navy,
-                          ),
-                        ],
-                        const SizedBox(width: 8),
-                        Text(
-                          thread.timeLabel,
-                          style: const TextStyle(
-                            color: MoolColors.muted,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
+                    _identity(context),
                     const SizedBox(height: 4),
                     Row(
                       children: [
@@ -1166,94 +1198,103 @@ Future<_ConversationAction?> _chooseConversationAction(
     viewPadding: viewPadding,
     platform: Theme.of(context).platform,
   );
+  FocusManager.instance.primaryFocus?.unfocus();
   return showModalBottomSheet<_ConversationAction>(
     context: context,
     showDragHandle: true,
     useSafeArea: true,
     isScrollControlled: true,
     sheetAnimationStyle: ChatMotion.sheetStyle(context),
-    builder: (sheetContext) => ChatBottomSheetSafeArea(
-      bottomInset: bottomInset,
-      exportedSemanticsClearance: exportedSemanticsClearance,
-      child: Column(
-        key: const Key('chat-conversation-actions'),
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          ListTile(
-            title: const Text(
-              'Conversation options',
-              style: TextStyle(
-                color: MoolColors.navy,
-                fontWeight: FontWeight.w900,
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+      ),
+      child: ChatBottomSheetSafeArea(
+        bottomInset: bottomInset,
+        exportedSemanticsClearance: exportedSemanticsClearance,
+        child: SingleChildScrollView(
+          key: const Key('chat-conversation-actions-scroll'),
+          child: Column(
+            key: const Key('chat-conversation-actions'),
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                title: const Text(
+                  'Conversation options',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                subtitle: Text(
+                  thread.title,
+                  key: const Key('chat-options-recipient'),
+                ),
               ),
-            ),
-            subtitle: Text(
-              thread.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-          const Divider(height: 1),
-          ListTile(
-            key: Key('chat-action-pin-${thread.id}'),
-            leading: Icon(
-              pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
-            ),
-            title: Text(pinned ? 'Unpin conversation' : 'Pin conversation'),
-            onTap: () =>
-                Navigator.of(sheetContext).pop(_ConversationAction.pin),
-          ),
-          ListTile(
-            key: Key('chat-action-attention-${thread.id}'),
-            leading: Icon(
-              reducedAttention
-                  ? Icons.notifications_active_outlined
-                  : Icons.notifications_paused_outlined,
-            ),
-            title: Text(
-              reducedAttention
-                  ? 'Restore attention cues'
-                  : 'Reduce attention cues',
-            ),
-            subtitle: const Text(
-              'Keep unread state with a quieter visual cue.',
-            ),
-            onTap: () =>
-                Navigator.of(sheetContext).pop(_ConversationAction.attention),
-          ),
-          ListTile(
-            key: Key('chat-action-read-${thread.id}'),
-            leading: Icon(
-              hasUnread
-                  ? Icons.drafts_outlined
-                  : Icons.mark_email_unread_outlined,
-            ),
-            title: Text(hasUnread ? 'Mark as read' : 'Mark as unread'),
-            onTap: () =>
-                Navigator.of(sheetContext).pop(_ConversationAction.read),
-          ),
-          ListTile(
-            key: Key('chat-action-archive-${thread.id}'),
-            leading: const Icon(Icons.archive_outlined),
-            title: const Text('Archive conversation'),
-            subtitle: const Text(
-              'Hide it until you restore it or close MoolSocial.',
-            ),
-            onTap: () =>
-                Navigator.of(sheetContext).pop(_ConversationAction.archive),
-          ),
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
-            child: Text(
-              'Pin, attention and archive choices reset when you close the app.',
-              style: TextStyle(
-                color: MoolColors.muted,
-                fontSize: 11.5,
-                height: 1.35,
+              const Divider(height: 1),
+              ListTile(
+                key: Key('chat-action-pin-${thread.id}'),
+                leading: Icon(
+                  pinned ? Icons.push_pin_outlined : Icons.push_pin_rounded,
+                ),
+                title: Text(pinned ? 'Unpin conversation' : 'Pin conversation'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_ConversationAction.pin),
               ),
-            ),
+              ListTile(
+                key: Key('chat-action-attention-${thread.id}'),
+                leading: Icon(
+                  reducedAttention
+                      ? Icons.notifications_active_outlined
+                      : Icons.notifications_paused_outlined,
+                ),
+                title: Text(
+                  reducedAttention
+                      ? 'Restore attention cues'
+                      : 'Reduce attention cues',
+                ),
+                subtitle: const Text(
+                  'Keep unread state with a quieter visual cue.',
+                ),
+                onTap: () => Navigator.of(
+                  sheetContext,
+                ).pop(_ConversationAction.attention),
+              ),
+              ListTile(
+                key: Key('chat-action-read-${thread.id}'),
+                leading: Icon(
+                  hasUnread
+                      ? Icons.drafts_outlined
+                      : Icons.mark_email_unread_outlined,
+                ),
+                title: Text(hasUnread ? 'Mark as read' : 'Mark as unread'),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_ConversationAction.read),
+              ),
+              ListTile(
+                key: Key('chat-action-archive-${thread.id}'),
+                leading: const Icon(Icons.archive_outlined),
+                title: const Text('Archive conversation'),
+                subtitle: const Text(
+                  'Hide it until you restore it or close MoolSocial.',
+                ),
+                onTap: () =>
+                    Navigator.of(sheetContext).pop(_ConversationAction.archive),
+              ),
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 8, 16, 14),
+                child: Text(
+                  'Pin, attention and archive choices reset when you close the app.',
+                  style: TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 11.5,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     ),
   );

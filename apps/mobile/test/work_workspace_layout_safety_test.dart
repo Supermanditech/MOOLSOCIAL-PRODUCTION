@@ -7913,6 +7913,74 @@ void main() {
           hintParagraph.getMaxIntrinsicWidth(double.infinity),
           lessThanOrEqualTo(hintParagraph.size.width + .01),
         );
+        final recipient = find.byKey(
+          const Key('chat-thread-title-shop-assist'),
+        );
+        final recipientParagraph = tester.renderObject<RenderParagraph>(
+          recipient,
+        );
+        expect(recipientParagraph.didExceedMaxLines, isFalse);
+        expect(tester.widget<Text>(recipient).maxLines, isNull);
+        expect(
+          tester.widget<Text>(recipient).data,
+          chat.thread('shop-assist').title,
+        );
+        if (width == 320 && scale == 2) {
+          expect(
+            tester
+                .getTopLeft(
+                  find.byKey(const Key('chat-thread-metadata-shop-assist')),
+                )
+                .dy,
+            greaterThanOrEqualTo(tester.getBottomRight(recipient).dy),
+          );
+        }
+        final options = find.byKey(const Key('chat-thread-more-shop-assist'));
+        await reveal(tester, options);
+        await tester.tap(options);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('chat-conversation-actions')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        final optionsRecipient = find.byKey(
+          const Key('chat-options-recipient'),
+        );
+        expect(
+          tester
+              .renderObject<RenderParagraph>(optionsRecipient)
+              .didExceedMaxLines,
+          isFalse,
+        );
+        final archive = find.byKey(
+          const Key('chat-action-archive-shop-assist'),
+        );
+        final optionsKeyboard = scale == 2 ? 200.0 : 0.0;
+        if (optionsKeyboard > 0) {
+          tester.view.viewInsets = FakeViewPadding(bottom: optionsKeyboard);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+        }
+        await reveal(tester, archive);
+        expect(archive.hitTestable(), findsOneWidget);
+        expect(
+          tester.getBottomRight(archive).dy,
+          lessThanOrEqualTo(height - 44 - optionsKeyboard),
+        );
+        await captureStoreView(tester, 'chat-options-$width-$scale-$reduced');
+        await tester.binding.handlePopRoute();
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('chat-conversation-actions')),
+          findsNothing,
+        );
+        final searchScroll = find.byKey(
+          const PageStorageKey('chat-inbox-scroll'),
+        );
+        await tester.drag(searchScroll, const Offset(0, 800));
+        await tester.pumpAndSettle();
         await captureStoreView(
           tester,
           'chat-inline-idle-$width-$scale-$reduced',

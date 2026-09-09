@@ -1104,6 +1104,18 @@ void main() {
         );
       }
       if (entry.$2 == 'Care Chat') {
+        final clinic = find.byKey(const Key('chat-open-thread-clinic-care'));
+        await tester.scrollUntilVisible(
+          clinic,
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('chat-inbox-scroll')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(clinic.hitTestable(), findsOneWidget);
         expect(
           find.byKey(const Key('chat-open-thread-clinic-care')),
           findsOneWidget,

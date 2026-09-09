@@ -297,9 +297,22 @@ void main() {
         size: const Size(320, 568),
       );
 
-      await tester.longPress(
-        find.byKey(const Key('chat-open-thread-work-opportunity')),
+      final opportunity = find.byKey(
+        const Key('chat-open-thread-work-opportunity'),
       );
+      await tester.scrollUntilVisible(
+        opportunity,
+        120,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const PageStorageKey('chat-inbox-scroll')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      expect(opportunity.hitTestable(), findsOneWidget);
+      await tester.longPress(opportunity);
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('chat-conversation-actions')),
