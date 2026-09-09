@@ -2,6 +2,14 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Latest purchase-reference and Restock audit — captures481–493
+
+Twelve successful native PNG/XML pairs visually inspected; external ledger R66-8-EXPANDED-AUDIT-CAPTURES-481-493-V1.json SHA256D42ADC0E9ECD1181306DF5B1EACEBD083C7859ED3DF2300E138FB8CD93623611. Same Redmi r66.8 candidate and normal display. Orders482 shows Purchase BUY-NEW-04 containing MS-NEW-09/74. Exact purchase query484 returns no match; clear485 and delivery-order ID486 correctly return that purchase/order. Clear487 and repeated purchase query488 fail identically. Registered OPEN P2 R668-AUDIT-ORDER-PURCHASE-SEARCH-001, related child of the product-search defect, before moving on. Source search omits purchaseId as well as line titles; delivery-ID success does not qualify purchase-reference search.
+
+Keyboard Back489 retains query. Horizontal shortcut swipe491 reveals Restock a business; tap492 opens Wholesale/Jodhpur/retained Stationery catalogue with blank query. Android Back493 returns to Scheduled Shop, exact481 XML5C4CF0172A8BDE18665C5E6A1F84861DD9A71DA308A7C7983C89B7BED9BA7418. OBSERVATION: Restock does not return to its originating Orders search on Back; review top-level destination navigation contract before classifying, and do not claim Orders-origin preservation passed. No purchase/cart/address/display changes, source/build/install or backend operations. Capture490 is excluded: unsupported helper argument DurationMs was rejected during parameter binding before device input; actual helper parameter Duration was read and used for491. This is a tooling incident, not an app defect.
+
+One confirmed search child defect in this batch; full audit remains open. Supplier-media/variant fixtures, untested responsive journeys and split-delivery purchase search remain unqualified; backend/auth integration deferred.
+
 ### Latest seller/product order-search audit — captures464–480
 
 Seventeen successful native PNG/XML pairs visually inspected; external ledger R66-8-EXPANDED-AUDIT-CAPTURES-464-480-V1.json SHA2569482E65E0A0A5D9C4D1800DEC6DD2BC9206F2E2AD5487BB1D4AA54C7B97ECA26. Same Redmi r66.8 candidate, normal display. Seller substring balaji467 finds visible Shree Balaji Fresh orders, with case-insensitive matching. Clear468 succeeds. Product query tomato469/470 falsely returns no orders; clear471 and Invoice472 prove existing MS-NEW-09 includes Fresh tomatoes, two500g packs at37/total74. Back473 and repeat474 reproduce exact469 XML. Registered R668-AUDIT-ORDER-PRODUCT-SEARCH-001, OPEN P2, before moving to the next route; source visibleOrders omits stored order-line product titles.

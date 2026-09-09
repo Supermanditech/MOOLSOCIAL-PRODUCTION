@@ -2,6 +2,12 @@
 
 ## Expanded r66.8 audit additions — 9 September 2026
 
+### R668-AUDIT-ORDER-PURCHASE-SEARCH-001 — Displayed purchase reference cannot retrieve its orders
+
+OPEN; P2, related child of ORDER-PRODUCT-SEARCH-001 for the separate purchase-reference acceptance case. Redmi r66.8/2026090903, normal display. Orders482 visibly groups MS-NEW-09/INR74 under Purchase BUY-NEW-04. Search exact BUY-NEW-04 in484 returns No orders match this search. Clear485 → exact delivery-order ID MS-NEW-09 in486 correctly returns that same order and BUY-NEW-04 heading. Clear487 → repeat purchase reference488 fails identically (484/488 XML0966862E630D458ADB05C8DED5684B466DC7C7E6EC4D824AA48096B5591AAEAE). Control486 XML9166969F3C2E9690C85BA70F6E41385D1BFED46E52DD51423624922D9500C371.
+
+Impact: a buyer using the purchase reference displayed by the app cannot locate the purchase or its deliveries, despite successful lookup by an individual delivery ID. Expected: purchase-reference search finds its account-owned orders within the selected status scope, including split deliveries where applicable. Source support: buy_v2_views.dart388 groups by order.purchaseId, while buy_v2_session.dart6359 visibleOrders excludes purchaseId from searchable fields. This shares the incomplete search-field implementation with the product-name defect; fix together without treating the cases as duplicate testing. Split-delivery search acceptance remains untested. No implementation or order mutation.
+
 ### R668-AUDIT-ORDER-PRODUCT-SEARCH-001 — Existing purchases cannot be found by their product name
 
 OPEN; P2, confirmed on Redmi r66.8/2026090903 at normal display. Orders Active → search tomato: captures469/470 show No orders match this search, followed by guidance to try a product name and unrelated-to-history catalogue recommendations. Clear471 → first order Invoice472 proves MS-NEW-09 contains two Fresh tomatoes 500 g packs at INR37 each, total INR74. Back473 → repeat tomato474 reproduces the same failure (469/474 XML C2BE68B2CFDEFA58C5EAEA3E8F1FD294534D06E28EEDB4D0CB587EE946E13BBA). Invoice472 XML2ACD630A0170C6D4640B31D6F86F49CD27ED90B43F449DC978183125E41C5C6B. Seller query balaji467 does find the existing Shree Balaji Fresh order; this is specifically a product-name lookup failure, not all search failing.
