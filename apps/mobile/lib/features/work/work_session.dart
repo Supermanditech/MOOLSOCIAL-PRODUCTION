@@ -365,6 +365,8 @@ class _StoreOperationalData {
   final List<WorkspaceOrderRecord> workspaceOrders = [];
   final Set<String> workspacePackedProductIds = <String>{};
   final Map<String, Set<String>> _packingByOrder = {};
+  final Map<String, ({String items, Map<String, int> quantities})>
+  _packingContentsByOrder = {};
   final Map<String, WorkspaceDeliveryAssignment> _deliveryByOrder = {};
   final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
   final List<WorkspaceStoreOffer> workspaceOffers = [];
@@ -1038,6 +1040,8 @@ class WorkSession extends ChangeNotifier {
   Set<String> get workspacePackedProductIds =>
       _storeData.workspacePackedProductIds;
   Map<String, Set<String>> get _packingByOrder => _storeData._packingByOrder;
+  Map<String, ({String items, Map<String, int> quantities})>
+  get _packingContentsByOrder => _storeData._packingContentsByOrder;
   Map<String, WorkspaceDeliveryAssignment> get _deliveryByOrder =>
       _storeData._deliveryByOrder;
   List<WorkspaceCustomerInvoice> get workspaceInvoices =>
@@ -1229,6 +1233,12 @@ class WorkSession extends ChangeNotifier {
   WorkspaceOrderRecord? get currentWorkspaceOrder => workspaceOrders
       .where((order) => order.id == currentWorkspaceOrderId)
       .firstOrNull;
+
+  bool isSelectedWorkspaceOrder(WorkspaceOrderRecord order) =>
+      order.id == currentWorkspaceOrderId ||
+      (currentWorkspaceOrderId == null &&
+          workspaceOrders.isEmpty &&
+          order.id == 'current-store-order');
 
   String _orderScope(String id) =>
       '${activeWorkspace?.id ?? workspaceId ?? ''}::$id';
@@ -1466,8 +1476,23 @@ class WorkSession extends ChangeNotifier {
         .toList(growable: false);
   }
 
-  List<WorkspacePackingLine> get workspacePackingLines {
-    final order = currentWorkspaceOrder;
+  List<WorkspacePackingLine> get workspacePackingLines =>
+      _packingLines(currentWorkspaceOrder, workspacePackedProductIds);
+
+  List<WorkspacePackingLine> workspacePackingLinesForOrder(
+    WorkspaceOrderRecord order,
+  ) => _packingLines(
+    order,
+    isSelectedWorkspaceOrder(order)
+        ? workspacePackedProductIds
+        : _packingByOrder[_orderScope(order.id)] ?? const <String>{},
+  );
+
+  List<WorkspacePackingLine> _packingLines(
+    WorkspaceOrderRecord? order,
+    Set<String> packedIds,
+  ) {
+    if (order != null && !_packingContentsMatch(order)) packedIds = const {};
     if (order != null && order.quantities.isNotEmpty) {
       return order.quantities.entries
           .map((entry) {
@@ -1478,12 +1503,12 @@ class WorkSession extends ChangeNotifier {
               id: entry.key,
               label: product?.title ?? entry.key,
               quantity: entry.value,
-              packed: workspacePackedProductIds.contains(entry.key),
+              packed: packedIds.contains(entry.key),
             );
           })
           .toList(growable: false);
     }
-    final parts = workspaceOrderItems
+    final parts = (order?.items ?? workspaceOrderItems)
         .split(RegExp(r'\s+[·,]\s+'))
         .where((part) => part.trim().isNotEmpty)
         .toList(growable: false);
@@ -1497,7 +1522,7 @@ class WorkSession extends ChangeNotifier {
                 RegExp(r'×\s*(\d+)').firstMatch(parts[index])?.group(1) ?? '',
               ) ??
               1,
-          packed: workspacePackedProductIds.contains('summary-$index'),
+          packed: packedIds.contains('summary-$index'),
         ),
     ];
   }
@@ -2093,12 +2118,72 @@ class WorkSession extends ChangeNotifier {
   }
 
   void setWorkspacePackingLine(String id, bool packed) {
+    if (currentWorkspaceOrder case final order?) {
+      _preparePackingContents(order, workspacePackedProductIds);
+    }
     if (packed) {
       workspacePackedProductIds.add(id);
     } else {
       workspacePackedProductIds.remove(id);
     }
     notifyListeners();
+  }
+
+  bool _packingContentsMatch(WorkspaceOrderRecord order) {
+    final contents = _packingContentsByOrder[_orderScope(order.id)];
+    return contents == null ||
+        (contents.items == order.items &&
+            mapEquals(contents.quantities, order.quantities));
+  }
+
+  void _preparePackingContents(
+    WorkspaceOrderRecord order,
+    Set<String> packedIds,
+  ) {
+    if (!_packingContentsMatch(order)) packedIds.clear();
+    _packingContentsByOrder[_orderScope(order.id)] = (
+      items: order.items,
+      quantities: Map.of(order.quantities),
+    );
+  }
+
+  bool setWorkspaceOrderPackingLine({
+    required String? storeId,
+    required String orderId,
+    required String lineId,
+    required int quantity,
+    required bool packed,
+  }) {
+    if (storeId != (activeWorkspace?.id ?? workspaceId) ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy) {
+      return false;
+    }
+    final order = visibleWorkspaceOrders
+        .where((record) => record.id == orderId)
+        .firstOrNull;
+    if (order == null ||
+        order.stage != 'Preparing' ||
+        order.isCustomerCollection ||
+        (isSelectedWorkspaceOrder(order) &&
+            workspaceOrderStage != 'Preparing') ||
+        !workspacePackingLinesForOrder(
+          order,
+        ).any((line) => line.id == lineId && line.quantity == quantity)) {
+      return false;
+    }
+    final packedIds = isSelectedWorkspaceOrder(order)
+        ? workspacePackedProductIds
+        : _packingByOrder.putIfAbsent(_orderScope(orderId), () => <String>{});
+    _preparePackingContents(order, packedIds);
+    if (packed) {
+      packedIds.add(lineId);
+    } else {
+      packedIds.remove(lineId);
+    }
+    notifyListeners();
+    return true;
   }
 
   void saveWorkspaceDeliverySettings({

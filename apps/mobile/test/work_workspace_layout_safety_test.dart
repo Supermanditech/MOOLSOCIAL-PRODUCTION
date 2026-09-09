@@ -9050,6 +9050,18 @@ void main() {
         viewport: scale == 1 ? const Size(412, 915) : const Size(320, 640),
         textScale: scale,
       );
+      expect(find.text('201\nAccept', findRichText: true), findsOneWidget);
+      expect(find.text('200\nPack', findRichText: true), findsOneWidget);
+      expect(find.text('200\nHand over', findRichText: true), findsOneWidget);
+      expect(find.text('200\nTrack', findRichText: true), findsOneWidget);
+      for (final group in ['new', 'packing', 'ready', 'delivery']) {
+        final control = find.byKey(Key('work-store-workload-$group'));
+        expect(tester.getSize(control).width, greaterThanOrEqualTo(48));
+        expect(tester.getSize(control).height, greaterThanOrEqualTo(48));
+      }
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspaceOrderStage, 'Confirmed');
+      await captureStoreView(tester, 'workload-1000-dashboard-$scale');
       await tester.tap(find.byKey(const Key('work-store-orders')));
       await tester.pumpAndSettle();
       Finder queue() => find.descendant(
@@ -9069,7 +9081,8 @@ void main() {
       expect(find.text('All 801'), findsOneWidget);
       expect(find.text('New 201'), findsOneWidget);
       expect(find.text('Packing 200'), findsOneWidget);
-      expect(find.text('Ready 400'), findsOneWidget);
+      expect(find.text('Ready 200'), findsOneWidget);
+      expect(find.text('Delivery 200'), findsOneWidget);
       expect(find.text('History 201'), findsOneWidget);
       await captureStoreView(tester, 'queue-1000-first-$scale');
       await tester.drag(queue(), const Offset(0, -600));
@@ -9089,17 +9102,15 @@ void main() {
             .childCount,
         200,
       );
-      final open = find.byKey(const Key('work-order-open-QUEUE-0001'));
-      await tester.ensureVisible(open);
-      await tester.pumpAndSettle();
-      await tester.tap(open);
-      await tester.pumpAndSettle();
-      expect(work.currentWorkspaceOrderId, 'QUEUE-0001');
-      expect(work.workspaceOrderStage, 'Preparing');
+      expect(find.byKey(const Key('work-order-open-QUEUE-0001')), findsNothing);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspaceOrderStage, 'Confirmed');
       await tester.drag(queue(), const Offset(0, 2000));
       await tester.pumpAndSettle();
       await captureStoreView(tester, 'queue-1000-selected-$scale');
-      final pack = find.byKey(const Key('work-order-pack-oil-fortune-1l'));
+      final pack = find.byKey(
+        const Key('work-order-pack-QUEUE-0001-oil-fortune-1l'),
+      );
       await tester.ensureVisible(pack);
       await tester.pumpAndSettle();
       expect(tester.widget<CheckboxListTile>(pack).value, isFalse);
@@ -9122,14 +9133,274 @@ void main() {
       );
       await tester.tap(pack);
       await tester.pumpAndSettle();
-      expect(work.workspacePackedProductIds, contains('oil-fortune-1l'));
-      expect(work.workspaceOrderStage, 'Preparing');
+      final packedOrder = work.workspaceOrders.singleWhere(
+        (order) => order.id == 'QUEUE-0001',
+      );
+      expect(
+        work.workspacePackingLinesForOrder(packedOrder).single.packed,
+        isTrue,
+      );
+      expect(work.workspacePackedProductIds, isEmpty);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspaceOrderStage, 'Confirmed');
       expect(work.workspaceInvoices, isEmpty);
       await captureStoreView(tester, 'queue-1000-packing-action-$scale');
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });
   }
+
+  for (final entry in [
+    ('New', 'Confirmed'),
+    ('Packing', 'Preparing'),
+    ('Ready', 'Ready'),
+    ('Delivery', 'Delivery requested'),
+    ('Attention', 'Awaiting reconciliation'),
+  ]) {
+    testWidgets('Store workload ${entry.$1} opens its exact queue in one tap', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      for (final stage in [
+        'Confirmed',
+        'Preparing',
+        'Ready',
+        'Delivery requested',
+        'Awaiting reconciliation',
+      ]) {
+        work.workspaceOrders.add(
+          customerOrder(
+            id: 'WORKLOAD-$stage',
+            customer: 'Test customer',
+            stage: stage,
+            createdAt: DateTime(2026, 9, 9, 9),
+          ),
+        );
+      }
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        textScale: 1,
+      );
+      final originalStages = {
+        for (final order in work.workspaceOrders) order.id: order.stage,
+      };
+      await tester.tap(
+        find.byKey(Key('work-store-workload-${entry.$1.toLowerCase()}')),
+      );
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderFilter, entry.$1);
+      final queue = tester.widget<ListView>(
+        find.descendant(
+          of: find.byKey(const Key('work-orders-destination')),
+          matching: find.byType(ListView),
+        ),
+      );
+      expect(
+        (queue.childrenDelegate as SliverChildBuilderDelegate).childCount,
+        entry.$1 == 'New' ? 2 : 1,
+      );
+      expect(
+        find.byKey(Key('work-order-stage-label-WORKLOAD-${entry.$2}')),
+        findsOneWidget,
+      );
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      await captureStoreView(tester, 'workload-first-tap-${entry.$1}');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-workload')), findsOneWidget);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspaceInvoices, isEmpty);
+      expect({
+        for (final order in work.workspaceOrders) order.id: order.stage,
+      }, originalStages);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  test(
+    'Store workload packing is scoped and stale contents need rechecking',
+    () {
+      final work = storeViewFixture();
+      addTearDown(work.dispose);
+      var order = customerOrder(
+        id: 'PACK-SCOPED',
+        customer: 'Test customer',
+        stage: 'Preparing',
+        createdAt: DateTime(2026, 9, 9, 9),
+      );
+      work.workspaceOrders.add(order);
+      final storeId = work.activeWorkspace?.id ?? work.workspaceId;
+      bool pack(int quantity, {String? scope}) =>
+          work.setWorkspaceOrderPackingLine(
+            storeId: scope ?? storeId,
+            orderId: order.id,
+            lineId: 'oil-fortune-1l',
+            quantity: quantity,
+            packed: true,
+          );
+      expect(pack(1, scope: 'ANOTHER-STORE'), isFalse);
+      expect(pack(2), isFalse);
+      expect(pack(1), isTrue);
+      expect(work.workspacePackingLinesForOrder(order).single.packed, isTrue);
+      final index = work.workspaceOrders.indexWhere(
+        (item) => item.id == order.id,
+      );
+      order = order.copyWith(quantities: const {'oil-fortune-1l': 2});
+      work.workspaceOrders[index] = order;
+      expect(work.workspacePackingLinesForOrder(order).single.packed, isFalse);
+      expect(pack(1), isFalse);
+      expect(pack(2), isTrue);
+      expect(work.workspacePackingLinesForOrder(order).single.packed, isTrue);
+      work.workspaceOrders[index] = order.copyWith(stage: 'Cancelled');
+      expect(pack(2), isFalse);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(work.workspacePackedProductIds, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+    },
+  );
+
+  testWidgets('Store workload packing advances only the checked order', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceOrders.add(
+      customerOrder(
+        id: 'PACK-DIRECT',
+        customer: 'Test customer',
+        stage: 'Preparing',
+        createdAt: DateTime(2026, 9, 9, 9),
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-store-workload-packing')));
+    await tester.pumpAndSettle();
+    final ready = find.byKey(const Key('work-order-ready-PACK-DIRECT'));
+    expect(tester.widget<FilledButton>(ready).onPressed, isNull);
+    final pack = find.byKey(
+      const Key('work-order-pack-PACK-DIRECT-oil-fortune-1l'),
+    );
+    await tester.tap(pack);
+    await tester.pumpAndSettle();
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    final oldReady = tester.widget<FilledButton>(ready).onPressed!;
+    final index = work.workspaceOrders.indexWhere(
+      (item) => item.id == 'PACK-DIRECT',
+    );
+    work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
+      quantities: const {'oil-fortune-1l': 2},
+    );
+    oldReady();
+    expect(work.workspaceOrders[index].stage, 'Preparing');
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    work.dismissMessages();
+    await tester.pumpAndSettle();
+    expect(tester.widget<CheckboxListTile>(pack).value, isFalse);
+    expect(tester.widget<FilledButton>(ready).onPressed, isNull);
+    await tester.tap(pack);
+    await tester.pumpAndSettle();
+    await tester.tap(ready);
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrders[index].stage, 'Ready for pickup');
+    expect(
+      work.workspaceOrders.singleWhere((item) => item.id == 'APP-1043').stage,
+      'Confirmed',
+    );
+    expect(work.workspaceInvoices, isEmpty);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Store workload arrivals preserve packing and reduced motion', (
+    tester,
+  ) async {
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        const FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final work = storeViewFixture();
+    final currentIndex = work.workspaceOrders.indexWhere(
+      (order) => order.id == work.currentWorkspaceOrderId,
+    );
+    work.workspaceOrders[currentIndex] = work.workspaceOrders[currentIndex]
+        .copyWith(stage: 'Preparing');
+    work.workspaceOrderStage = 'Preparing';
+    work.workspacePackedProductIds.add('oil-fortune-1l');
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    expect(find.byKey(const Key('work-store-workload')), findsNothing);
+    work.workspaceOrders.addAll(
+      List.generate(
+        1000,
+        (index) => customerOrder(
+          id: 'ARRIVAL-$index',
+          customer: 'Test customer $index',
+          stage: 'Confirmed',
+          createdAt: DateTime(2026, 9, 9, 9),
+        ),
+      ),
+    );
+    work.dismissMessages();
+    await tester.pumpAndSettle();
+    expect(find.text('1000\nAccept', findRichText: true), findsOneWidget);
+    expect(find.text('1\nPack', findRichText: true), findsOneWidget);
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    expect(work.workspaceOrderStage, 'Preparing');
+    expect(work.workspacePackedProductIds, contains('oil-fortune-1l'));
+    final transitions = tester.widgetList<AnimatedSwitcher>(
+      find.descendant(
+        of: find.byKey(const Key('work-store-workload')),
+        matching: find.byType(AnimatedSwitcher),
+      ),
+    );
+    expect(transitions, hasLength(4));
+    expect(transitions.every((item) => item.duration == Duration.zero), isTrue);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets(
+    'Store workload keeps an unknown active state visible for review',
+    (tester) async {
+      final work = storeViewFixture();
+      work.workspaceOrders
+        ..clear()
+        ..add(
+          customerOrder(
+            id: 'UNKNOWN-1',
+            customer: 'Test customer',
+            stage: 'Awaiting reconciliation',
+            createdAt: DateTime(2026, 9, 9, 9),
+          ),
+        );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(320, 640),
+        textScale: 2,
+      );
+      expect(find.text('1\nReview', findRichText: true), findsOneWidget);
+      final disabled = tester.widget<InkWell>(
+        find.byKey(const Key('work-store-workload-new')),
+      );
+      expect(disabled.onTap, isNull);
+      await captureStoreView(tester, 'workload-unknown-200');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
 
   testWidgets(
     'Store queue keys survive arrivals without selecting another order',
@@ -9311,7 +9582,7 @@ void main() {
       customerOrder(
         id: 'OPEN-LATER',
         customer: 'Next customer',
-        stage: 'Preparing',
+        stage: 'Confirmed',
         createdAt: DateTime(2026, 9, 7, 9),
       ),
     );

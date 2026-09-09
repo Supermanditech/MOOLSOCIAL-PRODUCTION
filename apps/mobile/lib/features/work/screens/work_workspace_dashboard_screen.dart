@@ -2502,6 +2502,159 @@ class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
   }
 }
 
+String? _storeOrderWorkFilter(WorkspaceOrderRecord order) {
+  if (order.isClosed) return null;
+  return switch (order.stage) {
+    'Confirmed' => 'New',
+    'Preparing' => 'Packing',
+    'Ready' ||
+    'Ready for pickup' ||
+    'Ready for collection' ||
+    'Awaiting customer' ||
+    'Matched' ||
+    'Customer confirmed' => 'Ready',
+    'Delivery requested' ||
+    'Picked up' ||
+    'Out for delivery' ||
+    'Dispatched' ||
+    'Delivering' => 'Delivery',
+    _ => 'Attention',
+  };
+}
+
+bool _hasStoreWorkload(WorkSession session) =>
+    session.visibleWorkspaceOrders.any(
+      (order) =>
+          _storeOrderWorkFilter(order) != null &&
+          (!session.isSelectedWorkspaceOrder(order) ||
+              _storeOrderWorkFilter(order) == 'Attention'),
+    );
+
+class _StoreWorkloadSummary extends StatelessWidget {
+  const _StoreWorkloadSummary({required this.session, required this.onOrders});
+  final WorkSession session;
+  final VoidCallback onOrders;
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = {
+      'New': 'Accept',
+      'Packing': 'Pack',
+      'Ready': 'Hand over',
+      'Delivery': 'Track',
+      'Attention': 'Review',
+    };
+    final counts = {for (final group in labels.keys) group: 0};
+    var selectedOrderIsActive = false;
+    for (final order in session.visibleWorkspaceOrders) {
+      final group = _storeOrderWorkFilter(order);
+      if (group != null) {
+        counts[group] = counts[group]! + 1;
+        selectedOrderIsActive |= session.isSelectedWorkspaceOrder(order);
+      }
+    }
+    final activeCount = counts.values.fold<int>(0, (sum, count) => sum + count);
+    if (activeCount == 0 ||
+        (activeCount == 1 &&
+            selectedOrderIsActive &&
+            counts['Attention'] == 0)) {
+      return const SizedBox.shrink();
+    }
+    final groups = labels.keys
+        .where((group) => group != 'Attention' || counts[group]! > 0)
+        .toList(growable: false);
+    final reducedMotion = MediaQuery.of(context).disableAnimations;
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    return Padding(
+      key: const Key('work-store-workload'),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final enlarged = MediaQuery.textScalerOf(context).scale(12) > 18;
+          final columns = enlarged || constraints.maxWidth < 208
+              ? 2
+              : groups.length > 4
+              ? 3
+              : 4;
+          return Material(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            child: Wrap(
+              children: [
+                for (final group in groups)
+                  SizedBox(
+                    width: constraints.maxWidth / columns,
+                    child: Semantics(
+                      button: true,
+                      enabled: counts[group]! > 0,
+                      label:
+                          '${labels[group]}, ${counts[group]} customer orders',
+                      child: InkWell(
+                        key: Key('work-store-workload-${group.toLowerCase()}'),
+                        borderRadius: BorderRadius.circular(10),
+                        onTap: counts[group] == 0
+                            ? null
+                            : () {
+                                if (storeId !=
+                                    (session.activeWorkspace?.id ??
+                                        session.workspaceId)) {
+                                  return;
+                                }
+                                session.setWorkspaceOrderFilter(group);
+                                onOrders();
+                              },
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(minHeight: 56),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 7,
+                            ),
+                            child: ExcludeSemantics(
+                              child: AnimatedSwitcher(
+                                duration: reducedMotion
+                                    ? Duration.zero
+                                    : const Duration(milliseconds: 140),
+                                child: Text.rich(
+                                  TextSpan(
+                                    text: '${counts[group]}\n',
+                                    style: TextStyle(
+                                      color: counts[group] == 0
+                                          ? MoolColors.muted
+                                          : MoolColors.navy,
+                                      fontSize: 16,
+                                      height: 1.15,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                    children: [
+                                      TextSpan(
+                                        text: labels[group],
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  key: ValueKey((group, counts[group])),
+                                  textAlign: TextAlign.center,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
 class _StoreControlDashboard extends StatelessWidget {
   const _StoreControlDashboard({
     required this.session,
@@ -2571,6 +2724,7 @@ class _StoreControlDashboard extends StatelessWidget {
                               key: const Key('store-stable-working-centre'),
                               session: session,
                               reviewedOrder: reviewedOrder,
+                              onOrders: onOrders,
                               onReviewOrder: onReviewOrder,
                               onCloseOrder: onCloseOrder,
                               onStock: onStock,
@@ -3184,6 +3338,7 @@ class _StorePulseMetric extends StatelessWidget {
 class _StoreActivityDeck extends StatelessWidget {
   const _StoreActivityDeck({
     required this.session,
+    required this.onOrders,
     required this.onReviewOrder,
     required this.onCloseOrder,
     required this.reviewedOrder,
@@ -3194,6 +3349,7 @@ class _StoreActivityDeck extends StatelessWidget {
   });
   final WorkSession session;
   final WorkspaceOrderRecord? reviewedOrder;
+  final VoidCallback onOrders;
   final VoidCallback onReviewOrder, onCloseOrder, onStock, onMoney, onGroupBulk;
 
   @override
@@ -3258,7 +3414,7 @@ class _StoreActivityDeck extends StatelessWidget {
     } else {
       content = _StoreReadyActivity(session: session);
     }
-    return Padding(
+    final deck = Padding(
       key: const Key('work-store-activity-deck'),
       padding: EdgeInsets.fromLTRB(
         12,
@@ -3281,28 +3437,36 @@ class _StoreActivityDeck extends StatelessWidget {
             _StoreReadyActivity() => 230.0,
             _IncomingOrderActivityCard() =>
               largeText
-                  ? 386.0 + session.workspacePackingLines.length * 48
+                  ? 426.0 + session.workspacePackingLines.length * 48
                   : 308.0 + session.workspacePackingLines.length * 36,
             _PackingActivityCard() => largeText ? 480.0 : 410.0,
             _PickupReadyActivityCard() => 300.0,
             _InvoiceReadyActivityCard() => 350.0,
             _ => 420.0,
           };
+          final card = SizedBox(
+            height: _hasStoreWorkload(session)
+                ? desiredHeight
+                : desiredHeight.clamp(0, constraints.maxHeight),
+            child: _ActivityDeckShell(
+              state:
+                  '${selectedOrder?.id}:${selectedOrder?.stage}:${content.runtimeType}',
+              child: content,
+            ),
+          );
+          if (_hasStoreWorkload(session) &&
+              constraints.maxHeight < desiredHeight) {
+            return SingleChildScrollView(
+              key: const Key('work-store-activity-scroll'),
+              child: card,
+            );
+          }
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              Flexible(
-                child: SizedBox(
-                  height: desiredHeight.clamp(0, constraints.maxHeight),
-                  child: _ActivityDeckShell(
-                    state:
-                        '${selectedOrder?.id}:${selectedOrder?.stage}:${content.runtimeType}',
-                    child: content,
-                  ),
-                ),
-              ),
+              Flexible(child: card),
               if (reviewedOrder == null &&
-                  constraints.maxHeight > desiredHeight + 100 &&
+                  constraints.maxHeight > desiredHeight + 160 &&
                   session.visibleWorkspaceOrders.any(
                     (order) => order.stage == 'Completed',
                   ))
@@ -3311,6 +3475,13 @@ class _StoreActivityDeck extends StatelessWidget {
           );
         },
       ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _StoreWorkloadSummary(session: session, onOrders: onOrders),
+        Expanded(child: deck),
+      ],
     );
   }
 }
@@ -12700,23 +12871,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     final allOrders = session.visibleWorkspaceOrders;
     bool matches(WorkspaceOrderRecord order, String filter) => switch (filter) {
       'Live' => !order.isClosed,
-      'New' => order.stage == 'Confirmed',
-      'Packing' => order.stage == 'Preparing',
-      'Ready' =>
-        const {
-              'Ready',
-              'Ready for pickup',
-              'Delivery requested',
-            }.contains(order.stage) ||
-            (order.isCustomerCollection &&
-                const {
-                  'Ready for collection',
-                  'Awaiting customer',
-                  'Matched',
-                  'Customer confirmed',
-                }.contains(order.stage)),
       'Done' => order.isClosed,
-      _ => false,
+      _ => _storeOrderWorkFilter(order) == filter,
     };
 
     const filterLabels = {
@@ -12724,6 +12880,8 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
       'New': 'New',
       'Packing': 'Packing',
       'Ready': 'Ready',
+      'Delivery': 'Delivery',
+      'Attention': 'Needs review',
       'Done': 'History',
     };
     final counts = {for (final filter in filterLabels.keys) filter: 0};
@@ -12802,7 +12960,12 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
             child: Row(
               children: [
-                for (final filter in filterLabels.keys) ...[
+                for (final filter in filterLabels.keys.where(
+                  (value) =>
+                      value != 'Attention' ||
+                      countFor(value) > 0 ||
+                      _filter == value,
+                )) ...[
                   ChoiceChip(
                     key: Key('work-orders-filter-${filter.toLowerCase()}'),
                     label: Text('${filterLabels[filter]} ${countFor(filter)}'),
@@ -12950,9 +13113,8 @@ class _LiveOrderTicket extends StatelessWidget {
             (session.currentWorkspaceOrderId == null &&
                 session.visibleWorkspaceOrders.length == 1 &&
                 session.visibleWorkspaceOrders.single.id == order.id));
-    final packingLines =
-        active && stage == 'Preparing' && !order.isCustomerCollection
-        ? session.workspacePackingLines
+    final packingLines = stage == 'Preparing' && !order.isCustomerCollection
+        ? session.workspacePackingLinesForOrder(order)
         : const <WorkspacePackingLine>[];
     final packedUnits = packingLines
         .where((line) => line.packed)
@@ -13055,14 +13217,15 @@ class _LiveOrderTicket extends StatelessWidget {
               style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
             ),
             const SizedBox(height: 7),
-            Text(
-              order.items,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
+            if (packingLines.isEmpty)
+              Text(
+                order.items,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-            ),
             if (packingLines.isNotEmpty) ...[
               const SizedBox(height: 10),
               Row(
@@ -13091,15 +13254,27 @@ class _LiveOrderTicket extends StatelessWidget {
                   color: const Color(0xFFF4F6FF),
                   borderRadius: BorderRadius.circular(12),
                   child: CheckboxListTile(
-                    key: Key('work-order-pack-${line.id}'),
+                    key: Key(
+                      active
+                          ? 'work-order-pack-${line.id}'
+                          : 'work-order-pack-${order.id}-${line.id}',
+                    ),
                     dense: true,
                     visualDensity: VisualDensity.compact,
                     contentPadding: const EdgeInsets.symmetric(horizontal: 8),
                     controlAffinity: ListTileControlAffinity.trailing,
                     value: line.packed,
                     onChanged: (value) {
-                      if (!currentActionIsValid()) return;
-                      session.setWorkspacePackingLine(line.id, value == true);
+                      if (!sameStore() || (active && !currentActionIsValid())) {
+                        return;
+                      }
+                      session.setWorkspaceOrderPackingLine(
+                        storeId: storeId,
+                        orderId: order.id,
+                        lineId: line.id,
+                        quantity: line.quantity,
+                        packed: value == true,
+                      );
                     },
                     title: Text(
                       '${line.label} × ${line.quantity}',
@@ -13183,6 +13358,39 @@ class _LiveOrderTicket extends StatelessWidget {
                     label: Text(nextAction),
                   ),
                 ],
+              ),
+            ] else if (stage == 'Preparing') ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  key: Key('work-order-ready-${order.id}'),
+                  onPressed:
+                      session.busy ||
+                          session.workspaceOperationsSyncing ||
+                          session.workspaceHandoverBusy ||
+                          packingLines.isEmpty ||
+                          packingLines.any((line) => !line.packed)
+                      ? null
+                      : () {
+                          final current = session.visibleWorkspaceOrders
+                              .where((record) => record.id == order.id)
+                              .firstOrNull;
+                          final currentLines = current == null
+                              ? const <WorkspacePackingLine>[]
+                              : session.workspacePackingLinesForOrder(current);
+                          if (!sameStore() ||
+                              current?.stage != 'Preparing' ||
+                              current?.isCustomerCollection == true ||
+                              currentLines.isEmpty ||
+                              currentLines.any((line) => !line.packed) ||
+                              !session.selectWorkspaceOrder(order.id) ||
+                              !currentActionIsValid()) {
+                            return;
+                          }
+                          _advanceDeskOrder(session, expectedOrderId: order.id);
+                        },
+                  child: const Text('Order ready'),
+                ),
               ),
             ] else if (!const ['Completed', 'Cancelled'].contains(stage)) ...[
               Align(
