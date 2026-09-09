@@ -445,6 +445,8 @@ class _WorkWorkspaceDashboardScreenState
   final FocusNode _searchFocus = FocusNode(debugLabel: 'workspace-search');
   final ScrollController _searchScroll = ScrollController();
   double _searchReturnOffset = 0;
+  final ScrollController _alertsScroll = ScrollController();
+  double _alertsReturnOffset = 0;
   String? _focusedOrderId, _focusedCustomerId;
   final _catalogueKey = GlobalKey<_WorkspaceCatalogueSurfaceState>();
   final _counterKey = GlobalKey<_CounterOrderSurfaceState>();
@@ -522,6 +524,7 @@ class _WorkWorkspaceDashboardScreenState
     _procurementRevealTimer?.cancel();
     _searchController.dispose();
     _searchScroll.dispose();
+    _alertsScroll.dispose();
     _searchFocus.dispose();
     super.dispose();
   }
@@ -723,6 +726,7 @@ class _WorkWorkspaceDashboardScreenState
     }
 
     void openScopedRoute(String route) {
+      if (!mounted || session.activeWorkspace?.id != workspace.id) return;
       final target = Uri.parse(route);
       if (target.path == '/app/buy' &&
           const {
@@ -753,7 +757,27 @@ class _WorkWorkspaceDashboardScreenState
           _ => null,
         };
         if (operation != null) {
-          _showOperation(operation);
+          final orderId = operation == _WorkspaceOperation.orders
+              ? target.queryParameters['order']
+              : null;
+          if (orderId != null &&
+              !session.visibleWorkspaceOrders.any(
+                (order) => order.id == orderId,
+              )) {
+            session.showNotice('This order is no longer available.');
+            return;
+          }
+          final fromAlerts = _view == _WorkspaceControlView.alerts;
+          if (fromAlerts) {
+            _alertsReturnOffset = _alertsScroll.hasClients
+                ? _alertsScroll.offset
+                : 0;
+          }
+          _showOperation(
+            operation,
+            focusedOrderId: orderId,
+            returnView: fromAlerts ? _WorkspaceControlView.alerts : null,
+          );
           return;
         }
         openRetailer(target.path, queryParameters: target.queryParameters);
@@ -1158,9 +1182,10 @@ class _WorkWorkspaceDashboardScreenState
           ),
           _WorkspaceControlView.alerts => _WorkspaceAlertsSurface(
             session: session,
+            scrollController: _alertsScroll,
             onOpen: openScopedRoute,
             onOpenOperation: _showOperation,
-            onOpenOrders: () => openRetailer('/app/retailer/orders'),
+            onOpenOrders: () => openScopedRoute('/app/retailer/orders'),
             onOpenStatus: _showStatus,
             onDismiss: session.dismissWorkspaceAlert,
           ),
@@ -1528,6 +1553,22 @@ class _WorkWorkspaceDashboardScreenState
 
   Future<void> _leaveOperation() async {
     if (!await _confirmDiscardCounterOrder() || !mounted) return;
+    if (_operationReturnView == _WorkspaceControlView.alerts) {
+      setState(() => _view = _WorkspaceControlView.alerts);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _view == _WorkspaceControlView.alerts &&
+            _alertsScroll.hasClients) {
+          _alertsScroll.jumpTo(
+            _alertsReturnOffset.clamp(
+              0,
+              _alertsScroll.position.maxScrollExtent,
+            ),
+          );
+        }
+      });
+      return;
+    }
     if (_operationReturnView == _WorkspaceControlView.search) {
       setState(() => _view = _WorkspaceControlView.search);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -6188,12 +6229,18 @@ Future<void> _showRejectOrderSheet(
   BuildContext context,
   WorkSession session,
 ) async {
+  final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+  final orderId = session.currentWorkspaceOrderId;
+  final stage = session.workspaceOrderStage;
+  final reviewedOrder = session.currentWorkspaceOrder;
+  if (stage != 'Confirmed') return;
   String? selectedReason;
   final reason = await showDialog<String>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
       builder: (context, setDialogState) => AlertDialog(
         key: const Key('work-reject-order-dialog'),
+        scrollable: true,
         backgroundColor: const Color(0xFFFFFDFD),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         titlePadding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
@@ -6207,11 +6254,40 @@ Future<void> _showRejectOrderSheet(
             children: [
               Icon(Icons.cancel_outlined, color: Color(0xFFB42318), size: 24),
               SizedBox(width: 10),
-              Text('Reject order'),
+              Expanded(child: Text('Reject order')),
             ],
           ),
         ),
         contentPadding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 14),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Keep order', textAlign: TextAlign.center),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: FilledButton(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFB42318),
+                    disabledBackgroundColor: const Color(0xFFE7E7EE),
+                  ),
+                  onPressed: selectedReason == null
+                      ? null
+                      : () => Navigator.of(dialogContext).pop(selectedReason),
+                  child: const Text(
+                    'Reject order',
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
         content: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 360),
           child: Column(
@@ -6219,7 +6295,7 @@ Future<void> _showRejectOrderSheet(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
-                'Choose the reason shared with the customer.',
+                'Choose a reason, then confirm rejection.',
                 style: TextStyle(color: MoolColors.muted),
               ),
               const SizedBox(height: 6),
@@ -6258,31 +6334,6 @@ Future<void> _showRejectOrderSheet(
                     ),
                   ),
                 ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => Navigator.of(dialogContext).pop(),
-                      child: const FittedBox(child: Text('Keep order')),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: FilledButton(
-                      style: FilledButton.styleFrom(
-                        backgroundColor: const Color(0xFFB42318),
-                        disabledBackgroundColor: const Color(0xFFE7E7EE),
-                      ),
-                      onPressed: selectedReason == null
-                          ? null
-                          : () =>
-                                Navigator.of(dialogContext).pop(selectedReason),
-                      child: const FittedBox(child: Text('Reject order')),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -6290,7 +6341,24 @@ Future<void> _showRejectOrderSheet(
     ),
   );
   if (reason == null || !context.mounted) return;
-  session.cancelWorkspaceOrder();
+  final order = session.currentWorkspaceOrder;
+  if (storeId != (session.activeWorkspace?.id ?? session.workspaceId) ||
+      orderId != session.currentWorkspaceOrderId ||
+      session.workspaceOrderStage != stage ||
+      (order != null && (order.id != orderId || order.stage != stage)) ||
+      (reviewedOrder != null &&
+          (order == null ||
+              order.amount != reviewedOrder.amount ||
+              order.items != reviewedOrder.items ||
+              order.payment != reviewedOrder.payment ||
+              !mapEquals(order.quantities, reviewedOrder.quantities))) ||
+      session.busy ||
+      session.workspaceOperationsSyncing ||
+      (order?.actionDeadline?.isAfter(DateTime.now()) == false)) {
+    session.showNotice('This order changed. Review its latest status.');
+    return;
+  }
+  session.cancelWorkspaceOrder(reason: reason);
 }
 
 class _DashboardSyncBanner extends StatelessWidget {
@@ -18998,6 +19066,7 @@ class _SettingsSectionLabel extends StatelessWidget {
 class _WorkspaceAlertsSurface extends StatelessWidget {
   const _WorkspaceAlertsSurface({
     required this.session,
+    required this.scrollController,
     required this.onOpen,
     required this.onOpenOperation,
     required this.onOpenOrders,
@@ -19005,6 +19074,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
     required this.onDismiss,
   });
   final WorkSession session;
+  final ScrollController scrollController;
   final ValueChanged<String> onOpen;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final VoidCallback onOpenOrders, onOpenStatus;
@@ -19013,6 +19083,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final alerts = _workspaceAlerts(session);
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
     if (alerts.isEmpty) {
       return WorkEmptyState(
         keyName: 'work-dashboard-alerts-empty',
@@ -19026,6 +19097,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
       color: Colors.white,
       child: ListView.separated(
         key: const Key('work-dashboard-alerts-screen'),
+        controller: scrollController,
         padding: const EdgeInsets.all(16),
         itemCount: alerts.length,
         separatorBuilder: (_, _) =>
@@ -19038,12 +19110,23 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
             child: InkWell(
               key: Key('work-alert-action-${alert.id}'),
               onTap: () {
-                if (alert.id == 'store-paused') {
+                if (storeId !=
+                    (session.activeWorkspace?.id ?? session.workspaceId)) {
+                  return;
+                }
+                final current = _workspaceAlerts(
+                  session,
+                ).where((item) => item.id == alert.id).firstOrNull;
+                if (current == null) {
+                  session.showNotice('This alert no longer needs action.');
+                  return;
+                }
+                if (current.id == 'store-paused') {
                   onOpenStatus();
-                } else if (alert.operation != null) {
-                  onOpenOperation(alert.operation!);
+                } else if (current.operation != null) {
+                  onOpenOperation(current.operation!);
                 } else {
-                  onOpen(alert.route!);
+                  onOpen(current.route!);
                 }
               },
               child: Padding(
@@ -19096,7 +19179,13 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
                       IconButton(
                         key: Key('work-alert-dismiss-${alert.id}'),
                         tooltip: 'Dismiss ${alert.title}',
-                        onPressed: () => onDismiss(alert.id),
+                        onPressed: () {
+                          if (storeId ==
+                              (session.activeWorkspace?.id ??
+                                  session.workspaceId)) {
+                            onDismiss(alert.id);
+                          }
+                        },
                         icon: const Icon(Icons.close_rounded, size: 19),
                       ),
                   ],
@@ -19294,26 +19383,59 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       requiredAction: true,
     ));
   }
-  if (session.workspaceOrderCustomer.isNotEmpty) {
+  final seenOrders = <String>{};
+  for (final order in session.visibleWorkspaceOrders) {
+    if (!seenOrders.add(order.id) ||
+        order.isClosed ||
+        const {'Delivered', 'Collected', 'Rejected'}.contains(order.stage)) {
+      continue;
+    }
+    final group = _storeOrderWorkFilter(order);
+    final acceptanceEnded =
+        order.stage == 'Confirmed' &&
+        order.actionDeadline != null &&
+        !order.actionDeadline!.isAfter(DateTime.now());
+    final status = order.stage == 'Confirmed'
+        ? acceptanceEnded
+              ? 'Acceptance update pending'
+              : 'Awaiting acceptance'
+        : session.workspaceOrderStageLabel(order);
+    final placed = order.createdAt.toLocal();
+    final when =
+        '${placed.day}/${placed.month} · '
+        '${placed.hour.toString().padLeft(2, '0')}:'
+        '${placed.minute.toString().padLeft(2, '0')}';
     alerts.add((
-      id: 'customer-order',
-      title: session.workspaceOrderNeedsDelivery
-          ? 'Customer order needs delivery details'
-          : 'Customer order is ready to review',
+      id: 'order-${order.id}',
+      title: '${order.id} · ${order.customer.split('·').first.trim()}',
       detail:
-          '${session.workspaceOrderItems} · ₹${session.workspaceOrderAmount}',
-      actionLabel: session.workspaceOrderNeedsDelivery
-          ? 'Continue delivery'
-          : 'Review order',
-      route: '/app/retailer/orders',
+          '${order.items} · ₹${_formatStoreAmount(order.amount)}\n'
+          '${order.payment} · $status\n$when',
+      actionLabel: switch (group) {
+        'New' => 'Review order',
+        'Packing' => 'Pack order',
+        'Ready' =>
+          order.isCustomerCollection ? 'View collection' : 'Check pickup',
+        'Delivery' => 'Track delivery',
+        _ => 'Review issue',
+      },
+      route: Uri(
+        path: '/app/retailer/orders',
+        queryParameters: {'order': order.id},
+      ).toString(),
       operation: null,
-      icon: session.workspaceOrderNeedsDelivery
+      icon: group == 'Delivery'
           ? Icons.delivery_dining_outlined
+          : group == 'Packing'
+          ? Icons.inventory_2_outlined
           : Icons.receipt_long_outlined,
       requiredAction: true,
     ));
   }
-  return alerts;
+  return [
+    ...alerts.where((alert) => alert.id.startsWith('order-')),
+    ...alerts.where((alert) => !alert.id.startsWith('order-')),
+  ];
 }
 
 class _WorkspaceDashboardHero extends StatelessWidget {

@@ -8457,7 +8457,8 @@ void main() {
               'product' => 'work-search-product-${product.id}',
               'order' =>
                 'work-search-order-${work.currentWorkspaceOrderId ?? 'current-store-order'}',
-              _ => 'work-alert-customer-order',
+              _ =>
+                'work-alert-order-${work.currentWorkspaceOrderId ?? 'current-store-order'}',
             }),
           );
           await reveal(tester, row);
@@ -9501,6 +9502,330 @@ void main() {
     expect(tester.takeException(), isNull);
     await tester.pumpWidget(const SizedBox.shrink());
   });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'Store alerts exact live records and resolved recovery $scale',
+      (tester) async {
+        final work = storeViewFixture();
+        final now = DateTime.now();
+        work.workspaceOrders.addAll([
+          customerOrder(
+            id: 'MS-1050',
+            customer: 'Asha Mehta',
+            createdAt: now,
+            stage: 'Preparing',
+          ),
+          customerOrder(
+            id: 'MS-1051',
+            customer: 'Ravi Sharma',
+            createdAt: now,
+            stage: 'Ready for pickup',
+          ),
+          customerOrder(
+            id: 'MS-1052',
+            customer: 'Neha Verma',
+            createdAt: now,
+            stage: 'Delivery requested',
+          ),
+        ]);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(412, 915),
+          textScale: scale,
+        );
+        await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-alert-order-SALE-1042')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('work-alert-customer-order')),
+          findsNothing,
+        );
+        await captureStoreView(tester, 'alerts-multiple-states-$scale');
+        final target = find.byKey(const Key('work-alert-action-order-MS-1050'));
+        final list = find.byKey(const Key('work-dashboard-alerts-screen'));
+        final scrollable = find
+            .descendant(of: list, matching: find.byType(Scrollable))
+            .first;
+        await tester.scrollUntilVisible(target, 180, scrollable: scrollable);
+        for (
+          var attempt = 0;
+          attempt < 8 && target.hitTestable().evaluate().isEmpty;
+          attempt++
+        ) {
+          await tester.drag(list, const Offset(0, -180));
+          await tester.pumpAndSettle();
+        }
+        expect(target.hitTestable(), findsOneWidget);
+        final savedScroll = tester
+            .state<ScrollableState>(scrollable)
+            .position
+            .pixels;
+        final retainedTap = tester.widget<InkWell>(target).onTap!;
+        await tester.tap(target);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-focused-order-id')), findsOneWidget);
+        expect(find.text('MS-1050'), findsOneWidget);
+        expect(work.currentWorkspaceOrderId, 'APP-1043');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          tester.state<ScrollableState>(scrollable).position.pixels,
+          closeTo(savedScroll, 0.5),
+        );
+        final index = work.workspaceOrders.indexWhere(
+          (order) => order.id == 'MS-1050',
+        );
+        work.workspaceOrders[index] = work.workspaceOrders[index].copyWith(
+          stage: 'Completed',
+        );
+        retainedTap();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-orders-destination')), findsNothing);
+        expect(find.text('This alert no longer needs action.'), findsOneWidget);
+        expect(find.byKey(const Key('work-alert-order-MS-1050')), findsNothing);
+        expect(work.currentWorkspaceOrderId, 'APP-1043');
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('Store alerts 1000 records address the last exact order', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceOrders.addAll(
+      List.generate(
+        1000,
+        (index) => customerOrder(
+          id: 'ALERT-${index.toString().padLeft(4, '0')}',
+          customer: 'Customer $index',
+          createdAt: DateTime.now(),
+          stage: index.isEven ? 'Confirmed' : 'Preparing',
+        ),
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+    await tester.pumpAndSettle();
+    final list = find.byKey(const Key('work-dashboard-alerts-screen'));
+    final scroll = tester.widget<ListView>(list).controller!;
+    // Lazy rows need not all be built to reach the final loaded alert.
+    for (var attempt = 0; attempt < 6; attempt++) {
+      scroll.jumpTo(scroll.position.maxScrollExtent);
+      await tester.pumpAndSettle();
+    }
+    final target = find.byKey(const Key('work-alert-action-order-ALERT-0999'));
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    expect(target.hitTestable(), findsOneWidget);
+    expect(find.byKey(const Key('work-alert-order-ALERT-0001')), findsNothing);
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+    expect(find.text('ALERT-0999'), findsOneWidget);
+    expect(work.currentWorkspaceOrderId, 'APP-1043');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  testWidgets('Store alerts retained action cannot cross stores', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+    await tester.pumpAndSettle();
+    final retainedTap = tester
+        .widget<InkWell>(
+          find.byKey(const Key('work-alert-action-order-APP-1043')),
+        )
+        .onTap!;
+    final store = work.activeWorkspace!;
+    work.activateWorkspace(
+      WorkWorkspace(
+        id: 'ALERT-OTHER-STORE',
+        name: 'Second Store',
+        profileId: store.profileId,
+        profileLabel: store.profileLabel,
+        area: store.area,
+        verified: true,
+      ),
+    );
+    retainedTap();
+    await tester.pumpAndSettle();
+    expect(work.currentWorkspaceOrderId, isNull);
+    expect(work.visibleWorkspaceOrders, isEmpty);
+    expect(find.byKey(const Key('work-orders-destination')), findsNothing);
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'Store reject requires confirmation and Back preserves order $scale',
+      (tester) async {
+        final gateway = ReviewWorkGateway();
+        final work = storeViewFixture(gateway);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          textScale: scale,
+        );
+        await tester.tap(find.text('Reject'));
+        await tester.pumpAndSettle();
+        final dialog = find.byKey(const Key('work-reject-order-dialog'));
+        final confirm = find.descendant(
+          of: dialog,
+          matching: find.byType(FilledButton),
+        );
+        expect(work.workspaceOrderStage, 'Confirmed');
+        expect(tester.widget<FilledButton>(confirm).onPressed, isNull);
+        await tester.tap(find.text('Product unavailable'));
+        await tester.pumpAndSettle();
+        expect(confirm.hitTestable(), findsOneWidget);
+        await captureStoreView(tester, 'reject-confirmation-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderStage, 'Confirmed');
+        expect(gateway.operationalSaveCalls, 0);
+        await tester.tap(find.text('Reject'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Product unavailable'));
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(confirm);
+        await tester.pumpAndSettle();
+        expect(confirm.hitTestable(), findsOneWidget);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(work.workspaceOrderStage, 'Cancelled');
+        expect(
+          work.currentWorkspaceOrder!.rejectionReason,
+          'Product unavailable',
+        );
+        expect(gateway.operationalSaveCalls, 1);
+        final savedOrders =
+            gateway.lastOperationalSnapshot!.state['orders'] as List;
+        expect(
+          savedOrders.cast<Map<String, Object?>>().singleWhere(
+            (order) => order['id'] == 'APP-1043',
+          )['rejectionReason'],
+          'Product unavailable',
+        );
+        expect(work.workspaceInvoices, isEmpty);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+  }
+
+  testWidgets('Store reject stale confirmation cannot cancel another order', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    work.workspaceOrders.add(
+      customerOrder(
+        id: 'OTHER-ORDER',
+        customer: 'Another customer',
+        createdAt: DateTime.now(),
+        stage: 'Confirmed',
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      textScale: 1,
+    );
+    await tester.tap(find.text('Reject'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Product unavailable'));
+    await tester.pumpAndSettle();
+    expect(work.selectWorkspaceOrder('OTHER-ORDER'), isTrue);
+    await tester.pumpAndSettle();
+    final confirm = find.descendant(
+      of: find.byKey(const Key('work-reject-order-dialog')),
+      matching: find.byType(FilledButton),
+    );
+    await tester.tap(confirm);
+    await tester.pumpAndSettle();
+    expect(
+      work.workspaceOrders.where((order) => order.stage == 'Cancelled'),
+      isEmpty,
+    );
+    expect(
+      find.text('This order changed. Review its latest status.'),
+      findsOneWidget,
+    );
+    expect(work.currentWorkspaceOrderId, 'OTHER-ORDER');
+    expect(tester.takeException(), isNull);
+    await tester.pumpWidget(const SizedBox.shrink());
+  });
+
+  for (final update in ['removed', 'price changed', 'expired']) {
+    testWidgets('Store reject rechecks an order that is $update', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        textScale: 1,
+      );
+      await tester.tap(find.text('Reject'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Product unavailable'));
+      await tester.pumpAndSettle();
+      final index = work.workspaceOrders.indexWhere(
+        (order) => order.id == 'APP-1043',
+      );
+      if (update == 'removed') {
+        work.workspaceOrders.removeAt(index);
+      } else {
+        work.workspaceOrders[index] = update == 'expired'
+            ? work.workspaceOrders[index].copyWith(
+                actionDeadline: DateTime.now().subtract(
+                  const Duration(seconds: 1),
+                ),
+              )
+            : work.workspaceOrders[index].copyWith(amount: 1500);
+      }
+      await tester.tap(
+        find.descendant(
+          of: find.byKey(const Key('work-reject-order-dialog')),
+          matching: find.byType(FilledButton),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        work.workspaceOrders.where((order) => order.stage == 'Cancelled'),
+        isEmpty,
+      );
+      expect(
+        find.text('This order changed. Review its latest status.'),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
 
   for (final scale in [1.0, 1.4, 2.0]) {
     testWidgets('Store queue 1000 local records and first action $scale', (

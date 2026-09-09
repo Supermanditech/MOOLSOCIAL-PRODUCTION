@@ -1996,6 +1996,8 @@ class WorkSession extends ChangeNotifier {
           'payment': order.payment,
           'address': order.address,
           'stage': order.stage,
+          if (order.rejectionReason != null)
+            'rejectionReason': order.rejectionReason,
           'needsDelivery': order.needsDelivery,
           'createdAt': order.createdAt.toUtc().toIso8601String(),
           'actionDeadline': order.actionDeadline?.toUtc().toIso8601String(),
@@ -2884,7 +2886,7 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
-  void cancelWorkspaceOrder() {
+  void cancelWorkspaceOrder({String? reason}) {
     if (hasPendingOrderTime) {
       showError('Confirm the time request before changing this order.');
       return;
@@ -2897,6 +2899,7 @@ class WorkSession extends ChangeNotifier {
       workspaceOrders[index] = order.copyWith(
         stage: 'Cancelled',
         stockReserved: false,
+        rejectionReason: reason?.trim(),
       );
     }
     _recordWorkspaceActivity('Customer order cancelled.');

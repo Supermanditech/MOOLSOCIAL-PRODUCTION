@@ -92,6 +92,7 @@ class WorkspaceOrderRecord {
     this.stockReserved = false,
     this.collectionStoreId,
     this.itemSnapshots = const [],
+    this.rejectionReason,
   });
 
   final String id;
@@ -115,6 +116,7 @@ class WorkspaceOrderRecord {
   /// A legacy Pickup label is not sufficient to grant collection authority.
   final String? collectionStoreId;
   final List<WorkspaceOrderItemSnapshot> itemSnapshots;
+  final String? rejectionReason;
 
   /// A changed SKU/quantity must not retain stale purchased-price information.
   bool get hasCompleteItemSnapshot =>
@@ -151,6 +153,7 @@ class WorkspaceOrderRecord {
     int? extraMinutes,
     bool? stockReserved,
     List<WorkspaceOrderItemSnapshot>? itemSnapshots,
+    String? rejectionReason,
   }) => WorkspaceOrderRecord(
     id: id,
     customer: customer ?? this.customer,
@@ -172,6 +175,7 @@ class WorkspaceOrderRecord {
     itemSnapshots: List<WorkspaceOrderItemSnapshot>.unmodifiable(
       itemSnapshots ?? this.itemSnapshots,
     ),
+    rejectionReason: rejectionReason ?? this.rejectionReason,
   );
 }
 
