@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "prebuild_controls_passed_pending_seal",
-  "buildAuthorization": "not_authorized",
+  "machineState": "installed_device_review_incomplete",
+  "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-13-review-20260909/prebuild-validation.md"
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "765ff438e3efc50af20a419b1d930b96916f2970"
+    "head": "9fd05843c8333b429d78024e4653f136684ae55b"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-13-review-20260909/source-manifest.txt",
@@ -124,7 +124,7 @@
     }
   ],
   "premiumMotionPolicy": {
-    "state": "locally_verified_oppo_replay_pending",
+    "state": "bounded_navigation_locally_and_oppo_verified",
     "policy": "config/buy-premium-motion-policy.json",
     "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
     "candidateContract": "artifacts/quality/codex-oppo-r66-13-review-20260909/candidate-contract.md",
@@ -139,6 +139,7 @@
     "dependencyHeld": [
       "REG4554_existing_Files_200_percent_content_review",
       "REG4555_inherited_shared_suite_contract_failures",
+      "REG4556_Files_sheet_Cancel_safe_area",
       "physical_200_percent_TalkBack",
       "backend_authority"
     ],
@@ -149,17 +150,18 @@
   "postBuildGates": [
     {
       "id": "apk-integrity",
-      "state": "pending",
+      "state": "passed",
       "evidence": "artifacts/quality/codex-oppo-r66-13-review-20260909/uaw-codex-oppo-r66.13-review-20260909-build-provenance.txt"
     },
     {
       "id": "oppo-install",
-      "state": "pending",
+      "state": "passed",
       "evidence": "artifacts/quality/codex-oppo-r66-13-review-20260909/post-install.json"
     },
     {
       "id": "oppo-real-user-review",
       "state": "pending",
+      "disposition": "REG4551 is closed for its local and exact-r66.13 native return-navigation checks. Global review remains incomplete: Files content REG4554, inherited legacy-suite REG4555, Files sheet Cancel REG4556, physical200%/TalkBack and backend authority are not qualified.",
       "evidence": "artifacts/quality/codex-oppo-r66-13-review-20260909/device-review.md"
     },
     {
