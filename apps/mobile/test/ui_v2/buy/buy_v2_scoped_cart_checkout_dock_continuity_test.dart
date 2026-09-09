@@ -539,7 +539,7 @@ void main() {
             );
             final detail = find.text(
               saved
-                  ? 'Save products from this grid for instant access.'
+                  ? 'Save products while browsing to find them here.'
                   : 'Check the product code or search by product name.',
             );
             final recovery = find.text(
@@ -740,7 +740,7 @@ void main() {
             );
             final title = find.text('No saved products yet');
             final detail = find.text(
-              'Save products from this grid for instant access.',
+              'Save products while browsing to find them here.',
             );
             final recovery = find.text('Show all products');
             final emptyParts = [title, detail, recovery];

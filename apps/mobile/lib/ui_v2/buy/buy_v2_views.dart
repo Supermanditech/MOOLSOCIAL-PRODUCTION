@@ -5120,13 +5120,29 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             fontWeight: FontWeight.w900,
           );
           final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
-          final totalLabel = session.cartScope == BuyV2CartScope.wholesale
+          final currencyInLabel = totalSize.width > constraints.maxWidth;
+          final displayedTotalText = currencyInLabel
+              ? totalText.replaceFirst('₹', '')
+              : totalText;
+          final displayedTotalSize = currencyInLabel
+              ? buyV2ValueTextSize(
+                  context,
+                  displayedTotalText,
+                  totalStyle,
+                  maxWidth: constraints.maxWidth,
+                  maxLines: null,
+                )
+              : totalSize;
+          final baseTotalLabel = session.cartScope == BuyV2CartScope.wholesale
               ? session.scopedTipTotal > 0
                     ? 'Landed total + delivery tip'
                     : 'Landed cart total'
               : session.scopedTipTotal > 0
               ? 'Items + delivery tip'
               : 'Cart total';
+          final totalLabel = currencyInLabel
+              ? '$baseTotalLabel (₹)'
+              : baseTotalLabel;
           final actionWidth = (constraints.maxWidth * .54).clamp(150.0, 190.0);
 
           void openCheckout() {
@@ -5140,14 +5156,19 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
             }
           }
 
-          final total = BuyV2FiniteValueTransition(
-            key: const ValueKey('buy-cart-payable-total-motion'),
-            incomingOnly: true,
-            stateKey: session.scopedPayableTotal,
-            text: totalText,
-            ownerSize: totalSize,
-            textAlign: TextAlign.start,
-            style: totalStyle,
+          final total = Semantics(
+            label: totalText,
+            excludeSemantics: true,
+            child: BuyV2FiniteValueTransition(
+              key: const ValueKey('buy-cart-payable-total-motion'),
+              incomingOnly: true,
+              stateKey: session.scopedPayableTotal,
+              text: displayedTotalText,
+              ownerSize: displayedTotalSize,
+              maxLines: currencyInLabel ? null : 1,
+              textAlign: TextAlign.start,
+              style: totalStyle,
+            ),
           );
           final review = FilledButton(
             style: FilledButton.styleFrom(

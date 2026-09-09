@@ -5509,6 +5509,114 @@ void main() {
     );
   });
 
+  for (final amount in [1000000, 10000000, 100001280]) {
+    for (final layout in [
+      (size: const Size(360, 800), scale: 1.0, label: 'normal'),
+      (size: const Size(320, 711), scale: 2.0, label: 'enlarged-portrait'),
+      (size: const Size(711, 320), scale: 2.0, label: 'enlarged-landscape'),
+    ]) {
+      testWidgets(
+        'R668 cart payable INR$amount is complete at ${layout.label}',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = layout.size;
+          addTearDown(tester.view.reset);
+          final session = _R668CartPayableFixture(amount);
+          addTearDown(session.dispose);
+          await tester.pumpWidget(app(session, textScale: layout.scale));
+          await tester.pumpAndSettle();
+          session.addProduct('w-notebook');
+          session.openCart(scope: BuyV2CartScope.all);
+          await tester.pumpAndSettle();
+          final actionBar = find.byKey(const ValueKey('buy-cart-action-bar'));
+          if (layout.label == 'enlarged-landscape') {
+            await tester.scrollUntilVisible(
+              actionBar,
+              240,
+              scrollable: scrollableWithin(
+                const PageStorageKey('buy-cart-all'),
+              ),
+            );
+            await tester.pumpAndSettle();
+          }
+          final amountOwner = find.byKey(
+            const ValueKey('buy-cart-payable-total-motion'),
+          );
+          final displayedAmount = find.descendant(
+            of: amountOwner,
+            matching: find.byType(Text),
+          );
+          expect(displayedAmount, findsOneWidget);
+          final amountText = tester.widget<Text>(displayedAmount).data!;
+          expect(
+            amountText,
+            isIn([
+              buyV2Money(amount),
+              buyV2Money(amount).replaceFirst('₹', ''),
+            ]),
+          );
+          if (!amountText.contains('₹')) {
+            expect(find.text('Cart total (₹)'), findsOneWidget);
+          }
+          final paragraph = tester.renderObject<RenderParagraph>(
+            displayedAmount,
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final amountRect = tester.getRect(displayedAmount);
+          expect(
+            amountRect.left,
+            greaterThanOrEqualTo(tester.getRect(actionBar).left),
+          );
+          expect(
+            amountRect.right,
+            lessThanOrEqualTo(tester.getRect(actionBar).right),
+          );
+          final boxes = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: 0, extentOffset: amountText.length),
+          );
+          expect(boxes, isNotEmpty);
+          final visibleAmountBoundary = tester.getRect(actionBar);
+          for (final box in boxes) {
+            final topLeft = paragraph.localToGlobal(Offset(box.left, box.top));
+            final bottomRight = paragraph.localToGlobal(
+              Offset(box.right, box.bottom),
+            );
+            expect(
+              topLeft.dx,
+              greaterThanOrEqualTo(visibleAmountBoundary.left),
+            );
+            expect(
+              bottomRight.dx,
+              lessThanOrEqualTo(visibleAmountBoundary.right),
+            );
+            expect(
+              bottomRight.dy,
+              lessThanOrEqualTo(visibleAmountBoundary.bottom),
+            );
+            expect(
+              box.top,
+              closeTo(boxes.first.top, .1),
+              reason: 'Keep the numeric amount together on one line.',
+            );
+          }
+          final review = find.descendant(
+            of: actionBar,
+            matching: find.text('Review order'),
+          );
+          await tester.ensureVisible(review);
+          await tester.pumpAndSettle();
+          expect(review.hitTestable(), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'r669-cart-$amount-${layout.label}');
+          await tester.tap(review);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.checkout);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   testWidgets('PAY-09 Cart summary clears the fixed action bar', (
     tester,
   ) async {
@@ -9012,6 +9120,14 @@ class _R66CartDisplayFixture extends BuyV2Session {
 
   @override
   int get cartTotal => displayTotal;
+}
+
+// Layout-only totals; arithmetic and real quantities use the session suites.
+class _R668CartPayableFixture extends _R66CartDisplayFixture {
+  _R668CartPayableFixture(super.displayTotal);
+
+  @override
+  int get scopedPayableTotal => displayTotal;
 }
 
 void _expectCustomerFacingBuyCopy(WidgetTester tester) {
