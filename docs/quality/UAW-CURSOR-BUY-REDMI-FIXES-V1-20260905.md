@@ -876,3 +876,70 @@ This exact five-control admission appends one registry entry, refreshes its poli
   ]
 }
 <!-- R676-DATA-END -->
+
+
+## r66.8 exact featured return correction source - 9 September 2026
+
+This mvp_supporting build qualification continues the founder's Redmi real-user-test/register/implement/retest routine for registered REG4548 and child R66-UAT-023-R667-FEATURED-RETURN-001. A buyer returning from a featured product must retain the horizontal browsing position independently of the vertical catalogue and other destinations. The existing native catalogue now gives the featured rail its own destination-specific saved-scroll identity. No new screen, route, dependency or backend is required. The bound source passed twelve actual BuyV2Screen return/destination-isolation cases and two complete1678-test Buy/Profile cycles with27 unchanged historical capture-only skips; protected reference comparisons remain separately tagged and immutable.
+
+The smallest build-support update adds only this exact source commit to the protected Buy review allowlist with the existing16-owner boundary. Relative to the previously qualified Medicine-title source, only the catalogue runtime owner differs. Both Windows hosts pass65 proposal boundary/egress/brand cases, including rejection of the previous three qualified source versions. After admission, apply only the exact proposed checker, rerun actual build-boundary checks, and prepare a fresh uniquely versioned one-build candidate state. Redmi checksum-matched replay is required before REG4548 closure. Earlier title and50kg device passes remain preserved separately; full87, parent Git and production acceptance remain unqualified.
+
+This exact three-control admission appends this manifest, updates its scope hash and extends the coordination checker while preserving R676's historical admission, registry4514, UI66/primary45 claims and execution authority. First-parent subject: `ui(buy-redmi-fixes-v1-20260905): admit r66.8 qualified review source`. Source qualification itself grants no build/install authority. Native/dependency configuration, accepted references, backend/shared integration, OPPO and real transactions remain outside this continuation. The consumed r66.7 build/install state cannot be reused.
+<!-- R677-DATA-BEGIN -->
+{
+  "parent": "0c36d2201c43665d38e00173df7d2df63f690344",
+  "implementation": [
+    {
+      "path": "scripts/check-buy-protected-baseline.ps1",
+      "beforeSha256": "4565F7095F1DC6D3DACCC1BBD478E2697A2536F9A449B2F654B27CA581755DA2",
+      "proposedSha256": "E5E95B276A8B3C0CEDBD921A43B020450095F633371FF44D52823367AEDD529D"
+    }
+  ],
+  "runtimeDelta": [
+    "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
+    "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+    "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
+    "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+  ],
+  "correctionRuntimeDelta": [
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"
+  ],
+  "proposalBinding": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r677-source-proposal-v1\\binding.json",
+    "sha256": "851D436C9EBB8403548D1CB1A9EA57F6757883FEF91A465732A29437E653844B"
+  },
+  "fullRegressionEvidence": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\SINGLECHAT-R676-FULL-REGRESSION-BINDING-V1.json",
+    "sha256": "B2FF8B20F61886FD2EF290F50F2D6B265F1EE116A0195DE74BC40EC27F7149FC",
+    "cycles": 2,
+    "passedPerCycle": 1678,
+    "skippedPerCycle": 27,
+    "sourceCommit": "0c36d2201c43665d38e00173df7d2df63f690344",
+    "mobileTreeSha256": "2A77FD4EFDEF6FB771C28DCB1F715D0BF802F2FBC375F342171FB67F36842901"
+  },
+  "sourceBoundaryProposalEvidence": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r677-proposed-boundaries7-1.result.json",
+      "sha256": "7C537172189659FBFA4D850BA3EF792F631D09B7A27A759CF652762AD4877A2A",
+      "cases": 65
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r677-proposed-boundaries51-1.result.json",
+      "sha256": "4A98FC3A1B67F3BE635D66A51D18997EB329464347BB4F53BD2EB390C6C966DB",
+      "cases": 65
+    }
+  ]
+}
+<!-- R677-DATA-END -->
