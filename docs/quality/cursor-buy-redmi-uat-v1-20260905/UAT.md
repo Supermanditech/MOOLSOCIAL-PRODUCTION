@@ -1,5 +1,61 @@
 # Fresh Redmi journey inventory
 
+## r66.8 expanded screen audit — started 9 September 2026
+
+Founder instruction: enumerate journeys, test on Redmi, register each real customer defect, continue to the next; report the complete bounded audit before implementation. Baseline147acab5, current871e73b2, installed r66.8/2026090903. Historical tables below remain evidence of earlier versions and are not automatic current passes. Backend/integration/provider settlement and physical supplier operations remain deferred. No real order/payment/share/message submission in this audit. Screen changes, temporary selections and basket changes must be reversible and recorded.
+
+| Screen family | Journeys to exercise | Current r66.8 evidence/status |
+| --- | --- | --- |
+| Entry and navigation shell | launch; Shop/Wholesale/Medicine; Mool menu; tab identity; Back; safe areas | prior local subsets; expand destination transitions |
+| SKU grid and modes | Quick/Scheduled/Wholesale/Bulk; category; pagination; refresh; compact facts/icons; empty/long content | pending current expanded audit |
+| Search and refine | type/clear/no result; recent search; filters/sort; apply/reset/cancel; retain scope and scroll | pending |
+| Product detail | title/SKU/pack/unit price; images; variants; MOQ; quantity; policy; business wording; disclosures; Back | in progress from retained wholesale cart |
+| Store | identity/opening/fulfilment; expand; catalogue; SKU; nested product/cart/Back | pending |
+| Saved | save/unsave; list/search/empty; product/Back; add; clear/Cancel | pending |
+| Recently viewed | list/cards/full facts; product/Back; scroll retention | previous featured return closure separate; expanded sheet pending |
+| Offers | issuer/eligibility; product/variant/compare; benefit selection; return origin | pending |
+| Monthly basket | price/pack count/scope; included products; cancel/return; add acknowledgement | pending |
+| Cart | scope/count/line price; quantity/remove/clear Cancel; browse; product Back; high totals; drag/park | prior normal controls pass; P1 child028-R668 nine-digit large-text truncation open |
+| Address | selection; add/edit; required/invalid input; keyboard; Cancel/Back; return context | high-total selection passed; remaining form audit pending |
+| Checkout payment | method selection; contextual PO; invalid/missing reference; offers/fees; review/Back | high-total local selection/PO validation passed; remaining states pending |
+| Confirmation | shipments/units/totals/GST; change payment/address; Back; action visibility | high-total normal review passed; no order submitted |
+| Orders list | filters; empty state; order identity; scrolling; detail/Back | pending |
+| Tracking | compact/expanded status; address/items; refresh/unavailable; alerts; Help/Back | pending |
+| Invoice | totals/identity; view/scroll; Back; download availability | pending; external save requires verified helper/system-surface handling |
+| Resolution | cancellation/return/replacement/refund eligibility; item/reason selection; validation; Cancel/Back | pending; accepted backend outcomes deferred |
+| Settings and alerts | saved shortcut; browsing preference truth; notifications list/target/Back; help/profile origin | pending |
+| Other entry points | scanner removal/qualified collection boundary; share Cancel; store chat origin | dependent/shared surfaces classified separately; no external send |
+| Cross-screen behaviour | portrait/landscape; large text; keyboard; focus/semantics; long content; background/restart; stale state | prior cart restart pass; expand per screen and bind exact captures |
+
+No entire screen family is declared production-ready by this planning inventory. Record pass/failure/blocked reasons against concrete routes and captures; evaluate whitespace/features by purchase relevance and usability, not personal taste. Confirmed defects are appended to DEFECTS before implementation; observations stay separate until reproduced.
+
+### SKU/variant media qualification and proposed supplier profile
+
+Current finding: supplier media is not end-to-end qualified. See R668-AUDIT-MEDIA-001/002 in DEFECTS. Decoder capability is not upload acceptance. The inspected default buyer adapter emits one atlas packshot; provider WorkspaceCatalogueItem does not carry the photo/video list. Existing proof-document upload validation is unrelated. A tap on the hero is not an established fullscreen action; source supplies pinch-to-zoom. Do not call a single tap's lack of response a defect. Actual pinch/multi-photo/video playback remain unverified on Redmi because the installed catalogue does not expose corresponding provider fixtures.
+
+Proposed first supplier profile (audit recommendation, not implemented limits or an accepted production contract):
+
+| Area | Proposed rule / acceptance check |
+| --- | --- |
+| Still inputs | JPG/JPEG, PNG and non-animated WebP; inspect decoded content/MIME, not filename alone. Convert HEIC/HEIF or other source formats before publication until conversion is qualified. Reject animated/unsupported files clearly. |
+| Image master | Recommend 1600x1600 square, sRGB, full pack visible with a small neutral margin; preserve native aspect ratio for portrait/landscape photos. Proposed upload ceiling 5MB and 4096px longest edge, minimum 600px shortest edge for primary product photos. These are proposed product budgets, not platform limits. |
+| Buyer derivatives | Generate bounded grid/detail derivatives; decode near rendered pixel size. Reserve stable media bounds while loading; contain the complete pack without stretching or cropping labels. A tall/wide input should letterbox cleanly, not resize surrounding price/actions. |
+| Video profile | Propose MP4 container, H.264 AVC with AAC-LC if audio is present, muted until user enables sound; streamable metadata at the beginning. Proposed max60sec, 30fps, 1080p/25MB supplier input with a qualified 720p delivery derivative. Produce a still poster and relevant transcript/captions. No claim that an arbitrary .mp4 file will decode. |
+| SKU/variant binding | Every asset needs productID, variantID where applicable, stable mediaID, ordering/primary flag, type, dimensions, bytes and descriptive alternative text; videos additionally duration/codec/poster. Switching variant must switch photo/pack/price/availability together; do not retain an unrelated prior variant image. |
+| Content integrity | Use actual supplied pack, correct size/colour/count and legible relevant labels. Visibly disclose illustrative/category imagery. No invented supplier photography, badges or certification from a fallback image. |
+| Input failures | Test wrong extension/MIME, zero-byte, corrupt/truncated files, oversized pixel count/bytes, unsupported codec, missing poster, rotated EXIF and transparent backgrounds. Supplier gets a specific correction; buyer gets stable truthful fallback/retry. |
+| Runtime failures | Test slow/offline/404/expired media, retry, cached revisit, rapid product/variant changes, portrait/landscape, large text, zoom/reset, media swipe versus page scroll, background/resume and Back while playing. Verify one active video, no autoplay audio, no continuing playback after leaving. |
+
+Source basis: Flutter documents JPEG/PNG/WebP plus other decoders, and explains that decoded image memory is uncompressed and can be limited through cacheWidth/cacheHeight ([Flutter Image](https://api.flutter.dev/flutter/widgets/Image-class.html), checked 9 September 2026). Android documents MP4/H.264 and AAC support, with device/profile constraints and streaming requirements ([Android supported media formats](https://developer.android.com/media/platform/supported-formats), checked same date). The numeric product budgets above are proposed engineering choices; those sources do not mandate them. Current network-image and video components use contain/aspect-ratio rendering, but no supplier size contract or real Redmi format matrix is thereby established.
+
+### Expanded execution observations, captures067–087
+
+- Normal retained cart → notebook detail → all product sections → Compare → A4 copier paper → Android Back restored the notebook's tools/reviews scroll (074/077 have identical XML). No wrong-product navigation was observed in this compare route.
+- Notebook → Visit supplier → nested notebook detail → Back restored supplier sheet (078/081 same XML). Full catalogue → Back restored supplier sheet (085), then Back restored notebook scroll (086 same XML as074); final Back returned Cart087 with unchanged 28736 packs/INR100001280 and supplier continuation.
+- Real defects registered before proceeding: generic SKU imagery MEDIA-001; supplier media contract MEDIA-002 (technical, device upload unqualified); truncated grid quantity QTY-001; full-catalogue continuation CATALOGUE-001. All task-local IDs, not central regression allocations.
+- Product detail repeats pack/variant/unit price/policy across facts, highlights, specifications and generated description (071–074). Link existing R66-UAT-003 / REG4545 observation; no duplicate new ticket or removal solely on aesthetic preference. Bulk quantity entry has only +/- in inspected product/grid controls; 080 quantity tap preserved079 XML, and earlier064 cart tap did not edit. Full Bulk-mode alternatives remain to be checked before a separate usability defect.
+- Basket was not changed in captures067–087. These are current route subsets, not completion of the 20-family matrix above. Exact external PNG/XML receipts remain preserved under redmi-r66-8.
+
 Candidate: UAW-CURSOR-BUY-R66-1-REDMI-REVIEW-20260905. Installed hash: `30A71FE8B6696BF51400FBED5A90C3179E25CE0A6153A998F5A041657C9D35C3`; code 2026090501. Fresh execution ledger below qualifies individual actions, not entire coverage groups.
 
 Every row below started Not tested. It is a planned coverage group, not a defect count. Expand to exact screens, controls and repeatable steps during current Redmi observation. Group status may be In progress with explicit observed subsets; individual results are Not tested, Passed on Redmi, Failed on Redmi, Blocked (reason), Locally tested only, or Not applicable (reason). Keep numerator/denominator explicit; never claim every conceivable combination tested.
