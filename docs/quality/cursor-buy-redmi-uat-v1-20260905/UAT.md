@@ -2,6 +2,12 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Latest Shop store search/pagination audit — captures494–510
+
+Seventeen native-success PNG/XML pairs visually inspected. Ledger R66-8-EXPANDED-AUDIT-CAPTURES-494-510-V1.json SHA256519115FED4DCA59D8211B9C07A088893D700CC396D70C96969B4505FD5074BEF. Same Redmi r66.8 and normal display. Shop Scheduled atta2 opens495 at retained product scroll; Visit store496 opens three-product preview; Browse all497 opens Mool Market000001 catalogue (fixture5000). Search soap499 yields60 fixture matches; keyboard Back500 and Next501 reach41–60. Product502 is correct soap3365, pack4/164/41each. Back503 preserves query and page but reopens dismissed keyboard; dismiss504 restores exact501 XML2A84DD02B0640394BD577BCAA9422846C2AF9353572C91A045233FBF04A5625E. Repeat505/506 reproduces; registered OPEN P3 STORE-KEYBOARD-RETURN-001 before proceeding. No wrong product/page or lost query observed. Existing category-image montage defect remains visible in soap imagery; this is not a newly counted duplicate media defect or real supplier-media qualification.
+
+Dismiss507; catalogue X508 restores exact496 store preview; Back509 restores exact495 original atta product; Back510 restores exact494 Shop XML5C4CF0172A8BDE18665C5E6A1F84861DD9A71DA308A7C7983C89B7BED9BA7418. Basket/address/display preserved; natural recent history includes atta2 and soap3365, no history cleared. No cart mutation, send/order/payment/download/backend operation, source change, build or install. One new P3 usability defect. Remaining store empty-search, category combinations and responsive cases are unqualified; full audit and live supplier-media/variant qualification remain open, backend/auth integration deferred.
+
 ### Latest purchase-reference and Restock audit — captures481–493
 
 Twelve successful native PNG/XML pairs visually inspected; external ledger R66-8-EXPANDED-AUDIT-CAPTURES-481-493-V1.json SHA256D42ADC0E9ECD1181306DF5B1EACEBD083C7859ED3DF2300E138FB8CD93623611. Same Redmi r66.8 candidate and normal display. Orders482 shows Purchase BUY-NEW-04 containing MS-NEW-09/74. Exact purchase query484 returns no match; clear485 and delivery-order ID486 correctly return that purchase/order. Clear487 and repeated purchase query488 fail identically. Registered OPEN P2 R668-AUDIT-ORDER-PURCHASE-SEARCH-001, related child of the product-search defect, before moving on. Source search omits purchaseId as well as line titles; delivery-ID success does not qualify purchase-reference search.
@@ -56,7 +62,7 @@ Founder instruction: enumerate journeys, test on Redmi, register each real custo
 | SKU grid and modes | Quick/Scheduled/Wholesale/Bulk; category; pagination; refresh; compact facts/icons; empty/long content | pending current expanded audit |
 | Search and refine | type/clear/no result; recent search; filters/sort; apply/reset/cancel; retain scope and scroll | 162–188: no-match/clear/recent-query, descending sort, price ceiling, combined multipack empty, brand/available selection, Clear/Apply restore passed; scope/product Back/enlarged remaining |
 | Product detail | title/SKU/pack/unit price; images; variants; MOQ; quantity; policy; business wording; disclosures; Back | in progress from retained wholesale cart |
-| Store | identity/opening/fulfilment; expand; catalogue; SKU; nested product/cart/Back | wholesale nested/full catalogue Back passed078–087; MEDIA/QTY/CATALOGUE issues registered; Shop expansion pending |
+| Store | identity/opening/fulfilment; expand; catalogue; SKU; nested product/cart/Back | wholesale nested/full catalogue Back passed078–087; Shop preview/full search/later-page SKU and nested return checked496–510; query/page retained, unwanted keyboard return P3 registered; empty/category/responsive combinations pending; MEDIA/QTY/CATALOGUE issues remain open |
 | Saved | save/unsave; list/search/empty; product/Back; add; clear/Cancel | empty132–133; temporary Barcode81 save/list/product/Back, Clear confirmation/Keep saved, unsave and Show all passed154–161; original Saved0 restored |
 | Recently viewed | list/cards/full facts; product/Back; scroll retention | Shop sheet/product Back passed118–120; settings count/scope defect125–126; enlarged subset pending |
 | Offers | issuer/eligibility; product/variant/compare; benefit selection; return origin | pending |

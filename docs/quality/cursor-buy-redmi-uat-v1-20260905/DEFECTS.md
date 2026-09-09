@@ -2,6 +2,10 @@
 
 ## Expanded r66.8 audit additions — 9 September 2026
 
+### R668-AUDIT-STORE-KEYBOARD-RETURN-001 — Dismissed search keyboard reopens after product Back
+
+OPEN; P3 usability, reproduced twice on Redmi r66.8/2026090903 at normal display. Shop product → Visit store → Browse all products → search soap499 → Android Back500 explicitly dismisses keyboard → Next501 (41–60 of60) → product502 → Android Back503. Query and page are preserved, but the keyboard reopens and covers the lower product row. Dismiss504 restores exact501 XML2A84DD02B0640394BD577BCAA9422846C2AF9353572C91A045233FBF04A5625E. Open same product505 → Back506 repeats the unwanted keyboard, exact503 XML7AD9493F45F8A16D3F6984483F3461F2E5C6E0063AECDCC9E0ED2F7DCA22E5C8. Customer impact: browsing/comparing products repeatedly hides lower results and requires an extra dismissal despite no intent to edit the query. Expected: preserve query/page and the explicitly dismissed keyboard state on product return; focus/keyboard should reopen when the buyer chooses the search field. Query loss, wrong page and data loss were not observed. Root cause not yet investigated; implementation and focused regression pending.
+
 ### R668-AUDIT-ORDER-PURCHASE-SEARCH-001 — Displayed purchase reference cannot retrieve its orders
 
 OPEN; P2, related child of ORDER-PRODUCT-SEARCH-001 for the separate purchase-reference acceptance case. Redmi r66.8/2026090903, normal display. Orders482 visibly groups MS-NEW-09/INR74 under Purchase BUY-NEW-04. Search exact BUY-NEW-04 in484 returns No orders match this search. Clear485 → exact delivery-order ID MS-NEW-09 in486 correctly returns that same order and BUY-NEW-04 heading. Clear487 → repeat purchase reference488 fails identically (484/488 XML0966862E630D458ADB05C8DED5684B466DC7C7E6EC4D824AA48096B5591AAEAE). Control486 XML9166969F3C2E9690C85BA70F6E41385D1BFED46E52DD51423624922D9500C371.
