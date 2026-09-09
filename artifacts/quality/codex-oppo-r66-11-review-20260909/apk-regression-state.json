@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "built_integrity_passed_install_pending",
+  "machineState": "installed_device_review_incomplete",
   "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
@@ -139,7 +139,7 @@
       "reduced_motion_static_resolution"
     ],
     "dependencyHeld": [
-      "native_OPPO_keyboard_and_scope_replay",
+      "native_OPPO_failed_send_error_and_attachment_recovery",
       "physical_200_percent_and_TalkBack",
       "authoritative_backend_and_unresolved_exploratory_contract_tests"
     ],
@@ -155,12 +155,13 @@
     },
     {
       "id": "oppo-install",
-      "state": "pending",
+      "state": "passed",
       "evidence": "artifacts/quality/codex-oppo-r66-11-review-20260909/post-install.json"
     },
     {
       "id": "oppo-real-user-review",
-      "state": "pending",
+      "state": "failed",
+      "disposition": "Contact and application-draft correction scenarios pass. REG-4551 is a confirmed dashboard Profile/Documents return defect, parked until pre-dashboard closure. Remaining pre-dashboard recovery/accessibility checks and exploratory regressions are explicitly unqualified; this is not complete device or production acceptance.",
       "evidence": "artifacts/quality/codex-oppo-r66-11-review-20260909/device-review.md"
     },
     {
