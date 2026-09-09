@@ -22,6 +22,22 @@ import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 
+class _OrderJournalFixture implements WorkOrderPendingStore {
+  _OrderJournalFixture(this.command);
+  WorkOrderCommand? command;
+  @override
+  Future<List<WorkOrderCommand>> readPending(
+    String accountScope,
+    String workspaceId,
+  ) async => command == null ? [] : [command!];
+  @override
+  Future<void> savePending(WorkOrderCommand value) async => command = value;
+  @override
+  Future<void> removePending(WorkOrderCommand value) async {
+    if (command?.operationId == value.operationId) command = null;
+  }
+}
+
 class _OrderCommandFixtureGateway implements WorkOrderCommandGateway {
   final submitted = <WorkOrderCommand>[];
   final reconciled = <WorkOrderCommand>[];
@@ -7849,6 +7865,70 @@ void main() {
     (412.0, 915.0, 1.0),
     (320.0, 568.0, 2.0),
   ]) {
+    testWidgets('DASH04 restored order card recovery $scale', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final gateway = _OrderCommandFixtureGateway();
+      final original = work.currentWorkspaceOrder!;
+      final storeId = work.activeWorkspace!.id;
+      final saved = WorkOrderCommand(
+        accountScope: 'review-draft-account',
+        workspaceId: storeId,
+        orderId: original.id,
+        operationId: 'retained-order-operation',
+        expectedRevision: 1,
+        action: WorkOrderAction.accept,
+      );
+      final journal = _OrderJournalFixture(saved);
+      final operations = WorkOrderOperations(
+        accountScope: saved.accountScope,
+        workspaceId: storeId,
+        gateway: gateway,
+        pendingStore: journal,
+      );
+      expect(await operations.restore(), isTrue);
+      WorkOrderReply snapshot(int revision, String stage) => WorkOrderReply(
+        accountScope: saved.accountScope,
+        workspaceId: storeId,
+        orderId: original.id,
+        operationId: saved.operationId,
+        revision: revision,
+        state: WorkOrderReplyState.applied,
+        order: original.copyWith(stage: stage),
+      );
+      operations.observe(snapshot(1, 'Confirmed'));
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(width, height),
+        textScale: scale,
+      );
+      final retry = find.byKey(
+        Key('work-order-operation-retry-${original.id}'),
+      );
+      await tester.ensureVisible(retry);
+      await tester.pumpAndSettle();
+      expect(retry.hitTestable(), findsOneWidget);
+      expect(tester.getSize(retry).height, greaterThanOrEqualTo(48));
+      expect(find.text('Update not confirmed'), findsOneWidget);
+      expect(find.byKey(const Key('work-activity-order-accept')), findsNothing);
+      expect(gateway.submitted, isEmpty);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'scoped-order-restored-$scale');
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(gateway.reconciled.single.operationId, saved.operationId);
+      expect(find.text('Checking update…'), findsOneWidget);
+      gateway.replies.single.complete(snapshot(2, 'Preparing'));
+      await tester.pumpAndSettle();
+      expect(work.workspaceOrderStage, 'Preparing');
+      expect(journal.command, isNull);
+      expect(gateway.submitted, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('DASH04 scoped order card submit retry $scale', (tester) async {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
       final gateway = _OrderCommandFixtureGateway();

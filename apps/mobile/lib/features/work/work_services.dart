@@ -448,6 +448,185 @@ abstract interface class WorkOrderCommandGateway {
   Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command);
 }
 
+/// A dedicated order journal, never a document draft or proof of success.
+abstract interface class WorkOrderPendingStore {
+  Future<List<WorkOrderCommand>> readPending(
+    String accountScope,
+    String workspaceId,
+  );
+  Future<void> savePending(WorkOrderCommand command);
+  Future<void> removePending(WorkOrderCommand command);
+}
+
+class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
+  SecureWorkOrderPendingStore({
+    FlutterSecureStorage? storage,
+    String? Function()? currentAccount,
+  }) : _storage = storage ?? const FlutterSecureStorage(),
+       _currentAccount = currentAccount ?? _signedInAccount;
+
+  final FlutterSecureStorage _storage;
+  final String? Function() _currentAccount;
+  // Across instances: timed-out callers must not release a still-running native
+  // read/write and let a later write erase an independently pending order.
+  static final Map<String, Future<void>> _tails = {};
+  static String? _signedInAccount() {
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } on Object {
+      return null;
+    }
+  }
+
+  String _key(String account, String store) =>
+      'moolsocial.workspace.order-pending.v1.${base64UrlEncode(utf8.encode(jsonEncode([account, store])))}';
+
+  void _checkAccount(String account, String store) {
+    if (account.isEmpty || store.isEmpty || _currentAccount() != account) {
+      throw const WorkGatewayException('Sign in again to check this order.');
+    }
+  }
+
+  Future<T> _serial<T>(String key, Future<T> Function() operation) {
+    final previous = _tails[key] ?? Future<void>.value();
+    final result = previous.then((_) => operation());
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _tails[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_tails[key], tail)) _tails.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  static Map<String, Object?> _encode(WorkOrderCommand command) => {
+    'orderId': command.orderId,
+    'operationId': command.operationId,
+    'expectedRevision': command.expectedRevision,
+    'action': command.action.name,
+    'reason': command.reason,
+  };
+
+  static bool _valid(WorkOrderCommand command) =>
+      command.orderId.trim().isNotEmpty &&
+      command.operationId.trim().isNotEmpty &&
+      command.expectedRevision >= 0 &&
+      (command.action == WorkOrderAction.reject
+          ? command.reason != null && command.reason!.trim().isNotEmpty
+          : command.reason == null);
+
+  Future<List<WorkOrderCommand>> _read(String account, String store) async {
+    _checkAccount(account, store);
+    final raw = await _storage.read(key: _key(account, store));
+    _checkAccount(account, store);
+    if (raw == null) return [];
+    final data = jsonDecode(raw);
+    if (data is! Map ||
+        data['version'] != WorkOrderCommand.contractVersion ||
+        data['accountScope'] != account ||
+        data['workspaceId'] != store ||
+        data['entries'] is! List) {
+      throw const FormatException('Invalid pending order journal');
+    }
+    final commands = <WorkOrderCommand>[];
+    final orders = <String>{}, operations = <String>{};
+    for (final entry in data['entries'] as List) {
+      if (entry is! Map ||
+          entry['orderId'] is! String ||
+          entry['operationId'] is! String ||
+          entry['expectedRevision'] is! int ||
+          entry['action'] is! String ||
+          (entry['reason'] != null && entry['reason'] is! String)) {
+        throw const FormatException('Invalid pending order entry');
+      }
+      final command = WorkOrderCommand(
+        accountScope: account,
+        workspaceId: store,
+        orderId: entry['orderId'] as String,
+        operationId: entry['operationId'] as String,
+        expectedRevision: entry['expectedRevision'] as int,
+        action: WorkOrderAction.values.byName(entry['action'] as String),
+        reason: entry['reason'] as String?,
+      );
+      if (!_valid(command) ||
+          !orders.add(command.orderId) ||
+          !operations.add(command.operationId)) {
+        throw const FormatException('Conflicting pending order entry');
+      }
+      commands.add(command);
+    }
+    return commands;
+  }
+
+  Future<void> _write(
+    String account,
+    String store,
+    List<WorkOrderCommand> commands,
+  ) async {
+    _checkAccount(account, store);
+    // Keep an empty envelope rather than deleting unrelated storage keys.
+    await _storage.write(
+      key: _key(account, store),
+      value: jsonEncode({
+        'version': WorkOrderCommand.contractVersion,
+        'accountScope': account,
+        'workspaceId': store,
+        'entries': commands.map(_encode).toList(),
+      }),
+    );
+    _checkAccount(account, store);
+  }
+
+  @override
+  Future<List<WorkOrderCommand>> readPending(
+    String accountScope,
+    String workspaceId,
+  ) => _serial(
+    _key(accountScope, workspaceId),
+    () => _read(accountScope, workspaceId),
+  );
+
+  @override
+  Future<void> savePending(
+    WorkOrderCommand command,
+  ) => _serial(_key(command.accountScope, command.workspaceId), () async {
+    if (!_valid(command)) throw const FormatException('Invalid order command');
+    final commands = await _read(command.accountScope, command.workspaceId);
+    for (final saved in commands) {
+      if (saved.orderId == command.orderId ||
+          saved.operationId == command.operationId) {
+        if (jsonEncode(_encode(saved)) == jsonEncode(_encode(command))) return;
+        throw const FormatException('Pending order cannot be overwritten');
+      }
+    }
+    commands.add(command);
+    await _write(command.accountScope, command.workspaceId, commands);
+  });
+
+  @override
+  Future<void> removePending(WorkOrderCommand command) => _serial(
+    _key(command.accountScope, command.workspaceId),
+    () async {
+      final commands = await _read(command.accountScope, command.workspaceId);
+      final matches = commands
+          .where((saved) => saved.orderId == command.orderId)
+          .toList();
+      if (matches.isEmpty) return;
+      if (jsonEncode(_encode(matches.single)) != jsonEncode(_encode(command))) {
+        throw const FormatException(
+          'A different order operation remains pending',
+        );
+      }
+      commands.removeWhere((saved) => saved.orderId == command.orderId);
+      await _write(command.accountScope, command.workspaceId, commands);
+    },
+  );
+}
+
 /// Per-Store frontend reconciliation. It never posts inventory, payments,
 /// invoices or collection completion. A/B operations may settle independently;
 /// an uncertain A keeps its original identity and cannot be submitted twice.
@@ -458,19 +637,24 @@ class WorkOrderOperations extends ChangeNotifier {
     required this.accountScope,
     required this.workspaceId,
     required this.gateway,
+    this.pendingStore,
     this.timeout = const Duration(seconds: 15),
   });
 
   final String accountScope, workspaceId;
   final WorkOrderCommandGateway gateway;
+  final WorkOrderPendingStore? pendingStore;
   final Duration timeout;
   final Map<String, WorkOrderReply> _orders = {};
   final Map<String, WorkOrderCommand> _pending = {};
   final Map<String, WorkOrderOperationState> _states = {};
   bool _disposed = false;
   String? _changedOrderId;
+  bool _restored = false;
+  Future<bool>? _restoring;
 
   bool get isDisposed => _disposed;
+  bool get recoveryReady => pendingStore == null || _restored;
   String? get changedOrderId => _changedOrderId;
   List<WorkOrderReply> get orders => List.unmodifiable(_orders.values);
 
@@ -485,10 +669,51 @@ class WorkOrderOperations extends ChangeNotifier {
   List<WorkOrderCommand> get pendingCommands =>
       List.unmodifiable(_pending.values);
 
+  /// Complete before session binding. Corruption/read failure leaves new actions
+  /// blocked; no restored command is automatically sent or treated as success.
+  Future<bool> restore() {
+    if (_disposed) return Future.value(false);
+    if (recoveryReady) return Future.value(true);
+    return _restoring ??= _restore().whenComplete(() => _restoring = null);
+  }
+
+  Future<bool> _restore() async {
+    try {
+      final commands = await pendingStore!
+          .readPending(accountScope, workspaceId)
+          .timeout(timeout);
+      if (_disposed) return false;
+      final orders = <String>{}, operations = <String>{};
+      for (final command in commands) {
+        if (command.accountScope != accountScope ||
+            command.workspaceId != workspaceId ||
+            accountScope.isEmpty ||
+            workspaceId.isEmpty ||
+            !SecureWorkOrderPendingStore._valid(command) ||
+            !orders.add(command.orderId) ||
+            !operations.add(command.operationId)) {
+          return false;
+        }
+      }
+      for (final command in commands) {
+        _pending[command.orderId] = command;
+        _states[command.orderId] = WorkOrderOperationState.uncertain;
+      }
+      _restored = true;
+      for (final command in commands) {
+        if (!_disposed) _emit(command.orderId);
+      }
+      return !_disposed;
+    } on Object {
+      return false;
+    }
+  }
+
   /// Restored local data is never success or permission. Only a read-only
   /// authoritative reconciliation may release a recovered operation lock.
   bool restorePending(WorkOrderCommand command) {
     if (_disposed ||
+        pendingStore != null ||
         accountScope.isEmpty ||
         workspaceId.isEmpty ||
         command.accountScope != accountScope ||
@@ -553,6 +778,7 @@ class WorkOrderOperations extends ChangeNotifier {
   Future<bool> act(String orderId, WorkOrderAction action, {String? reason}) {
     final snapshot = _orders[orderId];
     if (_disposed ||
+        !recoveryReady ||
         _pending.containsKey(orderId) ||
         snapshot == null ||
         !_allowed(snapshot, action) ||
@@ -578,6 +804,7 @@ class WorkOrderOperations extends ChangeNotifier {
   Future<bool> retry(String orderId) {
     final command = _pending[orderId];
     if (_disposed ||
+        !recoveryReady ||
         command == null ||
         _states[orderId] != WorkOrderOperationState.uncertain) {
       return Future.value(false);
@@ -594,6 +821,10 @@ class WorkOrderOperations extends ChangeNotifier {
         !_disposed && identical(_pending[command.orderId], command);
     try {
       if (!current()) return false;
+      if (!reconcile && pendingStore != null) {
+        await pendingStore!.savePending(command).timeout(timeout);
+        if (!current()) return false;
+      }
       final reply =
           await (reconcile
                   ? gateway.reconcileOrderCommand(command)
@@ -615,6 +846,10 @@ class WorkOrderOperations extends ChangeNotifier {
       final latest = _orders[command.orderId];
       if (latest == null || reply.revision > latest.revision) {
         _orders[command.orderId] = reply;
+      }
+      if (pendingStore != null) {
+        await pendingStore!.removePending(command).timeout(timeout);
+        if (!current()) return false;
       }
       _pending.remove(command.orderId);
       _states.remove(command.orderId);

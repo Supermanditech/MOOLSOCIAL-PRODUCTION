@@ -728,6 +728,7 @@ class WorkSession extends ChangeNotifier {
     final storeId = activeWorkspace?.id ?? workspaceId;
     if (_disposed ||
         operations.isDisposed ||
+        !operations.recoveryReady ||
         _contactAccountScope == null ||
         operations.accountScope != _contactAccountScope ||
         operations.workspaceId != storeId ||

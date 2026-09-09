@@ -1,9 +1,69 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+
+class _OrderJournalStorage extends FlutterSecureStorage {
+  final values = <String, String>{};
+  final writes = <String>[];
+  bool failRead = false, failWrite = false;
+  Completer<void>? holdWrite;
+  @override
+  Future<String?> read({
+    required String key,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    if (failRead) throw StateError('test read failure');
+    return values[key];
+  }
+
+  @override
+  Future<void> write({
+    required String key,
+    required String? value,
+    AppleOptions? iOptions,
+    AndroidOptions? aOptions,
+    LinuxOptions? lOptions,
+    WebOptions? webOptions,
+    AppleOptions? mOptions,
+    WindowsOptions? wOptions,
+  }) async {
+    writes.add(key);
+    await holdWrite?.future;
+    if (failWrite) throw StateError('test write failure');
+    values[key] = value!;
+  }
+}
+
+WorkOrderCommand _journalCommand(
+  String id, {
+  String account = 'account-A',
+  String store = 'store-A',
+  String? operation,
+  int revision = 1,
+}) => WorkOrderCommand(
+  accountScope: account,
+  workspaceId: store,
+  orderId: id,
+  operationId: operation ?? 'operation-$id',
+  expectedRevision: revision,
+  action: WorkOrderAction.accept,
+);
+
+Future<void> _drainOrderJournal() async {
+  for (var i = 0; i < 12; i++) {
+    await Future<void>.delayed(Duration.zero);
+  }
+}
 
 class _CommandAccountStore implements WorkPendingProofStore {
   _CommandAccountStore([this.accountScope = 'account-A']);
@@ -104,6 +164,385 @@ class _OrderTimeGateway extends ReviewWorkGateway
 }
 
 void main() {
+  group('DASH04 durable order journal', () {
+    late _OrderJournalStorage storage;
+    late SecureWorkOrderPendingStore journal;
+    late _CommandGateway gateway;
+    late WorkOrderOperations operations;
+    String? account;
+    setUp(() {
+      account = 'account-A';
+      storage = _OrderJournalStorage();
+      journal = SecureWorkOrderPendingStore(
+        storage: storage,
+        currentAccount: () => account,
+      );
+      gateway = _CommandGateway();
+      operations = WorkOrderOperations(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        gateway: gateway,
+        pendingStore: journal,
+      );
+    });
+    tearDown(() {
+      if (!operations.isDisposed) operations.dispose();
+    });
+
+    test(
+      'journal uses the installed secure storage API without document keys',
+      () async {
+        TestWidgetsFlutterBinding.ensureInitialized();
+        FlutterSecureStorage.setMockInitialValues({
+          'moolsocial.workspace.pending-proof.v1':
+              'untouched-document-checkpoint',
+        });
+        final nativeApi = SecureWorkOrderPendingStore(
+          currentAccount: () => account,
+        );
+        final command = _journalCommand('native');
+        await nativeApi.savePending(command);
+        expect(
+          (await nativeApi.readPending(
+            'account-A',
+            'store-A',
+          )).single.operationId,
+          command.operationId,
+        );
+        await nativeApi.removePending(command);
+        expect(await nativeApi.readPending('account-A', 'store-A'), isEmpty);
+        expect(
+          await const FlutterSecureStorage().read(
+            key: 'moolsocial.workspace.pending-proof.v1',
+          ),
+          'untouched-document-checkpoint',
+        );
+      },
+    );
+
+    test(
+      '1000 journal entries survive reopen and independent removal',
+      () async {
+        await Future.wait(
+          List.generate(
+            1000,
+            (index) => journal.savePending(_journalCommand('$index')),
+          ),
+        );
+        expect(await operations.restore(), isTrue);
+        expect(operations.pendingCommands.length, 1000);
+        expect(operations.pending('999')!.operationId, 'operation-999');
+        await Future.wait([
+          journal.removePending(_journalCommand('999')),
+          journal.removePending(_journalCommand('0')),
+        ]);
+        final retained = await journal.readPending('account-A', 'store-A');
+        expect(retained.length, 998);
+        expect(retained.map((c) => c.orderId), isNot(contains('999')));
+        expect(retained.map((c) => c.orderId), contains('500'));
+        expect(gateway.submitted, isEmpty);
+      },
+    );
+
+    test(
+      'failed storage read keeps actions blocked until a successful retry',
+      () async {
+        storage.failRead = true;
+        final first = operations.restore();
+        expect(operations.restore(), same(first));
+        expect(await first, isFalse);
+        operations.observe(_commandReply('A'));
+        expect(await operations.act('A', WorkOrderAction.accept), isFalse);
+        storage.failRead = false;
+        expect(await operations.restore(), isTrue);
+        expect(gateway.submitted, isEmpty);
+      },
+    );
+
+    test(
+      'disposal during journal write preserves recovery without transport',
+      () async {
+        await operations.restore();
+        operations.observe(_commandReply('A'));
+        storage.holdWrite = Completer<void>();
+        final pending = operations.act('A', WorkOrderAction.accept);
+        await _drainOrderJournal();
+        operations.dispose();
+        storage.holdWrite!.complete();
+        expect(await pending, isFalse);
+        expect(gateway.submitted, isEmpty);
+        expect(
+          (await journal.readPending('account-A', 'store-A')).single.orderId,
+          'A',
+        );
+      },
+    );
+
+    test('recovery must complete before actions or session binding', () async {
+      operations.observe(_commandReply('A'));
+      expect(await operations.act('A', WorkOrderAction.accept), isFalse);
+      expect(operations.restorePending(_journalCommand('A')), isFalse);
+      final work = WorkSession(contactDraftStore: _CommandAccountStore())
+        ..activeWorkspace = _commandStore
+        ..workspaceId = 'store-A';
+      expect(work.bindWorkspaceOrderOperations(operations), isFalse);
+      expect(await operations.restore(), isTrue);
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      expect(gateway.submitted, isEmpty);
+      work.dispose();
+    });
+
+    test('simultaneous instances retain A and B without overwrite', () async {
+      final other = SecureWorkOrderPendingStore(
+        storage: storage,
+        currentAccount: () => account,
+      );
+      final a = _journalCommand('A'), b = _journalCommand('B');
+      await Future.wait([journal.savePending(a), other.savePending(b)]);
+      expect(
+        (await journal.readPending(
+          'account-A',
+          'store-A',
+        )).map((c) => c.orderId),
+        ['A', 'B'],
+      );
+      await Future.wait([
+        journal.removePending(a),
+        other.savePending(_journalCommand('C')),
+      ]);
+      expect(
+        (await journal.readPending(
+          'account-A',
+          'store-A',
+        )).map((c) => c.orderId),
+        ['B', 'C'],
+      );
+    });
+
+    test('account and Store keys cannot collide through separators', () async {
+      account = 'A.B';
+      await journal.savePending(
+        _journalCommand('first', account: 'A.B', store: 'C'),
+      );
+      account = 'A';
+      await journal.savePending(
+        _journalCommand('second', account: 'A', store: 'B.C'),
+      );
+      expect(storage.values.length, 2);
+      expect((await journal.readPending('A', 'B.C')).single.orderId, 'second');
+      await expectLater(
+        journal.readPending('A.B', 'C'),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      account = 'A.B';
+      expect((await journal.readPending('A.B', 'C')).single.orderId, 'first');
+    });
+
+    test(
+      'duplicate save is idempotent but changed payload and stale remove fail',
+      () async {
+        final original = _journalCommand('A');
+        await journal.savePending(original);
+        await journal.savePending(original);
+        expect(storage.writes.length, 1);
+        await expectLater(
+          journal.savePending(_journalCommand('A', revision: 2)),
+          throwsFormatException,
+        );
+        await expectLater(
+          journal.savePending(
+            _journalCommand('B', operation: original.operationId),
+          ),
+          throwsFormatException,
+        );
+        await expectLater(
+          journal.removePending(_journalCommand('A', operation: 'new')),
+          throwsFormatException,
+        );
+        expect(
+          (await journal.readPending(
+            'account-A',
+            'store-A',
+          )).single.expectedRevision,
+          1,
+        );
+      },
+    );
+
+    test(
+      'corruption remains intact and recovery fails closed without partial load',
+      () async {
+        await journal.savePending(_journalCommand('A'));
+        final key = storage.values.keys.single;
+        final good = storage.values[key]!;
+        for (final bad in [
+          '{broken',
+          jsonEncode({...jsonDecode(good) as Map, 'version': 99}),
+          jsonEncode({...jsonDecode(good) as Map, 'accountScope': 'other'}),
+          jsonEncode({
+            ...jsonDecode(good) as Map,
+            'entries': [
+              ...(jsonDecode(good)['entries'] as List),
+              {'orderId': 'broken'},
+            ],
+          }),
+        ]) {
+          storage.values[key] = bad;
+          expect(await operations.restore(), isFalse);
+          expect(operations.pendingCommands, isEmpty);
+          expect(operations.recoveryReady, isFalse);
+          expect(storage.values[key], bad);
+        }
+        storage.values[key] = good;
+        expect(await operations.restore(), isTrue);
+        expect(operations.pending('A')!.operationId, 'operation-A');
+      },
+    );
+
+    test(
+      'write failure never submits and retry only asks original status',
+      () async {
+        expect(await operations.restore(), isTrue);
+        operations.observe(_commandReply('A'));
+        storage.failWrite = true;
+        expect(await operations.act('A', WorkOrderAction.accept), isFalse);
+        final original = operations.pending('A')!;
+        expect(gateway.submitted, isEmpty);
+        expect(operations.state('A'), WorkOrderOperationState.uncertain);
+        storage.failWrite = false;
+        final retry = operations.retry('A');
+        gateway.replies.single.complete(
+          _commandReply(
+            'A',
+            command: original,
+            state: WorkOrderReplyState.rejected,
+          ),
+        );
+        expect(await retry, isFalse);
+        expect(gateway.reconciled.single, same(original));
+        expect(operations.pending('A'), isNull);
+        expect(gateway.submitted, isEmpty);
+      },
+    );
+
+    test(
+      'relaunch restores original identity and reconciles without submitting',
+      () async {
+        expect(await operations.restore(), isTrue);
+        operations.observe(_commandReply('A'));
+        final sending = operations.act('A', WorkOrderAction.accept);
+        await _drainOrderJournal();
+        final command = gateway.submitted.single;
+        expect(
+          (await journal.readPending(
+            'account-A',
+            'store-A',
+          )).single.operationId,
+          command.operationId,
+        );
+        gateway.responses.single.completeError(StateError('offline'));
+        expect(await sending, isFalse);
+        operations.dispose();
+        operations = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: gateway,
+          pendingStore: journal,
+        );
+        expect(await operations.restore(), isTrue);
+        expect(operations.order('A'), isNull);
+        expect(operations.state('A'), WorkOrderOperationState.uncertain);
+        final retry = operations.retry('A');
+        expect(gateway.reconciled.single.operationId, command.operationId);
+        gateway.replies.single.complete(
+          _commandReply('A', command: command, revision: 2, stage: 'Preparing'),
+        );
+        expect(await retry, isTrue);
+        expect(await journal.readPending('account-A', 'store-A'), isEmpty);
+        expect(gateway.submitted.length, 1);
+      },
+    );
+
+    test(
+      'ack journal failure retains lock and newer snapshot without resubmitting',
+      () async {
+        await operations.restore();
+        operations.observe(_commandReply('A'));
+        final sending = operations.act('A', WorkOrderAction.accept);
+        await _drainOrderJournal();
+        final command = gateway.submitted.single;
+        storage.failWrite = true;
+        gateway.responses.single.complete(
+          _commandReply('A', command: command, revision: 2, stage: 'Preparing'),
+        );
+        expect(await sending, isFalse);
+        expect(operations.order('A')!.order!.stage, 'Preparing');
+        expect(operations.pending('A'), same(command));
+        expect(await operations.act('A', WorkOrderAction.ready), isFalse);
+        storage.failWrite = false;
+        final retry = operations.retry('A');
+        gateway.replies.single.complete(
+          _commandReply('A', command: command, revision: 2, stage: 'Preparing'),
+        );
+        expect(await retry, isTrue);
+        expect(operations.pending('A'), isNull);
+        expect(gateway.submitted.length, 1);
+      },
+    );
+
+    test(
+      'account change during native write cannot send the old account action',
+      () async {
+        await operations.restore();
+        operations.observe(_commandReply('A'));
+        storage.holdWrite = Completer<void>();
+        final sending = operations.act('A', WorkOrderAction.accept);
+        await _drainOrderJournal();
+        account = 'account-B';
+        storage.holdWrite!.complete();
+        expect(await sending, isFalse);
+        expect(gateway.submitted, isEmpty);
+        expect(await journal.readPending('account-B', 'store-A'), isEmpty);
+        account = 'account-A';
+        expect(
+          (await journal.readPending('account-A', 'store-A')).single.orderId,
+          'A',
+        );
+      },
+    );
+
+    test(
+      'timed-out native write stays serialized until it actually completes',
+      () async {
+        operations.dispose();
+        operations = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: gateway,
+          pendingStore: journal,
+          timeout: const Duration(milliseconds: 20),
+        );
+        await operations.restore();
+        operations.observe(_commandReply('A'));
+        storage.holdWrite = Completer<void>();
+        expect(await operations.act('A', WorkOrderAction.accept), isFalse);
+        final second = journal.savePending(_journalCommand('B'));
+        await _drainOrderJournal();
+        expect(storage.writes.length, 1);
+        storage.holdWrite!.complete();
+        await second;
+        expect(
+          (await journal.readPending(
+            'account-A',
+            'store-A',
+          )).map((c) => c.orderId),
+          ['A', 'B'],
+        );
+        expect(gateway.submitted, isEmpty);
+      },
+    );
+  });
+
   group('DASH04 scoped order operations', () {
     late _CommandGateway gateway;
     late WorkOrderOperations operations;
