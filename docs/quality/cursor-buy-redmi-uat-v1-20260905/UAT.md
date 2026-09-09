@@ -2,6 +2,16 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Shopping payment preferences and responsive return — captures853–870
+
+Eighteen native-success PNG/XML pairs visually inspected on Redmi r66.8. Immutable external ledger R66-8-EXPANDED-AUDIT-CAPTURES-853-870-V1.json SHA256889DF636B698DE5FEB1E7A3F501C4E22CD08E60B6F1774BA252D8412C053B8A6. No new distinct defect or closure; current index remains28 open findings (27 device/visual plus1 source-only supplier-media gap), and7 separate unimplemented requests. Historical records excluded. Full-module enumeration remains incomplete.
+
+Shop filter853 → Shopping tools854 → scroll855 → Settings856. Original PhonePe, notifications on, Saved0 and Basni342005 are visible. Payment preference857 opens three online choices. Paytm858 updates the Settings summary; reopen859 retains its radio selection. Pine Labs860 likewise updates the summary and reopen861 retains it. Enlarged portrait862 (fontScale2/density360) initially shows the final option below the viewport; scroll863 exposes the entire selected Pine Labs card and description. Enlarged landscape864 → scroll865 also exposes the complete final option. This is ordinary scrolling, not a hidden-final-option defect. Android Back866 returns to Shopping settings. Restore display receipt singlechat-r668-payment-restore-30 is native0 with font1/physical320/portrait/auto-rotation1;867 visually verifies it and exactly matches860 XMLBD99DA187CD0D19B3208F7BF06AF431353DBE68B9A1CBE971FCD4CF4F2DCBC5A. Reopen868 retains Pine Labs, exact861 XMLF6A6A12F68802EF7B535D1DBDB5949422A9C03015498D9BDB6560A67B9CB6336. PhonePe869 restores the original settings XMLBC8E07C7892ABB9FF4DC42D08300BF4E9AA086F9872387D4170DBCD47504F635, same856. No provider app, order or payment initiated.
+
+Privacy preferences870 opens the shared Privacy & preferences screen with English, Jodhpur/Rajasthan, standard text/motion and explicit device-setting notification guidance. Only the entry destination is qualified. Attempt871 to inspect Accessibility was stopped before input/capture by the foreground guard: Foreground is outside review app; no input or capture permitted. Immutable singlechat-r66-8-871-privacy-accessibility-information.result.json records native1,2026-09-09T19:03:37.6249214Z–19:03:39.9094799Z. Exclude871 from the success ledger; it is not an app defect or evidence of a successful Accessibility tap. No other foreground application was inspected and no input was retried. Founder asked to foreground MoolSocial Cursor Review before device continuation. Payment preference, Saved0 and display were restored before this guard. Original cart/addresses/notifications/delivery state were not changed.
+
+Documentation resume gate singlechat-r668-resume-audit-gate-30 passed before this update against4514 registry entries/SHA3767B01639BE3873CC53D34A733CCBC3377C3B208E35CAF60F4BFC2F321803D6. Prior checkpoint19c0d9e24839d40c5776bae08d5204bba976e737 was committed, pushed and independently matched to origin. Remaining device branches include privacy return, alert intersections, Saved sorting/add and interruptions, long SKU/media fixtures and the action inventory below; backend/provider outcomes remain deferred.
+
 ### Report accessibility and Saved filtering/recovery — captures812–852
 
 Current open register: **28 findings:27 device/visual defects plus1 supplier-media source-only gap**, with **7 separate unimplemented founder requests**. Historical001–035 excluded. Two distinct findings added in this batch: REPORT-LARGE-TEXT-001 P3 and SAVED-EMPTY-FILTER-001 P2. Registered before subsequent device input; no finding closed. Full-module enumeration remains incomplete.
@@ -80,6 +90,8 @@ This index supplements the full screen-family inventory below. “Exercised” m
 
 | Entry → tap/sub-tap → destination/return | Current evidence and result | Remaining qualification |
 | --- | --- | --- |
+| Shopping settings → Payment preference → Paytm/Pine Labs → reopen → enlarged portrait/landscape scroll → Back → restore PhonePe | 853–869; three visible options, selected radio/summary retained, final option reachable and normal display/original preference restored | Provider outcomes deferred; other lifecycle and checkout intersections unqualified |
+| Shopping settings → Privacy preferences | 870 opens shared preferences;871 guard stops before Accessibility input | Privacy return and shared sub-actions unqualified; device foreground required |
 | Scheduled grid → later horizontal SKU → detail → Back | 434–442, identity/unit price and row retention exercised | Other SKU content/media fixtures; long text states |
 | Grid → Next → later-page detail → Back → Previous | 443–447, page and row retention exercised | Final page, live pagination/stale/error recovery |
 | Quick/Scheduled → filter → Available draft → Back → reopen | 435–439,575–578; cancelled draft discarded | Remaining draft-interruption and responsive layouts |
