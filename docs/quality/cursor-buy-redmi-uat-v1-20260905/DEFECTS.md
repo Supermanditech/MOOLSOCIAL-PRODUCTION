@@ -4,7 +4,7 @@
 
 Founder reporting boundary clarified 9 September 2026: report only unresolved findings discovered on the currently installed r66.8 Cursor Review APK (version 1.0.0-r66.8-cursorreview, code 2026090903), Redmi TG8HCYTGGQT885OF. APK SHA256 55BB5961D92E1B76784141BD8B2891483507A3A44F3466BE2D28F4C5C7614F25. Historical R66-UAT-001 through 035 records below are retained evidence and excluded from this count; their inclusion below does not reopen them. A fresh child has its own current-candidate evidence and counts once.
 
-Current open total: **28 device/visual defects + 1 source-confirmed supplier-media technical gap = 29 findings**. Separately, **7 founder change requests remain unimplemented**. No finding in this index is closed. This is a running register, not a completed full-module audit or production-readiness verdict. Update this index whenever a distinct finding is added or closed; closure requires implementation plus the original Redmi reproduction passing on an identified successor build. Additional reproductions extend the existing ID rather than inflate the count.
+Current open total: **29 device/visual defects + 1 source-confirmed supplier-media technical gap = 30 findings**. Separately, **7 founder change requests remain unimplemented**. No finding in this index is closed. This is a running register, not a completed full-module audit or production-readiness verdict. Update this index whenever a distinct finding is added or closed; closure requires implementation plus the original Redmi reproduction passing on an identified successor build. Additional reproductions extend the existing ID rather than inflate the count.
 
 | Open ID | Customer-visible problem / technical gap | Severity / evidence |
 | --- | --- | --- |
@@ -37,10 +37,19 @@ Current open total: **28 device/visual defects + 1 source-confirmed supplier-med
 | R668-AUDIT-REPORT-LARGE-TEXT-001 | Report Cancel label breaks inside the word at enlarged text | P3, Redmi |
 | R668-AUDIT-SAVED-EMPTY-FILTER-001 | Filtered Saved list falsely says no products have been saved | P2, Redmi/source |
 | R668-AUDIT-TRACKING-FRESHNESS-001 | Failed refresh retains green CURRENT and unqualified delivery estimate | P2, Redmi/source |
+| R668-AUDIT-SAVED-FILTER-COUNT-001 | Saved filter preview reports full catalogue count for two saved products | P2, Redmi/source |
 
 Separate open requirements: R668-REQ-COMPARE-SUPPLIER-001; R668-REQ-STORE-CATEGORY-COMPACT-001; R668-REQ-LOCATION-INDIA-001; R668-REQ-ADDRESS-TYPE-DENSITY-001; R668-REQ-OFFERS-HEADER-001; R668-REQ-SHOP-COUNT-ROW-001; R668-AUDIT-DELIVERY-ICON-001. The delivery-icon ID is a requirement despite its AUDIT prefix. Backend/provider integration remains deferred; MEDIA-002 is not claimed as a Redmi upload failure. Detailed reproduction, expected outcome, evidence and implementation/retest status for every entry remain below.
 
 ## Expanded r66.8 audit additions — 9 September 2026
+
+### R668-AUDIT-SAVED-FILTER-COUNT-001 — Saved filter preview counts the entire catalogue
+
+Follow-up916–941: high-to-low sorts the two Saved products279 then210 (918); low-to-high reverses them (922). Thus destination sorting respects the shortlist, while the preview count does not. Reopening after the two saved products have been cleared still reports25000000 (938–939). Enlarged portrait horizontal scrolling926–927 reveals the second saved item, and landscape931 exposes both full Add actions; no data-loss or inaccessible-card claim. Clear confirmation fits enlarged landscape934 and portrait935; temporary items removed936, sort reset939–940, normal display restored937 and Shop941 exactly matches911. The scope-count defect remains open; successful sorting/cleanup does not close it.
+
+OPEN P2, filter scope and result truth, discovered10 September2026 IST on normal Redmi r66.8. From empty Saved911, save temporary atta279 at912 and notebook210 at913. Saved914 correctly shows only those two products and membership badge2. Open its Sort & filter915: header says25000000 products found without identifying a different catalogue scope. A buyer narrowing their saved shortlist is shown a full-catalogue result count unrelated to that shortlist. This is distinct from the zero-result empty-collection copy in SAVED-EMPTY-FILTER-001 and the founder's request to remove the ordinary Shop count row.
+
+Evidence914 PNG509178FC98F19DF6B07FB92057781D3E199AB57979977169A0B86D2175684346 / XML2057E3C1567E76E06B608105F43410381CBF3F7E7E35EA5615F8615BEC9A6305;915 PNGD98C0CC315A74E47DAA7EBDC54DFD606DC96EAE203E336796654ECD06F967AC9 / XMLE74820CD04F417E8A467F7F249AC75F477AB775BFF11574068FBA3271775E372. Source apps/mobile/lib/ui_v2/buy/buy_v2_views.dart12715–12789 opens catalogueQuery(refinements:draft) and presents preview.page.totalCount as products found. Expected: preview the same Saved membership/query/refinements used by the destination, with clear matching-saved wording; never imply that millions of products are saved. Registration precedes further device input. Sort behavior, draft/application recovery and responsive follow-up remain to be tested. Two saved products are temporary audit data; no cart/order change issued. Implementation and original-sequence Redmi retest pending.
 
 ### R668-AUDIT-TRACKING-FRESHNESS-001 — Failed order refresh still presents retained tracking as CURRENT
 
