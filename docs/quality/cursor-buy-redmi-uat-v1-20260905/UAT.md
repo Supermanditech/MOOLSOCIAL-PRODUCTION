@@ -2,6 +2,12 @@
 
 ## r66.8 expanded screen audit — started 9 September 2026
 
+### Delivery Keep/Hide recovery — captures704–714
+
+Eleven native-success PNG/XML pairs visually inspected. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-704-714-V1.json SHA256 14A3FB05BAA01473F76DDC164B5B2C6731F7977F51F3D1621851DFD40E24B4E6. Same Redmi r66.8 and normal display. Reopen704 restores exact699 panel; Keep705 visibly becomes Kept; tap706 restores Keep and exact704 XML CC8DE2DBC4C2328B5EDC82A8DBC5EFBA73A555B6B7E3D323DAF87457B8B3DB39. Hide707 removes the panel/control. Contextual Items Back708 restores correct MS-240741 order; Android Back709 returns Delivered list. Active710 → Track MS-NEW-09 at711 → top712 exposes Show delivery status. Tap713 removes that recovery action; Orders Back714 visibly restores the delivery control alongside cart, with exact earlier Active-list XML43B98A90E9D0AFF3CDA62B1DFE440CABC828BFAA6D2EED302BD2E9D4B29C97B1.
+
+Bounded Keep/unkeep/Hide/show recovery passes, with original unkept, sound-off and visible-collapsed delivery state restored. No lost-order or inaccessible-recovery defect demonstrated. Current route Orders/Active with blank query, twelve active/two delivered. Original basket/addresses/display retained. No external submission, source/build/install changes or new defect. Background persistence, actual arrival audio/live tracking and full-module enumeration remain unqualified.
+
 ### Delivered address, resolution sub-actions and delivery controls — captures677–703
 
 Twenty-seven native-success PNG/XML pairs visually inspected on the same Redmi r66.8. External ledger R66-8-EXPANDED-AUDIT-CAPTURES-677-703-V1.json SHA256 BC450056E95116CC3FFE6170968E5D181352C9B50FCB7A72D1B9C94B022B2A07. Resume677 restores Delivered list. MS-240741 detail678 → Address679 displays completed delivery alongside “Delivery partner: Not assigned yet”; registered OPEN P3 DELIVERED-PARTNER-STATUS-001 before further testing. Missing historical recipient/full address is explicitly disclosed and is not counted as another UI defect.
@@ -42,7 +48,8 @@ This index supplements the full screen-family inventory below. “Exercised” m
 | Address chooser → Work overflow → Edit → close → chooser close | 685–688; original fields and exact order restored | Removal confirmation/cancel, all address-type draft changes |
 | Retail resolution → Refund → scroll → Retry → Return → Replacement → Back | 689–696; choices/retry/dismiss exercised; no invented eligibility | Eligible selection, quantities, reasons and submitted outcomes unavailable |
 | Delivered retail/wholesale → Invoice → Back | 670–676; missing historical lines defect, return exercised | Download/export inspection; full historical-line fixture |
-| Retail order → Items → delivery control → Arrival sound on/off → collapse | 697–703; correct active order identity and restored UI | Keep/Hide/reopen paths, actual sound and background arrival |
+| Retail order → Items → delivery control → Arrival sound on/off → collapse | 697–703; correct active order identity and restored UI | Actual sound and background arrival |
+| Delivery control → Keep/unkeep → Hide → Orders/Active → Track → Show delivery status → Back | 704–714; original control and preferences restored | Background persistence/live delivery updates |
 | Cart → payment/reference → review → Back | Earlier current-r66.8 high-total subset documented below | All payment/offer/GST/destination combinations; no real placement/payment |
 | Monthly basket → View products | 150–153; wrong ordinary catalogue, P1 child open | Correct basket listing/Add/restore after implementation |
 | Settings/recent/alerts/help shortcuts | Current-r66.8 subsets below; RECENT and HELP tickets open | Remaining nested destinations, responsive and lifecycle checks |
