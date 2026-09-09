@@ -29,6 +29,22 @@ Founder instruction: enumerate journeys, test on Redmi, register each real custo
 
 No entire screen family is declared production-ready by this planning inventory. Record pass/failure/blocked reasons against concrete routes and captures; evaluate whitespace/features by purchase relevance and usability, not personal taste. Confirmed defects are appended to DEFECTS before implementation; observations stay separate until reproduced.
 
+### Expanded execution checkpoint, captures352–379
+
+Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-352-379-V1.json`, SHA256 `92B468DF9AC777BFA54641BCCACC3EF5A38A958BFB4DE9C3B42CCF77D6D3B8F4`, independently verifies28 PNG/XML pairs; all28 visually inspected. Same r66.8/2026090903; no source/build/install. Normal display unchanged.
+
+Scheduled Shop352 → Add one atta353 at279 → Cart354 correctly selects Shop scope279 while the global total is100001559. All-scope355 → Address356 → PhonePe payment357 → Confirm358/settled359 retains combined28737 units and correct100001559. Two indistinguishable GST cards exposed MIXED-GST-001, registered before implementation. First toggle360 and second362 change independently; each restoration361/363 exactly matches359 XML. Source views7572 loops invoice destinations; visible cards omit those destination labels. Both restored off, no GST details saved.
+
+Shipment review364 correctly separates wholesale notebook28736/100001280 and Shop atta1/279. The Shop Arrives field still says Delivery time confirmed at checkout beside Place order; CHECKOUT-PROMISE-001 registered as frontend fallback wording/state defect, not a claimed live-provider failure. No order/payment submitted. Back365/366/367 exactly restores payment357/address356/cart355 XML respectively.
+
+Remove temporary atta368 restores original wholesale28736/100001280 and XML64E8664FE012FBB4AE831A62C26B561A2133ECF8DDDA24680A54D0D5B6BE1746 (same332). Empty Shop scope369 shows0 and Browse Shop;370 returns Scheduled grid matching352 XML. Original Work address/PhonePe/no coupon or payment offer/Saved0 retained.
+
+Scheduled atta detail371: tap main image372 leaves371 XML unchanged; no photo viewer opens on this generated product route. The illustration shows mixed staples rather than a provider SKU photo, supporting existing MEDIA001/002; do not claim provider zoom/video or format qualification. Scroll373 exposes business details and review/report actions. Report issue374 identifies the correct SKU/pack/seller, starts with Send disabled; image-mismatch reason375 enables Send. Cancel376 restores373 XML; reopen377 restores unselected374 XML; Back378 restores373, Back379 restores352 Shop XML3CA005D48078E94BFEB2A94D059949FC886D17F5DCEC98572779A20F6CB6C9A5. No report sent. Recent browsing history naturally records the viewed SKU; no history cleared.
+
+Tool-only recovery under existing REG4547: attempted JavaScript eval helper failed parsing top-level await before any device/native command; retained singlechat-r668-helper-syntax-recovery-v1.md and used the established direct wrapper. All352–379 native captures exit0. No app defect inferred.
+
+Remaining qualification boundaries persist: live supplier media/variant formats and eligible post-purchase outcomes require suitable fixtures/contracts; backend/auth/shared integration deferred. This checkpoint adds mixed checkout and product-report cancellation routes, not an exhaustive all-journey verdict.
+
 ### Expanded execution checkpoint, captures333–351
 
 Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-333-351-V1.json`, SHA256 `951BFD532C0FCAB829D55828FFC26BFCB7CBAD4820718E5C162FE2AE346E0B43`, rehashes19 PNG/XML pairs; all19 visually inspected. Shop333 → profile334 → Back335 exactly restores333 XML. Sort/filter336 → Shopping tools337/338 → Shopping settings339. Font2/density360 settings340–341 remains scrollable and readable; Recent342 exposes the already-registered global10 versus Shop5 discrepancy, not a new ticket. Recent343 scrolls; landscape344–345 retains a scrollable product area with reachable Add, although the fixed header takes substantial height. No new functional failure inferred from whitespace or partial cards while scrolling. Back346 restores Shopping settings;347 reaches its lower settings. Display helper restore-5 returned1.0/320/0/1;348 normal settings retained original preferences.
