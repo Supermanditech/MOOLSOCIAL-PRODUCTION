@@ -200,7 +200,8 @@ void main() {
     await tester.pump();
     await tester.pump();
 
-    expect(find.text('CURRENT'), findsOneWidget);
+    expect(find.text('LAST KNOWN'), findsOneWidget);
+    expect(find.text('CURRENT'), findsNothing);
     expect(find.text('LIVE'), findsNothing);
     expect(
       renderedProgress(tester, const ValueKey('buy-tracking-progress')),
@@ -259,7 +260,8 @@ void main() {
 
     session.openTracking(activeOrder.id);
     await tester.pumpAndSettle();
-    expect(find.text('CURRENT'), findsOneWidget);
+    expect(find.text('LAST KNOWN'), findsOneWidget);
+    expect(find.text('CURRENT'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

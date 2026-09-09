@@ -3280,8 +3280,15 @@ class BuyV2Session extends ChangeNotifier {
           refreshed.promise.trim().isNotEmpty &&
           _validTaxInvoiceForOrder(refreshed);
       if (!valid) {
-        _orderRefreshStates[orderId] = result.state;
-        _orderRefreshMessages[orderId] = result.customerMessage;
+        final invalidSuccess =
+            result.state == BuyV2CommerceLoadState.ready ||
+            result.state == BuyV2CommerceLoadState.loading;
+        _orderRefreshStates[orderId] = invalidSuccess
+            ? BuyV2CommerceLoadState.unavailable
+            : result.state;
+        _orderRefreshMessages[orderId] = invalidSuccess
+            ? 'Order update could not be verified. Last known details are still shown.'
+            : result.customerMessage;
         notice = null;
         return false;
       }

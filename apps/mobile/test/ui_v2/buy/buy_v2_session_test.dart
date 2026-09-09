@@ -54,6 +54,7 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
   int reviewCalls = 0;
   int reportCalls = 0;
   int orderRefreshCalls = 0;
+  Completer<BuyV2OrderRefreshResult>? orderRefreshGate;
   final requests = <BuyV2OrderPlacementRequest>[];
   BuyV2MutationResult reviewResult = const BuyV2MutationResult(
     accepted: true,
@@ -99,7 +100,9 @@ final class _ShopCommerceAdapter implements BuyV2CommerceAdapter {
     required String orderId,
   }) async {
     orderRefreshCalls += 1;
-    return orderRefreshResult;
+    return orderRefreshGate == null
+        ? orderRefreshResult
+        : orderRefreshGate!.future;
   }
 
   @override
@@ -714,7 +717,10 @@ class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
       products.where((p) => productIds.contains(p.id)).toList();
 }
 
-Future<BuyV2Session> _openOrderSearchFixture() async {
+Future<BuyV2Session> _openOrderSearchFixture({
+  BuyV2OrderStatus tomatoStatus = BuyV2OrderStatus.preparing,
+  String? deliveryPartnerName,
+}) async {
   final tomato = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
   final milk = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-milk');
   BuyV2Order order(
@@ -732,7 +738,8 @@ Future<BuyV2Session> _openOrderSearchFixture() async {
     total: product.price * 2,
     partner: product.seller,
     partnerType: product.partnerRole,
-    promise: 'Delivery time unavailable',
+    promise: 'Delivery in 12 min',
+    deliveryPartnerName: deliveryPartnerName,
     destinationLabel: 'Sardarpura',
     progress: status == BuyV2OrderStatus.delivered ? 1 : .2,
     status: status,
@@ -754,7 +761,7 @@ Future<BuyV2Session> _openOrderSearchFixture() async {
           milk,
         ],
         orders: [
-          order('MS-SEARCH-TOMATO', tomato),
+          order('MS-SEARCH-TOMATO', tomato, status: tomatoStatus),
           order('MS-SEARCH-MILK', milk),
           order(
             'MS-SEARCH-DELIVERED',
@@ -784,6 +791,230 @@ Future<BuyV2Session> _openOrderSearchFixture() async {
 }
 
 void main() {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 tracking freshness fails closed and recovers $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 711);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final session = await _openOrderSearchFixture();
+      final adapter = session.commerceAdapter as _ShopCommerceAdapter;
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => r66VisualCaptureRoot(child!),
+          home: BuyV2Screen(
+            session: session,
+            initialDestination: BuyV2Destination.orders,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(session.openTracking('MS-SEARCH-TOMATO'), isTrue);
+      await tester.pumpAndSettle();
+      final original = session.selectedOrder;
+      final refresh = find.byKey(
+        const ValueKey('buy-tracking-refresh-MS-SEARCH-TOMATO'),
+      );
+      final estimate = find.byKey(
+        const ValueKey('buy-tracking-estimate-MS-SEARCH-TOMATO'),
+      );
+      void expectRetained() {
+        expect(find.text('LAST KNOWN'), findsOneWidget);
+        expect(find.text('CURRENT'), findsNothing);
+        expect(find.text('NOW'), findsNothing);
+        expect(
+          tester.widget<Text>(estimate).data,
+          startsWith('Last recorded estimate · '),
+        );
+        expect(session.selectedOrder, same(original));
+      }
+
+      expectRetained();
+      adapter.orderRefreshGate = Completer<BuyV2OrderRefreshResult>();
+      expect(refresh.hitTestable(), findsOneWidget);
+      await tester.tap(refresh);
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(find.text('REFRESHING'), findsOneWidget);
+      expect(tester.widget<IconButton>(refresh).onPressed, isNull);
+      adapter.orderRefreshGate!.complete(
+        const BuyV2OrderRefreshResult(
+          state: BuyV2CommerceLoadState.unavailable,
+          customerMessage: 'Order updates are unavailable right now.',
+        ),
+      );
+      await tester.pumpAndSettle();
+      expectRetained();
+      await captureR66Visual(tester, 'r669-order-status-failed-$scale');
+      adapter.orderRefreshGate = null;
+      adapter.orderRefreshResult = const BuyV2OrderRefreshResult(
+        state: BuyV2CommerceLoadState.ready,
+        customerMessage: 'Updated',
+      );
+      await tester.tap(refresh);
+      await tester.pumpAndSettle();
+      expect(
+        session.orderRefreshState(original.id),
+        BuyV2CommerceLoadState.unavailable,
+      );
+      expectRetained();
+      expect(
+        find.text(
+          'Order update could not be verified. Last known details are still shown.',
+        ),
+        findsOneWidget,
+      );
+      adapter.orderRefreshResult = BuyV2OrderRefreshResult(
+        state: BuyV2CommerceLoadState.ready,
+        order: original,
+        customerMessage: 'Order refreshed.',
+      );
+      await tester.tap(refresh);
+      await tester.pumpAndSettle();
+      expect(find.text('UPDATED'), findsOneWidget);
+      expect(tester.widget<Text>(estimate).data, 'Delivery in 12 min');
+      expect(
+        find.byKey(const ValueKey('buy-tracking-refresh-unavailable')),
+        findsNothing,
+      );
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+      expect(find.text('UPDATED').hitTestable(), findsOneWidget);
+      await captureR66Visual(tester, 'r669-order-status-updated-$scale');
+      adapter.orderRefreshGate = Completer<BuyV2OrderRefreshResult>();
+      await tester.tap(refresh);
+      await tester.pump(const Duration(milliseconds: 200));
+      adapter.orderRefreshGate!.completeError(
+        StateError('Network unavailable'),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        session.orderRefreshState(original.id),
+        BuyV2CommerceLoadState.offline,
+      );
+      expectRetained();
+      await tester.scrollUntilVisible(
+        find.text('RECORDED'),
+        240,
+        scrollable: find
+            .descendant(
+              of: find.byKey(
+                const PageStorageKey('buy-tracking-MS-SEARCH-TOMATO'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        maxScrolls: 40,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('RECORDED'), findsOneWidget);
+      expect(find.text('NOW'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.byKey(const ValueKey('buy-tracking-return-orders')),
+        -240,
+        scrollable: find
+            .descendant(
+              of: find.byKey(
+                const PageStorageKey('buy-tracking-MS-SEARCH-TOMATO'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        maxScrolls: 40,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(const ValueKey('buy-tracking-return-orders')),
+      );
+      await tester.pumpAndSettle();
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.itemCount, 0);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final status in BuyV2OrderStatus.values) {
+      testWidgets('R669 delivery partner details match ${status.name} $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 711);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final partnerName = status == BuyV2OrderStatus.arriving
+            ? '  Trusted courier  '
+            : status == BuyV2OrderStatus.dispatched
+            ? '  '
+            : null;
+        final session = await _openOrderSearchFixture(
+          tomatoStatus: status,
+          deliveryPartnerName: partnerName,
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => r66VisualCaptureRoot(child!),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: BuyV2Destination.orders,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.openTracking('MS-SEARCH-TOMATO'), isTrue);
+        await tester.pumpAndSettle();
+        final pending =
+            status == BuyV2OrderStatus.confirmed ||
+            status == BuyV2OrderStatus.preparing;
+        final label = status == BuyV2OrderStatus.arriving
+            ? 'Trusted courier'
+            : pending
+            ? 'Not assigned yet'
+            : 'Delivery partner details unavailable';
+        expect(find.text(label), findsOneWidget);
+        final address = find.byKey(const ValueKey('buy-tracking-address'));
+        await tester.scrollUntilVisible(
+          address,
+          240,
+          scrollable: find
+              .descendant(
+                of: find.byKey(
+                  const PageStorageKey('buy-tracking-MS-SEARCH-TOMATO'),
+                ),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+          maxScrolls: 40,
+        );
+        await tester.pumpAndSettle();
+        expect(address.hitTestable(), findsOneWidget);
+        await tester.tap(address);
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(const ValueKey('buy-order-delivery-sheet'));
+        final partner = find.descendant(of: sheet, matching: find.text(label));
+        expect(partner, findsOneWidget);
+        await tester.ensureVisible(partner);
+        await tester.pumpAndSettle();
+        if (status == BuyV2OrderStatus.delivered) {
+          expect(
+            find.descendant(of: sheet, matching: find.text('Not assigned yet')),
+            findsNothing,
+          );
+          await captureR66Visual(tester, 'r669-order-partner-delivered-$scale');
+        }
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.tracking);
+        expect(session.selectedOrder.id, 'MS-SEARCH-TOMATO');
+        expect(session.itemCount, 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   test(
     'R669 order search uses historical titles and split purchase references',
     () async {
@@ -5556,9 +5787,14 @@ void main() {
         );
         expect(await fixture.session.refreshOrder(fixture.order.id), isFalse);
         expect(fixture.session.orders.first.promise, updated.promise);
+        expect(fixture.session.orders.first, same(updated));
+        expect(
+          fixture.session.orderRefreshState(fixture.order.id),
+          BuyV2CommerceLoadState.unavailable,
+        );
         expect(
           fixture.session.orderRefreshMessage(fixture.order.id),
-          'Order identity could not be verified.',
+          'Order update could not be verified. Last known details are still shown.',
         );
         expect(fixture.session.notice, isNull);
       },

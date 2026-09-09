@@ -380,6 +380,15 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
 String _orderPromiseSummary(BuyV2Order order) =>
     buyV2OrderPromiseSummary(order);
 
+String _orderDeliveryPartnerLabel(BuyV2Order order) {
+  final name = order.deliveryPartnerName?.trim();
+  if (name != null && name.isNotEmpty) return name;
+  return order.status == BuyV2OrderStatus.preparing ||
+          order.status == BuyV2OrderStatus.confirmed
+      ? 'Not assigned yet'
+      : 'Delivery partner details unavailable';
+}
+
 typedef _BuyV2PurchaseGroup = ({String? purchaseId, List<BuyV2Order> orders});
 
 List<_BuyV2PurchaseGroup> _purchaseGroupsFor(List<BuyV2Order> orders) {
@@ -9457,7 +9466,7 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                     _OrderDeliveryFact(
                       icon: Icons.local_shipping_outlined,
                       label: 'Delivery partner',
-                      value: order.deliveryPartnerName ?? 'Not assigned yet',
+                      value: _orderDeliveryPartnerLabel(order),
                     ),
                     if (order.trackingReference case final trackingReference?)
                       _OrderDeliveryFact(
@@ -10658,30 +10667,47 @@ class BuyV2TrackingView extends StatelessWidget {
             )
           : const Icon(Icons.refresh_rounded, size: 20),
     );
+    final refreshed =
+        session.orderRefreshState(order.id) == BuyV2CommerceLoadState.ready;
+    final refreshing = session.orderRefreshBusy(order.id);
+    final freshnessLabel = refreshing
+        ? 'REFRESHING'
+        : refreshed
+        ? 'UPDATED'
+        : 'LAST KNOWN';
+    final freshnessColor = refreshed ? BuyV2Colors.green : BuyV2Colors.navy;
+    final retainedEstimate =
+        !refreshed && order.status != BuyV2OrderStatus.delivered;
     final currentStatus = Semantics(
-      label: 'Current order status: ${_trackingStatusLabel(order.status)}',
+      label:
+          '${refreshing
+              ? 'Refreshing'
+              : refreshed
+              ? 'Updated'
+              : 'Last known'} order status: ${_trackingStatusLabel(order.status)}',
       excludeSemantics: true,
       child: Container(
+        key: ValueKey('buy-tracking-freshness-${order.id}'),
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: BuyV2Colors.softGreen,
+          color: refreshed ? BuyV2Colors.softGreen : BuyV2Colors.softBlue,
           borderRadius: BorderRadius.circular(9),
         ),
-        child: const Row(
+        child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             DecoratedBox(
               decoration: BoxDecoration(
-                color: BuyV2Colors.green,
+                color: freshnessColor,
                 shape: BoxShape.circle,
               ),
-              child: SizedBox(width: 8, height: 8),
+              child: const SizedBox(width: 8, height: 8),
             ),
-            SizedBox(width: 5),
+            const SizedBox(width: 5),
             Text(
-              'CURRENT',
+              freshnessLabel,
               style: TextStyle(
-                color: BuyV2Colors.green,
+                color: freshnessColor,
                 fontSize: 8,
                 fontWeight: FontWeight.w900,
               ),
@@ -10817,7 +10843,10 @@ class BuyV2TrackingView extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                _orderPromiseSummary(order),
+                retainedEstimate
+                    ? 'Last recorded estimate · ${_orderPromiseSummary(order)}'
+                    : _orderPromiseSummary(order),
+                key: ValueKey('buy-tracking-estimate-${order.id}'),
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 13,
@@ -10827,7 +10856,9 @@ class BuyV2TrackingView extends StatelessWidget {
               if (order.updatedDeliveryEstimate case final estimate?) ...[
                 const SizedBox(height: 2),
                 Text(
-                  'Delayed · new estimate $estimate',
+                  retainedEstimate
+                      ? 'Last recorded revised estimate · $estimate'
+                      : 'Delayed · new estimate $estimate',
                   style: const TextStyle(
                     color: BuyV2Colors.orange,
                     fontSize: 9,
@@ -10895,12 +10926,7 @@ class BuyV2TrackingView extends StatelessWidget {
             _DecisionRow(
               icon: Icons.local_shipping_outlined,
               label: order.deliveryPartnerType ?? 'Delivery partner',
-              value:
-                  order.deliveryPartnerName ??
-                  (order.status == BuyV2OrderStatus.preparing ||
-                          order.status == BuyV2OrderStatus.confirmed
-                      ? 'Not assigned yet'
-                      : 'Details unavailable · Refresh order'),
+              value: _orderDeliveryPartnerLabel(order),
             ),
             if (order.dispatchPromise case final dispatchPromise?)
               _DecisionRow(
@@ -18776,7 +18802,7 @@ class _TrackingTimeline extends StatelessWidget {
                     '${indexed.$1 < completedSteps
                         ? 'Complete'
                         : indexed.$1 == completedSteps
-                        ? 'Current'
+                        ? 'Last recorded stage'
                         : 'Upcoming'}',
                 excludeSemantics: true,
                 child: Row(
@@ -18841,7 +18867,7 @@ class _TrackingTimeline extends StatelessWidget {
                           borderRadius: BorderRadius.circular(7),
                         ),
                         child: const Text(
-                          'NOW',
+                          'RECORDED',
                           style: TextStyle(
                             color: BuyV2Colors.navy,
                             fontSize: 7,
