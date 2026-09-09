@@ -7699,6 +7699,225 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final hardwareBack in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'REG4551 Files returns to the same Store hardware=$hardwareBack scale=$scale',
+        (tester) async {
+          final work = storeViewFixture();
+          final workspaceId = work.activeWorkspace!.id;
+          final orderId = work.currentWorkspaceOrderId;
+          final orderStage = work.workspaceOrderStage;
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: const Size(412, 915),
+            textScale: scale,
+          );
+          final dashboard = find.byType(WorkWorkspaceDashboardScreen);
+          final dashboardState = tester.state(dashboard);
+          final router = GoRouter.of(tester.element(dashboard));
+          for (var visit = 0; visit < 3; visit++) {
+            await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+            await tester.pumpAndSettle();
+            final documents = find.byKey(
+              const Key('global-profile-quick-documents'),
+            );
+            await tester.ensureVisible(documents);
+            await tester.tap(documents);
+            await tester.pumpAndSettle();
+            expect(find.byKey(const Key('shared-screen-160')), findsOneWidget);
+            expect(router.canPop(), isTrue);
+            expect(tester.takeException(), isNull);
+            if (!hardwareBack && visit == 0) {
+              await captureStoreView(tester, 'reg4551-files-$scale');
+            }
+            if (hardwareBack) {
+              await tester.binding.handlePopRoute();
+            } else {
+              await tester.tap(find.byKey(const Key('shared-160-back')));
+            }
+            await tester.pumpAndSettle();
+            expect(dashboard, findsOneWidget);
+            expect(tester.state(dashboard), same(dashboardState));
+            expect(find.byKey(const Key('shared-screen-162')), findsNothing);
+            expect(
+              find.byKey(const Key('global-profile-panel-v2')),
+              findsNothing,
+            );
+            expect(router.canPop(), isFalse);
+            expect(work.activeWorkspace!.id, workspaceId);
+            expect(work.currentWorkspaceOrderId, orderId);
+            expect(work.workspaceOrderStage, orderStage);
+            expect(tester.takeException(), isNull);
+            if (!hardwareBack && visit == 0) {
+              await captureStoreView(tester, 'reg4551-return-store-$scale');
+            }
+          }
+        },
+      );
+    }
+  }
+
+  for (final cancelButton in [false, true]) {
+    testWidgets(
+      'REG4551 Files nested sheet returns without losing Store cancel=$cancelButton',
+      (tester) async {
+        final work = storeViewFixture();
+        final workspaceId = work.activeWorkspace!.id;
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: const Size(412, 915),
+          textScale: 1,
+        );
+        final dashboard = find.byType(WorkWorkspaceDashboardScreen);
+        final dashboardState = tester.state(dashboard);
+        await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('global-profile-quick-documents')),
+        );
+        await tester.pumpAndSettle();
+        final files = find.byKey(const Key('shared-screen-160'));
+        final filesState = tester.state(files);
+        await tester.tap(find.byKey(const Key('shared-160-top-action')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('shared-file-add-sheet')), findsOneWidget);
+        if (cancelButton) {
+          await tester.tap(find.byKey(const Key('shared-file-add-cancel')));
+        } else {
+          await tester.binding.handlePopRoute();
+        }
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('shared-file-add-sheet')), findsNothing);
+        expect(tester.state(files), same(filesState));
+        expect(work.activeWorkspace!.id, workspaceId);
+        await tester.tap(find.byKey(const Key('shared-160-back')));
+        await tester.pumpAndSettle();
+        expect(tester.state(dashboard), same(dashboardState));
+        expect(find.byKey(const Key('shared-screen-162')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('REG4551 Files preserves an unsubmitted counter-sale draft', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1,
+    );
+    final orders = work.workspaceOrders.length;
+    final invoices = work.workspaceInvoices.length;
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-sale-customer')));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-order-customer')),
+      '9000000013',
+    );
+    await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
+    await tester.pumpAndSettle();
+    expect(work.workspaceOrderCustomer, '9000000013');
+    await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('global-profile-quick-documents')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('shared-160-back')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('work-dashboard-counter-order-screen')),
+      findsOneWidget,
+    );
+    expect(work.workspaceOrderCustomer, '9000000013');
+    expect(work.workspaceOrders.length, orders);
+    expect(work.workspaceInvoices.length, invoices);
+    await tester.tap(find.byKey(const Key('work-sale-customer')));
+    await tester.pumpAndSettle();
+    final editable = find.descendant(
+      of: find.byKey(const Key('work-order-customer')),
+      matching: find.byType(EditableText),
+    );
+    expect(tester.widget<EditableText>(editable).controller.text, '9000000013');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('REG4551 non-Files hub keeps its original Back behavior', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: storeViewFixture(),
+      textScale: 1,
+    );
+    final router = GoRouter.of(
+      tester.element(find.byType(WorkWorkspaceDashboardScreen)),
+    );
+    router.push<void>('/app/account/workspaces');
+    await tester.pumpAndSettle();
+    expect(router.canPop(), isTrue);
+    await tester.tap(find.byKey(const Key('shared-162-back')));
+    await tester.pumpAndSettle();
+    expect(router.routeInformationProvider.value.uri.path, '/app/social');
+    expect(find.byType(WorkWorkspaceDashboardScreen), findsNothing);
+    expect(router.canPop(), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('REG4551 direct Files retains its existing safe fallback', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      route: '/app/files',
+      work: storeViewFixture(),
+      textScale: 1,
+    );
+    final files = find.byKey(const Key('shared-screen-160'));
+    final router = GoRouter.of(tester.element(files));
+    expect(router.canPop(), isFalse);
+    await tester.tap(find.byKey(const Key('shared-160-back')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('shared-screen-162')), findsOneWidget);
+    expect(find.byType(WorkWorkspaceDashboardScreen), findsNothing);
+    expect(router.canPop(), isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('REG4551 Files returns to a non-Store pushed origin', (
+    tester,
+  ) async {
+    await mount(
+      tester,
+      route: '/app/account/workspaces',
+      work: storeViewFixture(),
+      textScale: 1,
+    );
+    final origin = find.byKey(const Key('shared-screen-162'));
+    final originState = tester.state(origin);
+    final router = GoRouter.of(tester.element(origin));
+    router.push<void>('/app/files');
+    await tester.pumpAndSettle();
+    expect(router.canPop(), isTrue);
+    await tester.tap(find.byKey(const Key('shared-160-back')));
+    await tester.pumpAndSettle();
+    expect(origin, findsOneWidget);
+    expect(tester.state(origin), same(originState));
+    expect(router.canPop(), isFalse);
+    expect(find.byType(WorkWorkspaceDashboardScreen), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'Store Review - acceptance keeps the original ten-minute fulfilment target',
     (tester) async {

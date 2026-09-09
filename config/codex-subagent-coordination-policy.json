@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4506,
-    "sha256": "B5C4CAFAA6DE73069FC8B8E4D56355F50D21DC5818B533512A34D29AD0AC28C9"
+    "entryCount": 4508,
+    "sha256": "4D4B619C2A1A6BE90AEEC16C0ED21B510E567FCC5839E0C880DC446C2AFF046F"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -70,6 +70,16 @@
         "artifacts/quality/codex-oppo-r66-12-review-20260909/post-install.json",
         "artifacts/quality/codex-oppo-r66-12-review-20260909/device-review.md",
         "artifacts/quality/codex-oppo-r66-12-review-20260909/ticket-and-screen-coverage.md",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/candidate-contract.md",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/source-manifest.txt",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/local-validation.md",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/prebuild-validation.md",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/motion-disposition.md",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/apk-regression-state.json",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/uaw-codex-oppo-r66.13-review-20260909-build-provenance.txt",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/post-install.json",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/device-review.md",
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md",
         "artifacts/quality/codex-oppo-r66-9-review-20260908/source-manifest.txt",
         "artifacts/quality/codex-oppo-r66-9-review-20260908/local-validation.md",
         "artifacts/quality/codex-oppo-r66-9-review-20260908/prebuild-validation.md",
@@ -97,6 +107,7 @@
         "apps/mobile/lib/features/work/work_workspace_benefits.dart",
         "apps/mobile/test/global_customer_copy_professionalization_test.dart",
         "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
+        "apps/mobile/lib/features/shared/screens/shared_screens.dart",
         "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "artifacts/quality/codex-oppo-r66-5-review-20260907/candidate-contract.md",

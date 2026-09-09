@@ -57,9 +57,15 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
           leading: IconButton(
             key: Key('shared-${spec.screen}-back'),
             tooltip: 'Back',
-            onPressed: () => context.go(
-              spec.screen == 162 ? '/app/social' : '/app/account/workspaces',
-            ),
+            onPressed: () {
+              if (spec.screen == 160 && context.canPop()) {
+                context.pop();
+                return;
+              }
+              context.go(
+                spec.screen == 162 ? '/app/social' : '/app/account/workspaces',
+              );
+            },
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
           ),
           titleSpacing: 0,
