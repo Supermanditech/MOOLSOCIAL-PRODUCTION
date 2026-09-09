@@ -9093,6 +9093,133 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('Exact order purchased facts have no repeated summary $scale', (
+      tester,
+    ) async {
+      final gateway = ReviewWorkGateway();
+      final work = storeViewFixture(gateway);
+      final order = WorkspaceOrderRecord(
+        id: 'MS-1048',
+        customer: 'Asha Mehta · 9001234567',
+        items: 'Fortune Sunflower Oil × 2, Aashirvaad Atta × 5',
+        quantities: const {'oil-fortune-1l': 2, 'atta-aashirvaad-1kg': 5},
+        amount: 1068,
+        source: 'App',
+        fulfilment: 'MoolSocial delivery',
+        payment: 'Paid online',
+        address: '12 Market Road, Test Area',
+        stage: 'Confirmed',
+        needsDelivery: true,
+        createdAt: DateTime(2026, 9, 10, 9, 30),
+        itemSnapshots: const [
+          WorkspaceOrderItemSnapshot(
+            productId: 'oil-fortune-1l',
+            name: 'Fortune Sunflower Oil',
+            pack: '1 L',
+            quantity: 2,
+            unitPricePaise: 26400,
+            lineTotalPaise: 52800,
+          ),
+          WorkspaceOrderItemSnapshot(
+            productId: 'atta-aashirvaad-1kg',
+            name: 'Aashirvaad Atta',
+            pack: '1 kg',
+            quantity: 5,
+            unitPricePaise: 10800,
+            lineTotalPaise: 54000,
+          ),
+        ],
+      );
+      work.workspaceOrders.add(order);
+      work.workspaceCatalogueItems.add(
+        workspaceMasterCatalogue
+            .singleWhere((item) => item.id == 'atta-aashirvaad-1kg')
+            .copyWith(stock: 20, available: true),
+      );
+      // Current catalogue pricing cannot change the purchased facts.
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
+          .copyWith(sellingPrice: 9999);
+      expect(order.hasCompleteItemSnapshot, isTrue);
+      expect(
+        order.copyWith(stage: 'Preparing').itemSnapshots,
+        order.itemSnapshots,
+      );
+      expect(
+        order
+            .copyWith(quantities: const {'oil-fortune-1l': 3})
+            .hasCompleteItemSnapshot,
+        isFalse,
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('work-dashboard-search-field')),
+        'MS-1048',
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-search-order-MS-1048')));
+      await tester.pumpAndSettle();
+      expect(find.text('MS-1048'), findsOneWidget);
+      expect(find.text('Asha Mehta · 9001234567'), findsOneWidget);
+      expect(find.text('Paid online'), findsOneWidget);
+      expect(find.text('₹1,068'), findsOneWidget);
+      expect(find.text('12 Market Road, Test Area'), findsOneWidget);
+      expect(find.text('2 × ₹264'), findsOneWidget);
+      expect(find.text('₹9,999'), findsNothing);
+      expect(find.text('Accept'), findsOneWidget);
+      expect(find.byKey(const Key('work-order-open-MS-1048')), findsNothing);
+      expect(
+        find.byKey(const Key('work-exact-order-prices-unavailable')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'exact-order-purchased-facts-$scale');
+      await tester.ensureVisible(find.text('Aashirvaad Atta'));
+      await tester.pumpAndSettle();
+      expect(find.text('Aashirvaad Atta').hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      expect(work.currentWorkspaceOrderId, 'APP-1043');
+      if (scale == 1) {
+        await tester.ensureVisible(find.text('Accept'));
+        await tester.tap(find.text('Accept'));
+        await tester.pumpAndSettle();
+        expect(work.currentWorkspaceOrderId, 'MS-1048');
+        expect(
+          work.workspaceOrders.singleWhere((row) => row.id == 'MS-1048').stage,
+          'Preparing',
+        );
+        expect(
+          work.workspaceOrders.singleWhere((row) => row.id == 'APP-1043').stage,
+          'Confirmed',
+        );
+        expect(work.workspaceInvoices, isEmpty);
+        final persistedOrders =
+            gateway.lastOperationalSnapshot!.state['orders'] as List;
+        final persistedOrder = persistedOrders
+            .cast<Map<String, Object?>>()
+            .singleWhere((row) => row['id'] == 'MS-1048');
+        final persistedItems = persistedOrder['itemSnapshots'] as List;
+        expect(persistedItems.length, 2);
+        expect((persistedItems.first as Map)['unitPricePaise'], 26400);
+        expect((persistedItems.first as Map)['lineTotalPaise'], 52800);
+        expect(find.text('Fortune Sunflower Oil'), findsNothing);
+        expect(find.text('Fortune Sunflower Oil · 1 L × 2'), findsOneWidget);
+      }
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(work.workspaceSearchQuery, 'MS-1048');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('Store search empty state fits compact 200% keyboard', (
     tester,
   ) async {

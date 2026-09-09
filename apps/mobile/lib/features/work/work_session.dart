@@ -1978,6 +1978,18 @@ class WorkSession extends ChangeNotifier {
           'customer': order.customer,
           'items': order.items,
           'quantities': order.quantities,
+          if (order.itemSnapshots.isNotEmpty)
+            'itemSnapshots': [
+              for (final line in order.itemSnapshots)
+                {
+                  'productId': line.productId,
+                  'name': line.name,
+                  'pack': line.pack,
+                  'quantity': line.quantity,
+                  'unitPricePaise': line.unitPricePaise,
+                  'lineTotalPaise': line.lineTotalPaise,
+                },
+            ],
           'amount': order.amount,
           'source': order.source,
           'fulfilment': order.fulfilment,

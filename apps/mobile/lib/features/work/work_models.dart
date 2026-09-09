@@ -55,6 +55,23 @@ class WorkspaceProductCompliance {
   final String? consumerCare;
 }
 
+/// Purchased facts from the order, never reconstructed from today's catalogue.
+/// Prices are INR minor units (paise); line total includes the order's line
+/// adjustments and is not recalculated by the display layer.
+class WorkspaceOrderItemSnapshot {
+  const WorkspaceOrderItemSnapshot({
+    required this.productId,
+    required this.name,
+    required this.pack,
+    required this.quantity,
+    required this.unitPricePaise,
+    required this.lineTotalPaise,
+  });
+
+  final String productId, name, pack;
+  final int quantity, unitPricePaise, lineTotalPaise;
+}
+
 class WorkspaceOrderRecord {
   const WorkspaceOrderRecord({
     required this.id,
@@ -74,6 +91,7 @@ class WorkspaceOrderRecord {
     this.extraMinutes = 0,
     this.stockReserved = false,
     this.collectionStoreId,
+    this.itemSnapshots = const [],
   });
 
   final String id;
@@ -96,6 +114,22 @@ class WorkspaceOrderRecord {
   /// Set only by the order adapter for authenticated customer collection.
   /// A legacy Pickup label is not sufficient to grant collection authority.
   final String? collectionStoreId;
+  final List<WorkspaceOrderItemSnapshot> itemSnapshots;
+
+  /// A changed SKU/quantity must not retain stale purchased-price information.
+  bool get hasCompleteItemSnapshot =>
+      itemSnapshots.isNotEmpty &&
+      itemSnapshots.length == quantities.length &&
+      itemSnapshots.map((line) => line.productId).toSet().length ==
+          itemSnapshots.length &&
+      itemSnapshots.every(
+        (line) =>
+            line.name.trim().isNotEmpty &&
+            line.quantity > 0 &&
+            quantities[line.productId] == line.quantity &&
+            line.unitPricePaise >= 0 &&
+            line.lineTotalPaise >= 0,
+      );
   bool get isCustomerCollection => collectionStoreId != null;
   bool get isCompleted =>
       stage == 'Completed' || (isCustomerCollection && stage == 'Collected');
@@ -116,6 +150,7 @@ class WorkspaceOrderRecord {
     DateTime? fulfilmentDeadline,
     int? extraMinutes,
     bool? stockReserved,
+    List<WorkspaceOrderItemSnapshot>? itemSnapshots,
   }) => WorkspaceOrderRecord(
     id: id,
     customer: customer ?? this.customer,
@@ -134,6 +169,9 @@ class WorkspaceOrderRecord {
     extraMinutes: extraMinutes ?? this.extraMinutes,
     stockReserved: stockReserved ?? this.stockReserved,
     collectionStoreId: collectionStoreId,
+    itemSnapshots: List<WorkspaceOrderItemSnapshot>.unmodifiable(
+      itemSnapshots ?? this.itemSnapshots,
+    ),
   );
 }
 

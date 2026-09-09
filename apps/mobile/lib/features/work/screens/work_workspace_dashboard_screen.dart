@@ -2300,20 +2300,10 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                                             fit: BoxFit.scaleDown,
                                             alignment: Alignment.centerLeft,
                                             child: Text(
-                                              searchController.text
-                                                      .trim()
-                                                      .isEmpty
-                                                  ? 'Search your store'
-                                                  : searchController.text
-                                                        .trim(),
+                                              'Search your store',
                                               maxLines: 1,
-                                              style: TextStyle(
-                                                color:
-                                                    searchController.text
-                                                        .trim()
-                                                        .isEmpty
-                                                    ? MoolColors.muted
-                                                    : MoolColors.navy,
+                                              style: const TextStyle(
+                                                color: MoolColors.muted,
                                                 fontSize: 11,
                                                 fontWeight: FontWeight.w700,
                                               ),
@@ -13135,6 +13125,7 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: _LiveOrderTicket(
                           session: session,
+                          detailed: widget.orderId != null,
                           onOpenCollection: widget.onOpenCollection,
                           order: order,
                           active:
@@ -13210,6 +13201,173 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   }
 }
 
+class _ExactOrderInformation extends StatelessWidget {
+  const _ExactOrderInformation({required this.order, required this.showItems});
+  final WorkspaceOrderRecord order;
+  final bool showItems;
+
+  static String _price(int paise) {
+    final fraction = paise % 100;
+    return '₹${_formatStoreAmount(paise ~/ 100)}'
+        '${fraction == 0 ? '' : '.${fraction.toString().padLeft(2, '0')}'}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final localizations = MaterialLocalizations.of(context);
+    final placed = order.createdAt.toLocal();
+    final facts = <(String, String)>[
+      (
+        'Placed',
+        '${localizations.formatShortDate(placed)} · '
+            '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(placed))}',
+      ),
+      ('Ordered via', order.source == 'App' ? 'MoolSocial app' : order.source),
+      (
+        'Payment',
+        order.payment.isEmpty ? 'Awaiting payment update' : order.payment,
+      ),
+      (
+        'Receive by',
+        order.isCustomerCollection
+            ? 'Collect at store'
+            : order.fulfilment.isEmpty
+            ? 'Awaiting confirmation'
+            : order.fulfilment,
+      ),
+      if (order.needsDelivery || order.address.trim().isNotEmpty)
+        (
+          'Deliver to',
+          order.address.trim().isEmpty
+              ? 'Address not yet available'
+              : order.address,
+        ),
+    ];
+    return Column(
+      key: Key('work-exact-order-information-${order.id}'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Divider(height: 20, color: Color(0xFFE5E8F1)),
+        for (final fact in facts)
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: MediaQuery.textScalerOf(context).scale(1) >= 1.8
+                ? Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        fact.$1,
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                      Text(
+                        fact.$2,
+                        style: const TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  )
+                : Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      SizedBox(
+                        width: 90,
+                        child: Text(
+                          fact.$1,
+                          style: const TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          fact.$2,
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+          ),
+        if (showItems) ...[
+          const Divider(height: 24, color: Color(0xFFE5E8F1)),
+          const Text(
+            'Ordered items',
+            style: TextStyle(
+              color: MoolColors.navy,
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (order.hasCompleteItemSnapshot)
+            for (final line in order.itemSnapshots)
+              Padding(
+                key: Key('work-exact-order-item-${line.productId}'),
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      line.name,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    if (line.pack.trim().isNotEmpty)
+                      Text(
+                        line.pack,
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                    const SizedBox(height: 5),
+                    _StoreMoneyLine(
+                      leading: Text(
+                        '${line.quantity} × ${_price(line.unitPricePaise)}',
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                      value: _price(line.lineTotalPaise),
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+          else ...[
+            const SizedBox(height: 8),
+            Text(
+              order.items,
+              style: const TextStyle(color: MoolColors.ink, fontSize: 13),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Item prices are not available on this order.',
+              key: Key('work-exact-order-prices-unavailable'),
+              style: TextStyle(color: MoolColors.muted, fontSize: 12),
+            ),
+          ],
+        ],
+      ],
+    );
+  }
+}
+
 class _LiveOrderTicket extends StatelessWidget {
   const _LiveOrderTicket({
     required this.session,
@@ -13217,6 +13375,7 @@ class _LiveOrderTicket extends StatelessWidget {
     required this.order,
     required this.active,
     required this.onOpenDelivery,
+    this.detailed = false,
   });
 
   final WorkSession session;
@@ -13224,6 +13383,7 @@ class _LiveOrderTicket extends StatelessWidget {
   final WorkspaceOrderRecord order;
   final bool active;
   final VoidCallback onOpenDelivery;
+  final bool detailed;
 
   @override
   Widget build(BuildContext context) {
@@ -13232,20 +13392,38 @@ class _LiveOrderTicket extends StatelessWidget {
     bool sameStore() =>
         context.mounted &&
         storeId == (session.activeWorkspace?.id ?? session.workspaceId);
-    bool currentActionIsValid() =>
-        sameStore() &&
-        !session.busy &&
-        !session.workspaceOperationsSyncing &&
-        !session.workspaceHandoverBusy &&
-        session.currentCollection?.needsReconciliation != true &&
-        session.workspaceOrderStage == stage &&
-        (session.currentWorkspaceOrderId == order.id ||
-            (session.currentWorkspaceOrderId == null &&
-                session.visibleWorkspaceOrders.length == 1 &&
-                session.visibleWorkspaceOrders.single.id == order.id));
+    bool currentActionIsValid() {
+      if (!sameStore() ||
+          session.busy ||
+          session.workspaceOperationsSyncing ||
+          session.workspaceHandoverBusy ||
+          session.currentCollection?.needsReconciliation == true) {
+        return false;
+      }
+      if (detailed && session.currentWorkspaceOrderId != order.id) {
+        final current = session.visibleWorkspaceOrders
+            .where((record) => record.id == order.id)
+            .firstOrNull;
+        if (current == null ||
+            current.isClosed ||
+            current.stage != stage ||
+            !session.selectWorkspaceOrder(order.id)) {
+          return false;
+        }
+      }
+      return session.workspaceOrderStage == stage &&
+          (session.currentWorkspaceOrderId == order.id ||
+              (session.currentWorkspaceOrderId == null &&
+                  session.visibleWorkspaceOrders.length == 1 &&
+                  session.visibleWorkspaceOrders.single.id == order.id));
+    }
+
     final packingLines = stage == 'Preparing' && !order.isCustomerCollection
         ? session.workspacePackingLinesForOrder(order)
         : const <WorkspacePackingLine>[];
+    final itemSnapshots = order.hasCompleteItemSnapshot
+        ? {for (final line in order.itemSnapshots) line.productId: line}
+        : const <String, WorkspaceOrderItemSnapshot>{};
     final packedUnits = packingLines
         .where((line) => line.packed)
         .fold<int>(0, (total, line) => total + line.quantity);
@@ -13338,16 +13516,22 @@ class _LiveOrderTicket extends StatelessWidget {
                 fontWeight: FontWeight.w900,
               ),
             ),
-            Text(
-              order.isCustomerCollection
-                  ? '${order.payment} · Collect at store'
-                  : '${order.source} · ${order.payment} · ${order.fulfilment}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
-            ),
+            if (!detailed)
+              Text(
+                order.isCustomerCollection
+                    ? '${order.payment} · Collect at store'
+                    : '${order.source} · ${order.payment} · ${order.fulfilment}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(color: MoolColors.muted, fontSize: 10.5),
+              ),
             const SizedBox(height: 7),
-            if (packingLines.isEmpty)
+            if (detailed)
+              _ExactOrderInformation(
+                order: order,
+                showItems: packingLines.isEmpty,
+              ),
+            if (!detailed && packingLines.isEmpty)
               Text(
                 order.items,
                 style: const TextStyle(
@@ -13407,13 +13591,26 @@ class _LiveOrderTicket extends StatelessWidget {
                       );
                     },
                     title: Text(
-                      '${line.label} × ${line.quantity}',
+                      detailed && itemSnapshots.containsKey(line.id)
+                          ? '${itemSnapshots[line.id]!.name} · '
+                                '${itemSnapshots[line.id]!.pack} × ${line.quantity}'
+                          : '${line.label} × ${line.quantity}',
                       style: const TextStyle(
                         color: MoolColors.ink,
                         fontSize: 10.5,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    subtitle: detailed && itemSnapshots.containsKey(line.id)
+                        ? Text(
+                            'Each ${_ExactOrderInformation._price(itemSnapshots[line.id]!.unitPricePaise)} · '
+                            'Total ${_ExactOrderInformation._price(itemSnapshots[line.id]!.lineTotalPaise)}',
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 12,
+                            ),
+                          )
+                        : null,
                   ),
                 ),
             ],
@@ -13432,7 +13629,8 @@ class _LiveOrderTicket extends StatelessWidget {
                   ),
                 ),
               )
-            else if (active) ...[
+            else if (active ||
+                (detailed && !order.isClosed && stage != 'Preparing')) ...[
               const SizedBox(height: 10),
               Wrap(
                 alignment: WrapAlignment.end,
