@@ -2331,7 +2331,10 @@ void main() {
       test(
         'native $source preserves selected $extension bytes and name',
         () async {
-          final bytes = Uint8List.fromList([1, 2, 3, 4]);
+          // Picker signature fixture only; this is not a renderable PDF.
+          final bytes = extension == 'pdf'
+              ? Uint8List.fromList(utf8.encode('%PDF-1.7\nQA picker fixture'))
+              : Uint8List.fromList([1, 2, 3, 4]);
           final picker = NativeWorkProofPicker(
             documentPicker: () async =>
                 XFile.fromData(bytes, path: 'business-proof.$extension'),
@@ -2372,6 +2375,112 @@ void main() {
       },
     );
   }
+  for (final source in [WorkProofSource.upload, WorkProofSource.cloudDrive]) {
+    for (final invalid in [
+      'text renamed as pdf',
+      '%PDF',
+      ' %PDF-1.7',
+      '\uFEFF%PDF-1.7',
+    ]) {
+      test(
+        'REG4552 $source rejects unsupported PDF signature $invalid',
+        () async {
+          final picker = NativeWorkProofPicker(
+            documentPicker: () async => XFile.fromData(
+              Uint8List.fromList(utf8.encode(invalid)),
+              path: 'QA-NOT-A-DOCUMENT.PDF',
+            ),
+          );
+          await expectLater(
+            picker.pick(source),
+            throwsA(
+              isA<WorkGatewayException>().having(
+                (error) => error.message,
+                'same guidance as Preview',
+                'This PDF could not be opened. Choose another copy.',
+              ),
+            ),
+          );
+        },
+      );
+    }
+    test('REG4552 $source accepts exact10MB with PDF signature', () async {
+      final bytes = Uint8List(10 * 1024 * 1024)
+        ..setRange(0, 5, ascii.encode('%PDF-'));
+      final picker = NativeWorkProofPicker(
+        documentPicker: () async => XFile.fromData(bytes, path: 'QA-LIMIT.PDF'),
+      );
+      final proof = await picker.pick(source);
+      expect(proof!.bytes, orderedEquals(bytes));
+      expect(proof.fileName, 'QA-LIMIT.PDF');
+      expect(proof.contentType, 'application/pdf');
+    });
+  }
+  test(
+    'REG4552 failed replacement and cancellation preserve the original until valid save',
+    () async {
+      XFile? selected = XFile.fromData(
+        Uint8List.fromList(ascii.encode('Not a PDF')),
+        path: 'QA-INVALID.pdf',
+      );
+      final gateway = _PdfReplacementGateway();
+      final work = WorkSession(
+        gateway: gateway,
+        proofPicker: NativeWorkProofPicker(
+          documentPicker: () async => selected,
+        ),
+      )..selectProfile('retailer-grocery');
+      addTearDown(work.dispose);
+      final original = _cameraProof();
+      work.addedProofs['shop-front'] = 'original-reference';
+      work.pickedProofs['shop-front'] = original;
+      work.declarationAccepted = true;
+
+      expect(
+        await work.addProof('shop-front', WorkProofSource.upload),
+        isFalse,
+      );
+      expect(gateway.saves, 0);
+      expect(work.addedProofs['shop-front'], 'original-reference');
+      expect(work.pickedProofs['shop-front'], same(original));
+      expect(work.declarationAccepted, isTrue);
+      expect(
+        work.errorMessage,
+        'This PDF could not be opened. Choose another copy.',
+      );
+
+      selected = null;
+      expect(
+        await work.addProof('shop-front', WorkProofSource.cloudDrive),
+        isFalse,
+      );
+      expect(gateway.saves, 0);
+      expect(work.pickedProofs['shop-front'], same(original));
+      expect(work.declarationAccepted, isTrue);
+
+      final replacement = Uint8List.fromList(
+        ascii.encode('%PDF-1.7\nQA fixture'),
+      );
+      selected = XFile.fromData(replacement, path: 'QA-REPLACEMENT.pdf');
+      final pending = work.addProof('shop-front', WorkProofSource.upload);
+      await gateway.started.future.timeout(const Duration(seconds: 3));
+      expect(gateway.saves, 1);
+      expect(work.addedProofs['shop-front'], 'original-reference');
+      expect(work.pickedProofs['shop-front'], same(original));
+      expect(work.declarationAccepted, isTrue);
+      expect(work.busy, isTrue);
+      gateway.result.complete('replacement-reference');
+      expect(await pending, isTrue);
+      expect(work.addedProofs['shop-front'], 'replacement-reference');
+      expect(
+        work.pickedProofs['shop-front']!.bytes,
+        orderedEquals(replacement),
+      );
+      expect(work.pickedProofs['shop-front']!.fileName, 'QA-REPLACEMENT.pdf');
+      expect(work.declarationAccepted, isFalse);
+      expect(work.errorMessage, isNull);
+    },
+  );
   test(
     'native document stops a growing or misreported stream at10MB',
     () async {
@@ -3523,6 +3632,19 @@ WorkPickedProof _cameraProof() => WorkPickedProof(
   contentType: 'image/jpeg',
   bytes: Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]),
 );
+
+class _PdfReplacementGateway extends ReviewWorkGateway {
+  int saves = 0;
+  final started = Completer<void>();
+  final result = Completer<String>();
+
+  @override
+  Future<String> saveProof(String proofId, WorkPickedProof proof) {
+    saves++;
+    if (!started.isCompleted) started.complete();
+    return result.future;
+  }
+}
 
 class _DeferredReviewGateway extends ReviewWorkGateway {
   final result = Completer<WorkReviewResult>();

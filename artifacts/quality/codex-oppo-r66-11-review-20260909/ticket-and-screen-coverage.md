@@ -35,3 +35,15 @@ REG-20260909-4551 — Grocery/Kirana Store profile Documents loses its return co
 - Source diagnosis and shared-owner check are pending. No source fix, new general owner permission, or acceptance of this destination is implied by registration.
 - Parked with dashboard first-tap follow-ups under the founder sequencing checkpoint; not silently closed or treated as one of the original contact/support defects.
 - Contact malformed-input checks and application A/B draft checks remain separately qualified. No real document, message, payment or approval was changed.
+
+## Document continuation and immediate children
+
+This updates the document-provider boundary above without closing untested work. Native captures113–153 and the84-file continuation manifest are detailed in device-review.md.
+
+- Gallery selection, native Done, correct attachment and View pass with a QA image.
+- The founder captured a camera photo and opened View. Codex independently replayed camera launch, shutter, retake, Back and Cancel, preserving that original attachment. The assisted and independent evidence are distinguished; no unobserved save-confirmation pass is claimed.
+- A10MB+1 file is rejected with complete guidance and preserves the prior attachment.
+- **REG-4552:** a96-byte plain-text.pdf incorrectly replaced a valid image before Preview rejected it. The frontend now checks the same signature before save. Eleven focused picker/session tests and supplementary three-size source-sheet tests cover rejection, old reference/bytes/declaration preservation, cancellation, retry and valid replacement. Final qualification and a new APK/native replay remain required.
+- **REG-4553:** local200% inspection found title/source-label ellipses. The existing sheet now wraps full labels and uses fewer columns only when the actual scaled choice text requires more width. Normal/140% captures remain pixel-identical. No smaller text, reduced touch targets, new route or normal-screen redesign. Final-source regression/capture verification is running; physical acceptance remains pending.
+
+The corrected candidate is planned as r66.12, not yet built or installed. These children remain open until their actual OPPO checks pass. REG-4551 stays parked with dashboard first-tap work. Remote cloud completion, physical200%/TalkBack, support-error replay, process-death/real-account boundaries and live backend dependencies remain explicit; fixture results cannot close them.

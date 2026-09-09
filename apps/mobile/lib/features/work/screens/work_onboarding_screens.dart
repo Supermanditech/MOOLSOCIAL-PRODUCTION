@@ -2790,88 +2790,111 @@ class _ProofSourceSheetState extends State<_ProofSourceSheet> {
               MoolSpacing.md,
               MoolSpacing.xs + 16,
             ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 42,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFD8DAE8),
-                        borderRadius: BorderRadius.circular(MoolRadii.capsule),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  Text(
-                    'Add ${widget.proof.label}',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: MoolColors.ink,
-                      fontSize: 19,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const Text(
-                    'PDF, JPG, JPEG, PNG or WebP · up to 10 MB. Cloud files shows the providers available on this device.',
-                    style: TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 10.5,
-                      height: 1.3,
-                    ),
-                  ),
-                  const SizedBox(height: MoolSpacing.md),
-                  if (_error case final message?) ...[
-                    Semantics(
-                      liveRegion: true,
-                      child: Text(
-                        message,
-                        key: const Key('work-proof-source-error'),
-                        style: TextStyle(
-                          color: Theme.of(context).colorScheme.error,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      for (var index = 0; index < sources.length; index++) ...[
-                        Expanded(
-                          child: _ProofSourceTile(
-                            keyName: 'work-proof-source-${sources[index].id}',
-                            label: sources[index].label,
-                            icon: sources[index].icon,
-                            busy: _busySource == sources[index].id,
-                            onTap: _busySource == null
-                                ? () => _pick(
-                                    sources[index].id,
-                                    sources[index].source,
-                                  )
-                                : null,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD8DAE8),
+                              borderRadius: BorderRadius.circular(
+                                MoolRadii.capsule,
+                              ),
+                            ),
                           ),
                         ),
-                        if (index < sources.length - 1)
-                          const SizedBox(width: 6),
+                        const SizedBox(height: MoolSpacing.sm),
+                        Text(
+                          'Add ${widget.proof.label}',
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Text(
+                          'PDF, JPG, JPEG, PNG or WebP · up to 10 MB. Cloud files shows the providers available on this device.',
+                          style: TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 10.5,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.md),
+                        if (_error case final message?) ...[
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              message,
+                              key: const Key('work-proof-source-error'),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final minTileWidth =
+                                MediaQuery.textScalerOf(context).scale(9.5) /
+                                    9.5 *
+                                    42 +
+                                8;
+                            final columns =
+                                constraints.maxWidth >= minTileWidth * 4 + 18
+                                ? 4
+                                : constraints.maxWidth >= minTileWidth * 2 + 6
+                                ? 2
+                                : 1;
+                            final tileWidth =
+                                (constraints.maxWidth - 6 * (columns - 1)) /
+                                columns;
+                            return Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final source in sources)
+                                  SizedBox(
+                                    width: tileWidth,
+                                    child: _ProofSourceTile(
+                                      keyName: 'work-proof-source-${source.id}',
+                                      label: source.label,
+                                      icon: source.icon,
+                                      busy: _busySource == source.id,
+                                      onTap: _busySource == null
+                                          ? () =>
+                                                _pick(source.id, source.source)
+                                          : null,
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
                       ],
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  TextButton(
-                    key: const Key('work-proof-source-cancel'),
-                    onPressed: _busySource == null
-                        ? () => Navigator.of(context).pop()
-                        : null,
-                    child: const Text('Cancel'),
-                  ),
-                ],
-              ),
+                ),
+                const SizedBox(height: MoolSpacing.sm),
+                TextButton(
+                  key: const Key('work-proof-source-cancel'),
+                  onPressed: _busySource == null
+                      ? () => Navigator.of(context).pop()
+                      : null,
+                  child: const Text('Cancel'),
+                ),
+              ],
             ),
           ),
         ),
@@ -2921,8 +2944,6 @@ class _ProofSourceTile extends StatelessWidget {
                 Text(
                   label,
                   textAlign: TextAlign.center,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
                     color: MoolColors.ink,
                     fontSize: 9.5,

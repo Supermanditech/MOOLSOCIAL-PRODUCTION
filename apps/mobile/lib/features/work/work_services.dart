@@ -1314,6 +1314,14 @@ WorkPickedProof _validateProof(String fileName, Uint8List bytes) {
   if (bytes.isEmpty || bytes.length > 10 * 1024 * 1024) {
     throw const WorkGatewayException('Choose a document up to 10 MB.');
   }
+  // Match the existing local preview boundary before replacing an attachment.
+  // A signature is not proof of readability or server-side document validity.
+  if (contentType == 'application/pdf' &&
+      (bytes.length < 5 || String.fromCharCodes(bytes.take(5)) != '%PDF-')) {
+    throw const WorkGatewayException(
+      'This PDF could not be opened. Choose another copy.',
+    );
+  }
   return WorkPickedProof(
     fileName: fileName,
     contentType: contentType,

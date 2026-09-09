@@ -50,3 +50,20 @@ Requested contact/draft corrections pass the native scenarios above. REG-4550 se
 The current pre-dashboard closure checklist is ticket-and-screen-coverage.md. Preserve previous visual approvals and earlier native evidence; explicitly resolve or retain each applicable interruption, document-provider, support-recovery, accessibility and backend boundary before claiming broader closure. This evidence checkpoint does not close those untested checks.
 
 Cursor, Redmi, production approvals, real OTP/messages/WhatsApp/payments, deployment and integration untouched. No source change or rebuild during this review. An evidence patch using delete/add for one file was rejected atomically; use one Update operation and verify readback.
+
+## Continued pre-dashboard document replay — captures113–153
+
+The previously saved APK remains installed; these observations concern r66.11, not the unbuilt successor. The original334-file manifest is unchanged. External `native-evidence-manifest-v2.json` adds84 files (24 PNG,37 XML,23 logs;5,041,479 bytes), SHA-256 `08800A66D3FC8F32A9B7CCE2F3CC73D8196EFBBD0B397FE62962F9F2AD5183BB`, and binds the v1 hash. It is an integrity inventory, not blanket screen approval.
+
+| Steps | Exercised boundary | Result |
+| --- | --- | --- |
+|113–120|Return from the prematurely started Statement to approved Store A; chooser resumes rejected Store B; labelled review-APK fixture explicitly requests clarification; open its document list.|Correct B/application context. No real admin decision or submission. Dashboard destinations were not continued.|
+|121–131|Photo gallery > Android picker > local Codex screenshot album > selected image > native Done > View.|Selected QA image attached and displayed.127 was captured before native Done and correctly rejected the external foreground; only its capture log exists.129 confirms Done visually;130–131 prove the actual return and attachment.|
+|133–135|Camera photo attached and View opened while founder was operating the phone.|Founder explicitly reported taking the photo and tapping View. The displayed Camera photo.jpg opens, but these steps are founder-assisted, not independent Codex completion evidence. The image contains a test desk surface, not a private document or person.|
+|136–143|Replace > Camera; Codex shutter > native confirmation > X/retake > Android Back > source-sheet Cancel.|Existing Camera photo.jpg remains unchanged. Independent shutter/confirmation/retake/cancellation is verified; a separately accepted replacement photograph is not claimed.|
+|144–150|PDF or image > native DocumentsUI > QA folder >10MB+1 negative fixture.|The complete10MB instruction appears and the original photo remains.145 had an Android null-root dump and produced no XML; the same tap was not repeated.146 is the fresh settled picker capture.|
+|151–153|Select a96-byte plain-text file named.pdf > View.|**REG-4552 confirmed:** picker replaces the original photo and marks the file attached; existing Preview then rejects the missing PDF signature. This is a real failed replacement-preservation boundary, not a pass.|
+
+The two negative files are labelled NOT-A-DOCUMENT, generated locally and copied only to `/sdcard/Download/MoolSocial-QA-r6611/`. Oversized fixture SHA-256 `3A8A8579BAD5EE1E17D5D730AC6085742F64341F18369EB97095C30049B0CF36`;96-byte fixture `46ECAE6B5DA37B08453510C217650340324C21F4CA1E3E72F78FDC35CC131B91`. No customer document was replaced or uploaded to a server.
+
+REG-4552 is being corrected by validating the same PDF signature before save/replacement. Supplementary local visual inspection also registered REG-4553: source-sheet title and source names truncate at200%. That child preserves normal typography/layout and reflows choices only where the scaled readable width requires it. Neither fix is native-qualified on r66.11; both require the corrected, checksum-matched APK and a fresh OPPO replay. Remote cloud-provider completion, physical200%/TalkBack, actual server validation and other previously disclosed checks remain unqualified.

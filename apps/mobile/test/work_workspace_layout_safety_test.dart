@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:go_router/go_router.dart';
@@ -5621,6 +5622,158 @@ void main() {
         },
       );
     }
+    testWidgets(
+      'REG4552 REG4553 PDF replacement recovery ${display.width} ${display.scale}',
+      (tester) async {
+        XFile? selection = XFile.fromData(
+          Uint8List.fromList('QA ONLY - NOT A PDF'.codeUnits),
+          path: 'QA-NOT-A-PDF.PDF',
+        );
+        final work =
+            WorkSession(
+                gateway: ReviewWorkGateway(),
+                proofPicker: NativeWorkProofPicker(
+                  documentPicker: () async => selection,
+                ),
+              )
+              ..selectProfile('retailer-grocery')
+              ..recoveredDocumentStep = true
+              ..saveDetails(
+                name: 'QA Kirana',
+                area: 'Jaipur',
+                activity: 'Groceries',
+              )
+              ..authorizedPersonName = 'QA Owner'
+              ..primaryMobile = '9829012321'
+              ..contactEmail = 'qa@example.com'
+              ..primaryMobileVerified = true
+              ..contactEmailVerified = true
+              ..declarationAccepted = true;
+        final original = WorkPickedProof(
+          fileName: 'QA-original.jpg',
+          contentType: 'image/jpeg',
+          bytes: Uint8List.fromList([0xff, 0xd8, 0xff, 0xd9]),
+        );
+        work.addedProofs['shop-front'] = 'original-reference';
+        work.pickedProofs['shop-front'] = original;
+        await mount(
+          tester,
+          route: '/app/work/workspace/proof',
+          work: work,
+          viewport: Size(display.width, display.height),
+          textScale: display.scale,
+        );
+        Future<void> tap(String key) async {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          expect(target.hitTestable(), findsOneWidget);
+          await tester.tap(target);
+          await tester.pumpAndSettle();
+        }
+
+        await tap('work-replace-proof-shop-front');
+        final cancel = find.byKey(const Key('work-proof-source-cancel'));
+        expect(cancel.hitTestable(), findsOneWidget);
+        await tap('work-proof-source-upload');
+        expect(cancel.hitTestable(), findsOneWidget);
+        final cancelAfterError = tester.getRect(cancel);
+        final title = find.text('Add Shop address document');
+        expect(title.hitTestable(), findsOneWidget);
+        expect(tester.widget<Text>(title).maxLines, isNull);
+        expect(
+          tester.widget<Text>(title).overflow,
+          isNot(TextOverflow.ellipsis),
+        );
+        final titleParagraph = tester.renderObject<RenderParagraph>(
+          find.descendant(of: title, matching: find.byType(RichText)),
+        );
+        expect(titleParagraph.didExceedMaxLines, isFalse);
+        expect(tester.getRect(title).right, lessThanOrEqualTo(display.width));
+        final error = find.byKey(const Key('work-proof-source-error'));
+        expect(error.hitTestable(), findsOneWidget);
+        expect(
+          tester.widget<Text>(error).data,
+          'This PDF could not be opened. Choose another copy.',
+        );
+        expect(tester.widget<Text>(error).maxLines, isNull);
+        expect(
+          tester.widget<Text>(error).overflow,
+          isNot(TextOverflow.ellipsis),
+        );
+        expect(work.addedProofs['shop-front'], 'original-reference');
+        expect(work.pickedProofs['shop-front'], same(original));
+        expect(work.declarationAccepted, isTrue);
+        for (final option in const {
+          'camera': 'Camera',
+          'gallery': 'Photo gallery',
+          'upload': 'PDF or image',
+          'cloud': 'Cloud files',
+        }.entries) {
+          final tile = find.byKey(Key('work-proof-source-${option.key}'));
+          final label = find.descendant(
+            of: tile,
+            matching: find.text(option.value),
+          );
+          expect(label, findsOneWidget);
+          expect(tester.widget<Text>(label).maxLines, isNull);
+          expect(
+            tester.widget<Text>(label).overflow,
+            isNot(TextOverflow.ellipsis),
+          );
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(of: label, matching: find.byType(RichText)),
+          );
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(tester.getRect(tile).left, greaterThanOrEqualTo(0));
+          expect(tester.getRect(tile).right, lessThanOrEqualTo(display.width));
+          expect(tester.getSize(tile).height, greaterThanOrEqualTo(48));
+        }
+        final cameraTop = tester
+            .getTopLeft(find.byKey(const Key('work-proof-source-camera')))
+            .dy;
+        final uploadTop = tester
+            .getTopLeft(find.byKey(const Key('work-proof-source-upload')))
+            .dy;
+        expect(
+          uploadTop,
+          display.scale == 2 ? greaterThan(cameraTop) : cameraTop,
+        );
+        await captureStoreView(
+          tester,
+          'r6612-pdf-replacement-error-${display.width}-${display.scale}',
+        );
+        for (final key in [
+          'work-proof-source-upload',
+          'work-proof-source-cancel',
+        ]) {
+          final target = find.byKey(Key(key));
+          await reveal(tester, target);
+          expect(target.hitTestable(), findsOneWidget);
+          expect(tester.getSize(target).height, greaterThanOrEqualTo(48));
+          expect(
+            tester.getRect(target).bottom,
+            lessThanOrEqualTo(display.height - 44),
+          );
+        }
+        selection = null;
+        expect(tester.getRect(cancel), cancelAfterError);
+        await captureStoreView(
+          tester,
+          'r6612-pdf-replacement-controls-${display.width}-${display.scale}',
+        );
+        await tap('work-proof-source-upload');
+        expect(error, findsNothing);
+        await tap('work-proof-source-cancel');
+        expect(
+          find.byKey(const Key('work-proof-source-safe-area')),
+          findsNothing,
+        );
+        expect(work.addedProofs['shop-front'], 'original-reference');
+        expect(work.pickedProofs['shop-front'], same(original));
+        expect(work.declarationAccepted, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
     testWidgets(
       'R669 document feedback stays with its document ${display.width} ${display.scale}',
       (tester) async {
