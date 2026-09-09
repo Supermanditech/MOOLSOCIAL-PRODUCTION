@@ -4,7 +4,7 @@
 
 Founder reporting boundary clarified 9 September 2026: report only unresolved findings discovered on the currently installed r66.8 Cursor Review APK (version 1.0.0-r66.8-cursorreview, code 2026090903), Redmi TG8HCYTGGQT885OF. APK SHA256 55BB5961D92E1B76784141BD8B2891483507A3A44F3466BE2D28F4C5C7614F25. Historical R66-UAT-001 through 035 records below are retained evidence and excluded from this count; their inclusion below does not reopen them. A fresh child has its own current-candidate evidence and counts once.
 
-Current open total: **27 device/visual defects + 1 source-confirmed supplier-media technical gap = 28 findings**. Separately, **7 founder change requests remain unimplemented**. No finding in this index is closed. This is a running register, not a completed full-module audit or production-readiness verdict. Update this index whenever a distinct finding is added or closed; closure requires implementation plus the original Redmi reproduction passing on an identified successor build. Additional reproductions extend the existing ID rather than inflate the count.
+Current open total: **28 device/visual defects + 1 source-confirmed supplier-media technical gap = 29 findings**. Separately, **7 founder change requests remain unimplemented**. No finding in this index is closed. This is a running register, not a completed full-module audit or production-readiness verdict. Update this index whenever a distinct finding is added or closed; closure requires implementation plus the original Redmi reproduction passing on an identified successor build. Additional reproductions extend the existing ID rather than inflate the count.
 
 | Open ID | Customer-visible problem / technical gap | Severity / evidence |
 | --- | --- | --- |
@@ -36,10 +36,17 @@ Current open total: **27 device/visual defects + 1 source-confirmed supplier-med
 | R668-AUDIT-BRAND-CATEGORY-001 | Brand filter presents generic category labels as brands | P2, Redmi/source |
 | R668-AUDIT-REPORT-LARGE-TEXT-001 | Report Cancel label breaks inside the word at enlarged text | P3, Redmi |
 | R668-AUDIT-SAVED-EMPTY-FILTER-001 | Filtered Saved list falsely says no products have been saved | P2, Redmi/source |
+| R668-AUDIT-TRACKING-FRESHNESS-001 | Failed refresh retains green CURRENT and unqualified delivery estimate | P2, Redmi/source |
 
 Separate open requirements: R668-REQ-COMPARE-SUPPLIER-001; R668-REQ-STORE-CATEGORY-COMPACT-001; R668-REQ-LOCATION-INDIA-001; R668-REQ-ADDRESS-TYPE-DENSITY-001; R668-REQ-OFFERS-HEADER-001; R668-REQ-SHOP-COUNT-ROW-001; R668-AUDIT-DELIVERY-ICON-001. The delivery-icon ID is a requirement despite its AUDIT prefix. Backend/provider integration remains deferred; MEDIA-002 is not claimed as a Redmi upload failure. Detailed reproduction, expected outcome, evidence and implementation/retest status for every entry remain below.
 
 ## Expanded r66.8 audit additions — 9 September 2026
+
+### R668-AUDIT-TRACKING-FRESHNESS-001 — Failed order refresh still presents retained tracking as CURRENT
+
+OPEN P2, status truth and buyer planning, discovered10 September2026 IST on normal Redmi r66.8. Shopping settings → Shopping alerts876 → Delivery update889 opens MS-NEW-09: Preparing your order40%, Delivery in12min, green CURRENT, and live updates explicitly unavailable. Refresh890 adds Order updates are unavailable right now, but green CURRENT and the same12min estimate remain without a last-known/last-updated qualification. A buyer seeking an updated arrival time receives conflicting freshness signals. This is not proof of a wrong ETA, actual late delivery, offline connectivity or a failed production provider; unavailable backend retrieval remains deferred. The reproduced UI defect is presenting retained status/ETA as current after the screen itself reports that updates cannot be obtained.
+
+Evidence890 PNGE649DD6203EE3DB8CD2BD844197BAB968BB445A81439DA7F3C0D421BF5F97BEC / XML55775D2B9315C19EAF3F55DFAD5626722E351DB588EFF25F710B3436CDA668C0;889 XMLCD65EF46C847B09D33941CFD60A7FEEF666A172C724660B26A2780327C5C702D. Source apps/mobile/lib/ui_v2/buy/buy_v2_views.dart10638–10670 builds currentStatus as an unconditional green CURRENT badge, with Current order status semantics. Expected: retain useful last-known order details, label their freshness truthfully when refresh fails, and qualify a time-sensitive estimate until refreshed. Use a real last-success timestamp only when available; never fabricate one. Keep retry/Back accessible and preserve the order. Separate from delivered-partner wording and final-checkout promise copy. Registered before further device input; implementation and successful/failed/recovered-refresh Redmi retest pending.
 
 ### R668-AUDIT-SAVED-EMPTY-FILTER-001 — No matching Saved results are described as nothing saved
 
