@@ -29,7 +29,21 @@ Founder instruction: enumerate journeys, test on Redmi, register each real custo
 
 No entire screen family is declared production-ready by this planning inventory. Record pass/failure/blocked reasons against concrete routes and captures; evaluate whitespace/features by purchase relevance and usability, not personal taste. Confirmed defects are appended to DEFECTS before implementation; observations stay separate until reproduced.
 
-### Expanded execution checkpoint, captures146–188
+### Expanded execution checkpoint, captures204–250
+
+Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-204-250-V1.json`, SHA256 `2698427807A92A47CE81CFD0225847B801B7C5E302A83B6B6B3FE81C032DB607`, independently rehashes47 PNG/XML pairs;31 are explicitly visually inspected. Runtime remains r66.8/2026090903; no source/build/install change. These results supplement the inventory above rather than declaring entire families complete.
+
+Offers204–222: Store offer Fresh Tomatoes1 at37 opens the same SKU/price, but product205 says “No product offers right now”; registered R668-AUDIT-OFFER-COPY-001 without claiming monetary loss. Store preview207 → Browse all208 gives5000 scoped products; Next209 gives41–80; nested SKU210 and Back211 preserve the page. Store search213 tomato yields119 scoped matches. Clear and successive Back216/217/218 exactly restore preview/product/Offers XML. Maker219 and Wholesale220 each show5m fixture offers, Retail221 shows10m; deselection222 restores204 XML. Counts are generated review fixtures, not live inventory.
+
+Shop223 → Scheduled224 → retained Cart225 → Address226. Edit Work227 exposes the large address-type selector; founder requirement R668-REQ-ADDRESS-TYPE-DENSITY-001 recorded. Phone123 is rejected232 with 10-digit guidance; Cancel233 restores original receiving address. Reopen234 restores original phone. PIN12345 is rejected237 with 6-digit guidance; Cancel238 exactly restores226 XML. Draft invalid values were not saved.
+
+Payment239 initially PhonePe → Paytm240 → review241/242 shows the same28736 packs and100001280 total. GST toggle243 changes the footer to Add GST details; blank form244/245 focuses Legal name and246 shows “Enter a legal name with at least3 characters.” Back247 cancels the sheet; toggle248 restores GST off. Payment Change249 returns with Paytm selected; PhonePe250 restores the original payment selection. No Place order or provider transaction submitted. Original notebook basket, receiving address and normal portrait display remain intact. GST format validation beyond blank legal name, Pine Labs review, and broader responsive checks remain pending.
+
+Founder requirements Offers promotion/header001, Shop count-row001 and address-type density001 are registered in DEFECTS before implementation. Their status is requested UI correction, not a fabricated runtime failure. Existing large-text total defect remains open.
+
+Tool recovery:245 response exceeded model context; immutable wrapper metadata proves native exit0 and capture hashes, then exact PNG reopened before another input (external singlechat-r668-gst-output-recovery-v1.md, existing REG4547). A later oversized UAT read and broad evidence-filename listing were truncated; bounded UAT1–36 and exact known wrapper receipts were subsequently read. No application defect was inferred from tooling truncation.
+
+### Expanded execution checkpoint, captures146–203
 
 External ledger `R66-8-EXPANDED-AUDIT-CAPTURES-146-203-V1.json`, SHA `5BD4491A2D0D7AF0B96D71418A3F0E277464A06F964407F8399CB28CC74135E4`, independently verifies58 PNG/XML pairs;34 are explicitly visually inspected. This supplements067–145 and retains raw evidence outside Git.
 
