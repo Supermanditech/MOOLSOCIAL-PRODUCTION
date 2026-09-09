@@ -2355,7 +2355,12 @@ void main() {
           );
           final minus = find.descendant(
             of: card,
-            matching: find.byTooltip('Remove one'),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is IconButton &&
+                  (widget.tooltip == 'Remove one' ||
+                      widget.tooltip == 'Remove from Cart'),
+            ),
           );
           await Scrollable.ensureVisible(tester.element(plus), alignment: .5);
           await tester.pumpAndSettle();
@@ -2372,6 +2377,7 @@ void main() {
           final frame =
               'r5-offers-$id-${size.width.toInt()}-${size.height.toInt()}-$scale';
           await capture(tester, '$frame-before');
+          expect(tester.widget<IconButton>(minus).tooltip, 'Remove from Cart');
           expect(minus.hitTestable(), findsOneWidget);
           await tester.tap(minus);
           await tester.pumpAndSettle();

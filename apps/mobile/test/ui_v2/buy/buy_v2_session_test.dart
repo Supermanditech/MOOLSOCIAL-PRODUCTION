@@ -715,6 +715,91 @@ class _CollectionPurchaseCatalogueSource implements BuyV2CataloguePageSource {
 }
 
 void main() {
+  test(
+    'R669 bulk quantity entry enforces the published minimum pack order',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      final product = BuyV2Catalogue.products.firstWhere(
+        (item) =>
+            item.destination == BuyV2Destination.wholesale &&
+            item.minimumOrder > 2,
+      );
+      expect(session.addProduct(product.id), isTrue);
+      expect(
+        session.setCartQuantity(product.id, '${product.minimumOrder - 1}'),
+        isFalse,
+      );
+      expect(session.quantityFor(product.id), product.minimumOrder);
+      expect(session.setCartQuantity(product.id, '1000'), isTrue);
+      expect(session.quantityFor(product.id), 1000);
+      expect(session.cartTotal, product.price * 1000);
+    },
+  );
+
+  test(
+    'R669 bulk quantity entry is atomic and preserves exact large totals',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      const id = 'w-notebook';
+      expect(session.addProduct(id), isTrue);
+      session.openProduct(id);
+      final previousQuantity = session.quantityFor(id);
+      for (final input in [
+        '',
+        '0',
+        '-1',
+        '1.5',
+        '1,000',
+        '999999999999999999999',
+      ]) {
+        expect(session.setCartQuantity(id, input), isFalse, reason: input);
+        expect(session.quantityFor(id), previousQuantity);
+      }
+      var notifications = 0;
+      session.addListener(() => notifications++);
+      expect(session.setCartQuantity(id, '28736'), isTrue);
+      expect(notifications, 1);
+      expect(session.quantityFor(id), 28736);
+      expect(session.cartTotal, 100001280);
+      expect(session.selectedProductId, id);
+      expect(session.view, BuyV2View.product);
+      expect(session.setCartQuantity(id, '1000'), isTrue);
+      expect(session.quantityFor(id), 1000);
+      session.increase(id);
+      expect(session.quantityFor(id), 1001);
+      session.decrease(id);
+      expect(session.quantityFor(id), 1000);
+      expect(
+        session.setCartQuantity(id, '${session.product(id).minimumOrder}'),
+        isTrue,
+      );
+      session.decrease(id);
+      expect(session.quantityFor(id), 0);
+      expect(session.setCartQuantity(id, '1000'), isFalse);
+      expect(session.quantityFor(id), 0);
+    },
+  );
+
+  test('R669 quantity entry respects prescription approval limits', () {
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    session.approveSavedPrescription('meera');
+    const id = 'm-telmisartan-40';
+    expect(session.addProduct(id), isTrue);
+    expect(session.setCartQuantity(id, '2'), isFalse);
+    expect(session.quantityFor(id), 1);
+    expect(session.notice, contains('prescription'));
+    expect(session.setCartQuantity(id, '1'), isTrue);
+  });
+
   for (final now in [
     DateTime(2026, 9, 8, 18, 29),
     DateTime(2026, 9, 8, 23, 59),
@@ -5099,6 +5184,11 @@ void main() {
         BuyV2CheckoutSubmissionState.paymentPending,
       );
       final quantity = restored.quantityFor(fixture.product.id);
+      expect(
+        restored.setCartQuantity(fixture.product.id, '${quantity + 10}'),
+        isFalse,
+      );
+      expect(restored.quantityFor(fixture.product.id), quantity);
       restored.increase(fixture.product.id);
       expect(restored.quantityFor(fixture.product.id), quantity);
       expect(

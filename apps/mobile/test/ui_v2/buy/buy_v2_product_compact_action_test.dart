@@ -260,10 +260,9 @@ void main() {
     await tester.pumpAndSettle();
 
     final stepper = find.byKey(ValueKey('buy-product-quantity-${product.id}'));
-    final remove = find.descendant(
-      of: stepper,
-      matching: find.byTooltip('Remove one'),
-    );
+    final remove = find
+        .descendant(of: stepper, matching: find.byType(IconButton))
+        .first;
     final add = find.descendant(
       of: stepper,
       matching: find.byTooltip('Add one'),
@@ -277,12 +276,14 @@ void main() {
     expect(tester.getCenter(stepper), tester.getCenter(slot));
     expect(incomingTransition.position.value, Offset.zero);
     expect(tester.getSize(remove), const Size(44, 44));
+    expect(tester.widget<IconButton>(remove).tooltip, 'Remove from Cart');
     expect(tester.getSize(add), const Size(44, 44));
     expect(session.quantityFor(product.id), 1);
     expect(find.descendant(of: panel, matching: stepper), findsOneWidget);
     await tester.tap(add);
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), 2);
+    expect(tester.widget<IconButton>(remove).tooltip, 'Remove one');
     expect(
       find.descendant(of: stepper, matching: find.text('2')),
       findsOneWidget,
@@ -294,7 +295,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('quantity label cannot retarget to the replacement plus', (
+  testWidgets('quantity opens its editor without retargeting to plus', (
     tester,
   ) async {
     await setSurface(tester, const Size(390, 844));
@@ -323,11 +324,13 @@ void main() {
     final stepper = find.byKey(ValueKey('buy-product-quantity-${product.id}'));
     final remove = find.descendant(
       of: stepper,
-      matching: find.byTooltip('Remove one'),
+      matching: find.byTooltip('Remove from Cart'),
     );
     final quantityLabel = find.byWidgetPredicate(
-      (widget) => widget is Semantics && widget.properties.label == '1 in cart',
-      description: 'non-clickable current quantity semantics owner',
+      (widget) =>
+          widget is Semantics &&
+          widget.properties.label == 'Edit quantity, 1 pack in Cart',
+      description: 'editable current quantity semantics owner',
     );
     expect(quantityLabel, findsOneWidget);
 
@@ -336,6 +339,11 @@ void main() {
     expect(find.text('Buy now'), findsNothing);
 
     await tester.tapAt(quantityPoint);
+    await tester.pumpAndSettle();
+    expect(session.quantityFor(product.id), 1);
+
+    expect(find.byKey(const ValueKey('buy-quantity-input')), findsOneWidget);
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), 1);
 

@@ -706,6 +706,11 @@ class BuyV2ProductView extends StatelessWidget {
                             deliveryDecision: buyerPromise,
                             rxBlocked: rxBlocked,
                             onAdd: addProduct,
+                            onEdit: () => showBuyV2QuantityEditor(
+                              context,
+                              session,
+                              product,
+                            ),
                             onDecrease: () => session.decrease(product.id),
                             onIncrease: () => session.increase(product.id),
                           ),
@@ -1114,6 +1119,7 @@ class BuyV2ProductView extends StatelessWidget {
             decision: offerDecision!,
             quantity: quantity,
             onAdd: addProduct,
+            onEdit: () => showBuyV2QuantityEditor(context, session, product),
             onDecrease: () => session.decrease(product.id),
             onIncrease: () => session.increase(product.id),
             onRetryOffer: () => session.refreshProductFacts(product.id),
@@ -2287,6 +2293,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
     required this.decision,
     required this.quantity,
     required this.onAdd,
+    required this.onEdit,
     required this.onDecrease,
     required this.onIncrease,
     required this.onRetryOffer,
@@ -2299,6 +2306,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
   final BuyV2ProductOfferDecision decision;
   final int quantity;
   final VoidCallback onAdd;
+  final VoidCallback onEdit;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final VoidCallback onRetryOffer;
@@ -2385,6 +2393,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
             '${product.title} to Cart for ${buyV2Money(orderTotal)}. '
             '$deliveryDecision',
         onAdd: onAdd,
+        onEdit: onEdit,
         onDecrease: onDecrease,
         onIncrease: onIncrease,
       );
@@ -14978,6 +14987,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
     this.leadingAction,
     required this.rxBlocked,
     required this.onAdd,
+    required this.onEdit,
     required this.onDecrease,
     required this.onIncrease,
   });
@@ -14989,6 +14999,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   final Widget? leadingAction;
   final bool rxBlocked;
   final VoidCallback onAdd;
+  final VoidCallback onEdit;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
@@ -14996,7 +15007,7 @@ class _ProductOwnedActionPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final action = SizedBox(
       key: ValueKey('buy-product-action-slot-${product.id}'),
-      width: 148,
+      width: quantity > 0 ? _productQuantityWidth(context, quantity) : 148,
       height: 44,
       child: AnimatedSwitcher(
         duration: BuyV2Motion.resolved(context, BuyV2Motion.stateChange),
@@ -15017,6 +15028,8 @@ class _ProductOwnedActionPanel extends StatelessWidget {
             ? _CompactProductStepper(
                 key: ValueKey('buy-product-quantity-${product.id}'),
                 quantity: quantity,
+                minimumOrder: product.minimumOrder,
+                onEdit: onEdit,
                 onDecrease: onDecrease,
                 onIncrease: onIncrease,
               )
@@ -15185,6 +15198,7 @@ class _ProductPurchaseActionRow extends StatelessWidget {
     required this.quantity,
     this.addSemanticLabel,
     required this.onAdd,
+    required this.onEdit,
     required this.onDecrease,
     required this.onIncrease,
   });
@@ -15193,6 +15207,7 @@ class _ProductPurchaseActionRow extends StatelessWidget {
   final int quantity;
   final String? addSemanticLabel;
   final VoidCallback onAdd;
+  final VoidCallback onEdit;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
 
@@ -15217,6 +15232,8 @@ class _ProductPurchaseActionRow extends StatelessWidget {
           ? _CompactProductStepper(
               key: ValueKey('buy-product-quantity-${product.id}'),
               quantity: quantity,
+              minimumOrder: product.minimumOrder,
+              onEdit: onEdit,
               expand: true,
               onDecrease: onDecrease,
               onIncrease: onIncrease,
@@ -15248,16 +15265,157 @@ class _ProductPurchaseActionRow extends StatelessWidget {
   }
 }
 
+Future<void> showBuyV2QuantityEditor(
+  BuildContext context,
+  BuyV2Session session,
+  BuyV2Product product,
+) async {
+  final bottomClearance = BuyV2AddressSheetMotion.resolveModalActionBottomInset(
+    context,
+  );
+  await showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
+    builder: (sheetContext) => Padding(
+      padding: EdgeInsets.only(
+        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + bottomClearance,
+      ),
+      child: _QuantityEditor(session: session, product: product),
+    ),
+  );
+}
+
+class _QuantityEditor extends StatefulWidget {
+  const _QuantityEditor({required this.session, required this.product});
+
+  final BuyV2Session session;
+  final BuyV2Product product;
+
+  @override
+  State<_QuantityEditor> createState() => _QuantityEditorState();
+}
+
+class _QuantityEditorState extends State<_QuantityEditor> {
+  late final TextEditingController _controller;
+  String? _error;
+  bool _closing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final text = '${widget.session.quantityFor(widget.product.id)}';
+    _controller = TextEditingController(text: text)
+      ..selection = TextSelection(baseOffset: 0, extentOffset: text.length);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_closing) return;
+    final error = widget.session.cartQuantityError(
+      widget.product.id,
+      _controller.text,
+    );
+    if (error != null) {
+      setState(() => _error = error);
+      return;
+    }
+    if (widget.session.setCartQuantity(widget.product.id, _controller.text)) {
+      _dismiss();
+    } else {
+      setState(
+        () =>
+            _error = widget.session.notice ?? 'Quantity could not be updated.',
+      );
+    }
+  }
+
+  void _dismiss() {
+    if (_closing) return;
+    _closing = true;
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+      padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('Edit quantity', style: context.buyTitle),
+          const SizedBox(height: 8),
+          Text(widget.product.title, style: context.buyBody),
+          Text('${widget.product.pack} per pack', style: context.buyMeta),
+          const SizedBox(height: 16),
+          TextField(
+            key: const ValueKey('buy-quantity-input'),
+            controller: _controller,
+            autofocus: true,
+            keyboardType: TextInputType.number,
+            textInputAction: TextInputAction.done,
+            decoration: InputDecoration(
+              labelText: 'Number of packs',
+              helperText:
+                  'Minimum ${_packCountLabel(widget.product.minimumOrder)}',
+              errorText: _error,
+              errorMaxLines: 4,
+              border: const OutlineInputBorder(),
+            ),
+            onChanged: (_) {
+              if (_error != null) setState(() => _error = null);
+            },
+            onSubmitted: (_) => _save(),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(
+            key: const ValueKey('buy-quantity-save'),
+            onPressed: _save,
+            child: const Text('Update quantity'),
+          ),
+          TextButton(onPressed: _dismiss, child: const Text('Cancel')),
+        ],
+      ),
+    );
+  }
+}
+
+const _productQuantityStyle = TextStyle(
+  color: BuyV2Colors.navy,
+  fontWeight: FontWeight.w900,
+);
+
+double _productQuantityWidth(BuildContext context, int quantity) =>
+    (buyV2ValueTextSize(context, '$quantity', _productQuantityStyle).width +
+            104)
+        .clamp(148.0, double.infinity)
+        .toDouble();
+
 class _CompactProductStepper extends StatelessWidget {
   const _CompactProductStepper({
     super.key,
     required this.quantity,
+    required this.minimumOrder,
+    required this.onEdit,
     this.expand = false,
     required this.onDecrease,
     required this.onIncrease,
   });
 
   final int quantity;
+  final int minimumOrder;
+  final VoidCallback onEdit;
   final bool expand;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
@@ -15265,7 +15423,9 @@ class _CompactProductStepper extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: expand ? double.infinity : 148,
+      width: expand
+          ? double.infinity
+          : _productQuantityWidth(context, quantity),
       height: 44,
       child: DecoratedBox(
         decoration: BoxDecoration(
@@ -15278,7 +15438,9 @@ class _CompactProductStepper extends StatelessWidget {
             SizedBox.square(
               dimension: 44,
               child: IconButton(
-                tooltip: 'Remove one',
+                tooltip: quantity <= minimumOrder
+                    ? 'Remove from Cart'
+                    : 'Remove one',
                 padding: EdgeInsets.zero,
                 constraints: const BoxConstraints.tightFor(
                   width: 44,
@@ -15289,18 +15451,27 @@ class _CompactProductStepper extends StatelessWidget {
               ),
             ),
             Expanded(
-              child: Semantics(
-                label: '$quantity in cart',
-                liveRegion: true,
-                excludeSemantics: true,
-                child: BuyV2FiniteValueTransition(
-                  key: const ValueKey('buy-product-quantity-value-motion'),
-                  stateKey: quantity,
-                  text: '$quantity',
-                  ownerSize: const Size(58, 28),
-                  style: const TextStyle(
-                    color: BuyV2Colors.navy,
-                    fontWeight: FontWeight.w900,
+              child: TextButton(
+                key: const ValueKey('buy-product-edit-quantity'),
+                style: TextButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(44, 44),
+                ),
+                onPressed: onEdit,
+                child: Semantics(
+                  label: 'Edit quantity, ${_packCountLabel(quantity)} in Cart',
+                  excludeSemantics: true,
+                  child: BuyV2FiniteValueTransition(
+                    key: const ValueKey('buy-product-quantity-value-motion'),
+                    incomingOnly: true,
+                    stateKey: quantity,
+                    text: '$quantity',
+                    ownerSize: buyV2ValueTextSize(
+                      context,
+                      '$quantity',
+                      _productQuantityStyle,
+                    ),
+                    style: _productQuantityStyle,
                   ),
                 ),
               ),
@@ -17619,16 +17790,29 @@ class _CartLine extends StatelessWidget {
             constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
             icon: const Icon(Icons.remove, size: 15),
           ),
-          BuyV2FiniteValueTransition(
-            key: ValueKey('buy-cart-line-quantity-motion-${product.id}'),
-            incomingOnly: true,
-            stateKey: line.quantity,
-            text: '${line.quantity}',
-            ownerSize: Size(
-              quantitySize.width.clamp(24.0, double.infinity).toDouble(),
-              quantitySize.height.clamp(28.0, double.infinity).toDouble(),
+          TextButton(
+            key: ValueKey('buy-cart-edit-quantity-${product.id}'),
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: const Size(44, 44),
             ),
-            style: quantityStyle,
+            onPressed: () => showBuyV2QuantityEditor(context, session, product),
+            child: Semantics(
+              label:
+                  'Edit quantity of ${product.title}, ${_packCountLabel(line.quantity)} in Cart',
+              excludeSemantics: true,
+              child: BuyV2FiniteValueTransition(
+                key: ValueKey('buy-cart-line-quantity-motion-${product.id}'),
+                incomingOnly: true,
+                stateKey: line.quantity,
+                text: '${line.quantity}',
+                ownerSize: Size(
+                  quantitySize.width.clamp(44.0, double.infinity).toDouble(),
+                  quantitySize.height.clamp(28.0, double.infinity).toDouble(),
+                ),
+                style: quantityStyle,
+              ),
+            ),
           ),
           IconButton(
             tooltip: wholesale ? 'Add one trade pack' : 'Add one',
@@ -17649,7 +17833,7 @@ class _CartLine extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final controlsWidth =
-              (88 + quantitySize.width.clamp(24.0, double.infinity)).clamp(
+              (88 + quantitySize.width.clamp(44.0, double.infinity)).clamp(
                 lineTotalSize.width,
                 double.infinity,
               );

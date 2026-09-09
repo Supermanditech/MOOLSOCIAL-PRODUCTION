@@ -9,8 +9,108 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final scale in [1.0, 2.0]) {
+    for (final id in ['s-milk', 'w-notebook']) {
+      testWidgets('R669 direct quantity product and Cart $id scale $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 711);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final product = session.product(id);
+        expect(session.addProduct(id), isTrue);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => r66VisualCaptureRoot(child!),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: product.destination,
+              initialView: BuyV2View.product,
+              productId: id,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
+        await tester.ensureVisible(edit);
+        await tester.pumpAndSettle();
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        final input = find.byKey(const ValueKey('buy-quantity-input'));
+        final save = find.byKey(const ValueKey('buy-quantity-save'));
+        expect(input, findsOneWidget);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+        await tester.pumpAndSettle();
+        await tester.enterText(input, '0');
+        await tester.ensureVisible(save);
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('Minimum order:'), findsOneWidget);
+        expect(session.quantityFor(id), product.minimumOrder);
+        await captureR66Visual(
+          tester,
+          'r669-product-$id-$scale-invalid-quantity',
+        );
+        await tester.enterText(input, '28736');
+        await tester.ensureVisible(save);
+        await tester.pumpAndSettle();
+        expect(save.hitTestable(), findsOneWidget);
+        final updatePoint = tester.getCenter(save);
+        await tester.tapAt(updatePoint);
+        await tester.tapAt(updatePoint);
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        expect(input, findsNothing);
+        expect(find.byType(BuyV2Screen), findsOneWidget);
+        expect(session.quantityFor(id), 28736);
+        expect(session.view, BuyV2View.product);
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(
+          tester,
+          'r669-product-$id-$scale-large-quantity',
+        );
+
+        session.openCart();
+        await tester.pumpAndSettle();
+        final cartEdit = find.byKey(ValueKey('buy-cart-edit-quantity-$id'));
+        await tester.ensureVisible(cartEdit);
+        await tester.pumpAndSettle();
+        expect(cartEdit.hitTestable(), findsOneWidget);
+        await tester.tap(cartEdit);
+        await tester.pumpAndSettle();
+        await tester.enterText(input, '1000');
+        await tester.ensureVisible(find.text('Cancel'));
+        await tester.tap(find.text('Cancel'));
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(id), 28736);
+        await tester.tap(cartEdit);
+        await tester.pumpAndSettle();
+        await tester.enterText(input, '1000');
+        await tester.ensureVisible(save);
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(id), 1000);
+        expect(session.view, BuyV2View.cart);
+        session.goBack();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProductId, id);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   test('product question opens shared Chat with exact product return', () {
     final product = BuyV2Catalogue.allProducts.firstWhere(

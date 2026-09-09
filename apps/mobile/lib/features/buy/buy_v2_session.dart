@@ -8462,6 +8462,75 @@ class BuyV2Session extends ChangeNotifier {
 
   int quantityFor(String id) => _cart[id]?.quantity ?? 0;
 
+  /// Validates pack entry without changing the basket or its navigation.
+  String? cartQuantityError(String id, String input) {
+    final line = _cart[id];
+    if (line == null) return 'This product is no longer in your Cart.';
+    final value = input.trim();
+    if (!RegExp(r'^[0-9]+$').hasMatch(value)) {
+      return 'Enter a whole number of packs.';
+    }
+    final quantity = int.tryParse(value);
+    if (quantity == null) return 'This quantity is too large to calculate.';
+    final item = line.product;
+    if (quantity < item.minimumOrder) {
+      return 'Minimum order: ${item.minimumOrder} ${item.minimumOrder == 1 ? 'pack' : 'packs'}.';
+    }
+    final approvedMaximum = _prescriptionApprovedQuantities[id];
+    if (approvedMaximum != null && quantity > approvedMaximum) {
+      return 'Your prescription allows up to $approvedMaximum ${approvedMaximum == 1 ? 'pack' : 'packs'}.';
+    }
+    // Preserve exact arithmetic across native and web, including intermediate
+    // percentage calculations. This is numeric capacity, not supplier stock.
+    final total = _cart.values.fold<BigInt>(BigInt.zero, (sum, entry) {
+      return sum +
+          BigInt.from(entry.product.price) *
+              BigInt.from(entry.product.id == id ? quantity : entry.quantity);
+    });
+    if (BigInt.from(quantity) > BigInt.from(9007199254740991) ||
+        total * BigInt.from(10000) > BigInt.from(9007199254740991)) {
+      return 'This quantity is too large to calculate. Enter a smaller quantity.';
+    }
+    if (quantity > line.quantity) {
+      final facts = productFactsFor(item);
+      if (facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
+        return 'This store is closed right now.';
+      }
+      if (!_availableForDiscovery(item)) {
+        return 'This product is unavailable right now.';
+      }
+      if (item.destination == BuyV2Destination.wholesale && !businessVerified) {
+        return 'Complete your business profile to place a wholesale order.';
+      }
+      if (item.requiresPrescription && approvedMaximum == null) {
+        return 'Attach a prescription before increasing this quantity.';
+      }
+    }
+    return null;
+  }
+
+  bool setCartQuantity(String id, String input) {
+    if (_holdCartForPaymentResolution()) return false;
+    final error = cartQuantityError(id, input);
+    if (error != null) {
+      notice = error;
+      notifyListeners();
+      return false;
+    }
+    final current = _cart[id]!;
+    final quantity = int.parse(input.trim());
+    if (quantity == current.quantity) return true;
+    _cart[id] = current.copyWith(quantity: quantity);
+    _pruneCartSelections();
+    _acknowledgeCart(
+      '${current.product.title} · $quantity in cart',
+      destination: current.product.destination,
+    );
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
   void increase(String id) {
     if (_holdCartForPaymentResolution()) return;
     final current = _cart[id];

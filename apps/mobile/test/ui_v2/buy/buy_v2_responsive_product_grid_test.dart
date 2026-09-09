@@ -12,8 +12,107 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final store in [false, true]) {
+    for (final size in [const Size(320, 711), const Size(711, 320)]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'R669 complete grid quantity store $store $size scale $scale',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = size;
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(tester.view.reset);
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            const id = 'w-notebook';
+            final product = session.product(id);
+            expect(session.addProduct(id), isTrue);
+            expect(session.setCartQuantity(id, '28736'), isTrue);
+            await tester.pumpWidget(
+              r66VisualCaptureRoot(
+                MaterialApp(
+                  debugShowCheckedModeBanner: false,
+                  theme: MoolTheme.light(),
+                  home: Scaffold(
+                    body: SingleChildScrollView(
+                      child: AnimatedBuilder(
+                        animation: session,
+                        builder: (context, _) => BuyV2ProgressiveProductGrid(
+                          session: session,
+                          products: [product],
+                          storageKey: 'r669-quantity-grid',
+                          semanticLabel: store ? 'Store products' : 'Products',
+                          storeContext: store,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final edit = find.byKey(
+              const ValueKey('buy-grid-edit-quantity-w-notebook'),
+            );
+            await tester.ensureVisible(edit);
+            await tester.pumpAndSettle();
+            expect(edit.hitTestable(), findsOneWidget);
+            final number = find.text('28736');
+            expect(number, findsOneWidget);
+            final paragraph = tester.renderObject<RenderParagraph>(number);
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final boxes = paragraph.getBoxesForSelection(
+              const TextSelection(baseOffset: 0, extentOffset: 5),
+            );
+            expect(boxes, isNotEmpty);
+            final owner = tester.getRect(edit);
+            for (final box in boxes) {
+              final topLeft = paragraph.localToGlobal(
+                Offset(box.left, box.top),
+              );
+              final bottomRight = paragraph.localToGlobal(
+                Offset(box.right, box.bottom),
+              );
+              expect(topLeft.dx, greaterThanOrEqualTo(owner.left - .1));
+              expect(topLeft.dy, greaterThanOrEqualTo(owner.top - .1));
+              expect(bottomRight.dx, lessThanOrEqualTo(owner.right + .1));
+              expect(bottomRight.dy, lessThanOrEqualTo(owner.bottom + .1));
+            }
+            expect(tester.getSize(edit).height, greaterThanOrEqualTo(44));
+            await captureR66Visual(
+              tester,
+              'r669-grid-$store-${size.width.toInt()}-$scale',
+            );
+            await tester.tap(edit);
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+            await tester.enterText(
+              find.byKey(const ValueKey('buy-quantity-input')),
+              '1000',
+            );
+            final save = find.byKey(const ValueKey('buy-quantity-save'));
+            await tester.ensureVisible(save);
+            await tester.pumpAndSettle();
+            await tester.tap(save);
+            await tester.pumpAndSettle();
+            expect(session.quantityFor(id), 1000);
+            expect(session.view, BuyV2View.catalogue);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
 
   for (final destination in const [
     BuyV2Destination.medicine,

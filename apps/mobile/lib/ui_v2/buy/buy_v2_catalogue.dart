@@ -1256,13 +1256,16 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
               detail: 'Try another search, category or area.',
             ),
           if (products.isNotEmpty)
-            LayoutBuilder(
-              builder: (context, constraints) {
+            _QuantityAwareGridLayout(
+              session: widget.session,
+              products: products,
+              builder: (context, constraints, quantityWidth) {
                 final scale = MediaQuery.textScalerOf(context).scale(1);
                 final layout = _resolveCompactProductGridLayout(
                   constraints: constraints,
                   accessibleText: scale > 1.25,
                   textScale: scale,
+                  cartQuantityWidth: quantityWidth,
                   denseStore: widget.storeContext,
                   scrollIndicatorInset: true,
                 );
@@ -2788,14 +2791,17 @@ class _SearchProductResults extends StatelessWidget {
         },
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
+    return _QuantityAwareGridLayout(
+      session: session,
+      products: products,
+      builder: (context, constraints, quantityWidth) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
           textScale: textScale,
+          cartQuantityWidth: quantityWidth,
         );
         return CustomScrollView(
           key: PageStorageKey('buy-search-${session.destination.name}-$query'),
@@ -7555,8 +7561,10 @@ class _ProductGrid extends StatelessWidget {
         ),
       );
     }
-    return LayoutBuilder(
-      builder: (context, constraints) {
+    return _QuantityAwareGridLayout(
+      session: session,
+      products: products,
+      builder: (context, constraints, quantityWidth) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
         const compactCards = true;
@@ -7565,6 +7573,7 @@ class _ProductGrid extends StatelessWidget {
           accessibleText: accessibleText,
           textScale: textScale,
           savedOnly: savedOnly,
+          cartQuantityWidth: quantityWidth,
         );
         final featuredProducts = showPromotions
             ? products.take(6).toList(growable: false)
@@ -8090,8 +8099,10 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
+    return _QuantityAwareGridLayout(
+      session: session,
+      products: products,
+      builder: (context, constraints, quantityWidth) {
         final textScale = MediaQuery.textScalerOf(context).scale(1);
         final accessibleText = textScale > 1.25;
         final layout = _resolveCompactProductGridLayout(
@@ -8099,6 +8110,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           accessibleText: accessibleText,
           textScale: textScale,
           denseStore: storeContext,
+          cartQuantityWidth: quantityWidth,
         );
         return _HorizontalProductGrid(
           session: session,
@@ -8127,6 +8139,7 @@ _resolveCompactProductGridLayout({
   bool savedOnly = false,
   bool denseStore = false,
   bool scrollIndicatorInset = false,
+  double cartQuantityWidth = 0,
 }) {
   // The founder-approved Shop and Wholesale rhythm keeps three products
   // visible at normal text scale. Enlarged accessibility text uses two cards
@@ -8174,7 +8187,106 @@ _resolveCompactProductGridLayout({
   return (
     columns: columns,
     cardWidth: cardWidth,
-    tileHeight: tileHeight + enlargedTextHeight,
+    tileHeight:
+        tileHeight +
+        enlargedTextHeight +
+        (cartQuantityWidth > 0 &&
+                _gridQuantityStacks(cardWidth - 12, cartQuantityWidth)
+            ? _gridQuantityLabelHeight(textScale)
+            : 0),
+  );
+}
+
+double _gridQuantityLabelHeight(double scale) =>
+    (scale * 11 * 1.2 * 2 + 2).clamp(44.0, double.infinity).toDouble();
+
+const _gridQuantityStyle = TextStyle(
+  color: BuyV2Colors.navy,
+  fontSize: 11,
+  height: 1.2,
+  fontWeight: FontWeight.w900,
+);
+
+bool _gridQuantityStacks(double width, double valueWidth) =>
+    width < 88 + (valueWidth + 16).clamp(44.0, double.infinity);
+
+double _gridMaximumQuantityWidth(
+  BuildContext context,
+  BuyV2Session session,
+  List<BuyV2Product> products,
+) {
+  var width = 0.0;
+  for (final product in products) {
+    final quantity = session.quantityFor(product.id);
+    if (quantity == 0) continue;
+    final measured = buyV2ValueTextSize(
+      context,
+      '$quantity',
+      _gridQuantityStyle,
+    ).width;
+    if (measured > width) width = measured;
+  }
+  return width;
+}
+
+class _QuantityAwareGridLayout extends StatefulWidget {
+  const _QuantityAwareGridLayout({
+    required this.session,
+    required this.products,
+    required this.builder,
+  });
+
+  final BuyV2Session session;
+  final List<BuyV2Product> products;
+  final Widget Function(BuildContext, BoxConstraints, double) builder;
+
+  @override
+  State<_QuantityAwareGridLayout> createState() =>
+      _QuantityAwareGridLayoutState();
+}
+
+class _QuantityAwareGridLayoutState extends State<_QuantityAwareGridLayout> {
+  late List<String> _productIds;
+  double _largestQuantityWidth = 0;
+  double? _viewportWidth;
+  double? _textScale;
+
+  @override
+  void initState() {
+    super.initState();
+    _productIds = widget.products.map((product) => product.id).toList();
+  }
+
+  @override
+  void didUpdateWidget(covariant _QuantityAwareGridLayout oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final ids = widget.products.map((product) => product.id).toList();
+    if (oldWidget.session != widget.session || !listEquals(_productIds, ids)) {
+      _largestQuantityWidth = 0;
+    }
+    _productIds = ids;
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final scale = MediaQuery.textScalerOf(context).scale(1);
+      if (_viewportWidth != constraints.maxWidth || _textScale != scale) {
+        _largestQuantityWidth = 0;
+        _viewportWidth = constraints.maxWidth;
+        _textScale = scale;
+      }
+      final measured = _gridMaximumQuantityWidth(
+        context,
+        widget.session,
+        widget.products,
+      );
+      if (measured > _largestQuantityWidth) _largestQuantityWidth = measured;
+      // Removing a quantity row must not shrink scroll extent under a buyer's
+      // finger. The product image uses the retained card space. A new product
+      // scope or viewport starts with its own compact geometry.
+      return widget.builder(context, constraints, _largestQuantityWidth);
+    },
   );
 }
 
@@ -9585,8 +9697,11 @@ class _FeaturedProductAction extends StatelessWidget {
         if (quantity > 0)
           Positioned.fill(
             child: _QuantityStepperTargets(
+              productId: product.id,
               productTitle: product.title,
               quantity: quantity,
+              minimumOrder: product.minimumOrder,
+              onEdit: () => showBuyV2QuantityEditor(context, session, product),
               onDecrease: () => session.decrease(product.id),
               onIncrease: () => session.increase(product.id),
             ),
@@ -9615,7 +9730,9 @@ class BuyV2ProductCard extends StatelessWidget {
   final bool storeContext;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
+
+  Widget _buildCard(BuildContext context, BoxConstraints constraints) {
     void openProduct() {
       HapticFeedback.selectionClick();
       final callback = onOpenProduct;
@@ -9651,6 +9768,10 @@ class BuyV2ProductCard extends StatelessWidget {
     final rxBlocked =
         product.requiresPrescription &&
         !session.isPrescriptionApproved(product.id);
+    final stackedQuantity = _gridQuantityStacks(
+      constraints.maxWidth - (compact ? 12 : 18),
+      buyV2ValueTextSize(context, '$quantity', _gridQuantityStyle).width,
+    );
     return BuyV2IntentDepth(
       key: ValueKey('buy-product-depth-${product.id}'),
       spatial: true,
@@ -9941,6 +10062,7 @@ class BuyV2ProductCard extends StatelessWidget {
                                               'buy-quantity-${product.id}',
                                             ),
                                             quantity: quantity,
+                                            stacked: stackedQuantity,
                                           )
                                         : SizedBox(
                                             key: ValueKey(
@@ -10094,11 +10216,22 @@ class BuyV2ProductCard extends StatelessWidget {
                     left: 0,
                     right: 0,
                     bottom: compact ? 2 : 8,
-                    height: BuyV2Metrics.minimumTap,
+                    height:
+                        BuyV2Metrics.minimumTap +
+                        (stackedQuantity
+                            ? _gridQuantityLabelHeight(
+                                MediaQuery.textScalerOf(context).scale(1),
+                              )
+                            : 0),
                     child: _QuantityStepperTargets(
+                      stacked: stackedQuantity,
                       visualInset: compact ? 6 : 9,
+                      productId: product.id,
                       productTitle: product.title,
                       quantity: quantity,
+                      minimumOrder: product.minimumOrder,
+                      onEdit: () =>
+                          showBuyV2QuantityEditor(context, session, product),
                       onDecrease: () => session.decrease(product.id),
                       onIncrease: () => session.increase(product.id),
                     ),
@@ -10115,45 +10248,86 @@ class BuyV2ProductCard extends StatelessWidget {
 String _sellerTypeLabel(String source) => _publicProviderType(source);
 
 class _QuantityStepper extends StatelessWidget {
-  const _QuantityStepper({super.key, required this.quantity});
+  const _QuantityStepper({
+    super.key,
+    required this.quantity,
+    this.stacked = true,
+  });
 
   final int quantity;
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) {
+    final labelHeight = _gridQuantityLabelHeight(
+      MediaQuery.textScalerOf(context).scale(1),
+    );
+    final value = LayoutBuilder(
+      builder: (context, constraints) => BuyV2FiniteValueTransition(
+        key: const ValueKey('buy-grid-quantity-value-motion'),
+        incomingOnly: true,
+        stateKey: quantity,
+        text: '$quantity',
+        maxLines: null,
+        ownerSize: Size(constraints.maxWidth, stacked ? labelHeight - 2 : 42),
+        style: _gridQuantityStyle,
+      ),
+    );
     return ExcludeSemantics(
       child: Container(
-        height: BuyV2Metrics.minimumTap,
+        height: BuyV2Metrics.minimumTap + (stacked ? labelHeight : 0),
         decoration: BoxDecoration(
           color: BuyV2Colors.softBlue,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(color: const Color(0x23000080)),
         ),
-        child: Row(
-          children: [
-            Expanded(
-              child: Center(
-                child: Icon(Icons.remove, size: 17, color: BuyV2Colors.navy),
+        child: stacked
+            ? Column(
+                children: [
+                  SizedBox(height: labelHeight - 2, child: value),
+                  Expanded(
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: Icon(
+                              Icons.remove,
+                              size: 17,
+                              color: BuyV2Colors.navy,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Center(
+                            child: Icon(
+                              Icons.add,
+                              size: 17,
+                              color: BuyV2Colors.navy,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                children: [
+                  const SizedBox(
+                    width: 44,
+                    child: Icon(
+                      Icons.remove,
+                      size: 17,
+                      color: BuyV2Colors.navy,
+                    ),
+                  ),
+                  Expanded(child: value),
+                  const SizedBox(
+                    width: 44,
+                    child: Icon(Icons.add, size: 17, color: BuyV2Colors.navy),
+                  ),
+                ],
               ),
-            ),
-            BuyV2FiniteValueTransition(
-              key: const ValueKey('buy-grid-quantity-value-motion'),
-              stateKey: quantity,
-              text: '$quantity',
-              ownerSize: const Size(24, 24),
-              style: const TextStyle(
-                color: BuyV2Colors.navy,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            Expanded(
-              child: Center(
-                child: Icon(Icons.add, size: 17, color: BuyV2Colors.navy),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -10161,18 +10335,26 @@ class _QuantityStepper extends StatelessWidget {
 
 class _QuantityStepperTargets extends StatelessWidget {
   const _QuantityStepperTargets({
+    required this.productId,
     required this.productTitle,
     required this.quantity,
+    required this.minimumOrder,
+    required this.onEdit,
     required this.onDecrease,
     required this.onIncrease,
     this.visualInset = 0,
+    this.stacked = true,
   });
 
+  final String productId;
   final String productTitle;
   final int quantity;
+  final int minimumOrder;
+  final VoidCallback onEdit;
   final VoidCallback onDecrease;
   final VoidCallback onIncrease;
   final double visualInset;
+  final bool stacked;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(
@@ -10182,13 +10364,14 @@ class _QuantityStepperTargets extends StatelessWidget {
         0.0,
         double.infinity,
       );
-      final inset =
-          (visualInset +
-                  1 +
-                  (constraints.maxWidth - visualInset * 2 - 2 - 24) / 4 -
-                  target / 2)
-              .clamp(0.0, maximumInset)
-              .toDouble();
+      final inset = stacked
+          ? (visualInset +
+                    1 +
+                    (constraints.maxWidth - visualInset * 2 - 2) / 4 -
+                    target / 2)
+                .clamp(0.0, maximumInset)
+                .toDouble()
+          : visualInset;
       Widget action(String verb, String tooltip, VoidCallback onTap) =>
           Semantics(
             label: '$verb $productTitle quantity from $quantity',
@@ -10210,15 +10393,41 @@ class _QuantityStepperTargets extends StatelessWidget {
       return Stack(
         children: [
           Positioned(
-            left: inset,
+            left: stacked ? 0 : visualInset + target,
+            right: stacked ? 0 : visualInset + target,
             top: 0,
+            height: stacked
+                ? _gridQuantityLabelHeight(
+                    MediaQuery.textScalerOf(context).scale(1),
+                  )
+                : target,
+            child: Semantics(
+              label:
+                  'Edit quantity of $productTitle, $quantity ${quantity == 1 ? 'pack' : 'packs'} in Cart',
+              button: true,
+              excludeSemantics: true,
+              onTap: onEdit,
+              child: TextButton(
+                key: ValueKey('buy-grid-edit-quantity-$productId'),
+                onPressed: onEdit,
+                child: const SizedBox.shrink(),
+              ),
+            ),
+          ),
+          Positioned(
+            left: inset,
+            bottom: 0,
             width: target,
             height: target,
-            child: action('Decrease', 'Remove one', onDecrease),
+            child: action(
+              'Decrease',
+              quantity <= minimumOrder ? 'Remove from Cart' : 'Remove one',
+              onDecrease,
+            ),
           ),
           Positioned(
             right: inset,
-            top: 0,
+            bottom: 0,
             width: target,
             height: target,
             child: action('Increase', 'Add one', onIncrease),
