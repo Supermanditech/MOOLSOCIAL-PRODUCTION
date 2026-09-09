@@ -1,0 +1,1 @@
+Pending: no r66.12 APK has been built. The existing guarded wrapper must produce exact version, source fingerprint, APK size and SHA-256 before this record is replaced with observed provenance.
