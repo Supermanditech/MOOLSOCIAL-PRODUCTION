@@ -394,6 +394,242 @@ class WorkReviewResult {
   final String? primaryActivity;
 }
 
+/// Version 1 order commands deliberately exclude payment, stock posting and
+/// handover. Customer collection continues through its separately owned,
+/// authenticated collection contract; a normal order reply cannot authorise it.
+enum WorkOrderAction { accept, ready, reject }
+
+enum WorkOrderReplyState { applied, rejected, pending }
+
+enum WorkOrderOperationState { submitting, reconciling, uncertain }
+
+class WorkOrderCommand {
+  const WorkOrderCommand({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.orderId,
+    required this.operationId,
+    required this.expectedRevision,
+    required this.action,
+    this.reason,
+  });
+
+  static const contractVersion = 1;
+  final String accountScope, workspaceId, orderId, operationId;
+  final int expectedRevision;
+  final WorkOrderAction action;
+  final String? reason;
+}
+
+class WorkOrderReply {
+  WorkOrderReply({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.orderId,
+    required this.operationId,
+    required this.revision,
+    required this.state,
+    WorkspaceOrderRecord? order,
+  }) : order = order?.copyWith();
+
+  final String accountScope, workspaceId, orderId, operationId;
+  final int revision;
+  final WorkOrderReplyState state;
+  final WorkspaceOrderRecord? order;
+}
+
+/// Backend adapters must authenticate the account independently, enforce Store
+/// permissions, expected revision and legal transitions, and deduplicate the
+/// same operation atomically with all business effects. IDs are not credentials.
+/// Reconcile is read-only: an unknown operation must not be submitted again
+/// unless the authority explicitly resolves the original attempt as rejected.
+abstract interface class WorkOrderCommandGateway {
+  Future<WorkOrderReply> submitOrderCommand(WorkOrderCommand command);
+  Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command);
+}
+
+/// Per-Store frontend reconciliation. It never posts inventory, payments,
+/// invoices or collection completion. A/B operations may settle independently;
+/// an uncertain A keeps its original identity and cannot be submitted twice.
+/// The owning session must bind this to its authenticated account lifetime and
+/// persist pending commands before enabling durable/relaunch qualification.
+class WorkOrderOperations extends ChangeNotifier {
+  WorkOrderOperations({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.gateway,
+    this.timeout = const Duration(seconds: 15),
+  });
+
+  final String accountScope, workspaceId;
+  final WorkOrderCommandGateway gateway;
+  final Duration timeout;
+  final Map<String, WorkOrderReply> _orders = {};
+  final Map<String, WorkOrderCommand> _pending = {};
+  final Map<String, WorkOrderOperationState> _states = {};
+  bool _disposed = false;
+
+  WorkOrderReply? order(String id) => _orders[id];
+  WorkOrderCommand? pending(String id) => _pending[id];
+  WorkOrderOperationState? state(String id) => _states[id];
+  List<WorkOrderCommand> get pendingCommands =>
+      List.unmodifiable(_pending.values);
+
+  /// Restored local data is never success or permission. Only a read-only
+  /// authoritative reconciliation may release a recovered operation lock.
+  bool restorePending(WorkOrderCommand command) {
+    if (_disposed ||
+        accountScope.isEmpty ||
+        workspaceId.isEmpty ||
+        command.accountScope != accountScope ||
+        command.workspaceId != workspaceId ||
+        command.orderId.isEmpty ||
+        command.operationId.isEmpty ||
+        command.expectedRevision < 0 ||
+        _pending.containsKey(command.orderId) ||
+        _pending.values.any(
+          (item) => item.operationId == command.operationId,
+        ) ||
+        (command.action == WorkOrderAction.reject &&
+            (command.reason == null || command.reason!.trim().isEmpty))) {
+      return false;
+    }
+    _pending[command.orderId] = command;
+    _states[command.orderId] = WorkOrderOperationState.uncertain;
+    notifyListeners();
+    return true;
+  }
+
+  bool _belongs(WorkOrderReply reply) =>
+      accountScope.isNotEmpty &&
+      workspaceId.isNotEmpty &&
+      reply.accountScope == accountScope &&
+      reply.workspaceId == workspaceId &&
+      reply.orderId.isNotEmpty &&
+      reply.revision >= 0 &&
+      reply.order?.id == reply.orderId &&
+      reply.order!.amount >= 0 &&
+      reply.order!.quantities.entries.every(
+        (entry) => entry.key.isNotEmpty && entry.value > 0,
+      ) &&
+      (reply.order?.collectionStoreId == null ||
+          reply.order?.collectionStoreId == workspaceId);
+
+  /// Full snapshots can skip revisions; patches cannot use this entry point.
+  /// Repeated/older events never replace a newer order or clear a pending action.
+  bool observe(WorkOrderReply snapshot) {
+    if (_disposed || !_belongs(snapshot)) return false;
+    final previous = _orders[snapshot.orderId];
+    if (previous != null && snapshot.revision <= previous.revision) {
+      return false;
+    }
+    _orders[snapshot.orderId] = snapshot;
+    notifyListeners();
+    return true;
+  }
+
+  bool _allowed(WorkOrderReply snapshot, WorkOrderAction action) {
+    final record = snapshot.order!;
+    // Readiness and handover of authenticated customer collection remain under
+    // the existing collection controller, not this general-order contract.
+    if (record.isCustomerCollection || record.isClosed) return false;
+    return switch (action) {
+      WorkOrderAction.accept ||
+      WorkOrderAction.reject => record.stage == 'Confirmed',
+      WorkOrderAction.ready => record.stage == 'Preparing',
+    };
+  }
+
+  Future<bool> act(String orderId, WorkOrderAction action, {String? reason}) {
+    final snapshot = _orders[orderId];
+    if (_disposed ||
+        _pending.containsKey(orderId) ||
+        snapshot == null ||
+        !_allowed(snapshot, action) ||
+        (action == WorkOrderAction.reject &&
+            (reason == null || reason.trim().isEmpty))) {
+      return Future.value(false);
+    }
+    final random = Random.secure();
+    final nonce = List.generate(16, (_) => random.nextInt(256));
+    final command = WorkOrderCommand(
+      accountScope: accountScope,
+      workspaceId: workspaceId,
+      orderId: orderId,
+      operationId: 'STORE-ORDER-${base64UrlEncode(nonce)}',
+      expectedRevision: snapshot.revision,
+      action: action,
+      reason: action == WorkOrderAction.reject ? reason!.trim() : null,
+    );
+    _pending[orderId] = command;
+    return _run(command, reconcile: false);
+  }
+
+  Future<bool> retry(String orderId) {
+    final command = _pending[orderId];
+    if (_disposed ||
+        command == null ||
+        _states[orderId] != WorkOrderOperationState.uncertain) {
+      return Future.value(false);
+    }
+    return _run(command, reconcile: true);
+  }
+
+  Future<bool> _run(WorkOrderCommand command, {required bool reconcile}) async {
+    _states[command.orderId] = reconcile
+        ? WorkOrderOperationState.reconciling
+        : WorkOrderOperationState.submitting;
+    notifyListeners();
+    bool current() =>
+        !_disposed && identical(_pending[command.orderId], command);
+    try {
+      if (!current()) return false;
+      final reply =
+          await (reconcile
+                  ? gateway.reconcileOrderCommand(command)
+                  : gateway.submitOrderCommand(command))
+              .timeout(timeout);
+      if (!current()) return false;
+      if (!_belongs(reply) ||
+          reply.orderId != command.orderId ||
+          reply.operationId != command.operationId ||
+          reply.order!.isCustomerCollection ||
+          reply.revision < command.expectedRevision ||
+          (reply.state == WorkOrderReplyState.applied &&
+              reply.revision <= command.expectedRevision) ||
+          reply.state == WorkOrderReplyState.pending) {
+        return false;
+      }
+      // A later full snapshot wins over this delayed acknowledgement. Resolving
+      // its operation must not restore an older stage or replay business effects.
+      final latest = _orders[command.orderId];
+      if (latest == null || reply.revision > latest.revision) {
+        _orders[command.orderId] = reply;
+      }
+      _pending.remove(command.orderId);
+      _states.remove(command.orderId);
+      return reply.state == WorkOrderReplyState.applied;
+    } catch (_) {
+      // Network/parse failures are not authoritative rejections. Keep identity.
+      return false;
+    } finally {
+      if (current()) {
+        _states[command.orderId] = WorkOrderOperationState.uncertain;
+      }
+      if (!_disposed) notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _orders.clear();
+    _pending.clear();
+    _states.clear();
+    super.dispose();
+  }
+}
+
 class WorkOperationalSnapshot {
   const WorkOperationalSnapshot({
     required this.workspaceId,

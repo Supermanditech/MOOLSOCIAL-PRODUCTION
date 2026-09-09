@@ -5,6 +5,60 @@ import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
+class _CommandGateway implements WorkOrderCommandGateway {
+  final submitted = <WorkOrderCommand>[];
+  final reconciled = <WorkOrderCommand>[];
+  final responses = <Completer<WorkOrderReply>>[];
+  final replies = <Completer<WorkOrderReply>>[];
+  @override
+  Future<WorkOrderReply> submitOrderCommand(WorkOrderCommand command) {
+    submitted.add(command);
+    final completer = Completer<WorkOrderReply>();
+    responses.add(completer);
+    return completer.future;
+  }
+
+  @override
+  Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command) {
+    reconciled.add(command);
+    final completer = Completer<WorkOrderReply>();
+    replies.add(completer);
+    return completer.future;
+  }
+}
+
+WorkOrderReply _commandReply(
+  String id, {
+  WorkOrderCommand? command,
+  int revision = 1,
+  String stage = 'Confirmed',
+  bool collection = false,
+  Map<String, int> quantities = const {'sku-A': 1},
+  WorkOrderReplyState state = WorkOrderReplyState.applied,
+}) => WorkOrderReply(
+  accountScope: 'account-A',
+  workspaceId: 'store-A',
+  orderId: id,
+  operationId: command?.operationId ?? '',
+  revision: revision,
+  state: state,
+  order: WorkspaceOrderRecord(
+    id: id,
+    customer: 'Customer $id',
+    items: 'Oil 1 litre',
+    quantities: quantities,
+    amount: 155,
+    source: 'App',
+    fulfilment: collection ? 'Collect at store' : 'Delivery',
+    payment: 'Paid online',
+    address: 'Test address',
+    stage: stage,
+    needsDelivery: !collection,
+    createdAt: DateTime.utc(2026, 9, 10),
+    collectionStoreId: collection ? 'store-A' : null,
+  ),
+);
+
 class _OrderTimeGateway extends ReviewWorkGateway
     implements WorkOrderTimeGateway {
   final requests = <WorkOrderTimeRequest>[];
@@ -29,6 +83,372 @@ class _OrderTimeGateway extends ReviewWorkGateway
 }
 
 void main() {
+  group('DASH04 scoped order operations', () {
+    late _CommandGateway gateway;
+    late WorkOrderOperations operations;
+    setUp(() {
+      gateway = _CommandGateway();
+      operations = WorkOrderOperations(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        gateway: gateway,
+      );
+    });
+    tearDown(() => operations.dispose());
+
+    test('order snapshots freeze quantities and reject invalid counts', () {
+      final quantities = <String, int>{'sku-A': 2};
+      final snapshot = _commandReply('A', quantities: quantities);
+      quantities['sku-A'] = 999;
+      expect(operations.observe(snapshot), isTrue);
+      expect(operations.order('A')!.order!.quantities['sku-A'], 2);
+      expect(
+        () => operations.order('A')!.order!.quantities['sku-A'] = 3,
+        throwsUnsupportedError,
+      );
+      expect(
+        operations.observe(_commandReply('B', quantities: const {'sku-A': -1})),
+        isFalse,
+      );
+    });
+
+    test(
+      'ready and explicit rejection carry exact intent and revision',
+      () async {
+        operations.observe(_commandReply('A', stage: 'Preparing', revision: 7));
+        final ready = operations.act('A', WorkOrderAction.ready);
+        expect(gateway.submitted.single.expectedRevision, 7);
+        expect(gateway.submitted.single.action, WorkOrderAction.ready);
+        gateway.responses.single.complete(
+          _commandReply(
+            'A',
+            command: gateway.submitted.single,
+            revision: 8,
+            stage: 'Ready',
+          ),
+        );
+        expect(await ready, isTrue);
+        operations.observe(_commandReply('B', revision: 3));
+        final reject = operations.act(
+          'B',
+          WorkOrderAction.reject,
+          reason: '  Item unavailable  ',
+        );
+        expect(gateway.submitted.last.reason, 'Item unavailable');
+        expect(gateway.submitted.last.expectedRevision, 3);
+        gateway.responses.last.complete(
+          _commandReply(
+            'B',
+            command: gateway.submitted.last,
+            revision: 4,
+            stage: 'Cancelled',
+          ),
+        );
+        expect(await reject, isTrue);
+        expect(operations.order('A')!.order!.stage, 'Ready');
+        expect(operations.order('B')!.order!.stage, 'Cancelled');
+      },
+    );
+
+    test(
+      'account disposal after notification ignores late replies and further actions',
+      () async {
+        final closed = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: gateway,
+        );
+        closed.observe(_commandReply('A'));
+        // Dispose after this notification unwinds; an already-sent response must
+        // still be ignored. Synchronous disposal inside notifyListeners is illegal.
+        closed.addListener(() => scheduleMicrotask(closed.dispose));
+        final result = closed.act('A', WorkOrderAction.accept);
+        await Future<void>.delayed(Duration.zero);
+        gateway.responses.single.complete(
+          _commandReply(
+            'A',
+            command: gateway.submitted.single,
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await result, isFalse);
+        expect(await closed.act('B', WorkOrderAction.accept), isFalse);
+        expect(gateway.submitted.length, 1);
+      },
+    );
+
+    test(
+      'restored operation reconciles without resubmission or local success',
+      () async {
+        const command = WorkOrderCommand(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          orderId: 'A',
+          operationId: 'retained-A',
+          expectedRevision: 3,
+          action: WorkOrderAction.accept,
+        );
+        expect(operations.restorePending(command), isTrue);
+        expect(operations.restorePending(command), isFalse);
+        expect(operations.order('A'), isNull);
+        expect(operations.state('A'), WorkOrderOperationState.uncertain);
+        final retry = operations.retry('A');
+        expect(gateway.submitted, isEmpty);
+        expect(gateway.reconciled.single, same(command));
+        gateway.replies.single.complete(
+          _commandReply('A', command: command, revision: 4, stage: 'Preparing'),
+        );
+        expect(await retry, isTrue);
+        expect(operations.order('A')!.revision, 4);
+      },
+    );
+
+    for (final wrong in [
+      'account',
+      'store',
+      'operation',
+      'revision',
+      'reason',
+    ]) {
+      test('restored $wrong mismatch fails closed', () {
+        expect(
+          operations.restorePending(
+            WorkOrderCommand(
+              accountScope: wrong == 'account' ? 'account-B' : 'account-A',
+              workspaceId: wrong == 'store' ? 'store-B' : 'store-A',
+              orderId: 'A',
+              operationId: wrong == 'operation' ? '' : 'retained-A',
+              expectedRevision: wrong == 'revision' ? -1 : 1,
+              action: wrong == 'reason'
+                  ? WorkOrderAction.reject
+                  : WorkOrderAction.accept,
+            ),
+          ),
+          isFalse,
+        );
+        expect(operations.pendingCommands, isEmpty);
+        expect(gateway.submitted, isEmpty);
+      });
+    }
+
+    test(
+      'timeout retains operation and ignores a late transport completion',
+      () async {
+        final short = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: gateway,
+          timeout: const Duration(milliseconds: 5),
+        );
+        addTearDown(short.dispose);
+        short.observe(_commandReply('A'));
+        expect(await short.act('A', WorkOrderAction.accept), isFalse);
+        final command = short.pending('A')!;
+        expect(short.state('A'), WorkOrderOperationState.uncertain);
+        gateway.responses.single.complete(
+          _commandReply('A', command: command, revision: 2, stage: 'Preparing'),
+        );
+        await Future<void>.delayed(Duration.zero);
+        expect(short.order('A')!.revision, 1);
+        expect(short.pending('A'), same(command));
+      },
+    );
+
+    test(
+      'disposed account ignores delayed reply and sends no further request',
+      () async {
+        final closed = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: gateway,
+        );
+        closed.observe(_commandReply('A'));
+        final action = closed.act('A', WorkOrderAction.accept);
+        closed.dispose();
+        gateway.responses.single.complete(
+          _commandReply(
+            'A',
+            command: gateway.submitted.single,
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await action, isFalse);
+        expect(await closed.retry('A'), isFalse);
+        expect(gateway.reconciled, isEmpty);
+        expect(closed.order('A'), isNull);
+        expect(closed.pendingCommands, isEmpty);
+      },
+    );
+
+    test('1000 independent pending orders resolve out of order once', () async {
+      final futures = <Future<bool>>[];
+      for (var i = 0; i < 1000; i++) {
+        expect(operations.observe(_commandReply('order-$i')), isTrue);
+        futures.add(operations.act('order-$i', WorkOrderAction.accept));
+      }
+      expect(gateway.submitted.length, 1000);
+      expect(gateway.submitted.map((c) => c.operationId).toSet().length, 1000);
+      expect(operations.pendingCommands.length, 1000);
+      expect(await operations.act('order-0', WorkOrderAction.accept), isFalse);
+      for (var i = 999; i >= 0; i--) {
+        gateway.responses[i].complete(
+          _commandReply(
+            'order-$i',
+            command: gateway.submitted[i],
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+      }
+      expect(await Future.wait(futures), everyElement(isTrue));
+      expect(operations.pendingCommands, isEmpty);
+      for (var i = 0; i < 1000; i++) {
+        expect(operations.order('order-$i')!.order!.stage, 'Preparing');
+        expect(operations.state('order-$i'), isNull);
+      }
+    });
+
+    test(
+      'uncertain A does not block B; retry only reconciles A identity',
+      () async {
+        operations.observe(_commandReply('A'));
+        operations.observe(_commandReply('B'));
+        final a = operations.act('A', WorkOrderAction.accept);
+        gateway.responses[0].completeError(StateError('unknown response'));
+        expect(await a, isFalse);
+        final original = operations.pending('A')!;
+        expect(operations.state('A'), WorkOrderOperationState.uncertain);
+        expect(
+          await operations.act(
+            'A',
+            WorkOrderAction.reject,
+            reason: 'Unavailable',
+          ),
+          isFalse,
+        );
+        final b = operations.act('B', WorkOrderAction.accept);
+        gateway.responses[1].complete(
+          _commandReply(
+            'B',
+            command: gateway.submitted[1],
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await b, isTrue);
+        expect(operations.pending('A'), same(original));
+        final retry = operations.retry('A');
+        expect(gateway.reconciled.single, same(original));
+        expect(await operations.retry('A'), isFalse);
+        gateway.replies.single.complete(
+          _commandReply(
+            'A',
+            command: original,
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await retry, isTrue);
+        expect(gateway.submitted.length, 2);
+        expect(operations.pendingCommands, isEmpty);
+      },
+    );
+
+    for (final mismatch in [
+      'account',
+      'store',
+      'order',
+      'operation',
+      'revision',
+      'missing',
+      'pending',
+    ]) {
+      test(
+        'rejects $mismatch acknowledgement without claiming success',
+        () async {
+          operations.observe(_commandReply('A'));
+          final action = operations.act('A', WorkOrderAction.accept);
+          final command = gateway.submitted.single;
+          gateway.responses.single.complete(
+            WorkOrderReply(
+              accountScope: mismatch == 'account' ? 'account-B' : 'account-A',
+              workspaceId: mismatch == 'store' ? 'store-B' : 'store-A',
+              orderId: mismatch == 'order' ? 'B' : 'A',
+              operationId: mismatch == 'operation'
+                  ? 'unrelated'
+                  : command.operationId,
+              revision: mismatch == 'revision' ? 1 : 2,
+              state: mismatch == 'pending'
+                  ? WorkOrderReplyState.pending
+                  : WorkOrderReplyState.applied,
+              order: mismatch == 'missing'
+                  ? null
+                  : _commandReply('A', stage: 'Preparing').order,
+            ),
+          );
+          expect(await action, isFalse);
+          expect(operations.pending('A'), same(command));
+          expect(operations.state('A'), WorkOrderOperationState.uncertain);
+          expect(operations.order('A')!.order!.stage, 'Confirmed');
+        },
+      );
+    }
+
+    test('late acknowledgement cannot regress latest snapshot', () async {
+      operations.observe(_commandReply('A'));
+      final action = operations.act('A', WorkOrderAction.accept);
+      final command = gateway.submitted.single;
+      operations.observe(_commandReply('A', revision: 4, stage: 'Cancelled'));
+      expect(operations.pending('A'), same(command));
+      gateway.responses.single.complete(
+        _commandReply('A', command: command, revision: 2, stage: 'Preparing'),
+      );
+      expect(await action, isTrue);
+      expect(operations.order('A')!.revision, 4);
+      expect(operations.order('A')!.order!.stage, 'Cancelled');
+      expect(operations.pending('A'), isNull);
+      expect(operations.observe(_commandReply('A', revision: 4)), isFalse);
+      expect(operations.observe(_commandReply('A', revision: 3)), isFalse);
+    });
+
+    test('authoritative rejection releases only its operation', () async {
+      operations.observe(_commandReply('A'));
+      final action = operations.act('A', WorkOrderAction.accept);
+      gateway.responses.single.complete(
+        _commandReply(
+          'A',
+          command: gateway.submitted.single,
+          state: WorkOrderReplyState.rejected,
+        ),
+      );
+      expect(await action, isFalse);
+      expect(operations.pendingCommands, isEmpty);
+      expect(operations.order('A')!.order!.stage, 'Confirmed');
+    });
+
+    test('reject needs reason and collection cannot bypass its flow', () async {
+      operations.observe(_commandReply('A'));
+      expect(await operations.act('A', WorkOrderAction.reject), isFalse);
+      expect(
+        await operations.act('A', WorkOrderAction.reject, reason: '  '),
+        isFalse,
+      );
+      expect(await operations.act('A', WorkOrderAction.ready), isFalse);
+      operations.observe(
+        _commandReply('A', revision: 2, stage: 'Collected', collection: true),
+      );
+      for (final action in WorkOrderAction.values) {
+        expect(
+          await operations.act('A', action, reason: 'Unavailable'),
+          isFalse,
+        );
+      }
+      expect(gateway.submitted, isEmpty);
+    });
+  });
+
   for (final entry in {
     '9829012345': '9829012345',
     ' 9829012345 ': '9829012345',
