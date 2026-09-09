@@ -1,5 +1,17 @@
 # Fresh Redmi defect register
 
+## Expanded r66.8 audit additions — 9 September 2026
+
+### R668-AUDIT-BULK-QTY-001 — Large orders require one tap per additional pack
+
+P2 confirmed ordering usability gap, distinct from truncated quantity display QTY-001. Redmi Bulk → Premium basmati rice4 → Add starts correctly at MOQ4 /6760 (195). Tap quantity196 leaves identical XML to195; plus197 adds exactly one, yielding5 /8450; minus198 restores4 and minus199 removes the temporary line. Earlier cart064 and detail080 quantity taps also expose no editor. Source `buy_v2_views.dart`15154–15308 supplies only decrement/increment callbacks and a non-editable finite-value label, with no long-press acceleration; `buy_v2_session.dart`8452 increments by1. A buyer needing1000 packs fromMOQ4 would need996 individual increments on this product control. This does not mean arithmetic fails or that996 taps were performed. Expected: accessible direct pack-quantity entry with MOQ/stock/business constraints and correct total, reachable from product/cart; preserve +/- for small adjustments. Exact source owners and validation contract to be confirmed before implementation. Evidence195 PNG532D976DBA1517395470A8A894AB74E125C005AE034550231E2F2B5AC9F3683B,196 XMLB5D32D65EE2B4AC34324D63219695085DFC6C336635522A51A3C6793CD5E5036,197 PNGA7860DE165B4AEFC4738FA2809415CBC535DDCF4C07F0F6E34CD6000A5F89EC0. Status: registered, unimplemented, original-sequence Redmi retest pending.
+
+Related accessibility observation: `_CompactProductStepper` says Remove one even at MOQ4, while the next decrement removes the whole four-pack line (198→199; session8475). The visible minus alone does not explain this boundary. Include truthful minimum/removal semantics when correcting this control; no claim that a real order was cancelled. Temporary rice line removed; retained notebook line untouched.
+
+### Founder delivery-icon requirement
+
+Task-local requirement `R668-AUDIT-DELIVERY-ICON-001`, recorded before implementation. Quick delivery: rider on a bike (bike plus person). Wholesale: tempo plus driver. Bulk: fleet plus driver. Use the appropriate mode consistently on Buy/Shop delivery surfaces; retain readable mode labels and accessible descriptions. These are delivery-mode illustrations, not a claim that a driver has been assigned or is currently travelling. Exact affected surfaces and current deviations remain under audit; this founder requirement is not counted as a newly reproduced runtime failure. Implementation and Redmi acceptance pending.
+
 Fresh Redmi observations are being collected on installed r66.1, code 2026090501, APK SHA `30A71FE8B6696BF51400FBED5A90C3179E25CE0A6153A998F5A041657C9D35C3`. Audit is incomplete; no all-journey verdict yet.
 
 Use `R66-UAT-NNN` only after a current-candidate observation, with exact steps, expected/actual, severity, customer/actor, screenshot/XML/log hashes, owning source, minimal proposed correction, local result and original-sequence Redmi retest. Register corresponding permanent regression incidents before implementation. Do not carry old totals of 59/75/76 forward as new findings.
@@ -168,6 +180,20 @@ P1 navigation context. Offers → manufacturer oil → Compare (267) → View al
 P2 settings truth/persistence. Shopping settings changes No preference → Quick local delivery (243–244). After review-process force-stop/cold launch (250–253), reopening settings shows No preference (255). The Quick top tab alone did not prove preference persistence; that earlier inference is explicitly withdrawn. Source `_showBuyV2DeliveryPreference` calls `chooseFulfilmentMode` on the catalogue's session filter. Expected: either persist an actual customer preference through the existing customer-state contract, or label it honestly as a current browsing filter; do not invent a second preference store or fake backend persistence. Exact minimal correction and customer-state dependency remain to be assessed.
 
 ## Additional evidence and ownership boundaries
+
+### R66-UAT-032-R668-PAGED-001 — Monthly basket review exposes unrelated paged catalogue
+
+Status: OPEN; P1 purchase-content/wiring defect, Redmi-confirmed child of032 in r66.8 normal display with the paged review catalogue. Sort/filter → Shopping tools → Monthly home basket150 correctly advertises subtotal5145,12 products/21 packs and6 Quick plus6 Scheduled. Choose View basket products151: banner says `6 of12 basket products · Quick`, but pagination is `1–40 of25,000,000` and ordinary generated catalogue cards remain. Tap Next152: banner remains six basket products while page41–80 shows Barcode label rolls81, Fresh tomatoes85, Herbal bathing soap89, A4 copier paper83 and other ordinary catalogue entries. Customer cannot review what Add basket will actually add, and may add unrelated items while believing they belong to the plan.
+
+Expected: bind the visible product list, count, pagination and Quick/Scheduled groups to the same exact monthly plan used by Add basket; prevent an ordinary catalogue response replacing that scope. Source monthlyBasketPlan uses the original12 Shop products, and _resolveVisibleProducts has intent-product filtering; diagnose the paged catalogue path separately rather than assuming that local-list filter also constrains paged rendering. No Add basket tap or cart mutation occurred. The150 subtotal/scope explanation is an observed improvement over the original032; this new child concerns the still-unqualified paged path, not a claim that the new explanatory copy is absent.
+
+Evidence: 150-audit-monthly-basket.png SHAFB5144B6D2C715934C02CC84D0D31EDE49617B15FE29702FFB9DEB2ECCCF4F88, XML SHAB5127A2201D655C58DCEA17F69AC1A1AA5ACE658F5BC087C01D9167EC5A54106;151-audit-monthly-products.png SHAFD70DC909DAA6CFA71456508D2D8D2268C2779FED05E8D7572285C6F76CF2F6C, XML SHAC34BF8D673955C21A730F07995E38FF1FEC42D2F47C62A820C0396D4A4C263F4;152-audit-monthly-next-page.png SHA97BBC489043585D2463183A785D8D98293AE05251A77366DFC5148821876F42D, XML SHAAF80BFC3516B5790CC235262EBFBF09E4C095CAB8F4560B6FD431D925F2AC4BD. All three visually inspected. Task-local child; no guessed central REG allocation.
+
+### R668-AUDIT-RECENT-001 — Settings count promises a different Recent list scope
+
+Status: OPEN; P2 count/scope consistency, Redmi-confirmed on normal r66.8. Shop → Sort and filter → Shopping tools → Shopping settings shows `10 recently viewed` (125). Tapping that row opens `Shop · 5 products` (126), without a control for the other five. Source _BuyV2ShoppingSettingsSheet adds Shop and Wholesale recent counts, while its callback opens the current destination's Recently viewed sheet. This makes customers believe half their recent products have disappeared or sends them to the wrong scope for the advertised count. Required: align count and destination, or explicitly expose the combined list and its scope; preserve settings origin and history. No data deletion was observed, and no backend change is inferred.
+
+Evidence: 125-audit-buy-settings.png SHA5659DADF3D830B04004FFB409493D052120CC526C4648DBA6B5D56C06D7C0A1E, XML SHAB251F22567D3C2C3D2400CE93E3715C603721FDEAB20EE12B60B6A1BCBA80E5F; 126-audit-settings-recent-count.png SHAD809ABFEB3F1041BA3C473FA3E9A622E93BA60BD7DB7F2F36EB65DCB93D04B09, XML SHA6C5DA0007270B1C3DA1E08BAE99F24D98C40F9AE6B51A619EA4A5B7713F77B62. Both visually inspected. This task-local ID is distinct from the previously corrected Recent product Back issue.
 
 ### R668-AUDIT-SELLER-001 — Seller visit action has inconsistent product-page placement
 

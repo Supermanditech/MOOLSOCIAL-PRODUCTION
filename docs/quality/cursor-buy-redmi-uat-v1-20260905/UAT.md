@@ -8,26 +8,42 @@ Founder instruction: enumerate journeys, test on Redmi, register each real custo
 | --- | --- | --- |
 | Entry and navigation shell | launch; Shop/Wholesale/Medicine; Mool menu; tab identity; Back; safe areas | prior local subsets; expand destination transitions |
 | SKU grid and modes | Quick/Scheduled/Wholesale/Bulk; category; pagination; refresh; compact facts/icons; empty/long content | pending current expanded audit |
-| Search and refine | type/clear/no result; recent search; filters/sort; apply/reset/cancel; retain scope and scroll | pending |
+| Search and refine | type/clear/no result; recent search; filters/sort; apply/reset/cancel; retain scope and scroll | 162–188: no-match/clear/recent-query, descending sort, price ceiling, combined multipack empty, brand/available selection, Clear/Apply restore passed; scope/product Back/enlarged remaining |
 | Product detail | title/SKU/pack/unit price; images; variants; MOQ; quantity; policy; business wording; disclosures; Back | in progress from retained wholesale cart |
-| Store | identity/opening/fulfilment; expand; catalogue; SKU; nested product/cart/Back | pending |
-| Saved | save/unsave; list/search/empty; product/Back; add; clear/Cancel | pending |
-| Recently viewed | list/cards/full facts; product/Back; scroll retention | previous featured return closure separate; expanded sheet pending |
+| Store | identity/opening/fulfilment; expand; catalogue; SKU; nested product/cart/Back | wholesale nested/full catalogue Back passed078–087; MEDIA/QTY/CATALOGUE issues registered; Shop expansion pending |
+| Saved | save/unsave; list/search/empty; product/Back; add; clear/Cancel | empty132–133; temporary Barcode81 save/list/product/Back, Clear confirmation/Keep saved, unsave and Show all passed154–161; original Saved0 restored |
+| Recently viewed | list/cards/full facts; product/Back; scroll retention | Shop sheet/product Back passed118–120; settings count/scope defect125–126; enlarged subset pending |
 | Offers | issuer/eligibility; product/variant/compare; benefit selection; return origin | pending |
-| Monthly basket | price/pack count/scope; included products; cancel/return; add acknowledgement | pending |
+| Monthly basket | price/pack count/scope; included products; cancel/return; add acknowledgement | 150–153: 12 products/21 packs/5145 subtotal visible; View products incorrectly retains ordinary paged catalogue; P1 child032-R668-PAGED registered; intent cleared, Add basket not submitted |
 | Cart | scope/count/line price; quantity/remove/clear Cancel; browse; product Back; high totals; drag/park | prior normal controls pass; P1 child028-R668 nine-digit large-text truncation open |
-| Address | selection; add/edit; required/invalid input; keyboard; Cancel/Back; return context | high-total selection passed; remaining form audit pending |
+| Address | selection; add/edit; required/invalid input; keyboard; Cancel/Back; return context | high-total selection passed; blank form rejection/keyboard reachability/Cancel passed134–145; populated invalid phone/PIN and edit remain pending |
 | Checkout payment | method selection; contextual PO; invalid/missing reference; offers/fees; review/Back | high-total local selection/PO validation passed; remaining states pending |
 | Confirmation | shipments/units/totals/GST; change payment/address; Back; action visibility | high-total normal review passed; no order submitted |
-| Orders list | filters; empty state; order identity; scrolling; detail/Back | pending |
-| Tracking | compact/expanded status; address/items; refresh/unavailable; alerts; Help/Back | pending |
-| Invoice | totals/identity; view/scroll; Back; download availability | pending; external save requires verified helper/system-surface handling |
-| Resolution | cancellation/return/replacement/refund eligibility; item/reason selection; validation; Cancel/Back | pending; accepted backend outcomes deferred |
-| Settings and alerts | saved shortcut; browsing preference truth; notifications list/target/Back; help/profile origin | pending |
+| Orders list | filters; empty state; order identity; scrolling; detail/Back | Active/Delivered and exact Back context passed091–108; empty/search remaining |
+| Tracking | compact/expanded status; address/items; refresh/unavailable; alerts; Help/Back | active/delivered details and Back passed092–108; alert-origin Back passed128–130; live tracking not available in fixture |
+| Invoice | totals/identity; view/scroll; Back; download availability | retained MS-NEW-09 local invoice099 shows2x37=74 and correct identity; Back100 restored tracking; fresh external download not exercised |
+| Resolution | cancellation/return/replacement/refund eligibility; item/reason selection; validation; Cancel/Back | cancellation required reason and dismissal094–098 passed; delivered unknown-eligibility blocks selection105–107; eligible fixture and accepted outcomes unqualified |
+| Settings and alerts | saved shortcut; browsing preference truth; notifications list/target/Back; help/profile origin | settings children Recent/Saved/address/alerts checked125–145; RECENT-001 count mismatch open; shared account/provider settings deferred |
 | Other entry points | scanner removal/qualified collection boundary; share Cancel; store chat origin | dependent/shared surfaces classified separately; no external send |
 | Cross-screen behaviour | portrait/landscape; large text; keyboard; focus/semantics; long content; background/restart; stale state | prior cart restart pass; expand per screen and bind exact captures |
 
 No entire screen family is declared production-ready by this planning inventory. Record pass/failure/blocked reasons against concrete routes and captures; evaluate whitespace/features by purchase relevance and usability, not personal taste. Confirmed defects are appended to DEFECTS before implementation; observations stay separate until reproduced.
+
+### Expanded execution checkpoint, captures146–188
+
+External ledger `R66-8-EXPANDED-AUDIT-CAPTURES-146-203-V1.json`, SHA `5BD4491A2D0D7AF0B96D71418A3F0E277464A06F964407F8399CB28CC74135E4`, independently verifies58 PNG/XML pairs;34 are explicitly visually inspected. This supplements067–145 and retains raw evidence outside Git.
+
+189–203: Wholesale entry resets Shop search; Bulk shows rice catalogue. Product191 MOQ4 x1690=6760, offers/pack/policy readable192–194, repeated facts linked to existing003/REG4545. Add195 creates4 packs; quantity tap196 leaves195 XML unchanged; plus197 gives5/8450; minus198 restores195 XML; minus199 removes only temporary rice and restores194 XML. Back200 exactly restores190 Bulk catalogue XML. Category201→Stationery202 yields0; Wholesale203 retains stationery and shows relevant paper/notebook/pencil/pen results.202 dock confirms retained28736/100001280. Direct bulk quantity-entry gap registered BULK-QTY-001. Current category=Stationery, mode=Wholesale, no search, normal display. Existing notebook retained; no order submitted.
+
+Variant qualification limitation: session6078 groups local `_catalogueProducts` by canonicalId, while generated paged `_product`812 assigns distinct generated IDs. Selector is only rendered for more than one resolved variant (views721). These fixtures do not establish provider variant switching/photo linkage; qualify that contract rather than treating generated sample SKU numbers as real variants. No alternate provider media fixture injected into the app.
+
+Monthly basket150–152 reproduced the registered paged-catalogue mismatch;153 cleared the intent. Saved154–161 temporarily bookmarked Barcode label rolls81, showed one saved product, opened it and returned to the exact saved-list XML, offered Clear list confirmation, and Keep saved preserved it. Removing only the temporary bookmark restored Saved0; Show all returned the same catalogue XML as153. No cart modification or order submission.
+
+Search162–188: zzqnomatch produced0 products and a readable empty state163. The field-clear control restored the suggestion-list XML164=162. Recent tomato selected165 returned matching tomato/ketchup products; Finish search166 hid keyboard,167 settled to complete grid.166 PNG contained a keyboard-hide transition;167 corrected the view, not a persistent visual defect. Descending sort169–171 put135 ketchup before37 tomatoes. Price ceiling100173–175 removed ketchup and showed600000 fixture matches. Adding Multipack177–179 produced0 results; Clear181 restored relevance/any price/any pack and the original filter XML. Brand MEAL COMPANIONS183 plus Available184 applied185, yielding590000 ketchup fixture matches. Clear187 and Apply188 restored the original tomato catalogue XML (188=167). No assertion that every fixture entry or all sort directions are independently validated; no live inventory claim. Filter-induced empty copy mentions search/category/area rather than filters; record as a recovery-copy observation, not a broken Clear action.
+
+Images visually inspected in this continuation:150–153,155,158,160,162–169,171–173,175,177,179,182,185. Other action captures retain XML/receipt evidence and are not automatic visual passes.163 initial command had an invalid helper parameter and performed no device action; a fresh receipt recorded successful retry.162 image display was incomplete after context exhaustion, then exact PNG was successfully re-opened. Both tooling incidents are external REG4547 recovery notes, not customer defects.
+
+Founder requirement R668-AUDIT-DELIVERY-ICON-001 recorded: Quick bike+rider; Wholesale tempo+driver; Bulk fleet+driver. Do not confuse a mode icon with live driver assignment. Source implementation and mode-specific Redmi acceptance pending.
 
 ### SKU/variant media qualification and proposed supplier profile
 
@@ -55,6 +71,19 @@ Source basis: Flutter documents JPEG/PNG/WebP plus other decoders, and explains 
 - Real defects registered before proceeding: generic SKU imagery MEDIA-001; supplier media contract MEDIA-002 (technical, device upload unqualified); truncated grid quantity QTY-001; full-catalogue continuation CATALOGUE-001. All task-local IDs, not central regression allocations.
 - Product detail repeats pack/variant/unit price/policy across facts, highlights, specifications and generated description (071–074). Link existing R66-UAT-003 / REG4545 observation; no duplicate new ticket or removal solely on aesthetic preference. Bulk quantity entry has only +/- in inspected product/grid controls; 080 quantity tap preserved079 XML, and earlier064 cart tap did not edit. Full Bulk-mode alternatives remain to be checked before a separate usability defect.
 - Basket was not changed in captures067–087. These are current route subsets, not completion of the 20-family matrix above. Exact external PNG/XML receipts remain preserved under redmi-r66-8.
+
+### Expanded execution checkpoint, captures088–145
+
+External immutable ledger R66-8-EXPANDED-AUDIT-CAPTURES-067-145-V1.json SHA33BD8071C52BBECA9154FBB7BD8FE0E7B9D386914A21C5725788F3D9CA8D34B7 binds79 capture pairs to the installed APK and identifies51 visually inspected images; other captures are retained action/semantic or restoration evidence, not independent visual acceptance. The file is under C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905. PNG/XML hashes were independently recomputed and matched every receipt. Capture117 contains a transient unrelated system notification; exclude it from upper-screen visual judgment and preserve the original. No app defect inferred from that notification.
+
+- Founder seller-link observation verified on Shop089–090: Visit store near product facts; no second visit link in its Ratings and seller panel. Wholesale074 places Visit supplier lower. R668-AUDIT-SELLER-001 is inconsistent placement with a single-link acceptance rule, not an assertion that both sampled pages contain duplicates. Registered in remotely verified audit commit bbaa60e7.
+- Active Orders091 → tracking092–093 → cancellation094–097 → dismiss098: required reason gates Submit; no request sent;093/098 XML match. Invoice099 binds MS-NEW-09,2 packs at37,total74; Back100 restores093 XML; Back101 restores091 XML. This is a review invoice, not tax/backend issuance qualification.
+- Delivered102 → detail103–104 → return105–106 reports unknown eligibility and disables item selection; no invented eligibility or return submitted. Dismiss107 restores104 XML; Back108 restores102 XML. Replacement/refund successful submissions remain unqualified without eligible fixtures.
+- Shared profile drawer110 and Mool menu112 dismissed to unchanged Offers109/111/113 XML; no shared account settings changed. Catalogue114 equals088 XML. Generated large-catalogue sample titles/counts are review fixtures, not assertions of live provider inventory.
+- Recent118 → product119 → Back120 restores118 XML. Settings125 advertises10 Recent entries but opens Shop5 in126: registered RECENT-001. Back127 restores125 XML. Alerts128 → correct MS-NEW-09 tracking129 → Back130 restores128 XML; dismiss131 returns settings. Saved132 correctly shows Shop0 and explains saving from the grid; dismiss133 restores125 XML. No history or Saved collection cleared.
+- Address134 retains Work/Basni. Blank new form135–137 is rejected with visible recipient/street/locality instruction. Focus138 initially precedes visible keyboard;139 already shows Gboard and140 independently confirms it. The earlier commentary implying two failed taps is corrected: the second-tap image shows keyboard, and no opening failure is confirmed. Form141–142 scrolls to a fully visible Save action above Gboard. Back143 hides keyboard,144 cancels unsaved form,145 restores settings and existing Basni selection. No address text entered or new address saved. Device readback: Gboard default, show_ime_with_hard_keyboard1, no physical keys; settings were read only.
+
+Cart remains28,736 wholesale notebook packs atINR100,001,280. No order, payment, return/cancellation request, supplier publication, share/message or address save was submitted. New task-local defects are registered before implementation; remaining inventory rows above are explicitly pending rather than assumed passed.
 
 Candidate: UAW-CURSOR-BUY-R66-1-REDMI-REVIEW-20260905. Installed hash: `30A71FE8B6696BF51400FBED5A90C3179E25CE0A6153A998F5A041657C9D35C3`; code 2026090501. Fresh execution ledger below qualifies individual actions, not entire coverage groups.
 
