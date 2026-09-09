@@ -307,7 +307,9 @@ Audit-runner incident REG4557: capture 084 succeeded, but a guard then expected 
 - Scope: exact existing shared Chat search/wrapper and focused tests, subject to current owner check; retain compact New conversation, filters, query, drafts and Store return. Do not change thread sending or Cursor Buy. Coordinate with REG4549/4550 rather than duplicating their error/recovery scope.
 - Acceptance: full professional search label, one clear search affordance, query/clear/close/keyboard states, 100%/200%, touch targets, focus/semantics and exact Back. Current native Chat entry/Back passes; this is not all-Chat acceptance.
 
-### DASH-FIRST-TAP-05 — Select the retailer's actual first product
+### DASH-FIRST-TAP-05 — Select the retailer's actual first product — HELD for separate product-add redesign
+
+Founder scope correction, 2026-09-09: preserve REG4561 and its evidence, but remove this child from the current dashboard implementation batch. Product selection/addition, import/editor design and setup pricing-field redesign will be reviewed together in the separate product-add scope. No fix, test closure or catalogue approval is implied by parking it.
 
 - State: OPEN; native102 plus source-confirmed; durable REG4561. Reuse DASH-LOAD-10/13 catalogue work.
 - User/outcome: Grocery/Kirana retailer chooses the product/pack actually sold before setting price and quantity; Speciality Retail must not be forced through an unrelated grocery default.
@@ -353,7 +355,7 @@ Final device state: same OPPO QA Store dashboard, off/private, setup0/2, zero or
 
 ### Implementation scope lock — dashboard, states, first tap only
 
-**19 open dashboard acceptance children:** DASH-LOAD-01–15 plus DASH-FIRST-TAP-02–05. These are not 19 reproduced native crashes. REG4557 is an audit-runner incident and is not included as a product ticket. Older carried-forward Files/support/accessibility/regression checks remain in DASH-FIRST-TAP-01 without duplication.
+**18 active dashboard acceptance children in this audit:** DASH-LOAD-01–15 plus DASH-FIRST-TAP-02–04. DASH-FIRST-TAP-05 / REG4561 is now held separately for product-add redesign by founder instruction. These are not 18 reproduced native crashes. REG4557 is an audit-runner incident and is not included as a product ticket. Older carried-forward Files/support/accessibility/regression checks remain in DASH-FIRST-TAP-01 without duplication; the complete current inventory appears below.
 
 | Existing ticket(s) | Implement within this round | Explicitly held beyond this round |
 | --- | --- | --- |
@@ -363,8 +365,71 @@ Final device state: same OPPO QA Store dashboard, off/private, setup0/2, zero or
 | DASH-LOAD-08/09/10 | Exact money/stock/return summaries, transaction/stock first view, validated first-view fields, pagination contract and exception entry | Actual settlement/refund/ledger execution, tax work and full downstream return journeys |
 | DASH-LOAD-12/13 | Existing first-tap wording/label fit, relevant actions, Chat/link context and honest unavailable/entitlement states | Real external sends, promotion/requirement publishing, filing/credit service execution and unrelated shared-screen redesign |
 | DASH-LOAD-15 | Controlled local mixed-state fixture replay/captures and subsequent OPPO UI qualification for the above | Production/server throughput claims or claims that one retailer can fulfil 1,000 concurrent orders |
-| DASH-FIRST-TAP-02–05 | Exact sheet inset, sale-contact validation, shared Chat first-view search, and setup product selection corrections | New onboarding flows, duplicate catalogue or broader product redesign |
+| DASH-FIRST-TAP-02–04 | Existing Stock tools sheet inset, sale-contact validation and shared Chat first-view search | Product-add/setup selection and editor redesign, including DASH-FIRST-TAP-05; new onboarding flows or duplicate catalogue |
 
 Pending scenarios must remain explicit: populated active/overdue/exception customer queues; 100/1,000 simultaneous mixed-state replay and larger daily history; real supplier/GPS events; approved/denied/unknown timing changes; order-specific collection authorisation; loaded dues/settlements/returns; populated search/alert identity; interruption/relaunch and multi-counter updates; physical200%/TalkBack, remaining cloud/support recovery and genuine barcode decoding. Empty QA views cannot close these.
 
 The approved main dashboard geometry is preserved. Correct first-tap fit/decision hierarchy through existing components, not additional rail layers, giant hero cards, new landing pages or duplicated business logic. Implement only after exact current owner checks and focused regression plans; no product/test source was changed by this audit.
+
+## Supplier concurrency clarification and deduplicated inventory — 2026-09-09
+
+Founder instruction: evaluate supplier-related actions alongside simultaneous customer work; keep product-add separate. This section supplements the existing tickets, not a second implementation list. Source checkpoint: 4598d91ffbe617f7685b4d32dbd89548f386db1d. Product sources and installed r66.13 are unchanged.
+
+### Supplier verdict and scope
+
+The Store-hosted Buy procurement screen exists, but that alone does not provide an incoming-supply work queue, independently reconciled receiving actions or a populated Store purchase ledger. The dashboard selects a single activity and the session retains one activeGroupBuy. Purchase/stock/payment updates cannot be claimed concurrent or live merely because their entry buttons open.
+
+Additional source distinction: Stock already offers a manual "Goods received" adjustment, and importWorkspaceProducts records imported quantities with the goodsReceived movement kind. Neither proves that a particular supplier shipment was physically received. DASH-LOAD-07/10 must distinguish opening/import/manual adjustments from a purchase-linked receipt, retain provenance and avoid counting an import or manual adjustment again when the actual receipt arrives. This is an extension of the existing receiving/stock tickets, not a separate duplicate defect. No stock quantity was changed during this audit.
+
+Product addition, product selection/setup default, import/editor redesign and its pricing-field presentation remain held under DASH-FIRST-TAP-05 / REG4561. Existing-product availability, reservations, stock movements, supplier receipt quantities and purchase history remain in the dashboard scope. DASH-FIRST-TAP-02 / REG4558 remains active only for the already-open Stock tools sheet's Android inset/fit; it does not authorise an Add Product redesign.
+
+### Required simultaneous supplier actions and states
+
+All placements reuse the approved dashboard geometry. Restock retains the supply entry and gains a compact incoming-stock count/exception indicator when data exists. Its first tap exposes the scoped incoming-purchase list; selecting a purchase changes the centre in place, with its applicable action visible there. Buy Direct and Group Bulk Buying retain their existing distinct purposes. This is a bounded state/first-tap contract, not authority to build deeper checkout journeys now.
+
+| Concurrent case | Visible information / retailer action in the existing centre or first-tap view | Existing ticket owners |
+| --- | --- | --- |
+| Several suppliers and purchase orders at once | Separate supplier, purchase number, shipment and store identity; ordered item/pack/quantity and next action. One purchase split into three shipments remains one purchase and three separately labelled shipments, not four orders. | DASH-LOAD-01/02/03/07 |
+| Supplier accepts, packs, dispatches or changes ETA | Track stock shows the exact purchase's confirmed milestone, carrier and last-update time. Customer orders being packed remain selected; no automatic central-card replacement or moving button. | DASH-LOAD-04/07/14 |
+| Stock arrives while customer orders need acceptance or handover | Non-blocking arrival/exception preview and Receive stock entry; unfinished customer checklist, bill and supplier receipt draft survive switching. Arrival is not automatic receipt. | DASH-LOAD-01/04/06/07 |
+| Partial shipment, shortage, damage, excess or wrong pack | Expected versus received quantities and units; keep remaining quantity outstanding, identify discrepancy and show Report issue. Preserve exact shipment/line references. Do not silently convert cartons into pieces or close the whole purchase. | DASH-LOAD-07/09/10 |
+| Two suppliers deliver the same SKU while customers purchase it | Separate receipt identity/provenance, available/reserved quantities and linked stock movement; imports/manual corrections cannot impersonate purchase receipts. Prevent duplicate local application and define authoritative reconciliation. | DASH-LOAD-04/07/10/14 |
+| Supplier payment changes during delivery or receiving | Purchase payment due/pending/paid/failed/refund and delivery state remain independent. Show balance, charges and current confirmed action; supplier payment never becomes customer-sale settlement income. | DASH-LOAD-07/08/14 |
+| Several Group Bulk Buying commitments progress together | Per-deal retailer quantity, confirmation/balance payment, closing time, stock secured, delivery and cancellation/refund state. A paid confirmation does not itself mean goods received; a generic creation reference is not proof of paid stock. | DASH-LOAD-07/08/11/14 |
+| Manufacturer offer changes while retailer packs an order | Stable selected offer with supplier, pack, MOQ, delivered total and supportable saving; expired/changed offer is explained without replacing current customer work. | DASH-LOAD-04/11/13 |
+| Rider GPS is stale, supplier reassigns delivery or network drops | Separate incoming-stock tracking from outgoing customer delivery. Show last confirmed update and unavailable/reconnecting state, not invented movement, arrival or completion. | DASH-LOAD-06/07/14 |
+| Receipt/payment reply is uncertain, duplicated or arrives out of order | Only the affected purchase/action remains pending or blocked; unrelated customer and supplier work remains usable. Retry/relaunch reconciles the same operation identity and revision before a second effect. | DASH-LOAD-04/08/14 |
+| Supplier return, dispute or purchase cancellation overlaps other work | Exact purchase/shipment/item reference and actionable exception preview; stock, refund and return progress remain separately visible. No assumed refund or credit entitlement. | DASH-LOAD-03/07/09 |
+| Supplier contact or workspace switch during updates | Exact supplier/purchase Chat context and Back return; retain unsent drafts and selection, reject late events from another store/account. Reuse shared messaging; do not send live messages in audit. | DASH-LOAD-02/12/14 |
+
+Implementation must not create another checkout, duplicate consumer Buy product code or add extra rail layers. Full supplier receipt/payment execution, GPS feed, stock/ledger authority and cross-agent integration remain named backend/owner dependencies. The current frontend work covers projection, exact identities, action states, safe recovery and first-tap wiring only.
+
+### Supplier mixed-workload acceptance additions to DASH-LOAD-15
+
+- Proposed controlled fixture: 100 active customer orders plus 20 Store purchase orders from six suppliers, split into 30 shipments; four group purchases, three manufacturer offers, overlapping payment/settlement updates and retained bill/Chat/receipt drafts. These are test inputs, not existing OPPO records or a promise of store capacity.
+- Repeat the same identity/state assertions with 1,000 active mixed records and separately with 1,000/10,000 daily-history records. Report active entities separately from daily events: one order can emit many updates. Do not present per-device record limits as store-wide admission control.
+- Replay arrival, dispatch, partial receipt, shortage, payment pending/success/failure and expiry during customer Accept, packing, customer collection and biker handover. Preserve current selection, stable controls and each independent next action; demonstrate that one pending supplier operation does not freeze every order.
+- Include identical SKU names across suppliers, split shipments for one purchase, stale/out-of-order/duplicate events, uncertain replies, store switching and restart. Reconcile expected counts and ledger projections after every transition; do not double-count overlapping payment/fulfilment states.
+- Verify normal/140%/200% layouts, long supplier/product names, 100–1,000 crore amounts, keyboard/draft preservation and reduced motion locally. Replay populated safe scenarios on OPPO only with controlled review data; physical large-text/TalkBack remains one shared verification item, not a duplicate per supplier ticket.
+- Existing local 11-test queue result qualifies only its recorded synthetic list cases. The native audit has empty supplier/customer queues. No populated supplier concurrency, receipt completion, live GPS, backend throughput or production handover security has passed from those screens.
+
+### Current count — one record per ticket, no double counting
+
+| Category | Exact existing references | Count / status |
+| --- | --- | --- |
+| Dashboard actions, states, workload and concurrency | DASH-LOAD-01–15 | 15 active execution/qualification tickets |
+| Newly recorded dashboard first-tap corrections | DASH-FIRST-TAP-02 / REG4558; 03 / REG4559; 04 / REG4560 | 3 active tickets; REG aliases are not extra tickets |
+| Carried-forward dashboard Profile/Files first-tap corrections | REG4554 heading fit; REG4556 Add-file Cancel inset | 2 active tickets |
+| Remaining pre-dashboard support/recovery | REG4549 draft boundaries; REG4550 failed-send/error/keyboard recovery | 2 active, partially qualified tickets; retain earlier passing evidence |
+| Shared inherited-regression disposition | REG4555 | 1 active investigation/correction ticket, not 14 product tickets |
+| Product-add — separate future redesign | DASH-FIRST-TAP-05 / REG4561 | 1 held ticket, excluded from current dashboard implementation |
+
+**23 active tickets = 20 dashboard/state/action/first-tap tickets + 2 pre-dashboard tickets + 1 shared-regression ticket. One additional product-add ticket is held separately: 24 named tickets retained in total.** No new duplicate supplier ticket was created; the supplier acceptance scope is added to the existing DASH-LOAD children above.
+
+Three further carried-forward acceptance items remain open and are not yet confirmed defects or additional named defect tickets:
+
+1. Physical large-text/200% and TalkBack verification across the affected onboarding and first-tap screens.
+2. Authorised remote cloud-provider completion/cancel/error and return/preservation verification; local file selection does not close this.
+3. Root-cause/owner classification of the seven exploratory assertions: chat_final_intent_matrix_test (1), C10D exact return (1), R11 continuity (3), Cursor-owned buy_v2_shop_chat_test (2), retained in r66.11/local-validation.md. These seven assertions are one pending classification batch, not seven proven product defects. Keep it separate from REG4555's 14 inherited failures; avoid duplicate correction tickets if diagnosis maps back to an existing owner/root cause.
+
+Thus **27 tracked work items = 23 active tickets + 1 held product-add ticket + 3 verification/investigation items**. DASH-FIRST-TAP-01 is the umbrella batch and is not counted again. REG4557 is an audit-harness incident, not a dashboard defect. Backend dependencies remain explicit within their relevant tickets, not falsely closed or inflated into additional frontend tickets. This inventory counts open work in this review batch, not all historical closed pre-dashboard tickets.
