@@ -29,6 +29,20 @@ Founder instruction: enumerate journeys, test on Redmi, register each real custo
 
 No entire screen family is declared production-ready by this planning inventory. Record pass/failure/blocked reasons against concrete routes and captures; evaluate whitespace/features by purchase relevance and usability, not personal taste. Confirmed defects are appended to DEFECTS before implementation; observations stay separate until reproduced.
 
+Founder follow-up: city list clipping at the Android bottom edge was explicitly reported and registered as R668-AUDIT-AREA-BOTTOM-001 in DEFECTS, supported by the partial Kolkata row in381/386/392/394/396. Attempt398 to verify maximum-scroll access stopped before input because the review app was not foreground (native1, no capture). Do not include398 in the successful ledger or declare the bottom edge passed. Resume with a fresh capture after the review app is foreground; do not interfere with another foreground app.
+
+### Expanded execution checkpoint, captures380–397
+
+Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-380-397-V1.json`, SHA256 `A017F77B00FE7AC7630122918CDDF48E5D4CAB6815F0340C762883142BD47F90`, rehashes18 PNG/XML pairs, all18 visually inspected. Same r66.8 candidate, no source/build/install or order/payment/report. Normal display retained.
+
+Shopping area380–390: location381, search focus382, zzqnomatch383 produces truthful No matching areas / browse any area guidance; keyboard Back384 and sheet Back385 return Shop without leaking the area query into product search. Reopen386 exactly restores381 XML with blank query. Focus387 and partial jai388 returns Jaipur; keyboard dismiss389 retains result; Back390 returns Shop. No city selected during either query.
+
+Catalogue scroll observation:380 hid the small count strip, whereas385/390 showed it again;391's attempted deeper swipe only hid that strip, retaining the same six Scheduled cards. This does not prove loss of a long-list position; no new defect registered from this bounded observation.
+
+City selection392–397: open392, Jaipur393 changes displayed area to Jaipur and cards to Mool Market000002. Reopen394; intended Jodhpur tap395 at140,829 produced Mumbai/Mool Market000004, despite394 XML recording Jodhpur bounds[24,774][680,886]. Filename395-area-jodhpur-restored is the intended action, NOT a successful restoration. Preserve the discrepant result as an unresolved observation; do not blame user/tool/app without evidence. Reopen396 with2000ms settle, tap350,828 in the displayed Jodhpur row397 correctly restores Jodhpur/Mool Market000001 and exact385/390 XML5C4CF0172A8BDE18665C5E6A1F84861DD9A71DA308A7C7983C89B7BED9BA7418. No repeat failure established. No saved delivery address or basket edited.
+
+Current397 ShopScheduled/Jodhpur, first-page grid with count strip, blank product query; original wholesale28736/100001280, PhonePe, GSToff, saved addresses and Saved0 preserved. No confirmed new defect in this pass. National-delivery selection, long-list area-cancel scroll continuity and independent reproduction of395 remain unqualified; provider media/backend boundaries remain deferred as previously recorded.
+
 ### Expanded execution checkpoint, captures352–379
 
 Ledger `R66-8-EXPANDED-AUDIT-CAPTURES-352-379-V1.json`, SHA256 `92B468DF9AC777BFA54641BCCACC3EF5A38A958BFB4DE9C3B42CCF77D6D3B8F4`, independently verifies28 PNG/XML pairs; all28 visually inspected. Same r66.8/2026090903; no source/build/install. Normal display unchanged.
