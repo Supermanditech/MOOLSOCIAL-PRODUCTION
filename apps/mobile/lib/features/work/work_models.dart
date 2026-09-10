@@ -14,6 +14,16 @@ String? normalizeWorkspaceMobile(String value) {
   return digits.length == 12 ? digits.substring(2) : digits;
 }
 
+/// Reads a supported phone or the stored `name · phone` display format.
+/// Never salvage a substring from malformed data or use this as account proof.
+String? workspaceCustomerMobile(String customer) {
+  final parts = customer.split('·');
+  if (parts.length > 2 || (parts.length == 2 && parts.first.trim().isEmpty)) {
+    return null;
+  }
+  return normalizeWorkspaceMobile(parts.last);
+}
+
 enum WorkFeedFilter { forYou, jobs, freelance, campaigns, nearby }
 
 extension WorkFeedFilterLabel on WorkFeedFilter {

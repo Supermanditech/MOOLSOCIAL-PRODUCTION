@@ -1758,6 +1758,70 @@ void main() {
     );
   }
 
+  test(
+    'DASH12 contact history parses whole phones without identity collisions',
+    () {
+      expect(
+        workspaceCustomerMobile('Customer 2 · +91 98290 12345'),
+        '9829012345',
+      );
+      expect(workspaceCustomerMobile('9829012345'), '9829012345');
+      for (final value in [
+        'Customer 2 9829012345',
+        'Customer · 19829012345',
+        'Customer · 9829012345x',
+        'Customer · 9829012345 · 9876543210',
+        '· 9829012345',
+        'Customer · 9829012345 / 9876543210',
+      ]) {
+        expect(workspaceCustomerMobile(value), isNull, reason: value);
+      }
+      final session = WorkSession(gateway: ReviewWorkGateway());
+      addTearDown(session.dispose);
+      final customers = [
+        'Customer 2 · 9829012345',
+        'Customer 2 · +91 98290 12345',
+        'Customer · 19829012345',
+        'Customer · 9829012345x',
+        '',
+      ];
+      for (var index = 0; index < customers.length; index++) {
+        session.workspaceOrders.add(
+          WorkspaceOrderRecord(
+            id: 'CONTACT-$index',
+            customer: customers[index],
+            items: 'Oil × 1',
+            quantities: const {'oil': 1},
+            amount: 120,
+            source: 'Counter',
+            fulfilment: 'Pickup',
+            payment: 'Paid online',
+            address: '',
+            stage: 'Completed',
+            needsDelivery: false,
+            createdAt: DateTime(2026, 9, 10),
+          ),
+        );
+      }
+      final book = session.workspaceCustomerBook;
+      expect(book, hasLength(4));
+      final valid = book.singleWhere((customer) => customer.id == '9829012345');
+      expect(valid.mobile, '9829012345');
+      expect(valid.name, 'Customer 2');
+      expect(valid.orders, hasLength(2));
+      expect(valid.totalSpend, 240);
+      expect(
+        book
+            .where((customer) => customer.id != valid.id)
+            .every(
+              (customer) => customer.mobile.isEmpty && customer.name.isNotEmpty,
+            ),
+        isTrue,
+      );
+      expect(session.workspaceOrders.map((order) => order.customer), customers);
+    },
+  );
+
   WorkSession liveSession([ReviewWorkGateway? gateway]) {
     final session = WorkSession(gateway: gateway ?? ReviewWorkGateway())
       ..activeWorkspace = const WorkWorkspace(

@@ -15555,6 +15555,253 @@ void main() {
     },
   );
 
+  for (final action in ['Call', 'WhatsApp']) {
+    for (final textScale in [1.0, 2.0]) {
+      for (final outcome in ['opened', 'unavailable', 'error', 'late-store']) {
+        testWidgets(
+          'DASH12 customer $action $outcome $textScale is not completed contact',
+          (tester) async {
+            final work = liveStore();
+            final originalStore = work.activeWorkspace!;
+            work.workspaceOrders.add(
+              customerOrder(
+                id: 'CONTACT-1',
+                customer: 'Customer 2 · +91 98290 12345',
+                createdAt: DateTime.now(),
+              ),
+            );
+            const channel = MethodChannel('plugins.flutter.io/url_launcher');
+            final launches = <Uri>[];
+            final deferred = Completer<bool>();
+            tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+              channel,
+              (call) async {
+                if (call.method != 'launch') return false;
+                launches.add(
+                  Uri.parse((call.arguments as Map)['url'] as String),
+                );
+                if (outcome == 'error') {
+                  throw PlatformException(code: 'launch_failed');
+                }
+                if (outcome == 'late-store') return deferred.future;
+                return outcome == 'opened';
+              },
+            );
+            addTearDown(
+              () => tester.binding.defaultBinaryMessenger
+                  .setMockMethodCallHandler(channel, null),
+            );
+            await mount(
+              tester,
+              route: '/app/work/workspace/dashboard',
+              work: work,
+              viewport: textScale == 1
+                  ? const Size(412, 915)
+                  : const Size(320, 568),
+              textScale: textScale,
+            );
+            await openStoreTools(tester);
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const Key('work-business-customers')));
+            await tester.pumpAndSettle();
+            if (action == 'Call') {
+              await reveal(
+                tester,
+                find.byKey(const Key('work-customer-call-9829012345')),
+              );
+              await tester.tap(
+                find.byKey(const Key('work-customer-call-9829012345')),
+              );
+            } else {
+              await reveal(
+                tester,
+                find.byKey(const Key('work-customer-9829012345')),
+              );
+              await tester.tap(
+                find.byKey(const Key('work-customer-9829012345')),
+              );
+              await tester.pumpAndSettle();
+              await reveal(tester, find.text('WhatsApp'));
+              await tester.tap(find.text('WhatsApp'));
+            }
+            await tester.pumpAndSettle();
+            expect(launches, hasLength(1));
+            expect(
+              launches.single.path,
+              action == 'Call' ? '9829012345' : '/919829012345',
+            );
+            if (outcome == 'late-store') {
+              work.activeWorkspace = const WorkWorkspace(
+                id: 'other-store',
+                name: 'Other Store',
+                profileId: 'retailer-grocery',
+                profileLabel: 'Grocery',
+                area: 'Jodhpur',
+                verified: true,
+              );
+              deferred.complete(false);
+              await tester.pumpAndSettle();
+            }
+            expect(work.workspaceCustomerLastContactAt, isEmpty);
+            expect(
+              work.errorMessage,
+              outcome == 'unavailable' || outcome == 'error'
+                  ? isNotNull
+                  : isNull,
+            );
+            if (outcome == 'late-store') {
+              expect(work.workspaceOrders, isEmpty);
+              work.activeWorkspace = originalStore;
+              expect(work.errorMessage, isNull);
+              expect(work.workspaceCustomerLastContactAt, isEmpty);
+            }
+            expect(work.workspaceOrders.single.id, 'CONTACT-1');
+            if (outcome == 'unavailable') {
+              expect(
+                find.byKey(const Key('work-error')).hitTestable(),
+                findsOneWidget,
+              );
+              if (action == 'WhatsApp') {
+                final error = find.byKey(const Key('work-error')).hitTestable();
+                final sheet = find.byType(BottomSheet);
+                expect(
+                  tester.getTopLeft(error).dy,
+                  greaterThanOrEqualTo(tester.getTopLeft(sheet).dy),
+                );
+                expect(
+                  tester.getBottomRight(error).dy,
+                  lessThanOrEqualTo(tester.getBottomRight(sheet).dy),
+                );
+              }
+              await captureStoreView(
+                tester,
+                'customer-${action.toLowerCase()}-error-$textScale',
+              );
+            }
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
+  testWidgets(
+    'DASH12 invalid history disables calling and Chat is not contact proof',
+    (tester) async {
+      final work = liveStore();
+      work.workspaceOrders.add(
+        customerOrder(
+          id: 'BAD-CONTACT',
+          customer: 'Customer · 19829012345',
+          createdAt: DateTime.now(),
+        ),
+      );
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      await openStoreTools(tester);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-business-customers')));
+      await tester.pumpAndSettle();
+      final id = work.workspaceCustomerBook.single.id;
+      expect(
+        tester
+            .widget<IconButton>(find.byKey(Key('work-customer-call-$id')))
+            .onPressed,
+        isNull,
+      );
+      await tester.tap(find.byKey(Key('work-customer-chat-$id')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-pending-draft-card')), findsOneWidget);
+      expect(work.workspaceCustomerLastContactAt, isEmpty);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    for (final action in ['Call', 'Map']) {
+      testWidgets('DASH12 delivery $action failure fits $scale', (
+        tester,
+      ) async {
+        final work = storeViewFixture();
+        work.workspaceOrderStage = 'Out for delivery';
+        work.workspaceOrderCustomer = 'Customer 2 · +91 98290 12345';
+        work.workspaceOrderFulfilment = 'Mool delivery';
+        work.workspaceOrderNeedsDelivery = true;
+        work.workspaceOrderAddress = 'Test lane';
+        work.workspaceOrders[0] = work.workspaceOrders[0].copyWith(
+          stage: work.workspaceOrderStage,
+          customer: work.workspaceOrderCustomer,
+          fulfilment: 'Mool delivery',
+          needsDelivery: true,
+          address: 'Test lane',
+        );
+        const channel = MethodChannel('plugins.flutter.io/url_launcher');
+        final launches = <Uri>[];
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          channel,
+          (call) async {
+            if (call.method != 'launch') return false;
+            launches.add(Uri.parse((call.arguments as Map)['url'] as String));
+            if (scale == 2) throw PlatformException(code: 'launch_failed');
+            return false;
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            channel,
+            null,
+          ),
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        final button = find.byKey(
+          Key(
+            action == 'Call'
+                ? 'work-delivery-call-customer'
+                : 'work-delivery-open-map',
+          ),
+        );
+        await reveal(tester, button);
+        final label = find.descendant(of: button, matching: find.text(action));
+        expect(
+          tester.getSize(label).height,
+          lessThan(25 * scale),
+          reason:
+              'Contact action must remain a readable line, not vertical letters',
+        );
+        await tester.tap(button);
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 500));
+        expect(launches, hasLength(1));
+        if (action == 'Call') {
+          expect(launches.single.path, '9829012345');
+        } else {
+          expect(launches.single.queryParameters['query'], 'Test lane');
+        }
+        expect(
+          find.text(
+            action == 'Call'
+                ? 'Could not open your phone app. Please try again.'
+                : 'Could not open Maps. Please try again.',
+          ),
+          findsOneWidget,
+        );
+        expect(work.workspaceCustomerLastContactAt, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceOrderStage, 'Out for delivery');
+        expect(tester.takeException(), isNull);
+        await captureStoreView(
+          tester,
+          'contact-delivery-${action.toLowerCase()}-$scale',
+        );
+      });
+    }
+  }
+
   for (final outcome in ['opened', 'unavailable', 'error', 'invalid-number']) {
     testWidgets('invoice WhatsApp $outcome never claims message completion', (
       tester,

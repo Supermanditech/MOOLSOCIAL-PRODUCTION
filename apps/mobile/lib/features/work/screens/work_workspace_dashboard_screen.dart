@@ -4363,15 +4363,13 @@ class _DeskCustomerActions extends StatelessWidget {
   final String customer, orderId;
   @override
   Widget build(BuildContext context) {
-    final phone = customer.replaceAll(RegExp(r'[^0-9]'), '');
+    final phone = workspaceCustomerMobile(customer);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
           key: const Key('work-activity-order-call'),
-          tooltip: phone.length >= 10
-              ? 'Call customer'
-              : 'Phone number unavailable',
+          tooltip: phone != null ? 'Call customer' : 'Phone number unavailable',
           constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
           padding: EdgeInsets.zero,
           icon: const Icon(
@@ -4379,7 +4377,7 @@ class _DeskCustomerActions extends StatelessWidget {
             size: 19,
             color: MoolColors.navy,
           ),
-          onPressed: phone.length < 10
+          onPressed: phone == null
               ? null
               : () async {
                   final messenger = ScaffoldMessenger.of(context);
@@ -5390,10 +5388,7 @@ class _DeliveryActivityCard extends StatelessWidget {
       'Delivery failed' => WorkspaceDeliveryStage.failed,
       _ => assignment?.deliveryStage,
     };
-    final phone = session.workspaceOrderCustomer.replaceAll(
-      RegExp(r'[^0-9]'),
-      '',
-    );
+    final phone = workspaceCustomerMobile(customer);
     final canConfirmOwnDelivery =
         session.workspaceOrderFulfilment == 'Own delivery' &&
         session.currentWorkspaceOrder?.isClosed != true &&
@@ -5404,6 +5399,7 @@ class _DeliveryActivityCard extends StatelessWidget {
           WorkspaceDeliveryStage.pickedUp,
           WorkspaceDeliveryStage.outForDelivery,
         ].contains(deliveryStage);
+    final stackContacts = MediaQuery.textScalerOf(context).scale(11) > 16;
     return Column(
       key: const Key('work-activity-delivery'),
       children: [
@@ -5540,12 +5536,19 @@ class _DeliveryActivityCard extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
+              Flex(
+                direction: stackContacts ? Axis.vertical : Axis.horizontal,
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: stackContacts
+                    ? CrossAxisAlignment.stretch
+                    : CrossAxisAlignment.center,
                 children: [
-                  Expanded(
+                  Flexible(
+                    flex: stackContacts ? 0 : 1,
+                    fit: FlexFit.tight,
                     child: TextButton.icon(
                       key: const Key('work-delivery-call-customer'),
-                      onPressed: phone.length < 10
+                      onPressed: phone == null
                           ? null
                           : () async {
                               if (!sameOrder()) {
@@ -5561,7 +5564,7 @@ class _DeliveryActivityCard extends StatelessWidget {
                               } catch (_) {
                                 // The OS phone handler is unavailable; no call occurred.
                               }
-                              if (context.mounted) {
+                              if (sameOrder()) {
                                 messenger.showSnackBar(
                                   const SnackBar(
                                     content: Text(
@@ -5579,7 +5582,9 @@ class _DeliveryActivityCard extends StatelessWidget {
                       label: const Text('Call'),
                     ),
                   ),
-                  Expanded(
+                  Flexible(
+                    flex: stackContacts ? 0 : 1,
+                    fit: FlexFit.tight,
                     child: TextButton.icon(
                       key: const Key('work-delivery-chat-customer'),
                       onPressed: () {
@@ -5610,24 +5615,40 @@ class _DeliveryActivityCard extends StatelessWidget {
                       label: const Text('Chat'),
                     ),
                   ),
-                  Expanded(
+                  Flexible(
+                    flex: stackContacts ? 0 : 1,
+                    fit: FlexFit.tight,
                     child: TextButton.icon(
                       key: const Key('work-delivery-open-map'),
                       onPressed: address.isEmpty
                           ? null
-                          : () {
+                          : () async {
                               if (!sameOrder()) {
                                 return;
                               }
-                              unawaited(
-                                launchUrl(
+                              final messenger = ScaffoldMessenger.of(context);
+                              try {
+                                if (await launchUrl(
                                   Uri.https('www.google.com', '/maps/search/', {
                                     'api': '1',
                                     'query': address,
                                   }),
                                   mode: LaunchMode.externalApplication,
-                                ),
-                              );
+                                )) {
+                                  return;
+                                }
+                              } catch (_) {
+                                // Opening an address is not a delivery event.
+                              }
+                              if (sameOrder()) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Could not open Maps. Please try again.',
+                                    ),
+                                  ),
+                                );
+                              }
                             },
                       style: TextButton.styleFrom(
                         minimumSize: const Size(48, 48),
@@ -14462,46 +14483,68 @@ class _CustomersDestinationSurfaceState
     super.dispose();
   }
 
-  Future<void> _call(WorkspaceCustomerRecord customer) async {
-    final digits = customer.mobile.replaceAll(RegExp(r'\D'), '');
-    final opened =
-        digits.length >= 10 &&
-        await launchUrl(Uri(scheme: 'tel', path: digits));
-    if (opened) {
-      widget.session.markWorkspaceCustomerContacted(customer.id);
-    } else {
-      widget.session.showError('Calling could not open on this device.');
-    }
-  }
+  bool _sameCustomer(String storeId, WorkspaceCustomerRecord customer) =>
+      mounted &&
+      storeId == widget.session.activeWorkspace?.id &&
+      widget.session.workspaceCustomerBook.any(
+        (current) =>
+            current.id == customer.id &&
+            current.mobile == customer.mobile &&
+            current.name == customer.name,
+      );
 
-  Future<void> _whatsApp(WorkspaceCustomerRecord customer) async {
-    final digits = customer.mobile.replaceAll(RegExp(r'\D'), '');
-    final number = digits.length > 10 ? digits : '91$digits';
-    final uri = Uri.https('wa.me', '/$number', {
-      'text':
-          'Hello ${customer.name}, this is ${widget.session.activeWorkspace?.name ?? widget.session.workName}.',
-    });
-    final opened =
-        digits.length >= 10 &&
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (opened) {
-      widget.session.markWorkspaceCustomerContacted(customer.id);
-    } else {
+  Future<void> _call(String storeId, WorkspaceCustomerRecord customer) async {
+    if (!_sameCustomer(storeId, customer)) return;
+    final mobile = normalizeWorkspaceMobile(customer.mobile);
+    if (mobile == null) return;
+    try {
+      if (await launchUrl(Uri(scheme: 'tel', path: mobile))) return;
+    } catch (_) {
+      // A launch attempt cannot confirm a completed call.
+    }
+    if (_sameCustomer(storeId, customer)) {
       widget.session.showError(
-        'WhatsApp could not open. You can contact this customer through MoolSocial Chat.',
+        'Could not open your phone app. Please try again.',
       );
     }
   }
 
-  void _chat(BuildContext context, WorkspaceCustomerRecord customer) {
-    widget.session.markWorkspaceCustomerContacted(customer.id);
+  Future<void> _whatsApp(
+    String storeId,
+    WorkspaceCustomerRecord customer,
+  ) async {
+    if (!_sameCustomer(storeId, customer)) return;
+    final mobile = normalizeWorkspaceMobile(customer.mobile);
+    if (mobile == null) return;
+    final uri = Uri.https('wa.me', '/91$mobile', {
+      'text':
+          'Hello ${customer.name}, this is ${widget.session.activeWorkspace?.name ?? widget.session.workName}.',
+    });
+    try {
+      if (await launchUrl(uri, mode: LaunchMode.externalApplication)) return;
+    } catch (_) {
+      // Opening WhatsApp does not prove that a message was sent.
+    }
+    if (_sameCustomer(storeId, customer)) {
+      widget.session.showError('WhatsApp could not open. Try Chat or retry.');
+    }
+  }
+
+  void _chat(
+    BuildContext context,
+    String storeId,
+    WorkspaceCustomerRecord customer,
+  ) {
+    if (!_sameCustomer(storeId, customer)) return;
     context.push(
       Uri(
         path: '/app/chat/inbox',
         queryParameters: {
           'return': GoRouterState.of(context).uri.toString(),
           'type': 'business',
-          'recipient': customer.mobile,
+          'recipient': customer.mobile.isEmpty
+              ? customer.name
+              : customer.mobile,
           'name': customer.name,
           'draft': 'Customer support for ${customer.name}',
         },
@@ -14528,8 +14571,27 @@ class _CustomersDestinationSurfaceState
 
   Future<void> _showCustomer(
     BuildContext context,
+    String storeId,
     WorkspaceCustomerRecord customer,
   ) async {
+    if (!_sameCustomer(storeId, customer)) return;
+    final contactErrorKey = GlobalKey();
+    Future<void> contact(Future<void> Function() launch) async {
+      await launch();
+      if (!_sameCustomer(storeId, customer) ||
+          widget.session.errorMessage == null) {
+        return;
+      }
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = contactErrorKey.currentContext;
+        if (_sameCustomer(storeId, customer) &&
+            target != null &&
+            target.mounted) {
+          unawaited(Scrollable.ensureVisible(target, alignment: 0));
+        }
+      });
+    }
+
     final largeAmounts =
         customer.totalSpend >= 10000000 ||
         customer.amountDue >= 10000000 ||
@@ -14574,7 +14636,9 @@ class _CustomersDestinationSurfaceState
                                 ),
                               ),
                               Text(
-                                customer.mobile,
+                                customer.mobile.isEmpty
+                                    ? 'Phone number unavailable'
+                                    : customer.mobile,
                                 style: const TextStyle(color: MoolColors.muted),
                               ),
                             ],
@@ -14599,6 +14663,13 @@ class _CustomersDestinationSurfaceState
                         value: '₹${_formatStoreAmount(customer.amountDue)}',
                       ),
                     ),
+                  AnimatedBuilder(
+                    key: contactErrorKey,
+                    animation: widget.session,
+                    builder: (context, _) => _sameCustomer(storeId, customer)
+                        ? WorkMessageBanner(session: widget.session)
+                        : const SizedBox.shrink(),
+                  ),
                   const SizedBox(height: 10),
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -14607,20 +14678,25 @@ class _CustomersDestinationSurfaceState
                         _CustomerAction(
                           icon: Icons.call_outlined,
                           label: 'Call',
-                          onTap: () => _call(customer),
+                          onTap: customer.mobile.isEmpty
+                              ? null
+                              : () => contact(() => _call(storeId, customer)),
                         ),
                         _CustomerAction(
                           icon: Icons.chat_bubble_outline_rounded,
                           label: 'Chat',
                           onTap: () {
                             Navigator.pop(sheetContext);
-                            _chat(context, customer);
+                            _chat(context, storeId, customer);
                           },
                         ),
                         _CustomerAction(
                           icon: Icons.message_outlined,
                           label: 'WhatsApp',
-                          onTap: () => _whatsApp(customer),
+                          onTap: customer.mobile.isEmpty
+                              ? null
+                              : () =>
+                                    contact(() => _whatsApp(storeId, customer)),
                         ),
                         _CustomerAction(
                           keyName: 'work-customer-repeat',
@@ -14788,6 +14864,7 @@ class _CustomersDestinationSurfaceState
     final customers = widget.customerId == null
         ? widget.session.visibleWorkspaceCustomers
         : allCustomers;
+    final storeId = widget.session.activeWorkspace?.id ?? '';
     final repeat = allCustomers
         .where((customer) => customer.repeatCustomer)
         .length;
@@ -14886,9 +14963,11 @@ class _CustomersDestinationSurfaceState
             for (final customer in customers) ...[
               _CustomerBookRow(
                 customer: customer,
-                onOpen: () => _showCustomer(context, customer),
-                onCall: () => _call(customer),
-                onChat: () => _chat(context, customer),
+                onOpen: () => _showCustomer(context, storeId, customer),
+                onCall: customer.mobile.isEmpty
+                    ? null
+                    : () => _call(storeId, customer),
+                onChat: () => _chat(context, storeId, customer),
               ),
               const SizedBox(height: 6),
             ],
@@ -14980,7 +15059,7 @@ class _CustomerBookRow extends StatelessWidget {
 
   final WorkspaceCustomerRecord customer;
   final VoidCallback onOpen;
-  final VoidCallback onCall;
+  final VoidCallback? onCall;
   final VoidCallback onChat;
 
   @override
@@ -18095,11 +18174,7 @@ class _CounterOrderSurface extends StatefulWidget {
 // Older customer history may contain a display name followed by a mobile.
 // Only history/draft display values use this; typed input is validated whole.
 String? _storedCounterCustomerMobile(String customer) {
-  final parts = customer.split('·');
-  if (parts.length > 2 || (parts.length == 2 && parts.first.trim().isEmpty)) {
-    return null;
-  }
-  return normalizeWorkspaceMobile(parts.last);
+  return workspaceCustomerMobile(customer);
 }
 
 class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {

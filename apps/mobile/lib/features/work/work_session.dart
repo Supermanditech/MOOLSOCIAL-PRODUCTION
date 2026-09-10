@@ -1589,9 +1589,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   String workspaceCustomerId(String customer) {
-    final digits = customer.replaceAll(RegExp(r'\D'), '');
-    if (digits.length >= 10) return digits.substring(digits.length - 10);
-    return customer.trim().toLowerCase();
+    return workspaceCustomerMobile(customer) ?? customer.trim().toLowerCase();
   }
 
   List<WorkspaceCustomerRecord> get workspaceCustomerBook {
@@ -1612,12 +1610,11 @@ class WorkSession extends ChangeNotifier {
           .map((part) => part.trim())
           .where((part) => part.isNotEmpty)
           .toList(growable: false);
-      final mobileMatch = RegExp(
-        r'(?:\+?91[\s-]?)?[6-9]\d(?:[\s-]?\d){8}',
-      ).firstMatch(raw);
-      final mobile = mobileMatch?.group(0)?.trim() ?? entry.key;
+      final mobile = workspaceCustomerMobile(raw) ?? '';
       final firstPart = parts.firstOrNull ?? raw;
-      final name = RegExp(r'^\+?[\d\s-]+$').hasMatch(firstPart)
+      final name = firstPart.isEmpty
+          ? 'Customer'
+          : RegExp(r'^\+?[\d\s-]+$').hasMatch(firstPart)
           ? 'Customer ending ${entry.key.length >= 4 ? entry.key.substring(entry.key.length - 4) : entry.key}'
           : firstPart;
       final totalSpend = orders
