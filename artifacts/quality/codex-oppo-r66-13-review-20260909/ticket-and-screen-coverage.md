@@ -457,7 +457,77 @@ Execution reference within existing DASH-LOAD-07/11/13/14, not another top-level
 - Acceptance: every offering maps to a reachable purposeful view or honest dependency state; no fake complete filing/credit/promotion service; fees/plan inclusions shown before request; default/public/store identity correct; returning from every first tap restores centre and draft.
 - Owners: Dashboard/benefit wiring/scoped shared entries/tests. Exact service/backend admission separate; no blanket new feature authority.
 
+- Business assistance v1 mounted verification: both normal/200% compact tests pass for tax, accounts and audit entries, preserved Store query identity, unchanged existing support draft and Back to the same services surface. Thus ordinary in-session Back is NOT a defect. Source-only uncertainty was narrowed by actual testing; process-restart/exact service conversation remains separate. Analysis zero issues; analysis log SHA `9C9C7F6BE826C51E21E02EF5825D0B5DC1060DE7E0391A447B2F29D21BCDC2BF`, focused log SHA `7B3AC82D9D3C49D14DC098BE6D5BD1DF732E085E9D6802B331D1DC5C5EDFB6BD` (business-assistance-v1 evidence prefix). Six actual Flutter captures inspected: oversized full-width buttons/cards plus a second Today/Customers/Money/Grow strip repeat navigation and consume first-tap space. Approved-style correction under this existing ticket: compact service rows, content-sized right-side Chat action at normal text, adaptive full-width content at enlarged text, restrained dividers, no duplicated secondary rail. Preserve current route/draft behaviour; no service execution, pricing authority or shared Chat code changes. REG4557: one attempted ledger patch matched only a sentence fragment rather than the full line and was rejected without changes; recovery uses the exact heading.
+
+- Business assistance v2 local correction: services now use compact divider-separated rows with right-side content-sized Chat actions at normal text, adaptive stacked content above 150% text/narrow width, and no duplicate inner context rail. Current URI service drafts and wrapper behaviour are preserved; no shared Chat product code changed. Two focused tests cover all three services at 320×568 normal/200%, minimum 48px targets, compact row geometry/right-side action placement, exact service draft, Store query identity, existing unsent support draft and Back. Full analysis zero issues. Eight actual Flutter captures inspected, aggregate SHA-256 `C29CCE203B2BF48488788B41C6BFC8B17A3DF7619CC805343FBB42CF3ED6CBC8` (sorted filename + space + uppercase file SHA, LF-joined UTF-8, no terminal newline) under external `dashboard-business-assistance-local-review-20260910-v2`.
+- Evidence: `business-assistance-analysis-v2.log` SHA `A5B9C953687C08ED63C7FD53F11F49884A043E7CD5F5C12A8313F03050AFE443`; `business-assistance-focused-v2.log` SHA `5191AF276D4A76C32C798A14A98D7B0BCFE12AC41E667D156F33DCC5F933BCB6`. Same two-file expanded/serialized capture command as budget v2, with name `DASH13 business assistance` and capture folder `dashboard-business-assistance-local-review-20260910-v2`. Combined five-file Work/Store/Chat replay: **1,027 passed / 79 existing skips / 1 failed**, exit 1, sole known failure `DASH10 restock search retains product cart and Back 2.0`. Combined log SHA `6F6AB5207257FFFE4C3D4B3287B4473EADF57B87AC024079A1442D7AF4247D92`. No skip or known Buy failure was removed/weakened. This seals only the services visual/navigation correction and inventory evidence, not whole-ticket/APK/backend/device qualification.
+
+##### DASH-LOAD-13 source inventory — 23 operations and 25 retailer offerings
+
+Read against clean Store tip `9063b6ba64b9552e65917944729e3960ded7ca93`. This is source-level disposition, not 48 new tickets or physical qualification. `_WorkspaceOperation` has 23 entries; `_WorkspaceOperationSurface.build` owns the mounted dispatch. Several old `_operationContent` branches are bypassed by earlier returns and must not be mistaken for current rendered screens. `work_workspace_benefits.dart` contains 25 retailer value propositions with action labels but no route/callback field; matching words alone does not establish reachability.
+
+| Existing operation | Current mounted destination / boundary |
+| --- | --- |
+| orders | Exact customer-order/queue surface; scoped command, collection and biker dependencies remain under 04/06/14. |
+| counterOrder | Counter bill and customer fields; no confirmed payment or sharing from a local draft. |
+| catalogue | Existing catalogue/stock surface; product-add redesign remains held separately. |
+| stockStatement | Complete stock-history view, exact reference recovery and Restock reuse; history authority remains backend-dependent. |
+| delivery | Delivery desk; actual rider authority/tracking availability must remain truthful. |
+| customers | Exact customer records, repeat basket and offer entry; communication scope remains 12. |
+| payments | Existing money/settlement surface; scoped finance adapters and unknown outcomes remain 08. |
+| books | Only three descriptive cards (sales, purchases/stock, dues); not an accounting implementation. Route handler exists for `/app/retailer/books`; first-tap entry and actionable record reuse remain to verify/correct. |
+| sourcing | Store purchases/receiving with reused Buy tracking; do not use bypassed legacy wholesale-description cards as evidence. |
+| growth | Existing grow destination with customers, offers, promotion, requirement and services callbacks; old `_operationContent` growth wording is bypassed. |
+| services | Three assistance cards currently route to generic support inbox drafts; exact service conversation, Store context, retained draft and return need real mounted verification/correction. No professional service or filing completion is implemented by these cards. |
+| settings | Store tools/profile context; not a daily high-priority rail action. |
+| preview | Existing customer-store preview; accepted public-link/consumer ownership dependencies remain separate. |
+| groupBuying | Connected typed offer surface, otherwise existing single-offer/empty fallback; no local payment/commitment authority. |
+| deliverySettings | Store delivery settings, separate from a shipment state. |
+| staff | Existing staff settings; permissions/backend enforcement not qualified from this screen. |
+| businessRecord | Business record/documents, plan display and update-support link; service-context/draft behavior needs same shared audit. |
+| offers | Offer editor/preview and contextual promotion entry; actual publish/permission/fees remain explicit dependencies. |
+| paidWork | Approved Post requirement selector, draft and review; budget validation sealed, no posting/payment taken. |
+| statement | Existing transaction statement, independently classified sales/purchases/payments. |
+| dues | Existing due balances and discuss action; do not equate a launched Chat with sent recovery notice. |
+| storeLink | Existing store-link first tap; authenticated consumer resume/public destination still requires qualified consumer/backend contract. |
+| direct | Existing manufacturer comparison/entry retained; removed from main supply rail in favour of Track stock, not deleted or redeveloped. |
+
+All 25 offering labels are accounted for below. Mapping is to an existing candidate destination or an explicit gap; it is not a new claim that the onboarding label itself is a button or that each action is end-to-end ready.
+
+| Offering label | Existing destination / missing requirement |
+| --- | --- |
+| Send offers | Offers + consent-based customer selection; actual dispatch/publish pending. |
+| Create basket | Customer repeat basket / counter bill; monthly-basket offer creation not proven by repeat-order reuse alone. |
+| Collect at store | Exact paid customer order and collection card; shared collection/backend acceptance pending. |
+| Publish products | Catalogue/public visibility; real publication authority pending, product-add redesign held. |
+| Promote store | Contextual shared promotion entry; fees/publication/backend pending. |
+| Send store link | Store-link surface; consumer public-store/auth-return dependency. |
+| Clear stock | Existing offer editor can target stock; slow-stock-specific entry/prefill not yet verified. |
+| Send bill | Exact invoice sharing; no delivered-message claim from app launch. |
+| Restock | Reused Wholesale/Bulk Store wrapper; Cursor eligibility/compact-layout qualification pending. |
+| Buy Direct | Retained manufacturer filter/entry inside procurement; not a duplicate main-rail button. |
+| Group Bulk Buying | Typed Store-specific offers; authoritative quote/commitment/payment pending. |
+| Track stock | Store-scoped purchase list and exact reused Buy tracker; live/split-shipment contract pending. |
+| Receive goods | Exact Store receipt quantities/differences; authoritative receipt/stock effect pending. |
+| Request stock | Post requirement has Stock supply/Product sourcing choices; exact product/quantity/date prefill not yet verified. |
+| Collect dues | Customer dues/exact invoice; account/customer-bound messaging/payment pending. |
+| View statement | Existing statement first tap and underlying records. |
+| Settle | Existing settlement surface with scoped amount/status; authoritative request/payment pending. |
+| Check earnings | Existing money/statement records; net-margin availability and missing-cost disclosure must be verified, not inferred from sales totals. |
+| Check eligibility | No Store-specific stock-credit eligibility destination found in the 23-operation dispatch; needs honest unavailable/request entry with no credit promise, coordinated service/backend terms. |
+| Arrange delivery | Delivery desk / approved send-store-link flow; do not recreate rejected manual delivery checkout. |
+| Add products | Existing product tools; separate founder-held redesign, not batch closure. |
+| Pack orders | Exact central order/checklist; permitted readiness action, collection and biker contracts remain distinct. |
+| Get tax help | Business services assistance; filing/pricing/eligibility are not implemented. |
+| Post requirement | Existing selector/draft/review; no publication or payment authority. |
+| Review returns | Exact issue/return state and draft; command/refund/stock reconciliation pending under 09/14. |
+
+Next exact frontend check: services help, business-record update and books reachability. Correction to the preliminary service finding: `openScopedRoute` already injects `workspaceId` and the generic dashboard return. The source gap is the generic inbox/service draft and lack of an exact service return/recovery contract, not total absence of a wrapper Store parameter. Do not misuse application IDs or commerce supplier fields to invent service authorisation. Existing `ChatWorkspaceApplicationContext` is intentionally limited to application-proof support and is not a service-draft scope.
+
+- REG4557 read-only audit note: a guessed `app.dart` lookup was absent, and a Windows wildcard file argument was invalid. Neither changed source. Subsequent file discovery located `app/moolsocial_app.dart`, `features/journey01/journey_router.dart` and the exact Chat screen files. No failed lookup or source-only inference qualifies a user journey.
+
 #### DASH-LOAD-14 — P0 · Versioned live-state and restart integration contract
+
 
 - Gap/dependency: no complete general Store order/payment/purchase feed or event version/reconnect contract in WorkGateway; collection/timing already have stronger narrow safeguards (evidence 6/16).
 - Correction: define minimal typed snapshots/events/capabilities/freshness/expected revision/op IDs and per-store/account reconciliation, reusing existing services. Distinguish optimistic local draft, submitted command, authority-confirmed result and unknown outcome. Do not deploy backend or count fixture success as authority.

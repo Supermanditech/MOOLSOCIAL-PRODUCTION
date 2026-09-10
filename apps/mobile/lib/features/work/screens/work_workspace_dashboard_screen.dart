@@ -9824,6 +9824,112 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         onTrackPurchase: onTrackPurchase,
       );
     }
+    if (operation == _WorkspaceOperation.services) {
+      return ListView(
+        key: const Key('work-dashboard-services-screen'),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        children: [
+          const Text(
+            'Business services',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: MoolColors.navy,
+            ),
+          ),
+          const SizedBox(height: 4),
+          for (final service in const [
+            (
+              'tax',
+              'GST and tax assistance',
+              'Ask about filing support, scope and fees.',
+              'GST and tax assistance',
+            ),
+            (
+              'accounts',
+              'Bookkeeping and accounts',
+              'Ask about organising your sales and purchase records.',
+              'Bookkeeping and accounts assistance',
+            ),
+            (
+              'audit',
+              'Audit support',
+              'Ask which records are needed and what support costs.',
+              'Business audit assistance',
+            ),
+          ]) ...[
+            Padding(
+              key: Key('work-service-${service.$1}'),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final details = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        service.$2,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: MoolColors.navy,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        service.$3,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          height: 1.4,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                    ],
+                  );
+                  final action = FilledButton(
+                    key: Key('work-service-${service.$1}-chat'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(64, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    onPressed: () => onOpenRoute(
+                      Uri(
+                        path: '/app/chat/inbox',
+                        queryParameters: {
+                          'type': 'support',
+                          'draft': service.$4,
+                        },
+                      ).toString(),
+                    ),
+                    child: const Text('Chat'),
+                  );
+                  if (MediaQuery.textScalerOf(context).scale(1) > 1.5 ||
+                      constraints.maxWidth < 260) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [details, const SizedBox(height: 8), action],
+                    );
+                  }
+                  return Row(
+                    children: [
+                      Expanded(child: details),
+                      const SizedBox(width: 12),
+                      action,
+                    ],
+                  );
+                },
+              ),
+            ),
+            const Divider(height: 1),
+          ],
+        ],
+      );
+    }
     if (operation == _WorkspaceOperation.settings) {
       return ListView(
         padding: const EdgeInsets.all(16),
@@ -10245,40 +10351,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
         onPressed: () => onOpenOperation(_WorkspaceOperation.services),
       ),
     ],
-    _WorkspaceOperation.services => [
-      _OperationActionCard(
-        icon: Icons.receipt_long_outlined,
-        title: 'GST and tax assistance',
-        detail:
-            'Keep business records ready and request professional filing assistance when needed.',
-        actionLabel: 'Ask for help',
-        onPressed: () => onOpenRoute(
-          '/app/chat/inbox?type=support&draft=GST%20and%20tax%20assistance',
-        ),
-      ),
-      const SizedBox(height: MoolSpacing.xs),
-      _OperationActionCard(
-        icon: Icons.menu_book_outlined,
-        title: 'Bookkeeping and accounts',
-        detail:
-            'Organise sales, purchases, stock and settlement records for your accountant.',
-        actionLabel: 'Ask for help',
-        onPressed: () => onOpenRoute(
-          '/app/chat/inbox?type=support&draft=Bookkeeping%20and%20accounts%20assistance',
-        ),
-      ),
-      const SizedBox(height: MoolSpacing.xs),
-      _OperationActionCard(
-        icon: Icons.verified_user_outlined,
-        title: 'Audit support',
-        detail:
-            'Request document and record assistance without changing your store operations.',
-        actionLabel: 'Ask for help',
-        onPressed: () => onOpenRoute(
-          '/app/chat/inbox?type=support&draft=Business%20audit%20assistance',
-        ),
-      ),
-    ],
+    _WorkspaceOperation.services => const [],
     _WorkspaceOperation.settings => [
       _OperationActionCard(
         keyName: 'work-dashboard-manage-record',

@@ -16050,6 +16050,84 @@ void main() {
   );
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'DASH13 business assistance preserves origin and drafts $scale',
+      (tester) async {
+        final work = liveStore();
+        final storeId = work.activeWorkspace!.id;
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        chat.setDraftTextForSession(
+          'workspace-support',
+          'Keep my unsent support message',
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          chat: chat,
+          viewport: const Size(320, 568),
+          textScale: scale,
+        );
+        await openStoreTools(tester);
+        await reveal(tester, find.byKey(const Key('work-business-grow')));
+        await tester.tap(find.byKey(const Key('work-business-grow')));
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-growth-services')));
+        await tester.tap(find.byKey(const Key('work-growth-services')));
+        await tester.pumpAndSettle();
+        expect(find.text('Today'), findsNothing);
+        await captureStoreView(tester, 'business-assistance-first-view-$scale');
+        for (final (id, title, draft) in [
+          ('tax', 'GST and tax assistance', 'GST and tax assistance'),
+          (
+            'accounts',
+            'Bookkeeping and accounts',
+            'Bookkeeping and accounts assistance',
+          ),
+          ('audit', 'Audit support', 'Business audit assistance'),
+        ]) {
+          final action = find.byKey(Key('work-service-$id-chat'));
+          await reveal(tester, action);
+          expect(tester.getSize(action).height, greaterThanOrEqualTo(48));
+          expect(tester.getSize(action).width, greaterThanOrEqualTo(48));
+          if (scale == 1.0) {
+            expect(
+              tester.getRect(action).left,
+              greaterThan(tester.getRect(find.text(title)).right),
+            );
+            expect(
+              tester.getSize(find.byKey(Key('work-service-$id'))).height,
+              lessThan(140),
+            );
+          }
+          await captureStoreView(
+            tester,
+            'business-assistance-${title.split(' ').first}-$scale',
+          );
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          final inbox = find.byKey(const Key('chat-inbox-screen'));
+          expect(inbox, findsOneWidget);
+          final route = GoRouterState.of(tester.element(inbox)).uri;
+          expect(route.queryParameters['workspaceId'], storeId);
+          expect(route.queryParameters['draft'], draft);
+          expect(
+            chat.draftTextForSession('workspace-support'),
+            'Keep my unsent support message',
+          );
+          await tester.tap(find.byKey(const Key('chat-inbox-back')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-dashboard-services-screen')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+        }
+      },
+    );
+
     testWidgets('DASH13 requirement budget validation $scale', (tester) async {
       final work = liveStore();
       await mount(
