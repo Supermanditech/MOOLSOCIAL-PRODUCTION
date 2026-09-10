@@ -1449,9 +1449,9 @@ void main() {
                       const ValueKey('buy-offers-publisher-summary'),
                     );
                     expectCartClearOf(tester, header);
-                    for (final type in BuyV2OfferPublisherType.values) {
+                    {
                       final filter = find.byKey(
-                        ValueKey('buy-offers-filter-${type.name}'),
+                        const ValueKey('buy-offers-category-control'),
                       );
                       expectCartClearOf(tester, filter);
                       if (parked.evaluate().isEmpty) {
@@ -1468,18 +1468,17 @@ void main() {
                       }
                       await tester.tap(filter);
                       await tester.pumpAndSettle();
-                      expect(session.view, BuyV2View.catalogue);
                       expect(
-                        tester.widget<Semantics>(filter).properties.selected,
-                        isTrue,
+                        find.byKey(const ValueKey('buy-offers-category-list')),
+                        findsOneWidget,
                       );
-                      expectCartClearOf(tester, header);
-                      await tester.tap(filter);
+                      await tester.tap(
+                        find.byKey(const ValueKey('buy-offers-category-all')),
+                      );
                       await tester.pumpAndSettle();
-                      expect(
-                        tester.widget<Semantics>(filter).properties.selected,
-                        isFalse,
-                      );
+                      expect(session.view, BuyV2View.catalogue);
+                      expect(session.finiteOffersCategoryId, 'all');
+                      expectCartClearOf(tester, header);
                     }
                   }
                   final fallback =
@@ -2321,15 +2320,31 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
           await tester.pumpAndSettle();
           final offers = find.byKey(const PageStorageKey('buy-offers'));
-          final publisher = find.byKey(
-            ValueKey(
-              'buy-offers-filter-${id == 'w-notebook' ? 'manufacturer' : 'retailer'}',
-            ),
+          final categoryControl = find.byKey(
+            const ValueKey('buy-offers-category-control'),
           );
-          await tester.ensureVisible(publisher);
+          await tester.ensureVisible(categoryControl);
           await tester.pumpAndSettle();
-          expect(publisher.hitTestable(), findsOneWidget);
-          await tester.tap(publisher);
+          expect(categoryControl.hitTestable(), findsOneWidget);
+          await tester.tap(categoryControl);
+          await tester.pumpAndSettle();
+          final category = find.byKey(
+            ValueKey('buy-offers-category-${session.product(id).categoryId}'),
+          );
+          await tester.scrollUntilVisible(
+            category,
+            120,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const ValueKey('buy-offers-category-list')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.ensureVisible(category);
+          await tester.pumpAndSettle();
+          expect(category.hitTestable(), findsOneWidget);
+          await tester.tap(category);
           await tester.pumpAndSettle();
           final scroll = find
               .descendant(of: offers, matching: find.byType(Scrollable))
@@ -3273,28 +3288,57 @@ void main() {
             final factsRail = find.byKey(
               const ValueKey('buy-published-offer-facts'),
             );
-            final offerCards = find.descendant(
-              of: factsRail,
-              matching: find.byType(InkWell),
+            final offerProduct = session.product('w-oil');
+            final card = find.byKey(
+              const ValueKey('buy-published-offer-w-oil'),
             );
-            expect(offerCards, findsWidgets);
-            for (final element in offerCards.evaluate()) {
-              final card = find.byWidget(element.widget);
-              final bounds = tester.getRect(card);
-              final facts = find.descendant(
+            expect(card, findsOneWidget);
+            final bounds = tester.getRect(factsRail);
+            final facts = find.descendant(
+              of: card,
+              matching: find.byType(Text),
+            );
+            expect(facts, findsNWidgets(5));
+            expect(
+              find.descendant(
                 of: card,
-                matching: find.byType(Text),
-              );
-              expect(facts, findsNWidgets(4));
-              for (final factElement in facts.evaluate()) {
-                final fact = find.byWidget(factElement.widget);
-                final paragraph = tester.renderObject<RenderParagraph>(fact);
-                expect(paragraph.didExceedMaxLines, isFalse);
-                expect(paragraph.maxLines, isNull);
-                final factBounds = tester.getRect(fact);
-                expect(factBounds.bottom, lessThanOrEqualTo(bounds.bottom - 7));
-                expect(factBounds.right, lessThanOrEqualTo(bounds.right - 10));
-              }
+                matching: find.text(offerProduct.title),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: card,
+                matching: find.text(
+                  'Offer price ${buyV2Money(offerProduct.price)} · ${offerProduct.pack}',
+                ),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: card,
+                matching: find.text(
+                  'Minimum ${offerProduct.minimumOrder} packs',
+                ),
+              ),
+              findsOneWidget,
+            );
+            expect(
+              find.descendant(
+                of: card,
+                matching: find.text('Published by ${offerProduct.seller}'),
+              ),
+              findsOneWidget,
+            );
+            for (final factElement in facts.evaluate()) {
+              final fact = find.byWidget(factElement.widget);
+              final paragraph = tester.renderObject<RenderParagraph>(fact);
+              expect(paragraph.didExceedMaxLines, isFalse);
+              expect(paragraph.maxLines, isNull);
+              final factBounds = tester.getRect(fact);
+              expect(factBounds.bottom, lessThanOrEqualTo(bounds.bottom - 7));
+              expect(factBounds.right, lessThanOrEqualTo(bounds.right - 10));
             }
             await capture(tester, '${destination.name}-offers-$scale');
             final allItems = '${session.itemCount} items';

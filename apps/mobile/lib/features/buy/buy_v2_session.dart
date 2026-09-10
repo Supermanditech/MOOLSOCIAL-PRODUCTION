@@ -1212,6 +1212,7 @@ class BuyV2DevelopmentPublishedCatalogueSource
           BuyV2OfferPublisherType.manufacturer => 'Manufacturer price',
           BuyV2OfferPublisherType.wholesaler => 'Bulk saving',
           BuyV2OfferPublisherType.retailer => 'Store offer',
+          BuyV2OfferPublisherType.moolSocial => 'Published offer',
         },
         sourceId: version,
         observedAt: observed,
@@ -3050,6 +3051,10 @@ class BuyV2Session extends ChangeNotifier {
   List<BuyV2CartBenefit> _liveCartBenefits = [];
   int _cartBenefitsRequestSequence = 0;
   final Map<String, List<BuyV2CartBenefit>> _productBenefits = {};
+  // Ephemeral Offers presentation state survives product/store Back navigation.
+  // Publication validity and product facts still come from the source contracts.
+  String? featuredOfferPublicationId;
+  String finiteOffersCategoryId = 'all';
   final Map<String, BuyV2CartBenefitsLoadState> _productBenefitStates = {};
   final Map<String, String> _productBenefitMessages = {};
   final Map<String, int> _productBenefitRequestSequences = {};

@@ -14,7 +14,8 @@ enum BuyV2StoreOperatingState { unknown, open, closed }
 /// Geographic scope is explicit; a destination search does not claim routing.
 enum BuyV2CatalogueAreaScope { regional, national, allAreas }
 
-enum BuyV2OfferPublisherType { manufacturer, wholesaler, retailer }
+/// The source authenticates publication authority; a display name never grants it.
+enum BuyV2OfferPublisherType { manufacturer, wholesaler, retailer, moolSocial }
 
 /// Immutable request identity shared by Store, category, Offers and Search.
 /// A response for another identity must never replace the visible results.

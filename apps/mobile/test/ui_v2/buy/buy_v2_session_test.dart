@@ -2203,10 +2203,18 @@ void main() {
             query(publisher: publisher),
             pageSize: 40,
           );
-          expect(
-            page.totalCount,
-            publisher == BuyV2OfferPublisherType.retailer ? 20 : 10,
-          );
+          expect(page.totalCount, switch (publisher) {
+            BuyV2OfferPublisherType.retailer => 20,
+            BuyV2OfferPublisherType.moolSocial => 0,
+            _ => 10,
+          });
+          if (publisher == BuyV2OfferPublisherType.moolSocial) {
+            expect(
+              page.items,
+              isEmpty,
+              reason: 'The review generator must not invent admin publications',
+            );
+          }
           expect(page.items.every((o) => o.publisherType == publisher), isTrue);
           expect(page.nextCursor, isNull);
           expect(

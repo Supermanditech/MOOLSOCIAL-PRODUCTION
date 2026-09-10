@@ -28,12 +28,17 @@ class BuyV2PublishedOffer {
     required this.publisherType,
     required this.headline,
     this.publisherName,
+    this.publicationId,
   });
 
   final String productId;
   final BuyV2OfferPublisherType publisherType;
   final String headline;
   final String? publisherName;
+  final String? publicationId;
+
+  String get identity =>
+      publicationId ?? '${publisherType.name}:$productId:$headline';
 }
 
 /// Presentation seam for the ordered offer placements published for Buy.
@@ -212,7 +217,6 @@ class BuyV2OffersView extends StatefulWidget {
 
 class _BuyV2OffersViewState extends State<BuyV2OffersView> {
   BuyV2PublishedOffersSnapshot? _snapshot;
-  BuyV2OfferPublisherType? _selectedPublisher;
   var _requestSequence = 0;
 
   BuyV2Session get session => widget.session;
@@ -294,103 +298,39 @@ class _BuyV2OffersViewState extends State<BuyV2OffersView> {
       }
       allResolved.add((offer: offer, product: product));
     }
-    final resolved = _selectedPublisher == null || query.isNotEmpty
-        ? allResolved
-        : allResolved
-              .where((entry) => entry.offer.publisherType == _selectedPublisher)
-              .toList(growable: false);
+    final resolved = allResolved
+        .where(
+          (entry) =>
+              session.finiteOffersCategoryId == 'all' ||
+              entry.product.categoryId == session.finiteOffersCategoryId,
+        )
+        .toList(growable: false);
     final products = resolved
         .map((entry) => entry.product)
         .toList(growable: false);
-    final publisherCounts = {
-      for (final type in BuyV2OfferPublisherType.values)
-        type: allResolved
-            .where((entry) => entry.offer.publisherType == type)
-            .length,
-    };
 
     return BuyV2VerticalScrollIndicator(
       child: CustomScrollView(
         key: const PageStorageKey('buy-offers'),
         slivers: [
           SliverToBoxAdapter(
-            child: BuyV2CartAvoidanceRegion(
-              child: Semantics(
-                key: const ValueKey('buy-offers-publisher-summary'),
-                container: true,
-                label:
-                    'Published offers from manufacturers, wholesalers and retailers.',
-                child: Container(
-                  margin: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-                  padding: const EdgeInsets.fromLTRB(10, 9, 10, 10),
-                  decoration: buyV2CardDecoration(
-                    color: BuyV2Colors.softOrange,
-                    radius: 16,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.local_offer_outlined,
-                            color: BuyV2Colors.orange,
-                            size: 22,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Offers',
-                                  style: context.buyTitle.copyWith(
-                                    fontSize: 17,
-                                  ),
-                                ),
-                                Text(
-                                  'Published prices from trusted sellers',
-                                  style: context.buyMeta.copyWith(fontSize: 8),
-                                ),
-                              ],
-                            ),
-                          ),
-                          Text(
-                            '${products.length} available',
-                            style: context.buyMeta.copyWith(
-                              color: BuyV2Colors.orange,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 5,
-                        runSpacing: 5,
-                        children: [
-                          for (final type in BuyV2OfferPublisherType.values)
-                            _OfferPublisherChip(
-                              type: type,
-                              count: publisherCounts[type] ?? 0,
-                              selected: _selectedPublisher == type,
-                              onTap: () => setState(() {
-                                _selectedPublisher = _selectedPublisher == type
-                                    ? null
-                                    : type;
-                              }),
-                            ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+            child: _OffersCategoryControl(
+              session: session,
+              categoryId: session.finiteOffersCategoryId,
+              onTap: () async {
+                final selected = await _chooseOffersCategory(
+                  context,
+                  session,
+                  session.finiteOffersCategoryId,
+                );
+                if (!mounted || selected == null) return;
+                setState(() => session.finiteOffersCategoryId = selected);
+              },
             ),
           ),
           if (resolved.isNotEmpty)
             SliverToBoxAdapter(
-              child: _PublishedOfferFactsRail(
+              child: _PublishedOfferPromotion(
                 session: session,
                 entries: resolved,
               ),
@@ -451,7 +391,6 @@ class _PagedPublishedOffersView extends StatefulWidget {
 
 class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
   static const _scope = 'published-offers';
-  BuyV2OfferPublisherType? _publisher;
   String _category = 'all';
 
   @override
@@ -462,7 +401,6 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
 
   void _restoreSelection() {
     final query = widget.session.retainedCatalogueOffersQuery(_scope);
-    _publisher = query?.offerPublisher;
     _category = query?.categoryId ?? 'all';
   }
 
@@ -472,58 +410,11 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
     if (oldWidget.session != widget.session) _restoreSelection();
   }
 
-  List<BuyV2Category> get _categories => {
-    for (final destination in [
-      BuyV2Destination.shop,
-      BuyV2Destination.wholesale,
-    ])
-      for (final category in widget.session.categoriesFor(destination))
-        if (category.id != 'all') category.id: category,
-  }.values.toList(growable: false);
-
   Future<void> _chooseCategory() async {
-    FocusScope.of(context).unfocus();
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) => SafeArea(
-        child: SizedBox(
-          height: MediaQuery.sizeOf(sheetContext).height * .8,
-          child: BuyV2VerticalScrollIndicator(
-            child: ListView(
-              key: const ValueKey('buy-offers-category-list'),
-              padding: const EdgeInsets.fromLTRB(12, 6, 12, 20),
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text('Offer categories', style: context.buyTitle),
-                    ),
-                    IconButton(
-                      tooltip: 'Close categories',
-                      onPressed: () => Navigator.pop(sheetContext),
-                      icon: const Icon(Icons.close_rounded),
-                    ),
-                  ],
-                ),
-                ListTile(
-                  key: const ValueKey('buy-offers-category-all'),
-                  title: const Text('All categories'),
-                  selected: _category == 'all',
-                  onTap: () => Navigator.pop(sheetContext, 'all'),
-                ),
-                for (final category in _categories)
-                  ListTile(
-                    key: ValueKey('buy-offers-category-${category.id}'),
-                    title: Text(category.label),
-                    selected: _category == category.id,
-                    onTap: () => Navigator.pop(sheetContext, category.id),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
+    final selected = await _chooseOffersCategory(
+      context,
+      widget.session,
+      _category,
     );
     if (!mounted || selected == null) return;
     setState(() => _category = selected);
@@ -532,78 +423,25 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final categoryLabel =
-        _categories.where((c) => c.id == _category).firstOrNull?.label ??
-        'Categories';
     return BuyV2PagedProductCatalogue(
       session: session,
       scopeKey: _scope,
-      query: session.catalogueOffersQuery(
-        publisher: _publisher,
-        categoryId: _category,
-      ),
+      query: session.catalogueOffersQuery(categoryId: _category),
       publishedOffers: true,
       showAreaControl: true,
-      header: BuyV2CartAvoidanceRegion(
-        child: Container(
-          key: const ValueKey('buy-offers-publisher-summary'),
-          margin: const EdgeInsets.fromLTRB(8, 6, 8, 6),
-          padding: const EdgeInsets.all(10),
-          decoration: buyV2CardDecoration(
-            color: BuyV2Colors.softOrange,
-            radius: 16,
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.local_offer_outlined,
-                    color: BuyV2Colors.orange,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Offers',
-                      style: context.buyTitle.copyWith(fontSize: 17),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 5,
-                runSpacing: 5,
-                children: [
-                  for (final type in BuyV2OfferPublisherType.values)
-                    _OfferPublisherChip(
-                      type: type,
-                      count: null,
-                      selected: _publisher == type,
-                      onTap: () => setState(
-                        () => _publisher = _publisher == type ? null : type,
-                      ),
-                    ),
-                  TextButton.icon(
-                    key: const ValueKey('buy-offers-category-control'),
-                    onPressed: _chooseCategory,
-                    icon: const Icon(Icons.category_outlined, size: 17),
-                    label: Text(categoryLabel),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
+      controlsAfterProducts: true,
+      header: _OffersCategoryControl(
+        session: session,
+        categoryId: _category,
+        onTap: _chooseCategory,
       ),
-      publicationFacts: (offers) => _PublishedOfferFactsRail(
+      publicationFacts: (offers) => _PublishedOfferPromotion(
         session: session,
         entries: [
           for (final value in offers)
             (
               offer: BuyV2PublishedOffer(
+                publicationId: value.publicationId,
                 productId: value.product.id,
                 publisherType: value.publisherType,
                 headline: value.headline,
@@ -617,109 +455,261 @@ class _PagedPublishedOffersViewState extends State<_PagedPublishedOffersView> {
   }
 }
 
-class _PublishedOfferFactsRail extends StatelessWidget {
-  const _PublishedOfferFactsRail({
+List<BuyV2Category> _offerCategories(BuyV2Session session) => {
+  for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale])
+    for (final category in session.categoriesFor(destination))
+      if (category.id != 'all') category.id: category,
+}.values.toList(growable: false);
+
+Future<String?> _chooseOffersCategory(
+  BuildContext context,
+  BuyV2Session session,
+  String selected,
+) {
+  FocusScope.of(context).unfocus();
+  return showModalBottomSheet<String>(
+    context: context,
+    isScrollControlled: true,
+    builder: (sheetContext) => SafeArea(
+      child: SizedBox(
+        height: MediaQuery.sizeOf(sheetContext).height * .8,
+        child: BuyV2VerticalScrollIndicator(
+          child: ListView(
+            key: const ValueKey('buy-offers-category-list'),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              6,
+              12,
+              20 + BuyV2AddressSheetMotion.resolveBottomSafeInset(sheetContext),
+            ),
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text('Offer categories', style: context.buyTitle),
+                  ),
+                  IconButton(
+                    tooltip: 'Close categories',
+                    onPressed: () => Navigator.pop(sheetContext),
+                    icon: const Icon(Icons.close_rounded),
+                  ),
+                ],
+              ),
+              ListTile(
+                key: const ValueKey('buy-offers-category-all'),
+                title: const Text('All categories'),
+                selected: selected == 'all',
+                onTap: () => Navigator.pop(sheetContext, 'all'),
+              ),
+              for (final category in _offerCategories(session))
+                ListTile(
+                  key: ValueKey('buy-offers-category-${category.id}'),
+                  title: Text(category.label),
+                  selected: selected == category.id,
+                  onTap: () => Navigator.pop(sheetContext, category.id),
+                ),
+            ],
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+class _OffersCategoryControl extends StatelessWidget {
+  const _OffersCategoryControl({
+    required this.session,
+    required this.categoryId,
+    required this.onTap,
+  });
+  final BuyV2Session session;
+  final String categoryId;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final label =
+        _offerCategories(
+          session,
+        ).where((category) => category.id == categoryId).firstOrNull?.label ??
+        'All categories';
+    return BuyV2CartAvoidanceRegion(
+      child: Padding(
+        key: const ValueKey('buy-offers-publisher-summary'),
+        padding: const EdgeInsets.fromLTRB(12, 2, 8, 2),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                'Offers',
+                style: context.buyTitle.copyWith(fontSize: 17),
+              ),
+            ),
+            _CatalogueChromeAction(
+              key: const ValueKey('buy-offers-category-control'),
+              label: 'Choose offer category. Current category $label',
+              tooltip: 'Offer categories · $label',
+              icon: Icons.grid_view_rounded,
+              emphasized: true,
+              onTap: onTap,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Presentation of one source-owned offer and its exact product action.
+/// Motion is finite on arrival/selection; it does not rotate while reading.
+class _PublishedOfferPromotion extends StatefulWidget {
+  const _PublishedOfferPromotion({
     required this.session,
     required this.entries,
   });
-
   final BuyV2Session session;
   final List<({BuyV2PublishedOffer offer, BuyV2Product product})> entries;
 
   @override
-  Widget build(BuildContext context) {
-    final factsByEntry = entries
-        .map((entry) {
-          final product = entry.product;
-          final minimum = product.destination == BuyV2Destination.wholesale
-              ? 'Minimum ${product.minimumOrder} ${product.minimumOrder == 1 ? 'pack' : 'packs'}'
-              : 'Pack-size minimum';
-          return <({String text, TextStyle style})>[
-            (
-              text: entry.offer.headline,
-              style: context.buyBody.copyWith(
-                color: BuyV2Colors.navy,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            (
-              text: product.title,
-              style: context.buyMeta.copyWith(
-                color: BuyV2Colors.ink,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            (
-              text: 'Offer price ${buyV2Money(product.price)} · $minimum',
-              style: context.buyMeta.copyWith(
-                color: BuyV2Colors.green,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            (
-              text:
-                  'Published by ${entry.offer.publisherName ?? product.seller} · Available while listed',
-              style: context.buyMeta.copyWith(fontSize: 8),
-            ),
-          ];
-        })
-        .toList(growable: false);
-    final railHeight = factsByEntry.fold<double>(96, (height, facts) {
-      final requiredHeight = facts.fold<double>(35, (sum, fact) {
-        return sum +
-            buyV2ValueTextSize(
-              context,
-              fact.text,
-              fact.style,
-              maxWidth: 226,
-              maxLines: null,
-            ).height;
-      });
-      return requiredHeight > height ? requiredHeight : height;
+  State<_PublishedOfferPromotion> createState() =>
+      _PublishedOfferPromotionState();
+}
+
+class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
+  int get _index {
+    final retained = widget.entries.indexWhere(
+      (entry) =>
+          entry.offer.identity == widget.session.featuredOfferPublicationId,
+    );
+    return retained < 0 ? 0 : retained;
+  }
+
+  void _select(int index) {
+    setState(() {
+      widget.session.featuredOfferPublicationId =
+          widget.entries[index].offer.identity;
     });
-    return SizedBox(
-      key: const ValueKey('buy-published-offer-facts'),
-      height: railHeight,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(8, 2, 12, 8),
-        scrollDirection: Axis.horizontal,
-        itemCount: entries.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 7),
-        itemBuilder: (context, index) {
-          final entry = entries[index];
-          final product = entry.product;
-          final facts = factsByEntry[index];
-          return SizedBox(
-            width: 248,
-            child: Material(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              child: InkWell(
-                key: ValueKey('buy-published-offer-${product.id}'),
-                onTap: () => session.openProduct(product.id),
-                borderRadius: BorderRadius.circular(14),
-                child: BuyV2CartAvoidanceRegion(
-                  child: Container(
-                    padding: const EdgeInsets.fromLTRB(10, 8, 10, 7),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(14),
-                      border: Border.all(color: const Color(0x33000080)),
-                    ),
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.entries.isEmpty) return const SizedBox.shrink();
+    final index = _index;
+    final entry = widget.entries[index];
+    final product = entry.product;
+    final publisher =
+        entry.offer.publisherName ??
+        (entry.offer.publisherType == BuyV2OfferPublisherType.moolSocial
+            ? 'MoolSocial'
+            : product.seller);
+    void open() {
+      widget.session.featuredOfferPublicationId = entry.offer.identity;
+      widget.session.openProduct(product.id);
+    }
+
+    return BuyV2CartAvoidanceRegion(
+      child: Padding(
+        key: const ValueKey('buy-published-offer-facts'),
+        padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [BuyV2Colors.softOrange, BuyV2Colors.softBlue],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0x33000080)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                BuyV2FiniteIncomingTransition(
+                  key: const ValueKey('buy-offer-promotion-motion'),
+                  stateKey: '${entry.offer.identity}:${product.price}',
+                  duration: const Duration(milliseconds: 450),
+                  child: InkWell(
+                    key: ValueKey('buy-published-offer-${product.id}'),
+                    onTap: open,
+                    borderRadius: BorderRadius.circular(12),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        for (var i = 0; i < facts.length; i++) ...[
-                          if (i > 0) SizedBox(height: i == 2 ? 4 : 2),
-                          Text(facts[i].text, style: facts[i].style),
-                        ],
+                        Text(
+                          entry.offer.headline,
+                          style: context.buyTitle.copyWith(fontSize: 16),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          product.title,
+                          style: context.buyBody.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Offer price ${buyV2Money(product.price)} · ${product.pack}',
+                          style: context.buyBody.copyWith(
+                            color: BuyV2Colors.green,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        if (product.minimumOrder > 1)
+                          Text(
+                            'Minimum ${product.minimumOrder} packs',
+                            style: context.buyMeta,
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Published by $publisher',
+                          key: const ValueKey('buy-offer-promotion-publisher'),
+                          style: context.buyMeta,
+                        ),
                       ],
                     ),
                   ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (widget.entries.length > 1) ...[
+                      IconButton(
+                        key: const ValueKey('buy-offer-promotion-previous'),
+                        tooltip: 'Previous offer',
+                        onPressed: index > 0 ? () => _select(index - 1) : null,
+                        icon: const Icon(Icons.chevron_left_rounded),
+                      ),
+                      IconButton(
+                        key: const ValueKey('buy-offer-promotion-next'),
+                        tooltip: 'Next offer',
+                        onPressed: index + 1 < widget.entries.length
+                            ? () => _select(index + 1)
+                            : null,
+                        icon: const Icon(Icons.chevron_right_rounded),
+                      ),
+                    ],
+                    const Spacer(),
+                    Flexible(
+                      flex: 3,
+                      child: OutlinedButton(
+                        key: ValueKey('buy-offer-promotion-cta-${product.id}'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 8,
+                          ),
+                        ),
+                        onPressed: open,
+                        child: const Text('View offer'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -856,65 +846,6 @@ bool _matchesPublishedOffer(String query, List<String> values) {
   return queryTokens.every(
     (queryToken) => valueTokens.any((value) => value.startsWith(queryToken)),
   );
-}
-
-class _OfferPublisherChip extends StatelessWidget {
-  const _OfferPublisherChip({
-    required this.type,
-    required this.count,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final BuyV2OfferPublisherType type;
-  final int? count;
-  final bool selected;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final label = switch (type) {
-      BuyV2OfferPublisherType.manufacturer => 'Makers',
-      BuyV2OfferPublisherType.wholesaler => 'Wholesale',
-      BuyV2OfferPublisherType.retailer => 'Retail',
-    };
-    return Semantics(
-      key: ValueKey('buy-offers-filter-${type.name}'),
-      button: true,
-      selected: selected,
-      label: count == null
-          ? '$label offers'
-          : '$label offers, $count available',
-      child: Material(
-        color: selected
-            ? BuyV2Colors.navy
-            : Colors.white.withValues(alpha: .88),
-        borderRadius: BorderRadius.circular(11),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(11),
-          child: Container(
-            constraints: const BoxConstraints(minHeight: 44),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(11),
-              border: Border.all(
-                color: selected ? BuyV2Colors.navy : const Color(0x1F000080),
-              ),
-            ),
-            child: Text(
-              count == null ? label : '$label · $count',
-              style: context.buyMeta.copyWith(
-                color: selected ? Colors.white : BuyV2Colors.navy,
-                fontSize: 8,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 /// Bounded source pages rendered with the existing compact product cards.

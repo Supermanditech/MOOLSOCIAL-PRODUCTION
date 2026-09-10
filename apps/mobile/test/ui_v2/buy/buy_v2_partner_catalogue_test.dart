@@ -123,7 +123,7 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
         await tester.pumpAndSettle();
         const scope = 'published-offers';
-        final range = find.byKey(const ValueKey('buy-page-range-$scope'));
+        final range = find.byKey(const ValueKey('buy-page-status-$scope'));
         final next = find.byKey(const ValueKey('buy-page-next-$scope'));
         final vertical = find.byKey(const ValueKey('buy-paged-scroll-$scope'));
         Future<void> reveal(Finder target, {bool header = false}) async {
@@ -216,20 +216,33 @@ void main() {
         }
 
         await capture('header');
-        await reveal(range);
-        expect(tester.widget<Text>(range).data, '1–40 of 20,000,000 offers');
-        final countParagraph = tester.renderObject<RenderParagraph>(range);
-        final countStart = tester
-            .widget<Text>(range)
-            .data!
-            .indexOf('20,000,000');
-        final countBoxes = countParagraph.getBoxesForSelection(
-          TextSelection(baseOffset: countStart, extentOffset: countStart + 10),
+        expect(
+          find.byKey(const ValueKey('buy-page-range-$scope')),
+          findsNothing,
         );
         expect(
-          countBoxes,
-          hasLength(1),
-          reason: 'The result count must not split inside its number',
+          find.byKey(const ValueKey('buy-offers-filter-manufacturer')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-offers-filter-wholesaler')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-offers-filter-retailer')),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const ValueKey('buy-offers-category-control')),
+            matching: find.byIcon(Icons.grid_view_rounded),
+          ),
+          findsOneWidget,
+        );
+        await reveal(next);
+        expect(
+          tester.widget<Semantics>(range).properties.label,
+          '1–40 of 20,000,000 offers',
         );
         expect(published.pages.single.items.length, 40);
         await capture('initial');
@@ -252,15 +265,15 @@ void main() {
           find.byKey(const ValueKey('buy-published-offer-facts')),
           header: true,
         );
-        final retailHeadline = find.descendant(
-          of: find.byKey(ValueKey('buy-published-offer-${retailProduct.id}')),
-          matching: find.text(retailOffer.headline),
+        expect(find.text(retailOffer.headline), findsOneWidget);
+        final retailCta = find.byKey(
+          ValueKey('buy-offer-promotion-cta-${retailProduct.id}'),
         );
-        await tester.ensureVisible(retailHeadline);
+        await tester.ensureVisible(retailCta);
         await tester.pumpAndSettle();
-        expect(retailHeadline.hitTestable(), findsOneWidget);
+        expect(retailCta.hitTestable(), findsOneWidget);
         final retailRequests = published.queries.length;
-        await tester.tap(retailHeadline);
+        await tester.tap(retailCta);
         await tester.pumpAndSettle();
         await checkAdditionalBenefits(retailProduct, 'retailer');
         await tester.binding.handlePopRoute();
@@ -290,23 +303,32 @@ void main() {
         await tester.pumpAndSettle();
         expect(session.isSaved(tradeProduct.id), isTrue);
         await capture('products');
-        await reveal(next, header: true);
+        await reveal(next);
         published.failNext = true;
         await tester.tap(next);
         await tester.pumpAndSettle();
         final retry = find.widgetWithText(TextButton, 'Try again');
-        await reveal(range, header: true);
-        expect(tester.widget<Text>(range).data, '1–40 of 20,000,000 offers');
+        await reveal(next);
+        expect(
+          tester.widget<Semantics>(range).properties.label,
+          '1–40 of 20,000,000 offers',
+        );
         await reveal(retry);
         expect(find.text('Results could not refresh'), findsOneWidget);
         await capture('retry');
         published.failNext = false;
         await tester.tap(retry);
         await tester.pumpAndSettle();
-        await reveal(range, header: true);
-        expect(tester.widget<Text>(range).data, '41–80 of 20,000,000 offers');
+        await reveal(next);
+        expect(
+          tester.widget<Semantics>(range).properties.label,
+          '41–80 of 20,000,000 offers',
+        );
         final pageProduct = published.pages.last.items.first.product;
-        await reveal(find.byKey(const ValueKey('buy-paged-lane-$scope-0')));
+        await reveal(
+          find.byKey(const ValueKey('buy-paged-lane-$scope-0')),
+          header: true,
+        );
         final packshot = find.byKey(
           ValueKey('buy-grid-packshot-${pageProduct.id}'),
         );
@@ -328,29 +350,39 @@ void main() {
           closeTo(offset, 1),
         );
         await capture('return');
-        final maker = find.byKey(
-          const ValueKey('buy-offers-filter-manufacturer'),
+        final makerIndex = published.pages.last.items.indexWhere(
+          (offer) =>
+              offer.publisherType == BuyV2OfferPublisherType.manufacturer,
         );
-        await reveal(maker, header: true);
-        await tester.tap(maker);
-        await tester.pumpAndSettle();
+        expect(makerIndex, greaterThanOrEqualTo(0));
+        final promotionNext = find.byKey(
+          const ValueKey('buy-offer-promotion-next'),
+        );
+        final promotionRequests = published.queries.length;
+        await reveal(promotionNext, header: true);
+        for (var index = 0; index < makerIndex; index++) {
+          await tester.ensureVisible(promotionNext);
+          await tester.pumpAndSettle();
+          expect(promotionNext.hitTestable(), findsOneWidget);
+          await tester.tap(promotionNext);
+          await tester.pumpAndSettle();
+        }
+        expect(published.queries.length, promotionRequests);
+        expect(published.queries.last.offerPublisher, isNull);
+        expect(published.pages.last.totalCount, 20000000);
+        final makerPublication = published.pages.last.items[makerIndex];
         expect(
-          published.queries.last.offerPublisher,
-          BuyV2OfferPublisherType.manufacturer,
+          session.featuredOfferPublicationId,
+          makerPublication.publicationId,
         );
-        expect(published.pages.last.totalCount, 5000000);
-        expect(
-          published.pages.last.items.every(
-            (offer) =>
-                offer.publisherType == BuyV2OfferPublisherType.manufacturer,
-          ),
-          isTrue,
+        final makerName = makerPublication.publisherName;
+        await reveal(
+          find.byKey(const ValueKey('buy-published-offer-facts')),
+          header: true,
         );
-        final makerName = published.pages.last.items.first.publisherName;
-        await reveal(find.byKey(const ValueKey('buy-published-offer-facts')));
         expect(find.textContaining('Published by $makerName'), findsWidgets);
         await capture('publisher');
-        final makerProduct = published.pages.last.items.first.product;
+        final makerProduct = makerPublication.product;
         final makerOffer = find.byKey(
           ValueKey('buy-published-offer-${makerProduct.id}'),
         );
@@ -410,11 +442,12 @@ void main() {
         expect(published.queries.length, filteredRequests);
         expect(
           session.retainedCatalogueOffersQuery(scope)?.offerPublisher,
-          BuyV2OfferPublisherType.manufacturer,
+          isNull,
         );
-        await reveal(maker, header: true);
-        await tester.tap(maker);
-        await tester.pumpAndSettle();
+        expect(
+          session.featuredOfferPublicationId,
+          makerPublication.publicationId,
+        );
         expect(published.queries.last.offerPublisher, isNull);
         final categoryControl = find.byKey(
           const ValueKey('buy-offers-category-control'),

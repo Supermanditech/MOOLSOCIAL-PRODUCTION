@@ -7898,27 +7898,176 @@ void main() {
     );
   });
 
-  testWidgets('Offers source filters are real, reversible and channel-safe', (
-    tester,
-  ) async {
-    final session = BuyV2Session(core: BuySession());
-    await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
-    await tester.pumpAndSettle();
-
-    final retail = find.byKey(const ValueKey('buy-offers-filter-retailer'));
-    expect(retail, findsOneWidget);
-    await tester.tap(retail);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsOneWidget);
-    expect(find.byKey(const ValueKey('buy-product-w-oil')), findsNothing);
-
-    await tester.tap(retail);
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-product-w-oil')), findsOneWidget);
-    expect(tester.takeException(), isNull);
-  });
+  for (final reducedMotion in [false, true]) {
+    for (final size in [const Size(320, 844), const Size(640, 360)]) {
+      testWidgets(
+        'R669 Offers promotion category CTA Back $size reduced $reducedMotion',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          const source = _FixedOffersSource([
+            BuyV2PublishedOffer(
+              publicationId: 'test-admin-rice',
+              productId: 'w-rice',
+              publisherType: BuyV2OfferPublisherType.moolSocial,
+              publisherName: 'MoolSocial',
+              headline: 'Rice buying offer',
+            ),
+            BuyV2PublishedOffer(
+              publicationId: 'test-supplier-tomato',
+              productId: 's-tomato',
+              publisherType: BuyV2OfferPublisherType.retailer,
+              publisherName: 'Test produce supplier',
+              headline: 'Fresh produce offer',
+            ),
+          ]);
+          await tester.pumpWidget(
+            app(
+              session,
+              offersSource: source,
+              textScale: 2,
+              disableAnimations: reducedMotion,
+              safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+            ),
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+          await tester.pumpAndSettle();
+          expect(find.text('Rice buying offer'), findsOneWidget);
+          expect(find.text('Published by MoolSocial'), findsOneWidget);
+          expect(find.text('Makers'), findsNothing);
+          expect(find.text('Categories'), findsNothing);
+          final next = find.byKey(const ValueKey('buy-offer-promotion-next'));
+          final previous = find.byKey(
+            const ValueKey('buy-offer-promotion-previous'),
+          );
+          expect(tester.widget<IconButton>(previous).onPressed, isNull);
+          await tester.ensureVisible(next);
+          await tester.pumpAndSettle();
+          expect(next.hitTestable(), findsOneWidget);
+          await tester.tap(next);
+          await tester.pump();
+          final opacity = find.descendant(
+            of: find.byKey(const ValueKey('buy-offer-promotion-motion')),
+            matching: find.byType(Opacity),
+          );
+          expect(
+            tester.widget<Opacity>(opacity).opacity,
+            reducedMotion ? 1 : lessThan(1),
+          );
+          await tester.pump(const Duration(milliseconds: 500));
+          expect(tester.widget<Opacity>(opacity).opacity, 1);
+          expect(find.text('Rice buying offer'), findsNothing);
+          expect(find.text('Fresh produce offer'), findsOneWidget);
+          expect(
+            find.text('Published by Test produce supplier'),
+            findsOneWidget,
+          );
+          expect(tester.widget<IconButton>(next).onPressed, isNull);
+          expect(session.featuredOfferPublicationId, 'test-supplier-tomato');
+          final cta = find.byKey(
+            const ValueKey('buy-offer-promotion-cta-s-tomato'),
+          );
+          await tester.ensureVisible(cta);
+          await tester.pumpAndSettle();
+          expect(cta.hitTestable(), findsOneWidget);
+          expect(tester.getSize(cta).height, greaterThanOrEqualTo(48));
+          await captureR66Visual(
+            tester,
+            'r669-offers-promotion-${size.width.toInt()}-$reducedMotion-cta',
+          );
+          await tester.tap(cta);
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, 's-tomato');
+          expect(
+            session.selectedProduct?.price,
+            session.product('s-tomato').price,
+          );
+          expect(session.itemCount, 0);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.featuredOfferPublicationId, 'test-supplier-tomato');
+          expect(find.text('Fresh produce offer'), findsOneWidget);
+          await tester.ensureVisible(previous);
+          await tester.pumpAndSettle();
+          expect(previous.hitTestable(), findsOneWidget);
+          await tester.tap(previous);
+          await tester.pumpAndSettle();
+          expect(find.text('Rice buying offer'), findsOneWidget);
+          final categoryControl = find.byKey(
+            const ValueKey('buy-offers-category-control'),
+          );
+          await tester.scrollUntilVisible(
+            categoryControl,
+            -120,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-offers')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.ensureVisible(categoryControl);
+          await tester.pumpAndSettle();
+          expect(
+            find.descendant(
+              of: categoryControl,
+              matching: find.byIcon(Icons.grid_view_rounded),
+            ),
+            findsOneWidget,
+          );
+          final shopCategory = session.selectedCategoryId;
+          await tester.tap(categoryControl);
+          await tester.pumpAndSettle();
+          final categoryId = session.product('s-tomato').categoryId;
+          expect(categoryId, isNot(session.product('w-rice').categoryId));
+          final category = find.byKey(
+            ValueKey('buy-offers-category-$categoryId'),
+          );
+          await tester.scrollUntilVisible(
+            category,
+            100,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const ValueKey('buy-offers-category-list')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.ensureVisible(category);
+          await tester.pumpAndSettle();
+          expect(category.hitTestable(), findsOneWidget);
+          await tester.tap(category);
+          await tester.pumpAndSettle();
+          expect(session.finiteOffersCategoryId, categoryId);
+          expect(session.selectedCategoryId, shopCategory);
+          expect(find.text('Fresh produce offer'), findsOneWidget);
+          expect(find.text('Rice buying offer'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('buy-offer-promotion-next')),
+            findsNothing,
+          );
+          await tester.ensureVisible(categoryControl);
+          await tester.pumpAndSettle();
+          await tester.tap(categoryControl);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.byKey(const ValueKey('buy-offers-category-all')),
+          );
+          await tester.pumpAndSettle();
+          expect(session.finiteOffersCategoryId, 'all');
+          expect(find.text('Rice buying offer'), findsOneWidget);
+          expect(session.itemCount, 0);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   testWidgets('Shop Orders excludes Care-owned Medicine and stale promises', (
     tester,
