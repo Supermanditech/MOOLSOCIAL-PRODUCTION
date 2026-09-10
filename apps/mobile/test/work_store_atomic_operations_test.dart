@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
@@ -1821,6 +1822,203 @@ void main() {
       expect(session.workspaceOrders.map((order) => order.customer), customers);
     },
   );
+
+  WorkspacePurchaseRecord supply(
+    String id, {
+    String account = 'account-A',
+    String store = 'store-A',
+    String supplier = 'supplier-A',
+    String order = 'PO-A',
+    int revision = 1,
+    WorkspaceSupplyStage stage = WorkspaceSupplyStage.dispatched,
+    int? received,
+    int minor = 15550,
+  }) => WorkspacePurchaseRecord(
+    accountScope: account,
+    workspaceId: store,
+    supplierId: supplier,
+    supplierName: supplier,
+    orderId: order,
+    shipmentId: id,
+    revision: revision,
+    createdAt: DateTime(2026, 9, 10),
+    updatedAt: DateTime(2026, 9, 10, 12, revision),
+    stage: stage,
+    amountMinor: minor,
+    itemSummary: 'Oil · 1 l × 10 packs',
+    paymentLabel: 'Paid online',
+    receiptState: received == null
+        ? WorkspaceReceiptState.awaiting
+        : WorkspaceReceiptState.partial,
+    lines: [
+      WorkspacePurchaseLine(
+        id: 'line-1',
+        productId: 'same-sku',
+        name: 'Oil',
+        pack: '1 l',
+        orderedPacks: 10,
+        receivedPacks: received,
+        unitPriceMinor: 1555,
+      ),
+    ],
+  );
+
+  test(
+    'DASH07 purchase snapshots isolate identities revisions and receipt effects',
+    () {
+      final account = _CommandAccountStore();
+      final session = WorkSession(
+        gateway: ReviewWorkGateway(),
+        pendingProofStore: account,
+      )..activeWorkspace = _commandStore;
+      addTearDown(session.dispose);
+      bool apply(
+        int revision,
+        List<WorkspacePurchaseRecord> records, {
+        bool complete = false,
+      }) => session.applyWorkspacePurchases(
+        accountScope: 'account-A',
+        storeId: 'store-A',
+        feedRevision: revision,
+        records: records,
+        complete: complete,
+      );
+      expect(session.workspacePurchasesConnected, isFalse);
+      expect(
+        apply(1, [
+          supply('A'),
+          supply('B', supplier: 'supplier-B', order: 'PO-B'),
+        ]),
+        isTrue,
+      );
+      expect(session.workspaceIncomingPurchaseCount, 2);
+      expect(
+        session.workspacePurchases.map(
+          (record) => record.lines.single.productId,
+        ),
+        ['same-sku', 'same-sku'],
+      );
+      expect(session.selectWorkspacePurchase('A'), isTrue);
+      expect(
+        apply(1, [
+          supply('A', revision: 2, stage: WorkspaceSupplyStage.delivered),
+        ]),
+        isFalse,
+      );
+      expect(
+        apply(2, [
+          supply(
+            'A',
+            revision: 2,
+            stage: WorkspaceSupplyStage.delivered,
+            received: 6,
+          ),
+        ]),
+        isTrue,
+      );
+      expect(session.focusedWorkspacePurchase!.lines.single.receivedPacks, 6);
+      expect(session.workspaceIncomingPurchaseCount, 1);
+      expect(session.workspaceStockMovements, isEmpty);
+      expect(session.workspaceInvoices, isEmpty);
+      expect(apply(3, [supply('A')]), isTrue);
+      expect(
+        session.focusedWorkspacePurchase!.stage,
+        WorkspaceSupplyStage.delivered,
+      );
+      expect(
+        apply(4, [supply('A', supplier: 'another-supplier', revision: 3)]),
+        isFalse,
+      );
+      expect(apply(4, [supply('C', account: 'other-account')]), isFalse);
+      expect(apply(4, [supply('C', store: 'other-store')]), isFalse);
+      expect(apply(4, [supply('C'), supply('C')]), isFalse);
+      expect(apply(4, [supply('C', minor: -1)]), isFalse);
+      expect(
+        apply(4, [
+          supply('B', supplier: 'supplier-B', order: 'PO-B'),
+        ], complete: true),
+        isTrue,
+      );
+      expect(session.focusedWorkspacePurchase, isNull);
+      expect(apply(5, [supply('A')]), isTrue);
+      expect(session.workspacePurchases.map((record) => record.shipmentId), [
+        'B',
+      ]);
+      expect(session.selectWorkspacePurchase('missing'), isFalse);
+      session.activeWorkspace = const WorkWorkspace(
+        id: 'store-B',
+        name: 'Other Store',
+        profileId: 'retailer-grocery',
+        profileLabel: 'Grocery',
+        area: 'Jodhpur',
+        verified: true,
+      );
+      expect(session.workspacePurchasesConnected, isFalse);
+      expect(
+        apply(6, [
+          supply(
+            'B',
+            supplier: 'supplier-B',
+            order: 'PO-B',
+            revision: 2,
+            stage: WorkspaceSupplyStage.cancelled,
+          ),
+        ]),
+        isTrue,
+      );
+      expect(session.workspacePurchases, isEmpty);
+      session.activeWorkspace = _commandStore;
+      expect(
+        session.workspacePurchases.single.stage,
+        WorkspaceSupplyStage.cancelled,
+      );
+      expect(session.workspaceIncomingPurchaseCount, 0);
+      account.accountScope = 'account-B';
+      expect(session.workspacePurchasesConnected, isFalse);
+      expect(session.workspacePurchases, isEmpty);
+      expect(apply(7, [supply('C')]), isFalse);
+    },
+  );
+
+  test('DASH07 Buy adapter needs explicit wholesale Store linkage', () {
+    BuyV2Order buy(BuyV2Destination destination) => BuyV2Order(
+      id: 'BUY-1',
+      destination: destination,
+      title: 'Supplier purchase',
+      itemSummary: 'Oil × 10',
+      total: 155,
+      partner: 'Supplier A',
+      partnerType: 'Wholesaler',
+      promise: 'Tomorrow',
+      destinationLabel: 'Test address',
+      progress: .5,
+      status: BuyV2OrderStatus.dispatched,
+      buyerName: 'Store A',
+      buyerType: 'Business',
+      receiptReference: 'receipt-reference',
+    );
+    WorkspacePurchaseRecord project(BuyV2Order order) =>
+        WorkspacePurchaseRecord.fromBuyOrder(
+          order: order,
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          supplierId: 'supplier-A',
+          revision: 1,
+          createdAt: DateTime(2026, 9, 10),
+          updatedAt: DateTime(2026, 9, 10, 12),
+        );
+    expect(() => project(buy(BuyV2Destination.shop)), throwsArgumentError);
+    final record = project(buy(BuyV2Destination.wholesale));
+    expect(record.valid, isTrue);
+    expect(record.amountMinor, 15500);
+    expect(record.paymentLabel, 'Payment update unavailable');
+    expect(record.receiptState, WorkspaceReceiptState.unavailable);
+    expect(record.invoiceReference, isNull);
+    expect(
+      () => record.lines.add(supply('A').lines.single),
+      throwsUnsupportedError,
+    );
+  });
 
   WorkSession liveSession([ReviewWorkGateway? gateway]) {
     final session = WorkSession(gateway: gateway ?? ReviewWorkGateway())

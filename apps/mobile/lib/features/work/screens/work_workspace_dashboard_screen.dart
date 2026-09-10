@@ -1559,6 +1559,12 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _leaveOperation() async {
+    if ((_operation == _WorkspaceOperation.sourcing ||
+            _operation == _WorkspaceOperation.statement) &&
+        session.focusedWorkspacePurchaseId != null) {
+      session.clearWorkspacePurchaseSelection();
+      return;
+    }
     if (!await _confirmDiscardCounterOrder() || !mounted) return;
     if (_operationReturnView == _WorkspaceControlView.alerts) {
       setState(() => _view = _WorkspaceControlView.alerts);
@@ -2037,7 +2043,7 @@ extension on _WorkspaceOperation {
     _WorkspaceOperation.customers => 'Customer records',
     _WorkspaceOperation.payments => 'Sales and settlements',
     _WorkspaceOperation.books => 'Business books',
-    _WorkspaceOperation.sourcing => 'Wholesale sourcing',
+    _WorkspaceOperation.sourcing => 'Incoming stock',
     _WorkspaceOperation.growth => 'Grow your store',
     _WorkspaceOperation.services => 'Business services',
     _WorkspaceOperation.settings => 'Workspace settings',
@@ -2069,8 +2075,7 @@ extension on _WorkspaceOperation {
     _WorkspaceOperation.payments =>
       'Completed sales, available balance and settlement',
     _WorkspaceOperation.books => 'Sales, purchases, stock and money records',
-    _WorkspaceOperation.sourcing =>
-      'Compare wholesale supply and replenish stock',
+    _WorkspaceOperation.sourcing => 'Supplier deliveries and purchase records',
     _WorkspaceOperation.growth =>
       'Bring customers back, publish offers and promote your store',
     _WorkspaceOperation.services =>
@@ -2872,6 +2877,8 @@ class _StoreControlDashboard extends StatelessWidget {
                     _StoreActionEdge(
                       session: session,
                       onRestock: onBuyStock,
+                      onPurchases: () =>
+                          onOpenOperation(_WorkspaceOperation.sourcing),
                       onDirect: () =>
                           onOpenOperation(_WorkspaceOperation.direct),
                       onGroup: () =>
@@ -2909,11 +2916,12 @@ class _StoreActionEdge extends StatelessWidget {
   const _StoreActionEdge({
     required this.session,
     required this.onRestock,
+    required this.onPurchases,
     required this.onDirect,
     required this.onGroup,
   });
   final WorkSession session;
-  final VoidCallback onRestock, onDirect, onGroup;
+  final VoidCallback onRestock, onPurchases, onDirect, onGroup;
 
   @override
   Widget build(BuildContext context) {
@@ -2945,6 +2953,29 @@ class _StoreActionEdge extends StatelessWidget {
                 detail: session.workspaceLowStockCount > 0
                     ? '${session.workspaceLowStockCount} low stock'
                     : null,
+              ),
+              TextButton(
+                key: const Key('work-incoming-purchases'),
+                onPressed: onPurchases,
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(48, 48),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 4,
+                  ),
+                ),
+                child: Text(
+                  session.workspaceIncomingPurchaseCount > 0
+                      ? session.workspacePurchasesComplete
+                            ? '${session.workspaceIncomingPurchaseCount} incoming'
+                            : 'Track ${session.workspaceIncomingPurchaseCount}'
+                      : 'Track purchases',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
               ),
               const Divider(height: 24, indent: 16, endIndent: 16),
               _StoreEdgeAction(
@@ -8125,6 +8156,307 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   }
 }
 
+String _purchaseAmount(int minor) =>
+    '₹${_formatStoreAmount(minor ~/ 100)}${minor % 100 == 0 ? '' : '.${(minor % 100).toString().padLeft(2, '0')}'}';
+
+class _StorePurchasesSurface extends StatefulWidget {
+  const _StorePurchasesSurface({required this.session, this.statement = false});
+  final WorkSession session;
+  final bool statement;
+
+  @override
+  State<_StorePurchasesSurface> createState() => _StorePurchasesSurfaceState();
+}
+
+class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
+  WorkSession get session => widget.session;
+  bool get statement => widget.statement;
+  String? _storeId, _lastViewedId;
+  bool _showedDetails = false;
+  final _returnRowKey = GlobalKey();
+
+  @override
+  Widget build(BuildContext context) {
+    final storeId = session.activeWorkspace?.id;
+    if (_storeId != storeId) {
+      _storeId = storeId;
+      _lastViewedId = null;
+      _showedDetails = false;
+    }
+    final selected = session.focusedWorkspacePurchase;
+    final returning =
+        _showedDetails && session.focusedWorkspacePurchaseId == null;
+    _showedDetails = session.focusedWorkspacePurchaseId != null;
+    if (selected != null) _lastViewedId = selected.shipmentId;
+    if (returning) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _returnRowKey.currentContext;
+        if (mounted &&
+            target != null &&
+            target.mounted &&
+            session.activeWorkspace?.id == storeId &&
+            session.focusedWorkspacePurchaseId == null) {
+          unawaited(Scrollable.ensureVisible(target, alignment: .5));
+        }
+      });
+    }
+    if (session.focusedWorkspacePurchaseId != null) {
+      if (selected == null) {
+        return ListView(
+          primary: false,
+          padding: const EdgeInsets.all(16),
+          children: [
+            TextButton(
+              onPressed: session.clearWorkspacePurchaseSelection,
+              child: const Text('Back to purchases'),
+            ),
+            const _DeskEmpty(
+              icon: Icons.local_shipping_outlined,
+              title: 'Purchase update unavailable',
+              detail: 'Return to your linked purchases and try again.',
+            ),
+          ],
+        );
+      }
+      return ListView(
+        key: PageStorageKey(
+          'work-purchase-details-$storeId-${selected.shipmentId}-$statement',
+        ),
+        primary: false,
+        padding: const EdgeInsets.all(16),
+        children: [
+          Row(
+            children: [
+              IconButton(
+                key: const Key('work-purchase-back'),
+                tooltip: 'Back to purchases',
+                onPressed: session.clearWorkspacePurchaseSelection,
+                icon: const Icon(Icons.arrow_back_rounded),
+              ),
+              Expanded(
+                child: Text(
+                  selected.supplierName,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: MoolColors.navy,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          Text(
+            selected.stage.label,
+            key: const Key('work-purchase-stage'),
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Order ${selected.orderId}',
+            style: const TextStyle(fontSize: 12),
+          ),
+          if (selected.shipmentId != selected.orderId)
+            Text('Shipment ${selected.shipmentId}'),
+          if (selected.purchaseId != null &&
+              selected.purchaseId != selected.orderId)
+            Text('Purchase ${selected.purchaseId}'),
+          const Divider(height: 24),
+          _StoreMoneyLine(
+            leading: const Text('Order total'),
+            value: _purchaseAmount(selected.amountMinor),
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: MoolColors.navy,
+            ),
+          ),
+          Text(
+            selected.paymentLabel.isEmpty
+                ? 'Payment update unavailable'
+                : selected.paymentLabel,
+          ),
+          const SizedBox(height: 14),
+          if (selected.stage.incoming &&
+              selected.expectedArrival?.isNotEmpty == true)
+            Text('Delivery estimate · ${selected.expectedArrival}'),
+          if (selected.deliveryPartner?.isNotEmpty == true)
+            Text('Delivery partner · ${selected.deliveryPartner}'),
+          if (selected.trackingReference?.isNotEmpty == true)
+            Text('Tracking · ${selected.trackingReference}'),
+          if (selected.address?.isNotEmpty == true)
+            Text('Deliver to · ${selected.address}'),
+          Text(
+            'Updated ${selected.updatedAt.day}/${selected.updatedAt.month}/${selected.updatedAt.year} '
+            '${selected.updatedAt.hour.toString().padLeft(2, '0')}:${selected.updatedAt.minute.toString().padLeft(2, '0')}',
+            style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+          ),
+          const Text(
+            'Live location unavailable',
+            style: TextStyle(fontSize: 11, color: MoolColors.muted),
+          ),
+          if (selected.updateNote?.isNotEmpty == true)
+            Text(selected.updateNote!),
+          const Divider(height: 24),
+          Text(
+            selected.receiptState.label,
+            key: const Key('work-purchase-receipt-status'),
+            style: const TextStyle(
+              fontWeight: FontWeight.w700,
+              color: MoolColors.navy,
+            ),
+          ),
+          if (selected.receiptReference?.isNotEmpty == true)
+            Text('Receipt · ${selected.receiptReference}'),
+          if (selected.invoiceReference?.isNotEmpty == true)
+            Text('Invoice · ${selected.invoiceReference}'),
+          if (selected.lines.isEmpty) ...[
+            Text(selected.itemSummary),
+            const Text('Item quantities are awaiting an update.'),
+          ],
+          for (final line in selected.lines)
+            Padding(
+              key: ValueKey('work-purchase-line-${line.id}'),
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${line.name}${line.pack.isEmpty ? '' : ' · ${line.pack}'}',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text('${_purchaseAmount(line.unitPriceMinor)} / pack'),
+                  Text(
+                    'Ordered ${line.orderedPacks} packs · Received ${line.receivedPacks == null ? 'not confirmed' : '${line.receivedPacks} packs'}',
+                  ),
+                  if (line.receivedPacks != null &&
+                      line.receivedPacks != line.orderedPacks)
+                    Text(
+                      line.receivedPacks! < line.orderedPacks
+                          ? '${line.orderedPacks - line.receivedPacks!} packs outstanding'
+                          : '${line.receivedPacks! - line.orderedPacks} extra packs reported',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+        ],
+      );
+    }
+    final records = statement
+        ? session.filteredWorkspacePurchases
+        : session.workspacePurchases;
+    if (!session.workspacePurchasesConnected) {
+      return ListView(
+        primary: false,
+        padding: const EdgeInsets.all(16),
+        children: const [
+          _DeskEmpty(
+            icon: Icons.local_shipping_outlined,
+            title: 'Purchase updates unavailable',
+            detail:
+                'Linked supplier purchases will appear here. Personal purchases stay separate.',
+          ),
+        ],
+      );
+    }
+    return ListView.builder(
+      key: PageStorageKey('work-purchases-$storeId-$statement'),
+      primary: false,
+      padding: const EdgeInsets.all(16),
+      itemCount: records.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (!statement)
+                  const Text(
+                    'Incoming stock',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: MoolColors.navy,
+                    ),
+                  ),
+                if (!session.workspacePurchasesComplete)
+                  const Text(
+                    'Showing available shipment updates. Full history is not available yet.',
+                  ),
+                if (records.isEmpty)
+                  Text(
+                    !session.workspacePurchasesComplete
+                        ? 'No shipment updates available'
+                        : statement
+                        ? 'No linked purchases in this period'
+                        : 'No linked supplier deliveries',
+                  ),
+              ],
+            ),
+          );
+        }
+        final record = records[index - 1];
+        void openPurchase() {
+          if (session.activeWorkspace?.id != storeId) return;
+          session.selectWorkspacePurchase(record.shipmentId);
+        }
+
+        final row = ListTile(
+          key: ValueKey('work-purchase-${record.shipmentId}'),
+          contentPadding: EdgeInsets.zero,
+          title: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  record.supplierName,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
+              const SizedBox(width: 8),
+              KeyedSubtree(
+                key: record.shipmentId == _lastViewedId ? _returnRowKey : null,
+                child: FilledButton(
+                  key: ValueKey('work-purchase-open-${record.shipmentId}'),
+                  onPressed: openPurchase,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: MoolColors.navy,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(48, 48),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                  ),
+                  child: Text(
+                    record.stage.incoming ? 'Track' : 'Review',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            '${record.orderId}${record.shipmentId == record.orderId ? '' : ' · ${record.shipmentId}'} · ${record.stage.label}\n${record.itemSummary}\nOrder total ${_purchaseAmount(record.amountMinor)} · ${record.paymentLabel}',
+          ),
+          onTap: openPurchase,
+        );
+        return row;
+      },
+    );
+  }
+}
+
 class _StoreStatementSurface extends StatefulWidget {
   const _StoreStatementSurface({required this.session});
   final WorkSession session;
@@ -8139,137 +8471,158 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
   Widget build(BuildContext context) {
     final session = widget.session;
     final orders = session.filteredWorkspaceMoneyOrders;
+    final largeText = MediaQuery.textScalerOf(context).scale(14) > 21;
+    final title = Text(
+      'Store statement',
+      style: TextStyle(
+        fontSize: largeText ? 14 : 20,
+        fontWeight: FontWeight.w800,
+        color: MoolColors.navy,
+      ),
+    );
+    final periodControl = PopupMenuButton<String>(
+      key: const Key('work-statement-period'),
+      tooltip: 'Statement period',
+      onSelected: (period) {
+        if (_book == 'Purchases') {
+          session.clearWorkspacePurchaseSelection();
+        }
+        session.setWorkspaceMoneyPeriod(period);
+      },
+      itemBuilder: (_) => [
+        for (final period in ['Today', 'Week', 'Month', 'Financial year'])
+          PopupMenuItem(value: period, child: Text(period)),
+      ],
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Text(
+          session.workspaceMoneyPeriod,
+          style: const TextStyle(
+            color: MoolColors.navy,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
     return Column(
       key: const Key('work-store-statement'),
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
-          child: _StoreScaledPair(
-            flexibleSecond: false,
-            first: const Text(
-              'Store statement',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: MoolColors.navy,
-              ),
-            ),
-            second: PopupMenuButton<String>(
-              key: const Key('work-statement-period'),
-              tooltip: 'Statement period',
-              onSelected: session.setWorkspaceMoneyPeriod,
-              itemBuilder: (_) => [
-                for (final period in [
-                  'Today',
-                  'Week',
-                  'Month',
-                  'Financial year',
-                ])
-                  PopupMenuItem(value: period, child: Text(period)),
-              ],
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Text(
-                  session.workspaceMoneyPeriod,
-                  style: const TextStyle(
-                    color: MoolColors.navy,
-                    fontWeight: FontWeight.w700,
+        if (_book != 'Purchases' || session.focusedWorkspacePurchaseId == null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 4),
+            child: largeText
+                ? SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        title,
+                        const SizedBox(width: 8),
+                        periodControl,
+                      ],
+                    ),
+                  )
+                : _StoreScaledPair(
+                    flexibleSecond: false,
+                    first: title,
+                    second: periodControl,
                   ),
-                ),
-              ),
-            ),
           ),
-        ),
         Expanded(
-          child: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              if (_book == 'Sales') ...[
-                const Text(
-                  'Customer purchases',
-                  style: TextStyle(fontSize: 12, color: MoolColors.muted),
-                ),
-                const SizedBox(height: 16),
-                if (orders.isEmpty)
-                  const _DeskEmpty(
-                    icon: Icons.receipt_long_outlined,
-                    title: 'No sales in this period',
-                    detail: 'Recorded customer purchases will appear here.',
-                  ),
-                for (final order in orders) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    child: _StoreMoneyLine(
-                      value: '₹${_formatStoreAmount(order.amount)}',
-                      style: const TextStyle(
-                        fontSize: 14,
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w800,
+          child: _book == 'Purchases'
+              ? _StorePurchasesSurface(session: session, statement: true)
+              : ListView(
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    if (_book == 'Sales') ...[
+                      const Text(
+                        'Customer purchases',
+                        style: TextStyle(fontSize: 12, color: MoolColors.muted),
                       ),
-                      leading: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 42,
-                            padding: const EdgeInsets.symmetric(vertical: 8),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF0F3FF),
-                              borderRadius: BorderRadius.circular(10),
+                      const SizedBox(height: 16),
+                      if (orders.isEmpty)
+                        const _DeskEmpty(
+                          icon: Icons.receipt_long_outlined,
+                          title: 'No sales in this period',
+                          detail:
+                              'Recorded customer purchases will appear here.',
+                        ),
+                      for (final order in orders) ...[
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: _StoreMoneyLine(
+                            value: '₹${_formatStoreAmount(order.amount)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: MoolColors.navy,
+                              fontWeight: FontWeight.w800,
                             ),
-                            child: Text(
-                              '${order.createdAt.day}\n${order.createdAt.month}',
-                              textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w700,
-                                color: MoolColors.navy,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
+                            leading: Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  order.customer,
-                                  style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
+                                Container(
+                                  width: 42,
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 8,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF0F3FF),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    '${order.createdAt.day}\n${order.createdAt.month}',
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                      color: MoolColors.navy,
+                                    ),
                                   ),
                                 ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  '${order.id} · ${order.payment}\n${session.workspaceOrderStageLabel(order)}',
-                                  style: const TextStyle(
-                                    fontSize: 11,
-                                    height: 1.4,
-                                    color: MoolColors.muted,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        order.customer,
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        '${order.id} · ${order.payment}\n${session.workspaceOrderStageLabel(order)}',
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          height: 1.4,
+                                          color: MoolColors.muted,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
-                        ],
+                        ),
+                        const Divider(height: 1),
+                      ],
+                    ] else
+                      _DeskEmpty(
+                        icon: _book == 'Purchases'
+                            ? Icons.local_shipping_outlined
+                            : Icons.receipt_outlined,
+                        title: _book == 'Purchases'
+                            ? 'No purchases linked to this store'
+                            : 'No recorded expenses',
+                        detail: _book == 'Purchases'
+                            ? 'Supplier invoices and incoming deliveries will appear when linked to this business. Personal purchases stay separate.'
+                            : 'Business expenses will appear here when recorded.',
                       ),
-                    ),
-                  ),
-                  const Divider(height: 1),
-                ],
-              ] else
-                _DeskEmpty(
-                  icon: _book == 'Purchases'
-                      ? Icons.local_shipping_outlined
-                      : Icons.receipt_outlined,
-                  title: _book == 'Purchases'
-                      ? 'No purchases linked to this store'
-                      : 'No recorded expenses',
-                  detail: _book == 'Purchases'
-                      ? 'Supplier invoices and incoming deliveries will appear when linked to this business. Personal purchases stay separate.'
-                      : 'Business expenses will appear here when recorded.',
+                  ],
                 ),
-            ],
-          ),
         ),
         SafeArea(
           top: false,
@@ -8288,7 +8641,10 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                           key: Key('work-statement-${book.toLowerCase()}'),
                           onPressed: _book == book
                               ? null
-                              : () => setState(() => _book = book),
+                              : () {
+                                  session.clearWorkspacePurchaseSelection();
+                                  setState(() => _book = book);
+                                },
                           style: TextButton.styleFrom(
                             backgroundColor: _book == book
                                 ? const Color(0xFFECEFFF)
@@ -8653,6 +9009,9 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   Widget build(BuildContext context) {
     if (operation == _WorkspaceOperation.statement) {
       return _StoreStatementSurface(session: session);
+    }
+    if (operation == _WorkspaceOperation.sourcing) {
+      return _StorePurchasesSurface(session: session);
     }
     if (operation == _WorkspaceOperation.settings) {
       return ListView(

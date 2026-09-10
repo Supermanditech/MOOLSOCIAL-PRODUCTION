@@ -24,6 +24,194 @@ String? workspaceCustomerMobile(String customer) {
   return normalizeWorkspaceMobile(parts.last);
 }
 
+enum WorkspaceSupplyStage {
+  ordered,
+  confirmed,
+  dispatched,
+  arriving,
+  delivered,
+  delayed,
+  cancelled,
+  returned,
+  unknown;
+
+  String get label => switch (this) {
+    ordered => 'Order placed',
+    confirmed => 'Supplier confirmed',
+    dispatched => 'Dispatched',
+    arriving => 'Arriving',
+    delivered => 'Delivered',
+    delayed => 'Delivery delayed',
+    cancelled => 'Cancelled',
+    returned => 'Returned',
+    unknown => 'Awaiting shipment update',
+  };
+  bool get incoming => !{delivered, cancelled, returned}.contains(this);
+}
+
+enum WorkspaceReceiptState {
+  unavailable,
+  awaiting,
+  partial,
+  confirmed,
+  disputed;
+
+  String get label => switch (this) {
+    unavailable => 'Receipt update unavailable',
+    awaiting => 'Receipt awaiting confirmation',
+    partial => 'Part received',
+    confirmed => 'Receipt confirmed',
+    disputed => 'Receipt under review',
+  };
+}
+
+class WorkspacePurchaseLine {
+  const WorkspacePurchaseLine({
+    required this.id,
+    required this.productId,
+    required this.name,
+    required this.pack,
+    required this.orderedPacks,
+    required this.unitPriceMinor,
+    this.receivedPacks,
+  });
+  final String id, productId, name, pack;
+  final int orderedPacks, unitPriceMinor;
+  final int? receivedPacks;
+  bool get valid =>
+      id.trim().isNotEmpty &&
+      productId.trim().isNotEmpty &&
+      name.trim().isNotEmpty &&
+      orderedPacks > 0 &&
+      unitPriceMinor >= 0 &&
+      (receivedPacks == null || receivedPacks! >= 0);
+}
+
+/// Versioned, read-only shipment facts. Link identities must come from an
+/// authenticated purchase adapter, never a display name or a URL parameter.
+/// Rendering a receipt does not post stock or authorize payment.
+class WorkspacePurchaseRecord {
+  WorkspacePurchaseRecord({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.supplierId,
+    required this.supplierName,
+    required this.orderId,
+    required this.shipmentId,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.stage,
+    required this.amountMinor,
+    required this.itemSummary,
+    required this.paymentLabel,
+    required List<WorkspacePurchaseLine> lines,
+    this.purchaseId,
+    this.expectedArrival,
+    this.address,
+    this.deliveryPartner,
+    this.trackingReference,
+    this.invoiceReference,
+    this.receiptState = WorkspaceReceiptState.unavailable,
+    this.receiptReference,
+    this.updateNote,
+  }) : lines = List.unmodifiable(lines);
+
+  final String accountScope,
+      workspaceId,
+      supplierId,
+      supplierName,
+      orderId,
+      shipmentId;
+  final int revision, amountMinor;
+  final DateTime createdAt, updatedAt;
+  final WorkspaceSupplyStage stage;
+  final String itemSummary, paymentLabel;
+  final List<WorkspacePurchaseLine> lines;
+  final String? purchaseId,
+      expectedArrival,
+      address,
+      deliveryPartner,
+      trackingReference,
+      invoiceReference,
+      receiptReference,
+      updateNote;
+  final WorkspaceReceiptState receiptState;
+
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        supplierId,
+        supplierName,
+        orderId,
+        shipmentId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      revision > 0 &&
+      amountMinor >= 0 &&
+      !updatedAt.isBefore(createdAt) &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.id).toSet().length == lines.length;
+
+  /// Buy owns order content. This projection adds only the separately supplied
+  /// trusted Store/supplier link; it cannot infer that link from Buy history.
+  /// A Buy order is one fulfilment group here. Further shipment splits require
+  /// explicit allocations from the receiving adapter, not a copied full order.
+  factory WorkspacePurchaseRecord.fromBuyOrder({
+    required BuyV2Order order,
+    required String accountScope,
+    required String workspaceId,
+    required String supplierId,
+    required int revision,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+  }) {
+    if (order.destination != BuyV2Destination.wholesale) {
+      throw ArgumentError(
+        'Only an explicitly linked wholesale order is supported',
+      );
+    }
+    return WorkspacePurchaseRecord(
+      accountScope: accountScope,
+      workspaceId: workspaceId,
+      supplierId: supplierId,
+      supplierName: order.partner,
+      orderId: order.id,
+      shipmentId: order.id,
+      purchaseId: order.purchaseId,
+      revision: revision,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      stage: switch (order.status) {
+        BuyV2OrderStatus.preparing => WorkspaceSupplyStage.ordered,
+        BuyV2OrderStatus.confirmed => WorkspaceSupplyStage.confirmed,
+        BuyV2OrderStatus.dispatched => WorkspaceSupplyStage.dispatched,
+        BuyV2OrderStatus.arriving => WorkspaceSupplyStage.arriving,
+        BuyV2OrderStatus.delivered => WorkspaceSupplyStage.delivered,
+      },
+      amountMinor: order.total * 100,
+      itemSummary: order.itemSummary,
+      paymentLabel: order.paymentStatusLabel ?? 'Payment update unavailable',
+      expectedArrival: order.updatedDeliveryEstimate ?? order.promise,
+      address: order.addressLine,
+      deliveryPartner: order.deliveryPartnerName,
+      trackingReference: order.trackingReference,
+      receiptReference: order.receiptReference,
+      lines: [
+        for (var i = 0; i < order.lines.length; i++)
+          WorkspacePurchaseLine(
+            id: '${order.id}:$i',
+            productId: order.lines[i].product.id,
+            name: order.lines[i].product.title,
+            pack: order.lines[i].product.pack,
+            orderedPacks: order.lines[i].quantity,
+            unitPriceMinor: order.lines[i].product.price * 100,
+          ),
+      ],
+    );
+  }
+}
+
 enum WorkFeedFilter { forYou, jobs, freelance, campaigns, nearby }
 
 extension WorkFeedFilterLabel on WorkFeedFilter {

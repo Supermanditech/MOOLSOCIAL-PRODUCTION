@@ -306,6 +306,13 @@ class StoreCollectionController extends ChangeNotifier {
 /// Existing Store fields partitioned by workspace, within this signed-in session.
 /// This cache is not authoritative persistence or backend membership validation.
 class _StoreOperationalData {
+  String? purchaseAccountScope;
+  int purchaseFeedRevision = 0;
+  bool purchasesComplete = false;
+  String? purchasesNextCursor;
+  final Map<String, WorkspacePurchaseRecord> purchases = {};
+  final Map<String, WorkspacePurchaseRecord> purchaseLastRecords = {};
+  String? focusedPurchaseId;
   WorkOrderOperations? orderOperations;
   final Map<String, int> projectedOrderRevisions = {};
   bool retailerProductAdded = false;
@@ -705,6 +712,121 @@ class WorkSession extends ChangeNotifier {
   bool initialWorkspaceStateLoaded = false;
   _StoreOperationalData _storeData = _StoreOperationalData();
   final Map<String, _StoreOperationalData> _storeDataById = {};
+
+  /// Accept only a separately authenticated, linked purchase projection.
+  /// This is not membership validation, a Buy-history import or a stock write.
+  bool applyWorkspacePurchases({
+    required String accountScope,
+    required String storeId,
+    required int feedRevision,
+    required List<WorkspacePurchaseRecord> records,
+    bool complete = false,
+    String? nextCursor,
+  }) {
+    if (_disposed ||
+        accountScope.isEmpty ||
+        accountScope != _contactAccountScope ||
+        feedRevision <= 0 ||
+        (complete && nextCursor != null)) {
+      return false;
+    }
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data == null ||
+        records.any(
+          (record) =>
+              !record.valid ||
+              record.accountScope != accountScope ||
+              record.workspaceId != storeId,
+        ) ||
+        records.map((record) => record.shipmentId).toSet().length !=
+            records.length) {
+      return false;
+    }
+    final sameAccount = data.purchaseAccountScope == accountScope;
+    if (sameAccount && feedRevision <= data.purchaseFeedRevision) return false;
+    final previous = sameAccount
+        ? data.purchaseLastRecords
+        : <String, WorkspacePurchaseRecord>{};
+    for (final record in records) {
+      final old = previous[record.shipmentId];
+      if (old != null &&
+          (old.orderId != record.orderId ||
+              old.supplierId != record.supplierId ||
+              old.purchaseId != record.purchaseId ||
+              old.createdAt != record.createdAt)) {
+        return false;
+      }
+    }
+    final next = complete || !sameAccount
+        ? <String, WorkspacePurchaseRecord>{}
+        : {...data.purchases};
+    for (final record in records) {
+      final old = previous[record.shipmentId];
+      if (old != null &&
+          record.revision <= old.revision &&
+          !data.purchases.containsKey(record.shipmentId)) {
+        continue;
+      }
+      next[record.shipmentId] = old != null && record.revision <= old.revision
+          ? old
+          : record;
+    }
+    if (!sameAccount) data.purchaseLastRecords.clear();
+    for (final record in records) {
+      final old = data.purchaseLastRecords[record.shipmentId];
+      if (old == null || record.revision > old.revision) {
+        data.purchaseLastRecords[record.shipmentId] = record;
+      }
+    }
+    data.purchaseAccountScope = accountScope;
+    data.purchaseFeedRevision = feedRevision;
+    data.purchasesComplete = complete;
+    data.purchasesNextCursor = nextCursor;
+    data.purchases
+      ..clear()
+      ..addAll(next);
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  bool get workspacePurchasesConnected =>
+      _contactAccountScope != null &&
+      _storeData.purchaseAccountScope == _contactAccountScope;
+  bool get workspacePurchasesComplete =>
+      workspacePurchasesConnected && _storeData.purchasesComplete;
+  List<WorkspacePurchaseRecord> get workspacePurchases {
+    if (!workspacePurchasesConnected) return const [];
+    final records = _storeData.purchases.values.toList()
+      ..sort((a, b) {
+        final date = b.createdAt.compareTo(a.createdAt);
+        return date == 0 ? a.shipmentId.compareTo(b.shipmentId) : date;
+      });
+    return List.unmodifiable(records);
+  }
+
+  int get workspaceIncomingPurchaseCount =>
+      workspacePurchases.where((record) => record.stage.incoming).length;
+  String? get focusedWorkspacePurchaseId => _storeData.focusedPurchaseId;
+  WorkspacePurchaseRecord? get focusedWorkspacePurchase =>
+      workspacePurchasesConnected
+      ? _storeData.purchases[_storeData.focusedPurchaseId]
+      : null;
+  bool selectWorkspacePurchase(String shipmentId) {
+    if (!workspacePurchasesConnected ||
+        !_storeData.purchases.containsKey(shipmentId)) {
+      return false;
+    }
+    _storeData.focusedPurchaseId = shipmentId;
+    notifyListeners();
+    return true;
+  }
+
+  void clearWorkspacePurchaseSelection() {
+    _storeData.focusedPurchaseId = null;
+    notifyListeners();
+  }
 
   WorkOrderOperations? get _scopedOrderOperations {
     final operations = _storeData.orderOperations;
@@ -1680,9 +1802,9 @@ class WorkSession extends ChangeNotifier {
     notifyListeners();
   }
 
-  List<WorkspaceOrderRecord> get filteredWorkspaceMoneyOrders {
+  DateTime? get workspaceMoneyPeriodStart {
     final now = DateTime.now();
-    final start = switch (workspaceMoneyPeriod) {
+    return switch (workspaceMoneyPeriod) {
       'Today' => DateTime(now.year, now.month, now.day),
       'Week' => now.subtract(const Duration(days: 7)),
       'Month' => DateTime(now.year, now.month, 1),
@@ -1693,6 +1815,17 @@ class WorkSession extends ChangeNotifier {
       ),
       _ => null,
     };
+  }
+
+  List<WorkspacePurchaseRecord> get filteredWorkspacePurchases {
+    final start = workspaceMoneyPeriodStart;
+    return workspacePurchases
+        .where((record) => start == null || !record.createdAt.isBefore(start))
+        .toList(growable: false);
+  }
+
+  List<WorkspaceOrderRecord> get filteredWorkspaceMoneyOrders {
+    final start = workspaceMoneyPeriodStart;
     return visibleWorkspaceOrders
         .where((order) {
           return start == null || !order.createdAt.isBefore(start);
