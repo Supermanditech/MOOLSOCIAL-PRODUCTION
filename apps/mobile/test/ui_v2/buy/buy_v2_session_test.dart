@@ -16,6 +16,8 @@ import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+import 'buy_v2_discovery_refinement_test.dart'
+    show R669BrandCommerce, r669BrandedSession;
 
 final class _R669ProcurementCommerce implements BuyV2CommerceAdapter {
   _R669ProcurementCommerce(this.snapshot);
@@ -1865,6 +1867,7 @@ void main() {
       'session variants and continuation shelves enforce supplier admission',
       () async {
         final eligible = product.copyWith(
+          brand: 'Declared supplier brand',
           procurementSupplierGrant: supplier(),
         );
         final rejected = eligible.copyWith(
@@ -5481,21 +5484,28 @@ void main() {
       expect(session.shopSaleType, BuyV2ShopSaleType.courier);
     });
 
-    test('R5 020 brand facets describe the current category and search', () {
-      final product = session.product('s-milk');
-      session.chooseShopSaleType(
-        session.fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal
-            ? BuyV2ShopSaleType.quickDelivery
-            : BuyV2ShopSaleType.courier,
-      );
-      session.chooseCategory(product.categoryId);
-      session.updateQuery(product.title);
-      final actualBrands = session.catalogueSaleTypeProducts
-          .map((product) => product.brand)
-          .toSet();
-      expect(actualBrands, isNotEmpty);
-      expect(session.discoveryBrands.toSet(), actualBrands);
-    });
+    test(
+      'R5 020 brand facets describe the current category and search',
+      () async {
+        final core = BuySession();
+        final session = await r669BrandedSession(core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        final product = session.product('s-milk');
+        session.chooseShopSaleType(
+          session.fulfilmentModeFor(product) == BuyV2FulfilmentMode.quickLocal
+              ? BuyV2ShopSaleType.quickDelivery
+              : BuyV2ShopSaleType.courier,
+        );
+        session.chooseCategory(product.categoryId);
+        session.updateQuery(product.title);
+        final actualBrands = session.catalogueSaleTypeProducts
+            .map((product) => product.brand)
+            .toSet();
+        expect(actualBrands, isNotEmpty);
+        expect(session.discoveryBrands.toSet(), actualBrands);
+      },
+    );
 
     test('R5 020 draft preview is pure and Apply emits one update', () async {
       final store = _MemoryCustomerStateStore('refinement-draft');
@@ -6502,54 +6512,61 @@ void main() {
       }
     });
 
-    test('discovery refinements combine and sort without crossing Shop', () {
-      session.openDestination(BuyV2Destination.shop);
-      final brand = session.discoveryBrands.first;
-      session.toggleDiscoveryBrand(brand);
-      expect(session.visibleProducts, isNotEmpty);
-      expect(
-        session.visibleProducts,
-        everyElement(
-          isA<BuyV2Product>().having(
-            (product) => product.brand,
-            'brand',
-            brand,
+    test(
+      'discovery refinements combine and sort without crossing Shop',
+      () async {
+        final core = BuySession();
+        final session = await r669BrandedSession(core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.openDestination(BuyV2Destination.shop);
+        final brand = session.discoveryBrands.first;
+        session.toggleDiscoveryBrand(brand);
+        expect(session.visibleProducts, isNotEmpty);
+        expect(
+          session.visibleProducts,
+          everyElement(
+            isA<BuyV2Product>().having(
+              (product) => product.brand,
+              'brand',
+              brand,
+            ),
           ),
-        ),
-      );
+        );
 
-      session.clearDiscoveryRefinements();
-      session.chooseMaximumProductPrice(250);
-      expect(
-        session.visibleProducts.every(
-          (product) => session.productFactsFor(product).price <= 250,
-        ),
-        isTrue,
-      );
-      session.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
-      expect(
-        session.visibleProducts.every(
-          (product) =>
-              session.fulfilmentModeFor(product) ==
-              BuyV2FulfilmentMode.quickLocal,
-        ),
-        isTrue,
-      );
-      session.chooseProductSort(BuyV2ProductSort.priceHighToLow);
-      final prices = session.visibleProducts
-          .map((product) => session.productFactsFor(product).price)
-          .toList(growable: false);
-      expect(
-        prices,
-        orderedEquals([...prices]..sort((a, b) => b.compareTo(a))),
-      );
-      expect(session.activeDiscoveryRefinementCount, 3);
+        session.clearDiscoveryRefinements();
+        session.chooseMaximumProductPrice(250);
+        expect(
+          session.visibleProducts.every(
+            (product) => session.productFactsFor(product).price <= 250,
+          ),
+          isTrue,
+        );
+        session.chooseFulfilmentMode(BuyV2FulfilmentMode.quickLocal);
+        expect(
+          session.visibleProducts.every(
+            (product) =>
+                session.fulfilmentModeFor(product) ==
+                BuyV2FulfilmentMode.quickLocal,
+          ),
+          isTrue,
+        );
+        session.chooseProductSort(BuyV2ProductSort.priceHighToLow);
+        final prices = session.visibleProducts
+            .map((product) => session.productFactsFor(product).price)
+            .toList(growable: false);
+        expect(
+          prices,
+          orderedEquals([...prices]..sort((a, b) => b.compareTo(a))),
+        );
+        expect(session.activeDiscoveryRefinementCount, 3);
 
-      session.clearDiscoveryRefinements();
-      expect(session.activeDiscoveryRefinementCount, 0);
-      expect(session.productSort, BuyV2ProductSort.relevance);
-      expect(session.selectedBrands, isEmpty);
-    });
+        session.clearDiscoveryRefinements();
+        expect(session.activeDiscoveryRefinementCount, 0);
+        expect(session.productSort, BuyV2ProductSort.relevance);
+        expect(session.selectedBrands, isEmpty);
+      },
+    );
 
     test('Buy account returns to the exact originating purchase depth', () {
       final product = BuyV2Catalogue.products.firstWhere(
@@ -7099,7 +7116,10 @@ void main() {
         final first = BuyV2Session(
           core: BuySession(),
           customerStateStore: store,
+          commerceAdapter: R669BrandCommerce(),
+          reviewDataEnabled: false,
         );
+        await first.restoreCommerce();
         final product = first.visibleProducts.first;
         first.addProduct(product.id);
         first.toggleSaved(product.id);
@@ -7129,7 +7149,10 @@ void main() {
         final restored = BuyV2Session(
           core: BuySession(),
           customerStateStore: store,
+          commerceAdapter: R669BrandCommerce(),
+          reviewDataEnabled: false,
         );
+        await restored.restoreCommerce();
         await restored.restoreCustomerState();
 
         expect(restored.quantityFor(product.id), product.minimumOrder);
@@ -8515,6 +8538,13 @@ void r669ComparisonContractTests() {
           await tester.pumpAndSettle();
           expect(find.text('Compare prices'), findsOneWidget);
           expect(fixture.calls.last.query.sort, BuyV2ComparisonSort.itemPrice);
+          for (final id in ['comparison-a', 'comparison-b', 'comparison-c']) {
+            expect(
+              find.byKey(ValueKey('buy-product-card-badge-$id')),
+              findsNothing,
+              reason: 'An empty supplier badge must not paint a coloured pill.',
+            );
+          }
           expect(fixture.calls.last.query.standardPurchase, isTrue);
           expect(find.text('View in product list'), findsNothing);
           expect(find.text('Retail and wholesale'), findsNothing);
@@ -8627,6 +8657,13 @@ void r669ComparisonContractTests() {
           );
           expect(session.quantityFor(fixture.product.id), retained);
           expect(tester.takeException(), isNull);
+          expect(
+            find.byKey(
+              const ValueKey('buy-product-gallery-badge-comparison-c'),
+            ),
+            findsNothing,
+            reason: 'The nested product must also hide its empty badge.',
+          );
           await captureR66Visual(
             tester,
             'r669-consumer-stores-${viewport.label}-product',

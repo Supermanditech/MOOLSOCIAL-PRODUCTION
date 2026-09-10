@@ -1204,11 +1204,9 @@ class BuyV2DevelopmentPublishedCatalogueSource
         product: product,
         publisherType: publisher,
         publisherId: publisher == BuyV2OfferPublisherType.manufacturer
-            ? '$version-maker-${product.brand}'
+            ? '$version-maker-${product.storeId ?? product.id}'
             : product.storeId!,
-        publisherName: publisher == BuyV2OfferPublisherType.manufacturer
-            ? '${product.brand} Makers'
-            : product.seller,
+        publisherName: product.seller,
         headline: switch (publisher) {
           BuyV2OfferPublisherType.manufacturer => 'Manufacturer price',
           BuyV2OfferPublisherType.wholesaler => 'Bulk saving',
@@ -7179,7 +7177,9 @@ class BuyV2Session extends ChangeNotifier {
 
     int score(BuyV2Product product) {
       var value = product.categoryId == current.categoryId ? 8 : 0;
-      if (product.brand == current.brand) value += 4;
+      if (current.brand.trim().isNotEmpty && product.brand == current.brand) {
+        value += 4;
+      }
       return value;
     }
 

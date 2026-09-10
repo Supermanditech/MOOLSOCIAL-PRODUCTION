@@ -11,6 +11,8 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_discovery_refinement_test.dart' show r669BrandedSession;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -135,7 +137,7 @@ void main() {
         tester.view.physicalSize = Size(scale == 2 ? 320 : 390, 844);
         addTearDown(tester.view.reset);
         final core = BuySession();
-        final session = BuyV2Session(core: core);
+        final session = await r669BrandedSession(core);
         addTearDown(core.dispose);
         addTearDown(session.dispose);
         final retail = mode == 'quick' || mode == 'scheduled';
@@ -206,31 +208,34 @@ void main() {
     BuyV2Destination.shop,
     BuyV2Destination.wholesale,
   ]) {
-    test('R66 search broadening clears extra refinements in $destination', () {
-      final core = BuySession();
-      final session = BuyV2Session(core: core);
-      addTearDown(core.dispose);
-      addTearDown(session.dispose);
-      session.openDestination(destination);
-      session.chooseCategory('fruits-vegetables');
-      session.choosePackFilter(BuyV2PackFilter.multipack);
-      session.chooseMaximumProductPrice(session.discoveryPriceLimits.first);
-      session.toggleDiscoveryBrand(session.discoveryBrands.first);
-      session.updateQuery('tomato');
-      expect(session.visibleProducts, isEmpty);
-      expect(session.broadenProductSearchScope(), isTrue);
-      expect(session.activeDiscoveryRefinementCount, 0);
-      expect(session.query, 'tomato');
-      expect(session.destination, destination);
-      expect(session.selectedCategoryId, 'all');
-      expect(session.visibleProducts, isNotEmpty);
-      expect(
-        session.visibleProducts.every(
-          (product) => product.destination == destination,
-        ),
-        isTrue,
-      );
-    });
+    test(
+      'R66 search broadening clears extra refinements in $destination',
+      () async {
+        final core = BuySession();
+        final session = await r669BrandedSession(core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.openDestination(destination);
+        session.chooseCategory('fruits-vegetables');
+        session.choosePackFilter(BuyV2PackFilter.multipack);
+        session.chooseMaximumProductPrice(session.discoveryPriceLimits.first);
+        session.toggleDiscoveryBrand(session.discoveryBrands.first);
+        session.updateQuery('tomato');
+        expect(session.visibleProducts, isEmpty);
+        expect(session.broadenProductSearchScope(), isTrue);
+        expect(session.activeDiscoveryRefinementCount, 0);
+        expect(session.query, 'tomato');
+        expect(session.destination, destination);
+        expect(session.selectedCategoryId, 'all');
+        expect(session.visibleProducts, isNotEmpty);
+        expect(
+          session.visibleProducts.every(
+            (product) => product.destination == destination,
+          ),
+          isTrue,
+        );
+      },
+    );
   }
 
   for (final keyboard in [0.0, 280.0]) {

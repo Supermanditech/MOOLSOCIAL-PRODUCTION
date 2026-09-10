@@ -1457,7 +1457,7 @@ final class BuyV2CatalogueProductContentAdapter
       ],
       highlights: [product.variant, product.unitPrice, ?returnDetail],
       specifications: [
-        BuyV2ProductSpecification(label: 'Brand', value: product.brand),
+        BuyV2ProductSpecification(label: 'Brand', value: product.brandLabel),
         BuyV2ProductSpecification(label: 'Pack', value: product.pack),
         BuyV2ProductSpecification(label: 'Variant', value: product.variant),
       ],

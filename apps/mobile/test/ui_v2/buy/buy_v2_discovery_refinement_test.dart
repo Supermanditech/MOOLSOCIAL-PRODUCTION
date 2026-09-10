@@ -15,6 +15,51 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+// Explicit supplier-brand fixtures, never replacement production seed data.
+class R669BrandCommerce implements BuyV2CommerceAdapter {
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [
+      for (final (index, product) in BuyV2Catalogue.products.indexed)
+        product.destination == BuyV2Destination.medicine
+            ? product
+            : product.copyWith(
+                brand: index ~/ 3 % 2 == 0
+                    ? 'Cedar Foods'
+                    : 'Riverstone Household Essentials',
+              ),
+    ],
+    orders: const [],
+    paymentMethods: const {'PhonePe', 'Paytm', 'Pine Labs', 'Cash on Delivery'},
+    businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
+  );
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: false,
+        customerMessage: '',
+      );
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError(invocation.memberName.toString());
+}
+
+Future<BuyV2Session> r669BrandedSession(BuySession core) async {
+  final session = BuyV2Session(
+    core: core,
+    commerceAdapter: R669BrandCommerce(),
+    reviewDataEnabled: false,
+  );
+  await session.restoreCommerce();
+  expect(session.discoveryBrands, contains('Cedar Foods'));
+  return session;
+}
+
 class _R671RefinementSource extends BuyV2DevelopmentCatalogueSource {
   _R671RefinementSource()
     : super(
@@ -49,6 +94,23 @@ class _R671RefinementSource extends BuyV2DevelopmentCatalogueSource {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  test('R669 brand seed groups are not supplier brand identities', () {
+    final commerce = BuyV2Catalogue.products.where(
+      (p) => p.destination != BuyV2Destination.medicine,
+    );
+    expect(commerce, isNotEmpty);
+    for (final product in commerce) {
+      expect(product.brand, isEmpty, reason: product.id);
+      expect(product.merchandisingLabel, isNotEmpty, reason: product.id);
+      expect(product.brandLabel, 'Brand not provided');
+      final declared = product.copyWith(brand: 'Cedar Foods');
+      expect(declared.brandLabel, 'Cedar Foods');
+      expect(declared.categoryId, product.categoryId);
+      expect(declared.merchandisingLabel, product.merchandisingLabel);
+      expect(declared.copyWith(price: product.price + 1).brand, 'Cedar Foods');
+    }
+  });
 
   Future<List<Offset>> readScrollBall(
     WidgetTester tester,
@@ -437,6 +499,72 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 brand missing identity ${destination.name} $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          r66VisualCaptureRoot(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              home: BuyV2Screen(
+                session: session,
+                initialDestination: destination,
+              ),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        if (destination == BuyV2Destination.shop) {
+          session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+          await tester.pumpAndSettle();
+        }
+        expect(session.discoveryBrands, isEmpty);
+        final categories = session.catalogueSaleTypeProducts
+            .map((p) => p.categoryId)
+            .toSet();
+        expect(categories, isNotEmpty);
+        await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+        await tester.pumpAndSettle();
+        await tapVisible(
+          tester,
+          const ValueKey('buy-refine-brand-unavailable'),
+        );
+        expect(find.text('BABY CARE'), findsNothing);
+        expect(find.text('BABY NUTRITION'), findsNothing);
+        expect(find.text('BEAUTY & GROOMING'), findsNothing);
+        expect(find.text('CHILLED FAVOURITES'), findsNothing);
+        await captureR66Visual(
+          tester,
+          'r669-brand-${destination.name}-$scale-unavailable',
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.destination, destination);
+        expect(session.selectedBrands, isEmpty);
+        expect(
+          session.catalogueSaleTypeProducts.map((p) => p.categoryId).toSet(),
+          categories,
+        );
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets(
     'R665 O03 paged refinement count follows its source without applying drafts',
     (tester) async {
@@ -644,7 +772,7 @@ void main() {
       tester.view.physicalSize = const Size(360, 800);
       addTearDown(tester.view.reset);
       final core = BuySession();
-      final session = BuyV2Session(core: core);
+      final session = await r669BrandedSession(core);
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       session.addProduct('w-rice');
@@ -731,7 +859,7 @@ void main() {
               tester.platformDispatcher.clearTextScaleFactorTestValue,
             );
             final core = BuySession();
-            final session = BuyV2Session(core: core)
+            final session = (await r669BrandedSession(core))
               ..openDestination(destination);
             addTearDown(core.dispose);
             addTearDown(session.dispose);
@@ -897,7 +1025,8 @@ void main() {
         addTearDown(tester.view.reset);
         addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
         final core = BuySession();
-        final session = BuyV2Session(core: core)..openDestination(destination);
+        final session = (await r669BrandedSession(core))
+          ..openDestination(destination);
         addTearDown(core.dispose);
         addTearDown(session.dispose);
         final semantics = tester.ensureSemantics();

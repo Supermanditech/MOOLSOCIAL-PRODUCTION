@@ -9987,37 +9987,39 @@ class _FeaturedProductVisual extends StatelessWidget {
               borderRadius: 13,
             ),
           ),
-          Positioned(
-            left: 7,
-            top: 7,
-            right: 50,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: BuyV2CartAvoidanceRegion(
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 92),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 6,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: product.requiresPrescription
-                        ? BuyV2Colors.navy
-                        : BuyV2Colors.green,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    _compactProductBadge(product.badge),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 7,
-                      fontWeight: FontWeight.w900,
+          if (product.badge.trim().isNotEmpty)
+            Positioned(
+              key: ValueKey('buy-compact-product-badge-${product.id}'),
+              left: 7,
+              top: 7,
+              right: 50,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: BuyV2CartAvoidanceRegion(
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 92),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: product.requiresPrescription
+                          ? BuyV2Colors.navy
+                          : BuyV2Colors.green,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _compactProductBadge(product.badge),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 7,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
         ],
       ),
     );
@@ -10289,7 +10291,8 @@ class BuyV2ProductCard extends StatelessWidget {
                                 : MainAxisSize.max,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              if (!compact) ...[
+                              if (!compact &&
+                                  product.brand.trim().isNotEmpty) ...[
                                 Text(
                                   product.brand,
                                   maxLines: 1,
@@ -11089,39 +11092,41 @@ class _ProductVisual extends StatelessWidget {
               ),
             ),
           ),
-          Positioned(
-            left: 6,
-            top: 6,
-            right: compact ? reservedActionWidth : 6,
-            child: Align(
-              alignment: Alignment.topLeft,
-              child: BuyV2CartAvoidanceRegion(
-                child: Container(
-                  constraints: BoxConstraints(maxWidth: compact ? 96 : 120),
-                  padding: EdgeInsets.symmetric(
-                    horizontal: compact ? 4 : 6,
-                    vertical: compact ? 2 : 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: product.requiresPrescription
-                        ? BuyV2Colors.navy
-                        : BuyV2Colors.green,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    compact
-                        ? _compactProductBadge(product.badge)
-                        : product.badge,
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: compact ? 8 : 8,
-                      fontWeight: FontWeight.w900,
+          if (product.badge.trim().isNotEmpty)
+            Positioned(
+              key: ValueKey('buy-product-card-badge-${product.id}'),
+              left: 6,
+              top: 6,
+              right: compact ? reservedActionWidth : 6,
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: BuyV2CartAvoidanceRegion(
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: compact ? 96 : 120),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 4 : 6,
+                      vertical: compact ? 2 : 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: product.requiresPrescription
+                          ? BuyV2Colors.navy
+                          : BuyV2Colors.green,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      compact
+                          ? _compactProductBadge(product.badge)
+                          : product.badge,
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: compact ? 8 : 8,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
           const Positioned(
             right: 8,
             bottom: 7,

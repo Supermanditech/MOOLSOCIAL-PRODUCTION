@@ -322,6 +322,7 @@ class BuyV2Product {
     required this.confirmedOn,
     required this.visualLabel,
     required this.visualKind,
+    this.merchandisingLabel = '',
     this.procurementSupplierGrant,
     this.storeId,
     this.mrp,
@@ -345,7 +346,12 @@ class BuyV2Product {
   final BuyV2Destination destination;
   final String categoryId;
   final String brand;
+
+  /// A catalogue grouping is not a brand or manufacturer identity.
+  final String merchandisingLabel;
   final BuyV2ProcurementSupplierGrant? procurementSupplierGrant;
+  String get brandLabel =>
+      brand.trim().isEmpty ? 'Brand not provided' : brand.trim();
   final String title;
   final String variant;
   final String pack;
@@ -375,6 +381,8 @@ class BuyV2Product {
     String? id,
     String? canonicalId,
     String? storeId,
+    String? brand,
+    String? merchandisingLabel,
     BuyV2ProcurementSupplierGrant? procurementSupplierGrant,
     String? title,
     String? origin,
@@ -397,7 +405,8 @@ class BuyV2Product {
     storeId: storeId ?? this.storeId,
     destination: destination,
     categoryId: categoryId,
-    brand: brand,
+    brand: brand ?? this.brand,
+    merchandisingLabel: merchandisingLabel ?? this.merchandisingLabel,
     procurementSupplierGrant:
         procurementSupplierGrant ?? this.procurementSupplierGrant,
     title: title ?? this.title,
@@ -759,7 +768,7 @@ class _BuyV2CommerceSeed {
   const _BuyV2CommerceSeed({
     required this.id,
     required this.title,
-    required this.brand,
+    required this.merchandisingLabel,
     required this.shopCategory,
     required this.wholesaleCategory,
     required this.variant,
@@ -792,7 +801,7 @@ class _BuyV2CommerceSeed {
     return _BuyV2CommerceSeed(
       id: values[0],
       title: values[1],
-      brand: values[2],
+      merchandisingLabel: values[2],
       shopCategory: values[3],
       wholesaleCategory: values[4],
       variant: values[5],
@@ -817,7 +826,7 @@ class _BuyV2CommerceSeed {
 
   final String id;
   final String title;
-  final String brand;
+  final String merchandisingLabel;
   final String shopCategory;
   final String wholesaleCategory;
   final String variant;
@@ -1117,7 +1126,10 @@ abstract final class BuyV2Catalogue {
       canonicalId: seed.id,
       destination: destination,
       categoryId: wholesale ? seed.wholesaleCategory : seed.shopCategory,
-      brand: seed.brand.toUpperCase(),
+      // The review source's third column contains merchandising groups,
+      // not substantiated brand identities. Do not invent a brand for it.
+      brand: '',
+      merchandisingLabel: seed.merchandisingLabel,
       title: seed.title,
       variant: _catalogueVariant(seed),
       pack: wholesale ? seed.wholesalePack : seed.shopPack,

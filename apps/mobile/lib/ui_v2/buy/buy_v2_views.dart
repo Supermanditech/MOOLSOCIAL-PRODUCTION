@@ -617,8 +617,8 @@ class BuyV2ProductView extends StatelessWidget {
                           children: [
                             Text(
                               shop
-                                  ? product.brand
-                                  : '${product.brand} · ${_sellerTypeLabel(product.sellerType)}',
+                                  ? product.brandLabel
+                                  : '${product.brandLabel} · ${_sellerTypeLabel(product.sellerType)}',
                               style: context.buyEyebrow.copyWith(fontSize: 8),
                             ),
                             Container(
@@ -926,7 +926,7 @@ class BuyV2ProductView extends StatelessWidget {
                           _DecisionRow(
                             icon: Icons.sell_outlined,
                             label: 'Brand',
-                            value: product.brand,
+                            value: product.brandLabel,
                           ),
                           _DecisionRow(
                             icon: Icons.tune_rounded,
@@ -3611,34 +3611,35 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
                 },
               ),
             ),
-            Positioned(
-              left: 9,
-              top: 9,
-              child: BuyV2CartAvoidanceRegion(
-                key: ValueKey('buy-product-gallery-badge-${product.id}'),
-                child: Container(
-                  constraints: const BoxConstraints(maxWidth: 150),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 7,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: product.requiresPrescription
-                        ? BuyV2Colors.navy
-                        : BuyV2Colors.green,
-                    borderRadius: BorderRadius.circular(9),
-                  ),
-                  child: Text(
-                    product.badge,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 8,
-                      fontWeight: FontWeight.w900,
+            if (product.badge.trim().isNotEmpty)
+              Positioned(
+                left: 9,
+                top: 9,
+                child: BuyV2CartAvoidanceRegion(
+                  key: ValueKey('buy-product-gallery-badge-${product.id}'),
+                  child: Container(
+                    constraints: const BoxConstraints(maxWidth: 150),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: product.requiresPrescription
+                          ? BuyV2Colors.navy
+                          : BuyV2Colors.green,
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Text(
+                      product.badge,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
             if (hasMultipleMedia) ...[
               Positioned(
                 right: 9,
@@ -9620,11 +9621,15 @@ class BuyV2OrderItemsView extends StatelessWidget {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                product.brand,
-                                style: context.buyEyebrow.copyWith(fontSize: 8),
-                              ),
-                              const SizedBox(height: 2),
+                              if (product.brand.trim().isNotEmpty) ...[
+                                Text(
+                                  product.brand,
+                                  style: context.buyEyebrow.copyWith(
+                                    fontSize: 8,
+                                  ),
+                                ),
+                                const SizedBox(height: 2),
+                              ],
                               Text(product.title, style: context.buyBody),
                               const SizedBox(height: 3),
                               Text(
@@ -13478,33 +13483,44 @@ Future<void> showBuyV2DiscoveryRefinementSheet(
                                   ),
                               ],
                             ),
-                          if (brands.isNotEmpty)
-                            _DiscoveryRefinementSection(
-                              id: 'brand',
-                              title: 'Brand',
-                              summary: draft.brands.isEmpty
-                                  ? 'Any brand'
-                                  : draft.brands.length == 1
-                                  ? draft.brands.single
-                                  : '${draft.brands.length} selected',
-                              children: [
-                                for (final brand in brands)
-                                  _DiscoveryChoice(
+                          _DiscoveryRefinementSection(
+                            id: 'brand',
+                            title: 'Brand',
+                            summary: brands.isEmpty
+                                ? 'Not provided'
+                                : draft.brands.isEmpty
+                                ? 'Any brand'
+                                : draft.brands.length == 1
+                                ? draft.brands.single
+                                : '${draft.brands.length} selected',
+                            children: [
+                              if (brands.isEmpty)
+                                const Padding(
+                                  padding: EdgeInsets.symmetric(vertical: 8),
+                                  child: Text(
+                                    'Brand details have not been provided for these products.',
                                     key: ValueKey(
-                                      'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+                                      'buy-refine-brand-unavailable',
                                     ),
-                                    label: brand,
-                                    selected: draft.brands.contains(brand),
-                                    onTap: () {
-                                      final selected = {...draft.brands};
-                                      if (!selected.remove(brand)) {
-                                        selected.add(brand);
-                                      }
-                                      update(draft.copyWith(brands: selected));
-                                    },
                                   ),
-                              ],
-                            ),
+                                ),
+                              for (final brand in brands)
+                                _DiscoveryChoice(
+                                  key: ValueKey(
+                                    'buy-refine-brand-${brand.toLowerCase().replaceAll(' ', '-')}',
+                                  ),
+                                  label: brand,
+                                  selected: draft.brands.contains(brand),
+                                  onTap: () {
+                                    final selected = {...draft.brands};
+                                    if (!selected.remove(brand)) {
+                                      selected.add(brand);
+                                    }
+                                    update(draft.copyWith(brands: selected));
+                                  },
+                                ),
+                            ],
+                          ),
                           SwitchListTile.adaptive(
                             key: const ValueKey(
                               'buy-refine-available-products',
@@ -17690,31 +17706,33 @@ class _CartRecommendationCard extends StatelessWidget {
                           borderRadius: 10,
                         ),
                       ),
-                      Positioned(
-                        left: 4,
-                        top: 4,
-                        child: Container(
-                          constraints: const BoxConstraints(maxWidth: 92),
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 5,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: BuyV2Colors.green,
-                            borderRadius: BorderRadius.circular(7),
-                          ),
-                          child: Text(
-                            product.badge,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 7,
-                              fontWeight: FontWeight.w900,
+                      if (product.badge.trim().isNotEmpty)
+                        Positioned(
+                          key: ValueKey('buy-related-product-badge-${product.id}'),
+                          left: 4,
+                          top: 4,
+                          child: Container(
+                            constraints: const BoxConstraints(maxWidth: 92),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: BuyV2Colors.green,
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Text(
+                              product.badge,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 7,
+                                fontWeight: FontWeight.w900,
+                              ),
                             ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
