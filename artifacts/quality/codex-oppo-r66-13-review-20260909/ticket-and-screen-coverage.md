@@ -774,6 +774,32 @@ REG4556 local visual continuation: the six focused v2 tests passed, but the actu
 
 ### REG4554 / REG4556 — Files local correction checkpoint, 2026-09-10
 
+- **Pre-dashboard capture replay completed on the unchanged `f1f25412` product/test tree:** `flutter test --no-pub test/work_workspace_layout_safety_test.dart --plain-name 'Workspace overnight visual' --reporter expanded --concurrency=1 --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=pre-dashboard-capture-audit-20260910-v1` passed **11 / 11**, terminal exit 0. Log `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/dashboard-load-implementation-20260909/pre-dashboard-capture-audit-v1.log`, SHA `5DF95FE147B6BCB63C731DE78A7FA516DA5D952CD277690E6FEE24A6DCB0B751`. All 15 actual Flutter captures in sibling `pre-dashboard-capture-audit-20260910-v1` were inspected. Workspace selection, requirements, contact, details, documents, picker sheet, review/consent, pending, clarification, rejection and approved dashboard preserve their accepted normal layout. Keyboard image uses simulated insets, not a physical keyboard. Document preview shows the host's honest PDF-open failure with Retry/Close/Replace, not successful native PDF viewing. No new visual defect identified in these captures. Review gateway supplies approval/clarification facts; no real admin/backend approval was performed.
+
+- **Exact 79-skip disposition:** 11 current overnight capture cases (separately passed above); 20 historical `Store Live v1 capture` cases; 25 historical founder capture cases; 23 cases in the explicitly skipped `local Store 1-40 review evidence` group. Historical capture helpers address old golden directories and must not be updated in place. These 68 historical exclusions are not 68 passes, and their underlying journeys still require current named regression/device coverage before batch closure. REG4557 parser correction: expanded-report skip totals apply to the preceding test, not the newly printed next test. The first name grouping was discarded; a second parser binds each +1 skip transition to the preceding complete test name and reconciles 79 = 11 + 20 + 25 + 23. No production test or skip flag was changed.
+
+- Capture SHA-256 inventory (all filenames under the v1 folder above):
+
+| Capture | SHA-256 |
+| --- | --- |
+| workspace-approved.png | 1887BD258687D2209D3DF0FD99CE0B9AC790992B6A9ECDE013F44A46A9429C44 |
+| workspace-choose.png | 4351EA776D7AD618B8453B2307139F4EC241616A62DD981198A460096AD4B75B |
+| workspace-clarification.png | 1DE224A9AEBCD8899254C7BD81FA1542BD922028DD146001D92682AE8648E5F2 |
+| workspace-contact-otp-keyboard.png | F72DC20CD3425E82BF153DDB3650F2DE734BF25689E2F0A5E1829AEB39CC7BC2 |
+| workspace-contact.png | 6D55BC26B29DA6BE055565ACC20636672C2157C3140F20EB5D2D66C195DCF843 |
+| workspace-details.png | 20F6F7AB5E8FF10F0658173E220EFFC9E8EC76DAC58C333ED757E1AECB0A8EEE |
+| workspace-document-preview.png | D3A2A87A738003D0126C62ABC71F36FE6B958A08767B104244449353BCA0988B |
+| workspace-documents.png | E2C0260EAF602C203B26667CE35F4F8C5967093D931449386B927D8FEF6D1194 |
+| workspace-pending.png | 7CF2F8ED7750D42891524F4207C653688727BA67730D99C6A76078415FDE2BEE |
+| workspace-rejected.png | 7839B055D4603F6DC123328C2B05E7165A03AEC022E0761F959FDEF45EDD3876 |
+| workspace-requirements-guidance.png | DC931F09FC9876338D14C1E7969E5B4CDC9671C3E19A60D751C44F70CD6FFA71 |
+| workspace-requirements.png | 651A705A0865DBE36253D4B1E81A3EDBCF9ECB8301BE5E0899927966219EE143 |
+| workspace-review-consent.png | 17AAB7A30D08B6864B2C45A1BFAD7F2CC5B3F41235939902C843D00DCD3578D0 |
+| workspace-review.png | 53ECC4ABCA10AB52E98C1DA9355ED812F18E9F955C81F1637EB6487EE9440AF5 |
+| workspace-source.png | 3C2CCBD6B1851F5836C1467361254D443E5EA005CD87D7FD6E881EEE7BAF9F60 |
+
+- Pre-APK skipped-case audit continuation from clean `f1f25412a4efb1edf02743fb8b3beeae10be8a87`: the combined run's 79 skips include 11 `Workspace overnight visual` cases disabled by the capture define, historical founder/Store-Live capture cases with fixed historical destinations, and the explicitly retired `local Store 1-40 review evidence` group. Do not enable historical capture flags with golden updates: that would overwrite earlier evidence. Replay only the 11 current-path overnight cases with the existing external capture-directory override and a fresh folder. Inspect their current fixture/state assertions; a capture name alone does not prove the intended approval/clarification state. This is pre-dashboard qualification work, not a new ticket or OPPO result. REG4557: combined long-paragraph source/ledger projections truncated and one guessed journey model path was absent; relevant source was recovered through its actual import and smaller bounded reads. No incomplete output is used to claim coverage. Store procurement return/relaunch remains an explicit contract dependency; no speculative duplicate persistence owner is added while Cursor completes its approved identity/revision persistence.
+
 - Exact functional owner: `apps/mobile/lib/features/shared/screens/shared_screens.dart`; tests reuse `apps/mobile/test/work_workspace_layout_safety_test.dart`. No new owner, route, dependency, provider action or Cursor edit. Files alone now uses a single readable title and text-scaled toolbar height, removing the redundant subtitle from that constrained header. Other shared-screen headers remain unchanged.
 - The existing Add-file sheet respects safe bottom/keyboard insets and remains scrollable. Source rows reuse their original actions with compact leading spacing and no redundant chevron; full words remain readable at 200%. Cancel keeps its full touch area above the bottom boundary. This does not implement camera/gallery/cloud completion: existing source handlers still produce local notices, so their `opened` wording/test assertions are not proof of a provider launch. Retain actual provider completion and truthful source-result handling within the existing cloud/REG4555/shared-owner disposition before any whole-Files production claim.
 - Six focused configurations cover 412x915 and 320x568, 100%/140%/200% text, 24/44/80px bottom insets and simulated 200px keyboard insets. They assert heading containment/non-overlap with Add, complete source-label words, minimum row/Cancel touch height, Cancel reach, both dismissal mechanisms, retained Files widget, exact original dashboard instance/Store/order after return. These synthetic cases do not close physical 200%/TalkBack testing.
