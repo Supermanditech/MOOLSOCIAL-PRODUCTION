@@ -2345,6 +2345,20 @@ class _WholesaleTradeActionDock extends StatelessWidget {
         '${buyV2FulfilmentModeLabel(fulfilmentMode)} · '
         '${buyV2BuyerDeliveryPromise(facts)}';
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
+    final viewportSize = MediaQuery.sizeOf(context);
+    final shortLandscape =
+        viewportSize.width > viewportSize.height && viewportSize.height <= 480;
+    const totalStyle = TextStyle(
+      color: BuyV2Colors.navy,
+      fontSize: 18,
+      height: 1,
+      fontWeight: FontWeight.w900,
+    );
+    final total = Text(
+      buyV2Money(orderTotal),
+      key: const ValueKey('buy-wholesale-dock-total'),
+      style: totalStyle,
+    );
     final summary = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -2361,16 +2375,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 2),
-        Text(
-          buyV2Money(orderTotal),
-          key: const ValueKey('buy-wholesale-dock-total'),
-          style: const TextStyle(
-            color: BuyV2Colors.navy,
-            fontSize: 18,
-            height: 1,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
+        total,
         const SizedBox(height: 3),
         Text(
           deliveryDecision,
@@ -2433,6 +2438,48 @@ class _WholesaleTradeActionDock extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
             child: LayoutBuilder(
               builder: (context, constraints) {
+                if (shortLandscape) {
+                  final totalWidth = buyV2ValueTextSize(
+                    context,
+                    buyV2Money(orderTotal),
+                    totalStyle,
+                    maxWidth: double.infinity,
+                    maxLines: 1,
+                  ).width;
+                  final priceWidth = math
+                      .max(constraints.maxWidth * .44, totalWidth + 4)
+                      .clamp(0.0, math.max(0.0, constraints.maxWidth - 158));
+                  return Row(
+                    key: ValueKey('buy-wholesale-compact-dock-${product.id}'),
+                    children: [
+                      SizedBox(
+                        width: priceWidth.toDouble(),
+                        child: Semantics(
+                          label:
+                              '${_packCountLabel(orderQuantity)}. '
+                              '${buyV2Money(orderTotal)}. $deliveryDecision',
+                          excludeSemantics: true,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                quantity > 0 ? 'In Cart' : 'Minimum order',
+                                style: context.buyMeta.copyWith(
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              total,
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(child: actionGroup),
+                    ],
+                  );
+                }
                 final stacked = largeText || constraints.maxWidth < 330;
                 if (stacked) {
                   return Column(
@@ -3542,7 +3589,7 @@ class _ProductBenefitsPreview extends StatelessWidget {
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 9),
-            Expanded(child: Text('Checking product offers')),
+            Expanded(child: Text('Checking additional benefits')),
           ],
         ),
       );
@@ -3560,12 +3607,13 @@ class _ProductBenefitsPreview extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Product offers unavailable',
+              'Additional benefits unavailable',
               style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
             ),
             const SizedBox(height: 4),
             Text(
-              customerMessage ?? 'Offers could not be checked right now.',
+              customerMessage ??
+                  'Additional benefits could not be checked right now.',
               style: context.buyMeta,
             ),
             const SizedBox(height: 9),
@@ -3597,7 +3645,7 @@ class _ProductBenefitsPreview extends StatelessWidget {
               const SizedBox(width: 7),
               Expanded(
                 child: Text(
-                  'Offers for this product',
+                  'Additional checkout benefits',
                   style: context.buyTitle.copyWith(fontSize: 14),
                 ),
               ),
@@ -3605,12 +3653,16 @@ class _ProductBenefitsPreview extends StatelessWidget {
           ),
           const SizedBox(height: 3),
           Text(
-            'Eligibility is checked again at Checkout.',
+            'Separate from the listed seller price. Eligibility is checked again at Checkout.',
             style: context.buyMeta.copyWith(fontSize: 8),
           ),
           const SizedBox(height: 8),
           if (visibleBenefits.isEmpty)
-            Text('No product offers right now.', style: context.buyBody)
+            Text(
+              'No additional benefits available.',
+              key: ValueKey('buy-product-benefits-empty-${product.id}'),
+              style: context.buyBody,
+            )
           else
             for (final (index, benefit) in visibleBenefits.indexed) ...[
               _ProductBenefitPreviewTile(benefit: benefit),

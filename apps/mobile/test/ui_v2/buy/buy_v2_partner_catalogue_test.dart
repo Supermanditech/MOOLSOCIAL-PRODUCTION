@@ -164,6 +164,57 @@ void main() {
           await captureR66Visual(tester, 'r5-offers-$profile-$state');
         }
 
+        Future<void> checkAdditionalBenefits(
+          BuyV2Product product,
+          String publisher,
+        ) async {
+          expect(session.selectedProductId, product.id);
+          expect(session.selectedProduct?.storeId, product.storeId);
+          expect(session.selectedProduct?.pack, product.pack);
+          expect(session.productFactsFor(product).price, product.price);
+          final itemCount = session.itemCount;
+          final saving = session.scopedCouponSaving;
+          final empty = find.byKey(
+            ValueKey('buy-product-benefits-empty-${product.id}'),
+          );
+          await _revealProductAction(tester, product.id, empty);
+          final panel = find.byKey(
+            ValueKey('buy-product-benefits-ready-${product.id}'),
+          );
+          await tester.ensureVisible(panel);
+          await tester.pumpAndSettle();
+          expect(find.text('Additional checkout benefits'), findsOneWidget);
+          expect(
+            find.text(
+              'Separate from the listed seller price. Eligibility is checked again at Checkout.',
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('No product offers right now.'), findsNothing);
+          expect(
+            tester.widget<Text>(empty).data,
+            'No additional benefits available.',
+          );
+          final paragraph = tester.renderObject<RenderParagraph>(empty);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final viewport = tester.getRect(
+            find.ancestor(of: empty, matching: find.byType(Scrollable)).first,
+          );
+          expect(tester.getRect(empty).top, greaterThanOrEqualTo(viewport.top));
+          expect(tester.getRect(panel).top, greaterThanOrEqualTo(viewport.top));
+          expect(
+            tester.getRect(empty).bottom,
+            lessThanOrEqualTo(viewport.bottom),
+          );
+          expect(empty.hitTestable(), findsOneWidget);
+          expect(session.itemCount, itemCount);
+          expect(session.scopedCouponSaving, saving);
+          await captureR66Visual(
+            tester,
+            'r669-additional-benefits-$profile-$publisher',
+          );
+        }
+
         await capture('header');
         await reveal(range);
         expect(tester.widget<Text>(range).data, '1–40 of 20,000,000 offers');
@@ -194,6 +245,29 @@ void main() {
                   offer.product.destination == BuyV2Destination.wholesale,
             )
             .product;
+        final retailOffer = original.firstWhere(
+          (offer) => offer.product.id == retailProduct.id,
+        );
+        await reveal(
+          find.byKey(const ValueKey('buy-published-offer-facts')),
+          header: true,
+        );
+        final retailHeadline = find.descendant(
+          of: find.byKey(ValueKey('buy-published-offer-${retailProduct.id}')),
+          matching: find.text(retailOffer.headline),
+        );
+        await tester.ensureVisible(retailHeadline);
+        await tester.pumpAndSettle();
+        expect(retailHeadline.hitTestable(), findsOneWidget);
+        final retailRequests = published.queries.length;
+        await tester.tap(retailHeadline);
+        await tester.pumpAndSettle();
+        await checkAdditionalBenefits(retailProduct, 'retailer');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(vertical, findsOneWidget);
+        expect(published.queries.length, retailRequests);
+        expect(session.itemCount, 0);
         for (final product in [retailProduct, tradeProduct]) {
           final lane = find.byKey(
             ValueKey(
@@ -291,10 +365,25 @@ void main() {
         await tester.tap(makerHeadline);
         await tester.pumpAndSettle();
         expect(session.selectedProductId, makerProduct.id);
+        await checkAdditionalBenefits(makerProduct, 'manufacturer');
         final storeAction = find.byKey(
           ValueKey('buy-wholesale-store-action-${makerProduct.id}'),
         );
-        await _revealProductAction(tester, makerProduct.id, storeAction);
+        await tester.scrollUntilVisible(
+          storeAction,
+          -180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(
+                  PageStorageKey('buy-product-${makerProduct.id}'),
+                ),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.ensureVisible(storeAction);
+        await tester.pumpAndSettle();
+        expect(storeAction.hitTestable(), findsOneWidget);
         await tester.tap(storeAction);
         await tester.pumpAndSettle();
         expect(

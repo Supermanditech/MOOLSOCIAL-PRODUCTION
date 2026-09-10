@@ -1,7 +1,7 @@
 import 'dart:async';
-import 'dart:ui' show SemanticsAction;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -10,6 +10,8 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +33,7 @@ void main() {
         viewPadding: padding,
         disableAnimations: true,
       ),
-      child: child!,
+      child: r66VisualCaptureRoot(child!),
     ),
     home: BuyV2Screen(
       session: session,
@@ -324,6 +326,12 @@ void main() {
         scale: 1.2,
         padding: const EdgeInsets.only(top: 47, bottom: 34),
       ),
+      for (final scale in [1.0, 2.0])
+        (
+          size: const Size(640, 360),
+          scale: scale,
+          padding: const EdgeInsets.only(top: 24, bottom: 34),
+        ),
     ];
 
     for (final viewport in viewports) {
@@ -362,6 +370,54 @@ void main() {
         reason: '${viewport.size} bottom inset',
       );
       expect(tester.takeException(), isNull, reason: '${viewport.size}');
+
+      if (viewport.size.width > viewport.size.height) {
+        expect(add.hitTestable(), findsOneWidget);
+        await captureR66Visual(
+          tester,
+          'r669-trade-compact-${viewport.scale}-minimum',
+        );
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(product.id), product.minimumOrder);
+        final bulkQuantity = (100000000 / product.price).ceil();
+        expect(session.setCartQuantity(product.id, '$bulkQuantity'), isTrue);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        final total = find.byKey(const ValueKey('buy-wholesale-dock-total'));
+        final amount = buyV2Money(product.price * bulkQuantity);
+        expect(tester.widget<Text>(total).data, amount);
+        final paragraph = tester.renderObject<RenderParagraph>(total);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final boxes = paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: 0, extentOffset: amount.length),
+        );
+        expect(
+          boxes,
+          hasLength(1),
+          reason: 'Nine-figure total remains on one complete line',
+        );
+        expect(
+          boxes.single.right,
+          lessThanOrEqualTo(paragraph.size.width + 1),
+          reason: 'Allow fractional glyph-edge overhang without a clipped digit',
+        );
+        expect(total.hitTestable(), findsOneWidget);
+        expect(tester.getSize(dock).height, lessThanOrEqualTo(104));
+        final productScroll = find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        expect(tester.getSize(productScroll).height, greaterThanOrEqualTo(120));
+        expect(session.quantityFor(product.id), bulkQuantity);
+        await captureR66Visual(
+          tester,
+          'r669-trade-compact-${viewport.scale}-nine-figure',
+        );
+        expect(tester.takeException(), isNull);
+      }
 
       await tester.pumpWidget(const SizedBox.shrink());
       await tester.pump();
