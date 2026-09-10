@@ -16,6 +16,28 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+final class _R669OrderReadyFacts implements BuyV2ProductFactsAdapter {
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter()
+          .snapshotFor(product)
+          .copyWith(
+            promisedByLabel: '11 September, 2–4 PM',
+            sourceId: 'r669-order-ready-fixture',
+          );
+}
+
+BuyV2Session _r669OrderReadySession() {
+  final core = BuySession();
+  final session = BuyV2Session(
+    core: core,
+    productFactsAdapter: _R669OrderReadyFacts(),
+  );
+  addTearDown(core.dispose);
+  addTearDown(session.dispose);
+  return session;
+}
+
 final class _T01CDeliveryFactsAdapter implements BuyV2ProductFactsAdapter {
   final promises = <BuyV2Destination, (String, String)>{
     BuyV2Destination.shop: ('within 5 min', 'by 6:35 PM'),
@@ -3925,6 +3947,7 @@ void main() {
     });
 
     test('one Shop checkout splits orders by fulfilling store', () {
+      final session = _r669OrderReadySession();
       final first = BuyV2Catalogue.products.firstWhere(
         (item) => item.destination == BuyV2Destination.shop,
       );
@@ -4153,6 +4176,7 @@ void main() {
     test(
       'scope checkout confirms only that family and preserves other cart lines',
       () {
+        final session = _r669OrderReadySession();
         final shop = BuyV2Catalogue.products.firstWhere(
           (item) => item.destination == BuyV2Destination.shop,
         );
@@ -4175,6 +4199,7 @@ void main() {
     test(
       'mixed checkout projects exact seller groups into traceable orders',
       () {
+        final session = _r669OrderReadySession();
         final selected = <BuyV2Product>[
           BuyV2Catalogue.products.firstWhere(
             (item) => item.destination == BuyV2Destination.shop,
@@ -5268,7 +5293,11 @@ void main() {
         final deliveryIds = <String>{};
         for (final wholesale in [true, false, true, false]) {
           final core = BuySession();
-          final session = BuyV2Session(core: core, customerStateStore: store);
+          final session = BuyV2Session(
+            core: core,
+            customerStateStore: store,
+            productFactsAdapter: _R669OrderReadyFacts(),
+          );
           try {
             await session.restoreCustomerState();
             for (final entry in purchases.entries) {

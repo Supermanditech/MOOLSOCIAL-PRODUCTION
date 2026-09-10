@@ -338,6 +338,16 @@ class BuyV2FulfilmentGroup {
   final String? deliveryProviderName;
   final String? deliveryServiceLevel;
 
+  /// A pre-checkout placeholder is not a delivery estimate at final review.
+  bool get hasPlaceholderDeliveryPromise {
+    final value = promise.trim().toLowerCase();
+    return value.isEmpty || value == 'delivery time confirmed at checkout';
+  }
+
+  bool get hasDeliveryEstimate =>
+      !hasPlaceholderDeliveryPromise ||
+      (promisedByLabel?.trim().isNotEmpty ?? false);
+
   int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
 
   int get total => lines.fold(0, (total, line) => total + line.total);

@@ -6626,6 +6626,9 @@ class BuyV2CheckoutView extends StatelessWidget {
         BuyV2CheckoutSubmissionState.confirmed => ('Order confirmed', null),
       };
     case BuyV2CheckoutStep.confirm:
+      if (session.checkoutDeliveryEstimateReviewRequired) {
+        return ('Check delivery', session.refreshCheckoutDeliveryEstimates);
+      }
       if (missingDetails.isNotEmpty) {
         return (
           'Add GST details',
@@ -18031,11 +18034,15 @@ class _CheckoutDeliverySummaryCard extends StatelessWidget {
             value: '${group.partner} · ${group.partnerType}',
           ),
           _CheckoutDeliveryFact(
-            label: 'Arrives',
-            value: buyV2DeliveryPromiseSummary(
-              promise: group.promise,
-              promisedByLabel: group.promisedByLabel,
-            ),
+            label: group.hasDeliveryEstimate ? 'Arrives' : 'Delivery estimate',
+            value: !group.hasDeliveryEstimate
+                ? 'Unavailable · Check delivery before placing your order'
+                : group.hasPlaceholderDeliveryPromise
+                ? group.promisedByLabel!.trim()
+                : buyV2DeliveryPromiseSummary(
+                    promise: group.promise,
+                    promisedByLabel: group.promisedByLabel,
+                  ),
           ),
           if (group.dispatchPromise case final dispatch?)
             _CheckoutDeliveryFact(label: 'Dispatches', value: dispatch),

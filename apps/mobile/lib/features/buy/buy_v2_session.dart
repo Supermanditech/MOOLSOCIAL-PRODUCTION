@@ -6365,6 +6365,33 @@ class BuyV2Session extends ChangeNotifier {
   bool get checkoutPromiseReviewRequired =>
       _pendingCheckoutPromiseSnapshot != null;
 
+  bool get checkoutDeliveryEstimateReviewRequired =>
+      !collectionCheckoutSelected &&
+      checkoutFulfilmentGroups.any((group) => !group.hasDeliveryEstimate);
+
+  bool refreshCheckoutDeliveryEstimates() {
+    if (checkoutBusy ||
+        checkoutRequiresResolution ||
+        collectionCheckoutSelected) {
+      return false;
+    }
+    var refreshed = true;
+    for (final line in checkoutLines) {
+      if (!refreshProductFacts(line.product.id)) refreshed = false;
+    }
+    if (!refreshed) return false;
+    if (checkoutDeliveryEstimateReviewRequired) {
+      showNotice(
+        'Delivery estimate unavailable. Try again before placing your order.',
+      );
+      return false;
+    }
+    showNotice(
+      'Delivery details updated. Review them before placing your order.',
+    );
+    return true;
+  }
+
   List<BuyV2DeliveryPromiseChange> get checkoutDeliveryPromiseChanges =>
       List.unmodifiable(_checkoutDeliveryPromiseChanges);
 
@@ -8894,6 +8921,12 @@ class BuyV2Session extends ChangeNotifier {
     }
     final groups = checkoutFulfilmentGroups;
     final refreshedSnapshot = _deliveryPromiseSnapshotFor(groups);
+    if (groups.any((group) => !group.hasDeliveryEstimate)) {
+      showNotice(
+        'Delivery estimate unavailable. Check delivery before placing your order.',
+      );
+      return false;
+    }
     if (_checkoutPromiseSnapshot.isEmpty) {
       _checkoutPromiseSnapshot = refreshedSnapshot;
     }
@@ -9054,6 +9087,12 @@ class BuyV2Session extends ChangeNotifier {
       notice = 'Prices changed. Review the updated total to continue.';
       _persistCustomerState();
       notifyListeners();
+      return false;
+    }
+    if (checkoutDeliveryEstimateReviewRequired) {
+      showNotice(
+        'Delivery estimate unavailable. Check delivery before placing your order.',
+      );
       return false;
     }
     return true;

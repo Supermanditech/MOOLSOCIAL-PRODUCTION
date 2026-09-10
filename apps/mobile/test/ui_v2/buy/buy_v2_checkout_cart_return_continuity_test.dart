@@ -231,6 +231,25 @@ class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
   }
 }
 
+class _R669PendingEstimateFacts implements BuyV2ProductFactsAdapter {
+  String? deadline;
+  int? price;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final facts = const BuyV2CatalogueProductFactsAdapter().snapshotFor(
+      product,
+    );
+    if (product.id != 's-milk') return facts;
+    return facts.copyWith(
+      deliveryPromise: 'Delivery time confirmed at checkout',
+      promisedByLabel: deadline,
+      price: price,
+      sourceId: 'r669-delivery-estimate-test-provider',
+    );
+  }
+}
+
 class _DeliveryPromiseFactsAdapter implements BuyV2ProductFactsAdapter {
   @override
   BuyV2ProductFactsSnapshot snapshotFor(
@@ -483,6 +502,155 @@ void main() {
     expect(session.continueCheckoutFromPayment(), isTrue);
     expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
   }
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 final delivery estimate recovery $size $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final facts = _R669PendingEstimateFacts();
+        final session = BuyV2Session(core: core, productFactsAdapter: facts);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-milk'), isTrue);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart(scope: BuyV2CartScope.all);
+        expect(session.openCheckout(), isTrue);
+        advanceCheckoutToConfirm(session);
+        final orderCount = session.orders.length;
+        final total = session.scopedPayableTotal;
+        expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+        expect(session.confirmOrder(), isFalse);
+        expect(await session.submitOrder(), isFalse);
+        expect(session.orders.length, orderCount);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const ValueKey('r66-cart-capture'),
+            child: app(
+              session,
+              size: size,
+              textScale: scale,
+              safeArea: const EdgeInsets.only(top: 24, bottom: 34),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final dock = find.byKey(const ValueKey('buy-checkout-action-bar'));
+        final check = find.descendant(
+          of: dock,
+          matching: find.text('Check delivery'),
+        );
+        expect(check.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(of: dock, matching: find.text('Place order')),
+          findsNothing,
+        );
+        await tester.tap(check);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+        final group = session.checkoutFulfilmentGroups.firstWhere(
+          (group) => group.productIds.contains('s-milk'),
+        );
+        final delivery = find.byKey(
+          ValueKey('buy-checkout-confirm-delivery-${group.key}'),
+        );
+        final unavailable = find.descendant(
+          of: delivery,
+          matching: find.text(
+            'Unavailable · Check delivery before placing your order',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          unavailable,
+          160,
+          maxScrolls: 50,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-confirm')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(unavailable.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.textContaining('at checkout'),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.renderObject<RenderParagraph>(unavailable).didExceedMaxLines,
+          isFalse,
+        );
+        await captureR66Visual(
+          tester,
+          'r669-checkout-estimate-unavailable-${size.width}-$scale',
+        );
+        facts.deadline = '11 September, 2–4 PM';
+        await tester.tap(check);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(session.checkoutDeliveryEstimateReviewRequired, isFalse);
+        expect(
+          find.descendant(of: dock, matching: find.text('Place order')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.text('11 September, 2–4 PM'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.textContaining('at checkout'),
+          ),
+          findsNothing,
+        );
+        await captureR66Visual(
+          tester,
+          'r669-checkout-estimate-ready-${size.width}-$scale',
+        );
+        expect(session.orders.length, orderCount);
+        expect(session.scopedPayableTotal, total);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  test('R669 missing estimate preserves required price review', () async {
+    final core = BuySession();
+    final facts = _R669PendingEstimateFacts();
+    final session = BuyV2Session(core: core, productFactsAdapter: facts);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    session.addProduct('s-milk');
+    session.openCart(scope: BuyV2CartScope.all);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    final orderCount = session.orders.length;
+    facts.price = 77;
+    expect(await session.submitOrder(), isFalse);
+    expect(session.checkoutPriceReviewRequired, isTrue);
+    expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+    facts.deadline = '11 September, 2–4 PM';
+    expect(session.refreshCheckoutDeliveryEstimates(), isTrue);
+    expect(session.checkoutPriceReviewRequired, isTrue);
+    expect(session.orders.length, orderCount);
+  });
 
   for (final size in [const Size(320, 711), const Size(711, 320)]) {
     for (final scale in [1.0, 2.0]) {
@@ -1033,7 +1201,11 @@ void main() {
     earlierCore.dispose();
 
     final core = BuySession();
-    final session = BuyV2Session(core: core, customerStateStore: store);
+    final session = BuyV2Session(
+      core: core,
+      customerStateStore: store,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
     addTearDown(session.dispose);
     addTearDown(core.dispose);
     await session.restoreCustomerState();
@@ -1273,6 +1445,7 @@ void main() {
       final session = BuyV2Session(
         core: BuySession(),
         commercialPaymentTermsAdapter: adapter,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
       );
       addTearDown(session.dispose);
       final shop = productFor(BuyV2Destination.shop);
@@ -1376,6 +1549,7 @@ void main() {
       core: BuySession(),
       checkoutQuoteAdapter: quoteAdapter,
       commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
     );
     addTearDown(session.dispose);
     expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
@@ -1530,6 +1704,7 @@ void main() {
       core: core,
       commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
       balancePaymentAdapter: balanceAdapter,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
     );
     addTearDown(session.dispose);
     addTearDown(core.dispose);
@@ -1585,6 +1760,7 @@ void main() {
         core: BuySession(),
         commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
         balancePaymentAdapter: balanceAdapter,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
       );
       addTearDown(session.dispose);
       final product = productFor(BuyV2Destination.wholesale);
