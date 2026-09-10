@@ -1773,6 +1773,15 @@ class BuyV2ProductPackshot extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final supplierMedia = BuyV2SupplierMediaPolicy.admittedAssets(product);
+    final supplied =
+        supplierMedia
+            .where(
+              (asset) => asset.kind == BuyV2ProductContentMediaKind.network,
+            )
+            .firstOrNull ??
+        supplierMedia.firstOrNull;
+    if (supplied != null) return _supplierPhoto(context, supplied);
     final source = resolveMedia(product);
     if (source == null) {
       return Semantics(
@@ -1866,6 +1875,65 @@ class BuyV2ProductPackshot extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _supplierPhoto(BuildContext context, BuyV2ProductMediaAsset asset) {
+    final video = asset.kind == BuyV2ProductContentMediaKind.networkVideo;
+    final file = video ? asset.binding!.posterFile! : asset.binding!.file;
+    final source = video ? asset.posterSource! : asset.source!;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: ColoredBox(
+        color: Colors.white,
+        child: Padding(
+          padding: EdgeInsets.all(borderRadius / 2),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final targetWidth = constraints.maxWidth.isFinite
+                  ? (constraints.maxWidth *
+                            MediaQuery.devicePixelRatioOf(context))
+                        .ceil()
+                  : file.width;
+              return Image.network(
+                source,
+                key: ValueKey(
+                  'buy-supplier-photo-${product.id}-${asset.id}-${asset.binding!.assetRevision}',
+                ),
+                width: constraints.hasBoundedWidth ? double.infinity : null,
+                height: constraints.hasBoundedHeight ? double.infinity : null,
+                cacheWidth: targetWidth.clamp(1, file.width),
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
+                frameBuilder: (context, child, frame, synchronouslyLoaded) =>
+                    frame != null || synchronouslyLoaded
+                    ? Semantics(
+                        image: true,
+                        label: video
+                            ? 'Video preview. ${asset.semanticLabel}'
+                            : asset.semanticLabel,
+                        child: child,
+                      )
+                    : Semantics(
+                        label:
+                            'Loading supplier photo for ${product.title}, ${product.pack}',
+                        child: const Center(
+                          child: Icon(
+                            Icons.photo_outlined,
+                            color: BuyV2Colors.muted,
+                          ),
+                        ),
+                      ),
+                errorBuilder: (context, error, stackTrace) =>
+                    BuyV2ProductPhotoUnavailable(
+                      product: product,
+                      borderRadius: borderRadius,
+                    ),
+              );
+            },
           ),
         ),
       ),

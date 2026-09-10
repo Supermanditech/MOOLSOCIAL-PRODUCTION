@@ -7,6 +7,13 @@ import '../work/scan_and_pick_contract.dart';
 import 'buy_v2_cart_contracts.dart';
 import 'buy_v2_models.dart';
 
+export 'buy_v2_models.dart'
+    show
+        BuyV2ProductContentMediaKind,
+        BuyV2ProductMediaAsset,
+        BuyV2MediaFileMetadata,
+        BuyV2ProductMediaBinding;
+
 enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
 
 enum BuyV2StoreOperatingState { unknown, open, closed }
@@ -423,47 +430,177 @@ abstract interface class BuyV2ProductFactsAdapter {
 
 enum BuyV2ProductContentState { ready, loading, offline, unavailable }
 
-enum BuyV2ProductContentMediaKind {
-  cataloguePackshot,
-  asset,
-  network,
-  networkVideo,
-}
-
-@immutable
-class BuyV2ProductMediaAsset {
-  const BuyV2ProductMediaAsset({
-    required this.id,
-    required this.label,
-    required this.semanticLabel,
-    required this.kind,
-    this.source,
-    this.posterSource,
-    this.transcript,
-  }) : assert(
-         kind == BuyV2ProductContentMediaKind.cataloguePackshot ||
-             (source != null && source != ''),
-       ),
-       assert(
-         kind != BuyV2ProductContentMediaKind.networkVideo ||
-             (transcript != null && transcript != ''),
-       );
-
-  final String id;
-  final String label;
-  final String semanticLabel;
-  final BuyV2ProductContentMediaKind kind;
-  final String? source;
-  final String? posterSource;
-  final String? transcript;
-}
-
 @immutable
 class BuyV2ProductSpecification {
   const BuyV2ProductSpecification({required this.label, required this.value});
 
   final String label;
   final String value;
+}
+
+/// The initial supplier publication contract, not proof of a successful upload
+/// or of bytes decoded by a backend. Sources must inspect/normalize the file
+/// and publish an immutable HTTPS URI for each asset revision.
+abstract final class BuyV2SupplierMediaPolicy {
+  static const imageMimeTypes = {'image/jpeg', 'image/png', 'image/webp'};
+  static const maximumImageBytes = 10 * 1024 * 1024;
+  static const maximumVideoBytes = 50 * 1024 * 1024;
+  static const maximumAssets = 10;
+
+  static String? inputMessage({
+    required bool video,
+    required BuyV2MediaFileMetadata file,
+  }) {
+    if (file.width <= 0 || file.height <= 0 || file.byteLength <= 0) {
+      return 'The file dimensions and size could not be confirmed.';
+    }
+    if (video) return _videoMessage(file);
+    if (!imageMimeTypes.contains(file.mimeType)) {
+      return 'Provide a static JPEG, PNG or WebP product photo.';
+    }
+    if (file.frameCount != 1 ||
+        file.duration != null ||
+        file.frameRate != null ||
+        file.videoCodec != null ||
+        file.videoProfile != null ||
+        file.audioCodec != null) {
+      return 'Provide a static product photo without animation or audio.';
+    }
+    if (file.byteLength > maximumImageBytes) {
+      return 'Each product photo must be 10 MiB or smaller.';
+    }
+    if (file.width < 512 ||
+        file.height < 512 ||
+        file.width > 8192 ||
+        file.height > 8192 ||
+        file.width * file.height > 24000000) {
+      return 'Use photos with both sides at least 512 pixels, no side above 8192 pixels, and at most 24 megapixels.';
+    }
+    return null;
+  }
+
+  static String? _videoMessage(BuyV2MediaFileMetadata file) {
+    if (file.mimeType != 'video/mp4' ||
+        file.videoCodec != 'h264' ||
+        file.videoProfile != 'baseline' ||
+        (file.audioCodec != null && file.audioCodec != 'aac-lc')) {
+      return 'Provide an MP4 video with H.264 Baseline video and optional AAC-LC audio.';
+    }
+    if (file.byteLength > maximumVideoBytes) {
+      return 'Each product video must be 50 MiB or smaller.';
+    }
+    final duration = file.duration;
+    final rate = file.frameRate;
+    if (duration == null ||
+        duration <= Duration.zero ||
+        duration > const Duration(seconds: 60) ||
+        rate == null ||
+        !rate.isFinite ||
+        rate <= 0 ||
+        rate > 30) {
+      return 'Use a video up to 60 seconds long and 30 frames per second.';
+    }
+    final longSide = file.width > file.height ? file.width : file.height;
+    final shortSide = file.width < file.height ? file.width : file.height;
+    if (shortSide <= 0 || longSide > 1280 || shortSide > 720) {
+      return 'Use video up to 1280 by 720 pixels, in portrait or landscape.';
+    }
+    return null;
+  }
+
+  static String? _publishedFileMessage({
+    required bool video,
+    required BuyV2MediaFileMetadata file,
+  }) {
+    if (!file.normalized) {
+      return 'This supplier file has not been prepared for display.';
+    }
+    if (file.byteLength <= 0 || file.width <= 0 || file.height <= 0) {
+      return 'The supplier file size could not be confirmed.';
+    }
+    if (video) return _videoMessage(file);
+    if (!imageMimeTypes.contains(file.mimeType) ||
+        file.byteLength > maximumImageBytes ||
+        file.width < 128 ||
+        file.height < 128 ||
+        file.width > 2048 ||
+        file.height > 2048 ||
+        file.width * file.height > 4000000 ||
+        file.frameCount != 1 ||
+        file.duration != null ||
+        file.frameRate != null ||
+        file.videoCodec != null ||
+        file.videoProfile != null ||
+        file.audioCodec != null) {
+      return 'This supplier photo does not meet the display format or size limits.';
+    }
+    return null;
+  }
+
+  static bool _identity(String value) =>
+      value.isNotEmpty && value.trim() == value;
+
+  static bool _https(String? value) {
+    final uri = value == null ? null : Uri.tryParse(value);
+    return uri != null &&
+        uri.scheme == 'https' &&
+        uri.host.isNotEmpty &&
+        uri.userInfo.isEmpty &&
+        uri.fragment.isEmpty;
+  }
+
+  static String? publicationMessage(
+    BuyV2Product product,
+    BuyV2ProductMediaAsset asset,
+  ) {
+    final binding = asset.binding;
+    if (!_identity(asset.id) ||
+        asset.label.trim().isEmpty ||
+        asset.semanticLabel.trim().isEmpty ||
+        binding == null ||
+        !_identity(binding.supplierWorkspaceId) ||
+        !_identity(binding.assetRevision) ||
+        !_identity(binding.storeId) ||
+        binding.storeId != product.storeId ||
+        !_identity(binding.productId) ||
+        !_identity(binding.skuId) ||
+        binding.productId != product.canonicalId ||
+        binding.skuId != product.id) {
+      return 'This supplier photo or video could not be matched to the selected pack.';
+    }
+    final supplier = product.procurementSupplierGrant;
+    if (supplier != null &&
+        supplier.workspaceId != binding.supplierWorkspaceId) {
+      return 'This media belongs to a different supplier workspace.';
+    }
+    final video = asset.kind == BuyV2ProductContentMediaKind.networkVideo;
+    if ((!video && asset.kind != BuyV2ProductContentMediaKind.network) ||
+        !_https(asset.source)) {
+      return 'This supplier photo or video has no valid secure source.';
+    }
+    final fileMessage = _publishedFileMessage(video: video, file: binding.file);
+    if (fileMessage != null) return fileMessage;
+    if (video) {
+      final poster = binding.posterFile;
+      if (!_https(asset.posterSource) ||
+          poster == null ||
+          _publishedFileMessage(video: false, file: poster) != null ||
+          asset.transcript?.trim().isNotEmpty != true) {
+        return 'This supplier video needs a valid still preview and transcript.';
+      }
+    }
+    return null;
+  }
+
+  static List<BuyV2ProductMediaAsset> admittedAssets(BuyV2Product product) {
+    final seen = <String>{};
+    return List.unmodifiable(
+      product.mediaAssets
+          .where((asset) => publicationMessage(product, asset) == null)
+          .where((asset) => seen.add(asset.id))
+          .take(maximumAssets),
+    );
+  }
 }
 
 @immutable
@@ -1441,20 +1578,26 @@ final class BuyV2CatalogueProductContentAdapter
   @override
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
     final returnDetail = product.returnPolicy;
+    final supplierMedia = BuyV2SupplierMediaPolicy.admittedAssets(product);
     return BuyV2ProductContentSnapshot(
       productId: product.id,
       state: BuyV2ProductContentState.ready,
       sourceId: 'approved-buy-catalogue',
-      media: [
-        BuyV2ProductMediaAsset(
-          id: '${product.id}-packshot',
-          label: 'Catalogue illustration',
-          semanticLabel:
-              'Illustration for ${product.title}. '
-              'Supplier photo of this pack is unavailable.',
-          kind: BuyV2ProductContentMediaKind.cataloguePackshot,
-        ),
-      ],
+      media: supplierMedia.isNotEmpty
+          ? List.unmodifiable(supplierMedia)
+          : [
+              BuyV2ProductMediaAsset(
+                id: '${product.id}-packshot',
+                label: 'Catalogue illustration',
+                semanticLabel:
+                    'Illustration for ${product.title}. '
+                    'Supplier photo of this pack is unavailable.',
+                kind: BuyV2ProductContentMediaKind.cataloguePackshot,
+              ),
+            ],
+      customerMessage: supplierMedia.length < product.mediaAssets.length
+          ? 'Some supplier photos or videos could not be displayed for this pack.'
+          : null,
       highlights: [product.variant, product.unitPrice, ?returnDetail],
       specifications: [
         BuyV2ProductSpecification(label: 'Brand', value: product.brandLabel),

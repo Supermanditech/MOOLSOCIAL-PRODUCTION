@@ -593,6 +593,17 @@ class BuyV2ProductView extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
+              if (content.state == BuyV2ProductContentState.ready &&
+                  product.mediaAssets.isNotEmpty &&
+                  content.customerMessage?.trim().isNotEmpty == true)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Text(
+                    content.customerMessage!,
+                    key: ValueKey('buy-product-media-notice-${product.id}'),
+                    style: context.buyMeta,
+                  ),
+                ),
               BuyV2FiniteIncomingTransition(
                 key: ValueKey('buy-product-title-reveal-${product.id}'),
                 stateKey: 'buy-product-title-${product.id}',
@@ -3300,7 +3311,7 @@ class _ProductContentMediaSurface extends StatelessWidget {
     return switch (media.kind) {
       BuyV2ProductContentMediaKind.cataloguePackshot => BuyV2ProductPackshot(
         key: ValueKey('buy-product-gallery-image-${media.id}'),
-        product: product,
+        product: product.copyWith(mediaAssets: const []),
         borderRadius: 17,
         animateFirstFrame: true,
       ),
@@ -3535,6 +3546,22 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
               ? (viewportHeight * .23).clamp(128.0, 160.0)
               : (viewportHeight * .29).clamp(174.0, 238.0)
         : (viewportHeight * .38).clamp(252.0, 320.0);
+    final badgeMeasure = TextPainter(
+      text: TextSpan(
+        text: product.badge.trim().isNotEmpty
+            ? product.badge
+            : '1 of ${widget.media.length}',
+        style: DefaultTextStyle.of(context).style.merge(
+          const TextStyle(fontSize: 8, fontWeight: FontWeight.w900),
+        ),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: 136);
+    final mediaTop = product.badge.trim().isNotEmpty || hasMultipleMedia
+        ? badgeMeasure.height + 8 + 9
+        : 0.0;
+    badgeMeasure.dispose();
     return Semantics(
       container: true,
       label: hasMultipleMedia
@@ -3543,7 +3570,7 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
                 'Swipe to browse.'
           : 'Product media for ${product.title}',
       child: Container(
-        height: galleryHeight,
+        height: galleryHeight + mediaTop,
         clipBehavior: Clip.antiAlias,
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -3561,6 +3588,7 @@ class _BuyV2ProductGalleryState extends State<_BuyV2ProductGallery> {
         child: Stack(
           children: [
             Positioned.fill(
+              top: mediaTop,
               child: PageView.builder(
                 key: ValueKey('buy-product-gallery-${product.id}'),
                 controller: _controller,

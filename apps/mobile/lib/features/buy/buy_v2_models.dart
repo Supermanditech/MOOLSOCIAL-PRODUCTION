@@ -302,6 +302,92 @@ class BuyV2ProductCompliance {
   final String? consumerCare;
 }
 
+enum BuyV2ProductContentMediaKind {
+  cataloguePackshot,
+  asset,
+  network,
+  networkVideo,
+}
+
+/// Provider-inspected file facts. Client validation cannot verify file bytes.
+class BuyV2MediaFileMetadata {
+  const BuyV2MediaFileMetadata({
+    required this.mimeType,
+    required this.byteLength,
+    required this.width,
+    required this.height,
+    this.normalized = false,
+    this.frameCount,
+    this.duration,
+    this.frameRate,
+    this.videoCodec,
+    this.videoProfile,
+    this.audioCodec,
+  });
+
+  final String mimeType;
+  final int byteLength;
+  final int width;
+  final int height;
+  final bool normalized;
+  final int? frameCount;
+  final Duration? duration;
+  final double? frameRate;
+  final String? videoCodec;
+  final String? videoProfile;
+  final String? audioCodec;
+}
+
+/// Explicit publication identity, never inferred from a product title/category.
+class BuyV2ProductMediaBinding {
+  const BuyV2ProductMediaBinding({
+    required this.supplierWorkspaceId,
+    required this.storeId,
+    required this.productId,
+    required this.skuId,
+    required this.assetRevision,
+    required this.file,
+    this.posterFile,
+  });
+
+  final String supplierWorkspaceId;
+  final String storeId;
+  final String productId;
+  final String skuId;
+  final String assetRevision;
+  final BuyV2MediaFileMetadata file;
+  final BuyV2MediaFileMetadata? posterFile;
+}
+
+class BuyV2ProductMediaAsset {
+  const BuyV2ProductMediaAsset({
+    required this.id,
+    required this.label,
+    required this.semanticLabel,
+    required this.kind,
+    this.source,
+    this.posterSource,
+    this.transcript,
+    this.binding,
+  }) : assert(
+         kind == BuyV2ProductContentMediaKind.cataloguePackshot ||
+             (source != null && source != ''),
+       ),
+       assert(
+         kind != BuyV2ProductContentMediaKind.networkVideo ||
+             (transcript != null && transcript != ''),
+       );
+
+  final String id;
+  final String label;
+  final String semanticLabel;
+  final BuyV2ProductContentMediaKind kind;
+  final String? source;
+  final String? posterSource;
+  final String? transcript;
+  final BuyV2ProductMediaBinding? binding;
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -324,6 +410,7 @@ class BuyV2Product {
     required this.visualKind,
     this.merchandisingLabel = '',
     this.procurementSupplierGrant,
+    this.mediaAssets = const [],
     this.storeId,
     this.mrp,
     this.requiresPrescription = false,
@@ -350,6 +437,7 @@ class BuyV2Product {
   /// A catalogue grouping is not a brand or manufacturer identity.
   final String merchandisingLabel;
   final BuyV2ProcurementSupplierGrant? procurementSupplierGrant;
+  final List<BuyV2ProductMediaAsset> mediaAssets;
   String get brandLabel =>
       brand.trim().isEmpty ? 'Brand not provided' : brand.trim();
   final String title;
@@ -384,6 +472,7 @@ class BuyV2Product {
     String? brand,
     String? merchandisingLabel,
     BuyV2ProcurementSupplierGrant? procurementSupplierGrant,
+    List<BuyV2ProductMediaAsset>? mediaAssets,
     String? title,
     String? origin,
     String? variant,
@@ -409,6 +498,7 @@ class BuyV2Product {
     merchandisingLabel: merchandisingLabel ?? this.merchandisingLabel,
     procurementSupplierGrant:
         procurementSupplierGrant ?? this.procurementSupplierGrant,
+    mediaAssets: mediaAssets ?? this.mediaAssets,
     title: title ?? this.title,
     variant: variant ?? this.variant,
     pack: pack ?? this.pack,

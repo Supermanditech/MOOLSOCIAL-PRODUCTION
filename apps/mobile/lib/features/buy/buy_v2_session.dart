@@ -2866,6 +2866,7 @@ class BuyV2Session extends ChangeNotifier {
     retained.addAll(_catalogueProducts.map((product) => product.id));
     _productFacts.removeWhere((id, _) => !retained.contains(id));
     _productContent.removeWhere((id, _) => !retained.contains(id));
+    _productContentMediaInputs.removeWhere((id, _) => !retained.contains(id));
     _marketplaceTrust.removeWhere((id, _) => !retained.contains(id));
     _productBenefits.removeWhere((id, _) => !retained.contains(id));
     _productBenefitStates.removeWhere((id, _) => !retained.contains(id));
@@ -3747,6 +3748,8 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2CartLine> _cart = {};
   final Map<String, BuyV2ProductFactsSnapshot> _productFacts = {};
   final Map<String, BuyV2ProductContentSnapshot> _productContent = {};
+  final Map<String, List<BuyV2ProductMediaAsset>> _productContentMediaInputs =
+      {};
   final Map<String, BuyV2MarketplaceTrustSnapshot> _marketplaceTrust = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
@@ -7597,6 +7600,15 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   BuyV2ProductContentSnapshot productContentFor(BuyV2Product product) {
+    if (!listEquals(
+      _productContentMediaInputs[product.id],
+      product.mediaAssets,
+    )) {
+      _productContent.remove(product.id);
+      _productContentMediaInputs[product.id] = List.unmodifiable(
+        product.mediaAssets,
+      );
+    }
     return _productContent.putIfAbsent(product.id, () {
       final next = productContentAdapter.snapshotFor(product);
       return _validProductContent(product, next)
@@ -7620,6 +7632,9 @@ class BuyV2Session extends ChangeNotifier {
     }
     final previous = _productContent[product.id];
     _productContent[product.id] = next;
+    _productContentMediaInputs[product.id] = List.unmodifiable(
+      product.mediaAssets,
+    );
     if (!identical(previous, next)) notifyListeners();
     return true;
   }
@@ -7637,7 +7652,10 @@ class BuyV2Session extends ChangeNotifier {
           item.id.trim().isEmpty ||
           !mediaIds.add(item.id) ||
           item.label.trim().isEmpty ||
-          item.semanticLabel.trim().isEmpty,
+          item.semanticLabel.trim().isEmpty ||
+          (item.binding != null &&
+              BuyV2SupplierMediaPolicy.publicationMessage(product, item) !=
+                  null),
     )) {
       return false;
     }
