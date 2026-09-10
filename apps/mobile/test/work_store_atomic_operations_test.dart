@@ -385,6 +385,357 @@ WorkspaceGroupOffer _groupOffer(
 );
 
 void main() {
+  group('DASH15 counter draft journal', () {
+    WorkspaceCounterDraft draft({
+      String account = 'account-A',
+      String store = 'store-A',
+      String id = 'bill-A',
+      int revision = 1,
+      WorkspaceCounterDraftStage stage = WorkspaceCounterDraftStage.editing,
+      String? order,
+      String customer = '9000000013',
+      List<WorkspaceOrderItemSnapshot>? lines,
+    }) => WorkspaceCounterDraft(
+      account: account,
+      store: store,
+      id: id,
+      revision: revision,
+      stage: stage,
+      customer: customer,
+      source: 'Counter',
+      fulfilment: 'At the shop',
+      payment: 'Cash',
+      address: 'दुकान के पास',
+      submissionOrderId: order,
+      lines:
+          lines ??
+          const [
+            WorkspaceOrderItemSnapshot(
+              productId: 'atta-5kg',
+              name: 'आटा',
+              pack: '5 kg',
+              quantity: 2,
+              unitPricePaise: 27500,
+              lineTotalPaise: 55000,
+            ),
+          ],
+    );
+
+    test('retains exact snapshot through a new storage instance', () async {
+      final storage = _OrderJournalStorage();
+      final first = SecureWorkCounterDraftStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      await first.save(draft(), expectedRevision: null);
+      final restarted = SecureWorkCounterDraftStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      final restored = (await restarted.read('account-A', 'store-A'))!;
+      expect(restored.toJson(), draft().toJson());
+      expect(restored.stage, WorkspaceCounterDraftStage.editing);
+      expect(restored.submissionOrderId, isNull);
+      expect(restored.lines.single.lineTotalPaise, 55000);
+      expect(() => restored.lines.clear(), throwsUnsupportedError);
+      expect(
+        storage.values.keys.single,
+        startsWith('moolsocial.workspace.counter-draft.v1.'),
+      );
+    });
+
+    test('isolates account Store and encoded path separators', () async {
+      final storage = _OrderJournalStorage();
+      var account = 'account/A';
+      final journal = SecureWorkCounterDraftStore(
+        accountScope: () => account,
+        storage: storage,
+      );
+      await journal.save(
+        draft(account: account, store: 'B'),
+        expectedRevision: null,
+      );
+      account = 'account';
+      expect(await journal.read(account, 'A/B'), isNull);
+      await journal.save(
+        draft(account: account, store: 'A/B'),
+        expectedRevision: null,
+      );
+      expect(storage.values, hasLength(2));
+      await expectLater(
+        journal.read('account/A', 'B'),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(await journal.read(account, 'another-store'), isNull);
+      await expectLater(
+        journal.save(draft(), expectedRevision: null),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(storage.writes, hasLength(2));
+    });
+
+    test(
+      'rejects corrupted schema money quantities and collection purpose',
+      () {
+        final invalid = <Map<String, Object?>>[
+          {...draft().toJson(), 'version': 2},
+          {...draft().toJson(), 'purpose': 'customer-collection'},
+          {...draft().toJson(), 'stage': 'paid'},
+          {...draft().toJson(), 'source': 'App'},
+          {...draft().toJson(), 'revision': 0},
+          {...draft().toJson(), 'revision': '1'},
+          {...draft().toJson(), 'stage': 'submitting'},
+          {...draft().toJson(), 'submissionOrderId': 'ORDER-A'},
+        ];
+        final line = ((draft().toJson()['lines'] as List).single as Map)
+            .cast<String, Object?>();
+        for (final changed in [
+          {...line, 'quantity': 0},
+          {...line, 'quantity': -1},
+          {...line, 'quantity': 1.5},
+          {...line, 'unitPricePaise': '27500'},
+          {...line, 'unitPricePaise': -1},
+          {...line, 'lineTotalPaise': 1},
+          {
+            ...line,
+            'quantity': 3,
+            'unitPricePaise': 9223372036854775807,
+            'lineTotalPaise': 9223372036854775805,
+          },
+          {...line, 'productId': ''},
+          {...line, 'name': ''},
+          {...line, 'pack': ''},
+        ]) {
+          invalid.add({
+            ...draft().toJson(),
+            'lines': [changed],
+          });
+        }
+        invalid.add({
+          ...draft().toJson(),
+          'lines': [line, line],
+        });
+        for (final value in invalid) {
+          expect(
+            WorkspaceCounterDraft.fromJson(value),
+            isNull,
+            reason: jsonEncode(value),
+          );
+        }
+      },
+    );
+
+    test('retains every selected line and large integer amounts', () async {
+      final storage = _OrderJournalStorage();
+      final journal = SecureWorkCounterDraftStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      final large = draft(
+        lines: List.generate(
+          1200,
+          (index) => WorkspaceOrderItemSnapshot(
+            productId: 'SKU-$index',
+            name: 'Product $index',
+            pack: 'Case',
+            quantity: 2,
+            unitPricePaise: 1000000000000,
+            lineTotalPaise: 2000000000000,
+          ),
+        ),
+      );
+      await journal.save(large, expectedRevision: null);
+      final restored = (await journal.read('account-A', 'store-A'))!;
+      expect(restored.lines, hasLength(1200));
+      expect(restored.toJson(), large.toJson());
+    });
+
+    test(
+      'serializes writers and rejects stale edits after retirement',
+      () async {
+        final storage = _OrderJournalStorage();
+        final journal = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        final other = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        await journal.save(draft(), expectedRevision: null);
+        storage.holdWrite = Completer<void>();
+        final edit = journal.save(
+          draft(revision: 2, customer: '9000000014'),
+          expectedRevision: 1,
+        );
+        await _drainOrderJournal();
+        final retire = other.save(
+          draft(revision: 3, stage: WorkspaceCounterDraftStage.retired),
+          expectedRevision: 2,
+        );
+        final stale = expectLater(
+          other.save(draft(revision: 2), expectedRevision: 1),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(storage.writes, hasLength(2));
+        storage.holdWrite!.complete();
+        await edit;
+        await retire;
+        await stale;
+        final restored = (await other.read('account-A', 'store-A'))!;
+        expect(restored.stage, WorkspaceCounterDraftStage.retired);
+        expect(restored.revision, 3);
+        expect(storage.writes, hasLength(3));
+        await expectLater(
+          journal.save(draft(revision: 4), expectedRevision: 3),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await journal.save(
+          draft(id: 'bill-B', revision: 4),
+          expectedRevision: 3,
+        );
+        expect((await journal.read('account-A', 'store-A'))!.id, 'bill-B');
+      },
+    );
+
+    test('interrupted submission cannot reopen or change its order', () async {
+      final storage = _OrderJournalStorage();
+      final journal = SecureWorkCounterDraftStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      await journal.save(draft(), expectedRevision: null);
+      final submitted = draft(
+        revision: 2,
+        stage: WorkspaceCounterDraftStage.submitting,
+        order: 'ORDER-A',
+      );
+      await journal.save(submitted, expectedRevision: 1);
+      final restarted = SecureWorkCounterDraftStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      expect(
+        (await restarted.read('account-A', 'store-A'))!.toJson(),
+        submitted.toJson(),
+      );
+      await restarted.save(submitted, expectedRevision: 1);
+      expect(storage.writes, hasLength(2));
+      for (final changed in [
+        draft(revision: 3),
+        draft(id: 'new-bill', revision: 3),
+        draft(
+          revision: 3,
+          stage: WorkspaceCounterDraftStage.submitting,
+          order: 'ORDER-B',
+        ),
+        draft(
+          revision: 3,
+          stage: WorkspaceCounterDraftStage.retired,
+          order: 'ORDER-B',
+        ),
+      ]) {
+        await expectLater(
+          restarted.save(changed, expectedRevision: 2),
+          throwsA(isA<WorkGatewayException>()),
+        );
+      }
+      await restarted.save(
+        draft(
+          revision: 3,
+          stage: WorkspaceCounterDraftStage.retired,
+          order: 'ORDER-A',
+        ),
+        expectedRevision: 2,
+      );
+      expect(
+        (await restarted.read('account-A', 'store-A'))!.stage,
+        WorkspaceCounterDraftStage.retired,
+      );
+    });
+
+    test('failed reads and writes preserve the previous checkpoint', () async {
+      final storage = _OrderJournalStorage();
+      final journal = SecureWorkCounterDraftStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      await journal.save(draft(), expectedRevision: null);
+      final before = Map<String, String>.from(storage.values);
+      storage.failRead = true;
+      await expectLater(
+        journal.save(draft(revision: 2), expectedRevision: 1),
+        throwsStateError,
+      );
+      expect(storage.writes, hasLength(1));
+      storage.failRead = false;
+      storage.failWrite = true;
+      await expectLater(
+        journal.save(draft(revision: 2), expectedRevision: 1),
+        throwsStateError,
+      );
+      expect(storage.values, before);
+      storage.failWrite = false;
+      await journal.save(draft(revision: 2), expectedRevision: 1);
+      expect((await journal.read('account-A', 'store-A'))!.revision, 2);
+    });
+
+    test('malformed or cross Store stored data is never overwritten', () async {
+      final storage = _OrderJournalStorage();
+      final journal = SecureWorkCounterDraftStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      await journal.save(draft(), expectedRevision: null);
+      for (final invalid in [
+        '{invalid',
+        jsonEncode(draft(store: 'other').toJson()),
+      ]) {
+        storage.values[storage.values.keys.single] = invalid;
+        await expectLater(
+          journal.read('account-A', 'store-A'),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await expectLater(
+          journal.save(draft(revision: 2), expectedRevision: 1),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(storage.values.values.single, invalid);
+      }
+      expect(storage.writes, hasLength(1));
+    });
+
+    test(
+      'account changes during write do not leak another account draft',
+      () async {
+        final storage = _OrderJournalStorage()..holdWrite = Completer<void>();
+        var account = 'account-A';
+        final journal = SecureWorkCounterDraftStore(
+          accountScope: () => account,
+          storage: storage,
+        );
+        final writing = expectLater(
+          journal.save(draft(), expectedRevision: null),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await _drainOrderJournal();
+        account = 'account-B';
+        storage.holdWrite!.complete();
+        await writing;
+        expect(await journal.read(account, 'store-A'), isNull);
+        await expectLater(
+          journal.read('account-A', 'store-A'),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        account = 'account-A';
+        expect(
+          (await journal.read(account, 'store-A'))!.toJson(),
+          draft().toJson(),
+        );
+      },
+    );
+  });
+
   test(
     'DASH11 supplier roles exclude retailer consumer and ambiguous names',
     () {

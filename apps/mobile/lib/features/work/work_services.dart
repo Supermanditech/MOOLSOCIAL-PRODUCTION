@@ -186,6 +186,119 @@ class SecureWorkIssueDraftStore implements WorkIssueDraftStore {
   }
 }
 
+abstract interface class WorkCounterDraftStore {
+  Future<WorkspaceCounterDraft?> read(String account, String store);
+  Future<void> save(
+    WorkspaceCounterDraft draft, {
+    required int? expectedRevision,
+  });
+}
+
+/// Device-local encrypted recovery, not an order/payment completion journal.
+/// A submitting draft cannot be restored as editable work. Its exact operation
+/// must be reconciled by the caller before retiring it. Keep a revisioned
+/// tombstone after discard/completion so delayed edits cannot revive the sale.
+class SecureWorkCounterDraftStore implements WorkCounterDraftStore {
+  SecureWorkCounterDraftStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  static final Map<String, Future<void>> _pending = {};
+
+  String _key(String account, String store) =>
+      'moolsocial.workspace.counter-draft.v1.'
+      '${Uri.encodeComponent(account)}/${Uri.encodeComponent(store)}';
+
+  // Serialize across session/store instances in the UI isolate. Do not time
+  // out a native write and release the queue while that write can still land.
+  // Distributed/cross-device concurrency belongs to the backend, not this key.
+  Future<T> _exclusive<T>(String key, Future<T> Function() action) {
+    final result = (_pending[key] ?? Future<void>.value()).then(
+      (_) => action(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _pending[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_pending[key], tail)) _pending.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  void _checkAccount(String account, String store) {
+    if (account.trim().isEmpty ||
+        store.trim().isEmpty ||
+        accountScope() != account) {
+      throw const WorkGatewayException('Sign in again to recover this bill.');
+    }
+  }
+
+  Future<WorkspaceCounterDraft?> _read(String account, String store) async {
+    _checkAccount(account, store);
+    final value = await _storage.read(key: _key(account, store));
+    _checkAccount(account, store);
+    if (value == null) return null;
+    WorkspaceCounterDraft? draft;
+    try {
+      draft = WorkspaceCounterDraft.fromJson(jsonDecode(value));
+    } on FormatException {
+      // Invalid retained bytes are not an empty bill and must not be replaced.
+    }
+    if (draft == null || draft.account != account || draft.store != store) {
+      throw const WorkGatewayException('Your saved bill could not be opened.');
+    }
+    return draft;
+  }
+
+  @override
+  Future<WorkspaceCounterDraft?> read(String account, String store) =>
+      _exclusive(_key(account, store), () => _read(account, store));
+
+  @override
+  Future<void> save(
+    WorkspaceCounterDraft draft, {
+    required int? expectedRevision,
+  }) => _exclusive(_key(draft.account, draft.store), () async {
+    _checkAccount(draft.account, draft.store);
+    if (!draft.valid ||
+        (expectedRevision != null && expectedRevision < 1) ||
+        draft.revision != (expectedRevision ?? 0) + 1) {
+      throw const WorkGatewayException('This bill could not be saved.');
+    }
+    final current = await _read(draft.account, draft.store);
+    final value = jsonEncode(draft.toJson());
+    if (current != null && jsonEncode(current.toJson()) == value) {
+      return; // Same write retried after an uncertain local result.
+    }
+    if (current?.revision != expectedRevision ||
+        (current == null &&
+            draft.stage != WorkspaceCounterDraftStage.editing) ||
+        (current != null &&
+            (current.id == draft.id
+                ? current.stage == WorkspaceCounterDraftStage.retired ||
+                      (current.stage == WorkspaceCounterDraftStage.submitting &&
+                          (draft.stage != WorkspaceCounterDraftStage.retired ||
+                              draft.submissionOrderId !=
+                                  current.submissionOrderId))
+                : current.stage != WorkspaceCounterDraftStage.retired ||
+                      draft.stage != WorkspaceCounterDraftStage.editing))) {
+      throw const WorkGatewayException(
+        'This saved bill changed. Reopen it before continuing.',
+      );
+    }
+    _checkAccount(draft.account, draft.store);
+    await _storage.write(key: _key(draft.account, draft.store), value: value);
+    _checkAccount(draft.account, draft.store);
+  });
+}
+
 enum WorkIssueReplyState { applied, rejected, pending, notRecorded }
 
 enum WorkIssueResponseError {

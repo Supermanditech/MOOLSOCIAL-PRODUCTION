@@ -746,6 +746,170 @@ class WorkspaceOrderItemSnapshot {
   final int quantity, unitPricePaise, lineTotalPaise;
 }
 
+/// Local composer recovery only. These stages grant no order/payment authority.
+enum WorkspaceCounterDraftStage { editing, submitting, retired }
+
+class WorkspaceCounterDraft {
+  WorkspaceCounterDraft({
+    required this.account,
+    required this.store,
+    required this.id,
+    required this.revision,
+    required this.stage,
+    required this.customer,
+    required this.source,
+    required this.fulfilment,
+    required this.payment,
+    required this.address,
+    required List<WorkspaceOrderItemSnapshot> lines,
+    this.submissionOrderId,
+  }) : lines = List.unmodifiable(lines);
+
+  final String account,
+      store,
+      id,
+      customer,
+      source,
+      fulfilment,
+      payment,
+      address;
+  final int revision;
+  final WorkspaceCounterDraftStage stage;
+  final String? submissionOrderId;
+  final List<WorkspaceOrderItemSnapshot> lines;
+
+  bool get valid =>
+      account.trim().isNotEmpty &&
+      store.trim().isNotEmpty &&
+      id.trim().isNotEmpty &&
+      revision > 0 &&
+      const {'Counter', 'Phone', 'Chat'}.contains(source) &&
+      const {
+        'At the shop',
+        'Own delivery',
+        'Mool delivery',
+      }.contains(fulfilment) &&
+      const {
+        'Cash',
+        'UPI',
+        'Pay request',
+        'On delivery',
+        'Customer due',
+      }.contains(payment) &&
+      (stage != WorkspaceCounterDraftStage.editing ||
+          submissionOrderId == null) &&
+      (stage != WorkspaceCounterDraftStage.submitting ||
+          (submissionOrderId?.trim().isNotEmpty == true &&
+              customer.trim().isNotEmpty &&
+              lines.isNotEmpty)) &&
+      lines.map((line) => line.productId).toSet().length == lines.length &&
+      lines.every(
+        (line) =>
+            line.productId.trim().isNotEmpty &&
+            line.name.trim().isNotEmpty &&
+            line.pack.trim().isNotEmpty &&
+            line.quantity > 0 &&
+            line.unitPricePaise >= 0 &&
+            line.lineTotalPaise >= 0 &&
+            line.lineTotalPaise ~/ line.quantity == line.unitPricePaise &&
+            line.lineTotalPaise % line.quantity == 0,
+      );
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'purpose': 'counter-bill-draft',
+    'account': account,
+    'store': store,
+    'id': id,
+    'revision': revision,
+    'stage': stage.name,
+    'customer': customer,
+    'source': source,
+    'fulfilment': fulfilment,
+    'payment': payment,
+    'address': address,
+    'submissionOrderId': submissionOrderId,
+    'lines': [
+      for (final line in lines)
+        {
+          'productId': line.productId,
+          'name': line.name,
+          'pack': line.pack,
+          'quantity': line.quantity,
+          'unitPricePaise': line.unitPricePaise,
+          'lineTotalPaise': line.lineTotalPaise,
+        },
+    ],
+  };
+
+  static WorkspaceCounterDraft? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['purpose'] != 'counter-bill-draft' ||
+        value['revision'] is! int ||
+        value['lines'] is! List ||
+        !const [
+          'account',
+          'store',
+          'id',
+          'customer',
+          'source',
+          'fulfilment',
+          'payment',
+          'address',
+        ].every((key) => value[key] is String) ||
+        (value['submissionOrderId'] != null &&
+            value['submissionOrderId'] is! String)) {
+      return null;
+    }
+    final stage = WorkspaceCounterDraftStage.values
+        .where((stage) => stage.name == value['stage'])
+        .firstOrNull;
+    if (stage == null) return null;
+    final lines = <WorkspaceOrderItemSnapshot>[];
+    for (final item in value['lines'] as List) {
+      if (item is! Map ||
+          !const [
+            'productId',
+            'name',
+            'pack',
+          ].every((key) => item[key] is String) ||
+          !const [
+            'quantity',
+            'unitPricePaise',
+            'lineTotalPaise',
+          ].every((key) => item[key] is int)) {
+        return null;
+      }
+      lines.add(
+        WorkspaceOrderItemSnapshot(
+          productId: item['productId'] as String,
+          name: item['name'] as String,
+          pack: item['pack'] as String,
+          quantity: item['quantity'] as int,
+          unitPricePaise: item['unitPricePaise'] as int,
+          lineTotalPaise: item['lineTotalPaise'] as int,
+        ),
+      );
+    }
+    final draft = WorkspaceCounterDraft(
+      account: value['account'] as String,
+      store: value['store'] as String,
+      id: value['id'] as String,
+      revision: value['revision'] as int,
+      stage: stage,
+      customer: value['customer'] as String,
+      source: value['source'] as String,
+      fulfilment: value['fulfilment'] as String,
+      payment: value['payment'] as String,
+      address: value['address'] as String,
+      submissionOrderId: value['submissionOrderId'] as String?,
+      lines: lines,
+    );
+    return draft.valid ? draft : null;
+  }
+}
+
 class WorkspaceOrderRecord {
   const WorkspaceOrderRecord({
     required this.id,
