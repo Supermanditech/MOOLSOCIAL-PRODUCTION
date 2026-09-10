@@ -18,6 +18,161 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final id in ['s-curd', 'w-notebook']) {
+    for (final size in [const Size(320, 711), const Size(711, 320)]) {
+      for (final scale in [1.0, 2.0]) {
+        final profile =
+            '$id-${size.width.toInt()}x${size.height.toInt()}-$scale';
+        testWidgets('R669 small full catalogue exposes every SKU $profile', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          final product = session.product(id);
+          final shop = product.destination == BuyV2Destination.shop;
+          final otherId = shop ? 'w-rice' : 's-tomato';
+          expect(session.addProduct(otherId), isTrue);
+          final otherQuantity = session.quantityFor(otherId);
+          expect(session.openProduct(id), isTrue);
+          await tester.pumpWidget(_app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          final prefix = shop ? 'buy-shop-seller' : 'buy-wholesale-supplier';
+          final action = find.byKey(
+            ValueKey(
+              '${shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-$id',
+            ),
+          );
+          await _revealProductAction(tester, id, action);
+          expect(action.hitTestable(), findsOneWidget);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          final preview = find.byKey(ValueKey('$prefix-sheet-$id'));
+          final viewAll = find.byKey(ValueKey('$prefix-view-more-$id'));
+          await tester.scrollUntilVisible(
+            viewAll,
+            100,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(ValueKey('$prefix-sheet-list')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+          await tester.ensureVisible(viewAll);
+          await tester.pumpAndSettle();
+          expect(viewAll.hitTestable(), findsOneWidget);
+          await tester.tap(viewAll);
+          await tester.pumpAndSettle();
+          final full = find.byKey(ValueKey('$prefix-full-catalogue-list'));
+          expect(full, findsOneWidget);
+          final products = session.partnerCatalogueFor(product);
+          expect(products, hasLength(4));
+          final horizontal = find.descendant(
+            of: full,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.right,
+            ),
+          );
+          expect(horizontal, findsNWidgets(2));
+          // Before ensureVisible can move an inner scroller, prove no SKU is
+          // hidden horizontally. Only the outer vertical journey is needed.
+          for (final element in horizontal.evaluate()) {
+            final state = tester.state<ScrollableState>(
+              find.byWidget(element.widget),
+            );
+            expect(state.position.maxScrollExtent, lessThanOrEqualTo(.5));
+            expect(state.position.pixels, 0);
+          }
+          final grid = find.descendant(
+            of: full,
+            matching: find.byKey(const ValueKey('buy-horizontal-product-grid')),
+          );
+          final label = tester.widget<Semantics>(grid).properties.label!;
+          expect(label, contains('Showing 4 of 4 products.'));
+          expect(label, contains('Scroll up or down'));
+          expect(label, isNot(contains('Swipe left or right')));
+          final viewport = tester.getRect(full);
+          for (final entry in products) {
+            final card = find.descendant(
+              of: full,
+              matching: find.byKey(ValueKey('buy-product-${entry.id}')),
+            );
+            expect(card, findsOneWidget);
+            expect(
+              tester.getRect(card).left,
+              greaterThanOrEqualTo(viewport.left + 12),
+            );
+            expect(
+              tester.getRect(card).right,
+              lessThanOrEqualTo(viewport.right - 12),
+            );
+          }
+          await captureR66Visual(tester, 'r669-small-catalogue-$profile-open');
+          final last = products.last;
+          final add = find.descendant(
+            of: full,
+            matching: find.byKey(ValueKey('buy-add-${last.id}')),
+          );
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
+          expect(
+            tester.getRect(add).bottom,
+            lessThanOrEqualTo(viewport.bottom),
+          );
+          await captureR66Visual(tester, 'r669-small-catalogue-$profile-last');
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(last.id), last.minimumOrder);
+          expect(session.quantityFor(otherId), otherQuantity);
+          final packshot = find.descendant(
+            of: full,
+            matching: find.byKey(ValueKey('buy-grid-packshot-${last.id}')),
+          );
+          await tester.ensureVisible(packshot);
+          await tester.pumpAndSettle();
+          const imageAction = Alignment(-.5, .55);
+          expect(packshot.hitTestable(at: imageAction), findsOneWidget);
+          await tester.tapAt(imageAction.withinRect(tester.getRect(packshot)));
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, last.id);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(full, findsOneWidget);
+          expect(session.quantityFor(last.id), last.minimumOrder);
+          final close = find.byKey(ValueKey('$prefix-full-catalogue-close'));
+          await tester.scrollUntilVisible(
+            close,
+            -100,
+            scrollable: find
+                .descendant(of: full, matching: find.byType(Scrollable))
+                .first,
+          );
+          await tester.ensureVisible(close);
+          await tester.pumpAndSettle();
+          expect(close.hitTestable(), findsOneWidget);
+          await tester.tap(close);
+          await tester.pumpAndSettle();
+          expect(preview, findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, id);
+          expect(session.quantityFor(otherId), otherQuantity);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+
   for (final size in [const Size(320, 711), const Size(711, 320)]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(
@@ -1670,8 +1825,17 @@ void main() {
         await tester.pumpAndSettle();
         expect(session.quantityFor(id), product.minimumOrder);
         expect(session.quantityFor(otherId), otherQuantity);
-        await tester.tap(card);
+        final packshot = find.descendant(
+          of: card,
+          matching: find.byKey(ValueKey('buy-grid-packshot-$id')),
+        );
+        await tester.ensureVisible(packshot);
         await tester.pumpAndSettle();
+        const imageAction = Alignment(-.5, .55);
+        expect(packshot.hitTestable(at: imageAction), findsOneWidget);
+        await tester.tapAt(imageAction.withinRect(tester.getRect(packshot)));
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, id);
         expect(tester.takeException(), isNull);
         expect(find.byKey(PageStorageKey('buy-product-$id')), findsWidgets);
         expectNestedStatusContrast();
@@ -1728,7 +1892,18 @@ void main() {
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(full, findsOneWidget);
-        await tester.tap(find.byKey(ValueKey('$prefix-full-catalogue-close')));
+        final close = find.byKey(ValueKey('$prefix-full-catalogue-close'));
+        await tester.scrollUntilVisible(
+          close,
+          -100,
+          scrollable: find
+              .descendant(of: full, matching: find.byType(Scrollable))
+              .first,
+        );
+        await tester.ensureVisible(close);
+        await tester.pumpAndSettle();
+        expect(close.hitTestable(), findsOneWidget);
+        await tester.tap(close);
         await tester.pumpAndSettle();
         expect(sheet, findsOneWidget);
         await tester.tap(

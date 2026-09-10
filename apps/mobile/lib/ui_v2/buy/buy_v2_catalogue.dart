@@ -6401,6 +6401,11 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                               semanticLabel:
                                   '${current.seller} full product catalogue',
                               laneCount: products.length >= 6 ? 2 : 1,
+                              fitSmallCatalogue:
+                                  current.destination ==
+                                      BuyV2Destination.shop ||
+                                  current.destination ==
+                                      BuyV2Destination.wholesale,
                               storeContext: true,
                               onOpenProduct: (product) =>
                                   unawaited(openProduct(sheetContext, product)),
@@ -8086,6 +8091,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
     required this.storageKey,
     required this.semanticLabel,
     this.laneCount,
+    this.fitSmallCatalogue = false,
     this.savedContext = false,
     this.onOpenProduct,
     this.storeContext = false,
@@ -8096,6 +8102,11 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
   final String storageKey;
   final String semanticLabel;
   final int? laneCount;
+
+  /// A complete small store catalogue uses rows instead of hiding a last SKU
+  /// beyond an apparently complete horizontal row. Larger inventories retain
+  /// the bounded progressive browsing behaviour.
+  final bool fitSmallCatalogue;
   final bool savedContext;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
@@ -8115,6 +8126,12 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           denseStore: storeContext,
           cartQuantityWidth: quantityWidth,
         );
+        final fittedRows =
+            fitSmallCatalogue &&
+                products.isNotEmpty &&
+                products.length <= _HorizontalProductGridState._pageSize
+            ? (products.length / layout.columns).ceil()
+            : null;
         return _HorizontalProductGrid(
           session: session,
           products: products,
@@ -8123,7 +8140,10 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           storageKey: storageKey,
           compact: true,
           laneCount:
-              laneCount ?? (products.length <= layout.columns ? 1 : null),
+              fittedRows ??
+              laneCount ??
+              (products.length <= layout.columns ? 1 : null),
+          verticalCatalogueColumns: fittedRows != null ? layout.columns : null,
           savedContext: savedContext,
           semanticLabel: semanticLabel,
           onOpenProduct: onOpenProduct,
@@ -8304,6 +8324,7 @@ class _HorizontalProductGrid extends StatefulWidget {
     this.laneCount,
     this.savedContext = false,
     this.semanticLabel = 'Products',
+    this.verticalCatalogueColumns,
     this.onOpenProduct,
     this.storeContext = false,
   });
@@ -8317,6 +8338,7 @@ class _HorizontalProductGrid extends StatefulWidget {
   final int? laneCount;
   final bool savedContext;
   final String semanticLabel;
+  final int? verticalCatalogueColumns;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
 
@@ -8386,6 +8408,16 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
         .take(_visibleCount)
         .toList(growable: false);
     final resolvedLaneCount = widget.laneCount ?? (products.length > 1 ? 2 : 1);
+    final verticalColumns = widget.verticalCatalogueColumns;
+    int laneItemCount(int laneIndex) {
+      if (verticalColumns != null) {
+        final remaining = products.length - laneIndex * verticalColumns;
+        return remaining < verticalColumns ? remaining : verticalColumns;
+      }
+      return (products.length - laneIndex + resolvedLaneCount - 1) ~/
+          resolvedLaneCount;
+    }
+
     var cardWidth = widget.cardWidth;
     if (widget.compact) {
       for (final product in products) {
@@ -8486,7 +8518,13 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
       label:
           '${widget.semanticLabel}. Showing ${products.length} of '
           '${widget.products.length} ${widget.products.length == 1 ? 'product' : 'products'}.'
-          '${widget.products.length > 1 ? ' Swipe left or right to browse.' : ''}',
+          '${verticalColumns != null
+              ? resolvedLaneCount > 1
+                    ? ' Scroll up or down to browse.'
+                    : ''
+              : widget.products.length > 1
+              ? ' Swipe left or right to browse.'
+              : ''}',
       child: SizedBox(
         key: ValueKey('buy-progressive-product-count-${widget.storageKey}'),
         height: (tileHeight * resolvedLaneCount) + 14,
@@ -8516,16 +8554,12 @@ class _HorizontalProductGridState extends State<_HorizontalProductGrid> {
                         primary: false,
                         keyboardDismissBehavior:
                             ScrollViewKeyboardDismissBehavior.onDrag,
-                        itemCount:
-                            (products.length -
-                                laneIndex +
-                                resolvedLaneCount -
-                                1) ~/
-                            resolvedLaneCount,
+                        itemCount: laneItemCount(laneIndex),
                         separatorBuilder: (_, _) => const SizedBox(width: 7),
                         itemBuilder: (context, index) {
-                          final productIndex =
-                              (index * resolvedLaneCount) + laneIndex;
+                          final productIndex = verticalColumns != null
+                              ? laneIndex * verticalColumns + index
+                              : (index * resolvedLaneCount) + laneIndex;
                           return SizedBox(
                             width: cardWidth,
                             child: BuyV2ProductCard(

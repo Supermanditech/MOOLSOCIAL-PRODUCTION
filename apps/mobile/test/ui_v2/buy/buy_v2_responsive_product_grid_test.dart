@@ -17,6 +17,145 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  for (final count in [1, 4, 8, 9]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R669 full catalogue small and progressive boundary $count scale $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 711);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          final products = BuyV2Catalogue.products
+              .where((product) => product.destination == BuyV2Destination.shop)
+              .take(count)
+              .toList(growable: false);
+          expect(products, hasLength(count));
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(
+                  context,
+                ).copyWith(textScaler: TextScaler.linear(scale)),
+                child: child!,
+              ),
+              home: Scaffold(
+                body: SingleChildScrollView(
+                  child: BuyV2ProgressiveProductGrid(
+                    session: session,
+                    products: products,
+                    storageKey: 'r669-full-catalogue-boundary',
+                    semanticLabel: 'Full store catalogue',
+                    fitSmallCatalogue: true,
+                    storeContext: true,
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final grid = find.byKey(
+            const ValueKey('buy-horizontal-product-grid'),
+          );
+          final horizontal = find.descendant(
+            of: grid,
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.right,
+            ),
+          );
+          final initialLabel = tester.widget<Semantics>(grid).properties.label!;
+          final last = products.last;
+          final add = find.byKey(ValueKey('buy-add-${last.id}'));
+          if (count <= 8) {
+            expect(initialLabel, contains('Showing $count of $count'));
+            expect(initialLabel, isNot(contains('Swipe left or right')));
+            if (count >= 4) {
+              final first = tester.getRect(
+                find.byKey(ValueKey('buy-product-${products.first.id}')),
+              );
+              final second = tester.getRect(
+                find.byKey(ValueKey('buy-product-${products[1].id}')),
+              );
+              expect(second.top, closeTo(first.top, .1));
+              expect(second.left, greaterThan(first.left));
+              final nextRowIndex = scale == 1 ? 3 : 2;
+              if (scale == 1) {
+                expect(
+                  tester
+                      .getRect(
+                        find.byKey(ValueKey('buy-product-${products[2].id}')),
+                      )
+                      .top,
+                  closeTo(first.top, .1),
+                );
+              }
+              expect(
+                tester
+                    .getRect(
+                      find.byKey(
+                        ValueKey('buy-product-${products[nextRowIndex].id}'),
+                      ),
+                    )
+                    .top,
+                greaterThan(first.bottom),
+              );
+            }
+            for (final element in horizontal.evaluate()) {
+              expect(
+                tester
+                    .state<ScrollableState>(find.byWidget(element.widget))
+                    .position
+                    .maxScrollExtent,
+                lessThanOrEqualTo(.5),
+              );
+            }
+            for (final product in products) {
+              final card = find.byKey(ValueKey('buy-product-${product.id}'));
+              expect(card, findsOneWidget);
+              expect(tester.getRect(card).left, greaterThanOrEqualTo(8));
+              expect(tester.getRect(card).right, lessThanOrEqualTo(308));
+            }
+          } else {
+            expect(initialLabel, contains('Showing 8 of 9'));
+            expect(initialLabel, contains('Swipe left or right'));
+            expect(add, findsNothing);
+            expect(
+              tester
+                  .state<ScrollableState>(horizontal.first)
+                  .position
+                  .maxScrollExtent,
+              greaterThan(0),
+            );
+            await tester.scrollUntilVisible(
+              add,
+              160,
+              scrollable: horizontal.first,
+              maxScrolls: 20,
+            );
+            await tester.pumpAndSettle();
+            expect(
+              tester.widget<Semantics>(grid).properties.label,
+              contains('Showing 9 of 9'),
+            );
+          }
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(last.id), last.minimumOrder);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   for (final store in [false, true]) {
     for (final size in [const Size(320, 711), const Size(711, 320)]) {
       for (final scale in [1.0, 2.0]) {
