@@ -13468,6 +13468,7 @@ class _AccessibleWorkTextField extends StatefulWidget {
     this.minLines,
     this.prefixIcon,
     this.prefixText,
+    this.stackedLabel = false,
   });
 
   final String keyName;
@@ -13481,6 +13482,7 @@ class _AccessibleWorkTextField extends StatefulWidget {
   final int? minLines;
   final Widget? prefixIcon;
   final String? prefixText;
+  final bool stackedLabel;
 
   @override
   State<_AccessibleWorkTextField> createState() =>
@@ -13520,6 +13522,22 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final field = TextField(
+      key: Key(widget.keyName),
+      controller: widget.controller,
+      focusNode: _focusNode,
+      keyboardType: widget.keyboardType,
+      textInputAction: widget.textInputAction,
+      onChanged: widget.onChanged,
+      maxLines: widget.maxLines,
+      minLines: widget.minLines,
+      decoration: InputDecoration(
+        label: widget.stackedLabel ? null : Text(widget.label),
+        hintText: widget.hint,
+        prefixIcon: widget.prefixIcon,
+        prefixText: widget.prefixText,
+      ),
+    );
     return Semantics(
       container: true,
       identifier: widget.keyName,
@@ -13537,22 +13555,21 @@ class _AccessibleWorkTextFieldState extends State<_AccessibleWorkTextField> {
         widget.onChanged?.call(value);
       },
       child: ExcludeSemantics(
-        child: TextField(
-          key: Key(widget.keyName),
-          controller: widget.controller,
-          focusNode: _focusNode,
-          keyboardType: widget.keyboardType,
-          textInputAction: widget.textInputAction,
-          onChanged: widget.onChanged,
-          maxLines: widget.maxLines,
-          minLines: widget.minLines,
-          decoration: InputDecoration(
-            label: Text(widget.label),
-            hintText: widget.hint,
-            prefixIcon: widget.prefixIcon,
-            prefixText: widget.prefixText,
-          ),
-        ),
+        child: widget.stackedLabel
+            ? Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    widget.label,
+                    key: Key('${widget.keyName}-label'),
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  field,
+                ],
+              )
+            : field,
       ),
     );
   }
@@ -21002,6 +21019,7 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                     const Expanded(
                       child: Text(
                         'Customer',
+                        key: Key('work-sale-customer-title'),
                         style: TextStyle(
                           color: MoolColors.navy,
                           fontSize: 18,
@@ -21021,6 +21039,7 @@ class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
                   keyName: 'work-order-customer',
                   controller: _controller,
                   label: 'Customer mobile number',
+                  stackedLabel: media.textScaler.scale(14) > 21,
                   keyboardType: TextInputType.phone,
                   textInputAction: TextInputAction.done,
                   prefixIcon: const Icon(Icons.phone_outlined, size: 20),

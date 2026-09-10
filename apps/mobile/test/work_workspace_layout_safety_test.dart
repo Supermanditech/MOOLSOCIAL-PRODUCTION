@@ -14813,16 +14813,18 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final (scale, viewport, activeOrders) in [
-    (1.0, const Size(412, 915), 100),
-    (2.0, const Size(412, 915), 100),
-    (2.0, const Size(320, 568), 100),
-    (1.0, const Size(412, 915), 1000),
-    (2.0, const Size(320, 568), 1000),
+  for (final (scale, viewport, activeOrders, editing) in [
+    (1.0, const Size(412, 915), 100, false),
+    (2.0, const Size(412, 915), 100, false),
+    (2.0, const Size(320, 568), 100, false),
+    (1.0, const Size(412, 915), 1000, false),
+    (2.0, const Size(320, 568), 1000, false),
+    (1.0, const Size(412, 915), 1000, true),
+    (2.0, const Size(320, 568), 1000, true),
   ]) {
     final stockViewSuffix = '$scale-${viewport.width.toInt()}-$activeOrders';
     testWidgets(
-      'DASH11 scoped supplier offers selection states and Back $stockViewSuffix',
+      '${editing ? 'DASH15 active editors during mixed updates' : 'DASH11 scoped supplier offers selection states and Back'} $stockViewSuffix',
       (tester) async {
         final contact = _ContactDraftFixtureStore();
         final work = storeViewFixture(null, contact);
@@ -15087,6 +15089,179 @@ void main() {
         expect(work.workspaceFinance!.payouts, hasLength(2));
         expect(work.workspaceGroupOffers, hasLength(4));
         expect(work.currentWorkspaceOrderId, selectedCustomerOrder);
+        if (editing) {
+          void updateOtherWork(int revision) {
+            work.workspaceOrders.add(
+              customerOrder(
+                id: 'ARRIVAL-$revision',
+                customer: 'New customer $revision',
+                createdAt: now,
+                stage: 'Confirmed',
+              ),
+            );
+            expect(applyIncoming(revision), isTrue);
+            expect(work.applyWorkspaceFinance(finance(revision)), isTrue);
+            expect(
+              apply(revision, [
+                for (var i = 0; i < 4; i++) offer(i, revision: revision),
+              ]),
+              isTrue,
+            );
+          }
+
+          await tester.tap(find.byKey(const Key('work-store-sell')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const Key('work-sale-customer')));
+          await tester.pumpAndSettle();
+          final customerField = find.byKey(const Key('work-order-customer'));
+          await tester.enterText(customerField, '9000000013');
+          const customerValue = TextEditingValue(
+            text: '9000000013',
+            selection: TextSelection.collapsed(offset: 4),
+            composing: TextRange(start: 0, end: 4),
+          );
+          tester.testTextInput.updateEditingValue(customerValue);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+          await tester.pumpAndSettle();
+          final customerEditable = find.descendant(
+            of: customerField,
+            matching: find.byType(EditableText),
+          );
+          final customerController = tester
+              .widget<EditableText>(customerEditable)
+              .controller;
+          updateOtherWork(2);
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<EditableText>(customerEditable).controller,
+            same(customerController),
+          );
+          expect(customerController.value, customerValue);
+          expect(
+            tester.widget<EditableText>(customerEditable).focusNode.hasFocus,
+            isTrue,
+          );
+          expect(work.workspaceInvoices, hasLength(invoiceCount));
+          expect(work.workspaceStockMovements, isEmpty);
+          if (scale > 1.5) {
+            final title = find.byKey(const Key('work-sale-customer-title'));
+            final label = find.byKey(const Key('work-order-customer-label'));
+            expect(label, findsOneWidget);
+            expect(
+              tester.getRect(label).top,
+              greaterThanOrEqualTo(tester.getRect(title).bottom),
+              reason: 'Enlarged mobile label must not overlap the sheet title',
+            );
+            expect(
+              tester.getRect(customerField).top,
+              greaterThanOrEqualTo(tester.getRect(label).bottom + 8),
+            );
+          }
+          await captureStoreView(
+            tester,
+            'mixed-counter-editor-$stockViewSuffix',
+          );
+          FocusManager.instance.primaryFocus?.unfocus();
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          final confirmCustomer = find.byKey(
+            const Key('work-sale-customer-confirm'),
+          );
+          await reveal(tester, confirmCustomer);
+          expect(confirmCustomer.hitTestable(), findsOneWidget);
+          expect(
+            tester.getSize(confirmCustomer).height,
+            greaterThanOrEqualTo(48),
+          );
+          await tester.tap(confirmCustomer);
+          await tester.pumpAndSettle();
+          expect(work.workspaceOrderCustomer, customerValue.text);
+          final add = find.byKey(const Key('work-order-add-oil-fortune-1l'));
+          await reveal(tester, add);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          final billItems = Map<String, int>.of(work.workspaceOrderQuantities);
+          final billTotal = work.workspaceOrderTotal;
+          final router = GoRouter.of(
+            tester.element(find.byType(WorkWorkspaceDashboardScreen)),
+          );
+          router.push<void>(
+            Uri(
+              path: '/app/chat/thread/workspace-support',
+              queryParameters: {
+                'return': '/app/work/workspace/dashboard',
+                'directReturn': 'true',
+              },
+            ).toString(),
+          );
+          await tester.pumpAndSettle();
+          final message = find.byKey(const Key('chat-message-field'));
+          await tester.enterText(message, 'Please check my supplier delivery.');
+          const messageValue = TextEditingValue(
+            text: 'Please check my supplier delivery.',
+            selection: TextSelection.collapsed(offset: 8),
+            composing: TextRange(start: 7, end: 12),
+          );
+          tester.testTextInput.updateEditingValue(messageValue);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+          await tester.pumpAndSettle();
+          final messageEditable = find.descendant(
+            of: message,
+            matching: find.byType(EditableText),
+          );
+          final messageController = tester
+              .widget<EditableText>(messageEditable)
+              .controller;
+          expect(
+            messageController.value,
+            messageValue,
+            reason: 'Valid IME composition is present before Store updates',
+          );
+          updateOtherWork(3);
+          await tester.pumpAndSettle();
+          expect(
+            tester.widget<EditableText>(messageEditable).controller,
+            same(messageController),
+          );
+          expect(messageController.value, messageValue);
+          expect(
+            tester.widget<EditableText>(messageEditable).focusNode.hasFocus,
+            isTrue,
+          );
+          expect(
+            chat.draftTextForSession('workspace-support'),
+            messageValue.text,
+          );
+          expect(work.workspaceOrderCustomer, customerValue.text);
+          expect(work.workspaceOrderQuantities, billItems);
+          expect(work.workspaceOrderTotal, billTotal);
+          expect(work.workspaceInvoices, hasLength(invoiceCount));
+          expect(work.workspaceStockMovements, isEmpty);
+          expect(work.workspaceOrders.length, customerStates.length + 2);
+          await captureStoreView(tester, 'mixed-chat-editor-$stockViewSuffix');
+          FocusManager.instance.primaryFocus?.unfocus();
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-dashboard-counter-order-screen')),
+            findsOneWidget,
+          );
+          expect(work.workspaceOrderQuantities, billItems);
+          expect(work.workspaceOrderTotal, billTotal);
+          expect(work.workspaceOrderCustomer, customerValue.text);
+          expect(
+            chat.draftTextForSession('workspace-support'),
+            messageValue.text,
+          );
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'mixed-counter-return-$stockViewSuffix',
+          );
+          return;
+        }
         await captureStoreView(
           tester,
           'group-mixed-dashboard-$stockViewSuffix',
@@ -15365,7 +15540,7 @@ void main() {
     );
     // The larger active-order dimension belongs to the mixed-workload replay,
     // not these stock-history scenarios, which retain their three viewports.
-    if (activeOrders != 100) continue;
+    if (activeOrders != 100 || editing) continue;
 
     testWidgets(
       'DASH10 stock changes retain filters references and Back $stockViewSuffix',
