@@ -1222,7 +1222,15 @@ class _WorkWorkspaceDashboardScreenState
             session: session,
             scrollController: _alertsScroll,
             onOpen: openScopedRoute,
-            onOpenOperation: _showOperation,
+            onOpenOperation: (operation) {
+              _alertsReturnOffset = _alertsScroll.hasClients
+                  ? _alertsScroll.offset
+                  : 0;
+              _showOperation(
+                operation,
+                returnView: _WorkspaceControlView.alerts,
+              );
+            },
             onOpenOrders: () => openScopedRoute('/app/retailer/orders'),
             onOpenStatus: _showStatus,
             onDismiss: session.dismissWorkspaceAlert,
@@ -1693,7 +1701,7 @@ class _WorkWorkspaceDashboardScreenState
             _operation == _WorkspaceOperation.statement) &&
         session.focusedWorkspacePurchaseId != null) {
       session.clearWorkspacePurchaseSelection();
-      return;
+      if (_operationReturnView != _WorkspaceControlView.alerts) return;
     }
     if (!await _confirmDiscardCounterOrder() || !mounted) return;
     if (_operationReturnView == _WorkspaceControlView.alerts) {
@@ -22228,6 +22236,19 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
               session.showNotice('This alert no longer needs action.');
               return;
             }
+            if (current.purchase case final purchase?) {
+              final original = alert.purchase;
+              if (original == null ||
+                  original.accountScope != purchase.accountScope ||
+                  original.workspaceId != purchase.workspaceId ||
+                  original.supplierId != purchase.supplierId ||
+                  original.orderId != purchase.orderId ||
+                  original.shipmentId != purchase.shipmentId ||
+                  !session.selectWorkspacePurchase(purchase.shipmentId)) {
+                session.showNotice('This purchase is no longer available.');
+                return;
+              }
+            }
             if (current.id == 'store-paused') {
               onOpenStatus();
             } else if (current.operation != null) {
@@ -22499,6 +22520,7 @@ typedef _WorkspaceAlertItem = ({
   String actionLabel,
   String? route,
   _WorkspaceOperation? operation,
+  WorkspacePurchaseRecord? purchase,
   IconData icon,
   bool requiredAction,
 });
@@ -22508,6 +22530,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (!session.retailerSetupSaved) {
     alerts.add((
       id: 'store-setup',
+      purchase: null,
       title: 'Finish setting up your store',
       detail:
           'Add products and choose delivery or pickup before taking orders.',
@@ -22521,6 +22544,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (!session.workspaceContactsReady) {
     alerts.add((
       id: 'contact-details',
+      purchase: null,
       title: 'Confirm contact details',
       detail:
           'Keep a confirmed contact number and email available for store support.',
@@ -22536,6 +22560,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       !session.dismissedWorkspaceAlerts.contains('store-paused')) {
     alerts.add((
       id: 'store-paused',
+      purchase: null,
       title: session.workspaceStoreState == WorkspaceStoreState.paused
           ? 'Your store is paused'
           : 'Your store is off',
@@ -22552,6 +22577,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (session.workspaceLowStockCount > 0) {
     alerts.add((
       id: 'low-stock',
+      purchase: null,
       title: '${session.workspaceLowStockCount} products need stock attention',
       detail:
           'Review available quantities before accepting the next customer order.',
@@ -22586,6 +22612,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
         '${placed.minute.toString().padLeft(2, '0')}';
     alerts.add((
       id: 'order-${order.id}',
+      purchase: null,
       title: '${order.id} · ${order.customer.split('·').first.trim()}',
       detail:
           '${order.items} · ₹${_formatStoreAmount(order.amount)}\n'
@@ -22611,9 +22638,67 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       requiredAction: true,
     ));
   }
+  bool needsReceiptReview(WorkspacePurchaseRecord purchase) =>
+      const {
+        WorkspaceReceiptState.partial,
+        WorkspaceReceiptState.disputed,
+      }.contains(purchase.receiptState) ||
+      (purchase.stage == WorkspaceSupplyStage.delivered &&
+          purchase.receiptState == WorkspaceReceiptState.awaiting);
+  final shipments = session.workspacePurchases
+      .where(
+        (purchase) => purchase.stage.incoming || needsReceiptReview(purchase),
+      )
+      .toList();
+  bool urgentPurchase(WorkspacePurchaseRecord purchase) =>
+      purchase.stage == WorkspaceSupplyStage.delayed ||
+      needsReceiptReview(purchase);
+  shipments.sort((a, b) {
+    final priority = (urgentPurchase(a) ? 0 : 1).compareTo(
+      urgentPurchase(b) ? 0 : 1,
+    );
+    return priority != 0 ? priority : a.shipmentId.compareTo(b.shipmentId);
+  });
+  for (final purchase in shipments) {
+    final receipt = needsReceiptReview(purchase);
+    final updated = purchase.updatedAt.toLocal();
+    final updateTime =
+        '${updated.day}/${updated.month} · '
+        '${updated.hour.toString().padLeft(2, '0')}:'
+        '${updated.minute.toString().padLeft(2, '0')}';
+    alerts.add((
+      id: 'purchase-${purchase.shipmentId}',
+      purchase: purchase,
+      title: '${purchase.orderId} · ${purchase.supplierName}',
+      detail: [
+        purchase.itemSummary,
+        '${_purchaseAmount(purchase.amountMinor)} · ${purchase.paymentLabel}',
+        receipt
+            ? '${purchase.stage.label} · ${purchase.receiptState.label}'
+            : purchase.stage.label,
+        if (purchase.expectedArrival?.trim().isNotEmpty == true && !receipt)
+          purchase.expectedArrival!,
+        'Updated $updateTime',
+      ].join('\n'),
+      actionLabel: receipt
+          ? 'Review receipt'
+          : purchase.stage == WorkspaceSupplyStage.delayed
+          ? 'Review delay'
+          : 'View delivery',
+      route: null,
+      operation: _WorkspaceOperation.sourcing,
+      icon: receipt
+          ? Icons.inventory_2_outlined
+          : Icons.local_shipping_outlined,
+      requiredAction: true,
+    ));
+  }
   return [
     ...alerts.where((alert) => alert.id.startsWith('order-')),
-    ...alerts.where((alert) => !alert.id.startsWith('order-')),
+    ...alerts.where((alert) => alert.purchase != null),
+    ...alerts.where(
+      (alert) => !alert.id.startsWith('order-') && alert.purchase == null,
+    ),
   ];
 }
 

@@ -17337,6 +17337,192 @@ void main() {
   );
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('DASH03 exact supplier alerts and resolved recovery $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final store = work.activeWorkspace!;
+      final selectedOrder = work.currentWorkspaceOrderId;
+      final now = DateTime.now();
+      WorkspacePurchaseRecord shipment(
+        int index, {
+        int revision = 1,
+        WorkspaceSupplyStage stage = WorkspaceSupplyStage.arriving,
+        WorkspaceReceiptState receipt = WorkspaceReceiptState.awaiting,
+      }) => WorkspacePurchaseRecord(
+        accountScope: 'review-draft-account',
+        workspaceId: store.id,
+        supplierId: 'supplier-$index',
+        supplierName: 'Same supplier',
+        orderId: 'PO-$index',
+        shipmentId: 'SHIP-$index',
+        revision: revision,
+        createdAt: now,
+        updatedAt: now.add(Duration(seconds: revision)),
+        stage: stage,
+        amountMinor: 1550050,
+        itemSummary: 'Sunflower oil · 1 l × 100 packs',
+        paymentLabel: 'Payment pending',
+        expectedArrival: 'Today, 4–6 pm',
+        receiptState: receipt,
+        lines: const [
+          WorkspacePurchaseLine(
+            id: 'line-1',
+            productId: 'oil-1',
+            name: 'Sunflower oil',
+            pack: '1 l',
+            orderedPacks: 100,
+            unitPriceMinor: 15500,
+          ),
+        ],
+      );
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: 'review-draft-account',
+          storeId: store.id,
+          feedRevision: 1,
+          complete: true,
+          records: [
+            shipment(0),
+            shipment(1, stage: WorkspaceSupplyStage.delayed),
+            shipment(
+              2,
+              stage: WorkspaceSupplyStage.delivered,
+              receipt: WorkspaceReceiptState.partial,
+            ),
+            shipment(
+              3,
+              stage: WorkspaceSupplyStage.delivered,
+              receipt: WorkspaceReceiptState.confirmed,
+            ),
+            shipment(4, stage: WorkspaceSupplyStage.cancelled),
+            shipment(
+              5,
+              stage: WorkspaceSupplyStage.cancelled,
+              receipt: WorkspaceReceiptState.disputed,
+            ),
+          ],
+        ),
+        isTrue,
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-dashboard-alerts')));
+      await tester.pumpAndSettle();
+      final list = find.byKey(const Key('work-dashboard-alerts-screen'));
+      final listScroll = find
+          .descendant(of: list, matching: find.byType(Scrollable))
+          .first;
+      final target = find.byKey(const Key('work-alert-action-purchase-SHIP-2'));
+      await tester.scrollUntilVisible(target, 240, scrollable: listScroll);
+      await tester.pumpAndSettle();
+      expect(target.hitTestable(), findsOneWidget);
+      final targetRect = tester.getRect(target);
+      expect(targetRect.width, greaterThanOrEqualTo(48));
+      expect(targetRect.height, greaterThanOrEqualTo(48));
+      final cta = find.byKey(const Key('work-alert-cta-purchase-SHIP-2'));
+      await tester.ensureVisible(cta);
+      await tester.pumpAndSettle();
+      expect(cta.hitTestable(), findsOneWidget);
+      expect(tester.getSize(cta).height, greaterThanOrEqualTo(48));
+      expect(
+        tester.getRect(cta).bottom,
+        lessThanOrEqualTo(tester.getRect(list).bottom),
+      );
+      final expectedCount = tester.widget<ListView>(list).semanticChildCount!;
+      // One customer order, four supply alerts, and the contact notice.
+      expect(expectedCount, 6);
+      final offset = tester.widget<ListView>(list).controller!.offset;
+      await captureStoreView(tester, 'supplier-alerts-$scale');
+      await tester.tap(cta);
+      await tester.pumpAndSettle();
+      expect(work.focusedWorkspacePurchaseId, 'SHIP-2');
+      expect(find.text('Order PO-2'), findsOneWidget);
+      expect(find.text('Same supplier'), findsOneWidget);
+      expect(work.currentWorkspaceOrderId, selectedOrder);
+      await captureStoreView(tester, 'supplier-alert-exact-$scale');
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: 'review-draft-account',
+          storeId: store.id,
+          feedRevision: 2,
+          records: [shipment(0, revision: 2)],
+        ),
+        isTrue,
+      );
+      await tester.pumpAndSettle();
+      expect(work.focusedWorkspacePurchaseId, 'SHIP-2');
+      if (scale == 1) {
+        await tester.tap(find.byKey(const Key('work-operation-back')));
+      } else {
+        await tester.binding.handlePopRoute();
+      }
+      await tester.pumpAndSettle();
+      expect(list, findsOneWidget);
+      expect(work.focusedWorkspacePurchaseId, isNull);
+      expect(
+        tester.widget<ListView>(list).controller!.offset,
+        closeTo(offset, 1),
+      );
+      expect(cta.hitTestable(), findsOneWidget);
+      final retainedTap = tester.widget<FilledButton>(cta).onPressed!;
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: 'review-draft-account',
+          storeId: store.id,
+          feedRevision: 3,
+          records: [
+            shipment(
+              2,
+              revision: 2,
+              stage: WorkspaceSupplyStage.delivered,
+              receipt: WorkspaceReceiptState.confirmed,
+            ),
+          ],
+        ),
+        isTrue,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ListView>(list).semanticChildCount,
+        expectedCount - 1,
+      );
+      retainedTap();
+      await tester.pumpAndSettle();
+      expect(list, findsOneWidget);
+      expect(work.focusedWorkspacePurchaseId, isNull);
+      expect(work.currentWorkspaceOrderId, selectedOrder);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      final disputed = find.byKey(const Key('work-alert-cta-purchase-SHIP-5'));
+      await tester.scrollUntilVisible(disputed, 240, scrollable: listScroll);
+      await tester.pumpAndSettle();
+      expect(disputed.hitTestable(), findsOneWidget);
+      final previousStoreTap = tester.widget<FilledButton>(disputed).onPressed!;
+      work.activateWorkspace(
+        WorkWorkspace(
+          id: 'SUPPLIER-OTHER-STORE',
+          name: 'Other store',
+          profileId: store.profileId,
+          profileLabel: store.profileLabel,
+          area: store.area,
+          verified: true,
+        ),
+      );
+      previousStoreTap();
+      await tester.pumpAndSettle();
+      expect(work.focusedWorkspacePurchaseId, isNull);
+      expect(work.workspacePurchases, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
     testWidgets(
       'DASH07 eight supplier arrivals alongside 100 active orders $scale',
       (tester) async {
