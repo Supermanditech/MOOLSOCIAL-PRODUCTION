@@ -382,6 +382,8 @@ class _StoreOperationalData {
   String workspacePayoutAccountEnding = '';
   final List<WorkspaceCatalogueItem> workspaceCatalogueItems = [];
   final List<WorkspaceStockMovement> workspaceStockMovements = [];
+  int stockMovementSequence = 0;
+  _StockHistoryState? stockHistory;
   final Map<String, int> workspaceOrderQuantities = {};
   final List<WorkspaceOrderRecord> workspaceOrders = [];
   final Set<String> workspacePackedProductIds = <String>{};
@@ -446,6 +448,17 @@ class _WorkspaceApplicationDraft {
   String? get caseId => details['caseId'] as String?;
 }
 
+class _StockHistoryState {
+  _StockHistoryState(this.query);
+  final WorkspaceStockHistoryQuery query;
+  final records = <WorkspaceStockMovement>[];
+  final recordIds = <String>{};
+  final usedCursors = <String>{};
+  String? snapshotId, nextCursor, error;
+  int? totalCount;
+  bool busy = false, loaded = false, needsRefresh = false;
+}
+
 class WorkSession extends ChangeNotifier {
   WorkSession({
     WorkGateway? gateway,
@@ -455,6 +468,7 @@ class WorkSession extends ChangeNotifier {
     this.issueDraftStore,
     this.issueCommandGateway,
     this.issueCommandStore,
+    this.stockHistoryGateway,
   }) : gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -486,6 +500,7 @@ class WorkSession extends ChangeNotifier {
     this.issueDraftStore,
     this.issueCommandGateway,
     this.issueCommandStore,
+    this.stockHistoryGateway,
   }) : gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -506,6 +521,7 @@ class WorkSession extends ChangeNotifier {
   final WorkIssueDraftStore? issueDraftStore;
   final WorkIssueCommandGateway? issueCommandGateway;
   final WorkIssueCommandStore? issueCommandStore;
+  final WorkStockHistoryGateway? stockHistoryGateway;
   late final WorkIssueCommandStore _issueCommandStorage =
       issueCommandStore ??
       SecureWorkIssueCommandStore(accountScope: () => _contactAccountScope);
@@ -1998,6 +2014,145 @@ class WorkSession extends ChangeNotifier {
       _storeData.workspaceCatalogueItems;
   List<WorkspaceStockMovement> get workspaceStockMovements =>
       _storeData.workspaceStockMovements;
+
+  _StockHistoryState? get _currentStockHistory {
+    final state = _storeData.stockHistory;
+    return state?.query.accountScope == _contactAccountScope &&
+            state?.query.workspaceId == activeWorkspace?.id
+        ? state
+        : null;
+  }
+
+  List<WorkspaceStockMovement> get workspaceStockHistory => List.unmodifiable(
+    _currentStockHistory?.records ?? const <WorkspaceStockMovement>[],
+  );
+  WorkspaceStockHistoryQuery? get workspaceStockHistoryQuery =>
+      _currentStockHistory?.query;
+  bool get workspaceStockHistoryLoaded => _currentStockHistory?.loaded == true;
+  bool get workspaceStockHistoryBusy => _currentStockHistory?.busy == true;
+  bool get workspaceStockHistoryNeedsRefresh =>
+      _currentStockHistory?.needsRefresh == true;
+  bool get workspaceStockHistoryHasMore =>
+      _currentStockHistory?.nextCursor != null;
+  String? get workspaceStockHistoryError => _currentStockHistory?.error;
+  int? get workspaceStockHistoryTotal => _currentStockHistory?.totalCount;
+
+  WorkspaceStockHistoryQuery? workspaceStockHistoryScope({
+    DateTime? from,
+    DateTime? until,
+    String? productId,
+  }) {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (account == null || account.isEmpty || store == null) return null;
+    return WorkspaceStockHistoryQuery(
+      accountScope: account,
+      workspaceId: store,
+      from: from,
+      until: until,
+      productId: productId,
+    );
+  }
+
+  Future<bool> loadWorkspaceStockHistory(
+    WorkspaceStockHistoryQuery query, {
+    bool more = false,
+  }) async {
+    if (_disposed ||
+        stockHistoryGateway == null ||
+        !query.valid ||
+        query.accountScope != _contactAccountScope ||
+        query.workspaceId != activeWorkspace?.id) {
+      return false;
+    }
+    final data = _storeData;
+    var state = data.stockHistory;
+    if (more) {
+      if (state == null ||
+          state.query.key != query.key ||
+          state.busy ||
+          !state.loaded ||
+          state.nextCursor == null ||
+          state.needsRefresh) {
+        return false;
+      }
+    } else {
+      if (state?.query.key == query.key && state?.busy == true) return false;
+      state = _StockHistoryState(query);
+      data.stockHistory = state;
+    }
+    final requested = state;
+    final cursor = more ? requested.nextCursor : null;
+    requested.busy = true;
+    requested.error = null;
+    notifyListeners();
+    try {
+      final page = await stockHistoryGateway!
+          .readStockHistory(
+            query,
+            cursor: cursor,
+            snapshotId: more ? requested.snapshotId : null,
+          )
+          .timeout(const Duration(seconds: 20));
+      if (_disposed ||
+          query.accountScope != _contactAccountScope ||
+          !identical(data.stockHistory, requested)) {
+        return false;
+      }
+      final count = requested.records.length + page.records.length;
+      final duplicate = page.records.any(
+        (row) => requested.recordIds.contains(row.id),
+      );
+      if (!page.valid ||
+          page.query.key != query.key ||
+          page.cursor != cursor ||
+          (more && page.snapshotId != requested.snapshotId) ||
+          duplicate ||
+          (page.nextCursor != null &&
+              requested.usedCursors.contains(page.nextCursor)) ||
+          (more &&
+              requested.totalCount != null &&
+              page.totalCount != requested.totalCount) ||
+          (page.totalCount != null &&
+              (page.nextCursor == null
+                  ? page.totalCount != count
+                  : page.totalCount! <= count)) ||
+          (requested.records.isNotEmpty &&
+              page.records.isNotEmpty &&
+              WorkspaceStockMovement.compareNewest(
+                    requested.records.last,
+                    page.records.first,
+                  ) >
+                  0)) {
+        requested.needsRefresh = true;
+        requested.error = 'Stock history changed. Refresh to continue.';
+        return false;
+      }
+      requested.records.addAll(page.records);
+      requested.recordIds.addAll(page.records.map((row) => row.id));
+      if (cursor != null) requested.usedCursors.add(cursor);
+      requested.snapshotId = page.snapshotId;
+      requested.nextCursor = page.nextCursor;
+      requested.totalCount = page.totalCount;
+      requested.loaded = true;
+      return true;
+    } on Object {
+      if (!_disposed &&
+          query.accountScope == _contactAccountScope &&
+          identical(data.stockHistory, requested)) {
+        requested.error = 'Could not load stock changes. Try again.';
+      }
+      return false;
+    } finally {
+      requested.busy = false;
+      if (!_disposed &&
+          query.accountScope == _contactAccountScope &&
+          identical(_storeData.stockHistory, requested)) {
+        notifyListeners();
+      }
+    }
+  }
+
   Map<String, int> get workspaceOrderQuantities =>
       _storeData.workspaceOrderQuantities;
   List<WorkspaceOrderRecord> get workspaceOrders => _storeData.workspaceOrders;
@@ -2946,6 +3101,9 @@ class WorkSession extends ChangeNotifier {
           'quantityDelta': movement.quantityDelta,
           'reason': movement.reason,
           'occurredAt': movement.occurredAt.toUtc().toIso8601String(),
+          if (movement.referenceKind != null)
+            'referenceKind': movement.referenceKind!.name,
+          if (movement.referenceId != null) 'referenceId': movement.referenceId,
         },
     ],
     'orders': [
@@ -3498,9 +3656,11 @@ class WorkSession extends ChangeNotifier {
       );
       _recordWorkspaceStockMovement(
         product: product,
-        kind: WorkspaceStockMovementKind.sale,
+        kind: WorkspaceStockMovementKind.reserved,
         quantityDelta: -entry.value,
         reason: 'Reserved for ${order.id}',
+        referenceKind: WorkspaceStockReferenceKind.order,
+        referenceId: order.id,
       );
     }
     return true;
@@ -3520,9 +3680,11 @@ class WorkSession extends ChangeNotifier {
       );
       _recordWorkspaceStockMovement(
         product: product,
-        kind: WorkspaceStockMovementKind.returned,
+        kind: WorkspaceStockMovementKind.released,
         quantityDelta: entry.value,
         reason: 'Released after ${order.id} was cancelled',
+        referenceKind: WorkspaceStockReferenceKind.order,
+        referenceId: order.id,
       );
     }
   }
@@ -4021,23 +4183,24 @@ class WorkSession extends ChangeNotifier {
     required WorkspaceStockMovementKind kind,
     required int quantityDelta,
     required String reason,
+    WorkspaceStockReferenceKind? referenceKind,
+    String? referenceId,
   }) {
     if (quantityDelta == 0) return;
     workspaceStockMovements.insert(
       0,
       WorkspaceStockMovement(
-        id: 'STK-${DateTime.now().microsecondsSinceEpoch}',
+        id: 'STK-${DateTime.now().microsecondsSinceEpoch}-${++_storeData.stockMovementSequence}',
         productId: product.id,
         productLabel: '${product.title} · ${product.pack}',
         kind: kind,
         quantityDelta: quantityDelta,
         reason: reason,
         occurredAt: DateTime.now(),
+        referenceKind: referenceKind,
+        referenceId: referenceId,
       ),
     );
-    if (workspaceStockMovements.length > 100) {
-      workspaceStockMovements.removeRange(100, workspaceStockMovements.length);
-    }
   }
 
   void addOrUpdateWorkspaceProduct(

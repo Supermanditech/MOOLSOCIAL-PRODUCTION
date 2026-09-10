@@ -454,6 +454,17 @@ class SecureWorkIssueCommandStore implements WorkIssueCommandStore {
   }
 }
 
+/// Read-only, authenticated stock history. Cursors and the immutable snapshot
+/// are bound to this exact account/Store/date/product scope. Never apply the
+/// returned deltas to local stock, and never include private purchase costs.
+abstract interface class WorkStockHistoryGateway {
+  Future<WorkspaceStockHistoryPage> readStockHistory(
+    WorkspaceStockHistoryQuery query, {
+    String? cursor,
+    String? snapshotId,
+  });
+}
+
 class NativeWorkProofPicker implements WorkRecoverableProofPicker {
   NativeWorkProofPicker({ImagePicker? imagePicker, this.documentPicker})
     : _imagePicker = imagePicker ?? ImagePicker();

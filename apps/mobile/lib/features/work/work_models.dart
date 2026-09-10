@@ -1045,6 +1045,8 @@ class WorkspaceStoreOffer {
 enum WorkspaceStockMode { availabilityOnly, exactQuantity }
 
 enum WorkspaceStockMovementKind {
+  reserved,
+  released,
   sale,
   returned,
   goodsReceived,
@@ -1052,6 +1054,8 @@ enum WorkspaceStockMovementKind {
   damageOrExpiry,
   openingStock,
 }
+
+enum WorkspaceStockReferenceKind { order, supplierReceipt }
 
 class WorkspaceStockMovement {
   const WorkspaceStockMovement({
@@ -1062,6 +1066,8 @@ class WorkspaceStockMovement {
     required this.quantityDelta,
     required this.reason,
     required this.occurredAt,
+    this.referenceKind,
+    this.referenceId,
   });
 
   final String id;
@@ -1071,6 +1077,128 @@ class WorkspaceStockMovement {
   final int quantityDelta;
   final String reason;
   final DateTime occurredAt;
+  final WorkspaceStockReferenceKind? referenceKind;
+  final String? referenceId;
+
+  bool get valid =>
+      id.trim().isNotEmpty &&
+      productId.trim().isNotEmpty &&
+      productLabel.trim().isNotEmpty &&
+      reason.trim().isNotEmpty &&
+      quantityDelta != 0 &&
+      (switch (kind) {
+        WorkspaceStockMovementKind.reserved ||
+        WorkspaceStockMovementKind.sale ||
+        WorkspaceStockMovementKind.damageOrExpiry => quantityDelta < 0,
+        WorkspaceStockMovementKind.released ||
+        WorkspaceStockMovementKind.returned ||
+        WorkspaceStockMovementKind.goodsReceived ||
+        WorkspaceStockMovementKind.openingStock => quantityDelta > 0,
+        WorkspaceStockMovementKind.adjustment => true,
+      }) &&
+      ((referenceKind == null && referenceId == null) ||
+          (referenceKind != null && referenceId?.trim().isNotEmpty == true));
+  Object get contentIdentity => (
+    id,
+    productId,
+    productLabel,
+    kind,
+    quantityDelta,
+    reason,
+    occurredAt.toUtc(),
+    referenceKind,
+    referenceId,
+  );
+  String get label => switch (kind) {
+    WorkspaceStockMovementKind.reserved => 'Reserved for order',
+    WorkspaceStockMovementKind.released => 'Reservation released',
+    WorkspaceStockMovementKind.sale => 'Sale',
+    WorkspaceStockMovementKind.returned => 'Returned to stock',
+    WorkspaceStockMovementKind.goodsReceived => 'Goods received',
+    WorkspaceStockMovementKind.adjustment => 'Counted adjustment',
+    WorkspaceStockMovementKind.damageOrExpiry => 'Damage or expiry',
+    WorkspaceStockMovementKind.openingStock => 'Opening quantity',
+  };
+  static int compareNewest(WorkspaceStockMovement a, WorkspaceStockMovement b) {
+    final date = b.occurredAt.compareTo(a.occurredAt);
+    return date != 0 ? date : a.id.compareTo(b.id);
+  }
+}
+
+typedef WorkspaceStockHistoryKey = ({
+  String account,
+  String store,
+  DateTime? from,
+  DateTime? until,
+  String? productId,
+});
+
+/// Immutable read scope. Calendar dates are converted to UTC by the caller;
+/// from is inclusive, until exclusive. A cursor belongs to one snapshot only.
+class WorkspaceStockHistoryQuery {
+  const WorkspaceStockHistoryQuery({
+    required this.accountScope,
+    required this.workspaceId,
+    this.from,
+    this.until,
+    this.productId,
+  });
+  final String accountScope, workspaceId;
+  final DateTime? from, until;
+  final String? productId;
+  static const pageSize = 50;
+  WorkspaceStockHistoryKey get key => (
+    account: accountScope,
+    store: workspaceId,
+    from: from,
+    until: until,
+    productId: productId,
+  );
+  bool get valid =>
+      accountScope.trim().isNotEmpty &&
+      workspaceId.trim().isNotEmpty &&
+      (from == null || from!.isUtc) &&
+      (until == null || until!.isUtc) &&
+      (from == null || until == null || from!.isBefore(until!)) &&
+      (productId == null || productId!.trim().isNotEmpty);
+  bool includes(WorkspaceStockMovement record) =>
+      (productId == null || record.productId == productId) &&
+      (from == null || !record.occurredAt.isBefore(from!)) &&
+      (until == null || record.occurredAt.isBefore(until!));
+}
+
+/// Server pages are read-only. They must not reapply quantities or expose cost.
+class WorkspaceStockHistoryPage {
+  WorkspaceStockHistoryPage({
+    required this.query,
+    required this.snapshotId,
+    required List<WorkspaceStockMovement> records,
+    this.cursor,
+    this.nextCursor,
+    this.totalCount,
+  }) : records = List.unmodifiable(records);
+  final WorkspaceStockHistoryQuery query;
+  final String snapshotId;
+  final String? cursor, nextCursor;
+  final int? totalCount;
+  final List<WorkspaceStockMovement> records;
+  bool get valid =>
+      query.valid &&
+      snapshotId.trim().isNotEmpty &&
+      records.length <= WorkspaceStockHistoryQuery.pageSize &&
+      records.every((record) => record.valid && query.includes(record)) &&
+      records.map((record) => record.id).toSet().length == records.length &&
+      (cursor == null || cursor!.isNotEmpty) &&
+      (nextCursor == null ||
+          (nextCursor!.isNotEmpty &&
+              nextCursor != cursor &&
+              records.isNotEmpty)) &&
+      (totalCount == null || totalCount! >= records.length) &&
+      Iterable.generate(records.isNotEmpty ? records.length - 1 : 0).every(
+        (i) =>
+            WorkspaceStockMovement.compareNewest(records[i], records[i + 1]) <=
+            0,
+      );
 }
 
 class WorkspaceCatalogueItem {

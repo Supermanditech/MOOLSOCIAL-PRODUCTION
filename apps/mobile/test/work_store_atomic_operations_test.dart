@@ -78,6 +78,59 @@ class _CommandAccountStore implements WorkPendingProofStore {
   Future<void> clear(String scope) async {}
 }
 
+typedef _StockHistoryRequest = ({
+  WorkspaceStockHistoryQuery query,
+  String? cursor,
+  String? snapshot,
+});
+
+class _StockHistoryGateway implements WorkStockHistoryGateway {
+  _StockHistoryGateway(this.records);
+  final List<WorkspaceStockMovement> records;
+  final requests = <_StockHistoryRequest>[];
+  Future<WorkspaceStockHistoryPage> Function(_StockHistoryRequest)? respond;
+  WorkspaceStockHistoryPage page(_StockHistoryRequest request) {
+    final matching = records.where(request.query.includes).toList()
+      ..sort(WorkspaceStockMovement.compareNewest);
+    final start = int.parse(request.cursor ?? '0');
+    final end = (start + WorkspaceStockHistoryQuery.pageSize).clamp(
+      0,
+      matching.length,
+    );
+    return WorkspaceStockHistoryPage(
+      query: request.query,
+      snapshotId: 'snapshot-1',
+      cursor: request.cursor,
+      nextCursor: end < matching.length ? '$end' : null,
+      totalCount: matching.length,
+      records: matching.sublist(start, end),
+    );
+  }
+
+  @override
+  Future<WorkspaceStockHistoryPage> readStockHistory(
+    WorkspaceStockHistoryQuery query, {
+    String? cursor,
+    String? snapshotId,
+  }) {
+    final request = (query: query, cursor: cursor, snapshot: snapshotId);
+    requests.add(request);
+    return respond?.call(request) ?? Future.value(page(request));
+  }
+}
+
+WorkspaceStockMovement _historyMovement(int index) => WorkspaceStockMovement(
+  id: 'movement-${index.toString().padLeft(5, '0')}',
+  productId: index.isEven ? 'atta-5kg' : 'oil-1l',
+  productLabel: index.isEven ? 'Atta · 5 kg' : 'Oil · 1 L',
+  kind: WorkspaceStockMovementKind.reserved,
+  quantityDelta: -1,
+  reason: 'Reserved for customer order',
+  referenceKind: WorkspaceStockReferenceKind.order,
+  referenceId: 'ORDER-$index',
+  occurredAt: DateTime.utc(2026, 9, 10, 12).subtract(Duration(minutes: index)),
+);
+
 class _IssueCommandGateway implements WorkIssueCommandGateway {
   final submitted = <WorkIssueCommand>[];
   final reconciled = <WorkIssueCommand>[];
@@ -255,6 +308,252 @@ class _OrderTimeGateway extends ReviewWorkGateway
 }
 
 void main() {
+  test(
+    'DASH10 local stock changes are not truncated after one hundred',
+    () async {
+      final work = WorkSession()..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      work.addOrUpdateWorkspaceProduct(_product(stock: 1000));
+      final first = work.workspaceStockMovements.single;
+      for (var i = 1; i <= 1000; i++) {
+        expect(
+          work.updateWorkspaceStock(
+            productId: 'atta-5kg',
+            quantity: 1000 + i,
+            reason: 'Recorded stock count $i',
+          ),
+          isTrue,
+        );
+      }
+      expect(work.workspaceStockMovements.length, 1001);
+      expect(work.workspaceStockMovements.last.id, first.id);
+      expect(
+        work.workspaceStockMovements.map((row) => row.id).toSet().length,
+        1001,
+      );
+      expect(
+        work.workspaceCatalogueItems
+            .singleWhere((item) => item.id == 'atta-5kg')
+            .stock,
+        2000,
+      );
+      expect(work.workspaceStockMovements.every((row) => row.valid), isTrue);
+      await _drainOrderJournal();
+    },
+  );
+
+  test(
+    'DASH10 stock history pages stay scoped ordered and read-only across ten thousand records',
+    () async {
+      final gateway = _StockHistoryGateway(
+        List.generate(10000, _historyMovement),
+      );
+      final work = WorkSession(
+        pendingProofStore: _CommandAccountStore(),
+        stockHistoryGateway: gateway,
+      )..activeWorkspace = _commandStore;
+      addTearDown(work.dispose);
+      work.workspaceCatalogueItems.add(_product());
+      final query = work.workspaceStockHistoryScope()!;
+      expect(await work.loadWorkspaceStockHistory(query), isTrue);
+      expect(work.workspaceStockHistory.length, 50);
+      expect(work.workspaceStockHistoryTotal, 10000);
+      while (work.workspaceStockHistoryHasMore) {
+        expect(await work.loadWorkspaceStockHistory(query, more: true), isTrue);
+      }
+      expect(work.workspaceStockHistory.length, 10000);
+      expect(
+        work.workspaceStockHistory.map((row) => row.id).toSet().length,
+        10000,
+      );
+      expect(work.workspaceStockHistory.last.id, 'movement-09999');
+      expect(gateway.requests.length, 200);
+      expect(
+        gateway.requests
+            .skip(1)
+            .every((request) => request.snapshot == 'snapshot-1'),
+        isTrue,
+      );
+      expect(work.workspaceCatalogueItems.single.stock, 10);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(await work.loadWorkspaceStockHistory(query, more: true), isFalse);
+      expect(gateway.requests.length, 200);
+    },
+  );
+
+  test(
+    'DASH10 bad snapshots duplicate pages cursor loops and wrong scope fail closed',
+    () async {
+      for (final invalid in [
+        'snapshot',
+        'duplicate',
+        'cursor',
+        'loop',
+        'scope',
+        'total',
+        'order',
+      ]) {
+        final gateway = _StockHistoryGateway(
+          List.generate(151, _historyMovement),
+        );
+        final work = WorkSession(
+          pendingProofStore: _CommandAccountStore(),
+          stockHistoryGateway: gateway,
+        )..activeWorkspace = _commandStore;
+        addTearDown(work.dispose);
+        final query = work.workspaceStockHistoryScope()!;
+        expect(await work.loadWorkspaceStockHistory(query), isTrue);
+        expect(await work.loadWorkspaceStockHistory(query, more: true), isTrue);
+        gateway.respond = (request) async {
+          final good = gateway.page(request);
+          return WorkspaceStockHistoryPage(
+            query: invalid == 'scope'
+                ? const WorkspaceStockHistoryQuery(
+                    accountScope: 'other',
+                    workspaceId: 'store-A',
+                  )
+                : good.query,
+            snapshotId: invalid == 'snapshot' ? 'changed' : good.snapshotId,
+            cursor: invalid == 'cursor' ? 'wrong' : good.cursor,
+            nextCursor: invalid == 'loop' ? '50' : good.nextCursor,
+            totalCount: invalid == 'total' ? 150 : good.totalCount,
+            records: invalid == 'duplicate'
+                ? [_historyMovement(0)]
+                : invalid == 'order'
+                ? good.records.reversed.toList()
+                : good.records,
+          );
+        };
+        expect(
+          await work.loadWorkspaceStockHistory(query, more: true),
+          isFalse,
+          reason: invalid,
+        );
+        expect(work.workspaceStockHistory.length, 100);
+        expect(work.workspaceStockHistoryNeedsRefresh, isTrue);
+        expect(work.workspaceStockHistoryError, contains('Refresh'));
+        final count = gateway.requests.length;
+        expect(
+          await work.loadWorkspaceStockHistory(query, more: true),
+          isFalse,
+        );
+        expect(gateway.requests.length, count);
+      }
+    },
+  );
+
+  test(
+    'DASH10 stock history retry and date product switch ignore late results',
+    () async {
+      final gateway = _StockHistoryGateway(
+        List.generate(160, _historyMovement),
+      );
+      final account = _CommandAccountStore();
+      final work = WorkSession(
+        pendingProofStore: account,
+        stockHistoryGateway: gateway,
+      )..activeWorkspace = _commandStore;
+      addTearDown(work.dispose);
+      final query = work.workspaceStockHistoryScope()!;
+      expect(await work.loadWorkspaceStockHistory(query), isTrue);
+      gateway.respond = (_) async =>
+          throw StateError('fixture connection failed');
+      expect(await work.loadWorkspaceStockHistory(query, more: true), isFalse);
+      expect(work.workspaceStockHistory.length, 50);
+      expect(work.workspaceStockHistoryNeedsRefresh, isFalse);
+      gateway.respond = null;
+      expect(await work.loadWorkspaceStockHistory(query, more: true), isTrue);
+      expect(gateway.requests[1].cursor, gateway.requests[2].cursor);
+      final held = Completer<WorkspaceStockHistoryPage>();
+      gateway.respond = (_) => held.future;
+      final stale = work.loadWorkspaceStockHistory(query, more: true);
+      expect(await work.loadWorkspaceStockHistory(query, more: true), isFalse);
+      final old = gateway.requests.last;
+      final filter = work.workspaceStockHistoryScope(
+        productId: 'atta-5kg',
+        from: DateTime.utc(2026, 9, 10, 11),
+        until: DateTime.utc(2026, 9, 10, 12),
+      )!;
+      gateway.respond = null;
+      expect(await work.loadWorkspaceStockHistory(filter), isTrue);
+      expect(work.workspaceStockHistory.length, 30);
+      final ids = work.workspaceStockHistory.map((row) => row.id).toList();
+      held.complete(gateway.page(old));
+      expect(await stale, isFalse);
+      expect(work.workspaceStockHistory.map((row) => row.id), ids);
+      expect(work.workspaceStockHistoryQuery?.key, filter.key);
+      account.accountScope = 'account-B';
+      expect(work.workspaceStockHistory, isEmpty);
+      expect(await work.loadWorkspaceStockHistory(query), isFalse);
+      expect(work.workspaceStockHistoryLoaded, isFalse);
+    },
+  );
+
+  test(
+    'DASH10 history query boundaries signs references and unavailable gateway are honest',
+    () async {
+      final query = WorkspaceStockHistoryQuery(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        from: DateTime.utc(2026, 9, 10, 11),
+        until: DateTime.utc(2026, 9, 10, 12),
+      );
+      expect(query.includes(_historyMovement(0)), isFalse);
+      expect(query.includes(_historyMovement(60)), isTrue);
+      expect(query.includes(_historyMovement(61)), isFalse);
+      expect(
+        WorkspaceStockHistoryQuery(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          from: DateTime(2026, 9, 10),
+        ).valid,
+        isFalse,
+      );
+      expect(
+        const WorkspaceStockHistoryQuery(
+          accountScope: '',
+          workspaceId: 'store-A',
+        ).valid,
+        isFalse,
+      );
+      final movement = _historyMovement(0);
+      expect(movement.label, 'Reserved for order');
+      expect(movement.referenceId, 'ORDER-0');
+      expect(
+        WorkspaceStockMovement(
+          id: 'bad',
+          productId: movement.productId,
+          productLabel: movement.productLabel,
+          kind: WorkspaceStockMovementKind.reserved,
+          quantityDelta: 1,
+          reason: movement.reason,
+          occurredAt: movement.occurredAt,
+        ).valid,
+        isFalse,
+      );
+      expect(
+        WorkspaceStockMovement(
+          id: 'bad',
+          productId: movement.productId,
+          productLabel: movement.productLabel,
+          kind: WorkspaceStockMovementKind.adjustment,
+          quantityDelta: 1,
+          reason: movement.reason,
+          occurredAt: movement.occurredAt,
+          referenceKind: WorkspaceStockReferenceKind.order,
+        ).valid,
+        isFalse,
+      );
+      final work = WorkSession(pendingProofStore: _CommandAccountStore())
+        ..activeWorkspace = _commandStore;
+      addTearDown(work.dispose);
+      expect(await work.loadWorkspaceStockHistory(query), isFalse);
+      expect(work.workspaceStockHistoryLoaded, isFalse);
+      expect(work.workspaceStockHistoryTotal, isNull);
+    },
+  );
+
   WorkspaceIssueRecord draftCase({
     String id = 'CASE-A',
     String order = 'ORDER-A',

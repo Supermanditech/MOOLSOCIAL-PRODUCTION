@@ -460,6 +460,7 @@ class _WorkWorkspaceDashboardScreenState
   final _counterKey = GlobalKey<_CounterOrderSurfaceState>();
   final _saleSearchController = TextEditingController();
   final Map<String, Map<String, String>> _requirementDrafts = {};
+  final Map<Object, _StockStatementBookmark> _stockStatementViews = {};
   bool _requirementPickerOpen = false;
   _WorkspaceControlView _view = _WorkspaceControlView.dashboard;
   bool _draftAcceptingOrders = true;
@@ -1219,6 +1220,10 @@ class _WorkWorkspaceDashboardScreenState
             catalogueKey: _catalogueKey,
             counterKey: _counterKey,
             saleQuery: _saleSearchController.text,
+            stockStatementBookmark: _stockStatementViews.putIfAbsent(
+              session.workspaceStockHistoryScope()?.key ?? workspace.id,
+              _StockStatementBookmark.new,
+            ),
             requirementDraft: _requirementDrafts.putIfAbsent(
               workspace.id,
               () => {},
@@ -1449,6 +1454,9 @@ class _WorkWorkspaceDashboardScreenState
       } else if (_view == _WorkspaceControlView.operation &&
           (createBillFromOrders ||
               _isNestedWorkspaceOperation(operation) ||
+              (_operation == _WorkspaceOperation.stockStatement &&
+                  (operation == _WorkspaceOperation.orders ||
+                      operation == _WorkspaceOperation.sourcing)) ||
               (operation == _WorkspaceOperation.catalogue &&
                   _operation == _WorkspaceOperation.storeLink))) {
         _operationReturnView = _WorkspaceControlView.operation;
@@ -9588,6 +9596,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.counterKey,
     required this.saleQuery,
     required this.requirementDraft,
+    required this.stockStatementBookmark,
     required this.onOpenStore,
     required this.onOpenOperation,
     required this.onOpenRoute,
@@ -9602,6 +9611,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final GlobalKey<_CounterOrderSurfaceState> counterKey;
   final String saleQuery;
   final Map<String, String> requirementDraft;
+  final _StockStatementBookmark stockStatementBookmark;
   final VoidCallback onOpenStore;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
@@ -9718,7 +9728,38 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     }
     if (operation == _WorkspaceOperation.stockStatement) {
       return _WorkspaceStockStatementSurface(
+        bookmark: stockStatementBookmark,
+        key: ValueKey(
+          session.workspaceStockHistoryScope()?.key ??
+              session.activeWorkspace?.id,
+        ),
         session: session,
+        onOpenReference: (movement) {
+          if (movement.referenceKind == WorkspaceStockReferenceKind.order) {
+            if (!session.visibleWorkspaceOrders.any(
+              (order) => order.id == movement.referenceId,
+            )) {
+              session.showNotice('Order details are not available here.');
+              return;
+            }
+            onOpenRoute(
+              Uri(
+                path: '/app/retailer/orders',
+                queryParameters: {'order': movement.referenceId!},
+              ).toString(),
+            );
+          } else {
+            final purchase = session.workspacePurchases.where(
+              (purchase) => purchase.receiptReference == movement.referenceId,
+            );
+            if (purchase.length == 1 &&
+                session.selectWorkspacePurchase(purchase.single.shipmentId)) {
+              onOpenOperation(_WorkspaceOperation.sourcing);
+            } else {
+              session.showNotice('This receipt is not available.');
+            }
+          }
+        },
         onRestock: (product) => onOpenRoute(
           Uri(
             path: '/app/buy',
@@ -11764,18 +11805,156 @@ class _ProductQuickValue extends StatelessWidget {
   }
 }
 
-class _WorkspaceStockStatementSurface extends StatelessWidget {
+class _StockStatementBookmark {
+  bool history = false;
+  double offset = 0;
+  DateTime? from, until;
+  String? productId;
+  List<WorkspaceStockMovement>? localRows;
+  List<String>? productIds;
+}
+
+class _WorkspaceStockStatementSurface extends StatefulWidget {
   const _WorkspaceStockStatementSurface({
+    super.key,
     required this.session,
     required this.onRestock,
+    required this.onOpenReference,
+    required this.bookmark,
   });
 
   final WorkSession session;
   final ValueChanged<WorkspaceCatalogueItem> onRestock;
+  final ValueChanged<WorkspaceStockMovement> onOpenReference;
+  final _StockStatementBookmark bookmark;
+
+  @override
+  State<_WorkspaceStockStatementSurface> createState() =>
+      _WorkspaceStockStatementSurfaceState();
+}
+
+class _WorkspaceStockStatementSurfaceState
+    extends State<_WorkspaceStockStatementSurface> {
+  late final ScrollController _scroll;
+  WorkSession get session => widget.session;
+  _StockStatementBookmark get view => widget.bookmark;
+  Object get _scope => (
+    'stock-statement',
+    session.workspaceStockHistoryScope()?.key ?? session.activeWorkspace?.id,
+  );
+  WorkspaceStockHistoryQuery? get _query => session.workspaceStockHistoryScope(
+    from: view.from,
+    until: view.until,
+    productId: view.productId,
+  );
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll =
+        ScrollController(
+          initialScrollOffset: view.offset,
+          keepScrollOffset: false,
+        )..addListener(() {
+          if (_scroll.hasClients) view.offset = _scroll.position.pixels;
+        });
+    view.localRows ??= [...session.workspaceStockMovements]
+      ..sort(WorkspaceStockMovement.compareNewest);
+    if (view.history) _scheduleLoad();
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  void _resetScroll() {
+    view.offset = 0;
+    if (_scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  void _scheduleLoad() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !view.history || session.stockHistoryGateway == null) {
+        return;
+      }
+      final query = _query;
+      if (query != null &&
+          (session.workspaceStockHistoryQuery?.key != query.key ||
+              (!session.workspaceStockHistoryLoaded &&
+                  !session.workspaceStockHistoryBusy &&
+                  session.workspaceStockHistoryError == null))) {
+        unawaited(session.loadWorkspaceStockHistory(query));
+      }
+    });
+  }
+
+  void _changeView(bool history, {String? productId}) {
+    setState(() {
+      view.history = history;
+      if (productId != null) view.productId = productId;
+      _resetScroll();
+    });
+    if (history) _scheduleLoad();
+  }
+
+  void _refresh() {
+    setState(() {
+      view.localRows = [...session.workspaceStockMovements]
+        ..sort(WorkspaceStockMovement.compareNewest);
+      view.productIds = null;
+      _resetScroll();
+    });
+    final query = _query;
+    if (query != null && session.stockHistoryGateway != null) {
+      unawaited(session.loadWorkspaceStockHistory(query));
+    }
+  }
+
+  Future<void> _chooseDates(int days) async {
+    DateTime? from, until;
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (days == -1) {
+      final range = await showDateRangePicker(
+        context: context,
+        firstDate: DateTime(1900),
+        lastDate: today,
+        initialDateRange: view.from == null || view.until == null
+            ? null
+            : DateTimeRange(
+                start: view.from!.toLocal(),
+                end: view.until!.toLocal().subtract(const Duration(days: 1)),
+              ),
+      );
+      if (!mounted || range == null) return;
+      from = range.start.toUtc();
+      until = DateTime(
+        range.end.year,
+        range.end.month,
+        range.end.day + 1,
+      ).toUtc();
+    } else if (days > 0) {
+      from = DateTime(now.year, now.month, now.day - days + 1).toUtc();
+      until = DateTime(now.year, now.month, now.day + 1).toUtc();
+    }
+    setState(() {
+      view.from = from;
+      view.until = until;
+      _resetScroll();
+    });
+    _scheduleLoad();
+  }
+
+  String _date(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day}/${local.month}/${local.year}';
+  }
 
   @override
   Widget build(BuildContext context) {
-    final products = [...session.workspaceCatalogueItems]
+    final ranked = [...session.workspaceCatalogueItems]
       ..sort((a, b) {
         final aRisk =
             !a.available ||
@@ -11791,104 +11970,317 @@ class _WorkspaceStockStatementSurface extends StatelessWidget {
             : 1;
         return aRisk != bRisk
             ? aRisk.compareTo(bRisk)
-            : a.stock.compareTo(b.stock);
+            : a.stock != b.stock
+            ? a.stock.compareTo(b.stock)
+            : a.id.compareTo(b.id);
       });
-    return Container(
-      key: const Key('work-stock-statement-screen'),
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFF9FAFF), Color(0xFFEEF2FF)],
+    final byId = {for (final product in ranked) product.id: product};
+    final known = view.productIds?.toSet() ?? <String>{};
+    view.productIds = [
+      ...?view.productIds?.where(byId.containsKey),
+      for (final product in ranked)
+        if (!known.contains(product.id)) product.id,
+    ];
+    final products = [for (final id in view.productIds!) byId[id]!];
+    final remote = session.stockHistoryGateway != null;
+    final matching =
+        remote && session.workspaceStockHistoryQuery?.key == _query?.key;
+    final rows = remote
+        ? (matching
+              ? session.workspaceStockHistory
+              : <WorkspaceStockMovement>[])
+        : view.localRows!
+              .where(
+                (row) =>
+                    (view.productId == null ||
+                        row.productId == view.productId) &&
+                    (view.from == null ||
+                        !row.occurredAt.isBefore(view.from!)) &&
+                    (view.until == null ||
+                        row.occurredAt.isBefore(view.until!)),
+              )
+              .toList();
+    final localChanged =
+        view.localRows!.length != session.workspaceStockMovements.length ||
+        (view.localRows!.isNotEmpty &&
+            session.workspaceStockMovements.isNotEmpty &&
+            view.localRows!.first.id !=
+                session.workspaceStockMovements.first.id);
+    final busy = matching && session.workspaceStockHistoryBusy;
+    final error = matching ? session.workspaceStockHistoryError : null;
+    final loaded = matching && session.workspaceStockHistoryLoaded;
+    final total = matching ? session.workspaceStockHistoryTotal : null;
+    final fromLabel = view.from == null ? null : _date(view.from!);
+    final untilLabel = view.until == null
+        ? null
+        : _date(view.until!.subtract(const Duration(microseconds: 1)));
+    final dateLabel = fromLabel == null
+        ? 'All dates'
+        : fromLabel == untilLabel
+        ? fromLabel
+        : '$fromLabel–$untilLabel';
+    final filters = <Widget>[
+      PopupMenuButton<int>(
+        key: const Key('work-stock-history-dates'),
+        tooltip: 'Filter dates',
+        onSelected: _chooseDates,
+        itemBuilder: (_) => const [
+          PopupMenuItem(value: 0, child: Text('All dates')),
+          PopupMenuItem(value: 1, child: Text('Today')),
+          PopupMenuItem(value: 7, child: Text('Last 7 days')),
+          PopupMenuItem(value: 30, child: Text('Last 30 days')),
+          PopupMenuItem(value: -1, child: Text('Choose dates')),
+        ],
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 48),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Flexible(child: Text(dateLabel)),
+              const Icon(Icons.arrow_drop_down, size: 20),
+            ],
+          ),
         ),
       ),
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
-        children: [
-          const Text(
-            'Know what you can sell today',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const Text(
-            'Available quantity, customer-order reservations and every recorded change stay together.',
-            style: TextStyle(color: MoolColors.muted, fontSize: 10.5),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _StockSummaryMetric(
-                value: '${session.workspaceAvailableUnitCount}',
-                label: 'Available',
-              ),
-              _StockSummaryMetric(
-                value: '${session.workspaceReservedUnitCount}',
-                label: 'Reserved',
-              ),
-              _StockSummaryMetric(
-                value: '${session.workspaceLowStockCount}',
-                label: 'Low stock',
-                attention: session.workspaceLowStockCount > 0,
-              ),
-              _StockSummaryMetric(
-                value: '${session.workspaceOutOfStockCount}',
-                label: 'Out',
-                attention: session.workspaceOutOfStockCount > 0,
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Stock position',
-            style: TextStyle(
+      if (view.productId != null)
+        InputChip(
+          key: const Key('work-stock-history-product-filter'),
+          label: DefaultTextStyle(
+            style: Theme.of(context).textTheme.labelLarge!.copyWith(
               color: MoolColors.navy,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
+            ),
+            child: Text(
+              products
+                      .where((p) => p.id == view.productId)
+                      .firstOrNull
+                      ?.title ??
+                  view.productId!,
             ),
           ),
-          const SizedBox(height: 6),
-          if (products.isEmpty)
-            const _StoreEmptyPanel(
-              icon: Icons.inventory_2_outlined,
-              title: 'No products added yet',
-              detail: 'Add a product to begin your stock statement.',
-            )
-          else
-            for (final product in products) ...[
-              _StockPositionRow(
-                product: product,
-                reserved: session.reservedWorkspaceUnitsFor(product.id),
-                daysOfStock: session.workspaceDaysOfStockFor(product),
-                suggestedQuantity: session.suggestedWorkspaceRestockFor(
-                  product,
+          onDeleted: () {
+            setState(() {
+              view.productId = null;
+              _resetScroll();
+            });
+            _scheduleLoad();
+          },
+          deleteButtonTooltipMessage: 'Show all products',
+        ),
+      TextButton.icon(
+        key: const Key('work-stock-history-refresh'),
+        onPressed: busy ? null : _refresh,
+        icon: const Icon(Icons.refresh, size: 18),
+        label: Text(localChanged ? 'New changes · Refresh' : 'Refresh'),
+      ),
+    ];
+    return Container(
+      key: const Key('work-stock-statement-screen'),
+      color: Colors.white,
+      child: CustomScrollView(
+        controller: _scroll,
+        key: PageStorageKey(_scope),
+        slivers: [
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(14, 8, 14, 28),
+            sliver: SliverMainAxisGroup(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      SegmentedButton<bool>(
+                        segments: const [
+                          ButtonSegment(value: false, label: Text('Stock')),
+                          ButtonSegment(value: true, label: Text('Changes')),
+                        ],
+                        selected: {view.history},
+                        showSelectedIcon: false,
+                        onSelectionChanged: (selection) =>
+                            _changeView(selection.single),
+                      ),
+                      const SizedBox(height: 10),
+                      if (!view.history)
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final columns =
+                                MediaQuery.textScalerOf(context).scale(14) > 20
+                                ? 2
+                                : 4;
+                            return Wrap(
+                              spacing: 4,
+                              runSpacing: 4,
+                              children:
+                                  [
+                                        (
+                                          '${session.workspaceAvailableUnitCount}',
+                                          'Available',
+                                        ),
+                                        (
+                                          '${session.workspaceReservedUnitCount}',
+                                          'Reserved',
+                                        ),
+                                        (
+                                          '${session.workspaceLowStockCount}',
+                                          'Low stock',
+                                        ),
+                                        (
+                                          '${session.workspaceOutOfStockCount}',
+                                          'Out',
+                                        ),
+                                      ]
+                                      .map(
+                                        (metric) => SizedBox(
+                                          width:
+                                              (constraints.maxWidth -
+                                                  (columns - 1) * 4) /
+                                              columns,
+                                          child: _StockSummaryMetric(
+                                            value: metric.$1,
+                                            label: metric.$2,
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                            );
+                          },
+                        ),
+                      if (view.history) ...[
+                        Wrap(
+                          spacing: 8,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          children: filters,
+                        ),
+                        Text(
+                          remote
+                              ? (loaded
+                                    ? (total == null
+                                          ? '${rows.length} changes loaded'
+                                          : '${rows.length} of $total changes')
+                                    : _query == null
+                                    ? 'Sign in to view stock history.'
+                                    : error != null
+                                    ? 'Stock history unavailable'
+                                    : 'Loading stock history…')
+                              : 'On this device · ${rows.length} changes',
+                          style: const TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (!remote)
+                          const Text(
+                            'Full stock history is not connected yet.',
+                            style: TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                      const SizedBox(height: 8),
+                    ],
+                  ),
                 ),
-                onRestock: () => onRestock(product),
-              ),
-              const SizedBox(height: 7),
-            ],
-          const SizedBox(height: 8),
-          const Text(
-            'Recent quantity changes',
-            style: TextStyle(
-              color: MoolColors.navy,
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
+                if (!view.history && products.isEmpty)
+                  const SliverToBoxAdapter(
+                    child: Text('No products added yet.'),
+                  ),
+                if (!view.history)
+                  SliverList.builder(
+                    itemCount: products.length,
+                    itemBuilder: (context, index) {
+                      final product = products[index];
+                      return _StockPositionRow(
+                        product: product,
+                        reserved: session.reservedWorkspaceUnitsFor(product.id),
+                        daysOfStock: session.workspaceDaysOfStockFor(product),
+                        suggestedQuantity: session.suggestedWorkspaceRestockFor(
+                          product,
+                        ),
+                        onRestock: () => widget.onRestock(product),
+                        onHistory: () =>
+                            _changeView(true, productId: product.id),
+                      );
+                    },
+                  ),
+                if (view.history)
+                  SliverList.builder(
+                    itemCount: rows.length,
+                    itemBuilder: (context, index) => _StockMovementRow(
+                      movement: rows[index],
+                      onOpenReference: rows[index].referenceKind == null
+                          ? null
+                          : () => widget.onOpenReference(rows[index]),
+                    ),
+                  ),
+                if (view.history)
+                  SliverToBoxAdapter(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        if (busy)
+                          const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Text(
+                              'Loading stock changes…',
+                              semanticsLabel: 'Loading stock changes',
+                            ),
+                          ),
+                        if (error != null)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Text(error),
+                          ),
+                        if (!busy && error != null)
+                          TextButton(
+                            key: const Key('work-stock-history-retry'),
+                            onPressed: () {
+                              if (session.workspaceStockHistoryNeedsRefresh ||
+                                  !loaded) {
+                                _refresh();
+                              } else if (_query != null) {
+                                unawaited(
+                                  session.loadWorkspaceStockHistory(
+                                    _query!,
+                                    more: true,
+                                  ),
+                                );
+                              }
+                            },
+                            child: Text(
+                              session.workspaceStockHistoryNeedsRefresh
+                                  ? 'Refresh history'
+                                  : 'Try again',
+                            ),
+                          ),
+                        if (!busy &&
+                            error == null &&
+                            matching &&
+                            session.workspaceStockHistoryHasMore)
+                          TextButton(
+                            key: const Key('work-stock-history-more'),
+                            onPressed: () => unawaited(
+                              session.loadWorkspaceStockHistory(
+                                _query!,
+                                more: true,
+                              ),
+                            ),
+                            child: const Text('Load older changes'),
+                          ),
+                        if (!busy &&
+                            error == null &&
+                            rows.isEmpty &&
+                            (!remote || loaded))
+                          const Padding(
+                            padding: EdgeInsets.all(12),
+                            child: Text('No stock changes for these filters.'),
+                          ),
+                      ],
+                    ),
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: 6),
-          if (session.workspaceStockMovements.isEmpty)
-            const _StoreEmptyPanel(
-              icon: Icons.history_rounded,
-              title: 'No quantity changes recorded',
-              detail:
-                  'Sales, goods received, returns and counted adjustments will appear here.',
-            )
-          else
-            for (final movement in session.workspaceStockMovements.take(12))
-              _StockMovementRow(movement: movement),
         ],
       ),
     );
@@ -11896,51 +12288,40 @@ class _WorkspaceStockStatementSurface extends StatelessWidget {
 }
 
 class _StockSummaryMetric extends StatelessWidget {
-  const _StockSummaryMetric({
-    required this.value,
-    required this.label,
-    this.attention = false,
-  });
+  const _StockSummaryMetric({required this.value, required this.label});
 
   final String value;
   final String label;
-  final bool attention;
 
   @override
   Widget build(BuildContext context) {
-    final color = attention ? const Color(0xFF9A4A00) : MoolColors.navy;
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 2),
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
-        decoration: BoxDecoration(
-          color: attention ? const Color(0xFFFFF3E4) : Colors.white,
-          borderRadius: BorderRadius.circular(13),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: TextStyle(
-                color: color,
-                fontSize: 17,
-                fontWeight: FontWeight.w900,
-              ),
+    const color = MoolColors.navy;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 3),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(13),
+      ),
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: TextStyle(
+              color: color,
+              fontSize: 17,
+              fontWeight: FontWeight.w900,
             ),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              child: Text(
-                label,
-                maxLines: 1,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 9,
-                  fontWeight: FontWeight.w800,
-                ),
-              ),
+          ),
+          Text(
+            label,
+            style: const TextStyle(
+              color: MoolColors.muted,
+              fontSize: 11,
+              fontWeight: FontWeight.w800,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -11953,6 +12334,7 @@ class _StockPositionRow extends StatelessWidget {
     required this.daysOfStock,
     required this.suggestedQuantity,
     required this.onRestock,
+    required this.onHistory,
   });
 
   final WorkspaceCatalogueItem product;
@@ -11960,6 +12342,7 @@ class _StockPositionRow extends StatelessWidget {
   final int? daysOfStock;
   final int suggestedQuantity;
   final VoidCallback onRestock;
+  final VoidCallback onHistory;
 
   @override
   Widget build(BuildContext context) {
@@ -11973,69 +12356,65 @@ class _StockPositionRow extends StatelessWidget {
       key: Key('work-stock-position-${product.id}'),
       color: Colors.white,
       borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
-        child: Row(
-          children: [
-            CircleAvatar(
-              radius: 19,
-              backgroundColor: low
-                  ? const Color(0xFFFFF0DB)
-                  : const Color(0xFFEAF2FF),
-              foregroundColor: low ? const Color(0xFF9A4A00) : MoolColors.navy,
-              child: Text(
-                product.brand.isEmpty ? '?' : product.brand.substring(0, 1),
-                style: const TextStyle(fontWeight: FontWeight.w900),
-              ),
-            ),
-            const SizedBox(width: 9),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    product.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: MoolColors.ink,
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  Text(
-                    '$stockLabel · $reserved reserved',
-                    style: TextStyle(
-                      color: low ? const Color(0xFF9A4A00) : MoolColors.muted,
-                      fontSize: 9.5,
-                      fontWeight: low ? FontWeight.w900 : FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    daysOfStock == null
-                        ? 'Sales history will estimate days remaining'
-                        : '$daysOfStock days at recent sales pace',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 9,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (low)
-              TextButton(
-                key: Key('work-stock-restock-${product.id}'),
-                onPressed: onRestock,
+      child: InkWell(
+        onTap: onHistory,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 19,
+                backgroundColor: low
+                    ? const Color(0xFFFFF0DB)
+                    : const Color(0xFFEAF2FF),
+                foregroundColor: low
+                    ? const Color(0xFF9A4A00)
+                    : MoolColors.navy,
                 child: Text(
-                  suggestedQuantity > 0
-                      ? 'Restock $suggestedQuantity'
-                      : 'Restock',
+                  product.brand.isEmpty ? '?' : product.brand.substring(0, 1),
+                  style: const TextStyle(fontWeight: FontWeight.w900),
                 ),
               ),
-          ],
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      product.title,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      '${product.pack} · $stockLabel · $reserved reserved',
+                      style: TextStyle(
+                        color: low ? const Color(0xFF9A4A00) : MoolColors.muted,
+                        fontSize: 12,
+                        fontWeight: low ? FontWeight.w900 : FontWeight.w600,
+                      ),
+                    ),
+                    if (daysOfStock != null)
+                      Text(
+                        '$daysOfStock days at recent sales pace',
+                        style: const TextStyle(
+                          color: MoolColors.muted,
+                          fontSize: 12,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+              if (low)
+                TextButton(
+                  key: Key('work-stock-restock-${product.id}'),
+                  onPressed: onRestock,
+                  child: const Text('Restock'),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -12043,53 +12422,52 @@ class _StockPositionRow extends StatelessWidget {
 }
 
 class _StockMovementRow extends StatelessWidget {
-  const _StockMovementRow({required this.movement});
+  const _StockMovementRow({required this.movement, this.onOpenReference});
 
   final WorkspaceStockMovement movement;
+  final VoidCallback? onOpenReference;
 
   @override
   Widget build(BuildContext context) {
     final positive = movement.quantityDelta > 0;
-    final label = switch (movement.kind) {
-      WorkspaceStockMovementKind.sale => 'Sale',
-      WorkspaceStockMovementKind.returned => 'Returned to stock',
-      WorkspaceStockMovementKind.goodsReceived => 'Goods received',
-      WorkspaceStockMovementKind.adjustment => 'Counted adjustment',
-      WorkspaceStockMovementKind.damageOrExpiry => 'Damage or expiry',
-      WorkspaceStockMovementKind.openingStock => 'Opening quantity',
-    };
-    return ListTile(
+    final label = movement.label;
+    final time = movement.occurredAt.toLocal();
+    return Padding(
       key: Key('work-stock-movement-${movement.id}'),
-      dense: true,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-      leading: CircleAvatar(
-        radius: 16,
-        backgroundColor: positive
-            ? const Color(0xFFEAF7F3)
-            : const Color(0xFFFFEFEA),
-        child: Icon(
-          positive ? Icons.add_rounded : Icons.remove_rounded,
-          color: positive ? const Color(0xFF08765D) : const Color(0xFFB42318),
-          size: 18,
-        ),
-      ),
-      title: Text(
-        movement.productLabel,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w900),
-      ),
-      subtitle: Text(
-        '$label · ${movement.reason}',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-      ),
-      trailing: Text(
-        '${positive ? '+' : ''}${movement.quantityDelta}',
-        style: TextStyle(
-          color: positive ? const Color(0xFF08765D) : const Color(0xFFB42318),
-          fontWeight: FontWeight.w900,
-        ),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            movement.productLabel,
+            style: const TextStyle(fontWeight: FontWeight.w900),
+          ),
+          Text(
+            '${positive ? '+' : ''}${movement.quantityDelta} · $label',
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          if (movement.reason != label)
+            Text(
+              movement.reason,
+              style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+            ),
+          Text(
+            '${time.day}/${time.month}/${time.year} · ${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
+            style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+          ),
+          if (onOpenReference != null)
+            TextButton(
+              key: Key('work-stock-reference-${movement.id}'),
+              onPressed: onOpenReference,
+              child: Text(
+                '${movement.referenceKind == WorkspaceStockReferenceKind.order ? 'Order' : 'Receipt'} ${movement.referenceId}',
+              ),
+            ),
+          const Divider(height: 12),
+        ],
       ),
     );
   }

@@ -381,6 +381,7 @@ void main() {
     WorkIssueDraftStore? issueDraftStore,
     WorkIssueCommandGateway? issueCommandGateway,
     WorkIssueCommandStore? issueCommandStore,
+    WorkStockHistoryGateway? stockHistoryGateway,
   ]) {
     final work =
         WorkSession(
@@ -389,6 +390,7 @@ void main() {
             issueDraftStore: issueDraftStore ?? _IssueDraftFixtureStore(),
             issueCommandGateway: issueCommandGateway,
             issueCommandStore: issueCommandStore ?? _IssueCommandFixtureStore(),
+            stockHistoryGateway: stockHistoryGateway,
           )
           ..seedVerifiedWorkspace()
           ..retailerSetupSaved = true
@@ -14788,6 +14790,316 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final (scale, viewport) in [
+    (1.0, const Size(412, 915)),
+    (2.0, const Size(412, 915)),
+    (2.0, const Size(320, 568)),
+  ]) {
+    final stockViewSuffix = '$scale-${viewport.width.toInt()}';
+    testWidgets(
+      'DASH10 stock changes retain filters references and Back $stockViewSuffix',
+      (tester) async {
+        final work = storeViewFixture();
+        final now = DateTime.now();
+        work.workspaceStockMovements.addAll(
+          List.generate(
+            121,
+            (i) => WorkspaceStockMovement(
+              id: 'history-$i',
+              productId: 'oil-fortune-1l',
+              productLabel: 'Fortune Sunflower Oil · 1 L',
+              kind: WorkspaceStockMovementKind.reserved,
+              quantityDelta: -2,
+              reason: 'Customer order reservation',
+              occurredAt: now.subtract(Duration(minutes: i)),
+              referenceKind: WorkspaceStockReferenceKind.order,
+              referenceId: 'APP-1043',
+            ),
+          ),
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: viewport,
+          textScale: scale,
+        );
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('work-catalogue-stock-statement')),
+        );
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'stock-position-$stockViewSuffix');
+        await tester.ensureVisible(
+          find.byKey(const Key('work-stock-position-oil-fortune-1l')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find
+              .byKey(const Key('work-stock-position-oil-fortune-1l'))
+              .hitTestable(),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const Key('work-stock-position-oil-fortune-1l')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-stock-history-product-filter')),
+          findsOneWidget,
+        );
+        final productLabel = find.descendant(
+          of: find.byKey(const Key('work-stock-history-product-filter')),
+          matching: find.text('Fortune Sunflower Oil'),
+        );
+        final labelParagraph = tester.renderObject<RenderParagraph>(
+          productLabel,
+        );
+        expect(labelParagraph.maxLines, isNull);
+        expect(labelParagraph.softWrap, isTrue);
+        expect(labelParagraph.didExceedMaxLines, isFalse);
+        expect(labelParagraph.text.style?.fontFamily, 'Inter');
+        expect(find.text('On this device · 121 changes'), findsOneWidget);
+        expect(
+          find.text('Full stock history is not connected yet.'),
+          findsOneWidget,
+        );
+        await captureStoreView(tester, 'stock-local-history-$stockViewSuffix');
+        final reference = find.byKey(
+          const Key('work-stock-reference-history-0'),
+        );
+        await reveal(tester, reference);
+        final historyScroll = find
+            .descendant(
+              of: find.byKey(const Key('work-stock-statement-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final referenceOffset = tester
+            .state<ScrollableState>(historyScroll)
+            .position
+            .pixels;
+        await tester.tap(reference);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-exact-order-information-APP-1043')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('work-stock-statement-screen')),
+          findsNothing,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-stock-statement-screen')),
+          findsOneWidget,
+        );
+        expect(
+          tester.state<ScrollableState>(historyScroll).position.pixels,
+          closeTo(referenceOffset, .1),
+        );
+        tester.state<ScrollableState>(historyScroll).position.jumpTo(0);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'stock-return-filter-$stockViewSuffix');
+        expect(
+          find.byKey(const Key('work-stock-history-product-filter')),
+          findsOneWidget,
+        );
+        expect(find.text('On this device · 121 changes'), findsOneWidget);
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('work-stock-movement-history-120')),
+          500,
+          scrollable: historyScroll,
+          maxScrolls: 200,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-stock-movement-history-120')),
+          findsOneWidget,
+        );
+        final oldestReference = find.byKey(
+          const Key('work-stock-reference-history-120'),
+        );
+        await reveal(tester, oldestReference);
+        expect(oldestReference.hitTestable(), findsOneWidget);
+        await captureStoreView(tester, 'stock-oldest-local-$stockViewSuffix');
+        final before = tester
+            .state<ScrollableState>(historyScroll)
+            .position
+            .pixels;
+        work.updateWorkspaceStock(
+          productId: 'oil-fortune-1l',
+          quantity: 70,
+          reason: 'Counted in store',
+        );
+        await tester.pumpAndSettle();
+        expect(
+          tester.state<ScrollableState>(historyScroll).position.pixels,
+          before,
+        );
+        expect(
+          find.byKey(const Key('work-stock-movement-history-120')),
+          findsOneWidget,
+        );
+        tester.state<ScrollableState>(historyScroll).position.jumpTo(0);
+        await tester.pumpAndSettle();
+        await reveal(
+          tester,
+          find.byKey(const Key('work-stock-history-refresh')),
+        );
+        expect(
+          find.byKey(const Key('work-stock-history-refresh')).hitTestable(),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('work-stock-history-refresh')));
+        await tester.pumpAndSettle();
+        expect(find.text('On this device · 122 changes'), findsOneWidget);
+        await reveal(tester, find.byKey(const Key('work-stock-history-dates')));
+        expect(
+          find.byKey(const Key('work-stock-history-dates')).hitTestable(),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('work-stock-history-dates')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Today').last);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .getSize(find.byKey(const Key('work-stock-history-dates')))
+              .height,
+          greaterThanOrEqualTo(48),
+        );
+        await captureStoreView(tester, 'stock-date-filter-$stockViewSuffix');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'DASH10 stock history older pages retry and return fit $stockViewSuffix',
+      (tester) async {
+        final gateway = _StockHistoryFixtureGateway();
+        final work = storeViewFixture(
+          null,
+          _ContactDraftFixtureStore(),
+          null,
+          null,
+          null,
+          gateway,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: viewport,
+          textScale: scale,
+        );
+        await tester.tap(find.byKey(const Key('work-store-stock')));
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.byKey(const Key('work-catalogue-stock-statement')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Changes'));
+        await tester.pumpAndSettle();
+        expect(work.workspaceStockHistory.length, 50);
+        expect(find.text('50 of 101 changes'), findsOneWidget);
+        await captureStoreView(tester, 'stock-server-history-$stockViewSuffix');
+        final scroll = find
+            .descendant(
+              of: find.byKey(const Key('work-stock-statement-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final more = find.byKey(const Key('work-stock-history-more'));
+        await tester.scrollUntilVisible(
+          more,
+          600,
+          scrollable: scroll,
+          maxScrolls: 150,
+        );
+        await tester.pumpAndSettle();
+        gateway.failNext = true;
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        expect(work.workspaceStockHistory.length, 50);
+        final retry = find.byKey(const Key('work-stock-history-retry'));
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'stock-history-retry-$stockViewSuffix');
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(work.workspaceStockHistory.length, 100);
+        await tester.scrollUntilVisible(
+          more,
+          600,
+          scrollable: scroll,
+          maxScrolls: 150,
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        expect(work.workspaceStockHistory.length, 101);
+        expect(work.workspaceStockHistoryHasMore, isFalse);
+        expect(gateway.cursors, [null, '50', '50', '100']);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('DASH10 five thousand stock products are built lazily', (
+    tester,
+  ) async {
+    final work = liveStore();
+    for (var i = 1; i <= 5000; i++) {
+      work.workspaceCatalogueItems.add(catalogueProduct(i));
+    }
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1,
+    );
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-catalogue-stock-statement')));
+    await tester.pumpAndSettle();
+    final mounted = find.byWidgetPredicate(
+      (widget) =>
+          widget.key is ValueKey<String> &&
+          (widget.key! as ValueKey<String>).value.startsWith(
+            'work-stock-position-',
+          ),
+    );
+    expect(mounted.evaluate().length, lessThan(30));
+    expect(mounted.evaluate().length, greaterThan(0));
+    expect(work.workspaceCatalogueItems.length, 5001);
+    final firstBefore = tester.getTopLeft(
+      find.byKey(const Key('work-stock-position-oil-fortune-1l')),
+    );
+    final changed = work.workspaceCatalogueItems.indexWhere(
+      (product) => product.id == catalogueProduct(1).id,
+    );
+    expect(changed, greaterThanOrEqualTo(0));
+    work.workspaceCatalogueItems[changed] = work
+        .workspaceCatalogueItems[changed]
+        .copyWith(stock: 0, available: false);
+    work.notifyListeners();
+    await tester.pumpAndSettle();
+    expect(
+      tester.getTopLeft(
+        find.byKey(const Key('work-stock-position-oil-fortune-1l')),
+      ),
+      firstBefore,
+    );
+    expect(tester.takeException(), isNull);
+    await captureStoreView(tester, 'stock-five-thousand-products');
+  });
+
   testWidgets('stock statement returns from exact Wholesale recommendation', (
     tester,
   ) async {
@@ -14900,14 +15212,14 @@ void main() {
     expect(work.workspaceReservedUnitCount, 2);
     expect(
       work.workspaceStockMovements.first.kind,
-      WorkspaceStockMovementKind.sale,
+      WorkspaceStockMovementKind.reserved,
     );
     work.cancelWorkspaceOrder();
     expect(work.workspaceCatalogueItems.first.stock, 10);
     expect(work.workspaceReservedUnitCount, 0);
     expect(
       work.workspaceStockMovements.first.kind,
-      WorkspaceStockMovementKind.returned,
+      WorkspaceStockMovementKind.released,
     );
 
     final availabilityOnly = catalogueProduct(90, stock: 0).copyWith(
@@ -18474,6 +18786,51 @@ class _IssueResponseFixtureGateway implements WorkIssueCommandGateway {
       commandDigest: command.digest,
       state: WorkIssueReplyState.applied,
       revision: command.draft.expectedRevision + 1,
+    );
+  }
+}
+
+class _StockHistoryFixtureGateway implements WorkStockHistoryGateway {
+  bool failNext = false;
+  final cursors = <String?>[];
+  @override
+  Future<WorkspaceStockHistoryPage> readStockHistory(
+    WorkspaceStockHistoryQuery query, {
+    String? cursor,
+    String? snapshotId,
+  }) async {
+    cursors.add(cursor);
+    if (failNext) {
+      failNext = false;
+      throw StateError('Offline fixture');
+    }
+    final now = DateTime.now();
+    final all = List.generate(
+      101,
+      (i) => WorkspaceStockMovement(
+        id: 'server-$i',
+        productId: 'oil-fortune-1l',
+        productLabel: 'Fortune Sunflower Oil · 1 L',
+        kind: WorkspaceStockMovementKind.reserved,
+        quantityDelta: -2,
+        reason: 'Customer order reservation',
+        occurredAt: now.subtract(Duration(minutes: i)),
+        referenceKind: WorkspaceStockReferenceKind.order,
+        referenceId: 'APP-1043',
+      ),
+    ).where(query.includes).toList();
+    final start = int.parse(cursor ?? '0');
+    final end = (start + WorkspaceStockHistoryQuery.pageSize).clamp(
+      0,
+      all.length,
+    );
+    return WorkspaceStockHistoryPage(
+      query: query,
+      snapshotId: 'history-v1',
+      cursor: cursor,
+      nextCursor: end < all.length ? '$end' : null,
+      totalCount: all.length,
+      records: all.sublist(start, end),
     );
   }
 }
