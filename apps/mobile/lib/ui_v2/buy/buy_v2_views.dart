@@ -69,7 +69,7 @@ String _cartHeaderSummary(BuyV2Session session) {
     _productCountLabel(lines.length),
     quantityLabel,
     if (destinations.isNotEmpty) _destinationSummary(destinations),
-    buyV2Money(session.scopedCartTotal),
+    'Subtotal ${buyV2Money(session.scopedCartTotal)}',
   ].join(' · ');
 }
 
@@ -5456,7 +5456,9 @@ class _GstInvoiceCard extends StatelessWidget {
             container: true,
             button: true,
             toggled: requested,
-            label: requested ? 'Remove GST details' : 'Add GST details',
+            label:
+                '${destination.label}. '
+                '${requested ? 'Remove GST details' : 'Add GST details'}',
             onTap: () => controller.setRequested(destination, !requested),
             child: ExcludeSemantics(
               child: GestureDetector(
@@ -5488,7 +5490,8 @@ class _GstInvoiceCard extends StatelessWidget {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Text(
-                              gstAdded ? 'GST added' : 'Add GST details',
+                              '${destination.label} · '
+                              '${gstAdded ? 'GST added' : 'Add GST details'}',
                               style: context.buyBody,
                             ),
                             Text(
@@ -15540,6 +15543,7 @@ class _CartScopeBar extends StatelessWidget {
     final entries = scopes
         .map((scope) {
           final selected = session.cartScope == scope;
+          final label = scope == BuyV2CartScope.all ? 'Subtotal' : scope.label;
           final text = scope == BuyV2CartScope.all
               ? buyV2Money(session.cartTotal)
               : '${session.countForDestination(_destinationForCartScope(scope)!)}';
@@ -15553,14 +15557,11 @@ class _CartScopeBar extends StatelessWidget {
             fontSize: 10,
             fontWeight: FontWeight.w900,
           );
-          final labelSize = buyV2ValueTextSize(
-            context,
-            scope.label,
-            labelStyle,
-          );
+          final labelSize = buyV2ValueTextSize(context, label, labelStyle);
           final valueSize = buyV2ValueTextSize(context, text, valueStyle);
           return (
             scope: scope,
+            label: label,
             selected: selected,
             text: text,
             labelStyle: labelStyle,
@@ -15632,7 +15633,7 @@ class _CartScopeBar extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Text(
-                                entry.scope.label,
+                                entry.label,
                                 maxLines: 1,
                                 style: entry.labelStyle,
                               ),
