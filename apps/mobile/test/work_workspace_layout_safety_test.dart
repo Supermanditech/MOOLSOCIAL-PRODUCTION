@@ -15381,6 +15381,100 @@ void main() {
             );
           }
 
+          final arrivals = find.byKey(const Key('work-incoming-purchases'));
+          await reveal(tester, arrivals);
+          await tester.tap(arrivals);
+          await tester.pumpAndSettle();
+          final supplier = find.text('Wholesale supplier 0');
+          await reveal(tester, supplier);
+          await tester.tap(supplier);
+          await tester.pumpAndSettle();
+          final receive = find.byKey(const Key('work-receipt-start'));
+          await reveal(tester, receive);
+          await tester.tap(receive);
+          await tester.pumpAndSettle();
+          final count = find.byKey(const Key('work-receipt-count-LINE-MIX-0'));
+          await reveal(tester, count);
+          await tester.enterText(count, '97');
+          await tester.pumpAndSettle();
+          final note = find.byWidgetPredicate(
+            (widget) =>
+                widget is TextField &&
+                widget.decoration?.labelText == 'Delivery note',
+          );
+          await reveal(tester, note);
+          await tester.enterText(note, 'Three packs need checking');
+          const receiptValue = TextEditingValue(
+            text: 'Three packs need checking',
+            selection: TextSelection.collapsed(offset: 11),
+            composing: TextRange(start: 6, end: 11),
+          );
+          tester.testTextInput.updateEditingValue(receiptValue);
+          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(note);
+          final receiptEditable = find.descendant(
+            of: note,
+            matching: find.byType(EditableText),
+          );
+          final receiptController = tester
+              .widget<EditableText>(receiptEditable)
+              .controller;
+          final beforeReceiving = work.workspaceReceiptDraft(incoming(0, 1))!;
+          expect(beforeReceiving.countedPacks['LINE-MIX-0'], '97');
+          expect(beforeReceiving.note, receiptValue.text);
+          updateOtherWork(2);
+          await tester.pumpAndSettle();
+          expect(work.focusedWorkspacePurchaseId, 'SHIP-MIX-0');
+          expect(work.currentWorkspaceOrderId, selectedCustomerOrder);
+          final afterReceiving = work.workspaceReceiptDraft(incoming(0, 2))!;
+          expect(
+            afterReceiving.shipmentRevision,
+            beforeReceiving.shipmentRevision,
+          );
+          expect(afterReceiving.countedPacks, beforeReceiving.countedPacks);
+          expect(afterReceiving.note, receiptValue.text);
+          final liveReceipt = tester.widget<EditableText>(receiptEditable);
+          expect(liveReceipt.controller, same(receiptController));
+          expect(liveReceipt.controller.value, receiptValue);
+          expect(liveReceipt.focusNode.hasFocus, isTrue);
+          expect(work.workspaceOrders.length, customerStates.length + 1);
+          expect(work.workspacePurchases, hasLength(8));
+          expect(work.workspaceGroupOffers, hasLength(4));
+          expect(work.workspaceFinance!.payouts, hasLength(2));
+          expect(work.workspaceInvoices.length, invoiceCount);
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'mixed-receiving-editor-$stockViewSuffix',
+          );
+          tester.testTextInput.hide();
+          tester.view.resetViewInsets();
+          await tester.pumpAndSettle();
+          final closeReceipt = find.byKey(const Key('work-receipt-close'));
+          final purchaseList = find.byKey(
+            PageStorageKey('work-purchase-details-$store-SHIP-MIX-0-false'),
+          );
+          for (
+            var attempt = 0;
+            attempt < 24 && closeReceipt.hitTestable().evaluate().isEmpty;
+            attempt++
+          ) {
+            await tester.drag(purchaseList, const Offset(0, 240));
+            await tester.pumpAndSettle();
+          }
+          expect(closeReceipt.hitTestable(), findsOneWidget);
+          await tester.tap(closeReceipt);
+          await tester.pumpAndSettle();
+          expect(
+            work.workspaceReceiptDraft(incoming(0, 2))!.note,
+            receiptValue.text,
+          );
+          expect(work.focusedWorkspacePurchaseId, 'SHIP-MIX-0');
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byKey(const Key('work-store-home')));
+          await tester.pumpAndSettle();
+
           await tester.tap(find.byKey(const Key('work-store-sell')));
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const Key('work-sale-customer')));
@@ -15402,7 +15496,7 @@ void main() {
           final customerController = tester
               .widget<EditableText>(customerEditable)
               .controller;
-          updateOtherWork(2);
+          updateOtherWork(3);
           await tester.pumpAndSettle();
           expect(
             tester.widget<EditableText>(customerEditable).controller,
@@ -15489,7 +15583,7 @@ void main() {
             messageValue,
             reason: 'Valid IME composition is present before Store updates',
           );
-          updateOtherWork(3);
+          updateOtherWork(4);
           await tester.pumpAndSettle();
           expect(
             tester.widget<EditableText>(messageEditable).controller,
@@ -15509,7 +15603,7 @@ void main() {
           expect(work.workspaceOrderTotal, billTotal);
           expect(work.workspaceInvoices, hasLength(invoiceCount));
           expect(work.workspaceStockMovements, isEmpty);
-          expect(work.workspaceOrders.length, customerStates.length + 2);
+          expect(work.workspaceOrders.length, customerStates.length + 3);
           await captureStoreView(tester, 'mixed-chat-editor-$stockViewSuffix');
           FocusManager.instance.primaryFocus?.unfocus();
           tester.view.viewInsets = const FakeViewPadding();
