@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 
 import '../buy/buy_v2_content_contracts.dart';
@@ -528,6 +530,203 @@ enum WorkspaceReceiptState {
     confirmed => 'Receipt confirmed',
     disputed => 'Receipt under review',
   };
+}
+
+typedef WorkspaceReceiptDraftKey = ({
+  String account,
+  String store,
+  String shipment,
+});
+
+enum WorkspaceReceiptProblem {
+  missing,
+  damaged,
+  wrongItem,
+  wrongPack,
+  extra,
+  other;
+
+  String get label => switch (this) {
+    missing => 'Missing packs',
+    damaged => 'Damaged packs',
+    wrongItem => 'Wrong item',
+    wrongPack => 'Wrong pack size',
+    extra => 'Extra packs',
+    other => 'Other issue',
+  };
+}
+
+/// Device-local observations, not an accepted receipt or a stock movement.
+/// Retain the original shipment revision and purchased lines; refreshed supplier
+/// facts must never silently rebase what the retailer actually checked.
+class WorkspaceReceiptDraft {
+  WorkspaceReceiptDraft({
+    required this.key,
+    required this.supplierId,
+    required this.orderId,
+    required this.shipmentRevision,
+    required this.revision,
+    required List<WorkspacePurchaseLine> lines,
+    required Map<String, String> countedPacks,
+    required Map<String, WorkspaceReceiptProblem> problems,
+    this.purchaseId,
+    this.note = '',
+  }) : lines = List.unmodifiable(lines),
+       countedPacks = Map.unmodifiable(countedPacks),
+       problems = Map.unmodifiable(problems);
+
+  final WorkspaceReceiptDraftKey key;
+  final String supplierId, orderId;
+  final String? purchaseId;
+  final int shipmentRevision, revision;
+  final List<WorkspacePurchaseLine> lines;
+  // Preserve incomplete/invalid typed values for correction after relaunch.
+  // Empty is unknown, never an inferred zero or the ordered quantity.
+  final Map<String, String> countedPacks;
+  final Map<String, WorkspaceReceiptProblem> problems;
+  final String note;
+
+  bool get valid =>
+      [
+        key.account,
+        key.store,
+        key.shipment,
+        supplierId,
+        orderId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      (purchaseId == null || purchaseId!.trim().isNotEmpty) &&
+      shipmentRevision > 0 &&
+      revision > 0 &&
+      lines.isNotEmpty &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.id).toSet().length == lines.length &&
+      countedPacks.keys.every((id) => lines.any((line) => line.id == id)) &&
+      problems.keys.every((id) => lines.any((line) => line.id == id)) &&
+      WorkspaceIssueDraft.acceptsNote(note);
+
+  int? counted(String lineId) {
+    final text = countedPacks[lineId]?.trim() ?? '';
+    if (!RegExp(r'^\d+$').hasMatch(text)) return null;
+    final number = int.tryParse(text);
+    return number != null && number >= 0 ? number : null;
+  }
+
+  bool get quantitiesComplete =>
+      valid && lines.every((line) => counted(line.id) != null);
+
+  bool belongsTo(WorkspacePurchaseRecord record) =>
+      key.account == record.accountScope &&
+      key.store == record.workspaceId &&
+      key.shipment == record.shipmentId &&
+      supplierId == record.supplierId &&
+      orderId == record.orderId &&
+      purchaseId == record.purchaseId;
+
+  bool matchesSnapshot(WorkspacePurchaseRecord record) =>
+      belongsTo(record) &&
+      shipmentRevision == record.revision &&
+      jsonEncode(lines.map(_lineJson).toList()) ==
+          jsonEncode(record.lines.map(_lineJson).toList());
+
+  static Map<String, Object?> _lineJson(WorkspacePurchaseLine line) => {
+    'id': line.id,
+    'productId': line.productId,
+    'name': line.name,
+    'pack': line.pack,
+    'orderedPacks': line.orderedPacks,
+    'unitPriceMinor': line.unitPriceMinor,
+    'receivedPacks': line.receivedPacks,
+  };
+
+  Map<String, Object?> toJson() => {
+    'schema': 1,
+    'account': key.account,
+    'store': key.store,
+    'shipment': key.shipment,
+    'supplierId': supplierId,
+    'orderId': orderId,
+    'purchaseId': purchaseId,
+    'shipmentRevision': shipmentRevision,
+    'revision': revision,
+    'lines': lines.map(_lineJson).toList(),
+    'countedPacks': countedPacks,
+    'problems': problems.map((id, value) => MapEntry(id, value.name)),
+    'note': note,
+  };
+
+  static WorkspaceReceiptDraft? fromJson(Object? value) {
+    if (value is! Map ||
+        value['schema'] != 1 ||
+        value['account'] is! String ||
+        value['store'] is! String ||
+        value['shipment'] is! String ||
+        value['supplierId'] is! String ||
+        value['orderId'] is! String ||
+        value['shipmentRevision'] is! int ||
+        value['revision'] is! int ||
+        value['lines'] is! List ||
+        value['countedPacks'] is! Map ||
+        value['problems'] is! Map ||
+        value['note'] is! String ||
+        (value['purchaseId'] != null && value['purchaseId'] is! String)) {
+      return null;
+    }
+    final lines = <WorkspacePurchaseLine>[];
+    for (final raw in value['lines'] as List) {
+      if (raw is! Map ||
+          raw['id'] is! String ||
+          raw['productId'] is! String ||
+          raw['name'] is! String ||
+          raw['pack'] is! String ||
+          raw['orderedPacks'] is! int ||
+          raw['unitPriceMinor'] is! int ||
+          (raw['receivedPacks'] != null && raw['receivedPacks'] is! int)) {
+        return null;
+      }
+      lines.add(
+        WorkspacePurchaseLine(
+          id: raw['id'] as String,
+          productId: raw['productId'] as String,
+          name: raw['name'] as String,
+          pack: raw['pack'] as String,
+          orderedPacks: raw['orderedPacks'] as int,
+          unitPriceMinor: raw['unitPriceMinor'] as int,
+          receivedPacks: raw['receivedPacks'] as int?,
+        ),
+      );
+    }
+    final counts = <String, String>{};
+    for (final entry in (value['countedPacks'] as Map).entries) {
+      if (entry.key is! String || entry.value is! String) return null;
+      counts[entry.key as String] = entry.value as String;
+    }
+    final problems = <String, WorkspaceReceiptProblem>{};
+    for (final entry in (value['problems'] as Map).entries) {
+      if (entry.key is! String || entry.value is! String) return null;
+      final matches = WorkspaceReceiptProblem.values.where(
+        (problem) => problem.name == entry.value,
+      );
+      if (matches.length != 1) return null;
+      problems[entry.key as String] = matches.single;
+    }
+    final draft = WorkspaceReceiptDraft(
+      key: (
+        account: value['account'] as String,
+        store: value['store'] as String,
+        shipment: value['shipment'] as String,
+      ),
+      supplierId: value['supplierId'] as String,
+      orderId: value['orderId'] as String,
+      purchaseId: value['purchaseId'] as String?,
+      shipmentRevision: value['shipmentRevision'] as int,
+      revision: value['revision'] as int,
+      lines: lines,
+      countedPacks: counts,
+      problems: problems,
+      note: value['note'] as String,
+    );
+    return draft.valid ? draft : null;
+  }
 }
 
 class WorkspacePurchaseLine {

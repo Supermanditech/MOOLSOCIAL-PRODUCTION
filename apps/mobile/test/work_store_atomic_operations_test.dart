@@ -415,7 +415,332 @@ WorkspaceGroupOffer _groupOffer(
   ),
 );
 
+WorkspaceReceiptDraft _receiptDraft({
+  String account = 'account-A',
+  String store = 'store-A',
+  String shipment = 'shipment-A',
+  String supplier = 'supplier-A',
+  int revision = 1,
+  int shipmentRevision = 4,
+  String count = '',
+  String note = 'दो पैक जाँचें 📦',
+  String product = 'sku-A',
+}) => WorkspaceReceiptDraft(
+  key: (account: account, store: store, shipment: shipment),
+  supplierId: supplier,
+  orderId: 'order-A',
+  purchaseId: 'purchase-A',
+  shipmentRevision: shipmentRevision,
+  revision: revision,
+  lines: [
+    WorkspacePurchaseLine(
+      id: 'line-A',
+      productId: product,
+      name: 'Sunflower oil',
+      pack: '1 l × 12',
+      orderedPacks: 10,
+      unitPriceMinor: 1550050,
+      receivedPacks: 3,
+    ),
+  ],
+  countedPacks: {'line-A': count},
+  problems: const {'line-A': WorkspaceReceiptProblem.damaged},
+  note: note,
+);
+
 void main() {
+  group('DASH07 receiving draft', () {
+    test(
+      'source snapshot match rejects revision identity and pack changes',
+      () {
+        final draft = _receiptDraft();
+        WorkspacePurchaseRecord shipment({
+          int revision = 4,
+          String store = 'store-A',
+          String supplier = 'supplier-A',
+          String pack = '1 l × 12',
+        }) => WorkspacePurchaseRecord(
+          accountScope: 'account-A',
+          workspaceId: store,
+          supplierId: supplier,
+          supplierName: 'Oil wholesaler',
+          orderId: 'order-A',
+          shipmentId: 'shipment-A',
+          purchaseId: 'purchase-A',
+          revision: revision,
+          createdAt: DateTime(2026),
+          updatedAt: DateTime(2026, 9),
+          stage: WorkspaceSupplyStage.arriving,
+          amountMinor: 15500500,
+          itemSummary: 'Oil',
+          paymentLabel: 'Paid online',
+          lines: [
+            WorkspacePurchaseLine(
+              id: 'line-A',
+              productId: 'sku-A',
+              name: 'Sunflower oil',
+              pack: pack,
+              orderedPacks: 10,
+              unitPriceMinor: 1550050,
+              receivedPacks: 3,
+            ),
+          ],
+        );
+        expect(draft.matchesSnapshot(shipment()), isTrue);
+        expect(draft.belongsTo(shipment(revision: 5)), isTrue);
+        expect(draft.matchesSnapshot(shipment(revision: 5)), isFalse);
+        expect(draft.matchesSnapshot(shipment(pack: '5 l × 4')), isFalse);
+        expect(draft.belongsTo(shipment(store: 'store-B')), isFalse);
+        expect(draft.belongsTo(shipment(supplier: 'competitor')), isFalse);
+        final json = draft.toJson();
+        final line = (json['lines'] as List).single;
+        expect(
+          WorkspaceReceiptDraft.fromJson({
+            ...json,
+            'lines': [line, line],
+          }),
+          isNull,
+        );
+        expect(draft.lines.single.pack, '1 l × 12');
+      },
+    );
+
+    test(
+      'account change during native save never exposes another account draft',
+      () async {
+        final native = _OrderJournalStorage();
+        var account = 'account-A';
+        final storage = SecureWorkReceiptDraftStore(
+          accountScope: () => account,
+          storage: native,
+        );
+        final held = Completer<void>();
+        native.holdWrite = held;
+        final draft = _receiptDraft();
+        final write = storage.save(draft, expectedRevision: null);
+        final rejected = expectLater(
+          write,
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await _drainOrderJournal();
+        account = 'account-B';
+        held.complete();
+        await rejected;
+        expect(await storage.read(_receiptDraft(account: account).key), isNull);
+        await expectLater(
+          storage.read(draft.key),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        account = 'account-A';
+        expect((await storage.read(draft.key))!.toJson(), draft.toJson());
+        final writes = native.writes.length;
+        await storage.save(draft, expectedRevision: null);
+        expect(native.writes.length, writes);
+      },
+    );
+
+    test('retains original lines and incomplete counts without false zero', () {
+      for (final value in ['', '3.', '-1', 'abc', '999999999999999999999999']) {
+        final draft = _receiptDraft(count: value);
+        final restored = WorkspaceReceiptDraft.fromJson(
+          jsonDecode(jsonEncode(draft.toJson())),
+        )!;
+        expect(restored.valid, isTrue);
+        expect(restored.countedPacks['line-A'], value);
+        expect(restored.quantitiesComplete, isFalse);
+        expect(restored.counted('line-A'), isNull);
+        expect(restored.lines.single.receivedPacks, 3);
+        expect(restored.note, draft.note);
+      }
+      for (final value in ['0', '11', '1000000000']) {
+        final draft = _receiptDraft(count: value);
+        expect(draft.quantitiesComplete, isTrue);
+        expect(draft.counted('line-A'), int.parse(value));
+        expect(draft.lines.single.orderedPacks, 10);
+        expect(draft.lines.single.receivedPacks, 3);
+      }
+    });
+
+    test('rejects malformed identities and unknown purchased lines', () {
+      final original = _receiptDraft().toJson();
+      for (final patch in <Map<String, Object?>>[
+        {'schema': 2},
+        {'account': ''},
+        {'shipmentRevision': 0},
+        {'revision': 0},
+        {'supplierId': ''},
+        {'purchaseId': 42},
+        {'lines': []},
+        {
+          'lines': [original['lines'], original['lines']],
+        },
+        {
+          'countedPacks': {'foreign-line': '10'},
+        },
+        {
+          'countedPacks': {'line-A': 3},
+        },
+        {
+          'problems': {'line-A': 'approve-refund'},
+        },
+        {
+          'problems': {'foreign-line': 'damaged'},
+        },
+        {'note': List.filled(2001, '📦').join()},
+      ]) {
+        expect(
+          WorkspaceReceiptDraft.fromJson({...original, ...patch}),
+          isNull,
+          reason: patch.keys.join(','),
+        );
+      }
+      final draft = _receiptDraft();
+      expect(() => draft.countedPacks['line-A'] = '7', throwsUnsupportedError);
+      expect(() => draft.lines.clear(), throwsUnsupportedError);
+    });
+
+    test(
+      'encrypted restart recovery stays account Store and shipment scoped',
+      () async {
+        final native = _OrderJournalStorage();
+        String account = 'account-A';
+        SecureWorkReceiptDraftStore open() => SecureWorkReceiptDraftStore(
+          accountScope: () => account,
+          storage: native,
+        );
+        final drafts = [
+          _receiptDraft(count: '7'),
+          _receiptDraft(store: 'store-B', count: '2'),
+          _receiptDraft(shipment: 'shipment-B', count: '9'),
+        ];
+        for (final draft in drafts) {
+          await open().save(draft, expectedRevision: null);
+        }
+        for (final draft in drafts) {
+          expect((await open().read(draft.key))!.toJson(), draft.toJson());
+        }
+        expect(native.values, hasLength(3));
+        account = 'account-B';
+        await expectLater(
+          open().read(drafts.first.key),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(await open().read(_receiptDraft(account: account).key), isNull);
+        expect(native.values, hasLength(3));
+      },
+    );
+
+    test(
+      'stale editor cannot overwrite newer count or source snapshot',
+      () async {
+        final native = _OrderJournalStorage();
+        final storage = SecureWorkReceiptDraftStore(
+          accountScope: () => 'account-A',
+          storage: native,
+        );
+        await storage.save(_receiptDraft(), expectedRevision: null);
+        final newer = _receiptDraft(revision: 2, count: '8');
+        await storage.save(newer, expectedRevision: 1);
+        final writeCount = native.writes.length;
+        await storage.save(newer, expectedRevision: 1);
+        expect(
+          native.writes.length,
+          writeCount,
+        ); // Same successful write retry.
+        for (final candidate in [
+          _receiptDraft(revision: 2, count: '9'),
+          _receiptDraft(revision: 3, supplier: 'other'),
+          _receiptDraft(revision: 3, product: 'replacement-sku'),
+          _receiptDraft(revision: 3, shipmentRevision: 5),
+        ]) {
+          await expectLater(
+            storage.save(candidate, expectedRevision: candidate.revision - 1),
+            throwsA(isA<WorkGatewayException>()),
+          );
+        }
+        expect((await storage.read(newer.key))!.toJson(), newer.toJson());
+      },
+    );
+
+    test(
+      'read failure and corrupt evidence cannot be replaced by blank draft',
+      () async {
+        final native = _OrderJournalStorage();
+        final storage = SecureWorkReceiptDraftStore(
+          accountScope: () => 'account-A',
+          storage: native,
+        );
+        final draft = _receiptDraft();
+        await storage.save(draft, expectedRevision: null);
+        native.failRead = true;
+        await expectLater(
+          storage.save(_receiptDraft(revision: 2), expectedRevision: 1),
+          throwsStateError,
+        );
+        native.failRead = false;
+        final key = native.values.keys.single;
+        native.values[key] = '{unreadable';
+        await expectLater(
+          storage.read(draft.key),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await expectLater(
+          storage.save(draft, expectedRevision: null),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(native.values[key], '{unreadable');
+        expect(native.writes, hasLength(1));
+      },
+    );
+
+    test(
+      'slow write serializes local instances while other shipments proceed',
+      () async {
+        final native = _OrderJournalStorage();
+        SecureWorkReceiptDraftStore open() => SecureWorkReceiptDraftStore(
+          accountScope: () => 'account-A',
+          storage: native,
+        );
+        await open().save(_receiptDraft(), expectedRevision: null);
+        final held = Completer<void>();
+        native.holdWrite = held;
+        final first = open().save(
+          _receiptDraft(revision: 2, count: '5'),
+          expectedRevision: 1,
+        );
+        await _drainOrderJournal();
+        native.holdWrite = null;
+        final second = open().save(
+          _receiptDraft(revision: 3, count: '6'),
+          expectedRevision: 2,
+        );
+        final other = _receiptDraft(shipment: 'shipment-B');
+        await open().save(other, expectedRevision: null);
+        expect(await open().read(other.key), isNotNull);
+        expect(native.writes, hasLength(3)); // second still waits on the first
+        held.complete();
+        await first;
+        await second;
+        expect((await open().read(_receiptDraft().key))!.counted('line-A'), 6);
+      },
+    );
+
+    test('native save failure retries without discarding draft', () async {
+      final native = _OrderJournalStorage()..failWrite = true;
+      final storage = SecureWorkReceiptDraftStore(
+        accountScope: () => 'account-A',
+        storage: native,
+      );
+      final draft = _receiptDraft(count: '8');
+      await expectLater(
+        storage.save(draft, expectedRevision: null),
+        throwsStateError,
+      );
+      native.failWrite = false;
+      await storage.save(draft, expectedRevision: null);
+      expect((await storage.read(draft.key))!.toJson(), draft.toJson());
+    });
+  });
   group('DASH15 counter session', () {
     late _CommandAccountStore account;
     late _OrderJournalStorage storage;

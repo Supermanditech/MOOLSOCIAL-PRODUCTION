@@ -186,6 +186,130 @@ class SecureWorkIssueDraftStore implements WorkIssueDraftStore {
   }
 }
 
+abstract interface class WorkReceiptDraftStore {
+  Future<WorkspaceReceiptDraft?> read(WorkspaceReceiptDraftKey key);
+  Future<void> save(
+    WorkspaceReceiptDraft draft, {
+    required int? expectedRevision,
+  });
+}
+
+/// Encrypted recovery of unsent receiving observations, never receipt authority.
+/// Serialize reads/writes across local instances and compare the retained draft
+/// revision. A slow native write must finish before a newer edit can be saved.
+class SecureWorkReceiptDraftStore implements WorkReceiptDraftStore {
+  SecureWorkReceiptDraftStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  static final Map<String, Future<void>> _pending = {};
+
+  String _key(WorkspaceReceiptDraftKey key) =>
+      'moolsocial.workspace.receipt-draft.v1.'
+      '${[key.account, key.store, key.shipment].map(Uri.encodeComponent).join('/')}';
+
+  Future<T> _exclusive<T>(String key, Future<T> Function() action) {
+    final result = (_pending[key] ?? Future<void>.value()).then(
+      (_) => action(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _pending[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_pending[key], tail)) _pending.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  void _check(WorkspaceReceiptDraftKey key) {
+    if ([
+          key.account,
+          key.store,
+          key.shipment,
+        ].any((value) => value.trim().isEmpty) ||
+        accountScope() != key.account) {
+      throw const WorkGatewayException(
+        'Sign in again to open this delivery draft.',
+      );
+    }
+  }
+
+  Future<WorkspaceReceiptDraft?> _read(WorkspaceReceiptDraftKey key) async {
+    _check(key);
+    final value = await _storage.read(key: _key(key));
+    _check(key);
+    if (value == null) return null;
+    WorkspaceReceiptDraft? draft;
+    try {
+      draft = WorkspaceReceiptDraft.fromJson(jsonDecode(value));
+    } on FormatException {
+      // Corrupt retained bytes are not an empty draft that may be overwritten.
+    }
+    if (draft == null || draft.key != key) {
+      throw const WorkGatewayException(
+        'Your saved delivery draft could not be opened.',
+      );
+    }
+    return draft;
+  }
+
+  @override
+  Future<WorkspaceReceiptDraft?> read(WorkspaceReceiptDraftKey key) =>
+      _exclusive(_key(key), () => _read(key));
+
+  @override
+  Future<void> save(
+    WorkspaceReceiptDraft draft, {
+    required int? expectedRevision,
+  }) => _exclusive(_key(draft.key), () async {
+    _check(draft.key);
+    if (!draft.valid ||
+        (expectedRevision != null && expectedRevision < 1) ||
+        draft.revision != (expectedRevision ?? 0) + 1) {
+      throw const WorkGatewayException(
+        'This delivery draft could not be saved.',
+      );
+    }
+    final current = await _read(draft.key);
+    final value = jsonEncode(draft.toJson());
+    if (current != null && jsonEncode(current.toJson()) == value) return;
+    if (current?.revision != expectedRevision) {
+      throw const WorkGatewayException(
+        'This delivery draft changed. Open the saved version first.',
+      );
+    }
+    // Counts/problem/note can change; purchased identity and its source
+    // snapshot cannot silently follow today's refreshed supplier catalogue.
+    if (current != null) {
+      final previous = current.toJson()
+        ..remove('revision')
+        ..remove('countedPacks')
+        ..remove('problems')
+        ..remove('note');
+      final next = draft.toJson()
+        ..remove('revision')
+        ..remove('countedPacks')
+        ..remove('problems')
+        ..remove('note');
+      if (jsonEncode(previous) != jsonEncode(next)) {
+        throw const WorkGatewayException(
+          'Keep the original delivery details with this draft.',
+        );
+      }
+    }
+    _check(draft.key);
+    await _storage.write(key: _key(draft.key), value: value);
+    _check(draft.key);
+  });
+}
+
 abstract interface class WorkCounterDraftStore {
   Future<WorkspaceCounterDraft?> read(String account, String store);
   Future<void> save(
