@@ -16665,6 +16665,139 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
+      'DASH02 exact activity search survives updates and Back $scale',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final store = work.activeWorkspace!;
+        final selectedOrder = work.currentWorkspaceOrderId;
+        final invoiceCount = work.workspaceInvoices.length;
+        final original = WorkspaceActivityEntry(
+          message:
+              'PO-417 delivery checked: 97 packs counted; three need review.',
+          time: DateTime(2026, 1, 2, 11, 24),
+        );
+        work.workspaceActivity.insert(0, original);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await tester.tap(find.byKey(const Key('work-dashboard-search')));
+        await tester.pumpAndSettle();
+        final search = find.byKey(const Key('work-dashboard-search-field'));
+        await tester.enterText(search, 'PO-417');
+        await tester.pumpAndSettle();
+        final result = find.byKey(const Key('work-search-activity-0'));
+        final retainedTap = tester.widget<MoolCardSurface>(result).onTap!;
+        for (var i = 0; i < 1000; i++) {
+          work.workspaceActivity.insert(
+            0,
+            WorkspaceActivityEntry(
+              message: 'Another delivery $i',
+              time: DateTime(2026, 1, 3, 0, i),
+            ),
+          );
+        }
+        work.showNotice('Store updated');
+        await tester.pumpAndSettle();
+        retainedTap();
+        await tester.pumpAndSettle();
+        final dialog = find.byKey(const Key('work-search-activity-detail'));
+        expect(dialog, findsOneWidget);
+        final date = find.byKey(const Key('work-search-activity-time'));
+        expect(tester.widget<Text>(date).data, contains('2026'));
+        expect(tester.widget<AlertDialog>(dialog).titleTextStyle!.fontSize, 16);
+        final dialogSurface = find
+            .descendant(of: dialog, matching: find.byType(Material))
+            .first;
+        expect(
+          tester.getSize(dialogSurface).height,
+          lessThan(scale == 1 ? 280 : 480),
+        );
+        expect(
+          find.descendant(of: dialog, matching: find.text(original.message)),
+          findsOneWidget,
+        );
+        expect(find.text('Business books'), findsNothing);
+        expect(work.currentWorkspaceOrderId, selectedOrder);
+        expect(work.workspaceInvoices.length, invoiceCount);
+        expect(tester.takeException(), isNull);
+        final close = find.byKey(const Key('work-search-activity-close'));
+        expect(close.hitTestable(), findsOneWidget);
+        expect(tester.getSize(close).height, greaterThanOrEqualTo(48));
+        await captureStoreView(tester, 'activity-exact-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(tester.widget<TextField>(search).controller!.text, 'PO-417');
+        final shifted = find.byKey(const Key('work-search-activity-1000'));
+        await reveal(tester, shifted);
+        await tester.tap(shifted);
+        await tester.pumpAndSettle();
+        work.workspaceActivity.remove(original);
+        work.showNotice('Store updated');
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: dialog, matching: find.text(original.message)),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: dialog,
+            matching: find.text(
+              'This activity is no longer available. Search again.',
+            ),
+          ),
+          findsOneWidget,
+        );
+        await captureStoreView(tester, 'activity-removed-$scale');
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        retainedTap();
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(tester.widget<TextField>(search).controller!.text, 'PO-417');
+        work.workspaceActivity.insert(0, original);
+        work.showNotice('Store updated');
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-search-activity-0')));
+        await tester.pumpAndSettle();
+        work.activateWorkspace(
+          WorkWorkspace(
+            id: 'ACTIVITY-OTHER',
+            name: 'Other store',
+            profileId: store.profileId,
+            profileLabel: store.profileLabel,
+            area: store.area,
+            verified: true,
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.descendant(of: dialog, matching: find.text(original.message)),
+          findsNothing,
+        );
+        expect(
+          find.descendant(
+            of: dialog,
+            matching: find.text(
+              'This activity is no longer available. Search again.',
+            ),
+          ),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        await captureStoreView(tester, 'activity-store-changed-$scale');
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        expect(dialog, findsNothing);
+        expect(work.activeWorkspace!.id, 'ACTIVITY-OTHER');
+        expect(tester.takeException(), isNull);
+      },
+    );
+    testWidgets(
       'DASH13 business assistance preserves origin and drafts $scale',
       (tester) async {
         final work = liveStore();

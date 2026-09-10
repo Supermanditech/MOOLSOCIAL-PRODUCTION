@@ -1467,8 +1467,87 @@ class _WorkWorkspaceDashboardScreenState
           returnView: _WorkspaceControlView.search,
         );
       case _WorkspaceSearchKind.product:
-      case _WorkspaceSearchKind.activity:
         openRoute(record.route);
+      case _WorkspaceSearchKind.activity:
+        final activity = session.workspaceActivity
+            .where(
+              (entry) =>
+                  entry.time.toIso8601String() == record.entityId &&
+                  entry.message == record.title,
+            )
+            .firstOrNull;
+        if (activity == null) {
+          session.showNotice(
+            'This activity is no longer available. Search again.',
+          );
+          return;
+        }
+        unawaited(
+          showDialog<void>(
+            context: context,
+            builder: (dialogContext) => AnimatedBuilder(
+              animation: session,
+              builder: (context, _) {
+                final available =
+                    session.activeWorkspace?.id == storeId &&
+                    session.workspaceActivity.contains(activity);
+                final localTime = activity.time.toLocal();
+                final labels = MaterialLocalizations.of(context);
+                return AlertDialog(
+                  key: const Key('work-search-activity-detail'),
+                  scrollable: true,
+                  insetPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 24,
+                  ),
+                  titlePadding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                  contentPadding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                  actionsPadding: const EdgeInsets.fromLTRB(8, 4, 8, 8),
+                  titleTextStyle: Theme.of(context).textTheme.titleMedium!
+                      .copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: MoolColors.navy,
+                      ),
+                  contentTextStyle: Theme.of(context).textTheme.bodyMedium!
+                      .copyWith(
+                        fontSize: 14,
+                        height: 1.4,
+                        color: MoolColors.navy,
+                      ),
+                  title: const Text('Store activity'),
+                  content: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        available
+                            ? activity.message
+                            : 'This activity is no longer available. Search again.',
+                      ),
+                      if (available) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          '${labels.formatShortDate(localTime)} · '
+                          '${labels.formatTimeOfDay(TimeOfDay.fromDateTime(localTime))}',
+                          key: const Key('work-search-activity-time'),
+                          style: const TextStyle(color: MoolColors.muted),
+                        ),
+                      ],
+                    ],
+                  ),
+                  actions: [
+                    TextButton(
+                      key: const Key('work-search-activity-close'),
+                      onPressed: () => Navigator.of(dialogContext).pop(),
+                      child: const Text('Close'),
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        );
     }
   }
 
@@ -22929,7 +23008,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
     if (!matches(activity.message)) continue;
     records.add((
       id: 'activity-$index',
-      entityId: '$index',
+      entityId: activity.time.toIso8601String(),
       kind: _WorkspaceSearchKind.activity,
       purchase: null,
       title: activity.message,
