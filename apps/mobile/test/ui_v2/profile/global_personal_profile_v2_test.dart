@@ -157,13 +157,13 @@ void main() {
     );
     await tester.pumpAndSettle();
     tester
-        .widget<InkWell>(
-          find.byKey(const Key('global-personal-profile-email')),
-        )
+        .widget<InkWell>(find.byKey(const Key('global-personal-profile-email')))
         .onTap!();
     await tester.pumpAndSettle();
     expect(
-      router.routeInformationProvider.value.uri.path,
+      GoRouterState.of(
+        tester.element(find.byKey(const Key('profile-security-destination'))),
+      ).uri.path,
       '/app/account/security',
     );
     expect(
@@ -184,7 +184,11 @@ void main() {
         .onTap!();
     await tester.pumpAndSettle();
     expect(
-      router.routeInformationProvider.value.uri.path,
+      GoRouterState.of(
+        tester.element(
+          find.byKey(const Key('profile-preferences-destination')),
+        ),
+      ).uri.path,
       '/app/account/workspaces/preferences',
     );
     expect(

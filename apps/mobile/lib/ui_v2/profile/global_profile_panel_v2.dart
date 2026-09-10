@@ -201,9 +201,13 @@ String? globalProfileSafeReturnLocation(String? raw) {
   if (raw == null || !raw.startsWith('/')) return null;
   final uri = Uri.tryParse(raw);
   if (uri == null || uri.hasScheme || uri.hasAuthority) return null;
-  final safe = _safeGlobalProfileReturnRoots.any(
-    (root) => uri.path == root || uri.path.startsWith('$root/'),
-  );
+  // Account details return to the exact Profile route, never arbitrary account
+  // editors, security actions or another account subpath.
+  final safe =
+      uri.path == _globalPersonalProfileRoute ||
+      _safeGlobalProfileReturnRoots.any(
+        (root) => uri.path == root || uri.path.startsWith('$root/'),
+      );
   return safe ? uri.toString() : null;
 }
 

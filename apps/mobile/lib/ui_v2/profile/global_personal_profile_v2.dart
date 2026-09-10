@@ -50,173 +50,180 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
       ];
       final palette = GlobalProfileSurfacePalette.forTone(surfaceTone);
 
-      return _PersonalProfilePaletteScope(
-        palette: palette,
-        child: Scaffold(
-          key: const Key('global-personal-profile-v2'),
-          backgroundColor: palette.canvas,
-          appBar: AppBar(
+      return PopScope<Object?>(
+        canPop: context.canPop(),
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _leave(context);
+        },
+        child: _PersonalProfilePaletteScope(
+          palette: palette,
+          child: Scaffold(
+            key: const Key('global-personal-profile-v2'),
             backgroundColor: palette.canvas,
-            surfaceTintColor: Colors.transparent,
-            toolbarHeight: 64,
-            leadingWidth: 56,
-            leading: Padding(
-              padding: const EdgeInsets.only(left: MoolSpacing.xs),
-              child: GlobalProfileBackButtonV2(
-                keyName: 'global-personal-profile-back',
-                palette: palette,
-                onPressed: () => _leave(context),
+            appBar: AppBar(
+              backgroundColor: palette.canvas,
+              surfaceTintColor: Colors.transparent,
+              toolbarHeight: 64,
+              leadingWidth: 56,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: MoolSpacing.xs),
+                child: GlobalProfileBackButtonV2(
+                  keyName: 'global-personal-profile-back',
+                  palette: palette,
+                  onPressed: () => _leave(context),
+                ),
+              ),
+              titleSpacing: MoolSpacing.xs,
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Personal profile',
+                    style: TextStyle(
+                      color: palette.ink,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -.2,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    'Your MoolSocial identity',
+                    style: TextStyle(
+                      color: palette.muted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
-            titleSpacing: MoolSpacing.xs,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Personal profile',
-                  style: TextStyle(
-                    color: palette.ink,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.2,
+            body: SafeArea(
+              top: false,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: ListView(
+                    key: const Key('global-personal-profile-content'),
+                    padding: const EdgeInsets.fromLTRB(
+                      MoolSpacing.md,
+                      MoolSpacing.xs,
+                      MoolSpacing.md,
+                      MoolSpacing.xl,
+                    ),
+                    children: [
+                      _ProfileHero(
+                        name: heroName,
+                        detail: heroDetail,
+                        completed: completed,
+                        status: accountActive ? 'Active' : 'Sign in',
+                        progressDetail: missing.isEmpty
+                            ? 'Your essential profile details are complete.'
+                            : 'Next: ${missing.join(' · ')}',
+                        dark:
+                            surfaceTone == GlobalProfileSurfaceTone.socialDark,
+                      ),
+                      const SizedBox(height: MoolSpacing.md),
+                      _ProfileSection(
+                        title: 'Personal details',
+                        children: [
+                          _ProfileDetail(
+                            keyName: 'global-personal-profile-name',
+                            icon: Icons.person_outline_rounded,
+                            label: 'Display name',
+                            value: displayName ?? 'Not added',
+                            onTap: () => _openAccountRoute(
+                              context,
+                              '/app/account/identity/name',
+                            ),
+                          ),
+                          _ProfileDetail(
+                            keyName: 'global-personal-profile-email',
+                            icon: Icons.alternate_email_rounded,
+                            label: 'Email address',
+                            value: email ?? 'Not added',
+                            onTap: () => _openAccountRoute(
+                              context,
+                              '/app/account/security',
+                            ),
+                          ),
+                          _ProfileDetail(
+                            keyName: 'global-personal-profile-phone',
+                            icon: Icons.phone_outlined,
+                            label: 'Mobile number',
+                            value: phone ?? 'Not added',
+                            onTap: () => _openAccountRoute(
+                              context,
+                              '/app/account/security',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: MoolSpacing.md),
+                      _ProfileSection(
+                        title: 'Preferences',
+                        children: [
+                          _ProfileDetail(
+                            keyName: 'global-personal-profile-language',
+                            icon: Icons.language_rounded,
+                            label: 'Language',
+                            value: session.languageCode == 'hi'
+                                ? 'हिन्दी'
+                                : 'English',
+                            onTap: () => _openAccountRoute(
+                              context,
+                              '/app/account/workspaces/preferences',
+                            ),
+                          ),
+                          _ProfileDetail(
+                            keyName: 'global-personal-profile-area',
+                            icon: Icons.location_on_outlined,
+                            label: 'Service area',
+                            value: area,
+                            onTap: () => _openAccountRoute(
+                              context,
+                              '/app/account/workspaces/preferences',
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: MoolSpacing.md),
+                      _ProfileSection(
+                        title: 'Account access',
+                        children: [
+                          _ProfileDetail(
+                            keyName: 'global-personal-profile-status',
+                            icon: Icons.verified_user_outlined,
+                            label: 'Account status',
+                            value: accountActive ? 'Active' : 'Not signed in',
+                            valueColor: accountActive
+                                ? _profileGreen
+                                : palette.muted,
+                            onTap: () => _openAccountRoute(
+                              context,
+                              '/app/account/security',
+                            ),
+                          ),
+                          _ProfileDetail(
+                            keyName: 'global-personal-profile-methods',
+                            icon: Icons.key_outlined,
+                            label: 'Sign-in methods',
+                            value: methods.isEmpty
+                                ? accountActive
+                                      ? 'MoolSocial sign-in'
+                                      : 'Add a sign-in method'
+                                : methods.join(' · '),
+                            onTap: () => _openAccountRoute(
+                              context,
+                              '/app/account/security',
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  'Your MoolSocial identity',
-                  style: TextStyle(
-                    color: palette.muted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          body: SafeArea(
-            top: false,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: ListView(
-                  key: const Key('global-personal-profile-content'),
-                  padding: const EdgeInsets.fromLTRB(
-                    MoolSpacing.md,
-                    MoolSpacing.xs,
-                    MoolSpacing.md,
-                    MoolSpacing.xl,
-                  ),
-                  children: [
-                    _ProfileHero(
-                      name: heroName,
-                      detail: heroDetail,
-                      completed: completed,
-                      status: accountActive ? 'Active' : 'Sign in',
-                      progressDetail: missing.isEmpty
-                          ? 'Your essential profile details are complete.'
-                          : 'Next: ${missing.join(' · ')}',
-                      dark: surfaceTone == GlobalProfileSurfaceTone.socialDark,
-                    ),
-                    const SizedBox(height: MoolSpacing.md),
-                    _ProfileSection(
-                      title: 'Personal details',
-                      children: [
-                        _ProfileDetail(
-                          keyName: 'global-personal-profile-name',
-                          icon: Icons.person_outline_rounded,
-                          label: 'Display name',
-                          value: displayName ?? 'Not added',
-                          onTap: () => _openAccountRoute(
-                            context,
-                            '/app/account/identity/name',
-                          ),
-                        ),
-                        _ProfileDetail(
-                          keyName: 'global-personal-profile-email',
-                          icon: Icons.alternate_email_rounded,
-                          label: 'Email address',
-                          value: email ?? 'Not added',
-                          onTap: () => _openAccountRoute(
-                            context,
-                            '/app/account/security',
-                          ),
-                        ),
-                        _ProfileDetail(
-                          keyName: 'global-personal-profile-phone',
-                          icon: Icons.phone_outlined,
-                          label: 'Mobile number',
-                          value: phone ?? 'Not added',
-                          onTap: () => _openAccountRoute(
-                            context,
-                            '/app/account/security',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: MoolSpacing.md),
-                    _ProfileSection(
-                      title: 'Preferences',
-                      children: [
-                        _ProfileDetail(
-                          keyName: 'global-personal-profile-language',
-                          icon: Icons.language_rounded,
-                          label: 'Language',
-                          value: session.languageCode == 'hi'
-                              ? 'हिन्दी'
-                              : 'English',
-                          onTap: () => _openAccountRoute(
-                            context,
-                            '/app/account/workspaces/preferences',
-                          ),
-                        ),
-                        _ProfileDetail(
-                          keyName: 'global-personal-profile-area',
-                          icon: Icons.location_on_outlined,
-                          label: 'Service area',
-                          value: area,
-                          onTap: () => _openAccountRoute(
-                            context,
-                            '/app/account/workspaces/preferences',
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: MoolSpacing.md),
-                    _ProfileSection(
-                      title: 'Account access',
-                      children: [
-                        _ProfileDetail(
-                          keyName: 'global-personal-profile-status',
-                          icon: Icons.verified_user_outlined,
-                          label: 'Account status',
-                          value: accountActive ? 'Active' : 'Not signed in',
-                          valueColor: accountActive
-                              ? _profileGreen
-                              : palette.muted,
-                          onTap: () => _openAccountRoute(
-                            context,
-                            '/app/account/security',
-                          ),
-                        ),
-                        _ProfileDetail(
-                          keyName: 'global-personal-profile-methods',
-                          icon: Icons.key_outlined,
-                          label: 'Sign-in methods',
-                          value: methods.isEmpty
-                              ? accountActive
-                                    ? 'MoolSocial sign-in'
-                                    : 'Add a sign-in method'
-                              : methods.join(' · '),
-                          onTap: () => _openAccountRoute(
-                            context,
-                            '/app/account/security',
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
                 ),
               ),
             ),
@@ -227,10 +234,15 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
   );
 
   static void _openAccountRoute(BuildContext context, String route) {
-    context.go(
+    final profileLocation = GoRouterState.of(context).uri;
+    context.push(
       Uri(
         path: route,
-        queryParameters: const {'return': '/app/account/identity'},
+        queryParameters: {
+          'return': profileLocation.toString(),
+          if (profileLocation.queryParameters['surface'] == 'social')
+            'surface': 'social',
+        },
       ).toString(),
     );
   }
@@ -288,14 +300,28 @@ class _GlobalPersonalProfileNameEditorV2State
     );
     if (!mounted) return;
     setState(() => _saving = false);
-    if (saved) context.go('/app/account/identity');
+    if (saved) _leave();
+  }
+
+  void _leave() {
+    // The editor owns a deterministic Profile return. Keyboard/local history
+    // must not consume it or pop past Profile after an asynchronous save.
+    final destination = globalProfileSafeReturnLocation(
+      GoRouterState.of(context).uri.queryParameters['return'],
+    );
+    context.go(
+      destination != null &&
+              Uri.parse(destination).path == '/app/account/identity'
+          ? destination
+          : '/app/account/identity',
+    );
   }
 
   @override
   Widget build(BuildContext context) => PopScope<Object?>(
     canPop: false,
     onPopInvokedWithResult: (didPop, _) {
-      if (!didPop) context.go('/app/account/identity');
+      if (!didPop) _leave();
     },
     child: Scaffold(
       key: const Key('global-personal-profile-name-editor'),
@@ -303,7 +329,7 @@ class _GlobalPersonalProfileNameEditorV2State
         leading: IconButton(
           key: const Key('global-personal-profile-name-back'),
           tooltip: 'Back',
-          onPressed: () => context.go('/app/account/identity'),
+          onPressed: _leave,
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         title: const Text('Display name'),
@@ -385,6 +411,63 @@ class _ProfileHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final progress = completed / 3;
+    final enlarged = MediaQuery.textScalerOf(context).scale(17) > 24;
+    final avatar = Container(
+      width: 52,
+      height: 52,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .14),
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: .7)),
+      ),
+      child: const Icon(Icons.person_rounded, color: Colors.white, size: 27),
+    );
+    final identity = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          name,
+          key: const Key('global-personal-profile-hero-name'),
+          maxLines: enlarged ? null : 1,
+          overflow: enlarged ? TextOverflow.visible : TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            letterSpacing: -.2,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          detail,
+          key: const Key('global-personal-profile-hero-detail'),
+          maxLines: enlarged ? null : 2,
+          overflow: enlarged ? TextOverflow.visible : TextOverflow.ellipsis,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: .78),
+            fontSize: 10,
+            height: 1.25,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+      ],
+    );
+    final statusBadge = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: .14),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        status,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
     return Container(
       key: const Key('global-personal-profile-hero'),
       padding: const EdgeInsets.all(MoolSpacing.md),
@@ -410,78 +493,21 @@ class _ProfileHero extends StatelessWidget {
         children: [
           Row(
             children: [
-              Container(
-                width: 52,
-                height: 52,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .14),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white.withValues(alpha: .7)),
-                ),
-                child: const Icon(
-                  Icons.person_rounded,
-                  color: Colors.white,
-                  size: 27,
-                ),
-              ),
+              avatar,
               const SizedBox(width: MoolSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        letterSpacing: -.2,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      detail,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: .78),
-                        fontSize: 10,
-                        height: 1.25,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              if (enlarged) const Spacer() else Expanded(child: identity),
               const SizedBox(width: MoolSpacing.xs),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: .14),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  status,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 9,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-              ),
+              statusBadge,
             ],
           ),
+          if (enlarged) ...[const SizedBox(height: MoolSpacing.sm), identity],
           const SizedBox(height: MoolSpacing.md),
           Row(
             children: [
               const Expanded(
                 child: Text(
                   'Profile setup',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  key: Key('global-personal-profile-hero-setup'),
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 10,
@@ -493,8 +519,7 @@ class _ProfileHero extends StatelessWidget {
               Expanded(
                 child: Text(
                   '$completed of 3 complete',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
+                  key: const Key('global-personal-profile-hero-completion'),
                   textAlign: TextAlign.right,
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: .76),
