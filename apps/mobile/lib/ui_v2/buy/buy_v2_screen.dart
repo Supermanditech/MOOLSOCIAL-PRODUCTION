@@ -340,6 +340,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   bool _offersActive = false;
   bool _quickTrackerMinimized = true;
   bool _quickTrackerHidden = false;
+  bool _deliveryPickerOpen = false;
+  final _deliveryPreferences = <String, ({bool hidden, bool kept})>{};
+  final _deliveryStatuses = <String, BuyV2OrderStatus>{};
+  final _deliverySoundOrders = <String>{};
   bool _quickTrackerKept = false;
   bool _quickTrackerSoundOnArrival = false;
   bool _quickTrackerSoundPreparing = false;
@@ -358,7 +362,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   final _landscapeCatalogueOffsets = <String, (double, double)>{};
   String? _landscapeCatalogueIdentity;
   String? _presentedQuickOrderId;
-  BuyV2OrderStatus? _presentedQuickOrderStatus;
   final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
   int _storeProductRouteDepth = 0;
   int _storeNavigationGeneration = 0;
@@ -396,9 +399,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       unawaited(_restoreSessionState());
     }
     _lastSearchDestination = widget.session.destination;
-    _presentedQuickOrderId = widget.session.activeQuickDeliveryOrder?.id;
-    _presentedQuickOrderStatus =
-        widget.session.activeQuickDeliveryOrder?.status;
+    _presentedQuickOrderId = _deliveryOrder?.id;
+    _deliveryStatuses.addEntries(
+      widget.session.orders.map((order) => MapEntry(order.id, order.status)),
+    );
     _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
     widget.session.addListener(_sessionChanged);
   }
@@ -415,9 +419,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       );
       _arrivalSound = widget.deliveryArrivalSound;
       _arrivalAccount = _arrivalIdentity;
-      _presentedQuickOrderId = widget.session.activeQuickDeliveryOrder?.id;
-      _presentedQuickOrderStatus =
-          widget.session.activeQuickDeliveryOrder?.status;
+      _presentedQuickOrderId = _deliveryOrder?.id;
+      _deliveryStatuses.addEntries(
+        widget.session.orders.map((order) => MapEntry(order.id, order.status)),
+      );
       _quickTrackerKept = false;
       _quickTrackerHidden = false;
       _quickTrackerMinimized = true;
@@ -508,7 +513,6 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _resetArrivalSound();
       _arrivalAccount = _arrivalIdentity;
       _presentedQuickOrderId = null;
-      _presentedQuickOrderStatus = null;
     }
     if (_quickTrackerNavigationSequence !=
         widget.session.navigationMotionSequence) {
@@ -526,21 +530,33 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       });
     }
     _surfaceMotionDirection = widget.session.navigationMotionDirection;
-    final previousOrder = widget.session.orders
-        .where((order) => order.id == _presentedQuickOrderId)
-        .firstOrNull;
-    _observeArrival(previousOrder, _presentedQuickOrderStatus);
-    final quickOrder = widget.session.activeQuickDeliveryOrder;
+    final newlyConfirmed = widget.session.view == BuyV2View.confirmation
+        ? widget.session.confirmedOrders
+              .where(
+                (order) =>
+                    order.collection == null &&
+                    order.destination != BuyV2Destination.medicine &&
+                    !_deliveryStatuses.containsKey(order.id),
+              )
+              .firstOrNull
+        : null;
+    for (final order in widget.session.orders) {
+      _observeArrival(order, _deliveryStatuses[order.id]);
+      _deliveryStatuses[order.id] = order.status;
+    }
+    final quickOrder = newlyConfirmed ?? _deliveryOrder;
     final quickOrderId = quickOrder?.id;
     if (quickOrderId != _presentedQuickOrderId) {
+      _rememberDeliveryPreferences();
       _presentedQuickOrderId = quickOrderId;
-      _presentedQuickOrderStatus = quickOrder?.status;
       _quickTrackerMinimized = true;
-      _quickTrackerHidden = false;
-      _quickTrackerKept = false;
+      _quickTrackerHidden = _deliveryPreferences[quickOrderId]?.hidden ?? false;
+      _quickTrackerKept = _deliveryPreferences[quickOrderId]?.kept ?? false;
+      _quickTrackerSoundOnArrival = _deliverySoundOrders.contains(quickOrderId);
+      _deliveryPickerOpen = false;
       _quickTrackerCollapseTimer?.cancel();
     }
-    _presentedQuickOrderStatus = quickOrder?.status;
+
     if (_offersActive &&
         !widget.session.hasShoppingHelpReturnOrigin &&
         widget.session.view == BuyV2View.catalogue &&
@@ -607,6 +623,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     _quickTrackerSoundError = null;
     _arrivalSoundPlaying = false;
     _arrivalNotifiedOrders.clear();
+    _deliverySoundOrders.clear();
+    _deliveryStatuses.clear();
+    _deliveryPreferences.clear();
+    _deliveryPickerOpen = false;
     final sound = _arrivalSound;
     _arrivalSound = dispose ? null : widget.deliveryArrivalSound;
     unawaited(_closeArrivalSound(sound, dispose: dispose));
@@ -625,9 +645,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   Future<void> _setArrivalSound(bool enabled, StateSetter update) async {
+    final orderId = _deliveryOrder?.id;
+    if (orderId == null) return;
     final operation = ++_arrivalSoundOperation;
     if (!enabled) {
       update(() {
+        _deliverySoundOrders.remove(orderId);
         _quickTrackerSoundOnArrival = false;
         _quickTrackerSoundPreparing = false;
         _quickTrackerSoundError = null;
@@ -656,7 +679,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
     update(() {
       _quickTrackerSoundPreparing = false;
-      _quickTrackerSoundOnArrival = ready;
+      if (ready) _deliverySoundOrders.add(orderId);
+      _quickTrackerSoundOnArrival = _deliverySoundOrders.contains(
+        _deliveryOrder?.id,
+      );
       _quickTrackerSoundError = ready ? null : 'Sound unavailable. Try again.';
     });
     if (!ready) await _closeArrivalSound(sound);
@@ -664,20 +690,20 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   void _observeArrival(BuyV2Order? order, BuyV2OrderStatus? previousStatus) {
-    if (!_quickTrackerSoundOnArrival ||
-        !_canSound ||
+    if (!_canSound ||
         order == null ||
+        !_deliverySoundOrders.contains(order.id) ||
         order.collection != null ||
         previousStatus == null ||
         previousStatus == order.status ||
         previousStatus == BuyV2OrderStatus.delivered ||
         (order.status != BuyV2OrderStatus.arriving &&
             order.status != BuyV2OrderStatus.delivered) ||
-        _arrivalSoundPlaying ||
         !_arrivalNotifiedOrders.add(order.id)) {
       return;
     }
-    unawaited(_playArrivalSound());
+    // Simultaneous arrivals share one chime; each delivery remains listed.
+    if (!_arrivalSoundPlaying) unawaited(_playArrivalSound());
   }
 
   Future<void> _playArrivalSound() async {
@@ -698,6 +724,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       if (!mounted || operation != _arrivalSoundOperation) return;
       setState(() {
         _quickTrackerSoundOnArrival = false;
+        _deliverySoundOrders.clear();
         _quickTrackerSoundError = 'Sound unavailable. Try again.';
       });
     }
@@ -1139,23 +1166,82 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _buildDeliveryStatus(BuyV2Session session, StateSetter update) {
-    if (session.view == BuyV2View.tracking) return const SizedBox.shrink();
-    final quickOrder = session.activeQuickDeliveryOrder;
-    if (quickOrder != null) {
-      return const SizedBox.shrink();
-    }
-    final quietOrder = session.activeQuietDeliveryOrder;
-    if (quietOrder == null) return const SizedBox.shrink();
-    return _BuyQuietDeliveryStatusBar(
-      order: quietOrder,
-      artwork: buyV2DeliveryArtworkForLines(
-        quietOrder.lines,
-        fulfilmentModeFor: session.fulfilmentModeFor,
-      ),
-      onOpen: () => session.openTracking(quietOrder.id),
-    );
+  List<BuyV2Order> get _deliveryOrders {
+    final active = widget.session.activeDeliveryOrders;
+    final selected = widget.session.orders
+        .where(
+          (order) =>
+              order.id == _presentedQuickOrderId &&
+              order.collection == null &&
+              order.destination != BuyV2Destination.medicine,
+        )
+        .firstOrNull;
+    return [
+      ...active,
+      if (selected != null && !active.any((order) => order.id == selected.id))
+        selected,
+    ];
   }
+
+  BuyV2Order? get _deliveryOrder {
+    final deliveries = _deliveryOrders;
+    return deliveries
+            .where((order) => order.id == _presentedQuickOrderId)
+            .firstOrNull ??
+        deliveries
+            .where(
+              (order) =>
+                  order.id == widget.session.activeQuickDeliveryOrder?.id,
+            )
+            .firstOrNull ??
+        deliveries.firstOrNull;
+  }
+
+  BuyV2DeliveryArtwork _deliveryArtwork(BuyV2Order order) => order.lines.isEmpty
+      ? (order.destination == BuyV2Destination.wholesale
+            ? BuyV2DeliveryArtwork.wholesale
+            : order.id == widget.session.activeQuickDeliveryOrder?.id
+            ? BuyV2DeliveryArtwork.quick
+            : BuyV2DeliveryArtwork.courier)
+      : buyV2DeliveryArtworkForLines(
+          order.lines,
+          fulfilmentModeFor: widget.session.fulfilmentModeFor,
+        );
+
+  void _rememberDeliveryPreferences() {
+    final id = _presentedQuickOrderId;
+    if (id != null) {
+      _deliveryPreferences[id] = (
+        hidden: _quickTrackerHidden,
+        kept: _quickTrackerKept,
+      );
+    }
+  }
+
+  void _selectDelivery(String id, StateSetter update) {
+    if (!_deliveryOrders.any((order) => order.id == id)) return;
+    _rememberDeliveryPreferences();
+    _quickTrackerCollapseTimer?.cancel();
+    if (_quickTrackerSoundPreparing) {
+      _arrivalSoundOperation++;
+      _quickTrackerSoundPreparing = false;
+      unawaited(_closeArrivalSound(_arrivalSound));
+    }
+    update(() {
+      _quickTrackerSoundError = null;
+      _presentedQuickOrderId = id;
+      _quickTrackerHidden = false;
+      _quickTrackerMinimized = false;
+      _quickTrackerKept = _deliveryPreferences[id]?.kept ?? false;
+      _quickTrackerSoundOnArrival = _deliverySoundOrders.contains(id);
+      _deliveryPickerOpen = false;
+    });
+    _rememberDeliveryPreferences();
+    _scheduleQuickTrackerCollapse(update);
+  }
+
+  Widget _buildDeliveryStatus(BuyV2Session session, StateSetter update) =>
+      const SizedBox.shrink();
 
   void _scheduleQuickTrackerCollapse(StateSetter update) {
     _quickTrackerCollapseTimer?.cancel();
@@ -1184,13 +1270,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _quickTrackerHidden = false;
       if (!expanded) _quickTrackerKept = false;
     });
+    _rememberDeliveryPreferences();
     if (expanded) _scheduleQuickTrackerCollapse(update);
   }
 
   Widget? _buildDeliveryControl(BuyV2Session session, StateSetter update) {
-    final order = session.activeQuickDeliveryOrder;
+    final order = _deliveryOrder;
     if (order == null ||
-        _quickTrackerHidden ||
         session.view == BuyV2View.tracking ||
         session.view == BuyV2View.assist) {
       return null;
@@ -1198,12 +1284,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     final expanded = !_quickTrackerMinimized && !_quickTrackerHidden;
     return Semantics(
       key: ValueKey(
-        _quickTrackerMinimized
+        _quickTrackerMinimized || _quickTrackerHidden
             ? 'buy-quick-delivery-status-minimized'
             : 'buy-quick-delivery-status-control',
       ),
       label:
-          'Delivery. ${order.id}. ${_buyOrderStatusLabel(order.status)}. '
+          '${_deliveryOrders.length} ${_deliveryOrders.length == 1 ? 'delivery' : 'deliveries'}. ${order.id}. ${_buyOrderStatusLabel(order.status)}. '
           '${buyV2OrderPromiseSummary(order)}',
       expanded: expanded,
       child: SizedBox.square(
@@ -1213,21 +1299,51 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           key: const ValueKey('buy-quick-delivery-expand'),
           tooltip: expanded
               ? 'Collapse delivery status'
+              : _deliveryOrders.length > 1
+              ? 'Show ${_deliveryOrders.length} deliveries'
               : 'Show delivery choices',
           onPressed: () => _setQuickTrackerExpanded(!expanded, update),
           padding: EdgeInsets.zero,
           color: BuyV2Colors.royal,
           icon: SizedBox(
-            width: 28,
+            width: 44,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (expanded)
                   const Icon(Icons.expand_more_rounded, size: 20)
                 else
-                  const BuyV2DeliveryModeIcon(
-                    artwork: BuyV2DeliveryArtwork.quick,
-                    color: BuyV2Colors.royal,
+                  ExcludeSemantics(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        BuyV2DeliveryModeIcon(
+                          key: const ValueKey('buy-delivery-compact-artwork'),
+                          artwork: _deliveryArtwork(order),
+                          size: 18,
+                          color: BuyV2Colors.royal,
+                        ),
+                        if (_deliveryOrders.length > 1) ...[
+                          const SizedBox(width: 2),
+                          Flexible(
+                            child: Text(
+                              _deliveryOrders.length > 9
+                                  ? '9+'
+                                  : '${_deliveryOrders.length}',
+                              key: const ValueKey('buy-delivery-count'),
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: _deliveryOrders.length > 9 ? 9 : 10,
+                                letterSpacing: 0,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                                color: BuyV2Colors.royal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ),
                 const SizedBox(height: 3),
                 ExcludeSemantics(
@@ -1250,7 +1366,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   Widget? _buildDeliveryRestore(BuyV2Session session, StateSetter update) {
-    final order = session.activeQuickDeliveryOrder;
+    final order = _deliveryOrder;
     if (order == null ||
         session.view == BuyV2View.tracking ||
         session.view == BuyV2View.assist ||
@@ -1258,6 +1374,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         _quickTrackerHidden) {
       return null;
     }
+    final refreshState =
+        session.orderRefreshState(order.id) ?? session.commerceLoadState;
+    final refreshing =
+        session.orderRefreshBusy(order.id) ||
+        refreshState == BuyV2CommerceLoadState.loading;
+    final refreshFailed =
+        refreshState == BuyV2CommerceLoadState.offline ||
+        refreshState == BuyV2CommerceLoadState.unavailable;
     void releasePointer(PointerEvent event) {
       _quickTrackerPointers.remove(event.pointer);
       _scheduleQuickTrackerCollapse(update);
@@ -1288,31 +1412,101 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                     physics: const AlwaysScrollableScrollPhysics(
                       parent: ClampingScrollPhysics(),
                     ),
-                    child: _BuyQuickDeliveryStatusBar(
-                      order: order,
-                      minimized: false,
-                      kept: _quickTrackerKept,
-                      soundOnArrival: _quickTrackerSoundOnArrival,
-                      soundPreparing: _quickTrackerSoundPreparing,
-                      soundError: _quickTrackerSoundError,
-                      onMinimizedChanged: (value) =>
-                          _setQuickTrackerExpanded(!value, update),
-                      onHiddenChanged: (value) {
-                        _quickTrackerCollapseTimer?.cancel();
-                        update(() {
-                          _quickTrackerHidden = value;
-                          _quickTrackerMinimized = true;
-                          _quickTrackerKept = false;
-                        });
-                      },
-                      onSoundChanged: (value) =>
-                          unawaited(_setArrivalSound(value, update)),
-                      onKeepOnScreen: () {
-                        _quickTrackerCollapseTimer?.cancel();
-                        update(() => _quickTrackerKept = !_quickTrackerKept);
-                        _scheduleQuickTrackerCollapse(update);
-                      },
-                      onOpen: () => session.openTracking(order.id),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (refreshing || refreshFailed)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                            child: Column(
+                              children: [
+                                Text(
+                                  refreshing
+                                      ? 'Refreshing delivery status'
+                                      : 'Status could not refresh. Last known details are shown.',
+                                  key: const ValueKey(
+                                    'buy-delivery-refresh-message',
+                                  ),
+                                  style: context.buyMeta,
+                                ),
+                                if (refreshFailed)
+                                  TextButton.icon(
+                                    key: const ValueKey('buy-delivery-retry'),
+                                    onPressed: refreshing
+                                        ? null
+                                        : () => unawaited(
+                                            session.refreshOrder(order.id),
+                                          ),
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Refresh delivery'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        if (_deliveryOrders.length > 1) ...[
+                          TextButton.icon(
+                            key: const ValueKey('buy-delivery-picker-toggle'),
+                            onPressed: () => update(
+                              () => _deliveryPickerOpen = !_deliveryPickerOpen,
+                            ),
+                            icon: const Icon(Icons.list_alt_outlined),
+                            label: Text(
+                              'Deliveries (${_deliveryOrders.length})',
+                            ),
+                          ),
+                          if (_deliveryPickerOpen)
+                            for (final delivery in _deliveryOrders)
+                              ListTile(
+                                key: ValueKey(
+                                  'buy-delivery-select-${delivery.id}',
+                                ),
+                                selected: delivery.id == order.id,
+                                leading: BuyV2DeliveryModeIcon(
+                                  artwork: _deliveryArtwork(delivery),
+                                ),
+                                title: Text(
+                                  '${delivery.partner} · ${delivery.id}',
+                                ),
+                                subtitle: Text(
+                                  '${delivery.destinationLabel} · ${_buyOrderStatusLabel(delivery.status)}\n${buyV2OrderPromiseSummary(delivery)}',
+                                ),
+                                onTap: () =>
+                                    _selectDelivery(delivery.id, update),
+                              ),
+                        ],
+                        _BuyQuickDeliveryStatusBar(
+                          order: order,
+                          artwork: _deliveryArtwork(order),
+                          minimized: false,
+                          kept: _quickTrackerKept,
+                          soundOnArrival: _quickTrackerSoundOnArrival,
+                          soundPreparing: _quickTrackerSoundPreparing,
+                          soundError: _quickTrackerSoundError,
+                          onMinimizedChanged: (value) =>
+                              _setQuickTrackerExpanded(!value, update),
+                          onHiddenChanged: (value) {
+                            _quickTrackerCollapseTimer?.cancel();
+                            update(() {
+                              _quickTrackerHidden = value;
+                              _quickTrackerMinimized = true;
+                              _quickTrackerKept = false;
+                              _deliveryPickerOpen = false;
+                            });
+                            _rememberDeliveryPreferences();
+                          },
+                          onSoundChanged: (value) =>
+                              unawaited(_setArrivalSound(value, update)),
+                          onKeepOnScreen: () {
+                            _quickTrackerCollapseTimer?.cancel();
+                            update(
+                              () => _quickTrackerKept = !_quickTrackerKept,
+                            );
+                            _rememberDeliveryPreferences();
+                            _scheduleQuickTrackerCollapse(update);
+                          },
+                          onOpen: () => session.openTracking(order.id),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -1343,14 +1537,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   VoidCallback? _deliveryStatusRestore(BuyV2Session session) {
-    final order = session.activeQuickDeliveryOrder;
+    final order = _deliveryOrder;
     if (!_quickTrackerHidden ||
         order == null ||
         order.id != session.selectedOrderOrNull?.id) {
       return null;
     }
     return () {
-      if (session.activeQuickDeliveryOrder?.id != order.id) return;
+      if (_deliveryOrder?.id != order.id) return;
       _setQuickTrackerExpanded(false, setState);
     };
   }
@@ -2189,6 +2383,7 @@ String _buyOrderStatusLabel(BuyV2OrderStatus status) => switch (status) {
 class _BuyQuickDeliveryStatusBar extends StatelessWidget {
   const _BuyQuickDeliveryStatusBar({
     required this.order,
+    required this.artwork,
     required this.minimized,
     required this.kept,
     required this.soundOnArrival,
@@ -2202,6 +2397,7 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
   });
 
   final BuyV2Order order;
+  final BuyV2DeliveryArtwork artwork;
   final bool minimized;
   final bool kept;
   final bool soundOnArrival;
@@ -2251,8 +2447,8 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                               padding: const EdgeInsets.only(left: 4),
                               child: Row(
                                 children: [
-                                  const BuyV2DeliveryModeIcon(
-                                    artwork: BuyV2DeliveryArtwork.quick,
+                                  BuyV2DeliveryModeIcon(
+                                    artwork: artwork,
                                     color: BuyV2Colors.royal,
                                     size: 16,
                                   ),
@@ -2307,8 +2503,8 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const BuyV2DeliveryModeIcon(
-                      artwork: BuyV2DeliveryArtwork.quick,
+                    BuyV2DeliveryModeIcon(
+                      artwork: artwork,
                       color: BuyV2Colors.navy,
                       size: 19,
                     ),
@@ -2320,10 +2516,13 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Quick delivery',
-                              style: context.buyBody.copyWith(fontSize: 12),
-                            ),
+                            Text(switch (artwork) {
+                              BuyV2DeliveryArtwork.quick => 'Quick delivery',
+                              BuyV2DeliveryArtwork.wholesale =>
+                                'Wholesale delivery',
+                              BuyV2DeliveryArtwork.bulk => 'Bulk delivery',
+                              BuyV2DeliveryArtwork.courier => 'Delivery',
+                            }, style: context.buyBody.copyWith(fontSize: 12)),
                             Text(
                               '$status · $promise',
                               style: context.buyMeta.copyWith(fontSize: 11),
@@ -2362,43 +2561,50 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                   runSpacing: 2,
                   alignment: WrapAlignment.end,
                   children: [
-                    TextButton.icon(
-                      key: const ValueKey('buy-quick-delivery-keep'),
-                      onPressed: onKeepOnScreen,
-                      style: TextButton.styleFrom(
-                        minimumSize: const Size(0, 44),
-                        padding: const EdgeInsets.symmetric(horizontal: 6),
-                      ),
-                      icon: Icon(
-                        kept ? Icons.push_pin_rounded : Icons.push_pin_outlined,
-                        size: 15,
-                      ),
-                      label: Text(
-                        kept ? 'Kept' : 'Keep',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                    if (order.status != BuyV2OrderStatus.delivered) ...[
+                      TextButton.icon(
+                        key: const ValueKey('buy-quick-delivery-keep'),
+                        onPressed: onKeepOnScreen,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                        ),
+                        icon: Icon(
+                          kept
+                              ? Icons.push_pin_rounded
+                              : Icons.push_pin_outlined,
+                          size: 15,
+                        ),
+                        label: Text(
+                          kept ? 'Kept' : 'Keep',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                    ),
-                    FilterChip(
-                      key: const ValueKey('buy-quick-delivery-sound'),
-                      selected: soundOnArrival,
-                      onSelected: soundPreparing ? null : onSoundChanged,
-                      selectedColor: BuyV2Colors.navy,
-                      backgroundColor: Colors.white,
-                      visualDensity: VisualDensity.compact,
-                      materialTapTargetSize: MaterialTapTargetSize.padded,
-                      side: const BorderSide(color: BuyV2Colors.navy),
-                      labelStyle: TextStyle(
-                        color: soundOnArrival ? Colors.white : BuyV2Colors.navy,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w800,
+                      IconButton(
+                        key: const ValueKey('buy-quick-delivery-sound'),
+                        tooltip: soundPreparing
+                            ? 'Setting arrival sound'
+                            : soundOnArrival
+                            ? 'Mute arrival sound for this delivery'
+                            : 'Enable arrival sound for this delivery',
+                        isSelected: soundOnArrival,
+                        onPressed: soundPreparing
+                            ? null
+                            : () => onSoundChanged(!soundOnArrival),
+                        icon: Icon(
+                          soundPreparing
+                              ? Icons.hourglass_top
+                              : Icons.volume_off_outlined,
+                        ),
+                        selectedIcon: const Icon(Icons.volume_up_rounded),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                        ),
                       ),
-                      label: Text(
-                        soundPreparing ? 'Setting sound' : 'Arrival sound',
-                      ),
-                    ),
+                    ],
                     TextButton.icon(
                       key: const ValueKey('buy-quick-delivery-hide'),
                       onPressed: () => onHiddenChanged(true),
@@ -2417,7 +2623,8 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                     ),
                   ],
                 ),
-                if (soundOnArrival || soundError != null)
+                if (order.status != BuyV2OrderStatus.delivered &&
+                    (soundOnArrival || soundError != null))
                   Align(
                     alignment: Alignment.centerLeft,
                     child: Text(
@@ -2435,68 +2642,6 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
       curve: Curves.easeOutCubic,
       alignment: Alignment.topCenter,
       child: statusBar,
-    );
-  }
-}
-
-class _BuyQuietDeliveryStatusBar extends StatelessWidget {
-  const _BuyQuietDeliveryStatusBar({
-    required this.order,
-    required this.artwork,
-    required this.onOpen,
-  });
-
-  final BuyV2Order order;
-  final BuyV2DeliveryArtwork artwork;
-  final VoidCallback onOpen;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 5, 8, 3),
-      child: Material(
-        color: Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(13),
-          side: const BorderSide(color: BuyV2Colors.line),
-        ),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          key: const ValueKey('buy-quiet-delivery-status'),
-          onTap: onOpen,
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(minHeight: 44),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  BuyV2DeliveryModeIcon(
-                    artwork: artwork,
-                    color: BuyV2Colors.navy,
-                    size: 19,
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '${_buyOrderStatusLabel(order.status)} · ${buyV2OrderPromiseSummary(order)}',
-                      style: context.buyMeta.copyWith(
-                        color: BuyV2Colors.navy,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  const Icon(
-                    Icons.chevron_right_rounded,
-                    color: BuyV2Colors.muted,
-                    size: 20,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

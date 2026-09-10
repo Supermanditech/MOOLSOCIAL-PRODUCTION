@@ -14,6 +14,98 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
+  _R669DeliveryCommerce() {
+    final quick = BuyV2Catalogue.products.firstWhere((p) => p.id == 's-tomato');
+    final scheduled = BuyV2Catalogue.products.firstWhere(
+      (p) =>
+          p.destination == BuyV2Destination.shop &&
+          buyV2CatalogueFulfilmentModeFor(p) ==
+              BuyV2FulfilmentMode.standardCourier,
+    );
+    final wholesale = BuyV2Catalogue.products.firstWhere(
+      (p) => p.destination == BuyV2Destination.wholesale,
+    );
+    final bulk = BuyV2Catalogue.products.firstWhere((p) => p.id == 'w-rice');
+    records = [
+      make('quick-1', quick, 'Work', 'Delivery in 15 min'),
+      make('scheduled-2', scheduled, 'Home', 'Delivery tomorrow'),
+      make('wholesale-3', wholesale, 'Warehouse', 'Delivery in 2 days'),
+      make('bulk-4', bulk, 'Warehouse receiving bay', 'Delivery in 4 days'),
+    ];
+  }
+  late List<BuyV2Order> records;
+  BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
+  BuyV2Order make(
+    String id,
+    BuyV2Product product,
+    String destination,
+    String promise, {
+    BuyV2OrderStatus status = BuyV2OrderStatus.preparing,
+  }) => BuyV2Order(
+    id: id,
+    destination: product.destination,
+    title: product.title,
+    itemSummary: product.title,
+    total: product.price * product.minimumOrder,
+    partner: product.seller,
+    partnerType: 'Supplier',
+    promise: promise,
+    destinationLabel: destination,
+    progress: status == BuyV2OrderStatus.delivered ? 1 : .4,
+    status: status,
+    purchaseId: product.destination == BuyV2Destination.wholesale
+        ? 'purchase-bulk'
+        : 'purchase-split',
+    lines: [BuyV2CartLine(product: product, quantity: product.minimumOrder)],
+    productIds: [product.id],
+  );
+  void advance(String id, BuyV2OrderStatus status) {
+    records = [
+      for (final order in records)
+        if (order.id == id)
+          make(
+            order.id,
+            order.lines.single.product,
+            order.destinationLabel,
+            order.promise,
+            status: status,
+          )
+        else
+          order,
+    ];
+  }
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: state,
+    products: BuyV2Catalogue.products,
+    orders: records,
+    businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
+  );
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: false,
+        customerMessage: '',
+      );
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async => BuyV2OrderRefreshResult(
+    state: state,
+    customerMessage: state == BuyV2CommerceLoadState.ready
+        ? ''
+        : 'Tracking could not refresh.',
+    order: records.where((o) => o.id == orderId).firstOrNull,
+  );
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError(invocation.memberName.toString());
+}
+
 class _R669DeliveryIconFacts implements BuyV2ProductFactsAdapter {
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
@@ -274,6 +366,349 @@ void main() {
     }
   }
 
+  Future<void> tapDelivery(WidgetTester tester, String action) async {
+    final target = find.byKey(ValueKey('buy-quick-delivery-$action'));
+    await tester.ensureVisible(target);
+    await tester.pumpAndSettle();
+    await tester.tap(target);
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('R669 delivery recovery with twelve simultaneous deliveries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(320, 780));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final core = BuySession();
+    final adapter = _R669DeliveryCommerce();
+    final product = adapter.records.first.lines.single.product;
+    adapter.records.addAll([
+      for (var index = 5; index <= 12; index++)
+        adapter.make('split-$index', product, 'Work', 'Delivery tomorrow'),
+    ]);
+    final session = BuyV2Session(
+      core: core,
+      commerceAdapter: adapter,
+      reviewDataEnabled: false,
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    await session.restoreCommerce();
+    await tester.pumpWidget(app(session, 2, sound: _R5ArrivalSound()));
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(const ValueKey('buy-quick-delivery-toggle'));
+    expect(toggle.hitTestable(), findsOneWidget);
+    expect(find.byTooltip('Show 12 deliveries'), findsOneWidget);
+    expect(find.text('9+'), findsOneWidget);
+    final artworkRect = tester.getRect(
+      find.byKey(const ValueKey('buy-delivery-compact-artwork')),
+    );
+    final countRect = tester.getRect(
+      find.byKey(const ValueKey('buy-delivery-count')),
+    );
+    expect(artworkRect.overlaps(countRect), isFalse);
+    final toggleRect = tester.getRect(toggle);
+    expect(countRect.right, lessThanOrEqualTo(toggleRect.right));
+    expect(countRect.bottom, lessThanOrEqualTo(toggleRect.bottom));
+    expect(countRect.left, greaterThanOrEqualTo(toggleRect.left));
+    expect(countRect.top, greaterThanOrEqualTo(toggleRect.top));
+    final countText = find.descendant(
+      of: find.byKey(const ValueKey('buy-delivery-count')),
+      matching: find.byType(RichText),
+    );
+    expect(
+      tester.renderObject<RenderParagraph>(countText).didExceedMaxLines,
+      isFalse,
+      reason: 'The complete 9+ count must remain visible at enlarged text.',
+    );
+    await capture(tester, 'r669-deliveries-twelve-hidden-rail');
+    await tapDelivery(tester, 'toggle');
+    await tester.tap(find.byKey(const ValueKey('buy-delivery-picker-toggle')));
+    await tester.pumpAndSettle();
+    final last = find.byKey(const ValueKey('buy-delivery-select-split-12'));
+    await tester.ensureVisible(last);
+    await tester.pumpAndSettle();
+    expect(last.hitTestable(), findsOneWidget);
+    await capture(tester, 'r669-deliveries-twelve-last-choice');
+    await tester.tap(last);
+    await tester.pumpAndSettle();
+    await tapDelivery(tester, 'open');
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrderId, 'split-12');
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final size in [const Size(320, 780), const Size(711, 360)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R669 delivery recovery and multiple identities ${size.width} $scale',
+        (tester) async {
+          await tester.binding.setSurfaceSize(size);
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final core = BuySession();
+          final adapter = _R669DeliveryCommerce();
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: adapter,
+            reviewDataEnabled: false,
+          );
+          final sound = _R5ArrivalSound();
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await session.restoreCommerce();
+          await tester.pumpWidget(app(session, scale, sound: sound));
+          await tester.pumpAndSettle();
+          expect(session.activeDeliveryOrders.map((o) => o.id), [
+            'quick-1',
+            'scheduled-2',
+            'wholesale-3',
+            'bulk-4',
+          ]);
+          final toggle = find.byKey(
+            const ValueKey('buy-quick-delivery-toggle'),
+          );
+          final panel = find.byKey(
+            const ValueKey('buy-quick-delivery-status-expanded'),
+          );
+          final prefix = 'r669-deliveries-${size.width.toInt()}-$scale';
+          await tapDelivery(tester, 'toggle');
+          expect(
+            find.descendant(of: panel, matching: find.text('quick-1')),
+            findsOneWidget,
+          );
+          expect(find.text('Arrival sound'), findsNothing);
+          await tapDelivery(tester, 'sound');
+          expect(
+            tester
+                .widget<IconButton>(
+                  find.byKey(const ValueKey('buy-quick-delivery-sound')),
+                )
+                .isSelected,
+            isTrue,
+          );
+          await tapDelivery(tester, 'hide');
+          expect(toggle.hitTestable(), findsOneWidget);
+          expect(panel, findsNothing);
+          adapter.records = adapter.records.reversed.toList();
+          await session.restoreCommerce();
+          session.openDestination(BuyV2Destination.wholesale);
+          await tester.pumpAndSettle();
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.paused,
+          );
+          tester.binding.handleAppLifecycleStateChanged(
+            AppLifecycleState.resumed,
+          );
+          await tester.pumpAndSettle();
+          expect(panel, findsNothing);
+          expect(toggle.hitTestable(), findsOneWidget);
+          expect(find.byTooltip('Show 4 deliveries'), findsOneWidget);
+          final artworkRect = tester.getRect(
+            find.byKey(const ValueKey('buy-delivery-compact-artwork')),
+          );
+          final countRect = tester.getRect(
+            find.byKey(const ValueKey('buy-delivery-count')),
+          );
+          final toggleRect = tester.getRect(toggle);
+          expect(artworkRect.overlaps(countRect), isFalse);
+          expect(toggleRect.contains(artworkRect.topLeft), isTrue);
+          expect(toggleRect.contains(countRect.bottomRight), isTrue);
+          await capture(tester, '$prefix-hidden-rail');
+          await tapDelivery(tester, 'toggle');
+          expect(
+            find.descendant(of: panel, matching: find.text('quick-1')),
+            findsOneWidget,
+          );
+          final picker = find.byKey(
+            const ValueKey('buy-delivery-picker-toggle'),
+          );
+          await tester.ensureVisible(picker);
+          await tester.pumpAndSettle();
+          await tester.tap(picker);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-delivery-select-quick-1')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-delivery-select-scheduled-2')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-delivery-select-wholesale-3')),
+            findsOneWidget,
+          );
+          await capture(tester, '$prefix-picker');
+          for (final id in [
+            'scheduled-2',
+            'wholesale-3',
+            'bulk-4',
+            'quick-1',
+          ]) {
+            if (find
+                .byKey(ValueKey('buy-delivery-select-$id'))
+                .evaluate()
+                .isEmpty) {
+              await tester.ensureVisible(picker);
+              await tester.pumpAndSettle();
+              await tester.tap(picker);
+              await tester.pumpAndSettle();
+            }
+            final choice = find.byKey(ValueKey('buy-delivery-select-$id'));
+            await tester.ensureVisible(choice);
+            await tester.pumpAndSettle();
+            await tester.tap(choice);
+            await tester.pumpAndSettle();
+            expect(
+              find.descendant(of: panel, matching: find.text(id)),
+              findsOneWidget,
+            );
+            await tester.ensureVisible(
+              find.byKey(const ValueKey('buy-quick-delivery-sound')),
+            );
+            await tester.pumpAndSettle();
+            expect(
+              tester
+                  .widget<IconButton>(
+                    find.byKey(const ValueKey('buy-quick-delivery-sound')),
+                  )
+                  .isSelected,
+              id == 'quick-1',
+            );
+            if (id == 'wholesale-3') await tapDelivery(tester, 'sound');
+            await capture(tester, '$prefix-$id');
+            await tapDelivery(tester, 'open');
+            expect(session.view, BuyV2View.tracking);
+            expect(session.selectedOrderId, id);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, isNot(BuyV2View.tracking));
+            await tapDelivery(tester, 'toggle');
+          }
+          await tapDelivery(tester, 'hide');
+          adapter.advance('quick-1', BuyV2OrderStatus.arriving);
+          await session.restoreCommerce();
+          await tester.pumpAndSettle();
+          expect(sound.plays, 1);
+          expect(panel, findsNothing);
+          adapter.advance('quick-1', BuyV2OrderStatus.delivered);
+          await session.restoreCommerce();
+          await tester.pumpAndSettle();
+          expect(sound.plays, 1);
+          expect(toggle.hitTestable(), findsOneWidget);
+          await tapDelivery(tester, 'toggle');
+          expect(
+            find.descendant(of: panel, matching: find.text('quick-1')),
+            findsOneWidget,
+          );
+          expect(find.textContaining('Delivered'), findsWidgets);
+          expect(
+            find.descendant(
+              of: panel,
+              matching: find.textContaining(
+                'Original promise: Delivery in 15 min',
+              ),
+            ),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: panel,
+              matching: find.textContaining('Delivered in 15 min'),
+            ),
+            findsNothing,
+          );
+          await capture(tester, '$prefix-completed');
+          expect(
+            find.byKey(const ValueKey('buy-quick-delivery-sound')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-quick-delivery-keep')),
+            findsNothing,
+          );
+          await tapDelivery(tester, 'hide');
+          adapter.advance('wholesale-3', BuyV2OrderStatus.arriving);
+          await session.restoreCommerce();
+          await tester.pumpAndSettle();
+          expect(
+            sound.plays,
+            2,
+            reason:
+                'An enabled nonselected delivery has its own arrival transition',
+          );
+          expect(panel, findsNothing);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
+  for (final failure in [
+    BuyV2CommerceLoadState.offline,
+    BuyV2CommerceLoadState.unavailable,
+  ]) {
+    testWidgets(
+      'R669 delivery recovery keeps ${failure.name} quiet and retries exact order',
+      (tester) async {
+        await tester.binding.setSurfaceSize(const Size(320, 780));
+        addTearDown(() => tester.binding.setSurfaceSize(null));
+        final core = BuySession();
+        final adapter = _R669DeliveryCommerce();
+        final session = BuyV2Session(
+          core: core,
+          commerceAdapter: adapter,
+          reviewDataEnabled: false,
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await session.restoreCommerce();
+        await tester.pumpWidget(app(session, 2));
+        await tester.pumpAndSettle();
+        await tapDelivery(tester, 'toggle');
+        await tapDelivery(tester, 'hide');
+        adapter.state = failure;
+        expect(await session.refreshOrder('quick-1'), isFalse);
+        await tester.pumpAndSettle();
+        final panel = find.byKey(
+          const ValueKey('buy-quick-delivery-status-expanded'),
+        );
+        expect(panel, findsNothing);
+        expect(
+          find.byKey(const ValueKey('buy-quick-delivery-toggle')).hitTestable(),
+          findsOneWidget,
+        );
+        await tapDelivery(tester, 'toggle');
+        final retry = find.byKey(const ValueKey('buy-delivery-retry'));
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Status could not refresh. Last known details are shown.'),
+          findsOneWidget,
+        );
+        expect(retry.hitTestable(), findsOneWidget);
+        await capture(tester, 'r669-deliveries-refresh-${failure.name}');
+        adapter.state = BuyV2CommerceLoadState.ready;
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(
+          session.orderRefreshState('quick-1'),
+          BuyV2CommerceLoadState.ready,
+        );
+        expect(
+          find.byKey(const ValueKey('buy-delivery-refresh-message')),
+          findsNothing,
+        );
+        expect(
+          find.descendant(of: panel, matching: find.text('quick-1')),
+          findsOneWidget,
+        );
+        expect(session.orders, hasLength(4));
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   test(
     'R669 delivery artwork follows catalogue modes and supplied fulfilment',
     () {
@@ -473,20 +908,15 @@ void main() {
             expect(order.deliveryPartnerName, isNull);
             session.openDestination(product.destination);
             await tester.pumpAndSettle();
-            final quick = entry.$2 == BuyV2DeliveryArtwork.quick;
             final control = find.byKey(
-              ValueKey(
-                quick
-                    ? 'buy-quick-delivery-toggle'
-                    : 'buy-quiet-delivery-status',
-              ),
+              const ValueKey('buy-quick-delivery-toggle'),
             );
             expect(control.hitTestable(), findsOneWidget);
             expect(artworkWithin(control), findsOneWidget);
             await capture(tester, 'r669-delivery-$profile-control');
             await tester.tap(control);
             await tester.pumpAndSettle();
-            if (quick) {
+            {
               final expanded = find.byKey(
                 const ValueKey('buy-quick-delivery-status-expanded'),
               );
@@ -568,7 +998,7 @@ void main() {
         } else {
           expect(
             find.byKey(const ValueKey('buy-quick-delivery-toggle')),
-            findsNothing,
+            findsOneWidget,
           );
           expect(session.openTracking(session.order.id), isTrue);
           await tester.pumpAndSettle();
@@ -589,14 +1019,6 @@ void main() {
       }
       expect(tester.takeException(), isNull);
     });
-  }
-
-  Future<void> tapDelivery(WidgetTester tester, String action) async {
-    final target = find.byKey(ValueKey('buy-quick-delivery-$action'));
-    await tester.ensureVisible(target);
-    await tester.pumpAndSettle();
-    await tester.tap(target);
-    await tester.pumpAndSettle();
   }
 
   for (final size in [
@@ -645,15 +1067,15 @@ void main() {
           expect(sound.plays, 0);
           expect(
             tester
-                .widget<FilterChip>(
+                .widget<IconButton>(
                   find.byKey(const ValueKey('buy-quick-delivery-sound')),
                 )
-                .selected,
+                .isSelected,
             isTrue,
           );
           await capture(tester, '$prefix-sound-on');
           await tapDelivery(tester, 'hide');
-          expect(toggle, findsNothing);
+          expect(toggle, findsOneWidget);
           expect(session.quantityFor('s-tomato'), quantity);
           await capture(tester, '$prefix-hidden');
           expect(session.openTracking(session.order.id), isTrue);
@@ -669,10 +1091,10 @@ void main() {
           expect(find.text('Keep'), findsOneWidget);
           expect(
             tester
-                .widget<FilterChip>(
+                .widget<IconButton>(
                   find.byKey(const ValueKey('buy-quick-delivery-sound')),
                 )
-                .selected,
+                .isSelected,
             isTrue,
           );
           await tapDelivery(tester, 'sound');
@@ -756,7 +1178,15 @@ void main() {
       await tapDelivery(tester, 'sound');
       expect(sound.plays, 0, reason: 'Selecting sound is not an arrival.');
       if (scenario.startsWith('pending')) {
-        expect(find.text('Setting sound'), findsOneWidget);
+        expect(find.byTooltip('Setting arrival sound'), findsOneWidget);
+        expect(
+          tester
+              .widget<IconButton>(
+                find.byKey(const ValueKey('buy-quick-delivery-sound')),
+              )
+              .onPressed,
+          isNull,
+        );
         if (scenario == 'pending-dispose') {
           await tester.pumpWidget(const SizedBox.shrink());
         } else {
@@ -775,10 +1205,10 @@ void main() {
           await tester.pumpAndSettle();
           expect(
             tester
-                .widget<FilterChip>(
+                .widget<IconButton>(
                   find.byKey(const ValueKey('buy-quick-delivery-sound')),
                 )
-                .selected,
+                .isSelected,
             isFalse,
           );
         } else {
@@ -795,10 +1225,10 @@ void main() {
         expect(find.text('Sound unavailable. Try again.'), findsOneWidget);
         expect(
           tester
-              .widget<FilterChip>(
+              .widget<IconButton>(
                 find.byKey(const ValueKey('buy-quick-delivery-sound')),
               )
-              .selected,
+              .isSelected,
           isFalse,
         );
         expect(sound.plays, 0);
@@ -844,10 +1274,10 @@ void main() {
           expect(find.text('Sound unavailable. Try again.'), findsOneWidget);
           expect(
             tester
-                .widget<FilterChip>(
+                .widget<IconButton>(
                   find.byKey(const ValueKey('buy-quick-delivery-sound')),
                 )
-                .selected,
+                .isSelected,
             isFalse,
           );
           await capture(tester, 'r5-delivery-sound-playback-unavailable');
@@ -958,10 +1388,10 @@ void main() {
           'r5-delivery-keyboard-${size.width.toInt()}-$scale-kept',
         );
         await tapDelivery(tester, 'hide');
-        expect(toggle, findsNothing);
+        expect(toggle, findsOneWidget);
         await tester.pumpWidget(app(session, scale, sound: sound));
         await tester.pumpAndSettle();
-        expect(toggle, findsNothing);
+        expect(toggle, findsOneWidget);
         expect(session.openTracking(session.order.id), isTrue);
         await tester.pumpAndSettle();
         await tapDelivery(tester, 'restore');
@@ -1014,10 +1444,10 @@ void main() {
         await tapDelivery(tester, 'toggle');
         expect(
           tester
-              .widget<FilterChip>(
+              .widget<IconButton>(
                 find.byKey(const ValueKey('buy-quick-delivery-sound')),
               )
-              .selected,
+              .isSelected,
           isFalse,
         );
       }
@@ -1133,7 +1563,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(
               find.byKey(const ValueKey('buy-quick-delivery-toggle')),
-              findsNothing,
+              findsOneWidget,
             );
             expect(session.openTracking(order.id), isTrue);
             await tester.pumpAndSettle();

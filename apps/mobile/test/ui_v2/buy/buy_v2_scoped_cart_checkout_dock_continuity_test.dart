@@ -28,6 +28,19 @@ class _R5DockArrivalSound implements BuyV2DeliveryArrivalSound {
   Future<void> dispose() async {}
 }
 
+class _R669NoOrdersSession extends BuyV2Session {
+  _R669NoOrdersSession({required super.core});
+
+  @override
+  List<BuyV2Order> get orders => const [];
+  @override
+  List<BuyV2Order> get visibleOrders => const [];
+  @override
+  int get activeOrderCount => 0;
+  @override
+  int get deliveredOrderCount => 0;
+}
+
 class _R66StoreStatusSession extends BuyV2Session {
   _R66StoreStatusSession({required super.core, required this.quiet}) {
     order = visibleOrders.firstWhere(
@@ -39,6 +52,9 @@ class _R66StoreStatusSession extends BuyV2Session {
 
   final bool quiet;
   late final BuyV2Order order;
+
+  @override
+  List<BuyV2Order> get activeDeliveryOrders => [order];
 
   @override
   BuyV2Order? get activeQuickDeliveryOrder => quiet ? null : order;
@@ -1361,7 +1377,7 @@ void main() {
             final core = BuySession();
             final session = activeOrder
                 ? _R66StoreStatusSession(core: core, quiet: false)
-                : BuyV2Session(core: core);
+                : _R669NoOrdersSession(core: core);
             addTearDown(core.dispose);
             addTearDown(session.dispose);
             for (final id in seed) {
@@ -1795,14 +1811,14 @@ void main() {
         await revealChoice(sound);
         await tester.tap(sound);
         await tester.pumpAndSettle();
-        expect(tester.widget<FilterChip>(sound).selected, isTrue);
+        expect(tester.widget<IconButton>(sound).isSelected, isTrue);
         final hide = find.byKey(const ValueKey('buy-quick-delivery-hide'));
         await revealChoice(hide);
         await tester.tap(hide);
         await tester.pumpAndSettle();
         expect(expanded, findsNothing);
         expect(tester.getRect(content), contentRect);
-        expect(toggle, findsNothing);
+        expect(toggle, findsOneWidget);
         session.openTracking(session.order.id);
         await tester.pumpAndSettle();
         final restore = find.byKey(
@@ -1820,7 +1836,7 @@ void main() {
         await revealDeliveryRailControl(tester, toggle);
         await tester.tap(toggle);
         await tester.pumpAndSettle();
-        expect(tester.widget<FilterChip>(sound).selected, isTrue);
+        expect(tester.widget<IconButton>(sound).isSelected, isTrue);
         final track = find.byKey(const ValueKey('buy-quick-delivery-open'));
         await revealChoice(track);
         await tester.tap(track);
@@ -2953,11 +2969,11 @@ void main() {
           expect(restore, findsNothing);
           expect(
             find.byKey(const ValueKey('buy-quick-delivery-toggle')),
-            findsNothing,
+            findsOneWidget,
           );
         } else if (lane == 'wholesale-quiet') {
           expect(
-            find.byKey(const ValueKey('buy-quiet-delivery-status')),
+            find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
             findsOneWidget,
           );
         }
@@ -3146,8 +3162,13 @@ void main() {
         if (lane == 'shop-live') {
           expect(
             find.byKey(const ValueKey('buy-quick-delivery-toggle')),
+            findsOneWidget,
+            reason:
+                'Quiet delivery access persists through Cart, checkout and Store returns',
+          );
+          expect(
+            find.byKey(const ValueKey('buy-quick-delivery-status-expanded')),
             findsNothing,
-            reason: 'Hide persists through Cart, checkout and Store returns',
           );
           final orderId = session.activeQuickDeliveryOrder!.id;
           session.openTracking(orderId);

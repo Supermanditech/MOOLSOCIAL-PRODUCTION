@@ -6501,6 +6501,14 @@ class BuyV2Session extends ChangeNotifier {
       .where((order) => !orderIsCompleted(order))
       .length;
 
+  /// Actual delivery records, including separate records from one purchase.
+  /// Collection and Care retain their own journeys; no ETA is aggregated here.
+  List<BuyV2Order> get activeDeliveryOrders => orders
+      .where((order) => order.collection == null)
+      .where((order) => order.destination != BuyV2Destination.medicine)
+      .where((order) => !orderIsCompleted(order))
+      .toList(growable: false);
+
   BuyV2Order? get activeQuickDeliveryOrder => _orders
       .where((order) => order.collection == null)
       .where((order) => order.destination != BuyV2Destination.medicine)

@@ -961,7 +961,12 @@ void main() {
         tester.view.physicalSize = size;
         addTearDown(tester.view.reset);
         final core = BuySession();
-        final session = BuyV2Session(core: core);
+        final session = BuyV2Session(
+          core: core,
+          productFactsAdapter: const _FixedDeliveryPromiseFactsAdapter(
+            'Delivery in 2 days',
+          ),
+        );
         addTearDown(core.dispose);
         addTearDown(session.dispose);
         await tester.pumpWidget(
@@ -1486,8 +1491,8 @@ void main() {
           (
             name: 'help',
             entry: 'buy-settings-help',
-            page: 'global-help-support-v2',
-            back: 'global-help-back',
+            page: 'buy-shopping-help',
+            back: 'buy-shopping-help-close',
           ),
         ]) {
           for (final platformBack in [false, true]) {
@@ -1570,7 +1575,7 @@ void main() {
             await tester.tap(entry);
             await tester.pumpAndSettle();
             expect(find.byKey(ValueKey(route.page)), findsOneWidget);
-            expectIcons(Brightness.dark);
+            expectIcons(fromSettings ? Brightness.light : Brightness.dark);
             if (!platformBack) {
               await captureReadability(
                 tester,
@@ -2483,14 +2488,22 @@ void main() {
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('buy-shop-sale-type-quick')),
-          matching: find.byIcon(Icons.speed_rounded),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is BuyV2DeliveryModeIcon &&
+                widget.artwork == BuyV2DeliveryArtwork.quick,
+          ),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: find.byKey(const ValueKey('buy-shop-sale-type-courier')),
-          matching: find.byIcon(Icons.schedule_rounded),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is BuyV2DeliveryModeIcon &&
+                widget.artwork == BuyV2DeliveryArtwork.courier,
+          ),
         ),
         findsOneWidget,
       );
@@ -2587,14 +2600,22 @@ void main() {
       expect(
         find.descendant(
           of: wholesaleSelector,
-          matching: find.byIcon(Icons.business_center_rounded),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is BuyV2DeliveryModeIcon &&
+                widget.artwork == BuyV2DeliveryArtwork.wholesale,
+          ),
         ),
         findsOneWidget,
       );
       expect(
         find.descendant(
           of: wholesaleSelector,
-          matching: find.byIcon(Icons.layers_rounded),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is BuyV2DeliveryModeIcon &&
+                widget.artwork == BuyV2DeliveryArtwork.bulk,
+          ),
         ),
         findsOneWidget,
       );
@@ -4569,7 +4590,7 @@ void main() {
       find
           .descendant(
             of: find.byKey(ValueKey('buy-product-${product.id}')),
-            matching: find.byTooltip('Remove one'),
+            matching: find.byTooltip('Remove from Cart'),
           )
           .hitTestable(),
     );
@@ -5220,7 +5241,7 @@ void main() {
     session.openTracking('MS-240782');
     await tester.pumpAndSettle();
 
-    expect(find.text('CURRENT'), findsOneWidget);
+    expect(find.text('LAST KNOWN'), findsOneWidget);
     expect(find.text('LIVE'), findsNothing);
     expect(find.text('54%'), findsOneWidget);
     expect(
@@ -5231,7 +5252,7 @@ void main() {
           .value,
       .54,
     );
-    expect(find.text('NOW'), findsOneWidget);
+    expect(find.text('RECORDED'), findsOneWidget);
     final nextStep = find.text('What happens next');
     final trackingScrollable = scrollableWithin(
       const PageStorageKey('buy-tracking-MS-240782'),
@@ -5741,7 +5762,11 @@ void main() {
       findsOneWidget,
     );
     expect(find.text('Keep'), findsOneWidget);
-    expect(find.text('Arrival sound'), findsOneWidget);
+    expect(find.text('Arrival sound'), findsNothing);
+    expect(
+      find.byTooltip('Enable arrival sound for this delivery'),
+      findsOneWidget,
+    );
     expect(find.text('Hide'), findsOneWidget);
     final controlCenters = [
       tester
@@ -5760,17 +5785,17 @@ void main() {
     await tester.pumpAndSettle();
     expect(
       tester
-          .widget<FilterChip>(
+          .widget<IconButton>(
             find.byKey(const ValueKey('buy-quick-delivery-sound')),
           )
-          .selected,
+          .isSelected,
       isTrue,
     );
     await tester.tap(find.byKey(const ValueKey('buy-quick-delivery-hide')));
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('buy-quick-delivery-toggle')),
-      findsNothing,
+      findsOneWidget,
     );
     expect(
       tester.getTopLeft(find.byKey(const ValueKey('buy-confirmation'))).dy,
@@ -5796,7 +5821,12 @@ void main() {
   testWidgets('PAY-08 scheduled and courier delivery uses quiet status', (
     tester,
   ) async {
-    final session = BuyV2Session(core: BuySession());
+    final session = BuyV2Session(
+      core: BuySession(),
+      productFactsAdapter: const _FixedDeliveryPromiseFactsAdapter(
+        'Delivery in 2 days',
+      ),
+    );
     addTearDown(session.dispose);
     final product = BuyV2Catalogue.products.firstWhere(
       (candidate) =>
@@ -5813,7 +5843,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.byKey(const ValueKey('buy-quiet-delivery-status')),
+      find.byKey(const ValueKey('buy-quick-delivery-status-minimized')),
       findsOneWidget,
     );
     expect(
@@ -6386,7 +6416,12 @@ void main() {
   testWidgets(
     'order confirmation preserves family identifiers then opens Orders',
     (tester) async {
-      final session = BuyV2Session(core: BuySession());
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: const _FixedDeliveryPromiseFactsAdapter(
+          'Delivery in 2 days',
+        ),
+      );
       final products = [
         BuyV2Catalogue.products.firstWhere(
           (item) => item.destination == BuyV2Destination.shop,
@@ -7100,7 +7135,11 @@ void main() {
     for (final order in session.orders.where(
       (o) => o.status == BuyV2OrderStatus.delivered,
     )) {
-      expect(buyV2OrderPromiseSummary(order).startsWith('Delivered'), isTrue);
+      expect(
+        buyV2OrderPromiseSummary(order).startsWith('Original promise: '),
+        isTrue,
+      );
+      expect(buyV2OrderPromiseSummary(order), isNot(contains('Delivered in')));
     }
   });
 
@@ -7444,7 +7483,17 @@ void main() {
           expect(tester.getRect(facts).top, closeTo(factsTop, 1));
 
           final search = find.byKey(const ValueKey('buy-search-control'));
-          await tester.scrollUntilVisible(search, -160, scrollable: scrollable);
+          final restoredScroll = find
+              .descendant(
+                of: find.byType(NestedScrollView),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            search,
+            -160,
+            scrollable: restoredScroll,
+          );
           await tester.pumpAndSettle();
           expect(search.hitTestable(), findsOneWidget);
           await tester.tap(search);
@@ -9333,8 +9382,9 @@ void main() {
         220,
         scrollable: wholesaleProductScroll,
       );
-      await tester.drag(wholesaleProductScroll, const Offset(0, -140));
+      await tester.ensureVisible(supplierAction);
       await tester.pumpAndSettle();
+      expect(supplierAction.hitTestable(), findsOneWidget);
       expect(tester.getCenter(supplierAction).dy, lessThan(700));
       await tester.tap(supplierAction);
       await tester.pumpAndSettle();

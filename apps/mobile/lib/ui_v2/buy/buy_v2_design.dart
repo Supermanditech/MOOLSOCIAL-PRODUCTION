@@ -693,7 +693,7 @@ String buyV2OrderPromiseSummary(BuyV2Order order) {
     promisedByLabel: order.promisedByLabel,
   );
   return order.status == BuyV2OrderStatus.delivered
-      ? summary.replaceFirst(RegExp(r'^Delivery\b'), 'Delivered')
+      ? 'Original promise: $summary'
       : summary;
 }
 
