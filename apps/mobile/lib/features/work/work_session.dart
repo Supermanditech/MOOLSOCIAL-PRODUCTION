@@ -464,6 +464,17 @@ class _StockHistoryState {
   bool busy = false, loaded = false, needsRefresh = false;
 }
 
+class _CounterDraftRecovery {
+  WorkspaceCounterDraft? record;
+  Future<void> writes = Future<void>.value();
+  bool loaded = false, loading = false, submitting = false;
+  String? error;
+  String? editingId;
+  String? customerInput;
+  bool catalogueChanged = false;
+  ({String orderId, WorkspaceCustomerInvoice? invoice})? completed;
+}
+
 class WorkSession extends ChangeNotifier {
   WorkSession({
     WorkGateway? gateway,
@@ -474,6 +485,7 @@ class WorkSession extends ChangeNotifier {
     this.issueCommandGateway,
     this.issueCommandStore,
     this.stockHistoryGateway,
+    this.counterDraftStore,
   }) : gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -506,6 +518,7 @@ class WorkSession extends ChangeNotifier {
     this.issueCommandGateway,
     this.issueCommandStore,
     this.stockHistoryGateway,
+    this.counterDraftStore,
   }) : gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -527,6 +540,541 @@ class WorkSession extends ChangeNotifier {
   final WorkIssueCommandGateway? issueCommandGateway;
   final WorkIssueCommandStore? issueCommandStore;
   final WorkStockHistoryGateway? stockHistoryGateway;
+  final WorkCounterDraftStore? counterDraftStore;
+  late final WorkCounterDraftStore _counterDraftStorage =
+      counterDraftStore ??
+      SecureWorkCounterDraftStore(accountScope: () => _contactAccountScope);
+  final _counterDraftRecovery =
+      <({String account, String store}), _CounterDraftRecovery>{};
+  String? _counterSubmissionOrderId;
+
+  ({String account, String store})? get _counterDraftScope {
+    final account = _contactAccountScope;
+    final store = activeWorkspace?.id;
+    if (account == null || account.isEmpty || store == null || store.isEmpty) {
+      return null;
+    }
+    return (account: account, store: store);
+  }
+
+  _CounterDraftRecovery? get _counterRecovery =>
+      _counterDraftRecovery[_counterDraftScope];
+  Object? get counterDraftIdentity => _counterDraftScope;
+  bool get counterDraftLoading => _counterRecovery?.loading == true;
+  bool get counterDraftSubmitting => _counterRecovery?.submitting == true;
+  bool get counterDraftNeedsReconciliation =>
+      _counterRecovery?.record?.stage == WorkspaceCounterDraftStage.submitting;
+  bool get counterDraftCatalogueChanged =>
+      _counterRecovery?.catalogueChanged == true;
+  String? get counterDraftError => _counterRecovery?.error;
+  String? get counterCustomerInput => _counterRecovery?.customerInput;
+  WorkspaceCounterDraft? get retainedCounterDraft => _counterRecovery?.record;
+  ({String orderId, WorkspaceCustomerInvoice? invoice})?
+  get recoveredCounterSubmission {
+    final recovery = _counterRecovery;
+    final completed = recovery?.completed;
+    return recovery?.record?.stage == WorkspaceCounterDraftStage.retired &&
+            completed != null &&
+            recovery!.record!.submissionOrderId == completed.orderId &&
+            currentWorkspaceOrderId == completed.orderId
+        ? completed
+        : null;
+  }
+
+  bool get counterDraftEditingBlocked =>
+      counterDraftLoading ||
+      counterDraftSubmitting ||
+      counterDraftNeedsReconciliation ||
+      counterDraftCatalogueChanged ||
+      (_counterRecovery != null && !_counterRecovery!.loaded);
+
+  bool _counterCatalogueMatches(WorkspaceCounterDraft draft) {
+    final catalogue = {
+      for (final item in workspaceCatalogueItems) item.id: item,
+    };
+    return draft.lines.every((line) {
+      final product = catalogue[line.productId];
+      return product != null &&
+          product.available &&
+          product.title == line.name &&
+          product.pack == line.pack &&
+          product.sellingPrice == line.unitPricePaise ~/ 100 &&
+          line.unitPricePaise % 100 == 0 &&
+          (product.stockMode == WorkspaceStockMode.availabilityOnly ||
+              product.stock >= line.quantity);
+    });
+  }
+
+  Future<void> loadWorkspaceCounterDraft({
+    bool retry = false,
+    bool Function()? shouldRestore,
+  }) async {
+    final scope = _counterDraftScope;
+    if (scope == null || _disposed) return;
+    final recovery = _counterDraftRecovery.putIfAbsent(
+      scope,
+      _CounterDraftRecovery.new,
+    );
+    if (recovery.loading ||
+        recovery.submitting ||
+        (recovery.loaded && !retry)) {
+      return;
+    }
+    recovery.loading = true;
+    recovery.error = null;
+    final data = _storeData;
+    // A retry must not replace text already entered after a failed save.
+    final hadEdits =
+        currentWorkspaceOrderId == null &&
+        (workspaceOrderCustomer.isNotEmpty ||
+            workspaceOrderQuantities.isNotEmpty);
+    notifyListeners();
+    try {
+      await recovery.writes;
+      final record = await _counterDraftStorage.read(
+        scope.account,
+        scope.store,
+      );
+      if (_disposed ||
+          _counterDraftScope != scope ||
+          !identical(data, _storeData)) {
+        return;
+      }
+      if (hadEdits &&
+          recovery.editingId != null &&
+          record != null &&
+          record.stage != WorkspaceCounterDraftStage.retired &&
+          record.id != recovery.editingId) {
+        recovery.loaded = false;
+        recovery.error =
+            'The saved bill changed. Your current details have been kept.';
+        return;
+      }
+      if (record?.id != recovery.record?.id ||
+          record?.submissionOrderId != recovery.completed?.orderId) {
+        recovery.completed = null;
+      }
+      recovery.record = record;
+      if (!hadEdits && record?.stage == WorkspaceCounterDraftStage.retired) {
+        recovery.editingId = null;
+        recovery.customerInput = null;
+      }
+      recovery.loaded = true;
+      recovery.catalogueChanged =
+          record?.stage == WorkspaceCounterDraftStage.editing &&
+          !_counterCatalogueMatches(record!);
+      if (record?.stage == WorkspaceCounterDraftStage.submitting) {
+        recovery.error = 'Check this bill’s status before creating another.';
+      } else if (recovery.catalogueChanged) {
+        recovery.error =
+            'Prices or stock changed. Your saved bill is kept for review.';
+      } else if (record?.stage == WorkspaceCounterDraftStage.editing) {
+        recovery.editingId = record!.id;
+        if (!hadEdits &&
+            currentWorkspaceOrderId == null &&
+            (shouldRestore?.call() ?? true)) {
+          recovery.customerInput = record.customer;
+          workspaceOrderCustomer =
+              workspaceCustomerMobile(record.customer) == null
+              ? ''
+              : record.customer;
+          workspaceOrderSource = record.source;
+          workspaceOrderFulfilment = record.fulfilment;
+          workspaceOrderPayment = record.payment;
+          workspaceOrderAddress = record.address;
+          workspaceOrderNeedsDelivery = record.fulfilment != 'At the shop';
+          workspaceOrderQuantities
+            ..clear()
+            ..addEntries(
+              record.lines.map(
+                (line) => MapEntry(line.productId, line.quantity),
+              ),
+            );
+        }
+      }
+    } catch (_) {
+      if (!_disposed && _counterDraftScope == scope) {
+        recovery.loaded = false;
+        recovery.error = 'Couldn’t open your saved bill. Try again.';
+      }
+    } finally {
+      recovery.loading = false;
+      if (!_disposed && _counterDraftScope == scope) notifyListeners();
+    }
+  }
+
+  WorkspaceCounterDraft? _counterDraftSnapshot({
+    required String account,
+    required String store,
+    required String id,
+    required int revision,
+    WorkspaceCounterDraftStage stage = WorkspaceCounterDraftStage.editing,
+    String? submissionOrderId,
+  }) {
+    final catalogue = {
+      for (final item in workspaceCatalogueItems) item.id: item,
+    };
+    final lines = <WorkspaceOrderItemSnapshot>[];
+    var totalPaise = BigInt.zero;
+    for (final quantity in workspaceOrderQuantities.entries) {
+      final item = catalogue[quantity.key];
+      if (item == null ||
+          quantity.value <= 0 ||
+          item.sellingPrice < 0 ||
+          item.sellingPrice > 92233720368547758) {
+        return null;
+      }
+      final price = item.sellingPrice * 100;
+      if (price > 0 && quantity.value > 9223372036854775807 ~/ price) {
+        return null;
+      }
+      totalPaise += BigInt.from(price) * BigInt.from(quantity.value);
+      if (totalPaise > BigInt.from(9223372036854775807)) return null;
+      lines.add(
+        WorkspaceOrderItemSnapshot(
+          productId: item.id,
+          name: item.title,
+          pack: item.pack,
+          quantity: quantity.value,
+          unitPricePaise: price,
+          lineTotalPaise: price * quantity.value,
+        ),
+      );
+    }
+    return WorkspaceCounterDraft(
+      account: account,
+      store: store,
+      id: id,
+      revision: revision,
+      stage: stage,
+      customer: counterCustomerInput ?? workspaceOrderCustomer,
+      source: workspaceOrderSource,
+      fulfilment: workspaceOrderFulfilment,
+      payment: workspaceOrderPayment,
+      address: workspaceOrderAddress,
+      submissionOrderId: submissionOrderId,
+      lines: lines,
+    );
+  }
+
+  WorkspaceCounterDraft _counterDraftRevision(
+    WorkspaceCounterDraft draft,
+    int revision, {
+    WorkspaceCounterDraftStage? stage,
+    String? order,
+  }) => WorkspaceCounterDraft(
+    account: draft.account,
+    store: draft.store,
+    id: draft.id,
+    revision: revision,
+    stage: stage ?? draft.stage,
+    customer: draft.customer,
+    source: draft.source,
+    fulfilment: draft.fulfilment,
+    payment: draft.payment,
+    address: draft.address,
+    lines: draft.lines,
+    submissionOrderId: order ?? draft.submissionOrderId,
+  );
+
+  Future<bool> saveWorkspaceCounterDraft() async {
+    final scope = _counterDraftScope;
+    if (scope == null) return true;
+    final recovery = _counterRecovery;
+    if (_disposed ||
+        recovery == null ||
+        counterDraftEditingBlocked ||
+        currentWorkspaceOrderId != null) {
+      return false;
+    }
+    recovery.editingId ??= 'BILL-${DateTime.now().microsecondsSinceEpoch}';
+    final snapshot = _counterDraftSnapshot(
+      account: scope.account,
+      store: scope.store,
+      id: recovery.editingId!,
+      revision: 1,
+    );
+    if (snapshot == null || !snapshot.valid) {
+      recovery.error =
+          'Check this bill’s products, prices and quantities before saving.';
+      notifyListeners();
+      return false;
+    }
+    final task = recovery.writes.then((_) async {
+      try {
+        if (_contactAccountScope != scope.account) return false;
+        final record = _counterDraftRevision(
+          snapshot,
+          (recovery.record?.revision ?? 0) + 1,
+        );
+        await _counterDraftStorage.save(
+          record,
+          expectedRevision: recovery.record?.revision,
+        );
+        recovery.record = record;
+        recovery.error = null;
+        return true;
+      } catch (_) {
+        recovery.error =
+            'This bill is not saved yet. Keep it open and try again.';
+        return false;
+      } finally {
+        if (!_disposed && _counterDraftScope == scope) notifyListeners();
+      }
+    });
+    recovery.writes = task.then<void>((_) {});
+    return task;
+  }
+
+  void updateWorkspaceCounterDetails({
+    String? customer,
+    String? source,
+    String? fulfilment,
+    String? payment,
+    String? address,
+  }) {
+    if (counterDraftEditingBlocked ||
+        !_canEditCounterOrder(allowCompletedInvoice: false)) {
+      return;
+    }
+    if (customer != null) {
+      workspaceOrderCustomer = customer;
+      _counterRecovery?.customerInput = customer;
+    }
+    if (source != null) workspaceOrderSource = source;
+    if (fulfilment != null) workspaceOrderFulfilment = fulfilment;
+    if (payment != null) workspaceOrderPayment = payment;
+    if (address != null) workspaceOrderAddress = address;
+    unawaited(saveWorkspaceCounterDraft());
+    notifyListeners();
+  }
+
+  void retainWorkspaceCounterCustomerInput(String value) {
+    if (counterDraftEditingBlocked || _counterRecovery == null) return;
+    _counterRecovery!.customerInput = value;
+    unawaited(saveWorkspaceCounterDraft());
+  }
+
+  Future<bool> discardWorkspaceCounterDraft() async {
+    final scope = _counterDraftScope;
+    if (scope == null) return true;
+    final recovery = _counterRecovery;
+    if (recovery == null ||
+        !recovery.loaded ||
+        recovery.loading ||
+        recovery.submitting ||
+        counterDraftNeedsReconciliation) {
+      return false;
+    }
+    recovery.submitting = true;
+    notifyListeners();
+    try {
+      await recovery.writes;
+      final record = recovery.record;
+      if (record != null &&
+          record.stage != WorkspaceCounterDraftStage.retired) {
+        final retired = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.retired,
+        );
+        await _counterDraftStorage.save(
+          retired,
+          expectedRevision: record.revision,
+        );
+        recovery.record = retired;
+      }
+      recovery.editingId = null;
+      recovery.customerInput = null;
+      recovery.catalogueChanged = false;
+      recovery.error = null;
+      return !_disposed && _counterDraftScope == scope;
+    } catch (_) {
+      recovery.error =
+          'This bill could not be discarded. Your details are kept.';
+      return false;
+    } finally {
+      recovery.submitting = false;
+      if (!_disposed && _counterDraftScope == scope) notifyListeners();
+    }
+  }
+
+  Future<({String orderId, WorkspaceCustomerInvoice? invoice})?>
+  submitWorkspaceCounterBill() async {
+    if (counterDraftEditingBlocked || !_canEditCounterOrder()) return null;
+    if ((counterCustomerInput != null &&
+            counterCustomerInput != workspaceOrderCustomer) ||
+        workspaceCustomerMobile(workspaceOrderCustomer) == null ||
+        workspaceOrderQuantities.isEmpty ||
+        workspaceOrderTotal <= 0 ||
+        (workspaceOrderFulfilment != 'At the shop' &&
+            workspaceOrderAddress.trim().isEmpty)) {
+      showError('Check the customer, products and delivery details.');
+      return null;
+    }
+    final scope = _counterDraftScope;
+    final data = _storeData;
+    final recovery = _counterRecovery;
+    if (scope != null && (recovery == null || !recovery.loaded)) return null;
+    if (recovery != null) recovery.completed = null;
+    final save = saveWorkspaceCounterDraft();
+    if (recovery != null) recovery.submitting = true;
+    notifyListeners();
+    try {
+      if (!await save ||
+          _disposed ||
+          _counterDraftScope != scope ||
+          !identical(data, _storeData)) {
+        return null;
+      }
+      var record = recovery?.record;
+      final id =
+          currentWorkspaceOrderId ??
+          'ORD-${DateTime.now().microsecondsSinceEpoch}';
+      if (scope != null && recovery != null) {
+        if (record == null || !_counterCatalogueMatches(record)) {
+          recovery.error =
+              'Prices or stock changed. Review the bill before creating it.';
+          return null;
+        }
+        final submitted = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.submitting,
+          order: id,
+        );
+        await _counterDraftStorage.save(
+          submitted,
+          expectedRevision: record.revision,
+        );
+        recovery.record = submitted;
+        record = submitted;
+        if (_disposed ||
+            _counterDraftScope != scope ||
+            !identical(data, _storeData)) {
+          return null;
+        }
+        final current = _counterDraftSnapshot(
+          account: scope.account,
+          store: scope.store,
+          id: record.id,
+          revision: record.revision,
+          stage: WorkspaceCounterDraftStage.submitting,
+          submissionOrderId: id,
+        );
+        if (current == null ||
+            jsonEncode(current.toJson()) != jsonEncode(record.toJson()) ||
+            !_counterCatalogueMatches(record)) {
+          recovery.error =
+              'This bill changed during saving. Its details are kept; no sale was created.';
+          return null;
+        }
+      }
+      _counterSubmissionOrderId = id;
+      final saved = saveWorkspaceOrderDraft(
+        customer: workspaceOrderCustomer,
+        source: workspaceOrderSource,
+        fulfilment: workspaceOrderFulfilment,
+        payment: workspaceOrderPayment,
+        address: workspaceOrderAddress,
+      );
+      if (!saved ||
+          _counterDraftScope != scope ||
+          !identical(data, _storeData)) {
+        return null;
+      }
+      final invoice = workspaceOrderFulfilment == 'At the shop'
+          ? completeWorkspaceCounterSale()
+          : null;
+      if (workspaceOrderFulfilment == 'At the shop' && invoice == null) {
+        return null;
+      }
+      final result = (orderId: id, invoice: invoice);
+      _counterSubmissionOrderId = null;
+      if (recovery != null && record != null) {
+        recovery.completed = result;
+        final retired = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.retired,
+        );
+        await _counterDraftStorage.save(
+          retired,
+          expectedRevision: record.revision,
+        );
+        recovery.record = retired;
+        recovery.editingId = null;
+        recovery.error = null;
+      }
+      return !_disposed &&
+              _counterDraftScope == scope &&
+              identical(data, _storeData) &&
+              currentWorkspaceOrderId == id
+          ? result
+          : null;
+    } catch (_) {
+      if (recovery != null) {
+        recovery.error = recovery.completed != null
+            ? 'Bill created. Retry saving its status.'
+            : 'The bill could not be confirmed. Your saved details are kept.';
+      }
+      return null;
+    } finally {
+      _counterSubmissionOrderId = null;
+      if (recovery != null) recovery.submitting = false;
+      if (!_disposed && _counterDraftScope == scope) notifyListeners();
+    }
+  }
+
+  Future<bool> retryWorkspaceCounterDraft({
+    bool Function()? shouldRestore,
+  }) async {
+    final scope = _counterDraftScope;
+    final recovery = _counterRecovery;
+    if (scope == null ||
+        recovery == null ||
+        recovery.loading ||
+        recovery.submitting) {
+      return false;
+    }
+    if (recovery.record?.stage == WorkspaceCounterDraftStage.submitting &&
+        recovery.completed != null &&
+        recovery.completed!.orderId == recovery.record!.submissionOrderId) {
+      recovery.submitting = true;
+      notifyListeners();
+      try {
+        final record = recovery.record!;
+        final retired = _counterDraftRevision(
+          record,
+          record.revision + 1,
+          stage: WorkspaceCounterDraftStage.retired,
+        );
+        await _counterDraftStorage.save(
+          retired,
+          expectedRevision: record.revision,
+        );
+        recovery.record = retired;
+        recovery.editingId = null;
+        recovery.error = null;
+        return !_disposed && _counterDraftScope == scope;
+      } catch (_) {
+        recovery.error = 'Bill created. Retry saving its status.';
+        return false;
+      } finally {
+        recovery.submitting = false;
+        if (!_disposed && _counterDraftScope == scope) notifyListeners();
+      }
+    }
+    final preserveEdits = recovery.loaded && !counterDraftEditingBlocked;
+    await loadWorkspaceCounterDraft(retry: true, shouldRestore: shouldRestore);
+    if (_disposed ||
+        _counterDraftScope != scope ||
+        counterDraftEditingBlocked) {
+      return false;
+    }
+    return preserveEdits ? saveWorkspaceCounterDraft() : true;
+  }
+
   late final WorkIssueCommandStore _issueCommandStorage =
       issueCommandStore ??
       SecureWorkIssueCommandStore(accountScope: () => _contactAccountScope);
@@ -2523,6 +3071,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool selectWorkspaceOrder(String orderId) {
+    if (counterDraftSubmitting) return false;
     if (hasPendingOrderTime && currentWorkspaceOrderId != orderId) {
       showNotice('Confirm the time request before switching orders.');
       return false;
@@ -3672,6 +4221,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderActionDeadline = null;
     final orderId =
         currentWorkspaceOrderId ??
+        _counterSubmissionOrderId ??
         'ORD-${DateTime.now().microsecondsSinceEpoch}';
     currentWorkspaceOrderId = orderId;
     final record = WorkspaceOrderRecord(
@@ -3712,7 +4262,9 @@ class WorkSession extends ChangeNotifier {
   // Counter editing must never rewrite an incoming order's purchased facts.
   // Inspect the stored order, not the mutable composer source/stage fields.
   bool _canEditCounterOrder({bool allowCompletedInvoice = true}) {
-    if (hasPendingOrderTime ||
+    if ((_counterSubmissionOrderId == null &&
+            (counterDraftSubmitting || counterDraftNeedsReconciliation)) ||
+        hasPendingOrderTime ||
         busy ||
         workspaceHandoverBusy ||
         _collection?.busy == true ||
@@ -4296,7 +4848,8 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool startNewWorkspaceOrder() {
-    if (hasPendingOrderTime ||
+    if (counterDraftSubmitting ||
+        hasPendingOrderTime ||
         busy ||
         workspaceHandoverBusy ||
         _collection?.busy == true ||
@@ -4308,6 +4861,9 @@ class WorkSession extends ChangeNotifier {
     }
     _rememberActiveOrder();
     _clearCollection();
+    if (_counterRecovery?.record?.stage == WorkspaceCounterDraftStage.retired) {
+      _counterRecovery?.customerInput = null;
+    }
     workspaceOrderCustomer = '';
     workspaceOrderItems = '';
     workspaceOrderAmount = '';
@@ -4487,6 +5043,7 @@ class WorkSession extends ChangeNotifier {
   }
 
   void adjustWorkspaceOrderQuantity(String productId, int change) {
+    if (counterDraftEditingBlocked) return;
     if (!_canEditCounterOrder(allowCompletedInvoice: false)) return;
     final product = workspaceCatalogueItems
         .where((item) => item.id == productId)
@@ -4501,6 +5058,9 @@ class WorkSession extends ChangeNotifier {
       workspaceOrderQuantities.remove(productId);
     } else {
       workspaceOrderQuantities[productId] = next;
+    }
+    if (_counterRecovery?.loaded == true && currentWorkspaceOrderId == null) {
+      unawaited(saveWorkspaceCounterDraft());
     }
     clearMessages();
     notifyListeners();
@@ -4529,6 +5089,7 @@ class WorkSession extends ChangeNotifier {
   @override
   void dispose() {
     _disposed = true;
+    _counterDraftRecovery.clear();
     _workspaceApplications.clear();
     _clearCollection();
     for (final data in {..._storeDataById.values, _storeData}) {

@@ -78,6 +78,33 @@ class _CommandAccountStore implements WorkPendingProofStore {
   Future<void> clear(String scope) async {}
 }
 
+class _CounterDraftBoundaryStore implements WorkCounterDraftStore {
+  _CounterDraftBoundaryStore(this.delegate);
+  final WorkCounterDraftStore delegate;
+  Completer<void>? readGate, submitGate;
+  bool failRetire = false;
+  @override
+  Future<WorkspaceCounterDraft?> read(String account, String store) async {
+    final value = await delegate.read(account, store);
+    await readGate?.future;
+    return value;
+  }
+
+  @override
+  Future<void> save(
+    WorkspaceCounterDraft draft, {
+    required int? expectedRevision,
+  }) async {
+    if (draft.stage == WorkspaceCounterDraftStage.submitting) {
+      await submitGate?.future;
+    }
+    if (failRetire && draft.stage == WorkspaceCounterDraftStage.retired) {
+      throw StateError('test retirement write failure');
+    }
+    await delegate.save(draft, expectedRevision: expectedRevision);
+  }
+}
+
 class _ReferenceOnlyGroupGateway extends UnavailableWorkGateway {
   int calls = 0, saves = 0;
   @override
@@ -385,6 +412,262 @@ WorkspaceGroupOffer _groupOffer(
 );
 
 void main() {
+  group('DASH15 counter session', () {
+    late _CommandAccountStore account;
+    late _OrderJournalStorage storage;
+    late _CounterDraftBoundaryStore journal;
+
+    setUp(() {
+      account = _CommandAccountStore();
+      storage = _OrderJournalStorage();
+      journal = _CounterDraftBoundaryStore(
+        SecureWorkCounterDraftStore(
+          accountScope: () => account.accountScope,
+          storage: storage,
+        ),
+      );
+    });
+
+    WorkSession session() {
+      final work = WorkSession(
+        gateway: ReviewWorkGateway(),
+        contactDraftStore: account,
+        counterDraftStore: journal,
+      )..activeWorkspace = _commandStore;
+      work.workspaceCatalogueItems.add(_product());
+      work.startNewWorkspaceOrder();
+      addTearDown(work.dispose);
+      return work;
+    }
+
+    Future<void> fill(WorkSession work) async {
+      await work.loadWorkspaceCounterDraft();
+      work.adjustWorkspaceOrderQuantity('atta-5kg', 2);
+      work.updateWorkspaceCounterDetails(
+        customer: '9000000013',
+        payment: 'Cash',
+      );
+      expect(await work.saveWorkspaceCounterDraft(), isTrue);
+    }
+
+    test('restores exact bill in a new session without sale effects', () async {
+      final first = session();
+      await fill(first);
+      first.updateWorkspaceCounterDetails(
+        source: 'Phone',
+        fulfilment: 'Own delivery',
+        address: 'Test counter lane',
+      );
+      expect(await first.saveWorkspaceCounterDraft(), isTrue);
+      final saved = (await journal.read('account-A', 'store-A'))!;
+      final next = session();
+      await next.loadWorkspaceCounterDraft();
+      expect(next.workspaceOrderCustomer, '9000000013');
+      expect(next.workspaceOrderSource, saved.source);
+      expect(next.workspaceOrderFulfilment, saved.fulfilment);
+      expect(next.workspaceOrderAddress, 'Test counter lane');
+      expect(next.workspaceOrderQuantities, {'atta-5kg': 2});
+      expect(next.workspaceOrderTotal, 550);
+      expect(next.workspaceInvoices, isEmpty);
+      expect(next.workspaceOrders, isEmpty);
+      expect(next.workspaceCatalogueItems.single.stock, 10);
+    });
+
+    test(
+      'unconfirmed phone is retained without becoming the bill customer',
+      () async {
+        final work = session();
+        await fill(work);
+        work.retainWorkspaceCounterCustomerInput('98290123456');
+        expect(await work.saveWorkspaceCounterDraft(), isTrue);
+        expect(work.workspaceOrderCustomer, '9000000013');
+        expect(await work.submitWorkspaceCounterBill(), isNull);
+        final next = session();
+        await next.loadWorkspaceCounterDraft();
+        expect(next.workspaceOrderCustomer, isEmpty);
+        expect(next.counterCustomerInput, '98290123456');
+        expect(next.workspaceOrderQuantities, {'atta-5kg': 2});
+        next.updateWorkspaceCounterDetails(customer: '9829012345');
+        expect(await next.saveWorkspaceCounterDraft(), isTrue);
+        expect(next.counterCustomerInput, '9829012345');
+        expect(next.workspaceInvoices, isEmpty);
+      },
+    );
+
+    test(
+      'account recovery clears composer and restores only that account bill',
+      () async {
+        final work = session();
+        await work.recoverPendingProof(accountReady: true);
+        await fill(work);
+        account.accountScope = 'account-B';
+        await work.recoverPendingProof(accountReady: true);
+        expect(work.activeWorkspace, isNull);
+        expect(work.workspaceOrderQuantities, isEmpty);
+        expect(work.workspaceOrderCustomer, isEmpty);
+        work.activeWorkspace = _commandStore;
+        work.workspaceCatalogueItems.add(_product());
+        await work.loadWorkspaceCounterDraft(retry: true);
+        expect(work.retainedCounterDraft, isNull);
+        expect(work.workspaceOrderCustomer, isEmpty);
+        account.accountScope = 'account-A';
+        await work.recoverPendingProof(accountReady: true);
+        work.activeWorkspace = _commandStore;
+        work.workspaceCatalogueItems.add(_product());
+        await work.loadWorkspaceCounterDraft(retry: true);
+        expect(work.workspaceOrderCustomer, '9000000013');
+        expect(work.workspaceOrderQuantities, {'atta-5kg': 2});
+        expect(work.workspaceInvoices, isEmpty);
+      },
+    );
+
+    test('failed save retry keeps latest incomplete customer input', () async {
+      final work = session();
+      await fill(work);
+      storage.failWrite = true;
+      work.updateWorkspaceCounterDetails(customer: '9000');
+      expect(await work.saveWorkspaceCounterDraft(), isFalse);
+      expect(work.counterDraftError, isNotNull);
+      storage.failWrite = false;
+      expect(await work.retryWorkspaceCounterDraft(), isTrue);
+      expect(work.workspaceOrderCustomer, '9000');
+      expect((await journal.read('account-A', 'store-A'))!.customer, '9000');
+      expect(await work.submitWorkspaceCounterBill(), isNull);
+      expect(work.workspaceInvoices, isEmpty);
+    });
+
+    test(
+      'failed read cannot overwrite a saved bill with an empty draft',
+      () async {
+        await fill(session());
+        final original = Map<String, String>.from(storage.values);
+        storage.failRead = true;
+        final work = session();
+        await work.loadWorkspaceCounterDraft();
+        expect(work.counterDraftEditingBlocked, isTrue);
+        expect(await work.saveWorkspaceCounterDraft(), isFalse);
+        expect(storage.values, original);
+        storage.failRead = false;
+        expect(await work.retryWorkspaceCounterDraft(), isTrue);
+        expect(work.workspaceOrderQuantities, {'atta-5kg': 2});
+      },
+    );
+
+    test(
+      'late restore does not change another Store or closed editor',
+      () async {
+        await fill(session());
+        journal.readGate = Completer<void>();
+        final work = session();
+        final loading = work.loadWorkspaceCounterDraft();
+        await _drainOrderJournal();
+        work.activeWorkspace = const WorkWorkspace(
+          id: 'store-B',
+          name: 'Store B',
+          profileLabel: 'Grocery / Kirana Shop',
+          profileId: 'retailer-grocery',
+          area: 'Jodhpur',
+          verified: true,
+        );
+        journal.readGate!.complete();
+        await loading;
+        expect(work.workspaceOrderCustomer, isEmpty);
+        expect(work.workspaceOrderQuantities, isEmpty);
+        final closed = session();
+        await closed.loadWorkspaceCounterDraft(shouldRestore: () => false);
+        expect(closed.workspaceOrderQuantities, isEmpty);
+        expect(closed.retainedCounterDraft!.lines.single.quantity, 2);
+      },
+    );
+
+    test(
+      'missing catalogue keeps original bill readonly until discard',
+      () async {
+        await fill(session());
+        final work = session();
+        work.workspaceCatalogueItems.clear();
+        await work.loadWorkspaceCounterDraft();
+        expect(work.counterDraftCatalogueChanged, isTrue);
+        expect(work.counterDraftEditingBlocked, isTrue);
+        expect(work.retainedCounterDraft!.lines.single.lineTotalPaise, 55000);
+        expect(await work.submitWorkspaceCounterBill(), isNull);
+        expect(await work.discardWorkspaceCounterDraft(), isTrue);
+        expect(
+          (await journal.read('account-A', 'store-A'))!.stage,
+          WorkspaceCounterDraftStage.retired,
+        );
+        expect(work.workspaceInvoices, isEmpty);
+      },
+    );
+
+    test(
+      'submission marker precedes effects and blocks duplicate taps',
+      () async {
+        final work = session();
+        await fill(work);
+        journal.submitGate = Completer<void>();
+        final submitting = work.submitWorkspaceCounterBill();
+        await _drainOrderJournal();
+        expect(work.counterDraftSubmitting, isTrue);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceCatalogueItems.single.stock, 10);
+        expect(await work.submitWorkspaceCounterBill(), isNull);
+        work.adjustWorkspaceOrderQuantity('atta-5kg', 1);
+        expect(work.workspaceOrderQuantities, {'atta-5kg': 2});
+        journal.submitGate!.complete();
+        final result = await submitting;
+        expect(result, isNotNull);
+        expect(work.workspaceInvoices, hasLength(1));
+        expect(work.workspaceCompletedSalesCount, 1);
+        expect(work.workspaceCatalogueItems.single.stock, 8);
+        final record = (await journal.read('account-A', 'store-A'))!;
+        expect(record.stage, WorkspaceCounterDraftStage.retired);
+        expect(record.submissionOrderId, result!.orderId);
+        final next = session();
+        await next.loadWorkspaceCounterDraft();
+        expect(next.workspaceOrderQuantities, isEmpty);
+      },
+    );
+
+    test(
+      'retirement retry never repeats invoice sale or stock effects',
+      () async {
+        final work = session();
+        await fill(work);
+        journal.failRetire = true;
+        expect(await work.submitWorkspaceCounterBill(), isNull);
+        expect(work.counterDraftNeedsReconciliation, isTrue);
+        expect(work.workspaceInvoices, hasLength(1));
+        final invoiceId = work.workspaceInvoices.single.id;
+        expect(await work.submitWorkspaceCounterBill(), isNull);
+        journal.failRetire = false;
+        expect(await work.retryWorkspaceCounterDraft(), isTrue);
+        expect(work.workspaceInvoices.single.id, invoiceId);
+        expect(work.workspaceCompletedSalesCount, 1);
+        expect(work.workspaceCatalogueItems.single.stock, 8);
+        expect(work.counterDraftNeedsReconciliation, isFalse);
+      },
+    );
+
+    test(
+      'cold interrupted submission cannot claim completion or recreate sale',
+      () async {
+        final first = session();
+        await fill(first);
+        journal.failRetire = true;
+        await first.submitWorkspaceCounterBill();
+        final next = session();
+        await next.loadWorkspaceCounterDraft();
+        expect(next.counterDraftNeedsReconciliation, isTrue);
+        expect(await next.retryWorkspaceCounterDraft(), isFalse);
+        expect(await next.submitWorkspaceCounterBill(), isNull);
+        expect(await next.discardWorkspaceCounterDraft(), isFalse);
+        expect(next.workspaceInvoices, isEmpty);
+        expect(next.workspaceCatalogueItems.single.stock, 10);
+      },
+    );
+  });
+
   group('DASH15 counter draft journal', () {
     WorkspaceCounterDraft draft({
       String account = 'account-A',

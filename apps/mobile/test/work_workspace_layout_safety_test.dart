@@ -403,6 +403,7 @@ void main() {
         WorkSession(
             gateway: gateway,
             contactDraftStore: contactStore,
+            counterDraftStore: _CounterDraftFixtureStore(),
             issueDraftStore: issueDraftStore ?? _IssueDraftFixtureStore(),
             issueCommandGateway: issueCommandGateway,
             issueCommandStore: issueCommandStore ?? _IssueCommandFixtureStore(),
@@ -16857,6 +16858,104 @@ void main() {
     );
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('DASH15 counter recovery read retry and completion $scale', (
+      tester,
+    ) async {
+      final journal = _CounterDraftFixtureStore()..failRead = true;
+      final work =
+          WorkSession(
+              gateway: ReviewWorkGateway(),
+              contactDraftStore: _ContactDraftFixtureStore(),
+              counterDraftStore: journal,
+            )
+            ..seedVerifiedWorkspace()
+            ..retailerSetupSaved = true
+            ..reviewStage = WorkReviewStage.live;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-store-sell')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-counter-draft-recovery')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-order-review')), findsNothing);
+      expect(journal.value, isNull);
+      expect(
+        find.byKey(const Key('work-counter-draft-retry')).hitTestable(),
+        findsOneWidget,
+      );
+      await captureStoreView(tester, 'counter-read-recovery-$scale');
+      expect(tester.takeException(), isNull);
+      journal.failRead = false;
+      await tester.tap(find.byKey(const Key('work-counter-draft-retry')));
+      await tester.pumpAndSettle();
+      await enterSaleCustomer(tester, '9829012345');
+      final add = find.byKey(const Key('work-order-add-oil-fortune-1l'));
+      await reveal(tester, add);
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      final stockBefore = work.workspaceCatalogueItems
+          .firstWhere((p) => p.id == 'oil-fortune-1l')
+          .stock;
+      journal.failRetire = true;
+      await reveal(tester, find.byKey(const Key('work-order-review')));
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.byKey(const Key('work-order-save')));
+      await tester.tap(find.byKey(const Key('work-order-save')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceInvoices, hasLength(1));
+      final invoiceId = work.workspaceInvoices.single.id;
+      expect(find.text('Send customer invoice'), findsNothing);
+      expect(
+        find.byKey(const Key('work-counter-draft-recovery')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-counter-draft-retry')).hitTestable(),
+        findsOneWidget,
+      );
+      await captureStoreView(tester, 'counter-completion-recovery-$scale');
+      expect(tester.takeException(), isNull);
+      journal.failRetire = false;
+      final retry = find.byKey(const Key('work-counter-draft-retry'));
+      await reveal(tester, retry);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      // The existing invoice transition starts after its 240ms delayed handoff.
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pumpAndSettle();
+      expect(find.text('Send customer invoice'), findsOneWidget);
+      expect(work.workspaceInvoices.single.id, invoiceId);
+      expect(work.workspaceOrderQuantities, isEmpty);
+      expect(work.workspaceOrderCustomer, isEmpty);
+      expect(
+        work.workspaceCatalogueItems
+            .firstWhere((p) => p.id == 'oil-fortune-1l')
+            .stock,
+        stockBefore - 1,
+      );
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'counter-recovered-invoice-$scale');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-counter-draft-recovery')),
+        findsNothing,
+      );
+      expect(work.workspaceInvoices, hasLength(1));
+    });
+  }
+
   testWidgets(
     'created counter invoice leaves an empty bill and safe Store return',
     (tester) async {
@@ -20200,6 +20299,29 @@ class _StockHistoryFixtureGateway implements WorkStockHistoryGateway {
       totalCount: all.length,
       records: all.sublist(start, end),
     );
+  }
+}
+
+// Presentation fault injection only; secure journal/CAS is tested separately.
+class _CounterDraftFixtureStore implements WorkCounterDraftStore {
+  WorkspaceCounterDraft? value;
+  bool failRead = false, failRetire = false;
+  @override
+  Future<WorkspaceCounterDraft?> read(String account, String store) async {
+    if (failRead) throw StateError('review read failure');
+    return value?.account == account && value?.store == store ? value : null;
+  }
+
+  @override
+  Future<void> save(
+    WorkspaceCounterDraft draft, {
+    required int? expectedRevision,
+  }) async {
+    if (value?.revision != expectedRevision ||
+        (failRetire && draft.stage == WorkspaceCounterDraftStage.retired)) {
+      throw StateError('review write failure');
+    }
+    value = draft;
   }
 }
 

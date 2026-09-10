@@ -1655,6 +1655,8 @@ class _WorkWorkspaceDashboardScreenState
           session.workspaceOrderQuantities.isNotEmpty);
 
   Future<bool> _confirmDiscardCounterOrder() async {
+    if (session.counterDraftSubmitting) return false;
+    if (session.counterDraftNeedsReconciliation) return true;
     if (!_hasCounterOrderDraft) return true;
     final discard = await showDialog<bool>(
       context: context,
@@ -1681,7 +1683,9 @@ class _WorkWorkspaceDashboardScreenState
         ],
       ),
     );
-    return discard == true && session.startNewWorkspaceOrder();
+    return discard == true &&
+        await session.discardWorkspaceCounterDraft() &&
+        session.startNewWorkspaceOrder();
   }
 
   Future<void> _leaveOperation() async {
@@ -20387,9 +20391,82 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   late String _fulfilment = widget.session.workspaceOrderFulfilment;
   late String _payment = widget.session.workspaceOrderPayment;
   String? _error;
+  bool _saving = false, _restoring = false, _openingDraft = false;
+  String? _customerInput;
+  Object? _draftIdentity;
+  Object get _currentDraftIdentity =>
+      (widget.session.counterDraftIdentity, widget.session.activeWorkspace?.id);
+
+  @override
+  void initState() {
+    super.initState();
+    _draftIdentity = _currentDraftIdentity;
+    _openingDraft = widget.session.counterDraftIdentity != null;
+    _address.addListener(_rememberDetails);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_openDraft());
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _CounterOrderSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_draftIdentity != _currentDraftIdentity) {
+      _draftIdentity = _currentDraftIdentity;
+      _openingDraft = true;
+      _saving = false;
+      _error = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_openDraft());
+      });
+    }
+  }
+
+  Future<void> _openDraft({bool retry = false}) async {
+    final identity = _currentDraftIdentity;
+    var recovered = false;
+    if (retry) {
+      recovered = await widget.session.retryWorkspaceCounterDraft(
+        shouldRestore: () => mounted && identity == _currentDraftIdentity,
+      );
+    } else {
+      await widget.session.loadWorkspaceCounterDraft(
+        retry: true,
+        shouldRestore: () => mounted && identity == _currentDraftIdentity,
+      );
+    }
+    if (!mounted || identity != _currentDraftIdentity) return;
+    _restoring = true;
+    setState(() {
+      _customer.text = widget.session.workspaceOrderCustomer;
+      _customerInput = widget.session.counterCustomerInput;
+      _address.text = widget.session.workspaceOrderAddress;
+      _source = widget.session.workspaceOrderSource;
+      _fulfilment = widget.session.workspaceOrderFulfilment;
+      _payment = widget.session.workspaceOrderPayment;
+      _openingDraft = false;
+    });
+    _restoring = false;
+    final completed = widget.session.recoveredCounterSubmission;
+    if (recovered && completed != null) {
+      _finishSavedBill(completed, identity);
+    }
+  }
+
+  void _rememberDetails() {
+    if (_restoring || _saving || _openingDraft || !mounted) return;
+    widget.session.updateWorkspaceCounterDetails(
+      customer: _customerInput == null ? _customer.text : null,
+      source: _source,
+      fulfilment: _fulfilment,
+      payment: _payment,
+      address: _address.text,
+    );
+  }
 
   @override
   void dispose() {
+    _address.removeListener(_rememberDetails);
     _customer.dispose();
     _address.dispose();
     super.dispose();
@@ -20425,7 +20502,10 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     _ => value,
   };
 
-  void _save() {
+  Future<void> _save() async {
+    if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
+      return;
+    }
     final error = _storedCounterCustomerMobile(_customer.text) == null
         ? 'Enter a valid 10-digit customer mobile number.'
         : widget.session.workspaceOrderItemCount == 0
@@ -20437,16 +20517,16 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       setState(() => _error = error);
       return;
     }
-    final saved = widget.session.saveWorkspaceOrderDraft(
-      customer: _customer.text,
-      source: _source,
-      fulfilment: _fulfilment,
-      payment: _payment,
-      address: _address.text,
-    );
-    if (!saved) {
+    _rememberDetails();
+    setState(() => _saving = true);
+    final identity = _currentDraftIdentity;
+    final submitted = await widget.session.submitWorkspaceCounterBill();
+    if (!mounted || identity != _currentDraftIdentity) return;
+    setState(() => _saving = false);
+    if (submitted == null) {
       setState(
         () => _error =
+            widget.session.counterDraftError ??
             widget.session.errorMessage ??
             widget.session.noticeMessage ??
             'This bill could not be saved.',
@@ -20455,23 +20535,33 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       widget.session.clearMessages();
       return;
     }
+    _finishSavedBill(submitted, identity);
+  }
+
+  void _finishSavedBill(
+    ({String orderId, WorkspaceCustomerInvoice? invoice}) submitted,
+    Object identity,
+  ) {
     setState(() => _error = null);
     FocusManager.instance.primaryFocus?.unfocus();
     if (_fulfilment == 'At the shop') {
-      final invoice = widget.session.completeWorkspaceCounterSale();
+      final invoice = submitted.invoice;
       if (invoice != null) {
         if (widget.session.startNewWorkspaceOrder()) {
+          _restoring = true;
           setState(() {
             _customer.clear();
+            _customerInput = null;
             _address.clear();
             _source = widget.session.workspaceOrderSource;
             _fulfilment = widget.session.workspaceOrderFulfilment;
             _payment = widget.session.workspaceOrderPayment;
           });
+          _restoring = false;
         }
         unawaited(
           Future<void>.delayed(const Duration(milliseconds: 240), () {
-            if (mounted) {
+            if (mounted && identity == _currentDraftIdentity) {
               _showWorkspaceInvoiceSheet(context, widget.session, invoice);
             }
           }),
@@ -20488,6 +20578,15 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Future<void> _review() async {
+    if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
+      return;
+    }
+    final pendingCustomer =
+        _customerInput ?? widget.session.counterCustomerInput;
+    if (pendingCustomer != null && pendingCustomer != _customer.text) {
+      await _editCustomer();
+      return;
+    }
     final systemBottom = MediaQuery.viewPaddingOf(context).bottom;
     await showModalBottomSheet<void>(
       context: context,
@@ -20548,10 +20647,12 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                               addressController: _address,
                               onFulfilmentChanged: (value) {
                                 setState(() => _fulfilment = value);
+                                _rememberDetails();
                                 setSheetState(() {});
                               },
                               onPaymentChanged: (value) {
                                 setState(() => _payment = value);
+                                _rememberDetails();
                                 setSheetState(() {});
                               },
                             ),
@@ -20613,9 +20714,13 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         },
       ),
     );
+    _rememberDetails();
   }
 
   Future<void> _scanProduct() async {
+    if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
+      return;
+    }
     final code = await showBuyV2ProductScanner(context);
     if (!mounted || code == null || code.trim().isEmpty) return;
     final normalized = code.trim().toLowerCase();
@@ -20637,7 +20742,11 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
   }
 
   Future<void> _editCustomer() async {
+    if (_openingDraft || _saving || widget.session.counterDraftEditingBlocked) {
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
+    final identity = _currentDraftIdentity;
     final selected = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -20646,20 +20755,35 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       backgroundColor: Colors.white,
       builder: (_) => _StoreSaleCustomerSheet(
         initialValue:
-            _storedCounterCustomerMobile(_customer.text) ?? _customer.text,
+            _customerInput ??
+            widget.session.counterCustomerInput ??
+            _storedCounterCustomerMobile(_customer.text) ??
+            _customer.text,
         recentCustomers: _recentCustomers,
+        onDraftChanged: (value) {
+          if (mounted && identity == _currentDraftIdentity && !_saving) {
+            _customerInput = value;
+            widget.session.retainWorkspaceCounterCustomerInput(value);
+          }
+        },
       ),
     );
-    if (!mounted || selected == null) return;
+    if (!mounted || identity != _currentDraftIdentity || selected == null) {
+      return;
+    }
     setState(() {
       _customer.text = selected;
+      _customerInput = null;
       _error = null;
     });
     // Draft identity only; no order, invoice or payment is created here.
-    widget.session.workspaceOrderCustomer = selected;
+    _rememberDetails();
   }
 
   Future<void> _chooseSaleOption({required bool delivery}) async {
+    if (_openingDraft || _saving || widget.session.counterDraftEditingBlocked) {
+      return;
+    }
     FocusManager.instance.primaryFocus?.unfocus();
     final values = delivery
         ? const ['At the shop', 'Own delivery', 'Mool delivery']
@@ -20728,17 +20852,97 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     setState(() {
       if (delivery) {
         _fulfilment = selected;
-        widget.session.workspaceOrderFulfilment = selected;
       } else {
         _source = selected;
-        widget.session.workspaceOrderSource = selected;
       }
     });
+    _rememberDetails();
   }
 
   @override
   Widget build(BuildContext context) {
     final validPhone = _storedCounterCustomerMobile(_customer.text) != null;
+    if (_openingDraft || widget.session.counterDraftLoading) {
+      return const Center(
+        child: CircularProgressIndicator(
+          semanticsLabel: 'Opening your saved bill',
+        ),
+      );
+    }
+    if (widget.session.counterDraftEditingBlocked && !_saving) {
+      final draft = widget.session.retainedCounterDraft;
+      return ListView(
+        key: const Key('work-counter-draft-recovery'),
+        padding: const EdgeInsets.all(16),
+        children: [
+          Text(
+            widget.session.counterDraftError ?? 'Checking your saved bill…',
+            style: const TextStyle(
+              color: MoolColors.navy,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              key: const Key('work-counter-draft-retry'),
+              style: FilledButton.styleFrom(minimumSize: const Size(48, 48)),
+              onPressed: widget.session.counterDraftSubmitting
+                  ? null
+                  : () => _openDraft(retry: true),
+              child: const Text('Try again'),
+            ),
+          ),
+          if (draft != null) ...[
+            const SizedBox(height: 12),
+            Text(draft.customer),
+            if (draft.submissionOrderId != null) Text(draft.submissionOrderId!),
+            for (final line in draft.lines)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('${line.name} · ${line.pack} × ${line.quantity}'),
+                subtitle: Text(
+                  '₹${_formatStoreAmount(line.lineTotalPaise ~/ 100)}.${(line.lineTotalPaise % 100).toString().padLeft(2, '0')}',
+                ),
+              ),
+          ],
+          if (widget.session.counterDraftCatalogueChanged)
+            TextButton(
+              key: const Key('work-counter-draft-discard'),
+              onPressed: () async {
+                final discard = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Discard saved bill?'),
+                    content: const Text(
+                      'No order will be cancelled. This removes only the unfinished bill.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Keep bill'),
+                      ),
+                      FilledButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Discard'),
+                      ),
+                    ],
+                  ),
+                );
+                if (discard == true &&
+                    mounted &&
+                    await widget.session.discardWorkspaceCounterDraft() &&
+                    mounted) {
+                  widget.session.startNewWorkspaceOrder();
+                  await _openDraft();
+                }
+              },
+              child: const Text('Discard bill'),
+            ),
+        ],
+      );
+    }
     final query = widget.query.trim().toLowerCase();
     final products = widget.session.workspaceCatalogueItems
         .where(
@@ -20851,16 +21055,28 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       itemBuilder: (context, index) =>
           _SaleProductTile(product: products[index], session: widget.session),
     );
-    final error = _error == null
+    final errorText = widget.session.counterDraftError ?? _error;
+    final error = errorText == null
         ? null
         : Padding(
             padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
             child: Semantics(
               liveRegion: true,
-              child: Text(
-                _error!,
-                key: const Key('work-order-error'),
-                style: const TextStyle(color: Color(0xFFB42318)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    errorText,
+                    key: const Key('work-order-error'),
+                    style: const TextStyle(color: Color(0xFFB42318)),
+                  ),
+                  if (widget.session.counterDraftError != null)
+                    TextButton(
+                      key: const Key('work-counter-draft-save-retry'),
+                      onPressed: _saving ? null : () => _openDraft(retry: true),
+                      child: const Text('Try again'),
+                    ),
+                ],
               ),
             ),
           );
@@ -20893,7 +21109,10 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
         ),
         second: FilledButton(
           key: const Key('work-order-review'),
-          onPressed: _selectedUnits == 0
+          onPressed:
+              _saving ||
+                  widget.session.counterDraftSubmitting ||
+                  _selectedUnits == 0
               ? null
               : validPhone
               ? _review
@@ -20972,9 +21191,11 @@ class _StoreSaleCustomerSheet extends StatefulWidget {
   const _StoreSaleCustomerSheet({
     required this.initialValue,
     required this.recentCustomers,
+    this.onDraftChanged,
   });
   final String initialValue;
   final List<String> recentCustomers;
+  final ValueChanged<String>? onDraftChanged;
 
   @override
   State<_StoreSaleCustomerSheet> createState() =>
@@ -20984,6 +21205,18 @@ class _StoreSaleCustomerSheet extends StatefulWidget {
 class _StoreSaleCustomerSheetState extends State<_StoreSaleCustomerSheet> {
   late final _controller = TextEditingController(text: widget.initialValue);
   String? _error;
+  late String _lastDraft = widget.initialValue;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(() {
+      if (_lastDraft != _controller.text) {
+        _lastDraft = _controller.text;
+        widget.onDraftChanged?.call(_lastDraft);
+      }
+    });
+  }
 
   @override
   void dispose() {
