@@ -76,6 +76,7 @@ final class _R669ProcurementCatalogue implements BuyV2CataloguePageSource {
   _R669ProcurementCatalogue(this.products);
   final List<BuyV2Product> products;
   Completer<void>? gate;
+  Completer<void>? resolutionGate;
   BuyV2CatalogueQuery? lastQuery;
 
   @override
@@ -96,8 +97,12 @@ final class _R669ProcurementCatalogue implements BuyV2CataloguePageSource {
   }
 
   @override
-  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async =>
-      products.where((product) => productIds.contains(product.id)).toList();
+  Future<List<BuyV2Product>> resolveProducts(Set<String> productIds) async {
+    await resolutionGate?.future;
+    return products
+        .where((product) => productIds.contains(product.id))
+        .toList();
+  }
 
   @override
   dynamic noSuchMethod(Invocation invocation) =>
@@ -438,6 +443,7 @@ class _PagingRecoverySource extends BuyV2DevelopmentCatalogueSource {
 
   bool failStores = false;
   bool failResolution = false;
+  bool wrongResolution = false;
   Completer<void>? resolutionGate;
   final resolutionRequests = <Set<String>>[];
   bool holdProducts = false;
@@ -497,7 +503,9 @@ class _PagingRecoverySource extends BuyV2DevelopmentCatalogueSource {
     resolutionRequests.add(Set.of(productIds));
     if (resolutionGate != null) await resolutionGate!.future;
     if (failResolution) throw StateError('Products could not restore');
-    return super.resolveProducts(productIds);
+    return super.resolveProducts(
+      wrongResolution ? {productIdAt(999, 7)} : productIds,
+    );
   }
 }
 
@@ -1308,7 +1316,275 @@ void r669ShoppingAreaTests() {
   });
 }
 
+void r669SharedProductTests() {
+  group('R669 shared product', () {
+    BuyV2Session makeSession(_PagingRecoverySource? source) {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: true,
+        cataloguePageSource: source,
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      return session;
+    }
+
+    test('URL carries exact encoded public listing identity only', () {
+      final product = BuyV2Catalogue.products.first.copyWith(
+        id: 'store/sku ?&=हिंदी#variant',
+      );
+      final uri = buyV2SharedProductUri(product);
+      expect(uri.scheme, 'https');
+      expect(uri.host, 'moolsocial.com');
+      expect(uri.path, '/app/buy');
+      expect(uri.fragment, isEmpty);
+      expect(Uri.parse(uri.toString()).queryParameters, {
+        'sub': product.destination.name,
+        'view': 'product',
+        'product': product.id,
+      });
+    });
+
+    test('known product opens without a resolver and retains Cart', () async {
+      final session = makeSession(null);
+      session.addProduct('s-tomato');
+      expect(await session.openLinkedProduct('s-oil'), isTrue);
+      expect(session.selectedProductId, 's-oil');
+      expect(session.linkedProductRecoveryId, isNull);
+      expect(session.quantityFor('s-tomato'), 1);
+      session.goBack();
+      expect(session.view, BuyV2View.catalogue);
+    });
+
+    test('cold listing keeps exact supplier pack search and Cart', () async {
+      final source = _PagingRecoverySource();
+      final session = makeSession(source);
+      final id = source.productIdAt(12, 4);
+      final expected = (await source.resolveProducts({id})).single;
+      source.resolutionRequests.clear();
+      session.addProduct('s-tomato');
+      session.updateQuery('retained groceries');
+      expect(session.findProduct(id), isNull);
+      expect(await session.openLinkedProduct(id), isTrue);
+      expect(source.resolutionRequests, [
+        {id},
+      ]);
+      expect(session.selectedProductId, id);
+      expect(session.selectedProduct!.storeId, expected.storeId);
+      expect(session.selectedProduct!.pack, expected.pack);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(session.addProduct(id), isTrue);
+      expect(session.quantityFor(id), expected.minimumOrder);
+      session.goBack();
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.query, 'retained groceries');
+      expect(session.quantityFor('s-tomato'), 1);
+    });
+
+    test(
+      'failed resolution retries the same listing without clearing Cart',
+      () async {
+        final source = _PagingRecoverySource()..failResolution = true;
+        final session = makeSession(source);
+        final id = source.productIdAt(12, 4);
+        session.addProduct('s-tomato');
+        expect(await session.openLinkedProduct(id), isFalse);
+        expect(session.linkedProductRecoveryId, id);
+        expect(session.linkedProductLoading, isFalse);
+        expect(session.quantityFor('s-tomato'), 1);
+        source.failResolution = false;
+        expect(await session.openLinkedProduct(id), isTrue);
+        expect(session.selectedProductId, id);
+        expect(session.quantityFor('s-tomato'), 1);
+      },
+    );
+
+    for (final id in ['', 'removed-listing']) {
+      test('unavailable identity "$id" never opens a substitute', () async {
+        final session = makeSession(_PagingRecoverySource());
+        expect(await session.openLinkedProduct(id), isFalse);
+        expect(session.selectedProduct, isNull);
+        expect(session.linkedProductRecoveryId, id);
+        expect(session.linkedProductLoading, isFalse);
+        session.goBack();
+        expect(session.view, BuyV2View.catalogue);
+      });
+    }
+
+    test('Back rejects a late resolved listing and keeps search', () async {
+      final source = _PagingRecoverySource()
+        ..resolutionGate = Completer<void>();
+      final session = makeSession(source);
+      final id = source.productIdAt(12, 4);
+      session.updateQuery('keep search');
+      final pending = session.openLinkedProduct(id);
+      expect(session.linkedProductLoading, isTrue);
+      session.goBack();
+      source.resolutionGate!.complete();
+      expect(await pending, isFalse);
+      expect(session.findProduct(id), isNull);
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.query, 'keep search');
+    });
+
+    test('provider cannot substitute a different supplier listing', () async {
+      final source = _PagingRecoverySource()..wrongResolution = true;
+      final session = makeSession(source);
+      final id = source.productIdAt(12, 4);
+      expect(await session.openLinkedProduct(id), isFalse);
+      expect(session.findProduct(id), isNull);
+      expect(session.findProduct(source.productIdAt(999, 7)), isNull);
+      expect(session.linkedProductRecoveryId, id);
+    });
+
+    test('disposed recipient session ignores a late listing', () async {
+      final source = _PagingRecoverySource()
+        ..resolutionGate = Completer<void>();
+      final core = BuySession();
+      final session = BuyV2Session(core: core, cataloguePageSource: source);
+      addTearDown(core.dispose);
+      final pending = session.openLinkedProduct(source.productIdAt(12, 4));
+      session.dispose();
+      source.resolutionGate!.complete();
+      expect(await pending, isFalse);
+    });
+
+    test('new product link wins over a pending older link', () async {
+      final source = _PagingRecoverySource()
+        ..resolutionGate = Completer<void>();
+      final session = makeSession(source);
+      final firstId = source.productIdAt(12, 4);
+      final secondId = source.productIdAt(13, 5);
+      final first = session.openLinkedProduct(firstId);
+      final second = session.openLinkedProduct(secondId);
+      source.resolutionGate!.complete();
+      expect(await first, isFalse);
+      expect(await second, isTrue);
+      expect(session.selectedProductId, secondId);
+      expect(session.findProduct(firstId), isNull);
+    });
+
+    testWidgets('ordinary Shop replacement preserves its supplied Cart view', (
+      tester,
+    ) async {
+      final first = makeSession(null);
+      final second = makeSession(null)
+        ..addProduct('s-oil')
+        ..openCart(scope: BuyV2CartScope.shop);
+      Widget app(BuyV2Session session) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(session: session, onExit: () {}),
+      );
+      await tester.pumpWidget(app(first));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(app(second));
+      await tester.pumpAndSettle();
+      expect(second.view, BuyV2View.cart);
+      expect(second.quantityFor('s-oil'), 1);
+      expect(second.linkedProductRecoveryId, isNull);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets('recipient session replacement reapplies the same link', (
+      tester,
+    ) async {
+      final oldSource = _PagingRecoverySource()
+        ..resolutionGate = Completer<void>();
+      final oldSession = makeSession(oldSource)..addProduct('s-tomato');
+      final newSession = makeSession(_PagingRecoverySource())
+        ..addProduct('s-oil');
+      final id = oldSource.productIdAt(12, 4);
+      Widget app(BuyV2Session session) => MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(session: session, productId: id, onExit: () {}),
+      );
+      await tester.pumpWidget(app(oldSession));
+      await tester.pump(const Duration(milliseconds: 300));
+      expect(find.text('Opening product'), findsOneWidget);
+      await tester.pumpWidget(app(newSession));
+      await tester.pumpAndSettle();
+      expect(newSession.selectedProductId, id);
+      expect(newSession.quantityFor('s-oil'), 1);
+      expect(newSession.quantityFor('s-tomato'), 0);
+      oldSource.resolutionGate!.complete();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<BuyV2Screen>(find.byType(BuyV2Screen)).session,
+        same(newSession),
+      );
+      expect(newSession.selectedProductId, id);
+      expect(newSession.quantityFor('s-oil'), 1);
+      expect(tester.takeException(), isNull);
+    });
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('recipient loading Retry product and Back 320x568 $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        addTearDown(tester.view.reset);
+        final source = _PagingRecoverySource()
+          ..resolutionGate = Completer<void>()
+          ..failResolution = true;
+        final session = makeSession(source);
+        final id = source.productIdAt(12, 4);
+        session.addProduct('s-tomato');
+        Widget app(String productId) => r66VisualCaptureRoot(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+                padding: const EdgeInsets.only(top: 24, bottom: 24),
+              ),
+              child: child!,
+            ),
+            home: BuyV2Screen(
+              session: session,
+              productId: productId,
+              onExit: () {},
+            ),
+          ),
+        );
+        await tester.pumpWidget(app(id));
+        await tester.pump(const Duration(milliseconds: 400));
+        expect(find.text('Opening product'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        source.resolutionGate!.complete();
+        await tester.pumpAndSettle();
+        expect(find.text('Product unavailable'), findsOneWidget);
+        await captureR66Visual(tester, 'r669-share-unavailable-$scale');
+        source.failResolution = false;
+        await tester.ensureVisible(
+          find.byKey(const ValueKey('buy-catalogue-retry')),
+        );
+        await tester.tap(find.byKey(const ValueKey('buy-catalogue-retry')));
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, id);
+        expect(session.linkedProductRecoveryId, isNull);
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'r669-share-product-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.quantityFor('s-tomato'), 1);
+        await tester.pumpWidget(app('s-oil'));
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, 's-oil');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+}
+
 void main() {
+  r669SharedProductTests();
   r669ShoppingAreaTests();
   r669ComparisonContractTests();
   group('STORE-PROCUREMENT-ELIGIBILITY-01 contract', () {
@@ -1462,6 +1738,106 @@ void main() {
         adapter: adapter,
       );
     }
+
+    for (final role in [
+      BuyV2SupplierWorkspaceRole.wholesaler,
+      BuyV2SupplierWorkspaceRole.mandi,
+      BuyV2SupplierWorkspaceRole.manufacturer,
+      BuyV2SupplierWorkspaceRole.retailer,
+    ]) {
+      for (final purpose in [
+        BuyV2ProcurementPurpose.restock,
+        BuyV2ProcurementPurpose.buyDirect,
+      ]) {
+        test('R669 shared product enforces $role for $purpose', () async {
+          final id = 'shared-${role.name}-${purpose.name}';
+          final offered = product.copyWith(
+            id: id,
+            procurementSupplierGrant: supplier(role: role, listing: id),
+          );
+          final source = _R669ProcurementCatalogue([offered]);
+          final fixture = await scopedSession(
+            context: scope(purpose: purpose),
+            snapshot: commerceSnapshot(products: []),
+            catalogueSource: source,
+          );
+          final session = fixture.session;
+          await session.restoreCustomerState();
+          final expected = purpose == BuyV2ProcurementPurpose.buyDirect
+              ? role == BuyV2SupplierWorkspaceRole.manufacturer
+              : role != BuyV2SupplierWorkspaceRole.retailer;
+          expect(await session.openLinkedProduct(id), expected);
+          if (expected) {
+            expect(session.selectedProductId, id);
+            expect(session.linkedProductRecoveryId, isNull);
+          } else {
+            expect(session.linkedProductRecoveryId, id);
+            expect(session.addProduct(id), isFalse);
+          }
+          session.goBack();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.destination, BuyV2Destination.wholesale);
+          expect(
+            session.procurementContext!.originOperationId,
+            'restock-operation',
+          );
+        });
+      }
+    }
+
+    test(
+      'R669 shared product Retry refreshes a rejected cached offer',
+      () async {
+        final id = 'shared-eligibility-refresh';
+        final offered = product.copyWith(
+          id: id,
+          procurementSupplierGrant: supplier(
+            listing: id,
+            role: BuyV2SupplierWorkspaceRole.retailer,
+          ),
+        );
+        final source = _R669ProcurementCatalogue([offered]);
+        final fixture = await scopedSession(
+          snapshot: commerceSnapshot(products: []),
+          catalogueSource: source,
+        );
+        await fixture.session.restoreCustomerState();
+        expect(await fixture.session.openLinkedProduct(id), isFalse);
+        expect(fixture.session.linkedProductRecoveryId, id);
+        source.products
+          ..clear()
+          ..add(
+            offered.copyWith(procurementSupplierGrant: supplier(listing: id)),
+          );
+        expect(await fixture.session.openLinkedProduct(id), isTrue);
+        expect(fixture.session.selectedProductId, id);
+        expect(fixture.session.linkedProductRecoveryId, isNull);
+      },
+    );
+
+    test(
+      'R669 shared product discards late response after Store switch',
+      () async {
+        final id = 'shared-store-switch';
+        final offered = product.copyWith(
+          id: id,
+          procurementSupplierGrant: supplier(listing: id),
+        );
+        final source = _R669ProcurementCatalogue([offered])
+          ..resolutionGate = Completer<void>();
+        final fixture = await scopedSession(
+          snapshot: commerceSnapshot(products: []),
+          catalogueSource: source,
+        );
+        await fixture.session.restoreCustomerState();
+        final pending = fixture.session.openLinkedProduct(id);
+        fixture.identity.value = scope(store: 'different-store');
+        source.resolutionGate!.complete();
+        expect(await pending, isFalse);
+        expect(fixture.session.findProduct(id), isNull);
+        expect(fixture.session.procurementScopeCurrent, isFalse);
+      },
+    );
 
     test(
       'R669 persistence restores browsing and exact Cart product Back chain',

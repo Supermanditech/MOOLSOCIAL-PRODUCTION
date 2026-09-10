@@ -8191,6 +8191,7 @@ class BuyV2CatalogueAvailabilityView extends StatelessWidget {
     this.detail,
     this.loading,
     this.retryAvailable = true,
+    this.onRetry,
     this.onReturn,
     this.returnLabel = 'Back',
   });
@@ -8200,6 +8201,7 @@ class BuyV2CatalogueAvailabilityView extends StatelessWidget {
   final String? detail;
   final bool? loading;
   final bool retryAvailable;
+  final VoidCallback? onRetry;
   final VoidCallback? onReturn;
   final String returnLabel;
 
@@ -8261,7 +8263,7 @@ class BuyV2CatalogueAvailabilityView extends StatelessWidget {
                   ),
                   child: FilledButton.icon(
                     key: const ValueKey('buy-catalogue-retry'),
-                    onPressed: session.retryCommerce,
+                    onPressed: onRetry ?? session.retryCommerce,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Try again'),
                   ),

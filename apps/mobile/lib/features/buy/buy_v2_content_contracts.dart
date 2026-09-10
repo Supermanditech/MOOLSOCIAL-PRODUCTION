@@ -16,6 +16,13 @@ export 'buy_v2_models.dart'
 
 enum BuyV2FulfilmentMode { quickLocal, standardCourier, bulkFreight }
 
+/// Public listing identity only; never include an account or procurement draft.
+Uri buyV2SharedProductUri(BuyV2Product product) => Uri.https(
+  'moolsocial.com',
+  '/app/buy',
+  {'sub': product.destination.name, 'view': 'product', 'product': product.id},
+);
+
 enum BuyV2StoreOperatingState { unknown, open, closed }
 
 /// Geographic scope is explicit; a destination search does not claim routing.

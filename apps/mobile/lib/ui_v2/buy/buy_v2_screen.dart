@@ -441,7 +441,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       restoreState = true;
     }
     if (restoreState) unawaited(_restoreSessionState());
-    if (oldWidget.initialDestination != widget.initialDestination ||
+    if ((oldWidget.session != widget.session && _hasExplicitBuyRoute) ||
+        oldWidget.initialDestination != widget.initialDestination ||
         oldWidget.initialOffersActive != widget.initialOffersActive ||
         oldWidget.initialView != widget.initialView ||
         oldWidget.initialCartScope != widget.initialCartScope ||
@@ -522,7 +523,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       widget.session.destination = widget.initialDestination;
       widget.session.openRecovery(recoveryKind);
     } else if (productId != null) {
-      widget.session.openProduct(productId);
+      unawaited(widget.session.openLinkedProduct(productId));
     } else if (orderId != null && widget.initialView == BuyV2View.orderItems) {
       widget.session.openOrderItems(orderId);
     } else if (orderId != null &&
@@ -2403,7 +2404,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     BuyV2Session session, {
     VoidCallback? onProductReturn,
   }) {
-    if (!session.isStoreProcurement) return null;
+    if (!session.isStoreProcurement ||
+        session.linkedProductRecoveryId != null) {
+      return null;
+    }
     final message = switch (session.view) {
       BuyV2View.catalogue when session.destination != BuyV2Destination.orders =>
         session.procurementUnavailableMessage,
@@ -2442,6 +2446,22 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   Widget _currentView(BuyV2Session session) {
+    final linkedProductId = session.linkedProductRecoveryId;
+    if (linkedProductId != null) {
+      return BuyV2CatalogueAvailabilityView(
+        key: const ValueKey('buy-linked-product-recovery'),
+        session: session,
+        title: session.linkedProductLoading
+            ? 'Opening product'
+            : 'Product unavailable',
+        detail: session.linkedProductLoading
+            ? 'Checking this product and its current availability.'
+            : session.linkedProductMessage,
+        loading: session.linkedProductLoading,
+        onRetry: () => unawaited(session.openLinkedProduct(linkedProductId)),
+        onReturn: session.goBack,
+      );
+    }
     final cartStoreAnchor = switch (session.cartScope) {
       BuyV2CartScope.all => _storeBrowseAnchor,
       BuyV2CartScope.shop => _storeBrowseAnchors[BuyV2Destination.shop],

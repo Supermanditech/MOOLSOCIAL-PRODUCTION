@@ -1478,11 +1478,7 @@ Future<void> _shareBuyV2Product(
   final origin = renderBox == null
       ? const Rect.fromLTWH(0, 0, 1, 1)
       : renderBox.localToGlobal(Offset.zero) & renderBox.size;
-  final productLink = Uri.https('moolsocial.app', '/app/buy', {
-    'sub': product.destination.name,
-    'view': 'product',
-    'product': product.id,
-  });
+  final productLink = buyV2SharedProductUri(product);
   try {
     await SharePlus.instance.share(
       ShareParams(
@@ -17736,7 +17732,9 @@ class _CartRecommendationCard extends StatelessWidget {
                       ),
                       if (product.badge.trim().isNotEmpty)
                         Positioned(
-                          key: ValueKey('buy-related-product-badge-${product.id}'),
+                          key: ValueKey(
+                            'buy-related-product-badge-${product.id}',
+                          ),
                           left: 4,
                           top: 4,
                           child: Container(

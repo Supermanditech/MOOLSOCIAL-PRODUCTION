@@ -5213,9 +5213,12 @@ class BuyV2Session extends ChangeNotifier {
   }.values;
 
   Future<Map<String, BuyV2Product>> _resolvePersistedCatalogueProducts(
-    Set<String> ids,
-  ) async {
-    final missing = ids.where((id) => findProduct(id) == null).toSet();
+    Set<String> ids, {
+    bool refreshKnown = false,
+  }) async {
+    final missing = ids
+        .where((id) => refreshKnown || findProduct(id) == null)
+        .toSet();
     if (missing.isEmpty) return {};
     final sources = <BuyV2CataloguePageSource>{
       ?cataloguePageSource,
@@ -8151,6 +8154,95 @@ class BuyV2Session extends ChangeNotifier {
       previous,
       BuyV2NavigationMotionDirection.replace,
     );
+  }
+
+  String? _linkedProductId;
+  bool _linkedProductLoading = false;
+  String? _linkedProductMessage;
+  int _linkedProductRequest = 0;
+  int _linkedProductNavigationSequence = -1;
+
+  String? get linkedProductRecoveryId =>
+      view == BuyV2View.product &&
+          selectedProductId == _linkedProductId &&
+          navigationMotionSequence == _linkedProductNavigationSequence
+      ? _linkedProductId
+      : null;
+
+  bool get linkedProductLoading =>
+      linkedProductRecoveryId != null && _linkedProductLoading;
+
+  String get linkedProductMessage =>
+      _linkedProductMessage ??
+      'This product could not be opened. Try again or return to shopping.';
+
+  /// Resolve the exact public listing before using normal product eligibility.
+  /// A late response must not replace a newer route, account or Store purchase.
+  Future<bool> openLinkedProduct(String id) async {
+    if (_collectionDisposed || !procurementScopeCurrent) return false;
+    final request = ++_linkedProductRequest;
+    final known = findProduct(id);
+    if (known != null && _procurementProductMessage(known) == null) {
+      _linkedProductId = null;
+      return openProduct(id);
+    }
+    final previous = _navigationSurfaceIdentity;
+    if (view != BuyV2View.product) {
+      _productReturnDestination = destination;
+      _productReturnView = view;
+      _comparedProductOrigins.clear();
+    }
+    selectedProductId = id;
+    view = BuyV2View.product;
+    _linkedProductId = id;
+    _linkedProductLoading = true;
+    _linkedProductMessage = null;
+    notice = null;
+    _linkedProductNavigationSequence =
+        navigationMotionSequence +
+        (previous == _navigationSurfaceIdentity ? 0 : 1);
+    final navigation = _linkedProductNavigationSequence;
+    final owner = customerStateStore?.ownerScope;
+    bool current() =>
+        !_collectionDisposed &&
+        procurementScopeCurrent &&
+        request == _linkedProductRequest &&
+        owner == customerStateStore?.ownerScope &&
+        navigation == navigationMotionSequence &&
+        linkedProductRecoveryId == id;
+    _notifyNavigationIfChanged(
+      previous,
+      BuyV2NavigationMotionDirection.forward,
+    );
+    try {
+      if (id.trim().isEmpty || id.length > 2048) {
+        throw const FormatException('Invalid product link identity');
+      }
+      final resolved = await _resolvePersistedCatalogueProducts({
+        id,
+      }, refreshKnown: true);
+      if (!current()) return false;
+      final product = resolved[id] ?? findProduct(id);
+      if (product == null) throw StateError('Linked product unavailable');
+      _pagedProducts.addAll(resolved);
+      final unavailable = _procurementProductMessage(product);
+      if (unavailable != null) {
+        _linkedProductMessage = unavailable;
+        _linkedProductLoading = false;
+        notifyListeners();
+        return false;
+      }
+      _linkedProductId = null;
+      _linkedProductLoading = false;
+      return openProduct(id);
+    } on Object {
+      if (!current()) return false;
+      _linkedProductLoading = false;
+      _linkedProductMessage =
+          'This product could not be opened. Try again or return to shopping.';
+      notifyListeners();
+      return false;
+    }
   }
 
   bool openProduct(String id, {bool preserveComparisonOrigin = false}) {
