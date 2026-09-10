@@ -2787,6 +2787,21 @@ class BuyV2Session extends ChangeNotifier {
   bool canReviewProduct(String productId) =>
       _reviewableProductIds.contains(productId);
 
+  String? productReviewUnavailableReason(
+    String productId,
+  ) => switch (commerceLoadState) {
+    BuyV2CommerceLoadState.loading =>
+      'Checking whether your purchase is eligible for a review.',
+    BuyV2CommerceLoadState.offline =>
+      'Review eligibility could not be checked. Reconnect and try again.',
+    BuyV2CommerceLoadState.unavailable =>
+      'Reviews are unavailable right now. Try again later.',
+    BuyV2CommerceLoadState.ready =>
+      canReviewProduct(productId)
+          ? null
+          : 'You can review this product after a delivered purchase. No eligible purchase is available for this product.',
+  };
+
   bool canReportProduct(String productId) =>
       findProduct(productId) != null && _productReportsAvailable;
 
@@ -8141,6 +8156,12 @@ class BuyV2Session extends ChangeNotifier {
     required int rating,
     required String comment,
   }) async {
+    final unavailable = productReviewUnavailableReason(productId);
+    if (unavailable != null) {
+      notice = unavailable;
+      notifyListeners();
+      return false;
+    }
     if (reviewDataEnabled) {
       return submitProductReview(
         productId: productId,

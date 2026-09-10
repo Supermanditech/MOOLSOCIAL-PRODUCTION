@@ -1,6 +1,7 @@
-import 'dart:ui' show SemanticsAction;
+import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -37,8 +38,371 @@ final class _R669PhotoContentAdapter implements BuyV2ProductContentAdapter {
       );
 }
 
+final class _R669ReviewCommerce implements BuyV2CommerceAdapter {
+  bool eligible = false;
+  bool reject = false;
+  int submissions = 0;
+  BuyV2CommerceLoadState state = BuyV2CommerceLoadState.ready;
+  Completer<void>? refreshGate;
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async {
+    await refreshGate?.future;
+    return BuyV2CommerceSnapshot(
+      state: state,
+      products: BuyV2Catalogue.allProducts,
+      businessVerified: true,
+      businessVerificationState: BuyV2BusinessVerificationState.verified,
+      productReportsAvailable: true,
+      reviewableProductIds: eligible ? {'s-milk'} : {},
+    );
+  }
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: false,
+        customerMessage: '',
+      );
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async {
+    submissions++;
+    return BuyV2MutationResult(
+      accepted: !reject,
+      customerMessage: reject
+          ? 'Review could not be saved. Try again.'
+          : 'Review saved.',
+    );
+  }
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw UnsupportedError('Unexpected review fixture operation');
+}
+
+Future<BuyV2Session> _mountR669Review(
+  WidgetTester tester,
+  _R669ReviewCommerce adapter, {
+  Size size = const Size(320, 711),
+  double scale = 1,
+}) async {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = size;
+  tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+  tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+  addTearDown(tester.view.reset);
+  final core = BuySession();
+  final session = BuyV2Session(
+    core: core,
+    commerceAdapter: adapter,
+    reviewDataEnabled: false,
+  );
+  addTearDown(core.dispose);
+  addTearDown(session.dispose);
+  await session.restoreCommerce();
+  expect(session.addProduct('w-notebook'), isTrue);
+  session.toggleSaved('s-milk');
+  await tester.pumpWidget(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: MoolTheme.light(),
+      builder: (context, child) => MediaQuery(
+        data: MediaQuery.of(
+          context,
+        ).copyWith(textScaler: TextScaler.linear(scale)),
+        child: r66VisualCaptureRoot(child!),
+      ),
+      home: BuyV2Screen(session: session, productId: 's-milk'),
+    ),
+  );
+  await tester.pumpAndSettle();
+  addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
+  await _openR669Review(tester);
+  return session;
+}
+
+Future<void> _openR669Review(WidgetTester tester) async {
+  final action = find.byKey(const ValueKey('buy-review-product-s-milk'));
+  await tester.scrollUntilVisible(
+    action,
+    160,
+    scrollable: find
+        .descendant(
+          of: find.byKey(const PageStorageKey('buy-product-s-milk')),
+          matching: find.byType(Scrollable),
+        )
+        .first,
+  );
+  await tester.ensureVisible(action);
+  await tester.pumpAndSettle();
+  expect(tester.widget<OutlinedButton>(action).onPressed, isNotNull);
+  await tester.tap(action);
+  await tester.pumpAndSettle();
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final eligible in [false, true]) {
+        final profile = '${size.width.toInt()}-$scale-$eligible';
+        testWidgets('R669 review entry is actionable $profile', (tester) async {
+          final adapter = _R669ReviewCommerce()..eligible = eligible;
+          final session = await _mountR669Review(
+            tester,
+            adapter,
+            size: size,
+            scale: scale,
+          );
+          final quantity = session.quantityFor('w-notebook');
+          expect(tester.takeException(), isNull);
+          final title = find.descendant(
+            of: find.byKey(
+              ValueKey(
+                eligible
+                    ? 'buy-product-review-sheet'
+                    : 'buy-product-review-eligibility',
+              ),
+            ),
+            matching: find.text(
+              eligible ? 'Write a review' : 'Review your purchase',
+            ),
+          );
+          final heading = tester.renderObject<RenderParagraph>(title);
+          expect(heading.didExceedMaxLines, isFalse);
+          if (!eligible) {
+            expect(
+              find.byKey(const ValueKey('buy-product-review-eligibility')),
+              findsOneWidget,
+            );
+            expect(find.textContaining('No eligible purchase'), findsOneWidget);
+            expect(
+              find.byKey(const ValueKey('buy-product-review-sheet')),
+              findsNothing,
+            );
+            expect(
+              await session.submitProductReviewOnline(
+                productId: 's-milk',
+                rating: 4,
+                comment: 'Not eligible',
+              ),
+              isFalse,
+            );
+            expect(adapter.submissions, 0);
+            final retry = find.byKey(
+              const ValueKey('buy-review-check-eligibility'),
+            );
+            await tester.ensureVisible(retry);
+            await tester.pumpAndSettle();
+            expect(retry.hitTestable(), findsOneWidget);
+            await captureR66Visual(tester, 'r669-review-$profile-eligibility');
+            await tester.tap(retry);
+            await tester.pumpAndSettle();
+            expect(
+              find.descendant(
+                of: find.byKey(
+                  const ValueKey('buy-product-review-eligibility'),
+                ),
+                matching: find.textContaining('No eligible purchase'),
+              ),
+              findsOneWidget,
+            );
+          } else {
+            expect(
+              find.byKey(const ValueKey('buy-product-review-sheet')),
+              findsOneWidget,
+            );
+            await captureR66Visual(tester, 'r669-review-$profile-editor');
+            final rating = find.byKey(
+              const ValueKey('buy-review-rating-s-milk-4'),
+            );
+            await tester.ensureVisible(rating);
+            await tester.tap(rating);
+            final comment = find.byKey(
+              const ValueKey('buy-review-comment-s-milk'),
+            );
+            await tester.ensureVisible(comment);
+            await tester.enterText(
+              comment,
+              'The pack arrived in good condition.',
+            );
+            await tester.pumpAndSettle();
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-product-review-sheet')),
+              findsOneWidget,
+            );
+            final save = find.byKey(const ValueKey('buy-submit-review-s-milk'));
+            await tester.ensureVisible(save);
+            await tester.pumpAndSettle();
+            expect(save.hitTestable(), findsOneWidget);
+            final cancelText = find.descendant(
+              of: find.byKey(const ValueKey('buy-cancel-product-review')),
+              matching: find.text('Cancel'),
+            );
+            final cancelParagraph = tester.renderObject<RenderParagraph>(
+              cancelText,
+            );
+            final cancelNatural = TextPainter(
+              text: cancelParagraph.text,
+              textDirection: cancelParagraph.textDirection,
+              textScaler: cancelParagraph.textScaler,
+            )..layout();
+            expect(
+              cancelParagraph.size.width + .1,
+              greaterThanOrEqualTo(cancelNatural.width),
+            );
+            cancelNatural.dispose();
+            await captureR66Visual(tester, 'r669-review-$profile-ready');
+            await tester.tap(save);
+            await tester.pumpAndSettle();
+            expect(adapter.submissions, 1);
+            expect(session.customerReviewFor('s-milk')?.rating, 4);
+            await _openR669Review(tester);
+            expect(
+              tester.widget<TextFormField>(comment).controller!.text,
+              'The pack arrived in good condition.',
+            );
+            await tester.enterText(comment, 'Discard this edit.');
+            await tester.pumpAndSettle();
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            final cancel = find.byKey(
+              const ValueKey('buy-cancel-product-review'),
+            );
+            await tester.ensureVisible(cancel);
+            await tester.tap(cancel);
+            await tester.pumpAndSettle();
+            expect(adapter.submissions, 1);
+            expect(
+              session.customerReviewFor('s-milk')?.comment,
+              'The pack arrived in good condition.',
+            );
+          }
+          if (!eligible) {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+          }
+          expect(session.selectedProductId, 's-milk');
+          expect(session.view, BuyV2View.product);
+          expect(session.quantityFor('w-notebook'), quantity);
+          expect(session.isSaved('s-milk'), isTrue);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
+  }
+
+  for (final state in [
+    BuyV2CommerceLoadState.offline,
+    BuyV2CommerceLoadState.unavailable,
+  ]) {
+    testWidgets('R669 review retry distinguishes ${state.name} and recovers', (
+      tester,
+    ) async {
+      final adapter = _R669ReviewCommerce();
+      final session = await _mountR669Review(tester, adapter);
+      adapter.state = state;
+      await session.restoreCommerce();
+      await tester.pumpAndSettle();
+      expect(
+        find.text(session.productReviewUnavailableReason('s-milk')!),
+        findsOneWidget,
+      );
+      expect(find.textContaining('No eligible purchase'), findsNothing);
+      expect(
+        await session.submitProductReviewOnline(
+          productId: 's-milk',
+          rating: 4,
+          comment: 'Unavailable',
+        ),
+        isFalse,
+      );
+      expect(adapter.submissions, 0);
+      await captureR66Visual(tester, 'r669-review-${state.name}');
+      adapter.refreshGate = Completer<void>();
+      final retry = find.byKey(const ValueKey('buy-review-check-eligibility'));
+      await tester.ensureVisible(retry);
+      await tester.tap(retry);
+      await tester.pump();
+      expect(find.text('Checking purchase'), findsOneWidget);
+      expect(tester.widget<OutlinedButton>(retry).onPressed, isNull);
+      adapter.state = BuyV2CommerceLoadState.ready;
+      adapter.eligible = true;
+      adapter.refreshGate!.complete();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-product-review-sheet')),
+        findsOneWidget,
+      );
+      expect(adapter.submissions, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'R669 review retains draft after eligibility changes and rejected save',
+    (tester) async {
+      final adapter = _R669ReviewCommerce()..eligible = true;
+      final session = await _mountR669Review(tester, adapter);
+      final comment = find.byKey(const ValueKey('buy-review-comment-s-milk'));
+      await tester.tap(
+        find.byKey(const ValueKey('buy-review-rating-s-milk-5')),
+      );
+      await tester.enterText(comment, 'Keep this draft.');
+      adapter.eligible = false;
+      await session.restoreCommerce();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextFormField>(comment).controller!.text,
+        'Keep this draft.',
+      );
+      final save = find.byKey(const ValueKey('buy-submit-review-s-milk'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(adapter.submissions, 0);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-product-review-sheet')),
+          matching: find.textContaining('No eligible purchase'),
+        ),
+        findsOneWidget,
+      );
+      adapter.eligible = true;
+      adapter.reject = true;
+      await session.restoreCommerce();
+      await tester.pumpAndSettle();
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(adapter.submissions, 1);
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-product-review-sheet')),
+          matching: find.text('Review could not be saved. Try again.'),
+        ),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<TextFormField>(comment).controller!.text,
+        'Keep this draft.',
+      );
+      adapter.reject = false;
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(adapter.submissions, 2);
+      expect(session.customerReviewFor('s-milk')?.comment, 'Keep this draft.');
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('R669 media complete illustration crops', (tester) async {
     tester.view.devicePixelRatio = 1;

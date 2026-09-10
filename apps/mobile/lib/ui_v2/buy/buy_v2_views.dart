@@ -1096,10 +1096,8 @@ class BuyV2ProductView extends StatelessWidget {
                   _ProductReviewsPanel(
                     product: product,
                     review: review,
-                    onReview: session.canReviewProduct(product.id)
-                        ? () =>
-                              _showProductReviewSheet(context, session, product)
-                        : null,
+                    onReview: () =>
+                        _showProductReviewSheet(context, session, product),
                     onReport: session.canReportProduct(product.id)
                         ? () =>
                               _showProductReportSheet(context, session, product)
@@ -4047,6 +4045,7 @@ Future<void> _showProductReviewSheet(
   BuyV2Product product,
 ) async {
   final existing = session.customerReviewFor(product.id);
+  var editorOpened = session.productReviewUnavailableReason(product.id) == null;
   final callerViewPadding = MediaQuery.viewPaddingOf(context);
   final exportedBottomClearance =
       defaultTargetPlatform == TargetPlatform.android
@@ -4073,10 +4072,55 @@ Future<void> _showProductReviewSheet(
             MediaQuery.viewInsetsOf(sheetContext).bottom +
             exportedBottomClearance,
       ),
-      child: _ProductReviewSheet(
-        session: session,
-        product: product,
-        existing: existing,
+      child: AnimatedBuilder(
+        animation: session,
+        builder: (context, _) {
+          final unavailable = session.productReviewUnavailableReason(
+            product.id,
+          );
+          if (editorOpened || unavailable == null) {
+            // Once editing starts, retain the draft during a failed refresh.
+            // Submission independently rechecks eligibility in the session.
+            editorOpened = true;
+            return _ProductReviewSheet(
+              session: session,
+              product: product,
+              existing: existing,
+            );
+          }
+          final loading =
+              session.commerceLoadState == BuyV2CommerceLoadState.loading;
+          return SingleChildScrollView(
+            key: const ValueKey('buy-product-review-eligibility'),
+            padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const _ProductFeedbackSheetHeader(
+                  icon: Icons.rate_review_outlined,
+                  title: 'Review your purchase',
+                  detail: 'Reviews are available after delivery.',
+                  closeKey: ValueKey('buy-close-product-review'),
+                ),
+                const SizedBox(height: 10),
+                _ProductFeedbackIdentity(product: product),
+                const SizedBox(height: 10),
+                Semantics(
+                  liveRegion: true,
+                  child: Text(unavailable, style: context.buyBody),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  key: const ValueKey('buy-review-check-eligibility'),
+                  onPressed: loading ? null : session.restoreCommerce,
+                  icon: Icon(loading ? Icons.hourglass_top : Icons.refresh),
+                  label: Text(loading ? 'Checking purchase' : 'Check again'),
+                ),
+              ],
+            ),
+          );
+        },
       ),
     ),
   );
@@ -4157,12 +4201,7 @@ class _ProductFeedbackSheetHeader extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                title,
-                maxLines: 2,
-                overflow: TextOverflow.clip,
-                style: context.buyTitle.copyWith(fontSize: 17),
-              ),
+              Text(title, style: context.buyTitle.copyWith(fontSize: 17)),
               const SizedBox(height: 2),
               Text(detail, style: context.buyMeta),
             ],
@@ -4345,58 +4384,6 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
               mainAxisSize: MainAxisSize.max,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                _ProductFeedbackSheetHeader(
-                  icon: Icons.rate_review_outlined,
-                  title: 'Write a review',
-                  detail:
-                      'Rate what you received. Keep personal or medical information out.',
-                  closeKey: const ValueKey('buy-close-product-review'),
-                ),
-                const SizedBox(height: 8),
-                _ProductFeedbackIdentity(product: widget.product),
-                const SizedBox(height: 8),
-                Semantics(
-                  label: _rating == 0
-                      ? 'No rating selected'
-                      : '$_rating star rating selected',
-                  liveRegion: true,
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      for (var value = 1; value <= 5; value++)
-                        AnimatedContainer(
-                          duration: stateDuration,
-                          curve: Curves.easeOut,
-                          decoration: BoxDecoration(
-                            color: value <= _rating
-                                ? BuyV2Colors.softOrange
-                                : Colors.transparent,
-                            borderRadius: BorderRadius.circular(14),
-                          ),
-                          child: IconButton(
-                            key: ValueKey(
-                              'buy-review-rating-${widget.product.id}-$value',
-                            ),
-                            tooltip: '$value ${value == 1 ? 'star' : 'stars'}',
-                            onPressed: _submitting
-                                ? null
-                                : () => setState(() {
-                                    _rating = value;
-                                    _submissionRejected = false;
-                                  }),
-                            icon: Icon(
-                              value <= _rating
-                                  ? Icons.star_rounded
-                                  : Icons.star_border_rounded,
-                              color: BuyV2Colors.orange,
-                              size: 24,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 9),
                 Flexible(
                   child: SingleChildScrollView(
                     key: const ValueKey('buy-product-review-fields-scroll'),
@@ -4404,6 +4391,59 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
+                        _ProductFeedbackSheetHeader(
+                          icon: Icons.rate_review_outlined,
+                          title: 'Write a review',
+                          detail:
+                              'Rate what you received. Keep personal or medical information out.',
+                          closeKey: const ValueKey('buy-close-product-review'),
+                        ),
+                        const SizedBox(height: 8),
+                        _ProductFeedbackIdentity(product: widget.product),
+                        const SizedBox(height: 8),
+                        Semantics(
+                          label: _rating == 0
+                              ? 'No rating selected'
+                              : '$_rating star rating selected',
+                          liveRegion: true,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              for (var value = 1; value <= 5; value++)
+                                AnimatedContainer(
+                                  duration: stateDuration,
+                                  curve: Curves.easeOut,
+                                  decoration: BoxDecoration(
+                                    color: value <= _rating
+                                        ? BuyV2Colors.softOrange
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(14),
+                                  ),
+                                  child: IconButton(
+                                    key: ValueKey(
+                                      'buy-review-rating-${widget.product.id}-$value',
+                                    ),
+                                    tooltip:
+                                        '$value ${value == 1 ? 'star' : 'stars'}',
+                                    onPressed: _submitting
+                                        ? null
+                                        : () => setState(() {
+                                            _rating = value;
+                                            _submissionRejected = false;
+                                          }),
+                                    icon: Icon(
+                                      value <= _rating
+                                          ? Icons.star_rounded
+                                          : Icons.star_border_rounded,
+                                      color: BuyV2Colors.orange,
+                                      size: 24,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(height: 9),
                         Semantics(
                           container: true,
                           excludeSemantics: true,
@@ -4524,40 +4564,54 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                   ),
                 ),
                 const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        key: const ValueKey('buy-cancel-product-review'),
-                        onPressed: _submitting
-                            ? null
-                            : () => Navigator.of(context).pop(),
-                        child: const Text('Cancel'),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 2,
-                      child: SizedBox(
-                        height: 48,
-                        child: FilledButton.icon(
-                          key: ValueKey(
-                            'buy-submit-review-${widget.product.id}',
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final stack =
+                        constraints.maxWidth < 360 &&
+                        MediaQuery.textScalerOf(context).scale(14) > 18;
+                    final available = constraints.maxWidth - (stack ? 0 : 8);
+                    return Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        SizedBox(
+                          width: stack ? available : available / 3,
+                          child: TextButton(
+                            key: const ValueKey('buy-cancel-product-review'),
+                            onPressed: _submitting
+                                ? null
+                                : () => Navigator.of(context).pop(),
+                            child: const Text('Cancel'),
                           ),
-                          onPressed: _isValid && !_submitting ? _submit : null,
-                          icon: _submitting
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.check_rounded, size: 18),
-                          label: Text(_submitting ? 'Saving…' : 'Save review'),
                         ),
-                      ),
-                    ),
-                  ],
+                        SizedBox(
+                          width: stack ? available : available * 2 / 3,
+                          child: ConstrainedBox(
+                            constraints: const BoxConstraints(minHeight: 48),
+                            child: FilledButton.icon(
+                              key: ValueKey(
+                                'buy-submit-review-${widget.product.id}',
+                              ),
+                              onPressed: _isValid && !_submitting
+                                  ? _submit
+                                  : null,
+                              icon: _submitting
+                                  ? const SizedBox.square(
+                                      dimension: 18,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(Icons.check_rounded, size: 18),
+                              label: Text(
+                                _submitting ? 'Saving…' : 'Save review',
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ),
