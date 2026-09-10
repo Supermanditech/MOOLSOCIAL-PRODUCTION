@@ -1672,6 +1672,7 @@ if ($ProductionLane -ceq 'baseline') {
     $primaryEvidenceCoordinationOwnerKeys = @()
     $r66OwnerAmendmentPending = $false
     $r665CollectionAdmissionPending = $false
+    $r678PersistenceAdmissionPending = $false
     if (
       $ProductionLane -ceq 'cursor_ui' -and
       $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and
@@ -1696,6 +1697,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r667DependenciesParent = '38fa1201488ae943487b58d4afe5d851f8b9fc37'
       $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
       $r677SourceParent = '0c36d2201c43665d38e00173df7d2df63f690344'
+      $r678PersistenceParent = 'e00a6981b92399f71c68233907bc79b6588c096c'
+      & git -C $root merge-base --is-ancestor $r678PersistenceParent $head
+      $r678PersistenceContext = $LASTEXITCODE -eq 0
+      $r677FreezeHead = if ($r678PersistenceContext) { $r678PersistenceParent } else { $head }
       & git -C $root merge-base --is-ancestor $r677SourceParent $head
       $r677SourceContext = $LASTEXITCODE -eq 0
       $r676FreezeHead = if ($r677SourceContext) { $r677SourceParent } else { $head }
@@ -3079,7 +3084,7 @@ if ($ProductionLane -ceq 'baseline') {
         $r676RegistryAfter.entries = @($r676RegistryAfter.entries | Select-Object -First 4513)
         Assert-Coordination (($r676RegistryBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r676RegistryAfter | ConvertTo-Json -Depth 100 -Compress)) 'Featured return changed historical registry.'
         $r676PolicyBefore = Get-R66Utf8GitJson $r676CorrectionParent $r676Owners[0]
-        $r676PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r676PolicyAfter = if ($r678PersistenceContext) { Get-R66Utf8GitJson $r678PersistenceParent $r676Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         Assert-Coordination ($r676PolicyAfter.registryBinding.entryCount -eq 4514 -and $r676PolicyAfter.registryBinding.sha256 -ceq $registrySha) 'Featured return policy registry changed.'
         $r676PolicyAfter.registryBinding = $r676PolicyBefore.registryBinding
         Assert-Coordination (($r676PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r676PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Featured return changed owner claims or unrelated policy.'
@@ -3132,7 +3137,7 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($evidence.cases -eq 65 -and (Get-Sha256 $evidence.path) -ceq $evidence.sha256) 'r66.8 boundary proposal evidence changed.'
         }
         $r677PolicyBefore = Get-R66Utf8GitJson $r677SourceParent $r670Owners[0]
-        $r677PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r677PolicyAfter = if ($r678PersistenceContext) { Get-R66Utf8GitJson $r678PersistenceParent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         Assert-Coordination (($r677PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r677PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.8 source changed policy or owner claims.'
         $r677ScopeBefore = Get-R66Utf8GitJson $r677SourceParent $r677Owners[1]
         $r677ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r677Owners[1]) | ConvertFrom-Json
@@ -3160,10 +3165,58 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r677Subject.Count -eq 1 -and [string]$r677Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit r66.8 qualified review source') 'r66.8 source admission subject changed.'
           $r677Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r677Commit)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r677Committed | Sort-Object) -join '|') -ceq (@($r677Owners | Sort-Object) -join '|')) 'r66.8 source admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r677Commit -- @r677Owners
+          & git -C $root diff --quiet $r677Commit $r677FreezeHead -- @r677Owners
           Assert-Coordination ($LASTEXITCODE -eq 0) 'r66.8 source coordination changed after admission.'
-          $r677Later = @(& git -C $root log --format=%H "${r677Commit}..$head" -- @r677Owners)
+          $r677Later = @(& git -C $root log --format=%H "${r677Commit}..$r677FreezeHead" -- @r677Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r677Later.Count -eq 0) 'r66.8 source admission cannot be replayed or revised.'
+        }
+      }
+      if ($r678PersistenceContext) {
+        # Founder-authorized STORE-PROCUREMENT-ELIGIBILITY-01 admission only.
+        # No runtime/test edit, generic dirty allowance or historical rewrite.
+        $r678Owners = @('config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1')
+        $r678SourceOwner = 'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart'
+        $r678Subject = 'ui(buy-redmi-fixes-v1-20260905): admit procurement persistence owner'
+        $r678Before = Get-R66Utf8GitJson $r678PersistenceParent $r678Owners[0]
+        $r678After = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r678Claim = @($r678After.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')
+        Assert-Coordination ($r678Claim.Count -eq 1 -and $r678Claim[0].owners.Count -eq 67 -and
+          @($r678Claim[0].owners | Where-Object { $_ -ceq $r678SourceOwner }).Count -eq 1) 'Procurement admission must add only its persistence owner.'
+        $r678Claim[0].owners = @($r678Claim[0].owners | Where-Object { $_ -cne $r678SourceOwner })
+        Assert-Coordination (($r678Before | ConvertTo-Json -Depth 100 -Compress) -ceq
+          ($r678After | ConvertTo-Json -Depth 100 -Compress)) 'Procurement admission changed unrelated policy or registry binding.'
+        if ($head -ceq $r678PersistenceParent) {
+          $r678PersistenceAdmissionPending = $true
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending procurement admission is not qualification.'
+          $r678CheckpointPath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/singlechat-r669-paused-preservation-1789053028136.json'
+          Assert-Coordination ((Get-Sha256 $r678CheckpointPath) -ceq 'A0F212E311F369C0092C90CD2A249A44D1202996B90D3B120833D625930591E2') 'Paused procurement checkpoint changed.'
+          $r678Checkpoint = Get-Content -Raw -Encoding UTF8 -LiteralPath $r678CheckpointPath | ConvertFrom-Json
+          Assert-Coordination ($r678Checkpoint.head -ceq $head -and $r678Checkpoint.files.Count -eq 16 -and
+            $r678Checkpoint.worktree -ceq $rootForward -and $r678Checkpoint.branch -ceq $branch) 'Paused procurement identity changed.'
+          foreach ($draft in $r678Checkpoint.files) {
+            Assert-Coordination ((Get-Sha256 (Join-Path $root $draft.path)) -ieq $draft.sha256) "Paused draft changed: $($draft.path)"
+          }
+          $r678Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r678Dirty | Sort-Object) -join '|') -ceq
+            (@(@($r678Owners) + @($r678Checkpoint.files.path) | Sort-Object) -join '|')) 'Procurement admission changed an extra owner.'
+          $r678Merge = @(& git -C $root rev-parse --verify --quiet MERGE_HEAD)
+          Assert-Coordination ($LASTEXITCODE -eq 1 -and $r678Merge.Count -eq 0) 'Procurement admission cannot run during a merge.'
+        } else {
+          $r678Following = @(& git -C $root rev-list --first-parent --reverse "${r678PersistenceParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r678Following.Count -gt 0) 'Procurement admission commit missing.'
+          $r678Commit = [string]$r678Following[0]
+          $r678Parents = @(& git -C $root show -s --format=%P $r678Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r678Parents.Count -eq 1 -and $r678Parents[0] -ceq $r678PersistenceParent) 'Procurement admission parent changed.'
+          $r678Text = @(& git -C $root show -s --format=%s $r678Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r678Text.Count -eq 1 -and $r678Text[0] -ceq $r678Subject) 'Procurement admission subject changed.'
+          $r678Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r678Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r678Committed | Sort-Object) -join '|') -ceq (@($r678Owners | Sort-Object) -join '|')) 'Procurement admission committed extra owners.'
+          & git -C $root diff --quiet $r678Commit -- @r678Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Procurement coordination changed after admission.'
+          $r678Later = @(& git -C $root log --format=%H "${r678Commit}..$head" -- @r678Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r678Later.Count -eq 0) 'Procurement admission cannot be reused.'
         }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
@@ -3874,9 +3927,15 @@ if ($ProductionLane -ceq 'baseline') {
         (@($r665Drafts.Keys | Sort-Object) -join '|')
       ) 'Collection admission must stage only five owners and preserve all four unstaged drafts.'
     }
+    if ($r678PersistenceAdmissionPending) {
+      Assert-Coordination (
+        (@($preCommitStagedOwners | Sort-Object) -join '|') -ceq (@($r678Owners | Sort-Object) -join '|') -and
+        (@($preCommitUnstagedOwners | Sort-Object) -join '|') -ceq (@($r678Checkpoint.files.path | Sort-Object) -join '|')
+      ) 'Procurement admission must stage only its two controls and preserve all 16 unstaged drafts.'
+    }
     Assert-Coordination (
       $preCommitStagedOwners.Count -gt 0 -and
-      ($preCommitUnstagedOwners.Count -eq 0 -or $r66OwnerAmendmentPending -or $r665CollectionAdmissionPending) -and
+      ($preCommitUnstagedOwners.Count -eq 0 -or $r66OwnerAmendmentPending -or $r665CollectionAdmissionPending -or $r678PersistenceAdmissionPending) -and
       $preCommitUntrackedOwners.Count -eq 0
     ) 'production pre-commit requires one fully staged atomic change set.'
     Assert-ProductionSecretSafe -BaseCommit $baseCommit -HeadCommit $head `

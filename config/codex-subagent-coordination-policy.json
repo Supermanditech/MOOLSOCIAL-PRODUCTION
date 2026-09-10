@@ -116,6 +116,7 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
         "apps/mobile/lib/features/buy/buy_v2_session.dart",
+        "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
         "apps/mobile/lib/features/buy/buy_v2_models.dart",
         "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
         "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
