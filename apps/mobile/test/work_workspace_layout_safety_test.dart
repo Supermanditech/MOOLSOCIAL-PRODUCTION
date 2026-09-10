@@ -4915,6 +4915,11 @@ void main() {
       await tester.tap(field);
       tester.view.viewInsets = const FakeViewPadding(bottom: 220);
       await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).maxLines, 2);
+      expect(
+        tester.widget<TextField>(field).keyboardType,
+        TextInputType.multiline,
+      );
       final send = find.byKey(const Key('chat-send'));
       expect(send.hitTestable(), findsOneWidget);
       await tester.tap(send);
@@ -4933,6 +4938,11 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await captureStoreView(tester, 'support-failure-keyboard-$scale');
+      expect(
+        tester.getSize(find.byKey(const Key('chat-message-list'))).height,
+        greaterThanOrEqualTo(kMinInteractiveDimension),
+        reason: 'Failed-send feedback and typing must leave conversation space',
+      );
       final feedback = find.byKey(const Key('chat-feedback-text-scroll'));
       final feedbackScroll = tester.state<ScrollableState>(
         find.descendant(of: feedback, matching: find.byType(Scrollable)).first,
@@ -4967,19 +4977,57 @@ void main() {
       );
       expect(endingBottom.dy, greaterThan(tester.getRect(feedback).top));
       await captureStoreView(tester, 'support-failure-instruction-$scale');
+      final keyboardRetry = find.byKey(Key('chat-retry-${failed.id}'));
+      final keyboardMessages = find
+          .descendant(
+            of: find.byKey(const Key('chat-message-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(
+        keyboardRetry,
+        120,
+        scrollable: keyboardMessages,
+      );
+      await tester.pumpAndSettle();
+      expect(keyboardRetry.hitTestable(), findsOneWidget);
+      await captureStoreView(tester, 'support-keyboard-retry-reachable-$scale');
+      const multiline = 'Please review the address.\nThe document is attached.';
+      await tester.enterText(field, multiline);
+      expect(tester.widget<TextField>(field).controller!.text, multiline);
+      expect(
+        chat.draftTextForSession(
+          thread,
+          workspaceApplicationId: 'APPLICATION-A',
+        ),
+        multiline,
+      );
       await tester.enterText(field, newerA);
       FocusManager.instance.primaryFocus?.unfocus();
       tester.view.viewInsets = FakeViewPadding.zero;
       await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).maxLines, 2);
       final router = GoRouter.of(tester.element(field));
       router.go(route('APPLICATION-B'));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(field).controller!.text, draftB);
       expect(find.byKey(const Key('chat-error')), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('Application APPLICATION-B'),
+        -160,
+        scrollable: keyboardMessages,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Application APPLICATION-B'), findsOneWidget);
       router.go(route('APPLICATION-A'));
       await tester.pumpAndSettle();
       expect(tester.widget<TextField>(field).controller!.text, newerA);
+      await tester.scrollUntilVisible(
+        find.text('Application APPLICATION-A'),
+        -160,
+        scrollable: keyboardMessages,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('Application APPLICATION-A'), findsOneWidget);
       final retry = find.byKey(Key('chat-retry-${failed.id}'));
       final messageScroll = find

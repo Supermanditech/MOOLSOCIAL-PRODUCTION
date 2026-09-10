@@ -3176,6 +3176,14 @@ class _ComposerState extends State<_Composer> {
         reply == null &&
         photo == null &&
         attachment == null;
+    final media = MediaQuery.of(context);
+    final constrainedKeyboard =
+        media.viewInsets.bottom > 0 &&
+        media.size.height -
+                media.viewInsets.vertical -
+                media.padding.vertical <=
+            400 &&
+        media.textScaler.scale(16) > 24;
     return SafeArea(
       top: false,
       bottom: false,
@@ -3560,6 +3568,8 @@ class _ComposerState extends State<_Composer> {
                             compactEmpty &&
                             hintMeasure.width <=
                                 constraints.maxWidth - MoolSpacing.sm - 106;
+                        final compactEditorHeight =
+                            hintMeasure.preferredLineHeight + 56;
                         hintMeasure.dispose();
                         return Container(
                           key: const Key('chat-composer-surface'),
@@ -3581,10 +3591,16 @@ class _ComposerState extends State<_Composer> {
                                 focusNode: _inputFocus,
                                 minLines: 1,
                                 maxLines: 2,
+                                keyboardType: TextInputType.multiline,
                                 scrollPadding: const EdgeInsets.only(
                                   bottom: 112,
                                 ),
                                 decoration: InputDecoration(
+                                  constraints: constrainedKeyboard
+                                      ? BoxConstraints(
+                                          maxHeight: compactEditorHeight,
+                                        )
+                                      : null,
                                   hintText: photo == null && attachment == null
                                       ? 'Message'
                                       : 'Add a caption',
