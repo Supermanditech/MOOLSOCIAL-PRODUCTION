@@ -16049,6 +16049,95 @@ void main() {
     },
   );
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('DASH13 requirement budget validation $scale', (tester) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(320, 568),
+        textScale: scale,
+      );
+      await reveal(tester, find.byKey(const Key('work-quick-requirement')));
+      await tester.tap(find.byKey(const Key('work-quick-requirement')));
+      await tester.pumpAndSettle();
+      final service = find.byKey(const Key('work-requirement-category-4'));
+      await reveal(tester, service);
+      await tester.tap(service);
+      await tester.pumpAndSettle();
+      for (final entry in const {
+        'work-requirement-title': 'Create store product photos',
+        'work-requirement-outcome': 'Deliver ten clear product photos.',
+      }.entries) {
+        final field = find.byKey(Key(entry.key));
+        await reveal(tester, field);
+        await tester.enterText(field, entry.value);
+      }
+      final budget = find.byKey(const Key('work-requirement-budget'));
+      final review = find.byKey(const Key('work-requirement-review'));
+      const error =
+          'Enter a positive amount with up to 2 decimal places, or leave it blank to discuss.';
+      for (final value in [
+        'NaN',
+        'Infinity',
+        '-Infinity',
+        '1e999',
+        '0',
+        '-1',
+        '1.234',
+        'abc',
+      ]) {
+        await reveal(tester, budget);
+        await tester.enterText(budget, value);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await reveal(tester, review);
+        await tester.tap(review);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-requirement-review-surface')),
+          findsNothing,
+        );
+        await reveal(tester, find.text(error));
+        expect(find.text(error).hitTestable(), findsOneWidget);
+        expect(work.workspacePaidRequirementReference, isNull);
+        expect(tester.takeException(), isNull);
+      }
+      await captureStoreView(tester, 'requirement-budget-error-$scale');
+      for (final value in ['', '0.01', '500.50', '10000000000']) {
+        await reveal(tester, budget);
+        await tester.enterText(budget, value);
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await reveal(tester, review);
+        await tester.tap(review);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-requirement-review-surface')),
+          findsOneWidget,
+        );
+        expect(find.text(error), findsNothing);
+        expect(work.workspacePaidRequirementReference, isNull);
+        if (value == '10000000000') {
+          final amount = find.text('₹10000000000');
+          await reveal(tester, amount);
+          expect(amount.hitTestable(), findsOneWidget);
+          final amountBox = tester.getRect(amount);
+          expect(amountBox.left, greaterThanOrEqualTo(0));
+          expect(amountBox.right, lessThanOrEqualTo(320));
+          await captureStoreView(tester, 'requirement-budget-large-$scale');
+        }
+        final edit = find.byKey(const Key('work-requirement-edit'));
+        await reveal(tester, edit);
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(budget).controller?.text, value);
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+
   testWidgets('Store settings save editable hours capacity and alerts', (
     tester,
   ) async {

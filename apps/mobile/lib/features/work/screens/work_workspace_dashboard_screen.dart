@@ -19209,15 +19209,22 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
   }
 
   void _review() {
-    final budget = num.tryParse(_budget.text.trim());
+    final budgetText = _budget.text.trim();
+    final budget = num.tryParse(budgetText);
+    final validBudget =
+        budgetText.isEmpty ||
+        (RegExp(r'^\d+(?:\.\d{1,2})?$').hasMatch(budgetText) &&
+            budget != null &&
+            budget.isFinite &&
+            budget > 0);
     final error = _title.text.trim().isEmpty
         ? 'Describe what your store needs.'
         : _outcome.text.trim().isEmpty
         ? 'Describe the result you expect.'
         : _location.text.trim().isEmpty
         ? 'Enter the required location.'
-        : _budget.text.trim().isNotEmpty && (budget == null || budget <= 0)
-        ? 'Enter a valid budget or leave it blank to discuss.'
+        : !validBudget
+        ? 'Enter a positive amount with up to 2 decimal places, or leave it blank to discuss.'
         : null;
     setState(() {
       _error = error;
