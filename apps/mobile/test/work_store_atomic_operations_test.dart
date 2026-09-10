@@ -1863,6 +1863,198 @@ void main() {
     ],
   );
 
+  test(
+    'DASH09 case projections isolate source items revisions and business effects',
+    () {
+      final account = _CommandAccountStore();
+      final session = WorkSession(
+        gateway: ReviewWorkGateway(),
+        pendingProofStore: account,
+      )..activeWorkspace = _commandStore;
+      addTearDown(session.dispose);
+      for (var i = 0; i < 100; i++) {
+        session.workspaceOrders.add(
+          _scopeOrder('ORDER-$i', stage: i.isEven ? 'Preparing' : 'Completed'),
+        );
+      }
+      expect(session.selectWorkspaceOrder('ORDER-0'), isTrue);
+      expect(
+        session.applyWorkspacePurchases(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 1,
+          records: [supply('SHIP-A', received: 8)],
+          complete: true,
+        ),
+        isTrue,
+      );
+      final stages = session.workspaceOrders
+          .map((o) => (o.id, o.stage, o.payment))
+          .toList();
+      WorkspaceIssueRecord issue({
+        String id = 'CASE-A',
+        String reference = 'ORDER-0',
+        WorkspaceIssueTarget target = WorkspaceIssueTarget.customerOrder,
+        WorkspaceIssueKind kind = WorkspaceIssueKind.packingShortage,
+        WorkspaceIssueState state = WorkspaceIssueState.retailerReview,
+        String scope = 'account-A',
+        int revision = 1,
+        int quantity = 1,
+        String reason = 'One pack is unavailable.',
+        String? resolution,
+        String? sku,
+        String? lineId,
+      }) => WorkspaceIssueRecord(
+        accountScope: scope,
+        workspaceId: 'store-A',
+        id: id,
+        referenceId: reference,
+        target: target,
+        kind: kind,
+        state: state,
+        revision: revision,
+        updatedAt: DateTime(2026, 9, 10, 10, revision),
+        reason: reason,
+        nextStep: 'Review the affected items.',
+        resolution: resolution,
+        lines: [
+          WorkspaceIssueLine(
+            lineId:
+                lineId ??
+                (target == WorkspaceIssueTarget.customerOrder
+                    ? 'atta-5kg'
+                    : 'line-1'),
+            productId:
+                sku ??
+                (target == WorkspaceIssueTarget.customerOrder
+                    ? 'atta-5kg'
+                    : 'same-sku'),
+            name: target == WorkspaceIssueTarget.customerOrder ? 'Atta' : 'Oil',
+            pack: target == WorkspaceIssueTarget.customerOrder ? '5 kg' : '1 l',
+            orderedQuantity: target == WorkspaceIssueTarget.customerOrder
+                ? 1
+                : 10,
+            affectedQuantity: quantity,
+          ),
+        ],
+      );
+      bool apply(int revision, List<WorkspaceIssueRecord> records) =>
+          session.applyWorkspaceIssues(
+            accountScope: 'account-A',
+            storeId: 'store-A',
+            feedRevision: revision,
+            records: records,
+          );
+      final customer = issue();
+      final supplier = issue(
+        id: 'CASE-S',
+        reference: 'SHIP-A',
+        target: WorkspaceIssueTarget.supplierShipment,
+        kind: WorkspaceIssueKind.damagedItem,
+        state: WorkspaceIssueState.supplierReview,
+        quantity: 2,
+      );
+      expect(apply(1, [customer, supplier]), isTrue);
+      expect(() => customer.lines.clear(), throwsUnsupportedError);
+      expect(
+        session
+            .workspaceIssuesFor(WorkspaceIssueTarget.customerOrder, 'ORDER-0')
+            .single
+            .id,
+        'CASE-A',
+      );
+      expect(
+        session.workspaceIssuesFor(
+          WorkspaceIssueTarget.customerOrder,
+          'ORDER-1',
+        ),
+        isEmpty,
+      );
+      expect(apply(2, [issue(quantity: 2)]), isFalse);
+      expect(apply(2, [issue(sku: 'unknown-sku')]), isFalse);
+      expect(apply(2, [issue(lineId: 'invented-line')]), isFalse);
+      expect(apply(2, [issue(scope: 'other-account')]), isFalse);
+      expect(apply(2, [issue(reference: 'unknown-order')]), isFalse);
+      expect(apply(2, [issue(reference: 'ORDER-1', revision: 2)]), isFalse);
+      expect(apply(2, [issue(reason: 'Same revision changed')]), isFalse);
+      expect(apply(2, [customer, customer]), isFalse);
+      expect(
+        apply(2, [issue(state: WorkspaceIssueState.declined, revision: 2)]),
+        isFalse,
+      );
+      expect(
+        apply(2, [
+          issue(
+            state: WorkspaceIssueState.resolved,
+            revision: 2,
+            resolution: 'Case reviewed.',
+          ),
+          supplier,
+        ]),
+        isTrue,
+      );
+      expect(
+        session.workspaceOrders.map((o) => (o.id, o.stage, o.payment)),
+        stages,
+      );
+      expect(session.workspaceStockMovements, isEmpty);
+      expect(session.workspaceInvoices, isEmpty);
+      expect(session.workspaceSettlementRequested, 0);
+      expect(session.workspacePurchases.single.lines.single.receivedPacks, 8);
+      expect(session.currentWorkspaceOrderId, 'ORDER-0');
+      session.markWorkspaceIssuesStale(
+        accountScope: 'account-A',
+        storeId: 'store-A',
+      );
+      expect(session.workspaceIssuesStale, isTrue);
+      expect(apply(3, []), isTrue);
+      expect(session.workspaceIssuesStale, isFalse);
+      expect(
+        apply(4, [customer]),
+        isFalse,
+        reason: 'Removal cannot allow stale case resurrection',
+      );
+      expect(
+        apply(4, [
+          issue(revision: 3, state: WorkspaceIssueState.customerReview),
+        ]),
+        isTrue,
+      );
+      session.activeWorkspace = const WorkWorkspace(
+        id: 'store-B',
+        name: 'Store B',
+        profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery',
+        area: 'Jodhpur',
+        verified: true,
+      );
+      expect(
+        session.workspaceIssuesFor(
+          WorkspaceIssueTarget.customerOrder,
+          'ORDER-0',
+        ),
+        isEmpty,
+      );
+      session.activeWorkspace = _commandStore;
+      expect(
+        session.workspaceIssuesFor(
+          WorkspaceIssueTarget.customerOrder,
+          'ORDER-0',
+        ),
+        hasLength(1),
+      );
+      account.accountScope = 'another-account';
+      expect(
+        session.workspaceIssuesFor(
+          WorkspaceIssueTarget.customerOrder,
+          'ORDER-0',
+        ),
+        isEmpty,
+      );
+      expect(apply(5, [issue(revision: 4)]), isFalse);
+    },
+  );
+
   final financeTime = DateTime(2026, 9, 10, 10);
   WorkspacePaymentRecord paymentFact(
     int i, {

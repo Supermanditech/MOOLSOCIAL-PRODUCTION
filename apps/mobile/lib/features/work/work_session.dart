@@ -306,6 +306,11 @@ class StoreCollectionController extends ChangeNotifier {
 /// Existing Store fields partitioned by workspace, within this signed-in session.
 /// This cache is not authoritative persistence or backend membership validation.
 class _StoreOperationalData {
+  String? issueAccountScope;
+  int issueFeedRevision = 0;
+  bool issuesStale = false;
+  final Map<String, WorkspaceIssueRecord> issues = {};
+  final Map<String, WorkspaceIssueRecord> issueHistory = {};
   WorkspaceFinanceSnapshot? finance;
   bool financeStale = false;
   final Map<String, WorkspacePaymentRecord> financePayments = {};
@@ -717,6 +722,148 @@ class WorkSession extends ChangeNotifier {
   bool initialWorkspaceStateLoaded = false;
   _StoreOperationalData _storeData = _StoreOperationalData();
   final Map<String, _StoreOperationalData> _storeDataById = {};
+
+  bool _issueReferenceExists(
+    _StoreOperationalData data,
+    WorkspaceIssueRecord issue,
+  ) {
+    if (issue.target == WorkspaceIssueTarget.supplierShipment) {
+      return data.purchaseAccountScope == issue.accountScope &&
+          data.purchases.containsKey(issue.referenceId);
+    }
+    return data.workspaceOrders.any((order) => order.id == issue.referenceId);
+  }
+
+  /// Linked case facts only. No case event may execute a financial, inventory,
+  /// replacement or collection command as a side effect of rendering it.
+  bool applyWorkspaceIssues({
+    required String accountScope,
+    required String storeId,
+    required int feedRevision,
+    required List<WorkspaceIssueRecord> records,
+  }) {
+    if (_disposed ||
+        accountScope != _contactAccountScope ||
+        accountScope.isEmpty) {
+      return false;
+    }
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data == null ||
+        feedRevision <= 0 ||
+        (data.issueAccountScope == accountScope &&
+            feedRevision <= data.issueFeedRevision) ||
+        records.map((issue) => issue.id).toSet().length != records.length) {
+      return false;
+    }
+    for (final issue in records) {
+      if (!issue.valid ||
+          issue.accountScope != accountScope ||
+          issue.workspaceId != storeId ||
+          !_issueReferenceExists(data, issue)) {
+        return false;
+      }
+      if (issue.target == WorkspaceIssueTarget.customerOrder) {
+        final order = data.workspaceOrders.firstWhere(
+          (o) => o.id == issue.referenceId,
+        );
+        if (issue.lines.any(
+          (line) =>
+              line.lineId != line.productId ||
+              order.quantities[line.productId] != line.orderedQuantity,
+        )) {
+          return false;
+        }
+        if (order.hasCompleteItemSnapshot &&
+            issue.lines.any((line) {
+              final original = order.itemSnapshots.firstWhere(
+                (s) => s.productId == line.productId,
+              );
+              return original.name != line.name || original.pack != line.pack;
+            })) {
+          return false;
+        }
+      } else {
+        final purchase = data.purchases[issue.referenceId]!;
+        for (final line in issue.lines) {
+          final original = purchase.lines
+              .where((l) => l.id == line.lineId)
+              .firstOrNull;
+          if (original == null ||
+              original.productId != line.productId ||
+              original.orderedPacks != line.orderedQuantity ||
+              original.name != line.name ||
+              original.pack != line.pack) {
+            return false;
+          }
+        }
+      }
+      final previous = data.issueAccountScope == accountScope
+          ? data.issueHistory[issue.id]
+          : null;
+      if (previous != null &&
+          (previous.referenceId != issue.referenceId ||
+              previous.target != issue.target ||
+              previous.kind != issue.kind ||
+              issue.revision < previous.revision ||
+              issue.updatedAt.isBefore(previous.updatedAt) ||
+              (issue.revision == previous.revision &&
+                  !issue.sameRevisionContent(previous)))) {
+        return false;
+      }
+    }
+    if (data.issueAccountScope != accountScope) data.issueHistory.clear();
+    data.issueAccountScope = accountScope;
+    data.issueFeedRevision = feedRevision;
+    data.issuesStale = false;
+    data.issues
+      ..clear()
+      ..addEntries(records.map((issue) => MapEntry(issue.id, issue)));
+    data.issueHistory.addAll(data.issues);
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  List<WorkspaceIssueRecord> workspaceIssuesFor(
+    WorkspaceIssueTarget target,
+    String referenceId,
+  ) {
+    if (_contactAccountScope == null ||
+        _storeData.issueAccountScope != _contactAccountScope) {
+      return const [];
+    }
+    final records =
+        _storeData.issues.values
+            .where(
+              (issue) =>
+                  issue.target == target &&
+                  issue.referenceId == referenceId &&
+                  _issueReferenceExists(_storeData, issue),
+            )
+            .toList()
+          ..sort((a, b) {
+            final priority = (a.state.closed ? 1 : 0).compareTo(
+              b.state.closed ? 1 : 0,
+            );
+            return priority != 0 ? priority : a.id.compareTo(b.id);
+          });
+    return List.unmodifiable(records);
+  }
+
+  bool get workspaceIssuesStale => _storeData.issuesStale;
+  void markWorkspaceIssuesStale({
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (_disposed || accountScope != _contactAccountScope) return;
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data?.issueAccountScope != accountScope) return;
+    data!.issuesStale = true;
+    if (identical(data, _storeData)) notifyListeners();
+  }
 
   WorkspaceFinanceSnapshot? get workspaceFinance {
     final finance = _storeData.finance;

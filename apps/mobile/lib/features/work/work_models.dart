@@ -3,6 +3,133 @@ import 'package:flutter/material.dart';
 import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 
+enum WorkspaceIssueTarget { customerOrder, supplierShipment }
+
+enum WorkspaceIssueKind {
+  returnRequest,
+  missingItem,
+  wrongItem,
+  damagedItem,
+  packingShortage,
+  substitution;
+
+  String get label => switch (this) {
+    returnRequest => 'Return requested',
+    missingItem => 'Missing item',
+    wrongItem => 'Wrong item',
+    damagedItem => 'Damaged item',
+    packingShortage => 'Packing shortage',
+    substitution => 'Replacement request',
+  };
+}
+
+enum WorkspaceIssueState {
+  retailerReview,
+  customerReview,
+  supplierReview,
+  moolSocialReview,
+  resolved,
+  declined,
+  cancelled;
+
+  String get label => switch (this) {
+    retailerReview => 'Your review needed',
+    customerReview => 'Awaiting customer response',
+    supplierReview => 'Awaiting supplier response',
+    moolSocialReview => 'MoolSocial is reviewing',
+    resolved => 'Case resolved',
+    declined => 'Request declined',
+    cancelled => 'Request cancelled',
+  };
+  bool get closed => const {resolved, declined, cancelled}.contains(this);
+}
+
+/// Original purchased line identity, not the current catalogue price or pack.
+class WorkspaceIssueLine {
+  const WorkspaceIssueLine({
+    required this.lineId,
+    required this.productId,
+    required this.name,
+    required this.pack,
+    required this.orderedQuantity,
+    required this.affectedQuantity,
+  });
+  final String lineId, productId, name, pack;
+  final int orderedQuantity, affectedQuantity;
+  bool get valid =>
+      lineId.trim().isNotEmpty &&
+      productId.trim().isNotEmpty &&
+      name.trim().isNotEmpty &&
+      orderedQuantity > 0 &&
+      affectedQuantity > 0 &&
+      affectedQuantity <= orderedQuantity;
+  Object get identity =>
+      (lineId, productId, name, pack, orderedQuantity, affectedQuantity);
+}
+
+/// Read-only case projection. A resolved case does not itself authorise a
+/// refund, stock posting, substitution, receipt or customer collection.
+class WorkspaceIssueRecord {
+  WorkspaceIssueRecord({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.id,
+    required this.referenceId,
+    required this.target,
+    required this.kind,
+    required this.state,
+    required this.revision,
+    required this.updatedAt,
+    required this.reason,
+    required this.nextStep,
+    required List<WorkspaceIssueLine> lines,
+    this.resolution,
+  }) : lines = List.unmodifiable(lines);
+
+  final String accountScope, workspaceId, id, referenceId, reason, nextStep;
+  final WorkspaceIssueTarget target;
+  final WorkspaceIssueKind kind;
+  final WorkspaceIssueState state;
+  final int revision;
+  final DateTime updatedAt;
+  final List<WorkspaceIssueLine> lines;
+  final String? resolution;
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        id,
+        referenceId,
+        reason,
+        nextStep,
+      ].every((s) => s.trim().isNotEmpty) &&
+      revision > 0 &&
+      lines.isNotEmpty &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.lineId).toSet().length == lines.length &&
+      (!state.closed || resolution?.trim().isNotEmpty == true);
+
+  Object get _revisionData => (
+    accountScope,
+    workspaceId,
+    id,
+    referenceId,
+    target,
+    kind,
+    state,
+    updatedAt,
+    reason,
+    nextStep,
+    resolution,
+  );
+  bool sameRevisionContent(WorkspaceIssueRecord other) =>
+      _revisionData == other._revisionData &&
+      lines.length == other.lines.length &&
+      lines.asMap().entries.every(
+        (entry) => entry.value.identity == other.lines[entry.key].identity,
+      );
+}
+
 /// Format validation only, using the existing supported Indian mobile range.
 /// This does not establish customer identity, consent or OTP verification.
 String? normalizeWorkspaceMobile(String value) {

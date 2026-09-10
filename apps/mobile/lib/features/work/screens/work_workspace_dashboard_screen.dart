@@ -2842,6 +2842,28 @@ class _StoreControlDashboard extends StatelessWidget {
               collection &&
               (constraints.maxHeight < 580 ||
                   MediaQuery.textScalerOf(context).scale(14) > 18);
+          final desk = ready
+              ? _StoreActivityDeck(
+                  key: const Key('store-stable-working-centre'),
+                  session: session,
+                  reviewedOrder: reviewedOrder,
+                  onOrders: onOrders,
+                  onReviewOrder: onReviewOrder,
+                  onCloseOrder: onCloseOrder,
+                  onStock: onStock,
+                  onMoney: onMoney,
+                  onGroupBulk: () =>
+                      onOpenOperation(_WorkspaceOperation.groupBuying),
+                )
+              : _StoreSetupDeck(
+                  session: session,
+                  workspace: workspace,
+                  onSetup: onSetup,
+                  onProducts: onStock,
+                );
+          // At enlarged text, the selected detail owns the working area.
+          // Closing restores all unchanged dashboard rails; no new route.
+          if (enlarged && reviewedOrder != null && !collection) return desk;
           final content = Column(
             children: [
               _StoreLiveBusinessPulse(
@@ -2859,28 +2881,7 @@ class _StoreControlDashboard extends StatelessWidget {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Expanded(
-                      child: ready
-                          ? _StoreActivityDeck(
-                              key: const Key('store-stable-working-centre'),
-                              session: session,
-                              reviewedOrder: reviewedOrder,
-                              onOrders: onOrders,
-                              onReviewOrder: onReviewOrder,
-                              onCloseOrder: onCloseOrder,
-                              onStock: onStock,
-                              onMoney: onMoney,
-                              onGroupBulk: () => onOpenOperation(
-                                _WorkspaceOperation.groupBuying,
-                              ),
-                            )
-                          : _StoreSetupDeck(
-                              session: session,
-                              workspace: workspace,
-                              onSetup: onSetup,
-                              onProducts: onStock,
-                            ),
-                    ),
+                    Expanded(child: desk),
                     _StoreActionEdge(
                       session: session,
                       onRestock: onBuyStock,
@@ -3537,6 +3538,19 @@ class _StoreActivityDeck extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget content;
     final selectedOrder = reviewedOrder ?? session.currentWorkspaceOrder;
+    final openIssueCount =
+        selectedOrder == null ||
+            selectedOrder.isCustomerCollection ||
+            reviewedOrder != null ||
+            !session.hasActiveWorkspaceOrder
+        ? 0
+        : session
+              .workspaceIssuesFor(
+                WorkspaceIssueTarget.customerOrder,
+                selectedOrder.id,
+              )
+              .where((issue) => !issue.state.closed)
+              .length;
     if (selectedOrder?.isCustomerCollection == true) {
       content = WorkCollectionLiveCard(
         key: ValueKey(
@@ -3616,13 +3630,16 @@ class _StoreActivityDeck extends StatelessWidget {
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
           final scrollCard =
-              _hasStoreWorkload(session) ||
-              (largeText &&
-                  ((content is _DeliveryActivityCard &&
-                          MediaQuery.textScalerOf(context).scale(1) >= 1.8) ||
-                      session.workspaceOrderHasTimeRequest(
-                        selectedOrder?.id ?? '',
-                      )));
+              !(MediaQuery.textScalerOf(context).scale(14) > 23 &&
+                  content is _StoreOrderDetails) &&
+              (_hasStoreWorkload(session) ||
+                  (largeText &&
+                      ((content is _DeliveryActivityCard &&
+                              MediaQuery.textScalerOf(context).scale(1) >=
+                                  1.8) ||
+                          session.workspaceOrderHasTimeRequest(
+                            selectedOrder?.id ?? '',
+                          ))));
           final desiredHeight = switch (content) {
             WorkCollectionLiveCard(:final controller) =>
               switch (controller?.snapshot?.state.name) {
@@ -3650,7 +3667,30 @@ class _StoreActivityDeck extends StatelessWidget {
             child: _ActivityDeckShell(
               state:
                   '${selectedOrder?.id}:${selectedOrder?.stage}:${content.runtimeType}',
-              child: content,
+              child: openIssueCount == 0
+                  ? content
+                  : Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: TextButton.icon(
+                            key: const Key('work-dashboard-review-issues'),
+                            onPressed: onReviewOrder,
+                            icon: const Icon(
+                              Icons.assignment_late_outlined,
+                              size: 18,
+                            ),
+                            label: Text(
+                              openIssueCount == 1
+                                  ? 'Review issue'
+                                  : 'Review $openIssueCount issues',
+                            ),
+                          ),
+                        ),
+                        Expanded(child: content),
+                      ],
+                    ),
             ),
           );
           if (scrollCard && constraints.maxHeight < desiredHeight) {
@@ -3674,6 +3714,11 @@ class _StoreActivityDeck extends StatelessWidget {
         },
       ),
     );
+    if (reviewedOrder != null &&
+        selectedOrder?.isCustomerCollection != true &&
+        MediaQuery.textScalerOf(context).scale(14) > 23) {
+      return deck;
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -4525,6 +4570,161 @@ class _OrderDecisionButtons extends StatelessWidget {
   );
 }
 
+class _StoreIssueReviews extends StatelessWidget {
+  const _StoreIssueReviews({
+    required this.session,
+    required this.target,
+    required this.referenceId,
+    this.initiallyExpanded = false,
+  });
+  final WorkSession session;
+  final WorkspaceIssueTarget target;
+  final String referenceId;
+  final bool initiallyExpanded;
+
+  @override
+  Widget build(BuildContext context) {
+    final records = session.workspaceIssuesFor(target, referenceId);
+    if (records.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (session.workspaceIssuesStale)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'Showing the last case update. Current status is unavailable.',
+              key: Key('work-issue-stale'),
+              style: TextStyle(fontSize: 12),
+            ),
+          ),
+        for (final issue in records)
+          _StoreIssueReview(
+            key: ValueKey((issue.accountScope, issue.workspaceId, issue.id)),
+            issue: issue,
+            initiallyExpanded: initiallyExpanded,
+          ),
+      ],
+    );
+  }
+}
+
+class _StoreIssueReview extends StatefulWidget {
+  const _StoreIssueReview({
+    super.key,
+    required this.issue,
+    required this.initiallyExpanded,
+  });
+  final WorkspaceIssueRecord issue;
+  final bool initiallyExpanded;
+  @override
+  State<_StoreIssueReview> createState() => _StoreIssueReviewState();
+}
+
+class _StoreIssueReviewState extends State<_StoreIssueReview> {
+  late bool _expanded = widget.initiallyExpanded;
+  @override
+  Widget build(BuildContext context) {
+    final issue = widget.issue;
+    return Padding(
+      key: Key('work-issue-${issue.id}'),
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      issue.kind.label,
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        color: MoolColors.navy,
+                        fontSize: 14,
+                      ),
+                    ),
+                    Text(
+                      issue.state.label,
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              TextButton(
+                key: Key('work-issue-review-${issue.id}'),
+                onPressed: () => setState(() => _expanded = !_expanded),
+                child: Text(
+                  _expanded
+                      ? 'Close'
+                      : issue.state.closed
+                      ? 'View'
+                      : 'Review',
+                ),
+              ),
+            ],
+          ),
+          if (_expanded) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Case ${issue.id}',
+              style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+            ),
+            for (final line in issue.lines)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${line.name}${line.pack.isEmpty ? '' : ' · ${line.pack}'}',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    Text(
+                      '${line.affectedQuantity} of ${line.orderedQuantity} ordered affected',
+                    ),
+                  ],
+                ),
+              ),
+            Text(issue.reason, key: Key('work-issue-reason-${issue.id}')),
+            const SizedBox(height: 8),
+            if (issue.resolution?.isNotEmpty == true)
+              Text(
+                issue.resolution!,
+                style: const TextStyle(fontWeight: FontWeight.w600),
+              ),
+            Text(issue.nextStep, key: Key('work-issue-next-${issue.id}')),
+            if (issue.kind == WorkspaceIssueKind.substitution &&
+                !issue.state.closed)
+              const Text(
+                'Do not replace items without the customer’s confirmation.',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            if (issue.state == WorkspaceIssueState.retailerReview) ...[
+              const SizedBox(height: 8),
+              const Text(
+                'Case actions are unavailable. No decision has been sent.',
+                key: Key('work-issue-actions-unavailable'),
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+            if (issue.state == WorkspaceIssueState.resolved)
+              const Text(
+                'Check the linked payment and stock records for any adjustments.',
+                style: TextStyle(fontSize: 12),
+              ),
+          ],
+          const Divider(height: 16),
+        ],
+      ),
+    );
+  }
+}
+
 class _StoreOrderDetails extends StatelessWidget {
   const _StoreOrderDetails({
     required this.session,
@@ -4629,6 +4829,12 @@ class _StoreOrderDetails extends StatelessWidget {
               ),
               _detail('Payment', session.workspaceOrderPaymentLabel(order)),
               _detail('Fulfilment', order.fulfilment),
+              _StoreIssueReviews(
+                session: session,
+                target: WorkspaceIssueTarget.customerOrder,
+                referenceId: order.id,
+                initiallyExpanded: true,
+              ),
               if (order.address.isNotEmpty)
                 _detail('Deliver to', order.address),
               const Divider(height: 24),
@@ -8327,6 +8533,11 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           ),
           if (selected.updateNote?.isNotEmpty == true)
             Text(selected.updateNote!),
+          _StoreIssueReviews(
+            session: session,
+            target: WorkspaceIssueTarget.supplierShipment,
+            referenceId: selected.shipmentId,
+          ),
           const Divider(height: 24),
           Text(
             selected.receiptState.label,
@@ -14484,6 +14695,11 @@ class _LiveOrderTicket extends StatelessWidget {
                   showItems: packingLines.isEmpty,
                   paymentLabel: session.workspaceOrderPaymentLabel(order),
                 ),
+              _StoreIssueReviews(
+                session: session,
+                target: WorkspaceIssueTarget.customerOrder,
+                referenceId: order.id,
+              ),
               if (!detailed && packingLines.isEmpty)
                 Text(
                   order.items,

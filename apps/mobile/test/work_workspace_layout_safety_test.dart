@@ -15766,6 +15766,327 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
+      'DASH09 inline customer and supplier cases preserve exact order and Back $scale',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final storeId = work.activeWorkspace!.id;
+        final originalOrder = work.currentWorkspaceOrderId;
+        final now = DateTime.now();
+        work.workspaceOrders[0] = work.workspaceOrders[0].copyWith(
+          quantities: const {'oil-fortune-1l': 1},
+        );
+        work.workspaceOrders.add(
+          customerOrder(id: 'RETURN-1', customer: 'Meena', createdAt: now),
+        );
+        work.workspaceOrders.add(
+          customerOrder(
+            id: 'SUB-1',
+            customer: 'Asha',
+            createdAt: now,
+            stage: 'Preparing',
+          ),
+        );
+        final purchase = WorkspacePurchaseRecord(
+          accountScope: 'review-draft-account',
+          workspaceId: storeId,
+          supplierId: 'supplier-A',
+          supplierName: 'Jodhpur Wholesale',
+          orderId: 'PO-22',
+          shipmentId: 'SHIP-22',
+          revision: 1,
+          createdAt: now,
+          updatedAt: now,
+          stage: WorkspaceSupplyStage.dispatched,
+          amountMinor: 155500,
+          itemSummary: 'Sunflower oil · 1 l × 10 packs',
+          paymentLabel: 'Paid online',
+          receiptState: WorkspaceReceiptState.partial,
+          lines: const [
+            WorkspacePurchaseLine(
+              id: 'LINE-22',
+              productId: 'oil-fortune-1l',
+              name: 'Sunflower oil',
+              pack: '1 l',
+              orderedPacks: 10,
+              receivedPacks: 8,
+              unitPriceMinor: 15550,
+            ),
+          ],
+        );
+        expect(
+          work.applyWorkspacePurchases(
+            accountScope: 'review-draft-account',
+            storeId: storeId,
+            feedRevision: 1,
+            records: [purchase],
+            complete: true,
+          ),
+          isTrue,
+        );
+        WorkspaceIssueRecord issue(
+          String id,
+          String reference,
+          WorkspaceIssueKind kind,
+          WorkspaceIssueState state, {
+          bool supplier = false,
+          int revision = 1,
+          String? resolution,
+        }) => WorkspaceIssueRecord(
+          accountScope: 'review-draft-account',
+          workspaceId: storeId,
+          id: id,
+          referenceId: reference,
+          target: supplier
+              ? WorkspaceIssueTarget.supplierShipment
+              : WorkspaceIssueTarget.customerOrder,
+          kind: kind,
+          state: state,
+          revision: revision,
+          updatedAt: now,
+          reason: supplier
+              ? 'Two packs arrived damaged.'
+              : 'The sealed pack is damaged.',
+          nextStep: supplier
+              ? 'Keep the affected packs separate while the supplier reviews.'
+              : state.closed
+              ? 'The decision is available to the customer.'
+              : 'Review the reported pack and its condition.',
+          resolution: resolution,
+          lines: [
+            WorkspaceIssueLine(
+              lineId: supplier ? 'LINE-22' : 'oil-fortune-1l',
+              productId: 'oil-fortune-1l',
+              name: 'Sunflower oil',
+              pack: '1 l',
+              orderedQuantity: supplier ? 10 : 1,
+              affectedQuantity: supplier ? 2 : 1,
+            ),
+          ],
+        );
+        WorkspaceIssueRecord returned({
+          int revision = 1,
+          bool declined = false,
+        }) => issue(
+          'RETURN-CASE',
+          'RETURN-1',
+          WorkspaceIssueKind.returnRequest,
+          declined
+              ? WorkspaceIssueState.declined
+              : WorkspaceIssueState.retailerReview,
+          revision: revision,
+          resolution: declined
+              ? 'The reported item could not be verified against this order.'
+              : null,
+        );
+        final replacement = issue(
+          'SUB-CASE',
+          'SUB-1',
+          WorkspaceIssueKind.substitution,
+          WorkspaceIssueState.customerReview,
+        );
+        final damaged = issue(
+          'SUPPLIER-CASE',
+          'SHIP-22',
+          WorkspaceIssueKind.damagedItem,
+          WorkspaceIssueState.supplierReview,
+          supplier: true,
+        );
+        final activeIssue = issue(
+          'ACTIVE-CASE',
+          'APP-1043',
+          WorkspaceIssueKind.packingShortage,
+          WorkspaceIssueState.retailerReview,
+        );
+        bool apply(int revision, WorkspaceIssueRecord customer) =>
+            work.applyWorkspaceIssues(
+              accountScope: 'review-draft-account',
+              storeId: storeId,
+              feedRevision: revision,
+              records: [customer, replacement, damaged, activeIssue],
+            );
+        expect(apply(1, returned()), isTrue);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        final dashboardReview = find.byKey(
+          const Key('work-dashboard-review-issues'),
+        );
+        await reveal(tester, dashboardReview);
+        await captureStoreView(tester, 'issue-dashboard-action-$scale');
+        await tester.tap(dashboardReview);
+        await tester.pumpAndSettle();
+        if (scale == 2) {
+          expect(
+            tester
+                .getSize(find.byKey(const Key('work-store-exact-order')))
+                .width,
+            greaterThan(280),
+          );
+          expect(
+            find.byKey(const Key('work-dashboard-enlarged-scroll')),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: find.byKey(const Key('work-workspace-dashboard')),
+              matching: find.byWidgetPredicate(
+                (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+              ),
+            ),
+            findsOneWidget,
+          );
+        }
+        await captureStoreView(tester, 'issue-dashboard-opened-$scale');
+        final detailScroll = find
+            .descendant(
+              of: find.byKey(const ValueKey('store-detail-APP-1043')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final activeReason = find.byKey(
+          const Key('work-issue-reason-ACTIVE-CASE'),
+        );
+        for (
+          var attempt = 0;
+          attempt < 25 && activeReason.hitTestable().evaluate().isEmpty;
+          attempt++
+        ) {
+          final visible = tester
+              .getRect(detailScroll)
+              .intersect(
+                tester.getRect(
+                  find.byKey(const Key('work-workspace-dashboard')),
+                ),
+              );
+          expect(visible.height, greaterThan(40));
+          await tester.dragFrom(
+            visible.center,
+            Offset(0, -visible.height * .45),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(
+          find.byKey(const Key('work-issue-reason-ACTIVE-CASE')).hitTestable(),
+          findsOneWidget,
+        );
+        await captureStoreView(tester, 'issue-dashboard-first-tap-$scale');
+        await reveal(tester, find.byKey(const Key('work-order-details-close')));
+        await tester.tap(find.byKey(const Key('work-order-details-close')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-incoming-purchases')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('work-dashboard-search')));
+        await tester.pumpAndSettle();
+        final field = find.byKey(const Key('work-dashboard-search-field'));
+        await tester.enterText(field, 'RETURN-1');
+        await tester.pumpAndSettle();
+        await reveal(
+          tester,
+          find.byKey(const Key('work-search-order-RETURN-1')),
+        );
+        await tester.tap(find.byKey(const Key('work-search-order-RETURN-1')));
+        await tester.pumpAndSettle();
+        final review = find.byKey(const Key('work-issue-review-RETURN-CASE'));
+        await reveal(tester, review);
+        await captureStoreView(tester, 'issue-customer-first-view-$scale');
+        await tester.tap(review);
+        await tester.pumpAndSettle();
+        await reveal(
+          tester,
+          find.byKey(const Key('work-issue-reason-RETURN-CASE')),
+        );
+        await captureStoreView(tester, 'issue-customer-details-$scale');
+        await reveal(
+          tester,
+          find.byKey(const Key('work-issue-actions-unavailable')),
+        );
+        expect(work.currentWorkspaceOrderId, originalOrder);
+        expect(apply(2, returned(revision: 2, declined: true)), isTrue);
+        await tester.pumpAndSettle();
+        await reveal(
+          tester,
+          find.text(
+            'The reported item could not be verified against this order.',
+          ),
+        );
+        await captureStoreView(tester, 'issue-declined-reason-$scale');
+        expect(
+          work.workspaceOrders.firstWhere((o) => o.id == 'RETURN-1').stage,
+          'Completed',
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.workspaceSearchQuery, 'RETURN-1');
+        await tester.enterText(field, 'SUB-1');
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-search-order-SUB-1')));
+        await tester.tap(find.byKey(const Key('work-search-order-SUB-1')));
+        await tester.pumpAndSettle();
+        final subReview = find.byKey(const Key('work-issue-review-SUB-CASE'));
+        await reveal(tester, subReview);
+        await tester.tap(subReview);
+        await tester.pumpAndSettle();
+        await reveal(
+          tester,
+          find.text(
+            'Do not replace items without the customer’s confirmation.',
+          ),
+        );
+        await captureStoreView(tester, 'issue-substitution-wait-$scale');
+        expect(
+          work.workspaceOrders.firstWhere((o) => o.id == 'SUB-1').stage,
+          'Preparing',
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        final incoming = find.byKey(const Key('work-incoming-purchases'));
+        await reveal(tester, incoming);
+        await tester.tap(incoming);
+        await tester.pumpAndSettle();
+        final shipment = find.byKey(const Key('work-purchase-open-SHIP-22'));
+        await reveal(tester, shipment);
+        await tester.tap(shipment);
+        await tester.pumpAndSettle();
+        final supplierReview = find.byKey(
+          const Key('work-issue-review-SUPPLIER-CASE'),
+        );
+        await reveal(tester, supplierReview);
+        await tester.tap(supplierReview);
+        await tester.pumpAndSettle();
+        await reveal(
+          tester,
+          find.byKey(const Key('work-issue-reason-SUPPLIER-CASE')),
+        );
+        await captureStoreView(tester, 'issue-supplier-details-$scale');
+        work.markWorkspaceIssuesStale(
+          accountScope: 'review-draft-account',
+          storeId: storeId,
+        );
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-issue-stale')));
+        await captureStoreView(tester, 'issue-stale-$scale');
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceSettlementRequested, 0);
+        expect(work.workspacePurchases.single.lines.single.receivedPacks, 8);
+        expect(work.currentWorkspaceOrderId, originalOrder);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.focusedWorkspacePurchaseId, isNull);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      },
+    );
+
+    testWidgets(
       'DASH08 finance first taps keep 25 payment updates separate from 100 orders $scale',
       (tester) async {
         final semantics = tester.ensureSemantics();
