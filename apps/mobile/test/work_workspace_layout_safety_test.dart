@@ -17584,6 +17584,212 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('DASH02 supplier search exact purchase and Back $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final store = work.activeWorkspace!;
+      final selectedOrder = work.currentWorkspaceOrderId;
+      final now = DateTime.now();
+      final purchases = List.generate(
+        1000,
+        (index) => WorkspacePurchaseRecord(
+          accountScope: 'review-draft-account',
+          workspaceId: store.id,
+          supplierId: 'supplier-$index',
+          supplierName: 'Same supplier',
+          orderId: 'PURCHASE-$index',
+          shipmentId: 'SEARCH-SHIP-$index',
+          purchaseId: 'BUY-$index',
+          revision: 1,
+          createdAt: now.subtract(Duration(seconds: index)),
+          updatedAt: now,
+          stage: WorkspaceSupplyStage.arriving,
+          amountMinor: 1550050,
+          itemSummary: 'Sunflower oil · 1 l × 100 packs',
+          paymentLabel: 'Payment pending',
+          invoiceReference: 'SUPPLY-INVOICE-$index',
+          receiptState: WorkspaceReceiptState.awaiting,
+          lines: [
+            WorkspacePurchaseLine(
+              id: 'line-$index',
+              productId: 'supplier-sku-$index',
+              name: 'Sunflower oil',
+              pack: '1 l',
+              orderedPacks: 100,
+              unitPriceMinor: 15500,
+            ),
+          ],
+        ),
+      );
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: 'review-draft-account',
+          storeId: store.id,
+          feedRevision: 1,
+          complete: true,
+          records: purchases,
+        ),
+        isTrue,
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-dashboard-search-field'));
+      await tester.enterText(field, 'Same supplier');
+      await tester.pumpAndSettle();
+      final results = find.byKey(const Key('work-dashboard-search-results'));
+      expect(tester.widget<ListView>(results).semanticChildCount, 1000);
+      final target = find.byKey(
+        const Key('work-search-purchase-SEARCH-SHIP-40'),
+      );
+      await tester.scrollUntilVisible(
+        target,
+        300,
+        scrollable: find
+            .descendant(of: results, matching: find.byType(Scrollable))
+            .first,
+        maxScrolls: 100,
+      );
+      await tester.pumpAndSettle();
+      final offset = tester.widget<ListView>(results).controller!.offset;
+      expect(offset, greaterThan(0));
+      await captureStoreView(tester, 'supplier-search-results-$scale');
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      expect(work.focusedWorkspacePurchaseId, 'SEARCH-SHIP-40');
+      expect(work.focusedWorkspacePurchase!.supplierId, 'supplier-40');
+      expect(work.currentWorkspaceOrderId, selectedOrder);
+      expect(find.byTooltip('Back to search'), findsOneWidget);
+      await captureStoreView(tester, 'supplier-search-exact-$scale');
+      await tester.tap(find.byKey(const Key('work-purchase-back')));
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ListView>(results).controller!.offset,
+        closeTo(offset, 1),
+      );
+      expect(tester.widget<TextField>(field).controller!.text, 'Same supplier');
+      expect(work.focusedWorkspacePurchaseId, isNull);
+      await tester.tap(target);
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<ListView>(results).controller!.offset,
+        closeTo(offset, 1),
+      );
+      for (final query in [
+        'supplier-sku-999',
+        'SUPPLY-INVOICE-999',
+        'BUY-999',
+      ]) {
+        await tester.enterText(field, query);
+        await tester.pumpAndSettle();
+        expect(tester.widget<ListView>(results).semanticChildCount, 1);
+        expect(
+          find.byKey(const Key('work-search-purchase-SEARCH-SHIP-999')),
+          findsOneWidget,
+        );
+      }
+      final last = find.byKey(
+        const Key('work-search-purchase-SEARCH-SHIP-999'),
+      );
+      final oldTap = tester.widget<MoolCardSurface>(last).onTap!;
+      await tester.tap(last);
+      await tester.pumpAndSettle();
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: 'review-draft-account',
+          storeId: store.id,
+          feedRevision: 2,
+          complete: true,
+          records: const [],
+        ),
+        isTrue,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Purchase update unavailable'), findsOneWidget);
+      await tester.tap(find.text('Back to search'));
+      await tester.pumpAndSettle();
+      oldTap();
+      await tester.pumpAndSettle();
+      expect(work.focusedWorkspacePurchaseId, isNull);
+      expect(
+        find.byKey(const Key('work-dashboard-search-empty')),
+        findsOneWidget,
+      );
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: 'review-draft-account',
+          storeId: store.id,
+          feedRevision: 3,
+          complete: true,
+          records: [purchases.last],
+        ),
+        isTrue,
+      );
+      expect(work.workspacePurchases, isEmpty);
+      final original = purchases.last;
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: original.accountScope,
+          storeId: store.id,
+          feedRevision: 4,
+          complete: true,
+          records: [
+            WorkspacePurchaseRecord(
+              accountScope: original.accountScope,
+              workspaceId: original.workspaceId,
+              supplierId: original.supplierId,
+              supplierName: original.supplierName,
+              orderId: original.orderId,
+              shipmentId: original.shipmentId,
+              purchaseId: original.purchaseId,
+              revision: 2,
+              createdAt: original.createdAt,
+              updatedAt: now.add(const Duration(seconds: 1)),
+              stage: original.stage,
+              amountMinor: original.amountMinor,
+              itemSummary: original.itemSummary,
+              paymentLabel: original.paymentLabel,
+              invoiceReference: original.invoiceReference,
+              receiptState: original.receiptState,
+              lines: original.lines,
+            ),
+          ],
+        ),
+        isTrue,
+      );
+      await tester.pumpAndSettle();
+      final previousStoreTap = tester.widget<MoolCardSurface>(last).onTap!;
+      work.activateWorkspace(
+        WorkWorkspace(
+          id: 'SUPPLIER-SEARCH-OTHER',
+          name: 'Other store',
+          profileId: store.profileId,
+          profileLabel: store.profileLabel,
+          area: store.area,
+          verified: true,
+        ),
+      );
+      previousStoreTap();
+      await tester.pumpAndSettle();
+      expect(work.focusedWorkspacePurchaseId, isNull);
+      expect(work.workspacePurchases, isEmpty);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
     testWidgets('DASH03 exact supplier alerts and resolved recovery $scale', (
       tester,
     ) async {

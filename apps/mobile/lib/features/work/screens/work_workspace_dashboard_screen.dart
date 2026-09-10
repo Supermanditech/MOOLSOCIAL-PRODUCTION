@@ -1302,6 +1302,9 @@ class _WorkWorkspaceDashboardScreenState
             onOpenOperation: _showOperation,
             onOpenRoute: openScopedRoute,
             onTrackPurchase: _showPurchaseTracking,
+            onPurchaseBack: _operationReturnView == _WorkspaceControlView.search
+                ? _leaveOperation
+                : null,
           ),
         },
       ),
@@ -1441,6 +1444,28 @@ class _WorkWorkspaceDashboardScreenState
           return;
         }
         unawaited(_showWorkspaceInvoiceSheet(context, session, invoice));
+      case _WorkspaceSearchKind.purchase:
+        final original = record.purchase;
+        final purchase = session.workspacePurchases
+            .where((item) => item.shipmentId == record.entityId)
+            .firstOrNull;
+        if (original == null ||
+            purchase == null ||
+            purchase.accountScope != original.accountScope ||
+            purchase.workspaceId != original.workspaceId ||
+            purchase.supplierId != original.supplierId ||
+            purchase.orderId != original.orderId ||
+            purchase.purchaseId != original.purchaseId ||
+            !session.selectWorkspacePurchase(purchase.shipmentId)) {
+          session.showNotice(
+            'This purchase is no longer available. Search again.',
+          );
+          return;
+        }
+        _showOperation(
+          _WorkspaceOperation.sourcing,
+          returnView: _WorkspaceControlView.search,
+        );
       case _WorkspaceSearchKind.product:
       case _WorkspaceSearchKind.activity:
         openRoute(record.route);
@@ -1719,7 +1744,10 @@ class _WorkWorkspaceDashboardScreenState
             _operation == _WorkspaceOperation.statement) &&
         session.focusedWorkspacePurchaseId != null) {
       session.clearWorkspacePurchaseSelection();
-      if (_operationReturnView != _WorkspaceControlView.alerts) return;
+      if (_operationReturnView != _WorkspaceControlView.alerts &&
+          _operationReturnView != _WorkspaceControlView.search) {
+        return;
+      }
     }
     if (!await _confirmDiscardCounterOrder() || !mounted) return;
     if (_operationReturnView == _WorkspaceControlView.alerts) {
@@ -8982,6 +9010,7 @@ class _WorkspaceSearchSurface extends StatelessWidget {
                   amountLabel: switch (destination.kind) {
                     _WorkspaceSearchKind.order => 'Order total',
                     _WorkspaceSearchKind.invoice => 'Invoice total',
+                    _WorkspaceSearchKind.purchase => 'Purchase total',
                     _ => 'Price',
                   },
                   onTap: () => onOpenRecord(destination),
@@ -9003,10 +9032,12 @@ class _StorePurchasesSurface extends StatefulWidget {
     required this.session,
     this.statement = false,
     this.onTrackPurchase,
+    this.onPurchaseBack,
   });
   final WorkSession session;
   final bool statement;
   final ValueChanged<String>? onTrackPurchase;
+  final VoidCallback? onPurchaseBack;
 
   @override
   State<_StorePurchasesSurface> createState() => _StorePurchasesSurfaceState();
@@ -9051,8 +9082,14 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           padding: const EdgeInsets.all(16),
           children: [
             TextButton(
-              onPressed: session.clearWorkspacePurchaseSelection,
-              child: const Text('Back to purchases'),
+              onPressed:
+                  widget.onPurchaseBack ??
+                  session.clearWorkspacePurchaseSelection,
+              child: Text(
+                widget.onPurchaseBack == null
+                    ? 'Back to purchases'
+                    : 'Back to search',
+              ),
             ),
             const _DeskEmpty(
               icon: Icons.local_shipping_outlined,
@@ -9073,8 +9110,12 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             children: [
               IconButton(
                 key: const Key('work-purchase-back'),
-                tooltip: 'Back to purchases',
-                onPressed: session.clearWorkspacePurchaseSelection,
+                tooltip: widget.onPurchaseBack == null
+                    ? 'Back to purchases'
+                    : 'Back to search',
+                onPressed:
+                    widget.onPurchaseBack ??
+                    session.clearWorkspacePurchaseSelection,
                 icon: const Icon(Icons.arrow_back_rounded),
               ),
               Expanded(
@@ -9855,6 +9896,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onOpenOperation,
     required this.onOpenRoute,
     required this.onTrackPurchase,
+    this.onPurchaseBack,
     this.focusedOrderId,
     this.focusedCustomerId,
   });
@@ -9871,6 +9913,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
   final ValueChanged<String> onTrackPurchase;
+  final VoidCallback? onPurchaseBack;
   final String? focusedOrderId, focusedCustomerId;
 
   static String _restockSearch(WorkspaceCatalogueItem product) {
@@ -9902,6 +9945,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _StorePurchasesSurface(
         session: session,
         onTrackPurchase: onTrackPurchase,
+        onPurchaseBack: onPurchaseBack,
       );
     }
     if (operation == _WorkspaceOperation.services) {
@@ -22473,7 +22517,14 @@ class _WorkspaceAlertContent extends StatelessWidget {
   }
 }
 
-enum _WorkspaceSearchKind { product, order, customer, invoice, activity }
+enum _WorkspaceSearchKind {
+  product,
+  order,
+  customer,
+  invoice,
+  purchase,
+  activity,
+}
 
 typedef _WorkspaceSearchRecord = ({
   String id,
@@ -22484,6 +22535,7 @@ typedef _WorkspaceSearchRecord = ({
   String? amount,
   String route,
   IconData icon,
+  WorkspacePurchaseRecord? purchase,
 });
 
 List<_WorkspaceSearchRecord> _workspaceSearchRecords(
@@ -22503,6 +22555,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       id: 'product-${product.id}',
       entityId: product.id,
       kind: _WorkspaceSearchKind.product,
+      purchase: null,
       title: product.title,
       detail: '${product.brand} · ${product.pack} · ${product.stock} available',
       amount: '₹${_formatStoreAmount(product.sellingPrice)}',
@@ -22524,6 +22577,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       id: 'order-${order.id}',
       entityId: order.id,
       kind: _WorkspaceSearchKind.order,
+      purchase: null,
       title: '${order.id} · ${order.customer}',
       detail: '$stage · ${order.items}',
       amount: '₹${_formatStoreAmount(order.amount)}',
@@ -22542,6 +22596,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       id: 'customer-${customer.id}',
       entityId: customer.id,
       kind: _WorkspaceSearchKind.customer,
+      purchase: null,
       title: customer.name,
       detail: '${customer.mobile} · ${customer.orderCount} orders',
       amount: null,
@@ -22562,11 +22617,45 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       id: 'invoice-${invoice.id}',
       entityId: invoice.id,
       kind: _WorkspaceSearchKind.invoice,
+      purchase: null,
       title: invoice.id,
       detail: '${invoice.customer} · ${invoice.orderId} · ${invoice.payment}',
       amount: '₹${_formatStoreAmount(invoice.amount)}',
       route: '/app/retailer/books',
       icon: Icons.description_outlined,
+    ));
+  }
+  for (final purchase in session.workspacePurchases) {
+    if (!matches(
+      [
+        purchase.supplierName,
+        purchase.supplierId,
+        purchase.orderId,
+        purchase.shipmentId,
+        purchase.purchaseId ?? '',
+        purchase.invoiceReference ?? '',
+        purchase.itemSummary,
+        purchase.stage.label,
+        purchase.receiptState.label,
+        purchase.paymentLabel,
+        _purchaseAmount(purchase.amountMinor),
+        for (final line in purchase.lines)
+          '${line.productId} ${line.name} ${line.pack}',
+      ].join(' '),
+    )) {
+      continue;
+    }
+    records.add((
+      id: 'purchase-${purchase.shipmentId}',
+      entityId: purchase.shipmentId,
+      kind: _WorkspaceSearchKind.purchase,
+      purchase: purchase,
+      title: '${purchase.orderId} · ${purchase.supplierName}',
+      detail:
+          '${purchase.shipmentId} · ${purchase.stage.label} · ${purchase.itemSummary}',
+      amount: _purchaseAmount(purchase.amountMinor),
+      route: '/app/retailer/wholesale',
+      icon: Icons.local_shipping_outlined,
     ));
   }
   for (var index = 0; index < session.workspaceActivity.length; index++) {
@@ -22576,6 +22665,7 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
       id: 'activity-$index',
       entityId: '$index',
       kind: _WorkspaceSearchKind.activity,
+      purchase: null,
       title: activity.message,
       detail:
           'Store activity · ${activity.time.hour.toString().padLeft(2, '0')}:${activity.time.minute.toString().padLeft(2, '0')}',
