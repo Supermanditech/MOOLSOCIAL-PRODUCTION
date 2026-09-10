@@ -1435,8 +1435,10 @@ final class BuyV2CatalogueProductContentAdapter
       media: [
         BuyV2ProductMediaAsset(
           id: '${product.id}-packshot',
-          label: 'Product image',
-          semanticLabel: '${product.title}, ${product.pack}',
+          label: 'Catalogue illustration',
+          semanticLabel:
+              'Illustration for ${product.title}. '
+              'Supplier photo of this pack is unavailable.',
           kind: BuyV2ProductContentMediaKind.cataloguePackshot,
         ),
       ],

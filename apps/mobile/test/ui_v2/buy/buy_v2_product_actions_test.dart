@@ -5,14 +5,312 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+final class _R669PhotoContentAdapter implements BuyV2ProductContentAdapter {
+  const _R669PhotoContentAdapter(this.available);
+  final bool available;
+
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) =>
+      BuyV2ProductContentSnapshot(
+        productId: product.id,
+        state: BuyV2ProductContentState.ready,
+        sourceId: 'host-media-fixture',
+        media: [
+          BuyV2ProductMediaAsset(
+            id: '${product.id}-supplied',
+            label: 'Supplied SKU photo',
+            semanticLabel: 'Fixture supplied SKU photo',
+            kind: BuyV2ProductContentMediaKind.asset,
+            source: available
+                ? BuyV2ProductPackshot.productAtlasPath
+                : 'assets/host-fixture-missing-photo.png',
+          ),
+        ],
+      );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  testWidgets('R669 media complete illustration crops', (tester) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(650, 600);
+    addTearDown(tester.view.reset);
+    final products =
+        [
+              's-tomato',
+              's-rice',
+              's-atta',
+              's-oil',
+              's-soap',
+              'w-notebook',
+              's-milk',
+              's-bread',
+              's-water',
+            ]
+            .map(
+              (id) => BuyV2Catalogue.allProducts.firstWhere((p) => p.id == id),
+            )
+            .toList();
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: MoolTheme.light(),
+        builder: (context, child) => r66VisualCaptureRoot(child!),
+        home: Scaffold(
+          body: Wrap(
+            children: [
+              for (final product in products)
+                SizedBox(
+                  width: 210,
+                  height: 190,
+                  child: BuyV2ProductPackshot(product: product),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Illustration'), findsNWidgets(9));
+    await captureR66Visual(tester, 'r669-media-complete-crops');
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 media illustration thumbnails preserve ratio at $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(711, 600);
+      addTearDown(tester.view.reset);
+      final products = ['s-milk', 'w-printer-paper', 's-cumin', 's-carry-bags']
+          .map((id) => BuyV2Catalogue.allProducts.firstWhere((p) => p.id == id))
+          .toList();
+      await tester.pumpWidget(
+        MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: r66VisualCaptureRoot(child!),
+          ),
+          home: Scaffold(
+            body: Column(
+              children: [
+                for (final size in [
+                  const Size(140, 150),
+                  const Size(120, 80),
+                  const Size(48, 32),
+                ])
+                  Row(
+                    children: [
+                      for (final product in products)
+                        SizedBox(
+                          width: size.width,
+                          height: size.height,
+                          child: BuyV2ProductPackshot(product: product),
+                        ),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      for (final product in products) {
+        expect(
+          find.byKey(ValueKey('buy-product-illustration-${product.id}')),
+          findsWidgets,
+        );
+        expect(
+          find.byKey(ValueKey('buy-product-photo-unavailable-${product.id}')),
+          findsWidgets,
+        );
+      }
+      for (final image in tester.widgetList<Image>(find.byType(Image))) {
+        final asset = image.image as AssetImage;
+        final size = tester.getSize(find.byWidget(image));
+        final expected =
+            asset.assetName == BuyV2ProductPackshot.productAtlasPath
+            ? 1.5
+            : 4 / 3;
+        expect(
+          size.width / size.height,
+          closeTo(expected, .0001),
+          reason: 'The decoded atlas must retain its published aspect ratio',
+        );
+      }
+      await captureR66Visual(tester, 'r669-media-thumbnails-$scale');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R669 media detail illustrations retain SKU and Back ${size.width}-$scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await tester.pumpWidget(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              builder: (context, child) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: TextScaler.linear(scale),
+                  padding: const EdgeInsets.only(top: 24, bottom: 34),
+                  viewPadding: const EdgeInsets.only(top: 24, bottom: 34),
+                  disableAnimations: true,
+                ),
+                child: r66VisualCaptureRoot(child!),
+              ),
+              home: BuyV2Screen(session: session),
+            ),
+          );
+          await tester.pumpAndSettle();
+          for (final id in [
+            'w-printer-paper',
+            's-cumin',
+            's-carry-bags',
+            's-milk',
+            's-milk-500ml',
+          ]) {
+            expect(session.openProduct(id), isTrue);
+            await tester.pumpAndSettle();
+            final disclosure = find.byKey(
+              ValueKey('buy-product-illustration-$id'),
+            );
+            final scroll = find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$id')),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            await tester.scrollUntilVisible(
+              disclosure,
+              100,
+              scrollable: scroll,
+            );
+            await tester.pumpAndSettle();
+            expect(disclosure.hitTestable(), findsOneWidget);
+            final product = session.product(id);
+            expect(
+              tester.widget<Text>(disclosure).data,
+              id.startsWith('s-milk')
+                  ? 'Illustration'
+                  : 'Category illustration',
+            );
+            expect(session.selectedProductId, id);
+            expect(session.cartLines, isEmpty);
+            final semantics = tester.ensureSemantics();
+            await tester.pump();
+            expect(
+              find.bySemanticsLabel(
+                RegExp('Supplier photo of this pack is unavailable'),
+              ),
+              findsWidgets,
+            );
+            expect(
+              find.bySemanticsLabel('Product photo of ${product.title}'),
+              findsNothing,
+            );
+            semantics.dispose();
+            if (id == 'w-printer-paper' || id == 's-cumin') {
+              await captureR66Visual(
+                tester,
+                'r669-media-$id-${size.width.toInt()}-$scale',
+              );
+              await tester.ensureVisible(
+                find.byKey(ValueKey('buy-product-packshot-$id')),
+              );
+              await tester.pumpAndSettle();
+              await captureR66Visual(
+                tester,
+                'r669-media-$id-${size.width.toInt()}-$scale-gallery',
+              );
+            }
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+            expect(tester.takeException(), isNull);
+          }
+        },
+      );
+    }
+  }
+
+  for (final available in [true, false]) {
+    testWidgets(
+      'R669 media supplied photo preferred with honest error $available',
+      (tester) async {
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          productContentAdapter: _R669PhotoContentAdapter(available),
+        );
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(session: session, productId: 's-milk'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final gallery = find.byKey(
+          const ValueKey('buy-product-packshot-s-milk'),
+        );
+        expect(gallery, findsOneWidget);
+        expect(
+          find.descendant(
+            of: gallery,
+            matching: find.byType(BuyV2ProductPackshot),
+          ),
+          findsNothing,
+        );
+        final semantics = tester.ensureSemantics();
+        await tester.pump();
+        if (available) {
+          expect(
+            find.bySemanticsLabel(RegExp('Fixture supplied SKU photo')),
+            findsWidgets,
+          );
+          final image = tester.widget<Image>(
+            find.byKey(
+              const ValueKey('buy-product-gallery-asset-s-milk-supplied'),
+            ),
+          );
+          expect(image.fit, BoxFit.contain);
+        } else {
+          expect(find.text('Photo unavailable'), findsOneWidget);
+          expect(
+            find.bySemanticsLabel(RegExp('Fixture supplied SKU photo')),
+            findsNothing,
+          );
+        }
+        semantics.dispose();
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final scale in [1.0, 2.0]) {
     for (final id in ['s-milk', 'w-notebook']) {

@@ -1710,6 +1710,37 @@ class BuyV2ProductMediaSource {
   final String assetPath;
   final int cell;
   final BuyV2ProductMediaKind kind;
+
+  /// The product illustration sheet is not a uniform grid: use the inspected
+  /// artwork bounds so neighbouring packs are neither shown nor cut off.
+  Size get atlasSize => assetPath == BuyV2ProductPackshot.productAtlasPath
+      ? const Size(1536, 1024)
+      : const Size(1448, 1086);
+
+  Rect get sourceRect {
+    if (assetPath == BuyV2ProductPackshot.productAtlasPath) {
+      return switch (cell) {
+        0 => const Rect.fromLTRB(16, 56, 432, 368),
+        1 => const Rect.fromLTRB(432, 24, 784, 368),
+        2 => const Rect.fromLTRB(812, 24, 1138, 370),
+        3 => const Rect.fromLTRB(1160, 16, 1508, 368),
+        4 => const Rect.fromLTRB(20, 390, 400, 674),
+        5 => const Rect.fromLTRB(418, 384, 790, 674),
+        6 => const Rect.fromLTRB(810, 374, 1146, 674),
+        7 => const Rect.fromLTRB(1170, 370, 1518, 674),
+        11 => const Rect.fromLTRB(1168, 684, 1530, 1008),
+        _ => Rect.fromLTWH(
+          (cell % 4) * 384,
+          (cell ~/ 4) * (1024 / 3),
+          384,
+          1024 / 3,
+        ),
+      };
+    }
+    return Rect.fromLTWH((cell % 4) * 362, (cell ~/ 4) * 362, 362, 362);
+  }
+
+  double get cellAspectRatio => sourceRect.width / sourceRect.height;
 }
 
 class BuyV2ProductPackshot extends StatelessWidget {
@@ -1735,14 +1766,21 @@ class BuyV2ProductPackshot extends StatelessWidget {
   final double borderRadius;
   final bool animateFirstFrame;
 
+  static String illustrationLabel(BuyV2Product product) =>
+      resolveMedia(product)?.kind == BuyV2ProductMediaKind.category
+      ? 'Category illustration'
+      : 'Illustration';
+
   @override
   Widget build(BuildContext context) {
     final source = resolveMedia(product);
     if (source == null) {
       return Semantics(
         image: true,
-        label: 'Category visual for ${product.title}',
-        child: _BuyV2ProductMediaFallback(
+        label:
+            'Product photo unavailable for ${product.title}, ${product.pack}',
+        excludeSemantics: true,
+        child: BuyV2ProductPhotoUnavailable(
           key: ValueKey('buy-product-media-fallback-${product.id}'),
           product: product,
           borderRadius: borderRadius,
@@ -1750,79 +1788,84 @@ class BuyV2ProductPackshot extends StatelessWidget {
       );
     }
     final cell = source.cell;
-    final column = cell % 4;
-    final row = cell ~/ 4;
+    final crop = source.sourceRect;
     return Semantics(
       image: true,
-      label: source.kind == BuyV2ProductMediaKind.exactProduct
-          ? 'Product photo of ${product.title}'
-          : 'Category photo for ${product.title}',
+      label:
+          '${illustrationLabel(product)} for ${product.title}. '
+          'Supplier photo of this pack is unavailable.',
+      excludeSemantics: true,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: ColoredBox(
           color: Colors.white,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final cellWidth = constraints.maxWidth;
-              final cellHeight = constraints.maxHeight;
-              return Transform.scale(
-                scale: 1.04,
-                child: Stack(
-                  clipBehavior: Clip.hardEdge,
-                  children: [
-                    Positioned.fill(
-                      child: ExcludeSemantics(
-                        child: _BuyV2ProductMediaFallback(
-                          product: product,
-                          borderRadius: borderRadius,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      key: ValueKey(
-                        'buy-packshot-sprite-${product.id}-'
-                        '${source.assetPath}-$cell',
-                      ),
-                      left: -column * cellWidth,
-                      top: -row * cellHeight,
-                      width: cellWidth * 4,
-                      height: cellHeight * 3,
-                      child: Image.asset(
-                        source.assetPath,
-                        fit: BoxFit.fill,
-                        filterQuality: FilterQuality.medium,
-                        frameBuilder: animateFirstFrame
-                            ? (context, child, frame, synchronouslyLoaded) {
-                                if (synchronouslyLoaded) {
-                                  return child;
-                                }
-                                return AnimatedOpacity(
-                                  key: ValueKey(
-                                    'buy-packshot-decoded-frame-${product.id}',
-                                  ),
-                                  opacity: frame == null ? 0 : 1,
-                                  duration: BuyV2Motion.resolved(
-                                    context,
-                                    const Duration(milliseconds: 180),
-                                  ),
-                                  curve: Curves.easeOutCubic,
-                                  child: child,
-                                );
-                              }
-                            : null,
-                        errorBuilder: (_, _, _) => const Center(
-                          child: Icon(
-                            Icons.inventory_2_outlined,
-                            color: BuyV2Colors.navy,
-                            size: 28,
+          child: _BuyV2IllustrationDisclosure(
+            product: product,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: source.cellAspectRatio,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cellWidth = constraints.maxWidth;
+                    final pixelScale = cellWidth / crop.width;
+                    return Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Positioned.fill(
+                          child: ExcludeSemantics(
+                            child: _BuyV2ProductMediaFallback(
+                              product: product,
+                              borderRadius: borderRadius,
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                  ],
+                        Positioned(
+                          key: ValueKey(
+                            'buy-packshot-sprite-${product.id}-'
+                            '${source.assetPath}-$cell',
+                          ),
+                          left: -crop.left * pixelScale,
+                          top: -crop.top * pixelScale,
+                          width: source.atlasSize.width * pixelScale,
+                          height: source.atlasSize.height * pixelScale,
+                          child: Image.asset(
+                            source.assetPath,
+                            fit: BoxFit.fill,
+                            filterQuality: FilterQuality.medium,
+                            frameBuilder: animateFirstFrame
+                                ? (context, child, frame, synchronouslyLoaded) {
+                                    if (synchronouslyLoaded) {
+                                      return child;
+                                    }
+                                    return AnimatedOpacity(
+                                      key: ValueKey(
+                                        'buy-packshot-decoded-frame-${product.id}',
+                                      ),
+                                      opacity: frame == null ? 0 : 1,
+                                      duration: BuyV2Motion.resolved(
+                                        context,
+                                        const Duration(milliseconds: 180),
+                                      ),
+                                      curve: Curves.easeOutCubic,
+                                      child: child,
+                                    );
+                                  }
+                                : null,
+                            errorBuilder: (_, _, _) => const Center(
+                              child: Icon(
+                                Icons.inventory_2_outlined,
+                                color: BuyV2Colors.navy,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
                 ),
-              );
-            },
+              ),
+            ),
           ),
         ),
       ),
@@ -1918,9 +1961,131 @@ class BuyV2ProductPackshot extends StatelessWidget {
   }
 }
 
+/// Keeps disclosure in the media bounds without overlaying the supplied pack.
+/// Tiny thumbnails use a neutral placeholder when readable text cannot fit.
+class _BuyV2IllustrationDisclosure extends StatelessWidget {
+  const _BuyV2IllustrationDisclosure({
+    required this.product,
+    required this.child,
+  });
+
+  final BuyV2Product product;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final label = BuyV2ProductPackshot.illustrationLabel(product);
+      const style = TextStyle(
+        fontSize: 10,
+        height: 1.2,
+        fontWeight: FontWeight.w600,
+        color: BuyV2Colors.muted,
+      );
+      final painter = TextPainter(
+        text: TextSpan(text: label, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: (constraints.maxWidth - 8).clamp(1, double.infinity));
+      final labelHeight = painter.height;
+      painter.dispose();
+      if (constraints.maxWidth < 48 ||
+          constraints.maxHeight < labelHeight + 28) {
+        return BuyV2ProductPhotoUnavailable(product: product);
+      }
+      return Column(
+        children: [
+          Expanded(child: child),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+            child: Text(
+              label,
+              key: ValueKey('buy-product-illustration-${product.id}'),
+              textAlign: TextAlign.center,
+              style: style,
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class BuyV2ProductPhotoUnavailable extends StatelessWidget {
+  const BuyV2ProductPhotoUnavailable({
+    super.key,
+    required this.product,
+    this.borderRadius = 14,
+  });
+
+  final BuyV2Product product;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    image: true,
+    label: 'Product photo unavailable for ${product.title}, ${product.pack}',
+    excludeSemantics: true,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: ColoredBox(
+        color: Colors.white,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final icon = Icon(
+              Icons.image_not_supported_outlined,
+              key: ValueKey('buy-product-photo-unavailable-${product.id}'),
+              color: BuyV2Colors.muted,
+              size: constraints.biggest.shortestSide.clamp(0, 32),
+            );
+            const style = TextStyle(
+              fontSize: 10,
+              height: 1.2,
+              color: BuyV2Colors.muted,
+            );
+            final painter =
+                TextPainter(
+                  text: const TextSpan(text: 'Photo unavailable', style: style),
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                )..layout(
+                  maxWidth: (constraints.maxWidth - 8).clamp(
+                    1,
+                    double.infinity,
+                  ),
+                );
+            final fits =
+                constraints.maxWidth >= 64 &&
+                constraints.maxHeight >= painter.height + 40;
+            painter.dispose();
+            return Center(
+              child: fits
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        icon,
+                        const SizedBox(height: 4),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            'Photo unavailable',
+                            textAlign: TextAlign.center,
+                            style: style,
+                          ),
+                        ),
+                      ],
+                    )
+                  : icon,
+            );
+          },
+        ),
+      ),
+    ),
+  );
+}
+
 class _BuyV2ProductMediaFallback extends StatelessWidget {
   const _BuyV2ProductMediaFallback({
-    super.key,
     required this.product,
     required this.borderRadius,
   });

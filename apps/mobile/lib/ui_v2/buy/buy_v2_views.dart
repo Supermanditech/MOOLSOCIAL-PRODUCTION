@@ -557,16 +557,21 @@ class BuyV2ProductView extends StatelessWidget {
                             ? [
                                 BuyV2ProductMediaAsset(
                                   id: '${product.id}-packshot-fallback',
-                                  label: 'Product image',
+                                  label: 'Catalogue illustration',
                                   semanticLabel:
-                                      '${product.title}, ${product.pack}',
+                                      'Illustration for ${product.title}. '
+                                      'Supplier photo unavailable.',
                                   kind: BuyV2ProductContentMediaKind
                                       .cataloguePackshot,
                                 ),
                               ]
                             : content.media)
                       _BuyV2ProductMediaItem(
-                        label: media.label,
+                        label:
+                            media.kind ==
+                                BuyV2ProductContentMediaKind.cataloguePackshot
+                            ? BuyV2ProductPackshot.illustrationLabel(product)
+                            : media.label,
                         zoomable:
                             media.kind !=
                             BuyV2ProductContentMediaKind.networkVideo,
@@ -2935,42 +2940,56 @@ class _ProductContentMediaSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget fallback() => BuyV2ProductPackshot(
+    Widget fallback() => BuyV2ProductPhotoUnavailable(
       key: ValueKey('buy-product-gallery-image-${media.id}'),
       product: product,
       borderRadius: 17,
-      animateFirstFrame: true,
     );
 
     if (media.kind == BuyV2ProductContentMediaKind.networkVideo) {
       return BuyV2ProductVideo(product: product, media: media, active: active);
     }
-    return Semantics(
-      image: true,
-      label: media.semanticLabel,
-      excludeSemantics: true,
-      child: switch (media.kind) {
-        BuyV2ProductContentMediaKind.cataloguePackshot => fallback(),
-        BuyV2ProductContentMediaKind.asset => Image.asset(
-          media.source!,
-          key: ValueKey('buy-product-gallery-asset-${media.id}'),
-          fit: BoxFit.contain,
-          errorBuilder: (_, _, _) => fallback(),
-        ),
-        BuyV2ProductContentMediaKind.network => Image.network(
-          media.source!,
-          key: ValueKey('buy-product-gallery-network-${media.id}'),
-          fit: BoxFit.contain,
-          loadingBuilder: (context, child, progress) => progress == null
-              ? child
-              : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-          errorBuilder: (_, _, _) => fallback(),
-        ),
-        BuyV2ProductContentMediaKind.networkVideo => throw StateError(
-          'Video media is handled before the image switch.',
-        ),
-      },
-    );
+    Widget decodedImage(
+      BuildContext context,
+      Widget child,
+      int? frame,
+      bool synchronouslyLoaded,
+    ) => frame == null && !synchronouslyLoaded
+        ? fallback()
+        : Semantics(
+            image: true,
+            label: media.semanticLabel,
+            excludeSemantics: true,
+            child: child,
+          );
+    return switch (media.kind) {
+      BuyV2ProductContentMediaKind.cataloguePackshot => BuyV2ProductPackshot(
+        key: ValueKey('buy-product-gallery-image-${media.id}'),
+        product: product,
+        borderRadius: 17,
+        animateFirstFrame: true,
+      ),
+      BuyV2ProductContentMediaKind.asset => Image.asset(
+        media.source!,
+        key: ValueKey('buy-product-gallery-asset-${media.id}'),
+        fit: BoxFit.contain,
+        frameBuilder: decodedImage,
+        errorBuilder: (_, _, _) => fallback(),
+      ),
+      BuyV2ProductContentMediaKind.network => Image.network(
+        media.source!,
+        key: ValueKey('buy-product-gallery-network-${media.id}'),
+        fit: BoxFit.contain,
+        frameBuilder: decodedImage,
+        loadingBuilder: (context, child, progress) => progress == null
+            ? child
+            : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+        errorBuilder: (_, _, _) => fallback(),
+      ),
+      BuyV2ProductContentMediaKind.networkVideo => throw StateError(
+        'Video media is handled before the image switch.',
+      ),
+    };
   }
 }
 
@@ -3067,7 +3086,7 @@ class _BuyV2ZoomableMediaState extends State<_BuyV2ZoomableMedia>
   Widget build(BuildContext context) {
     return Semantics(
       container: true,
-      label: '${widget.label}. Pinch to zoom ${widget.product.title}.',
+      label: 'Pinch to zoom ${widget.product.title}.',
       child: Stack(
         clipBehavior: Clip.hardEdge,
         children: [
@@ -3086,7 +3105,7 @@ class _BuyV2ZoomableMediaState extends State<_BuyV2ZoomableMedia>
                   _resetMedia();
                 }
               },
-              child: ExcludeSemantics(child: widget.child),
+              child: widget.child,
             ),
           ),
           if (_zoomed)

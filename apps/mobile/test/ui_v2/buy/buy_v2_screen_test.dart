@@ -4077,7 +4077,7 @@ void main() {
             for (final product in [tomato, rice, medicine, milk])
               SizedBox(
                 width: 64,
-                height: 56,
+                height: 96,
                 child: BuyV2ProductPackshot(product: product),
               ),
           ],
@@ -4102,13 +4102,18 @@ void main() {
     final riceCell = cellFor(rice);
     final medicineCell = cellFor(medicine);
     final milkCell = cellFor(milk);
-    expect((tomatoCell.left, tomatoCell.top), (0, 0));
-    expect((riceCell.left, riceCell.top), (-64, 0));
+    expect(tomatoCell.left! / tomatoCell.width!, closeTo(-16 / 1536, .0001));
+    expect(tomatoCell.top! / tomatoCell.height!, closeTo(-56 / 1024, .0001));
+    expect(riceCell.left! / riceCell.width!, closeTo(-432 / 1536, .0001));
     expect((medicineCell.left, medicineCell.top), (0, 0));
-    expect((milkCell.left, milkCell.top), (-128, -56));
+    expect(milkCell.left! / milkCell.width!, closeTo(-810 / 1536, .0001));
+    expect(milkCell.top! / milkCell.height!, closeTo(-374 / 1024, .0001));
     for (final cell in [tomatoCell, riceCell, medicineCell, milkCell]) {
-      expect(cell.width, 256);
-      expect(cell.height, 168);
+      expect(
+        cell.width! / cell.height!,
+        closeTo(identical(cell, medicineCell) ? 4 / 3 : 1.5, .0001),
+        reason: 'Atlas pixels must not stretch to the thumbnail aspect ratio',
+      );
     }
     expect(tester.takeException(), isNull);
   });
