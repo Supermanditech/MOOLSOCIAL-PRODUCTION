@@ -475,6 +475,7 @@ class _WorkWorkspaceDashboardScreenState
   bool _draftOrderAlertVibration = true;
   _WorkspaceOperation _operation = _WorkspaceOperation.orders;
   _WorkspaceControlView _operationReturnView = _WorkspaceControlView.dashboard;
+  _WorkspaceFinanceFocus? _focusedFinance;
   _WorkspaceOperation? _operationReturnOperation;
   ({String? workspaceId, String? orderId})? _counterOrderOrigin;
   Timer? _procurementRevealTimer;
@@ -1231,6 +1232,18 @@ class _WorkWorkspaceDashboardScreenState
                 returnView: _WorkspaceControlView.alerts,
               );
             },
+            onOpenFinance: (focus) {
+              _alertsReturnOffset = _alertsScroll.hasClients
+                  ? _alertsScroll.offset
+                  : 0;
+              _showOperation(
+                focus.payoutId != null
+                    ? _WorkspaceOperation.payments
+                    : _WorkspaceOperation.statement,
+                focusedFinance: focus,
+                returnView: _WorkspaceControlView.alerts,
+              );
+            },
             onOpenOrders: () => openScopedRoute('/app/retailer/orders'),
             onOpenStatus: _showStatus,
             onDismiss: session.dismissWorkspaceAlert,
@@ -1266,6 +1279,8 @@ class _WorkWorkspaceDashboardScreenState
               );
             },
           ),
+          _WorkspaceControlView.operation when _focusedFinance != null =>
+            _StoreFinanceSurface(session: session, focus: _focusedFinance),
           _WorkspaceControlView.operation => _WorkspaceOperationSurface(
             operation: _operation,
             focusedOrderId: _focusedOrderId,
@@ -1301,6 +1316,7 @@ class _WorkWorkspaceDashboardScreenState
       _reviewedOrder = null;
       _focusedOrderId = null;
       _focusedCustomerId = null;
+      _focusedFinance = null;
       _view = _WorkspaceControlView.dashboard;
     });
   }
@@ -1458,6 +1474,7 @@ class _WorkWorkspaceDashboardScreenState
     bool retainDirectFilter = false,
     String? focusedOrderId,
     String? focusedCustomerId,
+    _WorkspaceFinanceFocus? focusedFinance,
     _WorkspaceControlView? returnView,
   }) {
     _searchFocus.unfocus();
@@ -1501,6 +1518,7 @@ class _WorkWorkspaceDashboardScreenState
     setState(() {
       _focusedOrderId = focusedOrderId;
       _focusedCustomerId = focusedCustomerId;
+      _focusedFinance = focusedFinance;
       if (returnView != null) {
         _operationReturnView = returnView;
         _operationReturnOperation = null;
@@ -17703,13 +17721,43 @@ class _StoreFinanceSurface extends StatelessWidget {
   const _StoreFinanceSurface({
     required this.session,
     this.section = 'settlement',
+    this.focus,
   });
   final WorkSession session;
   final String section;
+  final _WorkspaceFinanceFocus? focus;
 
   @override
   Widget build(BuildContext context) {
     final finance = session.workspaceFinance;
+    final target = focus;
+    final exactPayment = finance?.payments
+        .where(
+          (p) =>
+              p.orderId == target?.orderId &&
+              p.customerId == target?.customerId,
+        )
+        .firstOrNull;
+    final exactPayout = finance?.payouts
+        .where(
+          (p) =>
+              p.id == target?.payoutId && p.operationId == target?.operationId,
+        )
+        .firstOrNull;
+    if (target != null &&
+        (finance == null ||
+            finance.accountScope != target.accountScope ||
+            finance.workspaceId != target.workspaceId ||
+            (exactPayment == null && exactPayout == null))) {
+      return ListView(
+        key: const Key('work-finance-record-unavailable'),
+        padding: const EdgeInsets.all(16),
+        children: const [
+          Text('This payment record is unavailable.'),
+          Text('Return to Alerts for the latest update.'),
+        ],
+      );
+    }
     if (finance == null || section == 'expenses') {
       return ListView(
         key: const Key('work-finance-unavailable'),
@@ -17727,25 +17775,35 @@ class _StoreFinanceSurface extends StatelessWidget {
         ],
       );
     }
-    final start = section == 'payments'
+    final start = target == null && section == 'payments'
         ? session.workspaceMoneyPeriodStart
         : null;
     final payments =
-        finance.payments
-            .where(
-              (p) =>
-                  (section != 'dues' || p.dueMinor > 0) &&
-                  (start == null || !p.updatedAt.isBefore(start)),
-            )
-            .toList()
+        target != null
+              ? [?exactPayment]
+              : finance.payments
+                    .where(
+                      (p) =>
+                          (section != 'dues' || p.dueMinor > 0) &&
+                          (start == null || !p.updatedAt.isBefore(start)),
+                    )
+                    .toList()
           ..sort((a, b) => a.orderId.compareTo(b.orderId));
-    final payouts = section == 'settlement'
+    final payouts = target != null
+        ? [?exactPayout]
+        : section == 'settlement'
         ? finance.payouts
         : const <WorkspacePayoutRecord>[];
     final orders = {for (final o in session.visibleWorkspaceOrders) o.id: o};
     return ListView.builder(
       key: ValueKey('work-finance-$section'),
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.symmetric(
+        horizontal:
+            target != null && MediaQuery.textScalerOf(context).scale(14) > 21
+            ? 8
+            : 16,
+        vertical: 16,
+      ),
       itemCount: 1 + payouts.length + payments.length,
       itemBuilder: (context, index) {
         if (index == 0) {
@@ -17753,13 +17811,17 @@ class _StoreFinanceSurface extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                section == 'settlement'
+                target != null
+                    ? (target.payoutId != null
+                          ? 'Settlement details'
+                          : 'Payment details')
+                    : section == 'settlement'
                     ? 'Settlement balance'
                     : section == 'dues'
                     ? 'Collect dues'
                     : 'Customer payments',
-                style: const TextStyle(
-                  fontSize: 20,
+                style: TextStyle(
+                  fontSize: target != null ? 16 : 20,
                   fontWeight: FontWeight.w800,
                   color: MoolColors.navy,
                 ),
@@ -17775,7 +17837,7 @@ class _StoreFinanceSurface extends StatelessWidget {
                   key: Key('work-finance-stale'),
                 ),
               const SizedBox(height: 12),
-              if (section == 'settlement') ...[
+              if (target == null && section == 'settlement') ...[
                 for (final fact in <(String, int)>[
                   ('Available for settlement', finance.availableMinor),
                   ('On hold', finance.heldMinor),
@@ -17811,12 +17873,12 @@ class _StoreFinanceSurface extends StatelessWidget {
                     value: _purchaseAmount(fact.$2),
                   ),
               ],
-              if (section == 'dues')
+              if (target == null && section == 'dues')
                 _MoneyDestinationLine(
                   label: 'Unpaid balance',
                   value: _purchaseAmount(finance.duesMinor),
                 ),
-              if (!finance.historyComplete)
+              if (target == null && !finance.historyComplete)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 10),
                   child: Text(
@@ -22189,6 +22251,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
     required this.scrollController,
     required this.onOpen,
     required this.onOpenOperation,
+    required this.onOpenFinance,
     required this.onOpenOrders,
     required this.onOpenStatus,
     required this.onDismiss,
@@ -22197,6 +22260,7 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
   final ScrollController scrollController;
   final ValueChanged<String> onOpen;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
+  final ValueChanged<_WorkspaceFinanceFocus> onOpenFinance;
   final VoidCallback onOpenOrders, onOpenStatus;
   final ValueChanged<String> onDismiss;
 
@@ -22234,6 +22298,16 @@ class _WorkspaceAlertsSurface extends StatelessWidget {
             ).where((item) => item.id == alert.id).firstOrNull;
             if (current == null) {
               session.showNotice('This alert no longer needs action.');
+              return;
+            }
+            if (current.financeFocus case final focus?) {
+              if (alert.financeFocus != focus) {
+                session.showNotice(
+                  'This payment record has changed. Review its latest alert.',
+                );
+                return;
+              }
+              onOpenFinance(focus);
               return;
             }
             if (current.purchase case final purchase?) {
@@ -22513,6 +22587,15 @@ List<_WorkspaceSearchRecord> _workspaceSearchRecords(
   return records;
 }
 
+typedef _WorkspaceFinanceFocus = ({
+  String accountScope,
+  String workspaceId,
+  String? orderId,
+  String? customerId,
+  String? payoutId,
+  String? operationId,
+});
+
 typedef _WorkspaceAlertItem = ({
   String id,
   String title,
@@ -22521,6 +22604,7 @@ typedef _WorkspaceAlertItem = ({
   String? route,
   _WorkspaceOperation? operation,
   WorkspacePurchaseRecord? purchase,
+  _WorkspaceFinanceFocus? financeFocus,
   IconData icon,
   bool requiredAction,
 });
@@ -22530,6 +22614,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (!session.retailerSetupSaved) {
     alerts.add((
       id: 'store-setup',
+      financeFocus: null,
       purchase: null,
       title: 'Finish setting up your store',
       detail:
@@ -22544,6 +22629,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (!session.workspaceContactsReady) {
     alerts.add((
       id: 'contact-details',
+      financeFocus: null,
       purchase: null,
       title: 'Confirm contact details',
       detail:
@@ -22560,6 +22646,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       !session.dismissedWorkspaceAlerts.contains('store-paused')) {
     alerts.add((
       id: 'store-paused',
+      financeFocus: null,
       purchase: null,
       title: session.workspaceStoreState == WorkspaceStoreState.paused
           ? 'Your store is paused'
@@ -22577,6 +22664,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
   if (session.workspaceLowStockCount > 0) {
     alerts.add((
       id: 'low-stock',
+      financeFocus: null,
       purchase: null,
       title: '${session.workspaceLowStockCount} products need stock attention',
       detail:
@@ -22612,11 +22700,12 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
         '${placed.minute.toString().padLeft(2, '0')}';
     alerts.add((
       id: 'order-${order.id}',
+      financeFocus: null,
       purchase: null,
       title: '${order.id} · ${order.customer.split('·').first.trim()}',
       detail:
           '${order.items} · ₹${_formatStoreAmount(order.amount)}\n'
-          '${order.payment} · $status\n$when',
+          '${session.workspaceOrderPaymentLabel(order)} · $status\n$when',
       actionLabel: switch (group) {
         'New' => 'Review',
         'Packing' => 'Pack order',
@@ -22668,6 +22757,7 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
         '${updated.minute.toString().padLeft(2, '0')}';
     alerts.add((
       id: 'purchase-${purchase.shipmentId}',
+      financeFocus: null,
       purchase: purchase,
       title: '${purchase.orderId} · ${purchase.supplierName}',
       detail: [
@@ -22693,11 +22783,113 @@ List<_WorkspaceAlertItem> _workspaceAlerts(WorkSession session) {
       requiredAction: true,
     ));
   }
+  final finance = session.workspaceFinance;
+  final paymentOrderIds = <String>{};
+  if (finance != null) {
+    String updateLabel(DateTime time) {
+      final local = time.toLocal();
+      return 'Updated ${local.day}/${local.month} · '
+          '${local.hour.toString().padLeft(2, '0')}:'
+          '${local.minute.toString().padLeft(2, '0')}';
+    }
+
+    final orders = {
+      for (final order in session.visibleWorkspaceOrders) order.id: order,
+    };
+    final payments =
+        finance.payments
+            .where(
+              (p) => const {
+                WorkspacePaymentState.pending,
+                WorkspacePaymentState.failed,
+                WorkspacePaymentState.refundPending,
+                WorkspacePaymentState.disputed,
+                WorkspacePaymentState.unknown,
+              }.contains(p.state),
+            )
+            .toList()
+          ..sort((a, b) => a.orderId.compareTo(b.orderId));
+    for (final payment in payments) {
+      paymentOrderIds.add(payment.orderId);
+      final order = orders[payment.orderId];
+      alerts.add((
+        id: 'payment-${payment.orderId}',
+        financeFocus: (
+          accountScope: finance.accountScope,
+          workspaceId: finance.workspaceId,
+          orderId: payment.orderId,
+          customerId: payment.customerId,
+          payoutId: null,
+          operationId: null,
+        ),
+        purchase: null,
+        title: '${payment.orderId} · ${payment.customerName}',
+        detail: [
+          if (order != null) order.items,
+          '${_purchaseAmount(payment.amountMinor)} · ${payment.label}',
+          if (order != null)
+            'Order · ${order.stage == 'Confirmed' ? 'Awaiting acceptance' : session.workspaceOrderStageLabel(order)}',
+          if (session.workspaceFinanceStale) 'Last confirmed update',
+          updateLabel(payment.updatedAt),
+        ].join('\n'),
+        actionLabel: 'Review payment',
+        route: null,
+        operation: null,
+        icon: Icons.payments_outlined,
+        requiredAction: true,
+      ));
+    }
+    final payouts =
+        finance.payouts
+            .where(
+              (p) => const {
+                WorkspacePayoutState.failed,
+                WorkspacePayoutState.held,
+                WorkspacePayoutState.unknown,
+              }.contains(p.state),
+            )
+            .toList()
+          ..sort((a, b) => a.id.compareTo(b.id));
+    for (final payout in payouts) {
+      alerts.add((
+        id: 'payout-${payout.id}',
+        financeFocus: (
+          accountScope: finance.accountScope,
+          workspaceId: finance.workspaceId,
+          orderId: null,
+          customerId: null,
+          payoutId: payout.id,
+          operationId: payout.operationId,
+        ),
+        purchase: null,
+        title: 'Settlement · ${payout.id}',
+        detail: [
+          '${_purchaseAmount(payout.amountMinor)} · ${payout.state.label}',
+          if (payout.bankLabel?.isNotEmpty == true) payout.bankLabel!,
+          if (session.workspaceFinanceStale) 'Last confirmed update',
+          updateLabel(payout.updatedAt),
+        ].join('\n'),
+        actionLabel: 'Review settlement',
+        route: null,
+        operation: null,
+        icon: Icons.account_balance_outlined,
+        requiredAction: true,
+      ));
+    }
+  }
   return [
-    ...alerts.where((alert) => alert.id.startsWith('order-')),
+    ...alerts.where((alert) => alert.financeFocus != null),
+    ...alerts.where(
+      (alert) =>
+          alert.id.startsWith('order-') &&
+          !paymentOrderIds.contains(alert.id.substring('order-'.length)),
+    ),
     ...alerts.where((alert) => alert.purchase != null),
     ...alerts.where(
-      (alert) => !alert.id.startsWith('order-') && alert.purchase == null,
+      (alert) =>
+          !alert.id.startsWith('order-') &&
+          alert.purchase == null &&
+          alert.financeFocus == null,
     ),
   ];
 }
