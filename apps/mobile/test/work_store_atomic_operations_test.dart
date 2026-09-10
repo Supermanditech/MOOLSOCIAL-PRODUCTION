@@ -78,6 +78,20 @@ class _CommandAccountStore implements WorkPendingProofStore {
   Future<void> clear(String scope) async {}
 }
 
+class _ReferenceOnlyGroupGateway extends UnavailableWorkGateway {
+  int calls = 0, saves = 0;
+  @override
+  Future<String> createGroupBuy(WorkGroupBuySubmission submission) async {
+    calls++;
+    return 'PAY-GROUP-unverified-reference';
+  }
+
+  @override
+  Future<void> saveOperationalState(WorkOperationalSnapshot snapshot) async {
+    saves++;
+  }
+}
+
 typedef _StockHistoryRequest = ({
   WorkspaceStockHistoryQuery query,
   String? cursor,
@@ -4262,6 +4276,80 @@ void main() {
       expect(session.activeGroupBuy?.leadRetailer, 'Mahadev Fresh Mart');
     },
   );
+
+  for (final direct in [false, true]) {
+    test(
+      'Group Bulk Buying reference cannot authorise production ${direct ? "direct confirmation" : "creation"}',
+      () async {
+        final gateway = _ReferenceOnlyGroupGateway();
+        final session = WorkSession.production(gateway: gateway)
+          ..activeWorkspace = const WorkWorkspace(
+            id: 'group-store',
+            name: 'Store A',
+            profileLabel: 'Grocery / Kirana Shop',
+            profileId: 'retailer-grocery',
+            area: 'Market Road',
+            verified: true,
+          )
+          ..workspaceId = 'group-store';
+        addTearDown(session.dispose);
+        session.workspaceCatalogueItems.add(_product(stock: 10));
+        for (var attempt = 0; attempt < 2; attempt++) {
+          if (direct) {
+            session.applyConfirmedWorkspaceGroupBuyPayment(
+              productName: 'Red onion',
+              specification: 'Grade A',
+              targetQuantity: 1000,
+              securedQuantity: 100,
+              unitLabel: 'kg',
+              regularUnitPrice: 18,
+              groupUnitPrice: 14,
+              facilitationFee: 20,
+              deliveryFee: 0,
+              confirmationAmount: 1400,
+              paymentReference: 'PAY-GROUP-unverified-reference',
+              closingLabel: 'Tomorrow',
+              storeDeliveryLabel: 'In two days',
+            );
+          } else {
+            expect(
+              await session.createWorkspaceGroupBuy(
+                productName: 'Red onion',
+                specification: 'Grade A',
+                targetQuantity: 1000,
+                securedQuantity: 100,
+                unitLabel: 'kg',
+                regularUnitPrice: 18,
+                groupUnitPrice: 14,
+                facilitationFee: 20,
+                deliveryFee: 0,
+                confirmationAmount: 1400,
+                closingLabel: 'Tomorrow',
+                storeDeliveryLabel: 'In two days',
+              ),
+              isFalse,
+            );
+          }
+          expect(session.activeGroupBuy, isNull);
+          expect(session.noticeMessage, isNull);
+          expect(
+            session.errorMessage,
+            direct
+                ? 'Group purchase payment could not be verified. No offer was published.'
+                : 'Group purchase payment is not available yet. Your details are still here.',
+          );
+          expect(session.workspaceOrders, isEmpty);
+          expect(session.workspaceInvoices, isEmpty);
+          expect(session.workspaceStockMovements, isEmpty);
+          expect(session.workspaceActivity, isEmpty);
+          expect(session.workspaceCatalogueItems.single.stock, 10);
+          expect(session.busy, isFalse);
+        }
+        expect(gateway.calls, 0);
+        expect(gateway.saves, 0);
+      },
+    );
+  }
 
   test(
     'catalogue import updates by SKU and retirement removes public sale',

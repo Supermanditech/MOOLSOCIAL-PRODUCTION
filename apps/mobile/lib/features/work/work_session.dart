@@ -6344,6 +6344,13 @@ class WorkSession extends ChangeNotifier {
     required String closingLabel,
     required String storeDeliveryLabel,
   }) {
+    // Legacy review fixture only. A reference is not payment authority.
+    if (gateway is! ReviewWorkGateway) {
+      showError(
+        'Group purchase payment could not be verified. No offer was published.',
+      );
+      return;
+    }
     if (paymentReference.trim().isEmpty) {
       showError(
         'Group Bulk Buying becomes active only after payment confirmation is received.',
@@ -6401,6 +6408,14 @@ class WorkSession extends ChangeNotifier {
     required String closingLabel,
     required String storeDeliveryLabel,
   }) async {
+    // Production needs a scoped, revisioned payment/publication response;
+    // the legacy gateway returns only a String and cannot establish either.
+    if (gateway is! ReviewWorkGateway) {
+      showError(
+        'Group purchase payment is not available yet. Your details are still here.',
+      );
+      return false;
+    }
     final id = activeWorkspace?.id ?? workspaceId;
     if (id == null || id.isEmpty || busy) return false;
     final data = _storeData;
