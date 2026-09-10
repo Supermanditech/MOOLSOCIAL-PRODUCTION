@@ -2865,7 +2865,7 @@ class _StoreWorkloadSummary extends StatelessWidget {
     const labels = {
       'New': 'Accept',
       'Packing': 'Pack',
-      'Ready': 'Hand over',
+      'Ready': 'Check pickup',
       'Delivery': 'Track',
       'Attention': 'Review',
     };

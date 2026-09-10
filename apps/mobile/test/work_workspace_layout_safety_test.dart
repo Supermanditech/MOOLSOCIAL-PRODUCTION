@@ -10743,7 +10743,10 @@ void main() {
       );
       expect(find.text('201\nAccept', findRichText: true), findsOneWidget);
       expect(find.text('200\nPack', findRichText: true), findsOneWidget);
-      expect(find.text('200\nHand over', findRichText: true), findsOneWidget);
+      expect(
+        find.text('200\nCheck pickup', findRichText: true),
+        findsOneWidget,
+      );
       expect(find.text('200\nTrack', findRichText: true), findsOneWidget);
       for (final group in ['new', 'packing', 'ready', 'delivery']) {
         final control = find.byKey(Key('work-store-workload-$group'));
@@ -14810,17 +14813,26 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  for (final (scale, viewport) in [
-    (1.0, const Size(412, 915)),
-    (2.0, const Size(412, 915)),
-    (2.0, const Size(320, 568)),
+  for (final (scale, viewport, activeOrders) in [
+    (1.0, const Size(412, 915), 100),
+    (2.0, const Size(412, 915), 100),
+    (2.0, const Size(320, 568), 100),
+    (1.0, const Size(412, 915), 1000),
+    (2.0, const Size(320, 568), 1000),
   ]) {
-    final stockViewSuffix = '$scale-${viewport.width.toInt()}';
+    final stockViewSuffix = '$scale-${viewport.width.toInt()}-$activeOrders';
     testWidgets(
       'DASH11 scoped supplier offers selection states and Back $stockViewSuffix',
       (tester) async {
         final contact = _ContactDraftFixtureStore();
         final work = storeViewFixture(null, contact);
+        final chat = ChatSession(
+          sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+        );
+        chat.setDraftTextForSession(
+          'workspace-support',
+          'Keep my unsent Store enquiry',
+        );
         final store = work.activeWorkspace!.id;
         final invoiceCount = work.workspaceInvoices.length;
         WorkspaceGroupOffer offer(
@@ -14916,19 +14928,36 @@ void main() {
         work.workspacePackedProductIds.add('summary-0');
         final packedBefore = work.workspacePackedProductIds.toSet();
         final now = DateTime.now();
-        for (var i = 1; i < 100; i++) {
+        for (var i = 1; i < activeOrders; i++) {
+          final slot = i % 100;
+          final collection = slot >= 50 && slot < 65;
           work.workspaceOrders.add(
-            customerOrder(
+            WorkspaceOrderRecord(
               id: 'MIX-$i',
               customer: 'Customer $i',
+              items: 'Fortune Sunflower Oil × 1',
+              quantities: const {'oil-fortune-1l': 1},
+              amount: 264,
+              source: 'App',
+              fulfilment: collection ? 'Collect at store' : 'Mool delivery',
+              payment: 'Paid online',
+              address: collection ? '' : 'Test delivery address $i',
+              needsDelivery: !collection,
+              collectionStoreId: collection ? store : null,
               createdAt: now,
-              stage: i < 30
+              stage: slot < 30
                   ? 'Confirmed'
-                  : i < 60
+                  : slot < 50
                   ? 'Preparing'
-                  : i < 80
+                  : slot < 60
+                  ? 'Ready for collection'
+                  : slot < 65
+                  ? 'Customer confirmed'
+                  : slot < 80
                   ? 'Ready'
-                  : 'Out for delivery',
+                  : slot < 95
+                  ? 'Out for delivery'
+                  : 'Delivery failed',
             ),
           );
         }
@@ -15010,24 +15039,44 @@ void main() {
           tester,
           route: '/app/work/workspace/dashboard',
           work: work,
+          chat: chat,
           viewport: viewport,
           textScale: scale,
         );
         expect(
           work.visibleWorkspaceOrders.where((order) => !order.isClosed),
-          hasLength(100),
+          hasLength(activeOrders),
         );
         for (final (stage, count) in [
           ('Confirmed', 30),
-          ('Preparing', 30),
-          ('Ready', 20),
-          ('Out for delivery', 20),
+          ('Preparing', 20),
+          ('Ready for collection', 10),
+          ('Customer confirmed', 5),
+          ('Ready', 15),
+          ('Out for delivery', 15),
+          ('Delivery failed', 5),
         ]) {
           expect(
             work.visibleWorkspaceOrders.where((order) => order.stage == stage),
-            hasLength(count),
+            hasLength(count * (activeOrders ~/ 100)),
           );
         }
+        final claimedCollections = work.visibleWorkspaceOrders.where(
+          (order) =>
+              order.isCustomerCollection && order.stage == 'Customer confirmed',
+        );
+        expect(claimedCollections, hasLength(5 * (activeOrders ~/ 100)));
+        for (final order in claimedCollections) {
+          expect(work.workspaceOrderStageLabel(order), 'Checking order');
+        }
+        expect(work.currentCollection, isNull);
+        expect(
+          find.text(
+            '${30 * (activeOrders ~/ 100)}\nCheck pickup',
+            findRichText: true,
+          ),
+          findsOneWidget,
+        );
         expect(
           work.visibleWorkspaceOrders
               .where((order) => order.isClosed)
@@ -15041,6 +15090,15 @@ void main() {
         await captureStoreView(
           tester,
           'group-mixed-dashboard-$stockViewSuffix',
+        );
+        final accept = find.byKey(const Key('work-activity-order-accept'));
+        await reveal(tester, accept);
+        expect(accept.hitTestable(), findsOneWidget);
+        expect(tester.getSize(accept).height, greaterThanOrEqualTo(48));
+        expect(work.currentWorkspaceOrderId, selectedCustomerOrder);
+        await captureStoreView(
+          tester,
+          'group-mixed-central-action-$stockViewSuffix',
         );
         await tester.ensureVisible(
           find.byKey(const Key('work-quick-group-buy')),
@@ -15065,6 +15123,7 @@ void main() {
         final switcherBefore = tester.getRect(
           find.byKey(const Key('work-group-offer-switch')),
         );
+        final heldTouch = await tester.startGesture(switcherBefore.center);
         expect(applyIncoming(2), isTrue);
         expect(work.applyWorkspaceFinance(finance(2)), isTrue);
         expect(applyIncoming(1), isFalse);
@@ -15094,8 +15153,18 @@ void main() {
         expect(work.workspaceInvoices, hasLength(invoiceCount));
         expect(work.workspaceStockMovements, isEmpty);
         expect(
+          chat.draftTextForSession('workspace-support'),
+          'Keep my unsent Store enquiry',
+        );
+        expect(
           tester.getRect(find.byKey(const Key('work-group-offer-switch'))),
           switcherBefore,
+        );
+        await heldTouch.cancel();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-group-choose-offer-1')),
+          findsNothing,
         );
         expect(tester.takeException(), isNull);
         await captureStoreView(tester, 'group-mixed-updates-$stockViewSuffix');
@@ -15294,6 +15363,10 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+    // The larger active-order dimension belongs to the mixed-workload replay,
+    // not these stock-history scenarios, which retain their three viewports.
+    if (activeOrders != 100) continue;
+
     testWidgets(
       'DASH10 stock changes retain filters references and Back $stockViewSuffix',
       (tester) async {
