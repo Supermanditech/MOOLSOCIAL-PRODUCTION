@@ -1677,16 +1677,20 @@ class _CatalogueSaleTypeSelector extends StatelessWidget {
     final shop = session.destination == BuyV2Destination.shop;
     final options = shop
         ? const [
-            (id: 'quick', title: 'Quick', icon: Icons.speed_rounded),
-            (id: 'courier', title: 'Scheduled', icon: Icons.schedule_rounded),
+            (id: 'quick', title: 'Quick', icon: BuyV2DeliveryArtwork.quick),
+            (
+              id: 'courier',
+              title: 'Scheduled',
+              icon: BuyV2DeliveryArtwork.courier,
+            ),
           ]
         : const [
             (
               id: 'wholesale',
               title: 'Wholesale',
-              icon: Icons.business_center_rounded,
+              icon: BuyV2DeliveryArtwork.wholesale,
             ),
-            (id: 'bulk', title: 'Bulk', icon: Icons.layers_rounded),
+            (id: 'bulk', title: 'Bulk', icon: BuyV2DeliveryArtwork.bulk),
           ];
     final selectedIndex = shop
         ? session.shopSaleType == BuyV2ShopSaleType.quickDelivery
@@ -1829,7 +1833,7 @@ class _CatalogueSaleSegment extends StatelessWidget {
   });
 
   final String title;
-  final IconData icon;
+  final BuyV2DeliveryArtwork icon;
   final bool selected;
   final bool showIcon;
   final Key labelStyleKey;
@@ -1918,9 +1922,9 @@ class _CatalogueSaleSegment extends StatelessWidget {
                                 ]
                               : const [],
                         ),
-                        child: Icon(
-                          icon,
-                          size: 14,
+                        child: BuyV2DeliveryModeIcon(
+                          artwork: icon,
+                          size: 18,
                           color: const Color(0xFF1010A8),
                         ),
                       ),
@@ -5583,14 +5587,21 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
                               context,
                               BuyV2Motion.stateChange,
                             ),
-                            child: Icon(
-                              _showFulfilment
-                                  ? Icons.expand_less_rounded
-                                  : Icons.local_shipping_outlined,
-                              key: ValueKey(_showFulfilment),
-                              color: BuyV2Colors.navy,
-                              size: 18,
-                            ),
+                            child: _showFulfilment
+                                ? const Icon(
+                                    Icons.expand_less_rounded,
+                                    key: ValueKey(true),
+                                    color: BuyV2Colors.navy,
+                                    size: 18,
+                                  )
+                                : BuyV2DeliveryModeIcon(
+                                    key: const ValueKey(false),
+                                    artwork: buyV2DeliveryArtworkFor(
+                                      product,
+                                      fulfilmentMode: facts.fulfilmentMode,
+                                    ),
+                                    size: 18,
+                                  ),
                           ),
                         ),
                       ),
@@ -6592,9 +6603,8 @@ class _RelatedStoreCard extends StatelessWidget {
                   const SizedBox(height: 2),
                   Row(
                     children: [
-                      const Icon(
-                        Icons.local_shipping_outlined,
-                        color: BuyV2Colors.navy,
+                      BuyV2DeliveryModeIcon(
+                        artwork: buyV2DeliveryArtworkFor(product),
                         size: 14,
                       ),
                       const SizedBox(width: 5),

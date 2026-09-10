@@ -693,6 +693,10 @@ class BuyV2ProductView extends StatelessWidget {
                           key: ValueKey(
                             'buy-product-hero-delivery-${product.id}',
                           ),
+                          deliveryArtwork: buyV2DeliveryArtworkFor(
+                            product,
+                            fulfilmentMode: facts.fulfilmentMode,
+                          ),
                           icon:
                               product.destination == BuyV2Destination.wholesale
                               ? Icons.local_shipping_outlined
@@ -1249,6 +1253,7 @@ class _ProductHeroFact extends StatelessWidget {
     required this.value,
     this.color = BuyV2Colors.ink,
     this.trailing,
+    this.deliveryArtwork,
     super.key,
   });
 
@@ -1256,13 +1261,17 @@ class _ProductHeroFact extends StatelessWidget {
   final String value;
   final Color color;
   final Widget? trailing;
+  final BuyV2DeliveryArtwork? deliveryArtwork;
 
   @override
   Widget build(BuildContext context) {
     final fact = Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 17, color: color),
+        if (deliveryArtwork case final artwork?)
+          BuyV2DeliveryModeIcon(artwork: artwork, size: 17, color: color)
+        else
+          Icon(icon, size: 17, color: color),
         const SizedBox(width: 7),
         Expanded(
           child: Text(
@@ -1960,6 +1969,10 @@ class _WholesaleTradeDecisionPanelState
                 _DecisionRow(
                   icon: Icons.local_shipping_outlined,
                   label: 'Delivery provider',
+                  deliveryArtwork: buyV2DeliveryArtworkFor(
+                    product,
+                    fulfilmentMode: fulfilmentMode,
+                  ),
                   value: provider,
                 ),
               if (facts.deliveryServiceLevel case final serviceLevel?)
@@ -1971,6 +1984,10 @@ class _WholesaleTradeDecisionPanelState
               _DecisionRow(
                 icon: Icons.local_shipping_outlined,
                 label: 'Delivery mode',
+                deliveryArtwork: buyV2DeliveryArtworkFor(
+                  product,
+                  fulfilmentMode: fulfilmentMode,
+                ),
                 value: buyV2FulfilmentModeLabel(fulfilmentMode),
               ),
               _DecisionRow(
@@ -1982,6 +1999,10 @@ class _WholesaleTradeDecisionPanelState
               _DecisionRow(
                 icon: Icons.local_shipping_outlined,
                 label: 'Freight',
+                deliveryArtwork: buyV2DeliveryArtworkFor(
+                  product,
+                  fulfilmentMode: fulfilmentMode,
+                ),
                 value: product.freightIncluded
                     ? 'Included in landed price'
                     : 'Confirmed before payment',
@@ -2551,6 +2572,10 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 stackAtLargeText: true,
                 icon: Icons.local_shipping_outlined,
                 label: 'Fulfilment',
+                deliveryArtwork: buyV2DeliveryArtworkFor(
+                  product,
+                  fulfilmentMode: fulfilmentMode,
+                ),
                 value: 'Fulfilment arranged by MoolSocial',
               ),
               if (mrp != null && mrp > facts.price)
@@ -2565,6 +2590,10 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                 stackAtLargeText: true,
                 icon: Icons.local_shipping_outlined,
                 label: 'Delivery mode',
+                deliveryArtwork: buyV2DeliveryArtworkFor(
+                  product,
+                  fulfilmentMode: fulfilmentMode,
+                ),
                 value: buyV2FulfilmentModeLabel(fulfilmentMode),
               ),
               if (facts.storeOperatingState != BuyV2StoreOperatingState.unknown)
@@ -2614,6 +2643,10 @@ class _ProductOfferDecisionPanel extends StatelessWidget {
                   stackAtLargeText: true,
                   icon: Icons.local_shipping_outlined,
                   label: 'Delivery provider',
+                  deliveryArtwork: buyV2DeliveryArtworkFor(
+                    product,
+                    fulfilmentMode: fulfilmentMode,
+                  ),
                   value: provider,
                 ),
               if (facts.deliveryServiceLevel case final serviceLevel?)
@@ -7692,6 +7725,10 @@ class _CheckoutConfirmStage extends StatelessWidget {
           _CheckoutDeliverySummaryCard(
             key: ValueKey('buy-checkout-confirm-delivery-${groups[index].key}'),
             group: groups[index],
+            artwork: buyV2DeliveryArtworkForLines(
+              groups[index].lines,
+              fulfilmentModeFor: session.fulfilmentModeFor,
+            ),
             shipmentNumber: index + 1,
           ),
           if (groups[index].destination == BuyV2Destination.wholesale) ...[
@@ -9525,6 +9562,10 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                     _OrderDeliveryFact(
                       icon: Icons.local_shipping_outlined,
                       label: 'Delivery partner',
+                      deliveryArtwork: buyV2DeliveryArtworkForLines(
+                        order.lines,
+                        fulfilmentModeFor: session.fulfilmentModeFor,
+                      ),
                       value: _orderDeliveryPartnerLabel(order),
                     ),
                     if (order.trackingReference case final trackingReference?)
@@ -10116,6 +10157,10 @@ class _BuyV2LiveDeliveryPanelState extends State<BuyV2LiveDeliveryPanel>
             _DecisionRow(
               icon: Icons.delivery_dining_outlined,
               label: 'Delivery partner',
+              deliveryArtwork: buyV2DeliveryArtworkForLines(
+                widget.order.lines,
+                fulfilmentModeFor: widget.session.fulfilmentModeFor,
+              ),
               value: switch (_nonBlankComplianceValue(snapshot.vehicleLabel)) {
                 final vehicle? => '${snapshot.driverName!} · $vehicle',
                 null => snapshot.driverName!,
@@ -10828,7 +10873,13 @@ class BuyV2TrackingView extends StatelessWidget {
             child: TextButton.icon(
               key: const ValueKey('buy-quick-delivery-restore'),
               onPressed: onRestoreDeliveryStatus,
-              icon: const Icon(Icons.local_shipping_outlined, size: 18),
+              icon: BuyV2DeliveryModeIcon(
+                artwork: buyV2DeliveryArtworkForLines(
+                  order.lines,
+                  fulfilmentModeFor: session.fulfilmentModeFor,
+                ),
+                size: 18,
+              ),
               label: const Text('Show delivery status'),
               style: TextButton.styleFrom(minimumSize: const Size(44, 44)),
             ),
@@ -10985,6 +11036,10 @@ class BuyV2TrackingView extends StatelessWidget {
             _DecisionRow(
               icon: Icons.local_shipping_outlined,
               label: order.deliveryPartnerType ?? 'Delivery partner',
+              deliveryArtwork: buyV2DeliveryArtworkForLines(
+                order.lines,
+                fulfilmentModeFor: session.fulfilmentModeFor,
+              ),
               value: _orderDeliveryPartnerLabel(order),
             ),
             if (order.dispatchPromise case final dispatchPromise?)
@@ -14871,6 +14926,7 @@ class _DecisionRow extends StatelessWidget {
     required this.value,
     this.valueColor = BuyV2Colors.ink,
     this.stackAtLargeText = true,
+    this.deliveryArtwork,
   });
 
   final IconData icon;
@@ -14878,6 +14934,7 @@ class _DecisionRow extends StatelessWidget {
   final String value;
   final Color valueColor;
   final bool stackAtLargeText;
+  final BuyV2DeliveryArtwork? deliveryArtwork;
 
   @override
   Widget build(BuildContext context) {
@@ -14889,7 +14946,10 @@ class _DecisionRow extends StatelessWidget {
           children: [
             Row(
               children: [
-                Icon(icon, color: BuyV2Colors.navy, size: 16),
+                if (deliveryArtwork case final artwork?)
+                  BuyV2DeliveryModeIcon(artwork: artwork, size: 16)
+                else
+                  Icon(icon, color: BuyV2Colors.navy, size: 16),
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
@@ -14921,7 +14981,10 @@ class _DecisionRow extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: BuyV2Colors.navy, size: 16),
+          if (deliveryArtwork case final artwork?)
+            BuyV2DeliveryModeIcon(artwork: artwork, size: 16)
+          else
+            Icon(icon, color: BuyV2Colors.navy, size: 16),
           const SizedBox(width: 7),
           SizedBox(
             width: 72,
@@ -18051,10 +18114,12 @@ class _CheckoutDeliverySummaryCard extends StatelessWidget {
     super.key,
     required this.group,
     required this.shipmentNumber,
+    required this.artwork,
   });
 
   final BuyV2FulfilmentGroup group;
   final int shipmentNumber;
+  final BuyV2DeliveryArtwork artwork;
 
   @override
   Widget build(BuildContext context) {
@@ -18066,8 +18131,8 @@ class _CheckoutDeliverySummaryCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(
-                Icons.local_shipping_outlined,
+              BuyV2DeliveryModeIcon(
+                artwork: artwork,
                 color: BuyV2Colors.navy,
                 size: 18,
               ),
@@ -18784,11 +18849,13 @@ class _OrderDeliveryFact extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.deliveryArtwork,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final BuyV2DeliveryArtwork? deliveryArtwork;
 
   @override
   Widget build(BuildContext context) {
@@ -18811,7 +18878,10 @@ class _OrderDeliveryFact extends StatelessWidget {
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: BuyV2Colors.navy, size: 16),
+              if (deliveryArtwork case final artwork?)
+                BuyV2DeliveryModeIcon(artwork: artwork, size: 16)
+              else
+                Icon(icon, color: BuyV2Colors.navy, size: 16),
               const SizedBox(width: 7),
               Expanded(
                 child: stacked

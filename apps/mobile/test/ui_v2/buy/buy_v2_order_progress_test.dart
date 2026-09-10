@@ -8,10 +8,27 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+class _R669DeliveryIconFacts implements BuyV2ProductFactsAdapter {
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final facts = const BuyV2CatalogueProductFactsAdapter().snapshotFor(
+      product,
+    );
+    return product.destination == BuyV2Destination.wholesale ||
+            product.destination == BuyV2Destination.medicine
+        ? facts.copyWith(
+            deliveryPromise: 'Delivery in 2 days',
+            sourceId: 'delivery-icon-test-fixture',
+          )
+        : facts;
+  }
+}
 
 class _R5ArrivalSound implements BuyV2DeliveryArrivalSound {
   int preparations = 0;
@@ -254,6 +271,261 @@ void main() {
       debugDisableShadows = previousShadows;
       repaint(boundary);
       await tester.pump();
+    }
+  }
+
+  test(
+    'R669 delivery artwork follows catalogue modes and supplied fulfilment',
+    () {
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      session.openDestination(BuyV2Destination.wholesale);
+      for (final type in BuyV2WholesaleSaleType.values) {
+        session.chooseWholesaleSaleType(type);
+        final products = session.catalogueSaleTypeProducts;
+        expect(products, isNotEmpty);
+        for (final product in products) {
+          final expected = type == BuyV2WholesaleSaleType.wholesale
+              ? BuyV2DeliveryArtwork.wholesale
+              : BuyV2DeliveryArtwork.bulk;
+          expect(buyV2DeliveryArtworkFor(product), expected);
+          for (final quantity in [product.minimumOrder, 999999999]) {
+            expect(
+              buyV2DeliveryArtworkForLines([
+                BuyV2CartLine(product: product, quantity: quantity),
+              ], fulfilmentModeFor: session.fulfilmentModeFor),
+              expected,
+            );
+          }
+        }
+      }
+      final quick = session.product('s-tomato');
+      expect(buyV2DeliveryArtworkFor(quick), BuyV2DeliveryArtwork.quick);
+      expect(
+        buyV2DeliveryArtworkFor(
+          quick,
+          fulfilmentMode: BuyV2FulfilmentMode.standardCourier,
+        ),
+        BuyV2DeliveryArtwork.courier,
+      );
+      expect(
+        buyV2DeliveryArtworkForLines(
+          const [],
+          fulfilmentModeFor: session.fulfilmentModeFor,
+        ),
+        BuyV2DeliveryArtwork.courier,
+      );
+      expect(
+        buyV2DeliveryArtworkForLines([
+          BuyV2CartLine(product: quick, quantity: 1),
+          BuyV2CartLine(product: session.product('w-rice'), quantity: 4),
+        ], fulfilmentModeFor: session.fulfilmentModeFor),
+        BuyV2DeliveryArtwork.courier,
+      );
+    },
+  );
+
+  testWidgets('R669 delivery artwork actual-size visual reference', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(480, 420));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      RepaintBoundary(
+        key: const ValueKey('r66-order-state-app-capture'),
+        child: MaterialApp(
+          debugShowCheckedModeBanner: false,
+          theme: MoolTheme.light(),
+          home: Scaffold(
+            body: Column(
+              children: [
+                for (final artwork in BuyV2DeliveryArtwork.values)
+                  for (final dark in [false, true])
+                    ColoredBox(
+                      color: dark ? BuyV2Colors.navy : Colors.white,
+                      child: SizedBox(
+                        height: 50,
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 90,
+                              child: Text(
+                                artwork.name,
+                                style: TextStyle(
+                                  color: dark ? Colors.white : BuyV2Colors.navy,
+                                ),
+                              ),
+                            ),
+                            for (final size in [
+                              14.0,
+                              16.0,
+                              18.0,
+                              20.0,
+                              32.0,
+                              48.0,
+                            ]) ...[
+                              BuyV2DeliveryModeIcon(
+                                artwork: artwork,
+                                size: size,
+                                color: dark ? Colors.white : BuyV2Colors.navy,
+                              ),
+                              const SizedBox(width: 12),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    await capture(tester, 'r669-delivery-artwork-reference');
+  });
+
+  for (final entry in [
+    ('s-tomato', BuyV2DeliveryArtwork.quick),
+    ('w-notebook', BuyV2DeliveryArtwork.wholesale),
+    ('w-rice', BuyV2DeliveryArtwork.bulk),
+  ]) {
+    for (final size in [const Size(320, 711), const Size(711, 320)]) {
+      for (final scale in [1.0, 2.0]) {
+        final profile = '${entry.$1}-${size.width.toInt()}-$scale';
+        testWidgets(
+          'R669 delivery artwork product checkout tracking $profile',
+          (tester) async {
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            final session = BuyV2Session(
+              core: core,
+              productFactsAdapter: _R669DeliveryIconFacts(),
+            );
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            final product = session.product(entry.$1);
+            Finder artworkWithin(Finder owner) => find.descendant(
+              of: owner,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is BuyV2DeliveryModeIcon &&
+                    widget.artwork == entry.$2,
+              ),
+            );
+            await tester.pumpWidget(app(session, scale));
+            await tester.pumpAndSettle();
+            expect(session.openProduct(product.id), isTrue);
+            await tester.pumpAndSettle();
+            final hero = find.byKey(
+              ValueKey('buy-product-hero-delivery-${product.id}'),
+            );
+            await tester.scrollUntilVisible(
+              hero,
+              140,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(PageStorageKey('buy-product-${product.id}')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            expect(artworkWithin(hero), findsOneWidget);
+            await capture(tester, 'r669-delivery-$profile-product');
+            expect(session.addProduct(product.id), isTrue);
+            session.openCart(
+              scope: product.destination == BuyV2Destination.shop
+                  ? BuyV2CartScope.shop
+                  : BuyV2CartScope.wholesale,
+            );
+            expect(session.openCheckout(), isTrue);
+            expect(session.continueCheckoutFromAddress(), isTrue);
+            expect(session.continueCheckoutFromPayment(), isTrue);
+            await tester.pumpAndSettle();
+            final group = session.checkoutFulfilmentGroups.single;
+            final shipment = find.byKey(
+              ValueKey('buy-checkout-confirm-delivery-${group.key}'),
+            );
+            await tester.scrollUntilVisible(
+              shipment,
+              100,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(
+                      const PageStorageKey('buy-checkout-confirm'),
+                    ),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            expect(artworkWithin(shipment), findsOneWidget);
+            expect(tester.getSize(artworkWithin(shipment)), const Size(18, 18));
+            await capture(tester, 'r669-delivery-$profile-checkout');
+            // Development checkout fixture only; no payment handoff is invoked.
+            expect(session.confirmOrder(), isTrue);
+            final order = session.confirmedOrders.single;
+            expect(order.deliveryPartnerName, isNull);
+            session.openDestination(product.destination);
+            await tester.pumpAndSettle();
+            final quick = entry.$2 == BuyV2DeliveryArtwork.quick;
+            final control = find.byKey(
+              ValueKey(
+                quick
+                    ? 'buy-quick-delivery-toggle'
+                    : 'buy-quiet-delivery-status',
+              ),
+            );
+            expect(control.hitTestable(), findsOneWidget);
+            expect(artworkWithin(control), findsOneWidget);
+            await capture(tester, 'r669-delivery-$profile-control');
+            await tester.tap(control);
+            await tester.pumpAndSettle();
+            if (quick) {
+              final expanded = find.byKey(
+                const ValueKey('buy-quick-delivery-status-expanded'),
+              );
+              expect(artworkWithin(expanded), findsOneWidget);
+              await capture(tester, 'r669-delivery-$profile-expanded');
+              final keep = find.byKey(
+                const ValueKey('buy-quick-delivery-keep'),
+              );
+              await tester.ensureVisible(keep);
+              await tester.pumpAndSettle();
+              expect(keep.hitTestable(), findsOneWidget);
+              await tester.tap(keep);
+              await tester.pumpAndSettle();
+              expect(find.text('Kept'), findsOneWidget);
+              final hide = find.byKey(
+                const ValueKey('buy-quick-delivery-hide'),
+              );
+              await tester.ensureVisible(hide);
+              await tester.pumpAndSettle();
+              expect(hide.hitTestable(), findsOneWidget);
+              await capture(tester, 'r669-delivery-$profile-scrolled-controls');
+              final open = find.byKey(
+                const ValueKey('buy-quick-delivery-open'),
+              );
+              await tester.ensureVisible(open);
+              await tester.pumpAndSettle();
+              expect(open.hitTestable(), findsOneWidget);
+              await tester.tap(open);
+              await tester.pumpAndSettle();
+            }
+            expect(session.view, BuyV2View.tracking);
+            expect(session.selectedOrderOrNull?.id, order.id);
+            expect(session.selectedOrderOrNull?.deliveryPartnerName, isNull);
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+          },
+        );
+      }
     }
   }
 
@@ -1050,6 +1322,13 @@ void main() {
     });
 
     test('mixed confirmation creates exact live vertical orders', () {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        productFactsAdapter: _R669DeliveryIconFacts(),
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
       final selected = {
         for (final destination in const [
           BuyV2Destination.shop,
@@ -1073,7 +1352,7 @@ void main() {
           entry.key: entry.value.price * entry.value.minimumOrder,
       };
 
-      session.confirmOrder();
+      expect(session.confirmOrder(), isTrue, reason: session.notice);
 
       expect(session.confirmedOrders, hasLength(3));
       expect(session.confirmedDestinations, selected.keys.toSet());

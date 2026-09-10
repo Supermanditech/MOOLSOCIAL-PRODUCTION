@@ -16,6 +16,183 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
 
+/// Mode artwork is illustrative, never evidence of a vehicle assignment.
+enum BuyV2DeliveryArtwork { quick, wholesale, bulk, courier }
+
+BuyV2DeliveryArtwork buyV2DeliveryArtworkFor(
+  BuyV2Product product, {
+  BuyV2FulfilmentMode? fulfilmentMode,
+}) {
+  if (product.destination == BuyV2Destination.wholesale) {
+    // Match the existing Wholesale/Bulk catalogue buckets, not basket quantity.
+    return product.minimumOrder <= 2
+        ? BuyV2DeliveryArtwork.wholesale
+        : BuyV2DeliveryArtwork.bulk;
+  }
+  return (fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product)) ==
+          BuyV2FulfilmentMode.quickLocal
+      ? BuyV2DeliveryArtwork.quick
+      : BuyV2DeliveryArtwork.courier;
+}
+
+BuyV2DeliveryArtwork buyV2DeliveryArtworkForLines(
+  Iterable<BuyV2CartLine> lines, {
+  required BuyV2FulfilmentMode Function(BuyV2Product) fulfilmentModeFor,
+}) {
+  final modes = lines
+      .map(
+        (line) => buyV2DeliveryArtworkFor(
+          line.product,
+          fulfilmentMode: fulfilmentModeFor(line.product),
+        ),
+      )
+      .toSet();
+  if (modes.length == 1) return modes.single;
+  if (modes.isNotEmpty &&
+      modes.every(
+        (mode) =>
+            mode == BuyV2DeliveryArtwork.wholesale ||
+            mode == BuyV2DeliveryArtwork.bulk,
+      )) {
+    return BuyV2DeliveryArtwork.bulk;
+  }
+  return BuyV2DeliveryArtwork.courier;
+}
+
+/// Decorative companion to the existing readable mode/status label.
+class BuyV2DeliveryModeIcon extends StatelessWidget {
+  const BuyV2DeliveryModeIcon({
+    super.key,
+    required this.artwork,
+    this.size = 20,
+    this.color = BuyV2Colors.navy,
+  });
+
+  final BuyV2DeliveryArtwork artwork;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: SizedBox.square(
+      dimension: size,
+      child: switch (artwork) {
+        BuyV2DeliveryArtwork.courier => Icon(
+          Icons.local_shipping_outlined,
+          size: size,
+          color: color,
+        ),
+        _ => CustomPaint(painter: _BuyV2DrivenFreightPainter(artwork, color)),
+      },
+    ),
+  );
+}
+
+class _BuyV2DrivenFreightPainter extends CustomPainter {
+  const _BuyV2DrivenFreightPainter(this.artwork, this.color);
+
+  final BuyV2DeliveryArtwork artwork;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    final line = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    final fill = Paint()..color = color;
+    if (artwork == BuyV2DeliveryArtwork.quick) {
+      canvas.drawCircle(const Offset(5, 19), 3, line);
+      canvas.drawCircle(const Offset(20, 19), 3, line);
+      canvas.drawCircle(const Offset(14, 4), 2, fill);
+      canvas.drawPath(
+        Path()
+          ..moveTo(12, 7)
+          ..lineTo(10, 12)
+          ..lineTo(14, 14)
+          ..lineTo(12, 19)
+          ..moveTo(12, 7)
+          ..lineTo(16, 10)
+          ..lineTo(19, 9)
+          ..moveTo(18, 9)
+          ..lineTo(20, 19)
+          ..moveTo(5, 19)
+          ..lineTo(8, 13)
+          ..lineTo(15, 13)
+          ..moveTo(5, 19)
+          ..lineTo(15, 19),
+        line,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(1, 8, 6, 5),
+          const Radius.circular(1),
+        ),
+        line,
+      );
+      canvas.restore();
+      return;
+    }
+    void tempo() {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(1, 6, 11, 11),
+          const Radius.circular(1),
+        ),
+        line,
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(12, 17)
+          ..lineTo(23, 17)
+          ..lineTo(23, 12)
+          ..lineTo(20, 8)
+          ..lineTo(14, 8)
+          ..lineTo(14, 17),
+        line,
+      );
+      // The driver is inside the cab, with a head and seated body.
+      canvas.drawCircle(const Offset(17.5, 10.5), 1.3, fill);
+      canvas.drawPath(
+        Path()
+          ..moveTo(17, 13)
+          ..lineTo(17, 15)
+          ..lineTo(20, 15)
+          ..moveTo(17, 13)
+          ..lineTo(20, 12.5),
+        line,
+      );
+      canvas.drawCircle(const Offset(5, 19), 2, line);
+      canvas.drawCircle(const Offset(19, 19), 2, line);
+    }
+
+    if (artwork == BuyV2DeliveryArtwork.bulk) {
+      canvas.save();
+      canvas.clipPath(
+        Path()
+          ..fillType = PathFillType.evenOdd
+          ..addRect(const Rect.fromLTWH(0, 0, 24, 24))
+          ..addRect(const Rect.fromLTWH(7, 11.4, 17, 12.6)),
+      );
+      canvas.scale(.68);
+      tempo();
+      canvas.restore();
+      canvas.translate(7, 8);
+      canvas.scale(.68);
+    }
+    tempo();
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BuyV2DrivenFreightPainter oldDelegate) =>
+      oldDelegate.artwork != artwork || oldDelegate.color != color;
+}
+
 /// A persistent vertical overflow cue. The list keeps its own controller,
 /// gestures, focus and accessibility scroll actions; the paint intercepts none.
 class BuyV2VerticalScrollIndicator extends StatefulWidget {

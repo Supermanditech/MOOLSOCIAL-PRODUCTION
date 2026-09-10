@@ -1147,6 +1147,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (quietOrder == null) return const SizedBox.shrink();
     return _BuyQuietDeliveryStatusBar(
       order: quietOrder,
+      artwork: buyV2DeliveryArtworkForLines(
+        quietOrder.lines,
+        fulfilmentModeFor: session.fulfilmentModeFor,
+      ),
       onOpen: () => session.openTracking(quietOrder.id),
     );
   }
@@ -1216,12 +1220,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  expanded
-                      ? Icons.expand_more_rounded
-                      : Icons.local_shipping_outlined,
-                  size: 20,
-                ),
+                if (expanded)
+                  const Icon(Icons.expand_more_rounded, size: 20)
+                else
+                  const BuyV2DeliveryModeIcon(
+                    artwork: BuyV2DeliveryArtwork.quick,
+                    color: BuyV2Colors.royal,
+                  ),
                 const SizedBox(height: 3),
                 ExcludeSemantics(
                   child: BuyV2HonestProgressIndicator(
@@ -2244,8 +2249,8 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
                               padding: const EdgeInsets.only(left: 4),
                               child: Row(
                                 children: [
-                                  const Icon(
-                                    Icons.bolt_rounded,
+                                  const BuyV2DeliveryModeIcon(
+                                    artwork: BuyV2DeliveryArtwork.quick,
                                     color: BuyV2Colors.royal,
                                     size: 16,
                                   ),
@@ -2300,8 +2305,8 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(
-                      Icons.local_shipping_outlined,
+                    const BuyV2DeliveryModeIcon(
+                      artwork: BuyV2DeliveryArtwork.quick,
                       color: BuyV2Colors.navy,
                       size: 19,
                     ),
@@ -2433,9 +2438,14 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
 }
 
 class _BuyQuietDeliveryStatusBar extends StatelessWidget {
-  const _BuyQuietDeliveryStatusBar({required this.order, required this.onOpen});
+  const _BuyQuietDeliveryStatusBar({
+    required this.order,
+    required this.artwork,
+    required this.onOpen,
+  });
 
   final BuyV2Order order;
+  final BuyV2DeliveryArtwork artwork;
   final VoidCallback onOpen;
 
   @override
@@ -2459,8 +2469,8 @@ class _BuyQuietDeliveryStatusBar extends StatelessWidget {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(
-                    Icons.local_shipping_outlined,
+                  BuyV2DeliveryModeIcon(
+                    artwork: artwork,
                     color: BuyV2Colors.navy,
                     size: 19,
                   ),
