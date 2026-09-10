@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -15,6 +17,81 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'R669 area final row clears Android navigation $size $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+          tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            cataloguePageSource: _PagedWidgetSource(BuyV2Destination.shop),
+            catalogueAreas: {
+              'jodhpur': 'Jodhpur',
+              for (var index = 1; index <= 30; index++)
+                'fixture-$index': 'Expanded area fixture $index',
+              'chennai': 'Chennai',
+            },
+            initialCatalogueRegionId: 'jodhpur',
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await tester.pumpWidget(_app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          unawaited(
+            showBuyV2CatalogueArea(
+              tester.element(find.byType(BuyV2Screen)),
+              session,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final list = find.byKey(const ValueKey('buy-catalogue-area-list'));
+          final last = find.byKey(const ValueKey('buy-catalogue-area-chennai'));
+          await tester.scrollUntilVisible(
+            last,
+            180,
+            maxScrolls: 50,
+            scrollable: find
+                .descendant(of: list, matching: find.byType(Scrollable))
+                .first,
+          );
+          await tester.drag(list, const Offset(0, -600));
+          await tester.pumpAndSettle();
+          final bounds = tester.getRect(last);
+          expect(bounds.top, greaterThanOrEqualTo(tester.getRect(list).top));
+          expect(bounds.bottom, lessThanOrEqualTo(size.height - 34));
+          expect(bounds.height, greaterThanOrEqualTo(48));
+          expect(last.hitTestable(), findsOneWidget);
+          await captureR66Visual(tester, 'r669-area-last-${size.width}-$scale');
+          await tester.tap(last);
+          await tester.pumpAndSettle();
+          expect(list, findsNothing);
+          expect(session.catalogueRegionId, 'chennai');
+          expect(session.catalogueAreaScope, BuyV2CatalogueAreaScope.regional);
+          expect(session.itemCount, 0);
+          unawaited(
+            showBuyV2CatalogueArea(
+              tester.element(find.byType(BuyV2Screen)),
+              session,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(list, findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(list, findsNothing);
+          expect(session.catalogueRegionId, 'chennai');
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
 
   for (final size in [const Size(320, 844), const Size(640, 360)]) {
     for (final scale in [1.0, 2.0]) {
@@ -592,6 +669,31 @@ void main() {
           tester.view.resetViewInsets();
           tester.testTextInput.hide();
           await tester.pumpAndSettle();
+          // A keyboard dismissal must survive a nested product round trip.
+          final lastImage = find.byKey(
+            ValueKey('buy-grid-packshot-$lastProduct'),
+          );
+          await tester.ensureVisible(lastImage);
+          await tester.pumpAndSettle();
+          final retainedRequests = source.productQueries.length;
+          expect(lastImage.hitTestable(at: imageAction), findsOneWidget);
+          await tester.tapAt(imageAction.withinRect(tester.getRect(lastImage)));
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, lastProduct);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(tester.testTextInput.isVisible, isFalse);
+          await _revealPagedHeader(tester, storeScope, storeField);
+          expect(
+            tester.widget<TextField>(storeField).focusNode!.hasFocus,
+            isFalse,
+          );
+          expect(
+            tester.widget<TextField>(storeField).controller!.text,
+            'sku 4999',
+          );
+          expect(tester.widget<Text>(range).data, '1–1 of 1');
+          expect(source.productQueries.length, retainedRequests);
           final add = find.byKey(ValueKey('buy-add-$lastProduct'));
           await tester.ensureVisible(add);
           await tester.pumpAndSettle();
@@ -617,11 +719,40 @@ void main() {
             const ValueKey('buy-store-category-control'),
           );
           await _revealPagedHeader(tester, storeScope, categoryControl);
+          final searchHint = find.descendant(
+            of: storeField,
+            matching: find.text(scale > 1.25 ? 'Search' : 'Search this store'),
+          );
+          expect(searchHint, findsOneWidget);
+          expect(
+            tester.renderObject<RenderParagraph>(searchHint).didExceedMaxLines,
+            isFalse,
+          );
+          expect(
+            tester.getSize(categoryControl).height,
+            greaterThanOrEqualTo(44),
+          );
+          expect(
+            tester.getRect(categoryControl).center.dy,
+            closeTo(tester.getRect(storeField).center.dy, .1),
+          );
+          expect(
+            find.descendant(
+              of: categoryControl,
+              matching: find.byIcon(Icons.grid_view_rounded),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(storeField);
+          await tester.pumpAndSettle();
+          expect(tester.testTextInput.isVisible, isTrue);
+          tester.testTextInput.hide();
+          await tester.pumpAndSettle();
           await tester.tap(categoryControl);
           await tester.pumpAndSettle();
           final category = session
               .categoriesFor(destination)
-              .firstWhere((value) => value.id != 'all');
+              .lastWhere((value) => value.id != 'all');
           final choice = find.byKey(
             ValueKey('buy-store-category-${category.id}'),
           );
@@ -636,9 +767,31 @@ void main() {
             100,
             scrollable: categoryScroll,
           );
+          await tester.drag(
+            find.byKey(const ValueKey('buy-store-category-list')),
+            const Offset(0, -600),
+          );
           await tester.pumpAndSettle();
+          expect(
+            tester.getRect(choice).bottom,
+            lessThanOrEqualTo(size.height - 34),
+          );
+          expect(tester.getSize(choice).height, greaterThanOrEqualTo(48));
+          expect(choice.hitTestable(), findsOneWidget);
+          await captureR66Visual(tester, 'r669-store-last-category-$profile');
           await tester.tap(choice);
           await tester.pumpAndSettle();
+          expect(tester.testTextInput.isVisible, isFalse);
+          await _revealPagedHeader(tester, storeScope, storeField);
+          expect(
+            tester.widget<TextField>(storeField).focusNode!.hasFocus,
+            isFalse,
+          );
+          expect(find.text('All products'), findsNothing);
+          await captureR66Visual(
+            tester,
+            'r669-store-compact-category-$profile',
+          );
           expect(source.productQueries.last.categoryId, category.id);
           expect(session.selectedCategoryId, 'all');
           expect(session.query, 'Mool Market');

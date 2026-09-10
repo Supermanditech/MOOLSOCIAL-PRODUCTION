@@ -1522,7 +1522,12 @@ Future<void> showBuyV2CatalogueArea(
             child: BuyV2VerticalScrollIndicator(
               child: ListView(
                 key: const ValueKey('buy-catalogue-area-list'),
-                padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+                padding: EdgeInsets.fromLTRB(
+                  12,
+                  8,
+                  12,
+                  16 + BuyV2AddressSheetMotion.resolveBottomSafeInset(context),
+                ),
                 keyboardDismissBehavior:
                     ScrollViewKeyboardDismissBehavior.onDrag,
                 children: [
@@ -6122,6 +6127,7 @@ class _PagedFullStoreCatalogue extends StatefulWidget {
 
 class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   late TextEditingController _search;
+  final _searchFocus = FocusNode();
   String _category = 'all';
   String get _scope =>
       'store-${widget.product.destination.name}-${widget.product.storeId}';
@@ -6140,11 +6146,12 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
   @override
   void dispose() {
     _search.dispose();
+    _searchFocus.dispose();
     super.dispose();
   }
 
   Future<void> _chooseCategory() async {
-    FocusScope.of(context).unfocus();
+    _searchFocus.unfocus();
     final categories = widget.session.categoriesFor(widget.product.destination);
     final choice = await showModalBottomSheet<String>(
       context: context,
@@ -6156,7 +6163,12 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
         child: BuyV2VerticalScrollIndicator(
           child: ListView(
             key: const ValueKey('buy-store-category-list'),
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 16),
+            padding: EdgeInsets.fromLTRB(
+              12,
+              8,
+              12,
+              16 + BuyV2AddressSheetMotion.resolveBottomSafeInset(sheetContext),
+            ),
             children: [
               Row(
                 children: [
@@ -6190,7 +6202,9 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
         ),
       ),
     );
-    if (choice != null && mounted) setState(() => _category = choice);
+    if (!mounted) return;
+    _searchFocus.unfocus();
+    if (choice != null) setState(() => _category = choice);
   }
 
   @override
@@ -6211,7 +6225,10 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
         search: _search.text,
         categoryId: _category,
       ),
-      onOpenProduct: widget.onOpenProduct,
+      onOpenProduct: (product) {
+        _searchFocus.unfocus();
+        widget.onOpenProduct(product);
+      },
       header: Padding(
         padding: const EdgeInsets.fromLTRB(12, 8, 12, 2),
         child: Column(
@@ -6244,37 +6261,59 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
               ),
             ),
             const SizedBox(height: 8),
-            TextField(
-              key: const ValueKey('buy-store-product-search'),
-              controller: _search,
-              maxLength: 80,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'Search this store',
-                counterText: '',
-                prefixIcon: const Icon(Icons.search_rounded),
-                suffixIcon: _search.text.isEmpty
-                    ? null
-                    : IconButton(
-                        key: const ValueKey('buy-store-product-search-clear'),
-                        tooltip: 'Clear store search',
-                        onPressed: () => setState(_search.clear),
-                        icon: const Icon(Icons.close_rounded),
+            Row(
+              children: [
+                Expanded(
+                  child: Semantics(
+                    label: 'Search this store',
+                    child: TextField(
+                      key: const ValueKey('buy-store-product-search'),
+                      controller: _search,
+                      focusNode: _searchFocus,
+                      maxLength: 80,
+                      textInputAction: TextInputAction.search,
+                      decoration: InputDecoration(
+                        hintText:
+                            MediaQuery.textScalerOf(context).scale(1) > 1.25
+                            ? 'Search'
+                            : 'Search this store',
+                        counterText: '',
+                        prefixIcon: const Icon(Icons.search_rounded),
+                        suffixIcon: _search.text.isEmpty
+                            ? null
+                            : IconButton(
+                                key: const ValueKey(
+                                  'buy-store-product-search-clear',
+                                ),
+                                tooltip: 'Clear store search',
+                                onPressed: () => setState(_search.clear),
+                                icon: const Icon(Icons.close_rounded),
+                              ),
+                        border: const OutlineInputBorder(),
                       ),
-                border: const OutlineInputBorder(),
-              ),
-              onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => FocusScope.of(context).unfocus(),
-            ),
-            TextButton.icon(
-              key: const ValueKey('buy-store-category-control'),
-              onPressed: _chooseCategory,
-              icon: const Icon(Icons.category_outlined, size: 18),
-              label: Text(
-                _category == 'all'
-                    ? 'All products'
-                    : category?.label ?? 'Choose category',
-              ),
+                      onChanged: (_) => setState(() {}),
+                      onSubmitted: (_) => _searchFocus.unfocus(),
+                      onTapOutside: (_) => _searchFocus.unfocus(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  selected: _category != 'all',
+                  child: _CatalogueChromeAction(
+                    key: const ValueKey('buy-store-category-control'),
+                    label:
+                        'Choose store category. Current category '
+                        '${_category == 'all' ? 'All products' : category?.label ?? 'Choose category'}',
+                    tooltip:
+                        'Store categories · '
+                        '${_category == 'all' ? 'All products' : category?.label ?? 'Choose category'}',
+                    icon: Icons.grid_view_rounded,
+                    active: _category != 'all',
+                    onTap: _chooseCategory,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
