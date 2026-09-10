@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -75,17 +76,25 @@ void main() {
     tester,
   ) async {
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    await mount(
+    final sessions = await mount(
       tester,
       route: '/app/chat/inbox?return=/app/social',
       size: const Size(360, 800),
     );
 
+    final people = find.byKey(const Key('chat-filter-people'));
+    expect(people, findsOneWidget);
+    await tester.tap(people);
+    await tester.pumpAndSettle();
+    expect(sessions.chat.selectedFilter, ChatThreadType.people);
+    expect(tester.widget<ChoiceChip>(people).selected, isTrue);
+    expect(find.byKey(const Key('chat-open-thread-mahadev')), findsNothing);
     await tester.enterText(
       find.byKey(const Key('chat-search-field')),
       'Home Basket',
     );
-    expect(find.byKey(const Key('chat-filter-people')), findsNothing);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-filter-strip')), findsNothing);
     await tester.tap(find.byKey(const Key('chat-open-thread-home-basket')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
@@ -96,6 +105,13 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
     expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
+    expect(sessions.chat.selectedFilter, ChatThreadType.people);
+    expect(find.byKey(const Key('chat-filter-strip')), findsNothing);
+    expect(
+      find.byKey(const Key('chat-open-thread-home-basket')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-open-thread-mahadev')), findsNothing);
     expect(
       tester
           .widget<TextField>(find.byKey(const Key('chat-search-field')))
@@ -103,8 +119,16 @@ void main() {
           ?.text,
       'Home Basket',
     );
+    await tester.tap(find.byKey(const Key('chat-clear-search')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('chat-close-inline-search')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<ChoiceChip>(people).selected, isTrue);
+    expect(sessions.chat.selectedFilter, ChatThreadType.people);
+    expect(find.byKey(const Key('chat-open-thread-mahadev')), findsNothing);
     expect(find.byKey(const Key('chat-back')), findsNothing);
     expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('thread keeps native composer focus without a global dock', (

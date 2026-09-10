@@ -1564,6 +1564,10 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq 'codex_oppo_review_v1_20260905' -and
         [string]$selectedContinuationBinding.baselineHead -ceq '1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d' -and
         $effectiveOwner -cin @(
+          'apps/mobile/test/shared_vertical_slice_test.dart',
+          'apps/mobile/test/chat_final_intent_matrix_test.dart',
+          'apps/mobile/test/ui_v2/universal/uaw_personal_mvp_chat_global_dock_exact_return_c10d_test.dart',
+          'apps/mobile/test/ui_v2/universal/uaw_r11_personal_global_chat_continuity_test.dart',
           'scripts/check-approved-ui-locks.ps1',
           'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
           'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/WorkDocumentPreviewBridge.kt',
