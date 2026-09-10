@@ -400,6 +400,11 @@ class _StoreOperationalData {
   bool workspaceHandoverBusy = false;
   final List<WorkspaceActivityEntry> workspaceActivity = [];
   WorkspaceGroupBuy? activeGroupBuy;
+  String? groupAccountScope, selectedGroupOfferId;
+  int groupFeedRevision = 0;
+  bool groupOffersStale = false, groupOffersComplete = false;
+  final Map<String, WorkspaceGroupOffer> groupOffers = {};
+  final Map<String, WorkspaceGroupOffer> groupOfferHistory = {};
   int workspaceDeliveryRadiusKm = 5;
   int workspaceDeliveryFee = 30;
   int workspaceFreeDeliveryAbove = 499;
@@ -2185,9 +2190,138 @@ class WorkSession extends ChangeNotifier {
       _storeData.workspaceHandoverBusy = value;
   List<WorkspaceActivityEntry> get workspaceActivity =>
       _storeData.workspaceActivity;
-  WorkspaceGroupBuy? get activeGroupBuy => _storeData.activeGroupBuy;
+  WorkspaceGroupBuy? get activeGroupBuy => workspaceGroupOffersConnected
+      ? selectedWorkspaceGroupOffer?.details
+      : gateway is ReviewWorkGateway
+      ? _storeData.activeGroupBuy
+      : null;
   set activeGroupBuy(WorkspaceGroupBuy? value) =>
       _storeData.activeGroupBuy = value;
+
+  bool get workspaceGroupOffersConnected =>
+      _contactAccountScope != null &&
+      _storeData.groupAccountScope == _contactAccountScope;
+  bool get workspaceGroupOffersStale =>
+      workspaceGroupOffersConnected && _storeData.groupOffersStale;
+  bool get workspaceGroupOffersComplete =>
+      workspaceGroupOffersConnected && _storeData.groupOffersComplete;
+  List<WorkspaceGroupOffer> get workspaceGroupOffers =>
+      workspaceGroupOffersConnected
+      ? List.unmodifiable(_storeData.groupOffers.values)
+      : const [];
+  String? get selectedWorkspaceGroupOfferId =>
+      workspaceGroupOffersConnected ? _storeData.selectedGroupOfferId : null;
+  WorkspaceGroupOffer? get selectedWorkspaceGroupOffer =>
+      workspaceGroupOffersConnected
+      ? _storeData.groupOffers[_storeData.selectedGroupOfferId]
+      : null;
+
+  bool selectWorkspaceGroupOffer(String id) {
+    if (!workspaceGroupOffersConnected ||
+        !_storeData.groupOffers.containsKey(id)) {
+      return false;
+    }
+    _storeData.selectedGroupOfferId = id;
+    notifyListeners();
+    return true;
+  }
+
+  /// Trusted adapter input only; this does not authenticate a retailer, publish
+  /// a deal, charge a payment, receive stock or complete a delivery.
+  bool applyWorkspaceGroupOffers({
+    required String accountScope,
+    required String storeId,
+    required int feedRevision,
+    required List<WorkspaceGroupOffer> records,
+    required bool complete,
+  }) {
+    if (_disposed ||
+        accountScope.isEmpty ||
+        accountScope != _contactAccountScope ||
+        feedRevision <= 0) {
+      return false;
+    }
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data == null ||
+        records.any(
+          (record) =>
+              !record.valid ||
+              record.accountScope != accountScope ||
+              record.workspaceId != storeId,
+        ) ||
+        records.map((record) => record.id).toSet().length != records.length) {
+      return false;
+    }
+    final sameAccount = data.groupAccountScope == accountScope;
+    if (sameAccount && feedRevision <= data.groupFeedRevision) return false;
+    final previous = sameAccount
+        ? data.groupOfferHistory
+        : <String, WorkspaceGroupOffer>{};
+    for (final record in records) {
+      final old = previous[record.id];
+      if (old != null &&
+          (old.supplierId != record.supplierId ||
+              old.supplierType != record.supplierType ||
+              old.productId != record.productId ||
+              old.details.unitLabel != record.details.unitLabel ||
+              record.updatedAt.isBefore(old.updatedAt))) {
+        return false;
+      }
+    }
+    final next = complete || !sameAccount
+        ? <String, WorkspaceGroupOffer>{}
+        : {...data.groupOffers};
+    for (final record in records) {
+      final old = previous[record.id];
+      if (old != null &&
+          record.revision <= old.revision &&
+          !data.groupOffers.containsKey(record.id)) {
+        continue;
+      }
+      next[record.id] = old != null && record.revision <= old.revision
+          ? old
+          : record;
+    }
+    if (!sameAccount) {
+      data.groupOfferHistory.clear();
+      data.selectedGroupOfferId = null;
+    }
+    for (final record in next.values) {
+      data.groupOfferHistory[record.id] = record;
+    }
+    data.groupAccountScope = accountScope;
+    data.groupFeedRevision = feedRevision;
+    data.groupOffersComplete = complete;
+    data.groupOffersStale = false;
+    final ordered = <String, WorkspaceGroupOffer>{
+      if (sameAccount)
+        for (final id in data.groupOffers.keys)
+          if (next.containsKey(id)) id: next[id]!,
+      ...next,
+    };
+    data.groupOffers
+      ..clear()
+      ..addAll(ordered);
+    data.selectedGroupOfferId ??= ordered.keys.firstOrNull;
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  void markWorkspaceGroupOffersStale({
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (_disposed || accountScope != _contactAccountScope) return;
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data?.groupAccountScope != accountScope) return;
+    data!.groupOffersStale = true;
+    if (identical(data, _storeData)) notifyListeners();
+  }
+
   int get workspaceDeliveryRadiusKm => _storeData.workspaceDeliveryRadiusKm;
   set workspaceDeliveryRadiusKm(int value) =>
       _storeData.workspaceDeliveryRadiusKm = value;

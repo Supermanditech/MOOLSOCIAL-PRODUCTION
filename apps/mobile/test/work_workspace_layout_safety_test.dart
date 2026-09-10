@@ -14797,6 +14797,249 @@ void main() {
   ]) {
     final stockViewSuffix = '$scale-${viewport.width.toInt()}';
     testWidgets(
+      'DASH11 scoped supplier offers selection states and Back $stockViewSuffix',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final store = work.activeWorkspace!.id;
+        final invoiceCount = work.workspaceInvoices.length;
+        WorkspaceGroupOffer offer(int index, {int revision = 1}) =>
+            WorkspaceGroupOffer(
+              accountScope: 'review-draft-account',
+              workspaceId: store,
+              supplierId: 'supplier-$index',
+              supplierName: [
+                'Jodhpur Mandi',
+                'Marwar Wholesale',
+                'Factory Direct',
+                'Market Wholesale',
+              ][index],
+              supplierType: [
+                WorkspaceStockSupplierType.mandi,
+                WorkspaceStockSupplierType.wholesaler,
+                WorkspaceStockSupplierType.manufacturer,
+                WorkspaceStockSupplierType.wholesaler,
+              ][index],
+              productId: 'product-$index',
+              revision: revision,
+              updatedAt: DateTime.utc(2026, 9, 10, 12, 0, revision),
+              closingAt: DateTime.utc(2026, 9, 12),
+              stage: index == 3
+                  ? WorkspaceGroupOfferStage.cancelled
+                  : WorkspaceGroupOfferStage.secured,
+              publicationConfirmed: true,
+              participation: index == 0
+                  ? const WorkspaceGroupParticipation(
+                      state: WorkspaceGroupParticipationState.notJoined,
+                    )
+                  : const WorkspaceGroupParticipation(
+                      state: WorkspaceGroupParticipationState.balanceDue,
+                      quantity: 10,
+                      goodsMinor: 14000,
+                      tradeFeeMinor: 500,
+                      deliveryMinor: 0,
+                      taxMinor: 0,
+                      totalMinor: 14500,
+                      referenceMinor: 18000,
+                      paidMinor: 5000,
+                      dueMinor: 9500,
+                    ),
+              details: WorkspaceGroupBuy(
+                id: 'offer-$index',
+                productName: [
+                  'Red onions',
+                  'Premium rice',
+                  'Whole wheat atta',
+                  'Cooking oil',
+                ][index],
+                specification: index == 3
+                    ? 'Refined oil · sealed 5 kg tins'
+                    : 'Grade A · sealed 5 kg bags',
+                leadRetailer: 'Shree Grocery',
+                confirmedRetailers: const ['Shree Grocery'],
+                targetQuantity: 1000,
+                securedQuantity: 300,
+                unitLabel: 'kg',
+                regularUnitPrice: 18,
+                groupUnitPrice: 14,
+                facilitationFee: 600,
+                deliveryFee: 200,
+                confirmationAmount: 3000,
+                closingLabel: '12 Sep',
+                storeDeliveryLabel: '14 Sep',
+                paymentConfirmed: true,
+                participants: const [
+                  WorkspaceGroupBuyParticipant(
+                    businessName: 'Shree Grocery',
+                    locality: 'Market road',
+                    quantity: 50,
+                    unitLabel: 'kg',
+                    milestone: 'Confirmed',
+                  ),
+                ],
+              ),
+            );
+        bool apply(int revision, List<WorkspaceGroupOffer> offers) =>
+            work.applyWorkspaceGroupOffers(
+              accountScope: 'review-draft-account',
+              storeId: store,
+              feedRevision: revision,
+              records: offers,
+              complete: true,
+            );
+        expect(apply(1, [for (var i = 0; i < 4; i++) offer(i)]), isTrue);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: viewport,
+          textScale: scale,
+        );
+        await tester.ensureVisible(
+          find.byKey(const Key('work-quick-group-buy')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-quick-group-buy')));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-group-offers-view')), findsOneWidget);
+        await captureStoreView(tester, 'group-offers-first-$stockViewSuffix');
+        await tester.tap(find.byKey(const Key('work-group-offer-switch')));
+        await tester.pumpAndSettle();
+        await captureStoreView(
+          tester,
+          'group-offers-selector-$stockViewSuffix',
+        );
+        final choice = find.byKey(const Key('work-group-choose-offer-1'));
+        await reveal(tester, choice);
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        expect(work.selectedWorkspaceGroupOfferId, 'offer-1');
+        expect(find.text('Marwar Wholesale · Wholesaler'), findsOneWidget);
+        expect(
+          apply(2, [offer(3, revision: 2), offer(2), offer(1), offer(0)]),
+          isTrue,
+        );
+        await tester.pumpAndSettle();
+        expect(work.selectedWorkspaceGroupOfferId, 'offer-1');
+        await captureStoreView(
+          tester,
+          'group-offers-selected-$stockViewSuffix',
+        );
+        final total = find.byKey(const ValueKey('work-group-value-Your total'));
+        await reveal(tester, total);
+        expect(
+          find.descendant(of: total, matching: find.text('₹145')),
+          findsOneWidget,
+        );
+        final pay = find.widgetWithText(FilledButton, 'Pay balance');
+        await reveal(tester, pay);
+        expect(tester.widget<FilledButton>(pay).onPressed, isNull);
+        await captureStoreView(tester, 'group-offers-cost-$stockViewSuffix');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(
+          find.byKey(const Key('work-quick-group-buy')),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-quick-group-buy')));
+        await tester.pumpAndSettle();
+        expect(work.selectedWorkspaceGroupOfferId, 'offer-1');
+        work.markWorkspaceGroupOffersStale(
+          accountScope: 'review-draft-account',
+          storeId: store,
+        );
+        await tester.pumpAndSettle();
+        tester
+            .state<ScrollableState>(
+              find
+                  .descendant(
+                    of: find.byKey(const Key('work-group-offers-view')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            )
+            .position
+            .jumpTo(0);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-group-offers-stale')),
+          findsOneWidget,
+        );
+        await captureStoreView(tester, 'group-offers-stale-$stockViewSuffix');
+        expect(apply(3, [offer(0), offer(2), offer(3, revision: 2)]), isTrue);
+        await tester.pumpAndSettle();
+        expect(work.selectedWorkspaceGroupOfferId, 'offer-1');
+        expect(find.text('This offer is no longer available'), findsOneWidget);
+        await captureStoreView(tester, 'group-offers-removed-$stockViewSuffix');
+        await tester.tap(find.byKey(const Key('work-group-offer-switch')));
+        await tester.pumpAndSettle();
+        final cancelledChoice = find.byKey(
+          const Key('work-group-choose-offer-3'),
+        );
+        await reveal(tester, cancelledChoice);
+        await tester.tap(cancelledChoice);
+        await tester.pumpAndSettle();
+        final cancelledList = tester.widget<ListView>(
+          find.byKey(const PageStorageKey('work-group-details-offer-3')),
+        );
+        final cancelledChildren =
+            (cancelledList.childrenDelegate as SliverChildListDelegate)
+                .children;
+        expect(
+          (cancelledChildren.singleWhere(
+                    (child) => child.key == const Key('work-group-your-state'),
+                  )
+                  as Text)
+              .data,
+          'Your recorded payment',
+        );
+        expect(
+          cancelledChildren.any(
+            (child) => child.key == const Key('work-group-payment-action'),
+          ),
+          isFalse,
+        );
+        await captureStoreView(
+          tester,
+          'group-offers-cancelled-$stockViewSuffix',
+        );
+        final previousDelivery = find.byKey(
+          const ValueKey('work-group-value-Previous delivery estimate'),
+        );
+        await reveal(tester, previousDelivery);
+        expect(
+          find.descendant(of: previousDelivery, matching: find.text('14 Sep')),
+          findsOneWidget,
+        );
+        final recordedBalance = find.byKey(
+          const ValueKey('work-group-value-Previously outstanding'),
+        );
+        await reveal(tester, recordedBalance);
+        expect(
+          find.descendant(of: recordedBalance, matching: find.text('₹95')),
+          findsOneWidget,
+        );
+        await captureStoreView(
+          tester,
+          'group-offers-cancelled-payment-$stockViewSuffix',
+        );
+        expect(apply(4, []), isTrue);
+        await tester.pumpAndSettle();
+        expect(find.text('No group offers available'), findsOneWidget);
+        final emptyScroll = tester.state<ScrollableState>(
+          find.descendant(
+            of: find.byKey(
+              const PageStorageKey('work-group-details-offer-3-unavailable'),
+            ),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        expect(emptyScroll.position.pixels, 0);
+        await captureStoreView(tester, 'group-offers-empty-$stockViewSuffix');
+        expect(work.workspaceInvoices.length, invoiceCount);
+        expect(tester.takeException(), isNull);
+      },
+    );
+    testWidgets(
       'DASH10 stock changes retain filters references and Back $stockViewSuffix',
       (tester) async {
         final work = storeViewFixture();

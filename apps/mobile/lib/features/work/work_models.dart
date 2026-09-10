@@ -1562,6 +1562,250 @@ class WorkspaceGroupBuyParticipant {
   final String milestone;
 }
 
+enum WorkspaceStockSupplierType {
+  wholesaler,
+  mandi,
+  manufacturer;
+
+  String get label => switch (this) {
+    wholesaler => 'Wholesaler',
+    mandi => 'Mandi',
+    manufacturer => 'Manufacturer',
+  };
+
+  /// Exact authoritative business role, never guessed from names or copy.
+  static WorkspaceStockSupplierType? fromRole(String role) => switch (role) {
+    'wholesaler' => wholesaler,
+    'mandi' => mandi,
+    'manufacturer' => manufacturer,
+    _ => null,
+  };
+}
+
+enum WorkspaceGroupOfferStage {
+  collecting,
+  full,
+  secured,
+  packing,
+  dispatched,
+  delivered,
+  closed,
+  failed,
+  cancelled;
+
+  String get label => switch (this) {
+    collecting => 'Accepting quantities',
+    full => 'Quantity filled',
+    secured => 'Stock secured',
+    packing => 'Preparing dispatch',
+    dispatched => 'On the way',
+    delivered => 'Delivery completed',
+    closed => 'Offer closed',
+    failed => 'Purchase not completed',
+    cancelled => 'Offer cancelled',
+  };
+}
+
+enum WorkspaceGroupParticipationState {
+  unknown,
+  notJoined,
+  pending,
+  confirmationPaid,
+  balanceDue,
+  paid,
+  paymentFailed,
+  refundPending,
+  refunded,
+  cancelled;
+
+  String get label => switch (this) {
+    unknown => 'Your purchase update unavailable',
+    notJoined => 'You have not joined',
+    pending => 'Your confirmation is pending',
+    confirmationPaid => 'Your confirmation payment received',
+    balanceDue => 'Your balance is due',
+    paid => 'Your payment is complete',
+    paymentFailed => 'Your payment was not completed',
+    refundPending => 'Your refund is pending',
+    refunded => 'Your refund is complete',
+    cancelled => 'Your purchase is cancelled',
+  };
+}
+
+/// This Store's quoted amounts in paise, never the aggregate group's costs.
+/// Unknown values remain null; local UI arithmetic cannot confirm a payment.
+class WorkspaceGroupParticipation {
+  const WorkspaceGroupParticipation({
+    required this.state,
+    this.quantity,
+    this.goodsMinor,
+    this.tradeFeeMinor,
+    this.deliveryMinor,
+    this.taxMinor,
+    this.totalMinor,
+    this.referenceMinor,
+    this.paidMinor,
+    this.dueMinor,
+    this.refundMinor,
+    this.paymentDeadline,
+  });
+  final WorkspaceGroupParticipationState state;
+  final int? quantity,
+      goodsMinor,
+      tradeFeeMinor,
+      deliveryMinor,
+      taxMinor,
+      totalMinor,
+      referenceMinor,
+      paidMinor,
+      dueMinor,
+      refundMinor;
+  final DateTime? paymentDeadline;
+  int? get savingMinor => totalMinor == null || referenceMinor == null
+      ? null
+      : referenceMinor! - totalMinor!;
+  bool get valid {
+    if ([
+      quantity,
+      goodsMinor,
+      tradeFeeMinor,
+      deliveryMinor,
+      taxMinor,
+      totalMinor,
+      referenceMinor,
+      paidMinor,
+      dueMinor,
+      refundMinor,
+    ].any((value) => value != null && value < 0)) {
+      return false;
+    }
+    if (paymentDeadline != null && !paymentDeadline!.isUtc) return false;
+    if (goodsMinor != null &&
+        tradeFeeMinor != null &&
+        deliveryMinor != null &&
+        taxMinor != null &&
+        totalMinor != null &&
+        totalMinor !=
+            goodsMinor! + tradeFeeMinor! + deliveryMinor! + taxMinor!) {
+      return false;
+    }
+    if (paidMinor != null &&
+        dueMinor != null &&
+        totalMinor != null &&
+        paidMinor! + dueMinor! != totalMinor) {
+      return false;
+    }
+    if (refundMinor != null && paidMinor != null && refundMinor! > paidMinor!) {
+      return false;
+    }
+    return switch (state) {
+      WorkspaceGroupParticipationState.notJoined =>
+        (quantity == null || quantity == 0) &&
+            (paidMinor == null || paidMinor == 0),
+      WorkspaceGroupParticipationState.paid =>
+        quantity != null &&
+            quantity! > 0 &&
+            totalMinor != null &&
+            paidMinor == totalMinor &&
+            dueMinor == 0,
+      WorkspaceGroupParticipationState.balanceDue =>
+        quantity != null && quantity! > 0 && dueMinor != null && dueMinor! > 0,
+      WorkspaceGroupParticipationState.confirmationPaid =>
+        quantity != null &&
+            quantity! > 0 &&
+            paidMinor != null &&
+            paidMinor! > 0,
+      WorkspaceGroupParticipationState.refunded =>
+        refundMinor != null && refundMinor! > 0,
+      _ => true,
+    };
+  }
+}
+
+/// Read-only projection supplied by an authenticated Store offer adapter.
+/// Scope/revision validation here is not server-side eligibility or authority.
+class WorkspaceGroupOffer {
+  WorkspaceGroupOffer({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.supplierId,
+    required this.supplierName,
+    required this.supplierType,
+    required this.productId,
+    required this.revision,
+    required this.updatedAt,
+    required this.closingAt,
+    required this.stage,
+    required this.publicationConfirmed,
+    required WorkspaceGroupBuy details,
+    required this.participation,
+    this.note,
+  }) : details = WorkspaceGroupBuy(
+         id: details.id,
+         productName: details.productName,
+         specification: details.specification,
+         leadRetailer: details.leadRetailer,
+         confirmedRetailers: List.unmodifiable(details.confirmedRetailers),
+         targetQuantity: details.targetQuantity,
+         securedQuantity: details.securedQuantity,
+         unitLabel: details.unitLabel,
+         regularUnitPrice: details.regularUnitPrice,
+         groupUnitPrice: details.groupUnitPrice,
+         facilitationFee: details.facilitationFee,
+         deliveryFee: details.deliveryFee,
+         confirmationAmount: details.confirmationAmount,
+         closingLabel: details.closingLabel,
+         storeDeliveryLabel: details.storeDeliveryLabel,
+         paymentConfirmed: details.paymentConfirmed,
+         deliveryPartnerName: details.deliveryPartnerName,
+         participants: List.unmodifiable(details.participants),
+       );
+  final String accountScope, workspaceId, supplierId, supplierName, productId;
+  final WorkspaceStockSupplierType supplierType;
+  final int revision;
+  final DateTime updatedAt, closingAt;
+  final WorkspaceGroupOfferStage stage;
+  final bool publicationConfirmed;
+  final WorkspaceGroupBuy details;
+  final WorkspaceGroupParticipation participation;
+  final String? note;
+  String get id => details.id;
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        supplierId,
+        supplierName,
+        productId,
+        id,
+        details.productName,
+        details.specification,
+        details.unitLabel,
+        details.leadRetailer,
+      ].every((value) => value.trim().isNotEmpty) &&
+      revision > 0 &&
+      updatedAt.isUtc &&
+      closingAt.isUtc &&
+      publicationConfirmed &&
+      details.targetQuantity > 0 &&
+      details.securedQuantity >= 0 &&
+      details.securedQuantity <= details.targetQuantity &&
+      details.groupUnitPrice >= 0 &&
+      details.regularUnitPrice >= 0 &&
+      details.facilitationFee >= 0 &&
+      details.deliveryFee >= 0 &&
+      details.confirmationAmount >= 0 &&
+      participation.valid &&
+      (participation.quantity == null ||
+          participation.quantity! <= details.targetQuantity) &&
+      details.participants.every(
+        (person) =>
+            person.quantity >= 0 &&
+            person.businessName.trim().isNotEmpty &&
+            person.unitLabel == details.unitLabel,
+      );
+}
+
 enum WorkOpportunityPosterType {
   moolSocial,
   retailer,

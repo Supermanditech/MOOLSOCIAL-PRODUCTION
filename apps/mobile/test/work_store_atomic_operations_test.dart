@@ -321,7 +321,241 @@ class _OrderTimeGateway extends ReviewWorkGateway
   }
 }
 
+WorkspaceGroupOffer _groupOffer(
+  String id, {
+  int revision = 1,
+  String account = 'account-A',
+  String store = 'group-store',
+  String supplier = 'mandi-A',
+  WorkspaceStockSupplierType supplierType = WorkspaceStockSupplierType.mandi,
+  WorkspaceGroupOfferStage stage = WorkspaceGroupOfferStage.collecting,
+  bool published = true,
+  WorkspaceGroupParticipation participation = const WorkspaceGroupParticipation(
+    state: WorkspaceGroupParticipationState.balanceDue,
+    quantity: 10,
+    goodsMinor: 14000,
+    tradeFeeMinor: 500,
+    deliveryMinor: 0,
+    taxMinor: 0,
+    totalMinor: 14500,
+    referenceMinor: 18000,
+    paidMinor: 5000,
+    dueMinor: 9500,
+  ),
+}) => WorkspaceGroupOffer(
+  accountScope: account,
+  workspaceId: store,
+  supplierId: supplier,
+  supplierName: 'Market supplier',
+  supplierType: supplierType,
+  productId: 'onion-$id',
+  revision: revision,
+  updatedAt: DateTime.utc(2026, 9, 10, 12, 0, revision),
+  closingAt: DateTime.utc(2026, 9, 12),
+  stage: stage,
+  publicationConfirmed: published,
+  participation: participation,
+  details: WorkspaceGroupBuy(
+    id: id,
+    productName: 'Onions $id',
+    specification: 'Grade A · 25 kg sacks',
+    leadRetailer: 'Peer retailer',
+    confirmedRetailers: ['Peer retailer'],
+    targetQuantity: 1000,
+    securedQuantity: 300,
+    unitLabel: 'kg',
+    regularUnitPrice: 18,
+    groupUnitPrice: 14,
+    facilitationFee: 600,
+    deliveryFee: 200,
+    confirmationAmount: 3000,
+    closingLabel: '12 Sep',
+    storeDeliveryLabel: '14 Sep',
+    paymentConfirmed: true,
+    participants: const [
+      WorkspaceGroupBuyParticipant(
+        businessName: 'Peer retailer',
+        locality: 'Market road',
+        quantity: 50,
+        unitLabel: 'kg',
+        milestone: 'Confirmed',
+      ),
+    ],
+  ),
+);
+
 void main() {
+  test(
+    'DASH11 supplier roles exclude retailer consumer and ambiguous names',
+    () {
+      for (final role in WorkspaceStockSupplierType.values) {
+        expect(WorkspaceStockSupplierType.fromRole(role.name), role);
+      }
+      for (final role in [
+        'retailer',
+        'consumer',
+        'shop',
+        'unknown',
+        'Manufacturer retailer',
+        '',
+      ]) {
+        expect(WorkspaceStockSupplierType.fromRole(role), isNull);
+      }
+    },
+  );
+
+  test(
+    'DASH11 immutable group facts keep Store amounts separate and unknown honest',
+    () {
+      final record = _groupOffer('one');
+      expect(record.valid, isTrue);
+      expect(record.details.securedQuantity, 300);
+      expect(record.participation.quantity, 10);
+      expect(record.participation.savingMinor, 3500);
+      expect(
+        () => record.details.confirmedRetailers.add('bad'),
+        throwsUnsupportedError,
+      );
+      expect(() => record.details.participants.clear(), throwsUnsupportedError);
+      expect(
+        const WorkspaceGroupParticipation(
+          state: WorkspaceGroupParticipationState.unknown,
+        ).savingMinor,
+        isNull,
+      );
+      expect(
+        const WorkspaceGroupParticipation(
+          state: WorkspaceGroupParticipationState.paid,
+          quantity: 10,
+          totalMinor: 100,
+          paidMinor: 50,
+          dueMinor: 50,
+        ).valid,
+        isFalse,
+      );
+      expect(
+        const WorkspaceGroupParticipation(
+          state: WorkspaceGroupParticipationState.pending,
+          goodsMinor: 100,
+          tradeFeeMinor: 10,
+          deliveryMinor: 0,
+          taxMinor: 0,
+          totalMinor: 100,
+        ).valid,
+        isFalse,
+      );
+      expect(_groupOffer('hidden', published: false).valid, isFalse);
+    },
+  );
+
+  test(
+    'DASH11 four offers preserve selection scope revisions and no trade effects',
+    () {
+      final account = _CommandAccountStore();
+      final work = WorkSession(contactDraftStore: account)
+        ..activeWorkspace = const WorkWorkspace(
+          id: 'group-store',
+          name: 'Store A',
+          profileLabel: 'Grocery',
+          profileId: 'retailer-grocery',
+          area: 'Market',
+          verified: true,
+        );
+      addTearDown(work.dispose);
+      bool apply(
+        int revision,
+        List<WorkspaceGroupOffer> records, {
+        bool complete = true,
+      }) => work.applyWorkspaceGroupOffers(
+        accountScope: 'account-A',
+        storeId: 'group-store',
+        feedRevision: revision,
+        records: records,
+        complete: complete,
+      );
+      final records = [
+        for (final id in ['A', 'B', 'C', 'D']) _groupOffer(id),
+      ];
+      expect(apply(1, records), isTrue);
+      expect(work.selectWorkspaceGroupOffer('B'), isTrue);
+      expect(
+        apply(2, [
+          records[3],
+          records[2],
+          _groupOffer(
+            'B',
+            revision: 2,
+            stage: WorkspaceGroupOfferStage.dispatched,
+          ),
+          records[0],
+        ]),
+        isTrue,
+      );
+      expect(work.workspaceGroupOffers.map((r) => r.id), ['A', 'B', 'C', 'D']);
+      expect(work.selectedWorkspaceGroupOfferId, 'B');
+      expect(
+        work.selectedWorkspaceGroupOffer!.stage,
+        WorkspaceGroupOfferStage.dispatched,
+      );
+      expect(
+        work.selectedWorkspaceGroupOffer!.participation.state,
+        WorkspaceGroupParticipationState.balanceDue,
+      );
+      expect(apply(2, records), isFalse);
+      expect(apply(3, [_groupOffer('B', account: 'other')]), isFalse);
+      expect(apply(3, [_groupOffer('B', store: 'other')]), isFalse);
+      expect(
+        apply(3, [_groupOffer('B', supplier: 'different', revision: 3)]),
+        isFalse,
+      );
+      expect(
+        apply(3, [
+          _groupOffer(
+            'B',
+            revision: 3,
+            supplierType: WorkspaceStockSupplierType.manufacturer,
+          ),
+        ]),
+        isFalse,
+      );
+      expect(apply(3, [records[0], records[0]]), isFalse);
+      expect(work.workspaceGroupOffers.length, 4);
+      expect(apply(3, [records[0], records[2], records[3]]), isTrue);
+      expect(work.selectedWorkspaceGroupOfferId, 'B');
+      expect(work.selectedWorkspaceGroupOffer, isNull);
+      expect(work.activeGroupBuy, isNull);
+      expect(
+        apply(4, [_groupOffer('B', revision: 2)], complete: false),
+        isTrue,
+      );
+      expect(work.selectedWorkspaceGroupOffer, isNull);
+      expect(
+        apply(5, [_groupOffer('B', revision: 3)], complete: false),
+        isTrue,
+      );
+      expect(work.selectedWorkspaceGroupOffer!.revision, 3);
+      work.markWorkspaceGroupOffersStale(
+        accountScope: 'account-A',
+        storeId: 'group-store',
+      );
+      expect(work.workspaceGroupOffersStale, isTrue);
+      expect(apply(5, records), isFalse);
+      expect(work.workspaceGroupOffersStale, isTrue);
+      expect(
+        apply(6, [_groupOffer('B', revision: 4)], complete: false),
+        isTrue,
+      );
+      expect(work.workspaceGroupOffersStale, isFalse);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceActivity, isEmpty);
+      account.accountScope = 'account-B';
+      expect(work.workspaceGroupOffers, isEmpty);
+      expect(work.selectedWorkspaceGroupOffer, isNull);
+      expect(apply(7, records), isFalse);
+    },
+  );
   test(
     'DASH10 local stock changes are not truncated after one hundred',
     () async {

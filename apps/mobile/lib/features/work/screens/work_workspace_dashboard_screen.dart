@@ -3007,7 +3007,11 @@ class _StoreActionEdge extends StatelessWidget {
                 label: 'Group Bulk Buying',
                 onTap: onGroup,
                 detail: deal == null
-                    ? null
+                    ? session.workspaceGroupOffersConnected
+                          ? '${session.workspaceGroupOffers.length} offers'
+                          : null
+                    : session.workspaceGroupOffersConnected
+                    ? '${session.workspaceGroupOffers.length} offers\n${deal.productName}'
                     : '${deal.productName}\n₹${deal.groupUnitPrice}/${deal.unitLabel}',
                 progress: deal == null || deal.targetQuantity <= 0
                     ? null
@@ -9773,6 +9777,9 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       );
     }
     if (operation == _WorkspaceOperation.groupBuying) {
+      if (session.workspaceGroupOffersConnected) {
+        return _WorkspaceGroupOffersSurface(session: session);
+      }
       return session.activeGroupBuy == null
           ? ListView(
               padding: const EdgeInsets.all(20),
@@ -13760,6 +13767,285 @@ class _PreviewFactChip extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _WorkspaceGroupOffersSurface extends StatelessWidget {
+  const _WorkspaceGroupOffersSurface({required this.session});
+  final WorkSession session;
+
+  Future<void> _choose(BuildContext context) async {
+    final id = await showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (context) => AnimatedBuilder(
+        animation: session,
+        builder: (context, _) => ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * .65,
+          ),
+          child: ListView(
+            key: const Key('work-group-offer-choices'),
+            shrinkWrap: true,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            children: [
+              for (final offer in session.workspaceGroupOffers)
+                ListTile(
+                  key: ValueKey('work-group-choose-${offer.id}'),
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(
+                    offer.details.productName,
+                    style: const TextStyle(fontWeight: FontWeight.w800),
+                  ),
+                  subtitle: Text(
+                    '${offer.supplierName} · ${offer.supplierType.label}\n${offer.stage.label}',
+                  ),
+                  trailing: offer.id == session.selectedWorkspaceGroupOfferId
+                      ? const Icon(Icons.check_circle, color: MoolColors.navy)
+                      : const Icon(Icons.chevron_right),
+                  onTap: () => Navigator.pop(context, offer.id),
+                ),
+              if (session.workspaceGroupOffers.isEmpty)
+                const Text('No group offers available.'),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (id != null) session.selectWorkspaceGroupOffer(id);
+  }
+
+  static String _date(DateTime value) {
+    final local = value.toLocal();
+    return '${local.day}/${local.month}/${local.year} · ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final offers = session.workspaceGroupOffers;
+    final offer = session.selectedWorkspaceGroupOffer;
+    final details = offer?.details;
+    final member = offer?.participation;
+    final purchaseStopped = const {
+      WorkspaceGroupOfferStage.cancelled,
+      WorkspaceGroupOfferStage.failed,
+    }.contains(offer?.stage);
+    final refundState = const {
+      WorkspaceGroupParticipationState.refundPending,
+      WorkspaceGroupParticipationState.refunded,
+    }.contains(member?.state);
+    Widget amount(String label, int? minor, {bool strong = false}) =>
+        _GroupBuyReviewLine(
+          label: label,
+          value: minor == null ? 'Not available' : _purchaseAmount(minor),
+          strong: strong,
+        );
+    final paymentAction =
+        member != null &&
+        offer != null &&
+        !const {
+          WorkspaceGroupOfferStage.cancelled,
+          WorkspaceGroupOfferStage.failed,
+          WorkspaceGroupOfferStage.closed,
+        }.contains(offer.stage) &&
+        const {
+          WorkspaceGroupParticipationState.balanceDue,
+          WorkspaceGroupParticipationState.paymentFailed,
+        }.contains(member.state);
+    final joinAction =
+        member?.state == WorkspaceGroupParticipationState.notJoined &&
+        offer?.stage == WorkspaceGroupOfferStage.collecting;
+    return Column(
+      key: const Key('work-group-offers-view'),
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        TextButton.icon(
+          key: const Key('work-group-offer-switch'),
+          onPressed: offers.isEmpty ? null : () => _choose(context),
+          style: TextButton.styleFrom(
+            minimumSize: const Size(48, 48),
+            alignment: Alignment.centerLeft,
+            padding: const EdgeInsets.all(16),
+          ),
+          icon: const Icon(Icons.unfold_more),
+          label: Text(
+            details?.productName ?? 'Choose group offer',
+            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            key: PageStorageKey(
+              'work-group-details-${session.selectedWorkspaceGroupOfferId}'
+              '${offer == null ? "-unavailable" : ""}',
+            ),
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+            children: [
+              Text(
+                '${offers.length} ${session.workspaceGroupOffersComplete ? "offers" : "offers loaded"}',
+                style: const TextStyle(color: MoolColors.muted),
+              ),
+              if (session.workspaceGroupOffersStale)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 8),
+                  child: Text(
+                    'Updates paused. Check the latest status before paying.',
+                    key: Key('work-group-offers-stale'),
+                  ),
+                ),
+              if (offer == null)
+                _DeskEmpty(
+                  icon: Icons.groups_2_outlined,
+                  title: offers.isEmpty
+                      ? 'No group offers available'
+                      : 'This offer is no longer available',
+                  detail: offers.isEmpty
+                      ? 'Eligible supplier offers will appear here.'
+                      : 'Choose another offer above.',
+                ),
+              if (offer != null && details != null && member != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  '${offer.supplierName} · ${offer.supplierType.label}',
+                  key: const Key('work-group-supplier'),
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Text(details.specification),
+                const SizedBox(height: 12),
+                Text(
+                  '₹${_formatStoreAmount(details.groupUnitPrice)} / ${details.unitLabel}',
+                  style: const TextStyle(
+                    fontSize: 26,
+                    color: MoolColors.navy,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  'Reference ₹${_formatStoreAmount(details.regularUnitPrice)} / ${details.unitLabel} · before fees',
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
+                _GroupBuyReviewLine(
+                  label: 'Group status',
+                  value: offer.stage.label,
+                ),
+                _GroupBuyReviewLine(
+                  label: 'Group quantity',
+                  value:
+                      '${details.securedQuantity} / ${details.targetQuantity} ${details.unitLabel}',
+                ),
+                _GroupBuyReviewLine(
+                  label: 'Closes',
+                  value: _date(offer.closingAt),
+                ),
+                _GroupBuyReviewLine(
+                  label: purchaseStopped
+                      ? 'Previous delivery estimate'
+                      : 'Expected delivery',
+                  value: details.storeDeliveryLabel.isEmpty
+                      ? 'Not available'
+                      : details.storeDeliveryLabel,
+                ),
+                if (details.deliveryPartnerName?.isNotEmpty == true)
+                  _GroupBuyReviewLine(
+                    label: 'Delivery partner',
+                    value: details.deliveryPartnerName!,
+                  ),
+                const Divider(height: 24),
+                Text(
+                  purchaseStopped && !refundState
+                      ? 'Your recorded payment'
+                      : member.state.label,
+                  key: const Key('work-group-your-state'),
+                  style: const TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                if (member.quantity != null && member.quantity! > 0) ...[
+                  _GroupBuyReviewLine(
+                    label: 'Your quantity',
+                    value: '${member.quantity} ${details.unitLabel}',
+                  ),
+                  amount('Your goods', member.goodsMinor),
+                  amount('Trade fee', member.tradeFeeMinor),
+                  amount('Delivery fee', member.deliveryMinor),
+                  amount('Tax', member.taxMinor),
+                  amount('Your total', member.totalMinor, strong: true),
+                  if (!purchaseStopped &&
+                      member.savingMinor != null &&
+                      member.savingMinor! > 0)
+                    amount('Your saving after fees', member.savingMinor),
+                  amount('Payment received', member.paidMinor),
+                  amount(
+                    purchaseStopped ? 'Previously outstanding' : 'Balance due',
+                    member.dueMinor,
+                    strong: true,
+                  ),
+                ],
+                if (member.refundMinor != null)
+                  amount('Refund amount', member.refundMinor),
+                if (!purchaseStopped && member.paymentDeadline != null)
+                  _GroupBuyReviewLine(
+                    label: 'Pay by',
+                    value: _date(member.paymentDeadline!),
+                  ),
+                if (offer.note?.isNotEmpty == true) Text(offer.note!),
+                if (paymentAction || joinAction) ...[
+                  const SizedBox(height: 8),
+                  FilledButton(
+                    key: const Key('work-group-payment-action'),
+                    onPressed: null,
+                    child: Text(
+                      joinAction
+                          ? 'Join group purchase'
+                          : member.state ==
+                                WorkspaceGroupParticipationState.paymentFailed
+                          ? 'Review payment'
+                          : 'Pay balance',
+                    ),
+                  ),
+                  const Text(
+                    'Group purchase payments are not available yet.',
+                    style: TextStyle(color: MoolColors.muted),
+                  ),
+                ],
+                const Divider(height: 24),
+                const Text(
+                  'Buying with you',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                if (!details.participants.any(
+                  (person) => person.businessName == details.leadRetailer,
+                ))
+                  _GroupBuyReviewLine(
+                    label: 'Lead retailer',
+                    value: details.leadRetailer,
+                  ),
+                for (final person in details.participants)
+                  _GroupBuyReviewLine(
+                    label: person.businessName == details.leadRetailer
+                        ? '${person.businessName} · Lead retailer'
+                        : person.businessName,
+                    value:
+                        '${person.quantity} ${person.unitLabel} · ${person.milestone}',
+                  ),
+                if (details.participants.isEmpty)
+                  const Text(
+                    'Participating retailer details are not available.',
+                  ),
+                const SizedBox(height: 12),
+                Text(
+                  'Updated ${_date(offer.updatedAt)}',
+                  style: const TextStyle(color: MoolColors.muted),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
