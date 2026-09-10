@@ -17790,6 +17790,91 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    for (final amount in [
+      (100000000050, '₹1,00,00,00,000.50'),
+      (1000000000050, '₹10,00,00,00,000.50'),
+    ]) {
+      for (final surface in ['search', 'detail']) {
+        testWidgets(
+          'DASH08 supplier monetary fit $surface ${amount.$1} $scale',
+          (tester) async {
+            final work = storeViewFixture(null, _ContactDraftFixtureStore());
+            final now = DateTime.now();
+            final orderBefore = work.currentWorkspaceOrderId;
+            expect(
+              work.applyWorkspacePurchases(
+                accountScope: 'review-draft-account',
+                storeId: work.activeWorkspace!.id,
+                feedRevision: 1,
+                complete: true,
+                records: [
+                  WorkspacePurchaseRecord(
+                    accountScope: 'review-draft-account',
+                    workspaceId: work.activeWorkspace!.id,
+                    supplierId: 'supplier-money',
+                    supplierName: 'Supplier purchase',
+                    orderId: 'PO-1',
+                    shipmentId: 'SHIP-1',
+                    revision: 1,
+                    createdAt: now,
+                    updatedAt: now,
+                    stage: WorkspaceSupplyStage.arriving,
+                    amountMinor: amount.$1,
+                    itemSummary: 'Stock purchase',
+                    paymentLabel: 'Paid online',
+                    lines: const [],
+                  ),
+                ],
+              ),
+              isTrue,
+            );
+            await mount(
+              tester,
+              route: '/app/work/workspace/dashboard',
+              work: work,
+              viewport: scale == 1
+                  ? const Size(412, 915)
+                  : const Size(320, 568),
+              textScale: scale,
+            );
+            await tester.tap(find.byKey(const Key('work-dashboard-search')));
+            await tester.pumpAndSettle();
+            await tester.enterText(
+              find.byKey(const Key('work-dashboard-search-field')),
+              'PO-1',
+            );
+            await tester.pumpAndSettle();
+            if (surface == 'detail') {
+              await tester.tap(
+                find.byKey(const Key('work-search-purchase-SHIP-1')),
+              );
+              await tester.pumpAndSettle();
+            }
+            final value = find.text(amount.$2);
+            await reveal(tester, value);
+            await captureStoreView(
+              tester,
+              'supplier-money-$surface-${amount.$1}-$scale',
+            );
+            expectExactMoneyVisible(tester, value);
+            final paragraph = tester.renderObject<RenderParagraph>(value);
+            expect(paragraph.textScaler.scale(14), closeTo(14 * scale, .01));
+            expect(
+              (paragraph.text as TextSpan).style!.fontSize,
+              greaterThanOrEqualTo(14),
+            );
+            expect(work.currentWorkspaceOrderId, orderBefore);
+            expect(work.workspaceStockMovements, isEmpty);
+            expect(work.workspaceInvoices, isEmpty);
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+          },
+        );
+      }
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
     testWidgets('DASH03 exact supplier alerts and resolved recovery $scale', (
       tester,
     ) async {

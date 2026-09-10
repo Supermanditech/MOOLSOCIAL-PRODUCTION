@@ -8836,6 +8836,7 @@ class _WorkspaceNavigationRow extends StatelessWidget {
     required this.onTap,
     this.amount,
     this.amountLabel = 'Price',
+    this.wideMoney = false,
   });
 
   final String keyName;
@@ -8845,17 +8846,20 @@ class _WorkspaceNavigationRow extends StatelessWidget {
   final VoidCallback onTap;
   final String? amount;
   final String amountLabel;
+  final bool wideMoney;
 
   @override
   Widget build(BuildContext context) {
     return WorkCard(
       keyName: keyName,
       onTap: onTap,
-      padding: EdgeInsets.all(
-        amount != null && MediaQuery.textScalerOf(context).scale(1) >= 2
-            ? 8
-            : MoolSpacing.sm,
-      ),
+      padding: wideMoney && MediaQuery.textScalerOf(context).scale(1) >= 2
+          ? const EdgeInsets.symmetric(vertical: 8)
+          : EdgeInsets.all(
+              amount != null && MediaQuery.textScalerOf(context).scale(1) >= 2
+                  ? 8
+                  : MoolSpacing.sm,
+            ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -9007,6 +9011,7 @@ class _WorkspaceSearchSurface extends StatelessWidget {
                   title: destination.title,
                   detail: destination.detail,
                   amount: destination.amount,
+                  wideMoney: destination.kind == _WorkspaceSearchKind.purchase,
                   amountLabel: switch (destination.kind) {
                     _WorkspaceSearchKind.order => 'Order total',
                     _WorkspaceSearchKind.invoice => 'Invoice total',
@@ -9104,7 +9109,10 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           'work-purchase-details-$storeId-${selected.shipmentId}-$statement',
         ),
         primary: false,
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.symmetric(
+          horizontal: MediaQuery.textScalerOf(context).scale(1) >= 2 ? 8 : 16,
+          vertical: 16,
+        ),
         children: [
           Row(
             children: [

@@ -2,6 +2,33 @@
 
 ## 2026-09-10 current 27-item skim and Cursor handoff receipt
 
+### DASH-LOAD-07/08 supplier monetary fit — 2026-09-11
+
+The approved 100–1000 crore requirement exposed two previously uncovered supplier surfaces: search and exact purchase details at 320×568/200%. Focused baseline replay has 6 passed / 2 failed, both for `₹10,00,00,00,000.50`; the complete value required horizontal scrolling. Actual captures confirm clipped final digits until sideways scrolling. Retain within existing DASH-LOAD-07/08, not a new parent ticket. The 100crore and normal-scale cases passed. Evidence `dashboard-load-implementation-20260909/supplier-money-before-v1.log`, SHA `E0FFCFF8354F65098B10E1228266BB9CA957D9CE896F0C19F0943AFA0806BF2D`. The two failing captures under `supplier-money-before-20260910-v1/` were inspected individually. Apply only responsive spacing changes to the affected purchase surfaces; preserve all digits/paise, minimum14px base text and full user text scaling. No financial facts, arithmetic, transactions, authority or Cursor edits.
+
+V2 correction: at 200% the purchase search row releases its inner horizontal inset, and exact purchase detail reduces horizontal padding from16 to8. Normal-size design and other search result kinds retain existing spacing. Ten focused tests passed (eight amount/surface/scale cases plus the two 1000-record search/Back cases); full analysis zero issues and protected UI locks passed. All twelve resulting Flutter captures were individually inspected. Full amount/decimal visibility is asserted without horizontal scrolling, clipping, wrapping, or text scaling below the user preference; base amount font remains at least14. Focused log `supplier-money-after-v2.log` SHA `FEE3C12802A3AA15F095A46238907297D6E7D505381B822E51C9CD87E5239CA8`; analysis `supplier-money-analysis-v2.log` SHA `745F8775F89DA0D6DCC7997A30EEAD07C9D51B450AB198140D2C7DB8F01F72FC`. Combined run pending at this checkpoint, no APK/device/backend qualification.
+
+Final V2 combined result: **1081 passed / 79 existing skips / one known failure**, exit1. Exact five-file serial command is the preceding supplier-search combined command; no test list/skip change other than the eight new monetary regression cases. Sole failure remains `DASH10 restock search retains product cart and Back 2.0` in the older embedded Buy owner. Evidence `dashboard-load-implementation-20260909/supplier-money-combined-v2.log`, SHA `D7174DA615564F652AF1C670A049C7A3D324F2FEF27DDB387FB3F8269AF9B087`. No new failing test. This increment is locally qualified for the bounded monetary fit correction, not full-batch or APK qualification. Cursor and all backend/device boundaries remain unchanged.
+
+Capture directory: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/supplier-money-after-20260911-v2/`.
+
+| Capture | SHA-256 |
+| --- | --- |
+| supplier-money-detail-1000000000050-1.0.png | 16E4827F70D373B126AE52AE91337E27FF948AC87F7DE96896A8E516AF80814E |
+| supplier-money-detail-1000000000050-2.0.png | 6C5E911C8F28E49B039812E2AE6824B694097A467E39F368B0840FCC5167BD38 |
+| supplier-money-detail-100000000050-1.0.png | 749D528525B34B3A3FA63D00BDD53AD4FDC08ADE9169C5949607F1AFBBC977DA |
+| supplier-money-detail-100000000050-2.0.png | 3AE43ED16D7B0E12676C33D8672F7DE01484803D910040B2F4CBEBF019C29C7D |
+| supplier-money-search-1000000000050-1.0.png | 5C413F4668B14CC97D7B93DB680B8F065C84960D4688122EB2134F6EBADDBA76 |
+| supplier-money-search-1000000000050-2.0.png | 5CE05016F5976B23D4A0BFB8872665787C45CBDC2376459A4CC6F80E2D4DC43C |
+| supplier-money-search-100000000050-1.0.png | FD705C9ABFB4282EB78DDDE6FF90FEF2BB059976BE123BF3D6AFD91465EC3D37 |
+| supplier-money-search-100000000050-2.0.png | F3FB2046C89A02A0FC04ACCDFF81E46BAB9EC8A343E24610DDC9E0D98F4840E4 |
+| supplier-search-exact-1.0.png | 9782F42A8F4D32CBE7778F13CB7AD69F6CF82C49B6457636F0AE9332C45D2CEB |
+| supplier-search-exact-2.0.png | 39F10734847898FAC7CAFC2B689F056C74C4A176D541A3F0EF60169DD86C432A |
+| supplier-search-results-1.0.png | 3B5DB45AFC76FFE13EF8A77823691D8FE624FDF8A8DDB8729BAFECD2E60D32A4 |
+| supplier-search-results-2.0.png | 7F98B1377C070602902009EF906BB9ECCEE85029BE17747992C732C9E0E8FECE |
+
+Regression-inventory reconciliation: retained shared/Profile log `shared-current-screen-combined-v1.log` hash independently reverified as `13C76F534FFF0A58C1761A53D4B6F92998133C2B0066B6F8ADE97CDFB21C957F`, and current ancestry includes `cd7cd2adab4b528f691ad20bb14cb6a4ab204bfe`. Its 173passes/2failures disposition supersedes the old fourteen-shared-plus-seven-exploratory implementation backlog: fourteen shared and five Codex exploratory cases have local corrections; two Buy/Chat assertions remain a compatibility dependency. Exact names: `order Help stays in one supplier conversation with one composer` and `Medicine order Help stays on Care and returns to Care`. Cursor handoff `5ae5059a...` still contains `find.text('Conversation')` in those two tests, but its complete file differs from Store. No execution against Cursor's source is claimed, and those tests must be evaluated on the eventual combined context; do not overwrite specific supplier/application identity to satisfy generic-title expectations. No new parent ticket or Cursor edit.
+
 Continuation: implement the existing DASH-LOAD-02/07 supplier/purchase search using the read-only, scoped shipment projection and current exact-purchase surface. Preserve customer-order selection, exact purchase identity, query/scroll on Back and unavailable recovery; no Buy integration or backend effects. REG4557: a combined source read exceeded its output budget; recover the omitted operation/navigation slices independently before editing, with no result inferred from the missing text.
 
 Supplier-search v1 analysis stopped with one brace-style lint on the expanded purchase Back condition; no focused test followed. Evidence `supplier-search-analysis-v1.log`, SHA-256 `3409FDADE1E03BD58A0672807391A2DA0BFB33DCEBA78F00AE28A615C0CF94F5`. Correct that exact condition. Before the first test, give the 1000-record fixture distinct creation timestamps so its intended 41st record is deterministic rather than dependent on lexicographic IDs; production ordering is unchanged.
@@ -34,7 +61,7 @@ REG4557 evidence-output follow-up: broad projections of historical candidate sta
 
 - REG4551: CLOSED for the bounded return-navigation correction. Focused10 and existing Files160 three tests pass locally; two historical44-file cycles each1497 passed/83 existing skips/0 failures; full analysis zero issues. Exact r66.13 installed hash matches. Native029–040 verify toolbar Back, Android Back, repeated visits, retained Store context and nested-sheet Android dismissal.
 - REG4554: shared Files heading implemented/local regressions and actual visual review passed; final OPPO replay pending. No device closure yet.
-- REG4555:14 inherited legacy shared-suite failures proven on accepted parent and current code; separate owner/contract disposition pending, no full-suite pass claimed.
+- REG4555: original14 inherited shared-suite failures retained as historical evidence; current local owner corrections are sealed in `cd7cd2ad...` and the 173pass/2failure disposition below. Only the two recorded Buy/Chat compatibility assertions remain in that replay. Physical OPPO and full combined-source qualification remain pending; do not reopen the corrected fourteen cases.
 - REG4556: IMPLEMENTED / LOCAL FOCUSED PASS / OPPO PENDING — shared Files Add sheet Cancel now has bottom-inset protection and readable source labels. Native037–038 preserve the original defect proof; final device replay still required. This is separate from the r66.12 Work document-source sheet and REG4558 product-tools sheet.
 - REG4552/4553: existing r66.12 document closure remains preserved, not rerun or reopened by this navigation-only change.
 
