@@ -335,6 +335,52 @@ void main() {
     }
   }
 
+  void expectFinanceActionWords(WidgetTester tester) {
+    for (final entry in const {
+      'work-pulse-sales': 'View statement',
+      'work-pulse-dues': 'Collect dues',
+      'work-pulse-settlement': 'Settle',
+    }.entries) {
+      final label = find.descendant(
+        of: find.byKey(Key(entry.key)),
+        matching: find.text(entry.value),
+      );
+      final paragraph = tester.renderObject<RenderParagraph>(label);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      for (final word in RegExp(r'\S+').allMatches(entry.value)) {
+        final boxes = paragraph.getBoxesForSelection(
+          TextSelection(baseOffset: word.start, extentOffset: word.end),
+        );
+        expect(boxes, hasLength(1), reason: '${entry.key}: ${word.group(0)}');
+        expect(boxes.single.left, greaterThanOrEqualTo(-.5));
+        expect(
+          boxes.single.right,
+          lessThanOrEqualTo(paragraph.size.width + .5),
+        );
+      }
+      final amount = find.descendant(
+        of: find.byKey(Key('${entry.key}-value-motion')),
+        matching: find.byType(Text),
+      );
+      expect(amount, findsOneWidget);
+      final amountText = tester.widget<Text>(amount).data!;
+      final amountParagraph = tester.renderObject<RenderParagraph>(amount);
+      expect(amountParagraph.didExceedMaxLines, isFalse);
+      for (final digits in RegExp(r'[\d,.]+').allMatches(amountText)) {
+        final boxes = amountParagraph.getBoxesForSelection(
+          TextSelection(baseOffset: digits.start, extentOffset: digits.end),
+        );
+        expect(boxes, hasLength(1), reason: '${entry.key}: $amountText');
+        expect(boxes.single.left, greaterThanOrEqualTo(-.5));
+        expect(
+          boxes.single.right,
+          lessThanOrEqualTo(amountParagraph.size.width + .5),
+          reason: '${entry.key}: all amount digits must fit',
+        );
+      }
+    }
+  }
+
   Future<void> mount(
     WidgetTester tester, {
     required String route,
@@ -18098,6 +18144,7 @@ void main() {
           WorkspaceFinanceSnapshot snapshot(
             int revision, {
             bool paid = false,
+            int availableMinor = 1000000000050,
           }) => WorkspaceFinanceSnapshot(
             accountScope: 'review-draft-account',
             workspaceId: work.activeWorkspace!.id,
@@ -18105,7 +18152,7 @@ void main() {
             asOf: now,
             salesTodayMinor: 1000000000050,
             duesMinor: paid ? 0 : 46825,
-            availableMinor: 1000000000050,
+            availableMinor: availableMinor,
             heldMinor: 75025,
             requestedMinor: paid ? 0 : 100000,
             paidOutMinor: paid ? 100000 : 0,
@@ -18163,7 +18210,10 @@ void main() {
               ),
             ],
           );
-          expect(work.applyWorkspaceFinance(snapshot(1)), isTrue);
+          expect(
+            work.applyWorkspaceFinance(snapshot(1, availableMinor: 9999999)),
+            isTrue,
+          );
           await mount(
             tester,
             route: '/app/work/workspace/dashboard',
@@ -18171,6 +18221,12 @@ void main() {
             viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
             textScale: scale,
           );
+          expectFinanceActionWords(tester);
+          await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
+          await captureStoreView(tester, 'finance-paise-boundary-$scale');
+          expect(work.applyWorkspaceFinance(snapshot(2)), isTrue);
+          await tester.pumpAndSettle();
+          expectFinanceActionWords(tester);
           await captureStoreView(tester, 'finance-dashboard-$scale');
           await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
           final pulseText = tester
@@ -18290,7 +18346,34 @@ void main() {
           await tester.pumpAndSettle();
           await reveal(tester, find.byKey(const Key('work-finance-stale')));
           await captureStoreView(tester, 'finance-stale-$scale');
-          expect(work.applyWorkspaceFinance(snapshot(2, paid: true)), isTrue);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          for (final key in [
+            'work-pulse-sales',
+            'work-pulse-dues',
+            'work-pulse-settlement',
+          ]) {
+            final pulse = find.byKey(Key(key));
+            await reveal(tester, pulse);
+            expect(
+              find.descendant(of: pulse, matching: find.text('Last update')),
+              findsOneWidget,
+              reason: key,
+            );
+            expect(
+              find.descendant(of: pulse, matching: find.text('—')),
+              findsNothing,
+              reason: 'Retain the confirmed amount for $key',
+            );
+          }
+          expectFinanceActionWords(tester);
+          await captureStoreView(tester, 'finance-stale-pulse-$scale');
+          await reveal(tester, find.byKey(const Key('work-pulse-sales')));
+          await captureStoreView(tester, 'finance-stale-pulse-leading-$scale');
+          await reveal(tester, find.byKey(const Key('work-pulse-dues')));
+          await tester.tap(find.byKey(const Key('work-pulse-dues')));
+          await tester.pumpAndSettle();
+          expect(work.applyWorkspaceFinance(snapshot(3, paid: true)), isTrue);
           await tester.pumpAndSettle();
           expect(work.workspaceFinance!.duesMinor, 0);
           expect(
@@ -18301,6 +18384,16 @@ void main() {
           expect(work.workspaceOrders.map((o) => (o.id, o.stage)), states);
           await tester.binding.handlePopRoute();
           await tester.pumpAndSettle();
+          final duesPulse = find.byKey(const Key('work-pulse-dues'));
+          await reveal(tester, duesPulse);
+          expect(
+            find.descendant(of: duesPulse, matching: find.text('₹0')),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(of: duesPulse, matching: find.text('Unpaid bills')),
+            findsOneWidget,
+          );
           await reveal(tester, find.byKey(const Key('work-pulse-sales')));
           await tester.tap(find.byKey(const Key('work-pulse-sales')));
           await tester.pumpAndSettle();
@@ -18337,6 +18430,9 @@ void main() {
           const UnavailableWorkGateway(),
           _ContactDraftFixtureStore(),
         );
+        final orderBefore = work.currentWorkspaceOrderId;
+        final invoicesBefore = work.workspaceInvoices.length;
+        final movementsBefore = work.workspaceStockMovements.length;
         await mount(
           tester,
           route: '/app/work/workspace/dashboard',
@@ -18344,8 +18440,44 @@ void main() {
           viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
           textScale: scale,
         );
+        for (final key in [
+          'work-pulse-sales',
+          'work-pulse-dues',
+          'work-pulse-settlement',
+        ]) {
+          final pulse = find.byKey(Key(key));
+          await reveal(tester, pulse);
+          expect(
+            find.descendant(of: pulse, matching: find.text('Update pending')),
+            findsOneWidget,
+            reason: key,
+          );
+          expect(
+            find.descendant(of: pulse, matching: find.text('—')),
+            findsOneWidget,
+            reason: 'Unavailable $key must not infer a balance',
+          );
+          final semantics = tester.widget<Semantics>(
+            find
+                .ancestor(
+                  of: pulse,
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Semantics && widget.properties.button == true,
+                  ),
+                )
+                .first,
+          );
+          expect(semantics.properties.label, contains('amount unavailable'));
+        }
+        expectFinanceActionWords(tester);
+        await captureStoreView(tester, 'finance-unavailable-pulse-$scale');
+        await reveal(tester, find.byKey(const Key('work-pulse-sales')));
+        await captureStoreView(
+          tester,
+          'finance-unavailable-pulse-leading-$scale',
+        );
         await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
-        expect(find.text('Update pending'), findsOneWidget);
         await tester.tap(find.byKey(const Key('work-pulse-settlement')));
         await tester.pumpAndSettle();
         expect(find.text('Payment updates unavailable'), findsOneWidget);
@@ -18358,6 +18490,20 @@ void main() {
           find.byKey(const Key('work-store-activity-deck')),
           findsOneWidget,
         );
+        for (final key in ['work-pulse-sales', 'work-pulse-dues']) {
+          final pulse = find.byKey(Key(key));
+          await reveal(tester, pulse);
+          await tester.tap(pulse);
+          await tester.pumpAndSettle();
+          expect(find.text('Payment updates unavailable'), findsOneWidget);
+          expect(find.text('₹0'), findsNothing);
+          await captureStoreView(tester, 'finance-unavailable-$key-$scale');
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        expect(work.currentWorkspaceOrderId, orderBefore);
+        expect(work.workspaceInvoices.length, invoicesBefore);
+        expect(work.workspaceStockMovements.length, movementsBefore);
         expect(tester.takeException(), isNull);
       },
     );

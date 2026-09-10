@@ -3287,10 +3287,15 @@ class _StoreEdgeAction extends StatelessWidget {
   );
 }
 
-double _storeRailWordWidth(BuildContext context, String labels) {
-  final style = DefaultTextStyle.of(
-    context,
-  ).style.merge(const TextStyle(fontSize: 11, fontWeight: FontWeight.w700));
+double _storeRailWordWidth(
+  BuildContext context,
+  String labels, {
+  TextStyle textStyle = const TextStyle(
+    fontSize: 11,
+    fontWeight: FontWeight.w700,
+  ),
+}) {
+  final style = DefaultTextStyle.of(context).style.merge(textStyle);
   var width = 0.0;
   for (final word in labels.split(RegExp(r'\s+'))) {
     final painter = TextPainter(
@@ -3310,18 +3315,32 @@ class _StoreAdaptiveRail extends StatelessWidget {
     required this.labels,
     required this.normalFlex,
     required this.builder,
+    this.minimumItemWidths = const [],
   });
   final List<String> labels;
   final List<int> normalFlex;
   final Widget Function(List<int>) builder;
+  final List<double> minimumItemWidths;
 
   @override
   Widget build(BuildContext context) {
+    assert(
+      minimumItemWidths.isEmpty || minimumItemWidths.length == labels.length,
+    );
     if (MediaQuery.textScalerOf(context).scale(11) <= 16) {
       return builder(normalFlex);
     }
     final widths = labels
-        .map((label) => (_storeRailWordWidth(context, label) + 16).ceil())
+        .asMap()
+        .entries
+        .map(
+          (entry) => (_storeRailWordWidth(context, entry.value) + 16)
+              .clamp(
+                minimumItemWidths.isEmpty ? 0 : minimumItemWidths[entry.key],
+                double.infinity,
+              )
+              .ceil(),
+        )
         .toList();
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -3450,6 +3469,45 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final finance = session.workspaceFinance;
+    final review = session.workspaceFinanceUsesLegacyReview;
+    String factLabel(String confirmed) => session.workspaceFinanceStale
+        ? 'Last update'
+        : finance != null || review
+        ? confirmed
+        : 'Update pending';
+    final salesLabel = factLabel('Sales today');
+    final duesLabel = factLabel('Unpaid bills');
+    final settlementLabel = factLabel('Available');
+    final salesValue = finance != null
+        ? _purchaseAmount(finance.salesTodayMinor)
+        : review
+        ? '₹${_formatStoreAmount(session.workspaceSalesToday)}'
+        : '—';
+    final duesValue = finance != null
+        ? _purchaseAmount(finance.duesMinor)
+        : review
+        ? '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}'
+        : '—';
+    final settlementValue = finance != null
+        ? _purchaseAmount(finance.availableMinor)
+        : review
+        ? '₹${_formatStoreAmount(session.workspaceSettlementEligible)}'
+        : '—';
+    final minimumAmountWidths = MediaQuery.textScalerOf(context).scale(11) <= 16
+        ? const <double>[]
+        : [salesValue, duesValue, settlementValue].map<double>((value) {
+            return _storeRailWordWidth(
+                  context,
+                  _storeSummaryAmount(value),
+                  textStyle: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    fontFeatures: [FontFeature.tabularFigures()],
+                  ),
+                ) +
+                16;
+          }).toList();
     return Semantics(
       container: true,
       label: 'Store finances',
@@ -3463,10 +3521,12 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
             border: Border(bottom: BorderSide(color: Color(0xFF3232A0))),
           ),
           child: _StoreAdaptiveRail(
-            labels: const [
-              'View statement Sales today',
-              'Collect dues Unpaid bills',
-              'Settle Available',
+            // Reserve each column's own readable label and amount width.
+            minimumItemWidths: minimumAmountWidths,
+            labels: [
+              'View statement $salesLabel',
+              'Collect dues $duesLabel',
+              'Settle $settlementLabel',
             ],
             normalFlex: const [1, 1, 1],
             builder: (flex) => IntrinsicHeight(
@@ -3478,12 +3538,8 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                     keyName: 'work-pulse-sales',
                     flex: flex[0],
                     label: 'View statement',
-                    contextLabel: 'Sales today',
-                    value: session.workspaceFinance != null
-                        ? _purchaseAmount(
-                            session.workspaceFinance!.salesTodayMinor,
-                          )
-                        : '₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                    contextLabel: salesLabel,
+                    value: salesValue,
                     icon: Icons.point_of_sale_outlined,
                     onTap: onSales,
                   ),
@@ -3492,10 +3548,8 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                     keyName: 'work-pulse-dues',
                     flex: flex[1],
                     label: 'Collect dues',
-                    contextLabel: 'Unpaid bills',
-                    value: session.workspaceFinance != null
-                        ? _purchaseAmount(session.workspaceFinance!.duesMinor)
-                        : '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
+                    contextLabel: duesLabel,
+                    value: duesValue,
                     icon: Icons.payments_outlined,
                     onTap: onOrders,
                   ),
@@ -3504,19 +3558,8 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                     keyName: 'work-pulse-settlement',
                     flex: flex[2],
                     label: 'Settle',
-                    contextLabel: session.workspaceFinanceStale
-                        ? 'Last update'
-                        : session.workspaceFinance != null ||
-                              session.workspaceFinanceUsesLegacyReview
-                        ? 'Available'
-                        : 'Update pending',
-                    value: session.workspaceFinance != null
-                        ? _purchaseAmount(
-                            session.workspaceFinance!.availableMinor,
-                          )
-                        : session.workspaceFinanceUsesLegacyReview
-                        ? '₹${_formatStoreAmount(session.workspaceSettlementEligible)}'
-                        : '—',
+                    contextLabel: settlementLabel,
+                    value: settlementValue,
                     icon: Icons.account_balance_wallet_outlined,
                     onTap: onSettlement,
                   ),
@@ -3566,10 +3609,12 @@ class _StorePulseMetric extends StatelessWidget {
     const accent = Colors.white;
     final enlarged = MediaQuery.textScalerOf(context).scale(1) >= 2;
     return Expanded(
-      flex: enlarged ? 1 : flex,
+      flex: flex,
       child: Semantics(
         button: true,
-        label: '$label, $contextLabel, $value in store records',
+        label: value == '—'
+            ? '$label, $contextLabel, amount unavailable'
+            : '$label, $contextLabel, $value in store records',
         onTap: onTap,
         excludeSemantics: true,
         child: InkWell(
