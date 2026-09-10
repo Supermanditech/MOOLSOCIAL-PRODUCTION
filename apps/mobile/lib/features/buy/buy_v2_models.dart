@@ -33,6 +33,175 @@ enum BuyV2CheckoutStep { address, payment, confirm }
 
 enum BuyV2CartScope { all, shop, wholesale, medicine }
 
+enum BuyV2ProcurementPurpose { restock, groupBulkBuying, buyDirect }
+
+enum BuyV2SupplierWorkspaceRole {
+  unknown,
+  consumer,
+  retailer,
+  wholesaler,
+  mandi,
+  manufacturer,
+}
+
+enum BuyV2SupplierListingChannel { unknown, consumer, wholesale, bulk }
+
+/// Store-owned entry identity, not a public URL or a grant of purchase access.
+/// The originating Store wrapper owns restoration of [originOperationId].
+class BuyV2ProcurementContext {
+  const BuyV2ProcurementContext({
+    required this.accountId,
+    required this.storeId,
+    required this.purpose,
+    required this.originOperationId,
+  });
+
+  final String accountId;
+  final String storeId;
+  final BuyV2ProcurementPurpose purpose;
+  final String originOperationId;
+
+  bool get hasIdentity => [
+    accountId,
+    storeId,
+    originOperationId,
+  ].every((value) => value.isNotEmpty && value.trim() == value);
+
+  /// Reuses the existing customer-state owner scope without mixing carts.
+  /// A wrapper must still verify the current account and approved Store.
+  String get customerStateOwnerScope =>
+      'buy-procurement:${Uri.encodeComponent(accountId)}:'
+      '${Uri.encodeComponent(storeId)}:${purpose.name}:'
+      '${Uri.encodeComponent(originOperationId)}';
+}
+
+/// Provider-supplied approval for the purchasing account's exact Store.
+class BuyV2ProcurementBuyerGrant {
+  const BuyV2ProcurementBuyerGrant({
+    required this.accountId,
+    required this.storeId,
+    required this.approved,
+    required this.validUntil,
+  });
+
+  final String accountId;
+  final String storeId;
+  final bool approved;
+  final DateTime validUntil;
+}
+
+/// Supplier workspace authority for one published offer. Display seller names,
+/// category labels and group participants cannot supply this authority.
+/// Stock, pack/MOQ, serviceability and charges still require the existing
+/// product/quote checks; an eligible role alone never makes checkout ready.
+class BuyV2ProcurementSupplierGrant {
+  const BuyV2ProcurementSupplierGrant({
+    required this.workspaceId,
+    required this.storeId,
+    required this.role,
+    required this.approved,
+    required this.listingId,
+    required this.productCanonicalId,
+    required this.offerId,
+    required this.offerRevision,
+    required this.channel,
+    required this.published,
+    required this.validUntil,
+  });
+
+  final String workspaceId;
+  final String storeId;
+  final BuyV2SupplierWorkspaceRole role;
+  final bool approved;
+  final String listingId;
+  final String productCanonicalId;
+  final String offerId;
+  final String offerRevision;
+  final BuyV2SupplierListingChannel channel;
+  final bool published;
+  final DateTime validUntil;
+}
+
+enum BuyV2ProcurementEligibility {
+  notRequested,
+  eligible,
+  contextUnavailable,
+  buyerUnavailable,
+  supplierUnavailable,
+  roleNotPermitted,
+  listingNotPermitted,
+  offerChanged,
+}
+
+/// Shared mandatory eligibility decision. It does not apply customer filters,
+/// mutate a cart, admit payment, or authorize historical order visibility.
+BuyV2ProcurementEligibility buyV2ProcurementEligibility({
+  required BuyV2ProcurementContext? context,
+  required String? activeAccountId,
+  required String? activeStoreId,
+  required BuyV2ProcurementBuyerGrant? buyer,
+  required BuyV2ProcurementSupplierGrant? supplier,
+  required BuyV2Product product,
+  required DateTime now,
+  String? expectedOfferId,
+  String? expectedOfferRevision,
+}) {
+  if (context == null) return BuyV2ProcurementEligibility.notRequested;
+  if (!context.hasIdentity ||
+      activeAccountId != context.accountId ||
+      activeStoreId != context.storeId) {
+    return BuyV2ProcurementEligibility.contextUnavailable;
+  }
+  if (buyer == null ||
+      !buyer.approved ||
+      buyer.accountId != context.accountId ||
+      buyer.storeId != context.storeId ||
+      !now.isBefore(buyer.validUntil)) {
+    return BuyV2ProcurementEligibility.buyerUnavailable;
+  }
+  if (supplier == null ||
+      !supplier.approved ||
+      !now.isBefore(supplier.validUntil) ||
+      [
+        supplier.workspaceId,
+        supplier.storeId,
+        supplier.listingId,
+        supplier.productCanonicalId,
+        supplier.offerId,
+        supplier.offerRevision,
+      ].any((value) => value.isEmpty || value.trim() != value)) {
+    return BuyV2ProcurementEligibility.supplierUnavailable;
+  }
+  final rolePermitted = switch (context.purpose) {
+    BuyV2ProcurementPurpose.buyDirect =>
+      supplier.role == BuyV2SupplierWorkspaceRole.manufacturer,
+    BuyV2ProcurementPurpose.restock ||
+    BuyV2ProcurementPurpose.groupBulkBuying => const {
+      BuyV2SupplierWorkspaceRole.wholesaler,
+      BuyV2SupplierWorkspaceRole.mandi,
+      BuyV2SupplierWorkspaceRole.manufacturer,
+    }.contains(supplier.role),
+  };
+  if (!rolePermitted) return BuyV2ProcurementEligibility.roleNotPermitted;
+  if (!supplier.published ||
+      product.destination != BuyV2Destination.wholesale ||
+      !const {
+        BuyV2SupplierListingChannel.wholesale,
+        BuyV2SupplierListingChannel.bulk,
+      }.contains(supplier.channel)) {
+    return BuyV2ProcurementEligibility.listingNotPermitted;
+  }
+  if (supplier.storeId != product.storeId ||
+      supplier.listingId != product.id ||
+      supplier.productCanonicalId != product.canonicalId ||
+      (expectedOfferId != null && expectedOfferId != supplier.offerId) ||
+      (expectedOfferRevision != null &&
+          expectedOfferRevision != supplier.offerRevision)) {
+    return BuyV2ProcurementEligibility.offerChanged;
+  }
+  return BuyV2ProcurementEligibility.eligible;
+}
+
 enum BuyV2ProductSort {
   relevance,
   priceLowToHigh,
@@ -153,6 +322,7 @@ class BuyV2Product {
     required this.confirmedOn,
     required this.visualLabel,
     required this.visualKind,
+    this.procurementSupplierGrant,
     this.storeId,
     this.mrp,
     this.requiresPrescription = false,
@@ -175,6 +345,7 @@ class BuyV2Product {
   final BuyV2Destination destination;
   final String categoryId;
   final String brand;
+  final BuyV2ProcurementSupplierGrant? procurementSupplierGrant;
   final String title;
   final String variant;
   final String pack;
@@ -204,6 +375,7 @@ class BuyV2Product {
     String? id,
     String? canonicalId,
     String? storeId,
+    BuyV2ProcurementSupplierGrant? procurementSupplierGrant,
     String? title,
     String? origin,
     String? variant,
@@ -226,6 +398,8 @@ class BuyV2Product {
     destination: destination,
     categoryId: categoryId,
     brand: brand,
+    procurementSupplierGrant:
+        procurementSupplierGrant ?? this.procurementSupplierGrant,
     title: title ?? this.title,
     variant: variant ?? this.variant,
     pack: pack ?? this.pack,

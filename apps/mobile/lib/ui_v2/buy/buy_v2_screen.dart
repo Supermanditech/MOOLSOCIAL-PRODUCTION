@@ -452,22 +452,56 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
   }
 
+  bool get _hasExplicitBuyRoute =>
+      widget.productId != null ||
+      widget.orderId != null ||
+      widget.recoveryKind != null ||
+      widget.initialView != BuyV2View.catalogue;
+
   Future<void> _restoreSessionState() async {
-    await widget.session.restoreCommerce();
-    await widget.session.restoreCustomerState();
-    await widget.session.restoreSavedProducts();
-    await widget.session.restoreOrderAlerts();
-    await widget.session.restoreShoppingAlerts();
-    await widget.session.refreshCartBenefits();
-    await widget.session.refreshCheckoutQuote();
-    await widget.session.refreshCommercialPaymentTerms();
-    await _gstInvoiceController.restore();
-    if (widget.session.businessVerified) {
-      _gstInvoiceController.applySavedBusinessProfile();
+    final session = widget.session;
+    final gstController = _gstInvoiceController;
+    bool current() =>
+        mounted &&
+        identical(widget.session, session) &&
+        session.procurementScopeCurrent &&
+        identical(_gstInvoiceController, gstController);
+    await session.restoreCommerce();
+    if (!current()) return;
+    await session.restoreCustomerState(restoreBrowsing: !_hasExplicitBuyRoute);
+    if (!current()) return;
+    // Explicit current links take precedence over a retained browsing position.
+    if (_hasExplicitBuyRoute && session.isStoreProcurement) {
+      _applyInitialState(afterRestore: true);
+    }
+    for (final restore in <Future<void> Function()>[
+      session.restoreSavedProducts,
+      session.restoreOrderAlerts,
+      session.restoreShoppingAlerts,
+      session.refreshCartBenefits,
+      session.refreshCheckoutQuote,
+      session.refreshCommercialPaymentTerms,
+      gstController.restore,
+    ]) {
+      if (!current()) return;
+      await restore();
+    }
+    if (!current()) return;
+    if (session.businessVerified) {
+      gstController.applySavedBusinessProfile();
     }
   }
 
-  void _applyInitialState() {
+  void _applyInitialState({bool afterRestore = false}) {
+    if (widget.session.isStoreProcurement &&
+        _hasExplicitBuyRoute &&
+        !afterRestore) {
+      // Opening a product records recent history; restore the retained draft
+      // before allowing that write to persist this session.
+      widget.session.destination = widget.initialDestination;
+      widget.session.view = BuyV2View.catalogue;
+      return;
+    }
     _offersActive = widget.initialOffersActive;
     final productId = widget.productId;
     final orderId = widget.orderId;
@@ -509,6 +543,30 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
 
   void _sessionChanged() {
     if (!mounted) return;
+    if (!widget.session.procurementScopeCurrent) {
+      _resetArrivalSound();
+      _noticeTimer?.cancel();
+      _cartAcknowledgementTimer?.cancel();
+      _quickTrackerCollapseTimer?.cancel();
+      _searchOpen = false;
+      final session = widget.session;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            widget.session != session ||
+            session.procurementScopeCurrent) {
+          return;
+        }
+        final root = ModalRoute.of(context);
+        if (root != null && !root.isCurrent) {
+          // Close only overlays above this Buy owner. Do not expose the old
+          // account's supplier, address or payment sheet after a scope change.
+          _storeNavigationGeneration++;
+          Navigator.of(context).popUntil((route) => route == root);
+        }
+      });
+      setState(() {});
+      return;
+    }
     if (_arrivalAccount != _arrivalIdentity) {
       _resetArrivalSound();
       _arrivalAccount = _arrivalIdentity;
@@ -634,6 +692,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      widget.session.retainProcurementNavigation();
+    }
     _foreground = state == AppLifecycleState.resumed;
     if (!_foreground) {
       _arrivalSoundOperation++;
@@ -900,6 +963,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
+    if (!session.procurementScopeCurrent) {
+      return _procurementScopeRecovery(session, onReturn: _exitBuy);
+    }
     final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
     final viewport = MediaQuery.sizeOf(context);
     final shortLandscapeCatalogue =
@@ -1030,20 +1096,24 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                               : 'buy-search-owner-motion-primary',
                                         ),
                                         child:
-                                            _storeProductRouteDepth > 0 &&
-                                                session.view !=
-                                                    BuyV2View.product
-                                            ? const SizedBox.expand()
-                                            : _searchOpen &&
-                                                  !_offersActive &&
-                                                  session.destination !=
-                                                      BuyV2Destination.orders
-                                            ? BuyV2SearchResultsView(
-                                                session: session,
-                                                onOpenStore:
-                                                    _openPartnerCatalogue,
-                                              )
-                                            : _currentView(session),
+                                            _procurementPurchaseRecovery(
+                                              session,
+                                            ) ??
+                                            (_storeProductRouteDepth > 0 &&
+                                                    session.view !=
+                                                        BuyV2View.product
+                                                ? const SizedBox.expand()
+                                                : _searchOpen &&
+                                                      !_offersActive &&
+                                                      session.destination !=
+                                                          BuyV2Destination
+                                                              .orders
+                                                ? BuyV2SearchResultsView(
+                                                    session: session,
+                                                    onOpenStore:
+                                                        _openPartnerCatalogue,
+                                                  )
+                                                : _currentView(session)),
                                       ),
                                     ),
                                   ),
@@ -2052,6 +2122,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           builder: (context, setRouteState) => AnimatedBuilder(
             animation: session,
             builder: (context, _) {
+              if (!session.procurementScopeCurrent) {
+                return _procurementScopeRecovery(
+                  session,
+                  onReturn: () => Navigator.of(routeContext).pop(false),
+                );
+              }
               final showingProduct =
                   !cartEntry && session.view == BuyV2View.product;
               void update(VoidCallback change) {
@@ -2111,46 +2187,53 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                               session.navigationMotionSequence,
                                           direction:
                                               session.navigationMotionDirection,
-                                          child: showingProduct
-                                              ? Column(
-                                                  children: [
-                                                    Expanded(
-                                                      child: BuyV2ProductView(
-                                                        session: session,
-                                                        trailingAction:
-                                                            _buildDeliveryControl(
-                                                              session,
-                                                              update,
-                                                            ),
-                                                        returnLabel:
-                                                            returnLabel == null
-                                                            ? 'Back to ${_storeBrowseAnchor?.seller ?? product.seller}'
-                                                            : 'Back to $returnLabel',
-                                                        onReturn: () =>
-                                                            Navigator.of(
-                                                              routeContext,
-                                                            ).pop(false),
-                                                        onAskSeller:
-                                                            _openProductQuestion,
-                                                        onOpenPartnerCatalogue:
-                                                            _openPartnerCatalogue,
-                                                        wholesaleTradeDecisionAdapter:
-                                                            widget
-                                                                .wholesaleTradeDecisionAdapter,
-                                                      ),
-                                                    ),
-                                                    if (session
-                                                            .countForDestination(
+                                          child:
+                                              _procurementPurchaseRecovery(
+                                                session,
+                                                onProductReturn: () =>
+                                                    Navigator.of(
+                                                      routeContext,
+                                                    ).pop(false),
+                                              ) ??
+                                              (showingProduct
+                                                  ? Column(
+                                                      children: [
+                                                        Expanded(
+                                                          child: BuyV2ProductView(
+                                                            session: session,
+                                                            trailingAction:
+                                                                _buildDeliveryControl(
+                                                                  session,
+                                                                  update,
+                                                                ),
+                                                            returnLabel:
+                                                                returnLabel ==
+                                                                    null
+                                                                ? 'Back to ${_storeBrowseAnchor?.seller ?? product.seller}'
+                                                                : 'Back to $returnLabel',
+                                                            onReturn: () =>
+                                                                Navigator.of(
+                                                                  routeContext,
+                                                                ).pop(false),
+                                                            onAskSeller:
+                                                                _openProductQuestion,
+                                                            onOpenPartnerCatalogue:
+                                                                _openPartnerCatalogue,
+                                                            wholesaleTradeDecisionAdapter:
+                                                                widget
+                                                                    .wholesaleTradeDecisionAdapter,
+                                                          ),
+                                                        ),
+                                                        if (session.countForDestination(
                                                               product
                                                                   .destination,
                                                             ) >
-                                                        0)
-                                                      BuyV2StoreCartBar(
-                                                        session: session,
-                                                        destination:
-                                                            product.destination,
-                                                        onOpenCart: () =>
-                                                            session.openCart(
+                                                            0)
+                                                          BuyV2StoreCartBar(
+                                                            session: session,
+                                                            destination: product
+                                                                .destination,
+                                                            onOpenCart: () => session.openCart(
                                                               scope: switch (product
                                                                   .destination) {
                                                                 BuyV2Destination
@@ -2166,13 +2249,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                                       .shop,
                                                               },
                                                             ),
-                                                      ),
-                                                  ],
-                                                )
-                                              : routeDepth ==
-                                                    _storeProductRouteDepth
-                                              ? _currentView(session)
-                                              : const SizedBox.expand(),
+                                                          ),
+                                                      ],
+                                                    )
+                                                  : routeDepth ==
+                                                        _storeProductRouteDepth
+                                                  ? _currentView(session)
+                                                  : const SizedBox.expand()),
                                         ),
                                       ),
                                       ?_buildDeliveryRestore(session, update),
@@ -2265,6 +2348,86 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         orderId: session.selectedOrderId,
         recoveryKind: session.recoveryKind,
       ),
+    );
+  }
+
+  void _exitBuy() {
+    if (widget.onExit case final onExit?) {
+      onExit();
+    } else {
+      context.go('/app/mool?from=buy');
+    }
+  }
+
+  Widget _procurementScopeRecovery(
+    BuyV2Session session, {
+    required VoidCallback onReturn,
+  }) => BuyV2ThemeScope(
+    spec: BuyV2ThemeSpec.resolve(session.destination, session.view),
+    child: PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) onReturn();
+      },
+      child: _BuySystemBars(
+        child: Scaffold(
+          key: const ValueKey('buy-procurement-scope-recovery'),
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: BuyV2CatalogueAvailabilityView(
+              session: session,
+              title: 'Reopen your Store purchase',
+              detail: session.procurementUnavailableMessage,
+              loading: false,
+              retryAvailable: false,
+              onReturn: onReturn,
+              returnLabel: 'Back to Store',
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget? _procurementPurchaseRecovery(
+    BuyV2Session session, {
+    VoidCallback? onProductReturn,
+  }) {
+    if (!session.isStoreProcurement) return null;
+    final message = switch (session.view) {
+      BuyV2View.catalogue when session.destination != BuyV2Destination.orders =>
+        session.procurementUnavailableMessage,
+      BuyV2View.product =>
+        session.selectedProduct == null
+            ? session.procurementUnavailableMessage
+            : session.procurementProductUnavailableMessage(
+                session.selectedProduct!,
+              ),
+      BuyV2View.checkout => session.procurementCheckoutUnavailableMessage,
+      _ => null,
+    };
+    if (message == null) return null;
+    final loading = session.commerceLoadState == BuyV2CommerceLoadState.loading;
+    final checkout = session.view == BuyV2View.checkout;
+    return BuyV2CatalogueAvailabilityView(
+      session: session,
+      title: loading
+          ? 'Checking Store purchasing'
+          : 'Store purchase unavailable',
+      detail: loading
+          ? 'Checking approval and current supplier offers.'
+          : message,
+      loading: loading,
+      onReturn: checkout
+          ? () => session.openCart(scope: session.checkoutScope)
+          : session.view == BuyV2View.product
+          ? onProductReturn ?? session.goBack
+          : _exitBuy,
+      returnLabel: checkout
+          ? 'Back to Cart'
+          : session.view == BuyV2View.product
+          ? 'Back to products'
+          : 'Back to Store',
     );
   }
 
@@ -3175,7 +3338,10 @@ class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
     final itemLabel = itemCount == 1 ? 'item' : 'items';
     final itemText = '$itemCount $itemLabel';
     final summaryText = otherBaskets ? 'All carts' : itemText;
-    final totalText = buyV2Money(total);
+    final priceUnavailable = session.procurementPricesUnavailableFor(
+      aggregate || destination == BuyV2Destination.orders ? null : destination,
+    );
+    final totalText = priceUnavailable ? 'Price pending' : buyV2Money(total);
     final acknowledgement = aggregate || destination == BuyV2Destination.orders
         ? session.cartAcknowledgement
         : session.cartAcknowledgementForDestination(destination);

@@ -7825,7 +7825,7 @@ class _ProductGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (!savedOnly && !session.catalogueAvailable) {
-      return _CatalogueAvailabilityState(session: session);
+      return BuyV2CatalogueAvailabilityView(session: session);
     }
     final products = savedOnly
         ? session.visibleSavedProducts
@@ -8005,21 +8005,41 @@ class _ProductGrid extends StatelessWidget {
   }
 }
 
-class _CatalogueAvailabilityState extends StatelessWidget {
-  const _CatalogueAvailabilityState({required this.session});
+class BuyV2CatalogueAvailabilityView extends StatelessWidget {
+  const BuyV2CatalogueAvailabilityView({
+    super.key,
+    required this.session,
+    this.title,
+    this.detail,
+    this.loading,
+    this.retryAvailable = true,
+    this.onReturn,
+    this.returnLabel = 'Back',
+  });
 
   final BuyV2Session session;
+  final String? title;
+  final String? detail;
+  final bool? loading;
+  final bool retryAvailable;
+  final VoidCallback? onReturn;
+  final String returnLabel;
 
   @override
   Widget build(BuildContext context) {
-    final loading = session.commerceLoadState == BuyV2CommerceLoadState.loading;
+    final loading =
+        this.loading ??
+        session.commerceLoadState == BuyV2CommerceLoadState.loading;
     final offline = session.commerceLoadState == BuyV2CommerceLoadState.offline;
-    final title = loading
-        ? 'Opening Shop'
-        : offline
-        ? 'Shop could not refresh'
-        : 'Shop is unavailable right now';
+    final title =
+        this.title ??
+        (loading
+            ? 'Opening Shop'
+            : offline
+            ? 'Shop could not refresh'
+            : 'Shop is unavailable right now');
     final detail =
+        this.detail ??
         session.commerceMessage ??
         (loading
             ? 'Checking current products, prices and delivery availability.'
@@ -8055,15 +8075,30 @@ class _CatalogueAvailabilityState extends StatelessWidget {
               ),
               const SizedBox(height: 5),
               Text(detail, textAlign: TextAlign.center, style: context.buyMeta),
-              if (!loading) ...[
+              if (!loading && retryAvailable) ...[
                 const SizedBox(height: 14),
-                SizedBox(
-                  height: BuyV2Metrics.minimumTap,
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: BuyV2Metrics.minimumTap,
+                  ),
                   child: FilledButton.icon(
                     key: const ValueKey('buy-catalogue-retry'),
                     onPressed: session.retryCommerce,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Try again'),
+                  ),
+                ),
+              ],
+              if (onReturn != null) ...[
+                const SizedBox(height: 10),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    minHeight: BuyV2Metrics.minimumTap,
+                  ),
+                  child: OutlinedButton(
+                    key: const ValueKey('buy-procurement-return'),
+                    onPressed: onReturn,
+                    child: Text(returnLabel, textAlign: TextAlign.center),
                   ),
                 ),
               ],

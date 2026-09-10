@@ -40,6 +40,7 @@ class BuyV2CatalogueQuery {
     this.offersOnly = false,
     this.collectionOnly = false,
     this.offerPublisher,
+    this.procurementContext,
   }) : brands = Set.unmodifiable(brands);
 
   final BuyV2Destination destination;
@@ -60,9 +61,10 @@ class BuyV2CatalogueQuery {
   final bool offersOnly;
   final bool collectionOnly;
   final BuyV2OfferPublisherType? offerPublisher;
+  final BuyV2ProcurementContext? procurementContext;
 
   String get key => jsonEncode([
-    2,
+    procurementContext == null ? 2 : 3,
     destination.name,
     regionId,
     areaScope.name,
@@ -81,6 +83,13 @@ class BuyV2CatalogueQuery {
     offersOnly,
     collectionOnly,
     offerPublisher?.name,
+    if (procurementContext case final context?)
+      [
+        context.accountId,
+        context.storeId,
+        context.purpose.name,
+        context.originOperationId,
+      ],
   ]);
 
   @override
@@ -943,6 +952,7 @@ class BuyV2CommerceSnapshot {
     this.productReportsAvailable = false,
     this.reviewableProductIds = const {},
     this.customerMessage,
+    this.procurementBuyerGrant,
   });
 
   final BuyV2CommerceLoadState state;
@@ -956,6 +966,7 @@ class BuyV2CommerceSnapshot {
   final bool productReportsAvailable;
   final Set<String> reviewableProductIds;
   final String? customerMessage;
+  final BuyV2ProcurementBuyerGrant? procurementBuyerGrant;
 }
 
 @immutable
@@ -969,6 +980,7 @@ class BuyV2OrderPlacementRequest {
     required this.idempotencyKey,
     this.commercialPaymentTermIds = const {},
     this.checkoutQuoteId,
+    this.procurementContext,
   });
 
   final List<BuyV2CartLine> lines;
@@ -979,6 +991,7 @@ class BuyV2OrderPlacementRequest {
   final String idempotencyKey;
   final Map<String, String> commercialPaymentTermIds;
   final String? checkoutQuoteId;
+  final BuyV2ProcurementContext? procurementContext;
 }
 
 @immutable

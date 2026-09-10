@@ -69,7 +69,9 @@ String _cartHeaderSummary(BuyV2Session session) {
     _productCountLabel(lines.length),
     quantityLabel,
     if (destinations.isNotEmpty) _destinationSummary(destinations),
-    'Subtotal ${buyV2Money(session.scopedCartTotal)}',
+    session.scopedProcurementPricesUnavailable
+        ? 'Price pending'
+        : 'Subtotal ${buyV2Money(session.scopedCartTotal)}',
   ].join(' · ');
 }
 
@@ -5282,14 +5284,18 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
           final textScale = MediaQuery.textScalerOf(context).scale(1);
           final compactAccessible =
               constraints.maxWidth < 350 && textScale > 1.2;
-          final totalText = buyV2Money(session.scopedPayableTotal);
+          final priceUnavailable = session.scopedProcurementPricesUnavailable;
+          final totalText = priceUnavailable
+              ? 'Pending'
+              : buyV2Money(session.scopedPayableTotal);
           final totalStyle = TextStyle(
             color: BuyV2Colors.navy,
             fontSize: compactAccessible ? 20 : 22,
             fontWeight: FontWeight.w900,
           );
           final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
-          final currencyInLabel = totalSize.width > constraints.maxWidth;
+          final currencyInLabel =
+              !priceUnavailable && totalSize.width > constraints.maxWidth;
           final displayedTotalText = currencyInLabel
               ? totalText.replaceFirst('₹', '')
               : totalText;
@@ -5302,7 +5308,9 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
                   maxLines: null,
                 )
               : totalSize;
-          final baseTotalLabel = session.cartScope == BuyV2CartScope.wholesale
+          final baseTotalLabel = priceUnavailable
+              ? 'Price confirmation required'
+              : session.cartScope == BuyV2CartScope.wholesale
               ? session.scopedTipTotal > 0
                     ? 'Landed total + delivery tip'
                     : 'Landed cart total'
@@ -15745,7 +15753,9 @@ class _CartScopeBar extends StatelessWidget {
           final selected = session.cartScope == scope;
           final label = scope == BuyV2CartScope.all ? 'Subtotal' : scope.label;
           final text = scope == BuyV2CartScope.all
-              ? buyV2Money(session.cartTotal)
+              ? session.procurementPricesUnavailableFor()
+                    ? 'Price pending'
+                    : buyV2Money(session.cartTotal)
               : '${session.countForDestination(_destinationForCartScope(scope)!)}';
           final labelStyle = TextStyle(
             color: selected ? Colors.white : BuyV2Colors.muted,
@@ -16591,7 +16601,7 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
                 '${_cartBenefitContextLabel(destination)} offers, '
                 '${_productCountLabel(session.productCountForDestination(destination))}, '
                 '${session.countForDestination(destination)} ${destination == BuyV2Destination.wholesale ? 'packs' : 'items'}, '
-                '${buyV2Money(session.totalForDestination(destination))}',
+                '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.totalForDestination(destination))}',
             child: Material(
               color: Colors.transparent,
               borderRadius: BorderRadius.circular(12),
@@ -16625,7 +16635,7 @@ class _CartBenefitDestinationSelector extends StatelessWidget {
                     fit: BoxFit.scaleDown,
                     child: Text(
                       '${_cartBenefitContextLabel(destination)} · '
-                      '${buyV2Money(session.totalForDestination(destination))}',
+                      '${session.procurementPricesUnavailableFor(destination) ? 'Price pending' : buyV2Money(session.totalForDestination(destination))}',
                       maxLines: 1,
                       style: TextStyle(
                         color: selected == destination
@@ -17655,6 +17665,17 @@ class _CartBillSummary extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (session.scopedProcurementPricesUnavailable) {
+      return Container(
+        key: const ValueKey('buy-cart-bill-summary'),
+        padding: const EdgeInsets.all(11),
+        decoration: buyV2CardDecoration(radius: 15),
+        child: Text(
+          'A retained item has no confirmed price. Review or remove it before ordering.',
+          style: context.buyMeta,
+        ),
+      );
+    }
     final familyTotals = session.scopedCartFamilyTotals;
     return Container(
       key: const ValueKey('buy-cart-bill-summary'),
@@ -17814,6 +17835,9 @@ class _CartLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final product = line.product;
+    final priceUnavailable = session.procurementRetainedPriceUnavailable(
+      product,
+    );
     final facts = session.productFactsFor(product);
     final wholesale = product.destination == BuyV2Destination.wholesale;
     final automaticFulfilment =
@@ -17919,8 +17943,10 @@ class _CartLine extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'MOQ ${_packCountLabel(product.minimumOrder)} · '
-                    '${buyV2Money(product.price)} per pack',
+                    priceUnavailable
+                        ? 'Price unavailable'
+                        : 'MOQ ${_packCountLabel(product.minimumOrder)} · '
+                              '${buyV2Money(product.price)} per pack',
                     style: context.buyMeta.copyWith(
                       color: BuyV2Colors.navy,
                       fontSize: 8,
@@ -17952,7 +17978,9 @@ class _CartLine extends StatelessWidget {
       fontSize: 14,
       fontWeight: FontWeight.w900,
     );
-    final lineTotalText = buyV2Money(line.total);
+    final lineTotalText = priceUnavailable
+        ? 'Price pending'
+        : buyV2Money(line.total);
     final lineTotalSize = buyV2ValueTextSize(
       context,
       lineTotalText,
@@ -17974,7 +18002,7 @@ class _CartLine extends StatelessWidget {
       children: [
         if (wholesale)
           Text(
-            'Landed subtotal',
+            priceUnavailable ? 'Retained item' : 'Landed subtotal',
             style: context.buyMeta.copyWith(fontSize: 7.5),
           ),
         BuyV2FiniteValueTransition(

@@ -205,6 +205,7 @@ void main() {
 
   Widget app(
     BuyV2Session session, {
+    BuyV2Destination initialDestination = BuyV2Destination.shop,
     double textScale = 1,
     EdgeInsets safePadding = EdgeInsets.zero,
     bool disableAnimations = false,
@@ -240,6 +241,7 @@ void main() {
       },
       home: BuyV2Screen(
         session: session,
+        initialDestination: initialDestination,
         accountIdentity: accountIdentity,
         accountAuthenticated: accountAuthenticated,
         scannerLauncher: scannerLauncher,
@@ -349,6 +351,88 @@ void main() {
       expect(bounds.height, greaterThanOrEqualTo(44));
       expect(action.hitTestable(), findsOneWidget);
     }
+  }
+
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    testWidgets(
+      'R669 forwarded catalogue empty and populated 320x568 2x ${destination.name}',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        session.openDestination(destination);
+        final retainedProduct = session.catalogueSaleTypeProducts.first;
+        expect(session.addProduct(retainedProduct.id), isTrue);
+        final retainedQuantity = session.quantityFor(retainedProduct.id);
+        session.updateQuery('unmatched-catalogue-query');
+        await tester.pumpWidget(
+          app(session, initialDestination: destination, textScale: 2),
+        );
+        await tester.pumpAndSettle();
+        expect(session.destination, destination);
+        expect(find.text('No matching products'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+        final clear = find.widgetWithText(TextButton, 'Clear search');
+        await tester.ensureVisible(clear);
+        await tester.pumpAndSettle();
+        expect(clear.hitTestable(), findsOneWidget);
+        await captureR66Visual(
+          tester,
+          'r669-forwarded-${destination.name}-empty',
+        );
+        await tester.tap(clear);
+        await tester.pumpAndSettle();
+        expect(session.query, isEmpty);
+        expect(session.catalogueSaleTypeProducts, isNotEmpty);
+        final catalogueScroll = find
+            .descendant(
+              of: find.byType(CustomScrollView).first,
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        for (
+          var step = 0;
+          step < 12 && find.byType(BuyV2ProductCard).evaluate().isEmpty;
+          step++
+        ) {
+          await tester.drag(catalogueScroll, const Offset(0, -160));
+          await tester.pumpAndSettle();
+        }
+        await tester.pumpAndSettle();
+        expect(find.byType(BuyV2ProductCard), findsWidgets);
+        expect(tester.takeException(), isNull);
+        final card = find.byType(BuyV2ProductCard).first;
+        final product = tester.widget<BuyV2ProductCard>(card).product;
+        final title = find
+            .descendant(of: card, matching: find.text(product.title))
+            .first;
+        await tester.ensureVisible(title);
+        await tester.pumpAndSettle();
+        expect(title.hitTestable(), findsOneWidget);
+        await captureR66Visual(
+          tester,
+          'r669-forwarded-${destination.name}-populated',
+        );
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProduct?.id, product.id);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.destination, destination);
+        expect(session.quantityFor(retainedProduct.id), retainedQuantity);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final size in [const Size(320, 844), const Size(640, 360)]) {
