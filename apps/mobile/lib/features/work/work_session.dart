@@ -768,6 +768,12 @@ class WorkSession extends ChangeNotifier {
           data.workspaceOrders.insert(0, order);
         }
         data.projectedOrderRevisions[orderId] = snapshot.revision;
+        final deliveryKey = '${operations.workspaceId}::$orderId';
+        if (snapshot.delivery case final delivery?) {
+          data._deliveryByOrder[deliveryKey] = delivery;
+        } else {
+          data._deliveryByOrder.remove(deliveryKey);
+        }
         if (identical(data, _storeData) && currentWorkspaceOrderId == orderId) {
           _projectSelectedWorkspaceOrder(order);
         }
@@ -801,6 +807,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderStage = order.stage;
     workspaceOrderNeedsDelivery = order.needsDelivery;
     workspaceOrderActionDeadline = order.actionDeadline;
+    workspaceDeliveryAssignment = _deliveryByOrder[_orderScope(order.id)];
     // No stock, invoice, payout or sales total is derived from this projection.
   }
 
@@ -1445,9 +1452,9 @@ class WorkSession extends ChangeNotifier {
 
   bool get hasActiveWorkspaceOrder =>
       workspaceOrderCustomer.isNotEmpty &&
-      !(currentWorkspaceOrder?.isCustomerCollection == true &&
-          currentWorkspaceOrder?.isCompleted == true) &&
+      currentWorkspaceOrder?.isClosed != true &&
       workspaceOrderStage != 'Completed' &&
+      workspaceOrderStage != 'Delivered' &&
       workspaceOrderStage != 'Cancelled';
 
   WorkspaceOrderRecord? get currentWorkspaceOrder => workspaceOrders

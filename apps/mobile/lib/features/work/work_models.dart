@@ -145,8 +145,25 @@ class WorkspaceOrderRecord {
       );
   bool get isCustomerCollection => collectionStoreId != null;
   bool get isCompleted =>
-      stage == 'Completed' || (isCustomerCollection && stage == 'Collected');
+      stage == 'Completed' ||
+      (!isCustomerCollection && stage == 'Delivered') ||
+      (isCustomerCollection && stage == 'Collected');
   bool get isClosed => isCompleted || stage == 'Cancelled';
+
+  bool get isDeliveryInProgress =>
+      !isCustomerCollection &&
+      const {
+        'Ready',
+        'Delivery requested',
+        'Assigned',
+        'At store',
+        'Picked up',
+        'Out for delivery',
+        'Dispatched',
+        'Delivering',
+        'Delivery failed',
+        'Delivery cancelled',
+      }.contains(stage);
 
   WorkspaceOrderRecord copyWith({
     String? customer,
@@ -230,6 +247,7 @@ class WorkspaceDeliveryAssignment {
     required this.vehicleLabel,
     required this.eta,
     required this.stage,
+    this.updatedAt,
   });
 
   final String orderId;
@@ -237,6 +255,54 @@ class WorkspaceDeliveryAssignment {
   final String vehicleLabel;
   final DateTime eta;
   final String stage;
+
+  /// Authority timestamp, not the time this device happened to receive it.
+  /// Its presence alone is not proof of fresh GPS or a guaranteed arrival.
+  final DateTime? updatedAt;
+
+  WorkspaceDeliveryStage get deliveryStage =>
+      switch (stage.trim().toLowerCase()) {
+        'assigned' => WorkspaceDeliveryStage.assigned,
+        'at store' => WorkspaceDeliveryStage.atStore,
+        'picked up' || 'collected' => WorkspaceDeliveryStage.pickedUp,
+        'out for delivery' ||
+        'dispatched' ||
+        'delivering' => WorkspaceDeliveryStage.outForDelivery,
+        'delivered' => WorkspaceDeliveryStage.delivered,
+        'cancelled' || 'delivery cancelled' => WorkspaceDeliveryStage.cancelled,
+        'failed' || 'delivery failed' => WorkspaceDeliveryStage.failed,
+        _ => WorkspaceDeliveryStage.unknown,
+      };
+}
+
+enum WorkspaceDeliveryStage {
+  assigned,
+  atStore,
+  pickedUp,
+  outForDelivery,
+  delivered,
+  cancelled,
+  failed,
+  unknown;
+
+  String get label => switch (this) {
+    assigned => 'Assigned',
+    atStore => 'At store',
+    pickedUp => 'Picked up',
+    outForDelivery => 'Out for delivery',
+    delivered => 'Delivered',
+    cancelled => 'Delivery cancelled',
+    failed => 'Delivery needs attention',
+    unknown => 'Delivery update unavailable',
+  };
+
+  int get progressIndex => switch (this) {
+    assigned => 0,
+    atStore => 1,
+    pickedUp || outForDelivery => 2,
+    delivered => 3,
+    _ => -1,
+  };
 }
 
 class WorkspacePackingLine {

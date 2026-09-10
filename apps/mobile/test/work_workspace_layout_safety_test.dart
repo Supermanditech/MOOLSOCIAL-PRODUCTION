@@ -13573,6 +13573,312 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final (width, height, scale) in [
+    (412.0, 915.0, 1.0),
+    (320.0, 568.0, 2.0),
+  ]) {
+    testWidgets('DASH06 delivery states fit and preserve exact order $scale', (
+      tester,
+    ) async {
+      tester.platformDispatcher.accessibilityFeaturesTestValue =
+          const FakeAccessibilityFeatures(disableAnimations: true);
+      addTearDown(
+        tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+      );
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final original = work.currentWorkspaceOrder!;
+      final operations = WorkOrderOperations(
+        accountScope: 'review-draft-account',
+        workspaceId: work.activeWorkspace!.id,
+        gateway: _OrderCommandFixtureGateway(),
+      );
+      void update(
+        int revision,
+        String stage, {
+        String? deliveryStage,
+        String? customer,
+      }) {
+        expect(
+          operations.observe(
+            WorkOrderReply(
+              accountScope: operations.accountScope,
+              workspaceId: operations.workspaceId,
+              orderId: original.id,
+              operationId: '',
+              revision: revision,
+              state: WorkOrderReplyState.applied,
+              order: original.copyWith(
+                stage: stage,
+                customer: customer,
+                fulfilment: 'Mool delivery',
+                needsDelivery: true,
+              ),
+              delivery: deliveryStage == null
+                  ? null
+                  : WorkspaceDeliveryAssignment(
+                      orderId: original.id,
+                      partnerName: 'Ravi Kumar',
+                      vehicleLabel: 'Bike',
+                      eta: DateTime.now().add(const Duration(minutes: 5)),
+                      updatedAt: DateTime(2026, 9, 10, 9, 55),
+                      stage: deliveryStage,
+                    ),
+            ),
+          ),
+          isTrue,
+        );
+      }
+
+      update(
+        1,
+        'Out for delivery',
+        deliveryStage: 'Out for delivery',
+        customer: 'Asha Mehta',
+      );
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(width, height),
+        textScale: scale,
+      );
+      expect(find.byKey(const Key('work-activity-delivery')), findsOneWidget);
+      expect(find.byKey(const Key('work-activity-order-accept')), findsNothing);
+      expect(
+        find.byKey(const Key('work-activity-confirm-handover')),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<TextButton>(
+              find.byKey(const Key('work-delivery-call-customer')),
+            )
+            .onPressed,
+        isNull,
+      );
+      final progress = find.byKey(const Key('work-delivery-progress'));
+      expect(
+        find.descendant(of: progress, matching: find.byType(FittedBox)),
+        findsNothing,
+      );
+      final step = tester.widget<AnimatedContainer>(
+        find.byKey(const ValueKey('work-delivery-step-2')),
+      );
+      expect(step.duration, Duration.zero);
+      expect((step.decoration! as BoxDecoration).color, MoolColors.navy);
+      await captureStoreView(tester, 'delivery-out-for-delivery-$scale');
+      expect(tester.takeException(), isNull);
+      final map = find.byKey(const Key('work-delivery-open-map'));
+      await tester.ensureVisible(map);
+      await tester.pumpAndSettle();
+      expect(map.hitTestable(), findsOneWidget);
+      final chat = find.byKey(const Key('work-delivery-chat-customer'));
+      await tester.ensureVisible(chat);
+      await tester.pumpAndSettle();
+      final router = GoRouter.of(tester.element(chat));
+      await tester.tap(chat);
+      await tester.pumpAndSettle();
+      final draftCard = find.byKey(const Key('chat-pending-draft-card'));
+      expect(draftCard, findsOneWidget);
+      await captureStoreView(tester, 'delivery-chat-first-view-$scale');
+      final uri = GoRouterState.of(tester.element(draftCard)).uri;
+      expect(uri.path, '/app/chat/inbox');
+      expect(uri.queryParameters['recipient'], 'Asha Mehta');
+      expect(uri.queryParameters['draft'], contains(original.id));
+      expect(uri.queryParameters['return'], '/app/work/workspace/dashboard');
+      final findCustomer = find.byKey(
+        const Key('chat-pending-draft-find-customer'),
+      );
+      await tester.ensureVisible(findCustomer);
+      await tester.pumpAndSettle();
+      expect(findCustomer.hitTestable(), findsOneWidget);
+      await captureStoreView(tester, 'delivery-chat-draft-$scale');
+      expect(tester.takeException(), isNull);
+      router.pop();
+      await tester.pumpAndSettle();
+      expect(work.currentWorkspaceOrderId, original.id);
+      expect(find.byKey(const Key('work-activity-delivery')), findsOneWidget);
+      update(2, 'Delivery failed', deliveryStage: 'Failed');
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-delivery-progress')), findsNothing);
+      expect(
+        find.byKey(const Key('work-activity-confirm-handover')),
+        findsNothing,
+      );
+      await captureStoreView(tester, 'delivery-needs-attention-$scale');
+      expect(tester.takeException(), isNull);
+      update(3, 'Delivery cancelled');
+      await tester.pumpAndSettle();
+      expect(work.workspaceDeliveryAssignment, isNull);
+      expect(find.text('Delivery cancelled'), findsWidgets);
+      expect(
+        find.byKey(const Key('work-activity-incoming-order')),
+        findsNothing,
+      );
+      update(4, 'Future stage');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-activity-order-attention')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('work-activity-incoming-order')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('DASH06 delivery aliases never present incoming order actions', (
+    tester,
+  ) async {
+    final work = liveStore();
+    seedIncomingOrder(work, stage: 'Assigned', delivery: true);
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    for (final stage in [
+      'Assigned',
+      'At store',
+      'Picked up',
+      'Out for delivery',
+      'Dispatched',
+      'Delivering',
+      'Delivery failed',
+      'Delivery cancelled',
+    ]) {
+      work.workspaceOrderStage = stage;
+      work.showNotice('');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-activity-delivery')),
+        findsOneWidget,
+        reason: stage,
+      );
+      expect(
+        find.byKey(const Key('work-activity-incoming-order')),
+        findsNothing,
+        reason: stage,
+      );
+      expect(tester.takeException(), isNull, reason: stage);
+    }
+  });
+
+  for (final stage in ['Out for delivery', 'Delivery failed']) {
+    testWidgets(
+      'DASH06 order list opens exact tracking without advancing $stage',
+      (tester) async {
+        final work = storeViewFixture();
+        final original = work.currentWorkspaceOrder!;
+        work.workspaceOrders[0] = original.copyWith(
+          stage: stage,
+          needsDelivery: true,
+          fulfilment: 'Mool delivery',
+        );
+        work.workspaceOrderStage = stage;
+        work.workspaceOrderNeedsDelivery = true;
+        work.workspaceOrderFulfilment = 'Mool delivery';
+        work.workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+          orderId: original.id,
+          partnerName: 'Rider A',
+          vehicleLabel: 'Bike',
+          eta: DateTime.now().subtract(const Duration(minutes: 1)),
+          stage: stage,
+        );
+        await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+        await tester.tap(find.byKey(const Key('work-store-orders')));
+        await tester.pumpAndSettle();
+        final track = find.widgetWithText(FilledButton, 'Track delivery');
+        await tester.ensureVisible(track);
+        await tester.pumpAndSettle();
+        expect(track.hitTestable(), findsOneWidget);
+        await tester.tap(track);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-delivery-destination')),
+          findsOneWidget,
+        );
+        expect(work.currentWorkspaceOrderId, original.id);
+        expect(work.workspaceOrderStage, stage);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(
+          find.byKey(const Key('work-activity-confirm-handover')),
+          findsNothing,
+        );
+        if (stage == 'Out for delivery') {
+          expect(find.text('Awaiting arrival update'), findsOneWidget);
+          expect(find.text('Time ended'), findsNothing);
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final changed in ['order', 'store', 'contact']) {
+    testWidgets('DASH06 stale delivery taps cannot retarget $changed', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      final original = work.currentWorkspaceOrder!;
+      work.workspaceOrders[0] = original.copyWith(
+        stage: 'Out for delivery',
+        fulfilment: 'Own delivery',
+        needsDelivery: true,
+        address: 'Test lane',
+      );
+      work.workspaceOrderStage = 'Out for delivery';
+      work.workspaceOrderFulfilment = 'Own delivery';
+      work.workspaceOrderNeedsDelivery = true;
+      work.workspaceOrderAddress = 'Test lane';
+      work.workspaceDeliveryAssignment = WorkspaceDeliveryAssignment(
+        orderId: original.id,
+        partnerName: 'Rider A',
+        vehicleLabel: 'Bike',
+        eta: DateTime.now(),
+        stage: 'Picked up',
+      );
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      final callbacks = [
+        for (final key in [
+          'work-delivery-call-customer',
+          'work-delivery-chat-customer',
+          'work-delivery-open-map',
+        ])
+          tester.widget<TextButton>(find.byKey(Key(key))).onPressed!,
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('work-activity-confirm-handover')),
+            )
+            .onPressed!,
+      ];
+      if (changed == 'order') {
+        expect(work.selectWorkspaceOrder('SALE-1042'), isTrue);
+      } else if (changed == 'store') {
+        work.activeWorkspace = const WorkWorkspace(
+          id: 'other-store',
+          name: 'Other Store',
+          profileId: 'retailer-grocery',
+          profileLabel: 'Grocery',
+          area: 'Jodhpur',
+          verified: true,
+        );
+      } else {
+        work.workspaceOrderCustomer = 'Different customer · 9876543210';
+      }
+      for (final callback in callbacks) {
+        callback();
+      }
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-pending-draft-card')), findsNothing);
+      expect(find.byKey(const Key('work-handover-otp')), findsNothing);
+      expect(
+        find.text('Could not open your phone app. Please try again.'),
+        findsNothing,
+      );
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('Packing moves to the live delivery object in one tap', (
     tester,
   ) async {
@@ -13623,7 +13929,7 @@ void main() {
     expect(work.workspaceOrderStage, 'Delivery requested');
     expect(work.workspaceDeliveryAssignment, isNotNull);
     expect(find.byKey(const Key('work-delivery-destination')), findsOneWidget);
-    expect(find.text('Review delivery partner'), findsOneWidget);
+    expect(find.text('Rider · Review delivery partner'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

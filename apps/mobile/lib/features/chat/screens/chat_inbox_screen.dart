@@ -823,47 +823,66 @@ class _ChatInboxScreenState extends State<ChatInboxScreen> {
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(color: const Color(0xFFDCE2F2)),
                   ),
-                  child: Row(
-                    children: [
-                      const CircleAvatar(
-                        backgroundColor: MoolColors.navy,
-                        foregroundColor: Colors.white,
-                        child: Icon(Icons.receipt_long_outlined),
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              (widget.initialRecipientQuery ?? '')
-                                      .trim()
-                                      .isEmpty
-                                  ? 'Message ready to send'
-                                  : 'For ${widget.initialRecipientQuery!.trim()}',
-                              style: const TextStyle(
-                                color: MoolColors.ink,
-                                fontWeight: FontWeight.w900,
-                              ),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final stacked =
+                          constraints.maxWidth /
+                              MediaQuery.textScalerOf(context).scale(1) <
+                          280;
+                      final details = Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            (widget.initialRecipientQuery ?? '').trim().isEmpty
+                                ? 'Message ready to send'
+                                : 'For ${widget.initialRecipientQuery!.trim()}',
+                            style: const TextStyle(
+                              color: MoolColors.ink,
+                              fontWeight: FontWeight.w900,
                             ),
-                            Text(
-                              widget.initialMessageDraft!.trim(),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: MoolColors.muted,
-                                fontSize: 11,
-                              ),
+                          ),
+                          Text(
+                            widget.initialMessageDraft!.trim(),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 11,
                             ),
-                          ],
-                        ),
-                      ),
-                      TextButton(
+                          ),
+                        ],
+                      );
+                      final action = TextButton(
                         key: const Key('chat-pending-draft-find-customer'),
                         onPressed: () => _selectSection(ChatHomeSection.people),
                         child: const Text('Find customer'),
-                      ),
-                    ],
+                      );
+                      final row = Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const CircleAvatar(
+                            backgroundColor: MoolColors.navy,
+                            foregroundColor: Colors.white,
+                            child: Icon(Icons.receipt_long_outlined),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: details),
+                          if (!stacked) action,
+                        ],
+                      );
+                      return stacked
+                          ? Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                row,
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: action,
+                                ),
+                              ],
+                            )
+                          : row;
+                    },
                   ),
                 ),
                 const SizedBox(height: MoolSpacing.sm),

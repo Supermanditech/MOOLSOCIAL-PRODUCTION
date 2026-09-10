@@ -124,6 +124,7 @@ WorkOrderReply _commandReply(
   WorkOrderReplyState state = WorkOrderReplyState.applied,
   DateTime? deadline,
   DateTime? fulfilmentDeadline,
+  WorkspaceDeliveryAssignment? delivery,
 }) => WorkOrderReply(
   accountScope: 'account-A',
   workspaceId: 'store-A',
@@ -131,6 +132,7 @@ WorkOrderReply _commandReply(
   operationId: command?.operationId ?? '',
   revision: revision,
   state: state,
+  delivery: delivery,
   order: WorkspaceOrderRecord(
     id: id,
     customer: 'Customer $id',
@@ -174,6 +176,232 @@ class _OrderTimeGateway extends ReviewWorkGateway
 }
 
 void main() {
+  group('DASH06 delivery projection', () {
+    WorkspaceDeliveryAssignment delivery(String id, String stage) =>
+        WorkspaceDeliveryAssignment(
+          orderId: id,
+          partnerName: 'Rider $id',
+          vehicleLabel: 'Bike',
+          eta: DateTime.utc(2026, 9, 10, 10),
+          updatedAt: DateTime.utc(2026, 9, 10, 9, 55),
+          stage: stage,
+        );
+
+    test(
+      'delivery progress distinguishes pickup final delivery and unknown states',
+      () {
+        for (final stage in [
+          'Picked up',
+          'Collected',
+          'Out for delivery',
+          'Dispatched',
+          'Delivering',
+        ]) {
+          expect(delivery('A', stage).deliveryStage.progressIndex, 2);
+        }
+        expect(
+          delivery('A', 'Out for delivery').deliveryStage.label,
+          'Out for delivery',
+        );
+        expect(delivery('A', 'Delivered').deliveryStage.progressIndex, 3);
+        for (final stage in [
+          'Cancelled',
+          'Delivery failed',
+          'future-unknown',
+        ]) {
+          expect(delivery('A', stage).deliveryStage.progressIndex, -1);
+        }
+        expect(_commandReply('A', stage: 'Delivered').order!.isClosed, isTrue);
+        expect(_commandReply('A', stage: 'Collected').order!.isClosed, isFalse);
+        expect(
+          _commandReply(
+            'A',
+            stage: 'Collected',
+            collection: true,
+          ).order!.isClosed,
+          isTrue,
+        );
+      },
+    );
+
+    test('assignment identity and collection separation fail closed', () {
+      final operations = WorkOrderOperations(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        gateway: _CommandGateway(),
+      );
+      addTearDown(operations.dispose);
+      expect(
+        operations.observe(
+          _commandReply('A', delivery: delivery('B', 'Assigned')),
+        ),
+        isFalse,
+      );
+      expect(
+        operations.observe(
+          _commandReply(
+            'A',
+            collection: true,
+            delivery: delivery('A', 'Collected'),
+          ),
+        ),
+        isFalse,
+      );
+      for (final identity in [
+        ('account-B', 'store-A'),
+        ('account-A', 'store-B'),
+      ]) {
+        expect(
+          operations.observe(
+            WorkOrderReply(
+              accountScope: identity.$1,
+              workspaceId: identity.$2,
+              orderId: 'A',
+              operationId: '',
+              revision: 1,
+              state: WorkOrderReplyState.applied,
+              order: _commandReply('A').order,
+              delivery: delivery('A', 'Assigned'),
+            ),
+          ),
+          isFalse,
+        );
+      }
+      expect(operations.orders, isEmpty);
+    });
+
+    test(
+      'A and B delivery snapshots survive switching and clear by revision without business effects',
+      () async {
+        final operations = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: _CommandGateway(),
+        );
+        final work = WorkSession(contactDraftStore: _CommandAccountStore())
+          ..activeWorkspace = _commandStore
+          ..workspaceId = 'store-A';
+        expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+        addTearDown(work.dispose);
+        for (final id in ['A', 'B']) {
+          expect(
+            operations.observe(
+              _commandReply(
+                id,
+                stage: 'Delivery requested',
+                delivery: delivery(id, 'Assigned'),
+              ),
+            ),
+            isTrue,
+          );
+        }
+        expect(work.selectWorkspaceOrder('A'), isTrue);
+        expect(work.workspaceDeliveryAssignment!.partnerName, 'Rider A');
+        expect(work.selectWorkspaceOrder('B'), isTrue);
+        expect(
+          operations.observe(
+            _commandReply(
+              'A',
+              revision: 3,
+              stage: 'Out for delivery',
+              delivery: delivery('A', 'Out for delivery'),
+            ),
+          ),
+          isTrue,
+        );
+        expect(work.currentWorkspaceOrderId, 'B');
+        expect(work.workspaceDeliveryAssignment!.partnerName, 'Rider B');
+        expect(
+          operations.observe(
+            _commandReply(
+              'A',
+              revision: 2,
+              stage: 'Delivery requested',
+              delivery: delivery('A', 'Assigned'),
+            ),
+          ),
+          isFalse,
+        );
+        expect(work.selectWorkspaceOrder('A'), isTrue);
+        expect(work.workspaceOrderStage, 'Out for delivery');
+        expect(
+          work.workspaceDeliveryAssignment!.deliveryStage,
+          WorkspaceDeliveryStage.outForDelivery,
+        );
+        expect(await work.verifyWorkspaceHandover('123456'), isFalse);
+        expect(
+          operations.observe(
+            _commandReply('A', revision: 4, stage: 'Delivery cancelled'),
+          ),
+          isTrue,
+        );
+        expect(work.workspaceDeliveryAssignment, isNull);
+        work.selectWorkspaceOrder('B');
+        work.selectWorkspaceOrder('A');
+        expect(work.workspaceDeliveryAssignment, isNull);
+        operations.observe(
+          _commandReply(
+            'A',
+            revision: 5,
+            stage: 'Delivered',
+            delivery: delivery('A', 'Delivered'),
+          ),
+        );
+        expect(work.hasActiveWorkspaceOrder, isFalse);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceSalesToday, 0);
+        expect(work.workspaceSettlementBalance, 0);
+      },
+    );
+
+    test(
+      'hidden store update cannot leak rider or overwrite visible store',
+      () {
+        final operations = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: _CommandGateway(),
+        );
+        final work = WorkSession(contactDraftStore: _CommandAccountStore())
+          ..activeWorkspace = _commandStore
+          ..workspaceId = 'store-A';
+        expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+        addTearDown(work.dispose);
+        operations.observe(
+          _commandReply(
+            'A',
+            stage: 'Delivery requested',
+            delivery: delivery('A', 'Assigned'),
+          ),
+        );
+        work.selectWorkspaceOrder('A');
+        work.activeWorkspace = const WorkWorkspace(
+          id: 'store-B',
+          name: 'Store B',
+          profileLabel: 'Grocery',
+          profileId: 'retailer-grocery',
+          area: 'Jodhpur',
+          verified: true,
+        );
+        operations.observe(
+          _commandReply(
+            'A',
+            revision: 2,
+            stage: 'Out for delivery',
+            delivery: delivery('A', 'Out for delivery'),
+          ),
+        );
+        expect(work.workspaceDeliveryAssignment, isNull);
+        work.activeWorkspace = _commandStore;
+        expect(work.currentWorkspaceOrderId, 'A');
+        expect(
+          work.workspaceDeliveryAssignment!.deliveryStage,
+          WorkspaceDeliveryStage.outForDelivery,
+        );
+      },
+    );
+  });
+
   group('DASH05 scoped time requests', () {
     late _TimeCommandGateway gateway;
     late WorkOrderOperations operations;

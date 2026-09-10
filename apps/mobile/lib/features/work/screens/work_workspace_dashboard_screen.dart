@@ -2641,6 +2641,8 @@ String? _storeOrderWorkFilter(WorkspaceOrderRecord order) {
     'Matched' ||
     'Customer confirmed' => 'Ready',
     'Delivery requested' ||
+    'Assigned' ||
+    'At store' ||
     'Picked up' ||
     'Out for delivery' ||
     'Dispatched' ||
@@ -3517,12 +3519,21 @@ class _StoreActivityDeck extends StatelessWidget {
         'Preparing' => _PackingActivityCard(session: session),
         'Ready for pickup' => _PickupReadyActivityCard(session: session),
         'Ready' ||
-        'Delivery requested' => _DeliveryActivityCard(session: session),
-        _ => _IncomingOrderActivityCard(
+        'Delivery requested' ||
+        'Assigned' ||
+        'At store' ||
+        'Picked up' ||
+        'Out for delivery' ||
+        'Dispatched' ||
+        'Delivering' ||
+        'Delivery failed' ||
+        'Delivery cancelled' => _DeliveryActivityCard(session: session),
+        'Confirmed' => _IncomingOrderActivityCard(
           session: session,
           onReview: onReviewOrder,
           onReject: () => _showRejectOrderSheet(context, session),
         ),
+        _ => _OrderAttentionActivityCard(onReview: onReviewOrder),
       };
     } else if (session.latestWorkspaceInvoice?.needsCustomerHandoff == true) {
       content = _InvoiceReadyActivityCard(
@@ -3555,9 +3566,11 @@ class _StoreActivityDeck extends StatelessWidget {
           final scrollCard =
               _hasStoreWorkload(session) ||
               (largeText &&
-                  session.workspaceOrderHasTimeRequest(
-                    selectedOrder?.id ?? '',
-                  ));
+                  ((content is _DeliveryActivityCard &&
+                          MediaQuery.textScalerOf(context).scale(1) >= 1.8) ||
+                      session.workspaceOrderHasTimeRequest(
+                        selectedOrder?.id ?? '',
+                      )));
           final desiredHeight = switch (content) {
             WorkCollectionLiveCard(:final controller) =>
               switch (controller?.snapshot?.state.name) {
@@ -3574,6 +3587,7 @@ class _StoreActivityDeck extends StatelessWidget {
                   : 308.0 + session.workspacePackingLines.length * 36,
             _PackingActivityCard() => largeText ? 480.0 : 410.0,
             _PickupReadyActivityCard() => 300.0,
+            _DeliveryActivityCard() => largeText ? 680.0 : 420.0,
             _InvoiceReadyActivityCard() => 350.0,
             _ => 420.0,
           };
@@ -5318,20 +5332,78 @@ Future<void> _showWorkspaceInvoiceSheet(
   );
 }
 
+class _OrderAttentionActivityCard extends StatelessWidget {
+  const _OrderAttentionActivityCard({required this.onReview});
+  final VoidCallback onReview;
+
+  @override
+  Widget build(BuildContext context) => SingleChildScrollView(
+    key: const Key('work-activity-order-attention'),
+    padding: const EdgeInsets.all(14),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Order needs attention',
+          style: TextStyle(
+            color: MoolColors.navy,
+            fontSize: 17,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text('Check the latest order details before taking action.'),
+        const SizedBox(height: 12),
+        FilledButton(onPressed: onReview, child: const Text('Review order')),
+      ],
+    ),
+  );
+}
+
 class _DeliveryActivityCard extends StatelessWidget {
   const _DeliveryActivityCard({required this.session});
   final WorkSession session;
 
   @override
   Widget build(BuildContext context) {
-    final assignment = session.workspaceDeliveryAssignment;
+    final storeId = session.activeWorkspace?.id ?? session.workspaceId;
+    final orderId = session.currentWorkspaceOrderId ?? 'current-store-order';
+    final customer = session.workspaceOrderCustomer;
+    final address = session.workspaceOrderAddress;
+    final renderedStage = session.workspaceOrderStage;
+    final storeName = session.activeWorkspace?.name ?? 'Store';
+    final returnRoute = GoRouterState.of(context).uri.toString();
+    bool sameOrder() =>
+        context.mounted &&
+        storeId == (session.activeWorkspace?.id ?? session.workspaceId) &&
+        orderId == (session.currentWorkspaceOrderId ?? 'current-store-order') &&
+        customer == session.workspaceOrderCustomer &&
+        address == session.workspaceOrderAddress;
+    final candidate = session.workspaceDeliveryAssignment;
+    final assignment =
+        candidate?.orderId ==
+            (session.currentWorkspaceOrderId ?? 'current-store-order')
+        ? candidate
+        : null;
+    final deliveryStage = switch (session.workspaceOrderStage) {
+      'Delivery cancelled' => WorkspaceDeliveryStage.cancelled,
+      'Delivery failed' => WorkspaceDeliveryStage.failed,
+      _ => assignment?.deliveryStage,
+    };
+    final phone = session.workspaceOrderCustomer.replaceAll(
+      RegExp(r'[^0-9]'),
+      '',
+    );
     final canConfirmOwnDelivery =
         session.workspaceOrderFulfilment == 'Own delivery' &&
+        session.currentWorkspaceOrder?.isClosed != true &&
+        !session.hasScopedWorkspaceOrder(
+          session.currentWorkspaceOrderId ?? '',
+        ) &&
         const [
-          'Picked up',
-          'Collected',
-          'Out for delivery',
-        ].contains(assignment?.stage);
+          WorkspaceDeliveryStage.pickedUp,
+          WorkspaceDeliveryStage.outForDelivery,
+        ].contains(deliveryStage);
     return Column(
       key: const Key('work-activity-delivery'),
       children: [
@@ -5351,35 +5423,6 @@ class _DeliveryActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 10),
                 Text(
-                  assignment?.partnerName ?? 'Awaiting a delivery partner',
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                if (assignment != null) ...[
-                  Text(
-                    '${assignment.vehicleLabel} · ${assignment.stage}',
-                    style: const TextStyle(
-                      color: MoolColors.muted,
-                      fontSize: 12,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _DeliveryProgressTrack(stage: assignment.stage),
-                  const SizedBox(height: 8),
-                  _LiveCountdownText(
-                    deadline: assignment.eta,
-                    fallback: 'Arrival estimate unavailable',
-                    style: const TextStyle(
-                      color: MoolColors.navy,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-                const Divider(height: 22),
-                Text(
                   session.workspaceOrderCustomer,
                   style: const TextStyle(
                     color: MoolColors.ink,
@@ -5388,6 +5431,81 @@ class _DeliveryActivityCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 5),
+                Text(
+                  assignment != null
+                      ? 'Rider · ${assignment.partnerName}'
+                      : (deliveryStage == WorkspaceDeliveryStage.cancelled ||
+                                deliveryStage == WorkspaceDeliveryStage.failed
+                            ? deliveryStage!.label
+                            : 'Awaiting a delivery partner'),
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (assignment != null) ...[
+                  Text(
+                    '${assignment.vehicleLabel} · ${deliveryStage!.label}',
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _DeliveryProgressTrack(stage: deliveryStage),
+                  const SizedBox(height: 8),
+                  if (deliveryStage.progressIndex >= 0 &&
+                      deliveryStage != WorkspaceDeliveryStage.delivered)
+                    _LiveCountdownText(
+                      deadline: assignment.eta,
+                      fallback: 'Arrival estimate unavailable',
+                      prefix: 'Estimated arrival · ',
+                      expiredLabel: 'Awaiting arrival update',
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 12,
+                      ),
+                    ),
+                  Text(
+                    assignment.updatedAt == null
+                        ? 'Live rider location unavailable'
+                        : 'Last update ${MaterialLocalizations.of(context).formatCompactDate(assignment.updatedAt!.toLocal())} ${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(assignment.updatedAt!.toLocal()))} · Live location unavailable',
+                    key: const Key('work-delivery-freshness'),
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+                const Divider(height: 22),
+                if (session.currentWorkspaceOrder case final order?) ...[
+                  _StoreOrderAmount(
+                    '₹${_formatStoreAmount(order.amount)}',
+                    orderReference: order.id,
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  Text(
+                    order.payment,
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  Text(
+                    '${order.id} · ${order.items}',
+                    style: const TextStyle(
+                      color: MoolColors.muted,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                ],
                 Text(
                   session.workspaceOrderAddress.isEmpty
                       ? 'Customer address unavailable'
@@ -5427,15 +5545,32 @@ class _DeliveryActivityCard extends StatelessWidget {
                   Expanded(
                     child: TextButton.icon(
                       key: const Key('work-delivery-call-customer'),
-                      onPressed: () {
-                        final digits = session.workspaceOrderCustomer
-                            .replaceAll(RegExp(r'[^0-9]'), '');
-                        if (digits.length >= 10) {
-                          unawaited(
-                            launchUrl(Uri(scheme: 'tel', path: digits)),
-                          );
-                        }
-                      },
+                      onPressed: phone.length < 10
+                          ? null
+                          : () async {
+                              if (!sameOrder()) {
+                                return;
+                              }
+                              final messenger = ScaffoldMessenger.of(context);
+                              try {
+                                if (await launchUrl(
+                                  Uri(scheme: 'tel', path: phone),
+                                )) {
+                                  return;
+                                }
+                              } catch (_) {
+                                // The OS phone handler is unavailable; no call occurred.
+                              }
+                              if (context.mounted) {
+                                messenger.showSnackBar(
+                                  const SnackBar(
+                                    content: Text(
+                                      'Could not open your phone app. Please try again.',
+                                    ),
+                                  ),
+                                );
+                              }
+                            },
                       style: TextButton.styleFrom(
                         minimumSize: const Size(48, 48),
                         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -5447,17 +5582,23 @@ class _DeliveryActivityCard extends StatelessWidget {
                   Expanded(
                     child: TextButton.icon(
                       key: const Key('work-delivery-chat-customer'),
-                      onPressed: () => context.push(
-                        Uri(
-                          path: '/app/chat/inbox',
-                          queryParameters: {
-                            'return': GoRouterState.of(context).uri.toString(),
-                            'recipient': session.workspaceOrderCustomer,
-                            'draft':
-                                'Delivery support for ${session.workspaceOrderCustomer}',
-                          },
-                        ).toString(),
-                      ),
+                      onPressed: () {
+                        if (!sameOrder()) {
+                          return;
+                        }
+                        context.push(
+                          Uri(
+                            path: '/app/chat/inbox',
+                            queryParameters: {
+                              'return': returnRoute,
+                              'type': 'business',
+                              'recipient': customer,
+                              'draft':
+                                  'Delivery for order $orderId · $storeName',
+                            },
+                          ).toString(),
+                        );
+                      },
                       style: TextButton.styleFrom(
                         minimumSize: const Size(48, 48),
                         padding: const EdgeInsets.symmetric(horizontal: 4),
@@ -5472,22 +5613,30 @@ class _DeliveryActivityCard extends StatelessWidget {
                   Expanded(
                     child: TextButton.icon(
                       key: const Key('work-delivery-open-map'),
-                      onPressed: session.workspaceOrderAddress.isEmpty
+                      onPressed: address.isEmpty
                           ? null
-                          : () => unawaited(
-                              launchUrl(
-                                Uri.https('www.google.com', '/maps/search/', {
-                                  'api': '1',
-                                  'query': session.workspaceOrderAddress,
-                                }),
-                                mode: LaunchMode.externalApplication,
-                              ),
-                            ),
+                          : () {
+                              if (!sameOrder()) {
+                                return;
+                              }
+                              unawaited(
+                                launchUrl(
+                                  Uri.https('www.google.com', '/maps/search/', {
+                                    'api': '1',
+                                    'query': address,
+                                  }),
+                                  mode: LaunchMode.externalApplication,
+                                ),
+                              );
+                            },
                       style: TextButton.styleFrom(
                         minimumSize: const Size(48, 48),
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                       ),
-                      icon: const Icon(Icons.map_outlined, size: 18),
+                      icon: const Tooltip(
+                        message: 'Customer address, not live rider tracking',
+                        child: Icon(Icons.map_outlined, size: 18),
+                      ),
                       label: const Text('Map'),
                     ),
                   ),
@@ -5498,15 +5647,33 @@ class _DeliveryActivityCard extends StatelessWidget {
                   key: const Key('work-activity-confirm-handover'),
                   onPressed: session.workspaceHandoverBusy
                       ? null
-                      : () => _showWorkspaceHandoverSheet(context, session),
+                      : () {
+                          if (sameOrder() &&
+                              renderedStage == session.workspaceOrderStage &&
+                              identical(
+                                candidate,
+                                session.workspaceDeliveryAssignment,
+                              )) {
+                            _showWorkspaceHandoverSheet(context, session);
+                          }
+                        },
                   icon: const Icon(Icons.password_rounded, size: 18),
                   label: const Text('Confirm customer delivery'),
                 )
               else
-                const Text(
-                  'Waiting for the delivery partner’s pickup or delivery confirmation.',
-                  key: Key('work-delivery-proof-pending'),
-                  style: TextStyle(
+                Text(
+                  switch (deliveryStage) {
+                    WorkspaceDeliveryStage.cancelled ||
+                    WorkspaceDeliveryStage.failed =>
+                      'Contact the customer about this delivery.',
+                    WorkspaceDeliveryStage.unknown =>
+                      'Waiting for a confirmed delivery update.',
+                    WorkspaceDeliveryStage.delivered => 'Delivery confirmed.',
+                    _ =>
+                      'Waiting for the delivery partner’s pickup or delivery confirmation.',
+                  },
+                  key: const Key('work-delivery-proof-pending'),
+                  style: const TextStyle(
                     color: MoolColors.muted,
                     fontSize: 11,
                     height: 1.35,
@@ -5523,70 +5690,90 @@ class _DeliveryActivityCard extends StatelessWidget {
 class _DeliveryProgressTrack extends StatelessWidget {
   const _DeliveryProgressTrack({required this.stage});
 
-  final String? stage;
+  final WorkspaceDeliveryStage stage;
 
   @override
   Widget build(BuildContext context) {
     const steps = ['Assigned', 'At store', 'Picked up', 'Delivered'];
-    final currentIndex = stage == null
-        ? -1
-        : steps.indexWhere(
-            (step) =>
-                step.toLowerCase() == stage!.trim().toLowerCase() ||
-                (step == 'Picked up' &&
-                    stage!.trim().toLowerCase() == 'collected'),
-          );
+    final currentIndex = stage.progressIndex;
+    if (currentIndex < 0) return const SizedBox.shrink();
     return Container(
+      key: const Key('work-delivery-progress'),
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F8F6),
+        color: const Color(0xFFF4F5FF),
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Row(
-        children: [
-          for (var index = 0; index < steps.length; index++)
-            Expanded(
-              child: Column(
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 320),
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      color: index <= currentIndex
-                          ? const Color(0xFF08765D)
-                          : const Color(0xFFDCE2F2),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      index < currentIndex
-                          ? Icons.check_rounded
-                          : index == currentIndex
-                          ? Icons.circle
-                          : Icons.circle_outlined,
-                      color: index <= currentIndex
-                          ? Colors.white
-                          : MoolColors.muted,
-                      size: index == currentIndex ? 10 : 14,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final columns =
+              constraints.maxWidth /
+                      MediaQuery.textScalerOf(context).scale(1) >=
+                  220
+              ? 4
+              : 2;
+          return Wrap(
+            runSpacing: 10,
+            children: [
+              for (var index = 0; index < steps.length; index++)
+                SizedBox(
+                  width: constraints.maxWidth / columns,
+                  child: Semantics(
+                    selected: index == currentIndex,
+                    label:
+                        '${steps[index]}: ${index < currentIndex
+                            ? 'complete'
+                            : index == currentIndex
+                            ? 'current'
+                            : 'pending'}',
+                    excludeSemantics: true,
+                    child: Column(
+                      children: [
+                        AnimatedContainer(
+                          key: ValueKey('work-delivery-step-$index'),
+                          duration: MediaQuery.disableAnimationsOf(context)
+                              ? Duration.zero
+                              : const Duration(milliseconds: 180),
+                          width: 24,
+                          height: 24,
+                          decoration: BoxDecoration(
+                            color: index <= currentIndex
+                                ? MoolColors.navy
+                                : const Color(0xFFDCE2F2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(
+                            index < currentIndex
+                                ? Icons.check_rounded
+                                : index == currentIndex
+                                ? Icons.circle
+                                : Icons.circle_outlined,
+                            color: index <= currentIndex
+                                ? Colors.white
+                                : MoolColors.muted,
+                            size: index == currentIndex ? 10 : 14,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 3),
+                          child: Text(
+                            steps[index],
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: MoolColors.navy,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 5),
-                  FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      steps[index],
-                      maxLines: 1,
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 8.5,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
+                ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -6361,11 +6548,14 @@ class _LiveCountdownText extends StatefulWidget {
     required this.deadline,
     required this.fallback,
     required this.style,
+    this.prefix = '',
+    this.expiredLabel = 'Time ended',
   });
 
   final DateTime? deadline;
   final String fallback;
   final TextStyle style;
+  final String prefix, expiredLabel;
 
   @override
   State<_LiveCountdownText> createState() => _LiveCountdownTextState();
@@ -6427,8 +6617,8 @@ class _LiveCountdownTextState extends State<_LiveCountdownText>
         1 << 31,
       );
       label = seconds == 0
-          ? 'Time ended'
-          : '${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
+          ? widget.expiredLabel
+          : '${widget.prefix}${(seconds ~/ 60).toString().padLeft(2, '0')}:${(seconds % 60).toString().padLeft(2, '0')}';
     }
     return _StoreValueMotion(
       value: label,
@@ -13765,6 +13955,7 @@ class _LiveOrderTicket extends StatelessWidget {
       'Ready' when order.needsDelivery => 'Arrange delivery',
       'Ready' => 'Complete pickup',
       'Delivery requested' => 'Track delivery',
+      _ when order.isDeliveryInProgress => 'Track delivery',
       _ => 'Review',
     };
     return _OrderDeadlineBoundary(
@@ -13967,7 +14158,7 @@ class _LiveOrderTicket extends StatelessWidget {
                 )
               else if (session.workspaceOrderOperationState(order.id) != null)
                 _OrderOperationStatus(session: session, orderId: order.id)
-              else if (active ||
+              else if ((active && !order.isClosed) ||
                   (detailed && !order.isClosed && stage != 'Preparing')) ...[
                 const SizedBox(height: 10),
                 Wrap(
@@ -14006,7 +14197,8 @@ class _LiveOrderTicket extends StatelessWidget {
                               }
                               if (stage == 'Ready for pickup') {
                                 _showWorkspacePickupSheet(context, session);
-                              } else if (stage == 'Delivery requested') {
+                              } else if (order.isDeliveryInProgress &&
+                                  stage != 'Ready') {
                                 onOpenDelivery();
                               } else if (stage == 'Ready' &&
                                   order.needsDelivery) {
@@ -14066,7 +14258,7 @@ class _LiveOrderTicket extends StatelessWidget {
                     child: const Text('Order ready'),
                   ),
                 ),
-              ] else if (!const ['Completed', 'Cancelled'].contains(stage)) ...[
+              ] else if (!order.isClosed) ...[
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(

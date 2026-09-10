@@ -436,12 +436,17 @@ class WorkOrderReply {
     required this.revision,
     required this.state,
     WorkspaceOrderRecord? order,
+    this.delivery,
   }) : order = order?.copyWith();
 
   final String accountScope, workspaceId, orderId, operationId;
   final int revision;
   final WorkOrderReplyState state;
   final WorkspaceOrderRecord? order;
+
+  /// Full order-scoped projection. Null removes a previous assignment; callers
+  /// must not submit partial order events here. Collection uses its own contract.
+  final WorkspaceDeliveryAssignment? delivery;
 }
 
 /// Backend adapters must authenticate the account independently, enforce Store
@@ -792,6 +797,9 @@ class WorkOrderOperations extends ChangeNotifier {
       reply.order!.quantities.entries.every(
         (entry) => entry.key.isNotEmpty && entry.value > 0,
       ) &&
+      (reply.delivery == null ||
+          (!reply.order!.isCustomerCollection &&
+              reply.delivery!.orderId == reply.orderId)) &&
       (reply.order?.collectionStoreId == null ||
           reply.order?.collectionStoreId == workspaceId);
 
