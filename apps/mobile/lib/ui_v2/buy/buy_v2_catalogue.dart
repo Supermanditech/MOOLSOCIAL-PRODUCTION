@@ -931,6 +931,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     this.usePrimaryScrollController = false,
     this.publishedOffers = false,
     this.publicationFacts,
+    this.controlsAfterProducts = false,
   });
 
   final BuyV2Session session;
@@ -943,6 +944,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final bool usePrimaryScrollController;
   final bool publishedOffers;
   final Widget Function(List<BuyV2PublishedCatalogueOffer>)? publicationFacts;
+  final bool controlsAfterProducts;
 
   @override
   State<BuyV2PagedProductCatalogue> createState() =>
@@ -1192,6 +1194,28 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         widget.query.storeId == null &&
         widget.query.areaScope != BuyV2CatalogueAreaScope.allAreas &&
         widget.query.regionId == null;
+    final pageControls = _CataloguePageControls(
+      scopeKey: widget.scopeKey,
+      noun: widget.publishedOffers ? 'offers' : 'products',
+      start: publicationCurrent ? page?.startIndex : null,
+      count: products.length,
+      total: publicationCurrent ? page?.totalCount : null,
+      loading: loading,
+      showRange: !widget.controlsAfterProducts,
+      areaLabel: !widget.storeContext
+          ? widget.session.catalogueAreaLabel
+          : null,
+      onArea: widget.showAreaControl
+          ? () => showBuyV2CatalogueArea(context, widget.session)
+          : null,
+      onPrevious: !loading && publicationCurrent && page?.previousCursor != null
+          ? _pager.previous
+          : null,
+      onNext: !loading && publicationCurrent && page?.nextCursor != null
+          ? _pager.next
+          : null,
+      onRefresh: loading ? null : _pager.refresh,
+    );
     return BuyV2VerticalScrollIndicator(
       child: ListView(
         key: ValueKey('buy-paged-scroll-${widget.scopeKey}'),
@@ -1200,29 +1224,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         padding: const EdgeInsets.only(bottom: 12),
         children: [
           if (widget.header != null) widget.header!,
-          _CataloguePageControls(
-            scopeKey: widget.scopeKey,
-            noun: widget.publishedOffers ? 'offers' : 'products',
-            start: publicationCurrent ? page?.startIndex : null,
-            count: products.length,
-            total: publicationCurrent ? page?.totalCount : null,
-            loading: loading,
-            areaLabel: !widget.storeContext
-                ? widget.session.catalogueAreaLabel
-                : null,
-            onArea: widget.showAreaControl
-                ? () => showBuyV2CatalogueArea(context, widget.session)
-                : null,
-            onPrevious:
-                !loading && publicationCurrent && page?.previousCursor != null
-                ? _pager.previous
-                : null,
-            onNext: !loading && publicationCurrent && page?.nextCursor != null
-                ? _pager.next
-                : null,
-            onRefresh: loading ? null : _pager.refresh,
-          ),
-          if (loading) const LinearProgressIndicator(minHeight: 2),
+          if (!widget.controlsAfterProducts) pageControls,
+          if (loading && !widget.controlsAfterProducts)
+            const LinearProgressIndicator(minHeight: 2),
           if (publicationCurrent &&
               offers.isNotEmpty &&
               widget.publicationFacts != null)
@@ -1241,14 +1245,14 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
               action: 'Refresh offers',
               onAction: loading ? null : _pager.refresh,
             )
-          else if (message != null)
+          else if (message != null && !widget.controlsAfterProducts)
             _CataloguePageNotice(
               title: 'Results could not refresh',
               detail: message,
               action: 'Try again',
               onAction: _pager.retry,
             )
-          else if (!loading && products.isEmpty)
+          else if (!loading && products.isEmpty && message == null)
             _CataloguePageNotice(
               title: widget.publishedOffers
                   ? 'No matching offers'
@@ -1320,6 +1324,17 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                 );
               },
             ),
+          if (widget.controlsAfterProducts) ...[
+            if (loading) const LinearProgressIndicator(minHeight: 2),
+            if (!needsArea && publicationCurrent && message != null)
+              _CataloguePageNotice(
+                title: 'Results could not refresh',
+                detail: message,
+                action: 'Try again',
+                onAction: _pager.retry,
+              ),
+            pageControls,
+          ],
           if (!loading &&
               page != null &&
               products.isNotEmpty &&
@@ -1355,6 +1370,7 @@ class _CataloguePageControls extends StatelessWidget {
     this.onNext,
     this.onRefresh,
     this.noun = 'products',
+    this.showRange = true,
   });
   final String scopeKey;
   final int? start;
@@ -1367,6 +1383,7 @@ class _CataloguePageControls extends StatelessWidget {
   final VoidCallback? onNext;
   final VoidCallback? onRefresh;
   final String noun;
+  final bool showRange;
 
   @override
   Widget build(BuildContext context) {
@@ -1420,6 +1437,22 @@ class _CataloguePageControls extends StatelessWidget {
             onPressed: onArea,
             icon: const Icon(Icons.location_on_outlined, size: 20),
           );
+    if (!showRange) {
+      return BuyV2CartAvoidanceRegion(
+        key: ValueKey('buy-page-controls-protection-$scopeKey'),
+        child: Semantics(
+          key: ValueKey('buy-page-status-$scopeKey'),
+          label: range,
+          liveRegion: true,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+            child: Row(
+              children: [previous, next, const Spacer(), refresh, ?area],
+            ),
+          ),
+        ),
+      );
+    }
     return BuyV2CartAvoidanceRegion(
       key: ValueKey('buy-page-controls-protection-$scopeKey'),
       child: Padding(
@@ -1653,6 +1686,8 @@ class BuyV2CatalogueView extends StatelessWidget {
                     session: session,
                     query: session.catalogueQuery(),
                     scopeKey: 'catalogue-${session.destination.name}',
+                    controlsAfterProducts:
+                        session.destination == BuyV2Destination.shop,
                     header: session.query.trim().isEmpty || onOpenStore == null
                         ? null
                         : _CatalogueStoreMatches(

@@ -879,7 +879,56 @@ void main() {
           addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
           final scope = 'catalogue-${destination.name}';
           final range = find.byKey(ValueKey('buy-page-range-$scope'));
-          expect(tester.widget<Text>(range).data, startsWith('1–40 of '));
+          final shop = destination == BuyV2Destination.shop;
+          void expectPage(int start) {
+            expect(source.pages.last.startIndex, start);
+            if (shop) {
+              expect(range, findsNothing);
+            } else {
+              expect(
+                tester.widget<Text>(range).data,
+                startsWith('${start + 1}–${start + 40} of '),
+              );
+            }
+          }
+
+          Future<void> revealControls(Finder target) async {
+            if (!shop) {
+              await _revealPagedHeader(tester, scope, target);
+              return;
+            }
+            final scrollable = find
+                .descendant(
+                  of: find.byKey(ValueKey('buy-paged-scroll-$scope')),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            await tester.scrollUntilVisible(
+              target,
+              100,
+              scrollable: scrollable,
+            );
+            await tester.ensureVisible(target);
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOneWidget);
+            final status = find.byKey(ValueKey('buy-page-status-$scope'));
+            expect(
+              tester.widget<Semantics>(status).properties.label,
+              startsWith('${source.pages.last.startIndex + 1}–'),
+            );
+            expect(range, findsNothing);
+          }
+
+          expectPage(0);
+          if (shop) {
+            final lane = find.byKey(ValueKey('buy-paged-lane-$scope-0'));
+            final viewport = find.byKey(ValueKey('buy-paged-scroll-$scope'));
+            expect(
+              tester.getTopLeft(lane).dy - tester.getTopLeft(viewport).dy,
+              closeTo(6, 1),
+              reason: 'Shop products begin immediately without the count row',
+            );
+          }
           expect(source.requests.length, 1);
           expect(tester.takeException(), isNull);
           await captureR66Visual(tester, 'r5-paged-$profile-initial');
@@ -902,12 +951,13 @@ void main() {
           expect(session.quantityFor(first.id), first.minimumOrder);
 
           final next = find.byKey(ValueKey('buy-page-next-$scope'));
-          await _revealPagedHeader(tester, scope, next);
+          await revealControls(next);
+          await captureR66Visual(tester, 'r669-page-controls-$profile-first');
           source.failNext = true;
           await tester.tap(next);
           await tester.pumpAndSettle();
           expect(find.text('Results could not refresh'), findsOneWidget);
-          expect(tester.widget<Text>(range).data, startsWith('1–40 of '));
+          expectPage(0);
           expect(session.quantityFor(first.id), first.minimumOrder);
           await captureR66Visual(tester, 'r5-paged-$profile-retry');
           source.failNext = false;
@@ -916,7 +966,7 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(retry);
           await tester.pumpAndSettle();
-          expect(tester.widget<Text>(range).data, startsWith('41–80 of '));
+          expectPage(40);
           expect(session.isSaved(first.id), isTrue);
           expect(session.quantityFor(first.id), first.minimumOrder);
 
@@ -978,8 +1028,23 @@ void main() {
           expect(session.quantityFor(first.id), first.minimumOrder);
           await captureR66Visual(tester, 'r5-paged-$profile-return');
 
-          await _revealPagedHeader(tester, scope, next);
-          expect(tester.widget<Text>(range).data, startsWith('41–80 of '));
+          await revealControls(next);
+          expectPage(40);
+          final previous = find.byKey(ValueKey('buy-page-previous-$scope'));
+          await tester.tap(previous);
+          await tester.pumpAndSettle();
+          await revealControls(next);
+          expectPage(0);
+          expect(tester.widget<IconButton>(previous).onPressed, isNull);
+          final refresh = find.byKey(ValueKey('buy-page-refresh-$scope'));
+          final beforeRefresh = source.requests.length;
+          await tester.tap(refresh);
+          await tester.pumpAndSettle();
+          expect(source.requests.length, beforeRefresh + 1);
+          await revealControls(next);
+          expectPage(0);
+          expect(session.quantityFor(first.id), first.minimumOrder);
+          expect(session.isSaved(first.id), isTrue);
           final area = find.byKey(const ValueKey('buy-change-location'));
           await _revealPagedHeader(tester, scope, area);
           await tester.tap(area);
@@ -1007,7 +1072,7 @@ void main() {
           await tester.pumpAndSettle();
           expect(session.catalogueRegionId, 'mumbai');
           expect(source.requests.last.regionId, 'mumbai');
-          expect(tester.widget<Text>(range).data, startsWith('1–40 of '));
+          expectPage(0);
           expect(session.isSaved(first.id), isTrue);
           expect(session.quantityFor(first.id), first.minimumOrder);
           expect(tester.takeException(), isNull);
@@ -2277,6 +2342,7 @@ class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {
     : super(destination: destination, providerCount: 40);
   bool failNext = false;
   final requests = <BuyV2CatalogueQuery>[];
+  final pages = <BuyV2CataloguePage<BuyV2Product>>[];
 
   @override
   Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
@@ -2286,7 +2352,13 @@ class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {
   }) async {
     requests.add(query);
     if (failNext && cursor != null) throw StateError('Page source unavailable');
-    return super.loadProducts(query, cursor: cursor, pageSize: pageSize);
+    final page = await super.loadProducts(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    pages.add(page);
+    return page;
   }
 }
 
