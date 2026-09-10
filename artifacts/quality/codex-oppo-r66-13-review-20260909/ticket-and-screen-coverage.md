@@ -2,6 +2,12 @@
 
 ## 2026-09-10 current 27-item skim and Cursor handoff receipt
 
+### Founder decision: defer Cursor integration — 2026-09-11
+
+Founder explicitly defers integration this round until Cursor's Redmi APK is tested and its tickets are closed. This replaces the pending request for immediate integration permission; do not repeatedly ask for that exception, merge/cherry-pick Cursor work or copy its dirty/source files. Preserve Codex Store and Cursor branches independently. Cursor catalogue/procurement candidate `5ae5059a2c1536e0dbd12373d3b6fb4b7c04f448` and pinned parent `cb46b588f25365e8d180e7c441c26ff5143625a8` remain reference inputs, not admitted Store code. Reverify the eventual qualified handoff after Redmi closure before future integration.
+
+`DASH10 restock search retains product cart and Back 2.0` remains an open failed local check; deferral is neither a pass nor a waiver of pre-APK gates. The combined OPPO APK and dependent Store/Buy return/relaunch qualification remain held. Do not hide the failure, duplicate Cursor's fix or replace the requested complete journey with a smaller candidate. Codex Desktop retains OPPO only; Cursor IDE retains Redmi only. No product/test, policy, device, build or integration change accompanies this decision record. Resume the dependent qualification after the external Redmi closure/handoff and required integration authorization are available; unrelated scope remains excluded.
+
 ### Final Store-source combined checkpoint — 2026-09-11
 
 REG4557 recovery: the preceding evidence-seal tool output was truncated, so its gate outcome was not inferred. Readback confirmed unchanged source HEAD and only this ledger staged. A fresh bounded invocation using both quoted literal paths passed coordination and regression memory (4514 entries), exit 0; the incremental implementation gate also passed. The retained final test log hash was independently rechecked unchanged. No product/test rerun or APK followed the incomplete gate output.
