@@ -3,11 +3,185 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
+    show
+        BuyV2LivePublishedOffersSource,
+        BuyV2PublishedOffer,
+        BuyV2CataloguePublishedOffersSource,
+        BuyV2PublishedOffersSnapshot,
+        BuyV2PublishedOffersLoadState;
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
+final class _R669ContinuityPublications
+    implements BuyV2LivePublishedOffersSource {
+  const _R669ContinuityPublications();
+  @override
+  List<BuyV2PublishedOffer> get publishedOffers =>
+      const BuyV2CataloguePublishedOffersSource().publishedOffers;
+  @override
+  Future<BuyV2PublishedOffersSnapshot> load() async =>
+      BuyV2PublishedOffersSnapshot(
+        state: BuyV2PublishedOffersLoadState.ready,
+        offers: publishedOffers,
+      );
+}
+
+final class _R669ContinuityCommerce implements BuyV2CommerceAdapter {
+  late BuyV2CommerceSnapshot snapshot;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => snapshot;
+  @override
+  dynamic noSuchMethod(Invocation invocation) =>
+      throw StateError('Unexpected comparison continuity commerce operation');
+}
+
+final class _R669ContinuityComparison implements BuyV2ComparisonSource {
+  _R669ContinuityComparison(this.products, this.now);
+  final List<BuyV2Product> products;
+  final DateTime now;
+
+  @override
+  BuyV2ComparisonIdentity? identityFor(BuyV2Product product) =>
+      BuyV2ComparisonIdentity(
+        specificationId: 'fixture:${product.canonicalId}:${product.variant}',
+        packId: 'fixture:${product.canonicalId}:${product.pack}',
+        unit: BuyV2ComparisonUnit.count,
+        packQuantityMilli: 1000,
+      );
+
+  @override
+  Future<BuyV2ComparisonPage> load(BuyV2ComparisonPageRequest request) async {
+    final query = request.query;
+    final rows =
+        products
+            .where(
+              (product) =>
+                  product.canonicalId == query.productCanonicalId &&
+                  identityFor(
+                    product,
+                  )!.equivalentTo(query.identity, samePack: true),
+            )
+            .map(
+              (product) => BuyV2ComparisonOffer(
+                id: 'offer-${product.id}',
+                revision: '1',
+                queryKey: query.key,
+                snapshotId: 'continuity-quotes',
+                product: product,
+                identity: identityFor(product)!,
+                supplierWorkspaceId: 'workspace-${product.storeId}',
+                storeId: product.storeId!,
+                channel: query.purpose == BuyV2ComparisonPurpose.bulkPurchase
+                    ? BuyV2ComparisonChannel.wholesale
+                    : BuyV2ComparisonChannel.retail,
+                fulfilment: query.fulfilment ?? BuyV2FulfilmentMode.bulkFreight,
+                originLabel: 'Jodhpur',
+                local: true,
+                serviceable: true,
+                customerEligible: true,
+                availablePacks: 100000,
+                minimumPacks: product.minimumOrder,
+                incrementPacks: 1,
+                packPriceMinor: product.price * 100,
+                charges: const BuyV2ComparisonCharges(
+                  taxMinor: 0,
+                  freightMinor: 0,
+                  mandatoryFeesMinor: 0,
+                  immediateDiscountMinor: 0,
+                ),
+                observedAt: now,
+                validUntil: now.add(const Duration(hours: 1)),
+                arrivalStart: now.add(const Duration(minutes: 20)),
+                arrivalEnd: now.add(const Duration(minutes: 40)),
+              ),
+            )
+            .toList()
+          ..sort((a, b) {
+            final price = a.packPriceMinor.compareTo(b.packPriceMinor);
+            return price != 0 ? price : a.id.compareTo(b.id);
+          });
+    return BuyV2ComparisonPage(
+      queryKey: query.key,
+      snapshotId: 'continuity-quotes',
+      observedAt: now,
+      validUntil: now.add(const Duration(hours: 1)),
+      offers: rows,
+      globallyRanked: true,
+      totalCount: rows.length,
+      lowestItemPriceOfferId: rows.isEmpty ? null : rows.first.id,
+      lowestDeliveredOfferId: rows.isEmpty ? null : rows.first.id,
+    );
+  }
+}
+
+Future<BuyV2Session> r669ComparisonContinuitySession(BuySession core) async {
+  final now = DateTime.utc(2026, 9, 10, 12);
+  final products = BuyV2Catalogue.allProducts
+      .map(
+        (product) => product.copyWith(
+          storeId: 'fixture-${product.destination.name}-${product.seller}',
+        ),
+      )
+      .toList();
+  for (final id in ['s-milk', 'w-oil']) {
+    final source = products.singleWhere((product) => product.id == id);
+    products.add(
+      source.copyWith(
+        id: '$id-comparison',
+        storeId: 'fixture-other-$id',
+        seller: 'Another ${source.seller}',
+        price: source.price - 1,
+        badge: '',
+        catalogueListing: true,
+      ),
+    );
+  }
+  final commerce = _R669ContinuityCommerce();
+  final session = BuyV2Session(
+    core: core,
+    commerceAdapter: commerce,
+    reviewDataEnabled: false,
+    catalogueNow: () => now,
+    comparisonSource: _R669ContinuityComparison(products, now),
+  );
+  commerce.snapshot = BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: products,
+    addresses: const [
+      BuyV2Address(
+        id: 'home',
+        kind: BuyV2AddressKind.home,
+        label: 'Home',
+        recipient: 'Comparison customer',
+        phone: '9000000000',
+        line: '12, Central Avenue',
+        area: 'Sardarpura, Jodhpur',
+        pinCode: '342003',
+        landmark: 'Near Sardarpura circle',
+      ),
+    ],
+    selectedAddressId: 'home',
+    paymentMethods: BuyV2Session.paymentMethods,
+    businessVerified: true,
+    businessVerificationState: BuyV2BusinessVerificationState.verified,
+    productReportsAvailable: true,
+  );
+  await session.restoreCommerce();
+  expect(
+    session.findProduct('s-milk')!.storeId,
+    products.singleWhere((p) => p.id == 's-milk').storeId,
+  );
+  expect(
+    session.findProduct('w-oil')!.storeId,
+    products.singleWhere((p) => p.id == 'w-oil').storeId,
+  );
+  return session;
+}
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -29,7 +203,12 @@ void main() {
           child: r66VisualCaptureRoot(child!),
         );
       },
-      home: BuyV2Screen(session: session),
+      home: BuyV2Screen(
+        session: session,
+        offersSource: session.reviewDataEnabled
+            ? const BuyV2CataloguePublishedOffersSource()
+            : const _R669ContinuityPublications(),
+      ),
     );
   }
 
@@ -53,11 +232,11 @@ void main() {
           tester.view.physicalSize = Size(scale == 2 ? 320 : 390, 844);
           addTearDown(tester.view.reset);
           final core = BuySession();
-          final session = BuyV2Session(core: core);
+          final session = await r669ComparisonContinuitySession(core);
           addTearDown(core.dispose);
           addTearDown(session.dispose);
           final sourceId = offers ? 'w-oil' : 's-milk';
-          final alternateId = offers ? 'w-oil-10l' : 's-milk-500ml';
+          final alternateId = '$sourceId-comparison';
           session.addProduct(sourceId);
           final quantity = session.quantityFor(sourceId);
           await tester.pumpWidget(app(session, textScale: scale));
@@ -170,19 +349,22 @@ void main() {
             reason: 'Compare must open comparison without entering Cart',
           );
           final alternate = find.byKey(
-            ValueKey('buy-product-compare-view-$alternateId'),
+            ValueKey('buy-product-compare-$alternateId'),
           );
           await tester.scrollUntilVisible(
             alternate,
             180,
             scrollable: find.byType(Scrollable).last,
           );
-          await tester.tap(alternate);
+          final alternateCard = find.descendant(
+            of: alternate,
+            matching: find.byKey(ValueKey('buy-product-$alternateId')),
+          );
+          await tester.ensureVisible(alternateCard);
+          await tester.tap(alternateCard);
           await tester.pumpAndSettle();
           expect(session.selectedProductId, alternateId);
-          await tester.tap(
-            find.byKey(const ValueKey('buy-compact-cart-indicator')),
-          );
+          await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
           await tester.pumpAndSettle();
           expect(session.view, BuyV2View.cart);
           await tester.binding.handlePopRoute();
@@ -190,10 +372,7 @@ void main() {
           expect(session.selectedProductId, alternateId);
           final comparedBack = find.descendant(
             of: find.byKey(PageStorageKey('buy-product-$alternateId')),
-            matching: find.widgetWithText(
-              InkWell,
-              session.product(sourceId).title,
-            ),
+            matching: find.widgetWithText(InkWell, 'Back to Compare suppliers'),
           );
           await tester.scrollUntilVisible(
             comparedBack,
@@ -217,6 +396,13 @@ void main() {
           expect(session.view, BuyV2View.product);
           expect(session.selectedProductId, sourceId);
           expect(session.quantityFor(sourceId), quantity);
+          expect(
+            find.byKey(const ValueKey('buy-product-comparison-sheet')),
+            findsOneWidget,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, sourceId);
           final report = find.byKey(ValueKey('buy-report-product-$sourceId'));
           await tester.scrollUntilVisible(
             report,
@@ -348,11 +534,11 @@ void main() {
       tester.view.physicalSize = const Size(320, 844);
       addTearDown(tester.view.reset);
       final core = BuySession();
-      final session = BuyV2Session(core: core);
+      final session = await r669ComparisonContinuitySession(core);
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       final sourceId = wholesale ? 'w-oil' : 's-milk';
-      final alternateId = wholesale ? 'w-oil-10l' : 's-milk-500ml';
+      final alternateId = '$sourceId-comparison';
       await tester.pumpWidget(app(session, textScale: 2));
       session.openProduct(sourceId);
       await tester.pumpAndSettle();
@@ -377,14 +563,30 @@ void main() {
         expect(compare.hitTestable(), findsOneWidget);
         await tester.tap(compare);
         await tester.pumpAndSettle();
-        final option = find.byKey(ValueKey('buy-product-compare-view-$id'));
+        final option = find.byKey(ValueKey('buy-product-compare-$id'));
         await tester.scrollUntilVisible(
           option,
           180,
           scrollable: find.byType(Scrollable).last,
         );
-        await tester.tap(option);
+        final sku = find.descendant(
+          of: option,
+          matching: find.byKey(ValueKey('buy-product-$id')),
+        );
+        await tester.ensureVisible(sku);
+        await tester.tap(sku);
         await tester.pumpAndSettle();
+        expect(
+          session.selectedProductId,
+          id,
+          reason: find
+              .byType(Text)
+              .evaluate()
+              .map((e) => (e.widget as Text).data)
+              .whereType<String>()
+              .join(' | '),
+        );
+        expect(find.byKey(PageStorageKey('buy-product-$id')), findsOneWidget);
       }
 
       await compareTo(alternateId);
@@ -425,14 +627,28 @@ void main() {
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(session.selectedProductId, alternateId);
+      expect(
+        find.byKey(const ValueKey('buy-product-comparison-sheet')),
+        findsOneWidget,
+      );
       expect(session.canReturnToComparedProduct, isFalse);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.selectedProductId, alternateId);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(sheet, findsOneWidget);
       expect(session.selectedProductId, alternateId);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(session.canReturnToComparedProduct, isTrue);
+      expect(session.selectedProductId, alternateId);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-product-comparison-sheet')),
+        findsOneWidget,
+      );
+      expect(session.selectedProductId, sourceId);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(session.selectedProductId, sourceId);

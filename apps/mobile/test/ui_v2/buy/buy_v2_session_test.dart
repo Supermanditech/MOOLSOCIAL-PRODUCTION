@@ -928,6 +928,7 @@ Future<BuyV2Session> _openOrderSearchFixture({
 }
 
 void main() {
+  r669ComparisonContractTests();
   group('STORE-PROCUREMENT-ELIGIBILITY-01 contract', () {
     final now = DateTime.utc(2026, 9, 10, 10);
     final expiry = now.add(const Duration(minutes: 10));
@@ -7904,4 +7905,1725 @@ void main() {
       );
     });
   });
+}
+
+void r669ComparisonContractTests() {
+  group('R669 supplier comparison contract', () {
+    final now = DateTime.utc(2026, 9, 10, 12);
+    final expiry = now.add(const Duration(minutes: 10));
+    final product = BuyV2Catalogue.products.first.copyWith(
+      id: 'atta-retail',
+      canonicalId: 'atta-spec',
+      storeId: 'store-a',
+    );
+    const zeroCharges = BuyV2ComparisonCharges(
+      taxMinor: 0,
+      freightMinor: 0,
+      mandatoryFeesMinor: 0,
+      immediateDiscountMinor: 0,
+    );
+    BuyV2ComparisonIdentity identity({
+      String specification = 'brand-a:whole-wheat:grade-a',
+      String pack = 'bag-5kg',
+      String? contained,
+      int size = 5000,
+      BuyV2ComparisonUnit unit = BuyV2ComparisonUnit.kilogram,
+    }) => BuyV2ComparisonIdentity(
+      specificationId: specification,
+      packId: pack,
+      unit: unit,
+      packQuantityMilli: size,
+      containedRetailUnitId: contained,
+    );
+    BuyV2ComparisonQuery query({
+      BuyV2ComparisonIdentity? specification,
+      int quantity = 20000,
+      bool samePack = true,
+      BuyV2ComparisonPurpose purpose = BuyV2ComparisonPurpose.bulkPurchase,
+      bool allowExtra = true,
+      String account = 'buyer-a',
+      String destination = 'address-a:revision-1',
+      String pin = '342003',
+      BuyV2ComparisonChannel? channel,
+      BuyV2FulfilmentMode? fulfilment,
+      BuyV2ComparisonScope scope = BuyV2ComparisonScope.allServiceable,
+      BuyV2ComparisonSort sort = BuyV2ComparisonSort.deliveredCost,
+      DateTime? deadline,
+      BuyV2ProcurementContext? procurement,
+    }) => BuyV2ComparisonQuery(
+      productId: product.id,
+      productCanonicalId: product.canonicalId,
+      identity: specification ?? identity(),
+      purchaserScope: account,
+      destinationKey: destination,
+      pinCode: pin,
+      requestedQuantityMilli: quantity,
+      samePack: samePack,
+      purpose: procurement == null
+          ? purpose
+          : BuyV2ComparisonPurpose.storeProcurement,
+      allowExtraQuantity: allowExtra,
+      channel: channel,
+      fulfilment: fulfilment,
+      scope: scope,
+      sort: sort,
+      arriveBy: deadline,
+      procurementContext: procurement,
+    );
+    BuyV2ComparisonOffer offer(
+      BuyV2ComparisonQuery request, {
+      BuyV2Product? listing,
+      BuyV2ComparisonIdentity? specification,
+      String id = 'offer-a',
+      String revision = '1',
+      String snapshot = 'snapshot-a',
+      String? key,
+      String workspace = 'workspace-a',
+      String store = 'store-a',
+      String origin = 'Jodhpur',
+      BuyV2ComparisonChannel channel = BuyV2ComparisonChannel.retail,
+      BuyV2FulfilmentMode fulfilment = BuyV2FulfilmentMode.quickLocal,
+      bool local = true,
+      bool serviceable = true,
+      bool eligible = true,
+      int stock = 100,
+      int minimum = 1,
+      int increment = 1,
+      int price = 30000,
+      BuyV2ComparisonCharges charges = zeroCharges,
+      DateTime? observed,
+      DateTime? until,
+      DateTime? arrivalStart,
+      DateTime? arrivalEnd,
+      List<BuyV2ComparisonPriceTier> tiers = const [],
+    }) => BuyV2ComparisonOffer(
+      id: id,
+      revision: revision,
+      queryKey: key ?? request.key,
+      snapshotId: snapshot,
+      product: listing ?? product,
+      identity: specification ?? identity(),
+      supplierWorkspaceId: workspace,
+      storeId: store,
+      channel: channel,
+      fulfilment: fulfilment,
+      originLabel: origin,
+      local: local,
+      serviceable: serviceable,
+      customerEligible: eligible,
+      availablePacks: stock,
+      minimumPacks: minimum,
+      incrementPacks: increment,
+      packPriceMinor: price,
+      charges: charges,
+      observedAt: observed ?? now,
+      validUntil: until ?? expiry,
+      arrivalStart: arrivalStart,
+      arrivalEnd: arrivalEnd,
+      tiers: tiers,
+    );
+    BuyV2ComparisonCalculation calculate(
+      BuyV2ComparisonQuery request,
+      BuyV2ComparisonOffer value,
+    ) => BuyV2ComparisonCalculation.evaluate(
+      query: request,
+      offer: value,
+      now: now,
+    );
+    BuyV2ComparisonPage page(
+      BuyV2ComparisonQuery request,
+      List<BuyV2ComparisonOffer> offers, {
+      String snapshot = 'snapshot-a',
+      String? key,
+      DateTime? observed,
+      DateTime? until,
+      String? next,
+      String? previous,
+      int start = 0,
+      int? total,
+      bool ranked = true,
+      String? itemCheapest,
+      String? cheapest,
+      String? fastest,
+    }) => BuyV2ComparisonPage(
+      queryKey: key ?? request.key,
+      snapshotId: snapshot,
+      observedAt: observed ?? now,
+      validUntil: until ?? expiry,
+      offers: offers,
+      globallyRanked: ranked,
+      startIndex: start,
+      totalCount: total,
+      previousCursor: previous,
+      nextCursor: next,
+      lowestItemPriceOfferId: itemCheapest,
+      lowestDeliveredOfferId: cheapest,
+      earliestArrivalOfferId: fastest,
+    );
+
+    test('consumer defaults fix exact pack and item-price intent', () {
+      final request = BuyV2ComparisonQuery(
+        productId: product.id,
+        productCanonicalId: product.canonicalId,
+        identity: identity(),
+        purchaserScope: 'buyer-a',
+        destinationKey: 'address-a',
+        pinCode: '342003',
+        requestedQuantityMilli: 5000,
+      );
+      expect(request.valid, isTrue);
+      expect(request.standardPurchase, isTrue);
+      expect(request.samePack, isTrue);
+      expect(request.allowExtraQuantity, isFalse);
+      expect(request.sort, BuyV2ComparisonSort.itemPrice);
+    });
+
+    test(
+      'biscuit C90 A100 B110 ranks item price separately from delivery',
+      () async {
+        final biscuit = identity(
+          specification: 'biscuit-brand:original',
+          pack: 'sealed-biscuit-pack',
+          size: 1000,
+          unit: BuyV2ComparisonUnit.count,
+        );
+        final request = query(
+          specification: biscuit,
+          quantity: 1000,
+          purpose: BuyV2ComparisonPurpose.standardPurchase,
+          allowExtra: false,
+          sort: BuyV2ComparisonSort.itemPrice,
+        );
+        BuyV2ComparisonOffer store(String name, int price, int delivery) =>
+            offer(
+              request,
+              id: name,
+              listing: product.copyWith(id: 'biscuit-$name', storeId: name),
+              store: name,
+              specification: biscuit,
+              price: price,
+              charges: BuyV2ComparisonCharges(
+                taxMinor: 0,
+                freightMinor: delivery,
+                mandatoryFeesMinor: 0,
+                immediateDiscountMinor: 0,
+              ),
+            );
+        final c = store('store-c', 9000, 3000);
+        final a = store('store-a', 10000, 0);
+        final b = store('store-b', 11000, 0);
+        final result = page(
+          request,
+          [c, a, b],
+          itemCheapest: c.id,
+          cheapest: a.id,
+        );
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(biscuit, (_) async => result),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        expect(controller.page!.offers.map((offer) => offer.storeId), [
+          'store-c',
+          'store-a',
+          'store-b',
+        ]);
+        expect(calculate(request, c).itemSubtotalMinor, 9000);
+        expect(calculate(request, c).payableMinor, 12000);
+        expect(result.isLowestItemPrice(c, calculate(request, c)), isTrue);
+        expect(result.isLowestDelivered(c, calculate(request, c)), isFalse);
+        expect(result.isLowestDelivered(a, calculate(request, a)), isTrue);
+      },
+    );
+
+    test('consumer cannot admit wholesale by clearing channel filters', () {
+      final request = query(
+        purpose: BuyV2ComparisonPurpose.standardPurchase,
+        allowExtra: false,
+      );
+      expect(
+        calculate(
+          request,
+          offer(request, channel: BuyV2ComparisonChannel.wholesale),
+        ).unavailable,
+        BuyV2ComparisonUnavailable.filtered,
+      );
+      expect(
+        query(
+          purpose: BuyV2ComparisonPurpose.standardPurchase,
+          allowExtra: false,
+          channel: BuyV2ComparisonChannel.wholesale,
+        ).valid,
+        isFalse,
+      );
+    });
+
+    test('larger requested amount never changes consumer eligibility', () {
+      final request = query(
+        quantity: 500000,
+        purpose: BuyV2ComparisonPurpose.standardPurchase,
+        allowExtra: false,
+      );
+      expect(
+        calculate(
+          request,
+          offer(request, channel: BuyV2ComparisonChannel.wholesale),
+        ).unavailable,
+        BuyV2ComparisonUnavailable.filtered,
+      );
+    });
+
+    test('consumer cannot silently increase packs to meet MOQ', () {
+      final request = query(
+        quantity: 5000,
+        purpose: BuyV2ComparisonPurpose.standardPurchase,
+        allowExtra: false,
+      );
+      expect(
+        calculate(request, offer(request, minimum: 2)).unavailable,
+        BuyV2ComparisonUnavailable.unwantedQuantity,
+      );
+      expect(
+        query(
+          purpose: BuyV2ComparisonPurpose.standardPurchase,
+          allowExtra: true,
+        ).valid,
+        isFalse,
+      );
+    });
+
+    test('bulk extra quantity requires separately bound consent', () {
+      final exact = query(quantity: 5001, allowExtra: false);
+      final consent = query(quantity: 5001, allowExtra: true);
+      expect(exact.key, isNot(consent.key));
+      expect(
+        calculate(exact, offer(exact)).unavailable,
+        BuyV2ComparisonUnavailable.unwantedQuantity,
+      );
+      expect(calculate(consent, offer(consent)).excessQuantityMilli, 4999);
+    });
+
+    test(
+      'consumer other packs remain retail and must meet exact requirement',
+      () {
+        final request = query(
+          samePack: false,
+          purpose: BuyV2ComparisonPurpose.standardPurchase,
+          allowExtra: false,
+        );
+        expect(
+          calculate(
+            request,
+            offer(
+              request,
+              specification: identity(pack: 'bag-10kg', size: 10000),
+            ),
+          ).packCount,
+          2,
+        );
+        expect(
+          calculate(
+            request,
+            offer(
+              request,
+              specification: identity(pack: 'bag-12kg', size: 12000),
+            ),
+          ).unavailable,
+          BuyV2ComparisonUnavailable.unwantedQuantity,
+        );
+        expect(
+          calculate(
+            request,
+            offer(
+              request,
+              channel: BuyV2ComparisonChannel.wholesale,
+              specification: identity(pack: 'bag-10kg', size: 10000),
+            ),
+          ).unavailable,
+          BuyV2ComparisonUnavailable.filtered,
+        );
+      },
+    );
+
+    test(
+      'unknown delivery can win item price but cannot win delivered cost',
+      () {
+        final request = query(
+          purpose: BuyV2ComparisonPurpose.standardPurchase,
+          allowExtra: false,
+        );
+        final value = offer(request, charges: const BuyV2ComparisonCharges());
+        final result = page(request, [value], itemCheapest: value.id);
+        expect(
+          result.validFor(BuyV2ComparisonPageRequest(query: request), now),
+          isTrue,
+        );
+        expect(
+          result.isLowestItemPrice(value, calculate(request, value)),
+          isTrue,
+        );
+        expect(
+          result.isLowestDelivered(value, calculate(request, value)),
+          isFalse,
+        );
+        expect(calculate(request, value).payableMinor, isNull);
+      },
+    );
+
+    test(
+      'provider item winner cannot contradict cheaper visible item price',
+      () {
+        final request = query();
+        final cheap = offer(request, id: 'cheap', price: 9000);
+        final expensive = offer(request, id: 'expensive', price: 10000);
+        expect(
+          page(
+            request,
+            [cheap, expensive],
+            itemCheapest: expensive.id,
+          ).validFor(BuyV2ComparisonPageRequest(query: request), now),
+          isFalse,
+        );
+        expect(
+          page(
+            request,
+            [cheap],
+            ranked: false,
+            itemCheapest: cheap.id,
+          ).isLowestItemPrice(cheap, calculate(request, cheap)),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'Store alternate cartons require same contained sealed resale unit',
+      () {
+        const procurement = BuyV2ProcurementContext(
+          accountId: 'buyer-a',
+          storeId: 'retailer-a',
+          purpose: BuyV2ProcurementPurpose.restock,
+          originOperationId: 'op-a',
+        );
+        final request = query(
+          samePack: false,
+          procurement: procurement,
+          specification: identity(contained: 'sealed-brand-a-1kg'),
+        );
+        final compatible = offer(
+          request,
+          channel: BuyV2ComparisonChannel.wholesale,
+          specification: identity(
+            pack: 'carton-10kg',
+            size: 10000,
+            contained: 'sealed-brand-a-1kg',
+          ),
+        );
+        expect(calculate(request, compatible).packCount, 2);
+        final sack = offer(
+          request,
+          channel: BuyV2ComparisonChannel.wholesale,
+          specification: identity(pack: 'loose-sack-20kg', size: 20000),
+        );
+        expect(
+          calculate(request, sack).unavailable,
+          BuyV2ComparisonUnavailable.differentProduct,
+        );
+        expect(
+          calculate(request, offer(request)).unavailable,
+          BuyV2ComparisonUnavailable.filtered,
+        );
+      },
+    );
+
+    test(
+      'Store comparison cannot run without authoritative procurement context',
+      () {
+        expect(
+          query(purpose: BuyV2ComparisonPurpose.storeProcurement).valid,
+          isFalse,
+        );
+      },
+    );
+
+    ({
+      BuyV2Session session,
+      BuyV2Product product,
+      List<BuyV2ComparisonPageRequest> calls,
+    })
+    consumerFixture({DateTime Function()? clock}) {
+      final base = BuyV2Catalogue.products.firstWhere(
+        (value) => value.title.toLowerCase().contains('biscuits'),
+      );
+      final pack = identity(
+        specification: 'published:${base.canonicalId}:${base.variant}',
+        pack: 'published:${base.id}',
+        size: 1000,
+        unit: BuyV2ComparisonUnit.count,
+      );
+      final calls = <BuyV2ComparisonPageRequest>[];
+      final source = _R669ComparisonSource(pack, (load) async {
+        calls.add(load);
+        final request = load.query;
+        BuyV2ComparisonOffer priced(String name, int price, int? freight) =>
+            offer(
+              request,
+              id: 'offer-$name',
+              listing: base.copyWith(
+                id: 'comparison-$name',
+                storeId: name,
+                seller: 'Store ${name.toUpperCase()}',
+                price: price,
+                unitPrice: '₹$price per pack',
+                badge: '',
+              ),
+              store: name,
+              workspace: 'workspace-$name',
+              specification: pack,
+              price: price * 100,
+              charges: BuyV2ComparisonCharges(
+                taxMinor: 0,
+                freightMinor: freight,
+                mandatoryFeesMinor: 0,
+                immediateDiscountMinor: 0,
+              ),
+              arrivalStart: now.add(const Duration(minutes: 20)),
+              arrivalEnd: now.add(const Duration(minutes: 40)),
+            );
+        final c = priced('c', 90, 3000);
+        final a = priced('a', 100, 0);
+        final b = priced('b', 110, null);
+        final values = request.sort == BuyV2ComparisonSort.itemPrice
+            ? [c, a, b]
+            : [a, c, b];
+        final packs =
+            request.requestedQuantityMilli ~/
+            request.identity.packQuantityMilli;
+        return page(
+          request,
+          values,
+          itemCheapest: c.id,
+          cheapest: 90 * packs + 30 < 100 * packs ? c.id : a.id,
+        );
+      });
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        comparisonSource: source,
+        catalogueNow: clock ?? () => now,
+      );
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      return (session: session, product: base, calls: calls);
+    }
+
+    test(
+      'session binds consumer entry and explicit Wholesale entry separately',
+      () {
+        final fixture = consumerFixture();
+        final session = fixture.session;
+        final consumer = session.comparisonQueryFor(fixture.product)!;
+        expect(consumer.standardPurchase, isTrue);
+        expect(consumer.sort, BuyV2ComparisonSort.itemPrice);
+        expect(
+          session.comparisonQueryFor(
+            fixture.product,
+            channel: BuyV2ComparisonChannel.wholesale,
+          ),
+          isNull,
+        );
+        expect(
+          session.comparisonQueryFor(fixture.product, allowExtraQuantity: true),
+          isNull,
+        );
+        session.destination = BuyV2Destination.wholesale;
+        final bulk = session.comparisonQueryFor(fixture.product)!;
+        expect(bulk.purpose, BuyV2ComparisonPurpose.bulkPurchase);
+        expect(bulk.sort, BuyV2ComparisonSort.itemPrice);
+        expect(session.comparisonQueryIsCurrent(consumer), isFalse);
+        expect(session.openProduct(fixture.product.id), isTrue);
+        expect(session.comparisonPurpose, BuyV2ComparisonPurpose.bulkPurchase);
+        expect(session.comparisonQueryIsCurrent(bulk), isTrue);
+      },
+    );
+
+    for (final viewport in [
+      (size: const Size(320, 568), scale: 1.0, label: 'compact', quantity: 1),
+      (
+        size: const Size(320, 568),
+        scale: 2.0,
+        label: 'large-text',
+        quantity: 1,
+      ),
+      (size: const Size(568, 320), scale: 2.0, label: 'landscape', quantity: 1),
+      (
+        size: const Size(320, 568),
+        scale: 1.0,
+        label: 'three-packs',
+        quantity: 3,
+      ),
+    ]) {
+      testWidgets(
+        'consumer stores prices navigation cart and Back ${viewport.label}',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = viewport.size;
+          tester.platformDispatcher.textScaleFactorTestValue = viewport.scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          var currentTime = now;
+          final fixture = consumerFixture(clock: () => currentTime);
+          final session = fixture.session;
+          expect(
+            session.addProduct(fixture.product.id, quantity: viewport.quantity),
+            isTrue,
+          );
+          final retained = session.quantityFor(fixture.product.id);
+          await tester.pumpWidget(
+            MaterialApp(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              builder: (context, child) => r66VisualCaptureRoot(child!),
+              home: BuyV2Screen(
+                session: session,
+                initialView: BuyV2View.product,
+                productId: fixture.product.id,
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, fixture.product.id);
+          expect(session.view, BuyV2View.product);
+          final productList = find.byKey(
+            PageStorageKey('buy-product-${fixture.product.id}'),
+          );
+          expect(productList, findsOneWidget);
+          await tester.scrollUntilVisible(
+            find.text('Compare'),
+            240,
+            maxScrolls: 80,
+            scrollable: find
+                .descendant(of: productList, matching: find.byType(Scrollable))
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('Compare').hitTestable(), findsOneWidget);
+          await tester.tap(find.text('Compare'));
+          await tester.pumpAndSettle();
+          expect(find.text('Compare prices'), findsOneWidget);
+          expect(fixture.calls.last.query.sort, BuyV2ComparisonSort.itemPrice);
+          expect(fixture.calls.last.query.standardPurchase, isTrue);
+          expect(find.text('View in product list'), findsNothing);
+          expect(find.text('Retail and wholesale'), findsNothing);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(
+            tester,
+            'r669-consumer-stores-${viewport.label}-entry',
+          );
+
+          final priceC = find.byKey(
+            const ValueKey('buy-comparison-item-price-offer-c'),
+          );
+          await tester.ensureVisible(priceC);
+          await tester.pumpAndSettle();
+          expect(
+            find.text('₹${90 * viewport.quantity} item price'),
+            findsOneWidget,
+          );
+          expect(find.text('Delivery: ₹30'), findsOneWidget);
+          expect(
+            find.descendant(
+              of: find.byKey(
+                const ValueKey('buy-product-compare-comparison-c'),
+              ),
+              matching: find.text('₹${90 * viewport.quantity + 30} delivered'),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('Lowest item price'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(
+            tester,
+            'r669-consumer-stores-${viewport.label}-price',
+          );
+
+          final saveC = find.byKey(const ValueKey('buy-save-comparison-c'));
+          await tester.ensureVisible(saveC);
+          await tester.tap(saveC);
+          await tester.pumpAndSettle();
+          expect(session.isSaved('comparison-c'), isTrue);
+          expect(session.quantityFor('comparison-c'), 0);
+          await tester.tap(saveC);
+          await tester.pumpAndSettle();
+          expect(session.isSaved('comparison-c'), isFalse);
+
+          final addC = find.byKey(const ValueKey('buy-add-comparison-c'));
+          await tester.ensureVisible(addC);
+          await tester.tap(addC);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('comparison-c'), viewport.quantity);
+          expect(session.quantityFor(fixture.product.id), retained);
+          expect(session.selectedProductId, fixture.product.id);
+          expect(find.text('Compare prices'), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('buy-vertical-product-grid-comparison')),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(
+            tester,
+            'r669-consumer-stores-${viewport.label}-added',
+          );
+
+          final supplierCard = find.byKey(
+            const ValueKey('buy-product-compare-comparison-c'),
+          );
+          final plus = find.descendant(
+            of: supplierCard,
+            matching: find.byTooltip('Add one'),
+          );
+          await tester.ensureVisible(plus);
+          await tester.tap(plus);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('comparison-c'), viewport.quantity + 1);
+          final minus = find.descendant(
+            of: supplierCard,
+            matching: find.byTooltip('Remove one'),
+          );
+          await tester.ensureVisible(minus);
+          await tester.tap(minus);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('comparison-c'), viewport.quantity);
+          final edit = find.byKey(
+            const ValueKey('buy-grid-edit-quantity-comparison-c'),
+          );
+          await tester.ensureVisible(edit);
+          await tester.tap(edit);
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const ValueKey('buy-quantity-input')),
+            '${viewport.quantity + 2}',
+          );
+          final saveQuantity = find.byKey(const ValueKey('buy-quantity-save'));
+          await tester.ensureVisible(saveQuantity);
+          await tester.tap(saveQuantity);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor('comparison-c'), viewport.quantity + 2);
+          expect(session.quantityFor(fixture.product.id), retained);
+          expect(session.selectedProductId, fixture.product.id);
+          expect(find.text('Compare prices'), findsOneWidget);
+          expect(tester.takeException(), isNull);
+
+          await tester.ensureVisible(find.text('Store C'));
+          await tester.tap(find.text('Store C'));
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, 'comparison-c');
+          expect(
+            find.byKey(const ValueKey('buy-product-comparison-sheet')),
+            findsNothing,
+          );
+          expect(session.quantityFor(fixture.product.id), retained);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(
+            tester,
+            'r669-consumer-stores-${viewport.label}-product',
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.text('Compare prices'), findsOneWidget);
+          expect(session.selectedProductId, fixture.product.id);
+          expect(
+            fixture.calls
+                .map((call) => call.query.requestedQuantityMilli)
+                .toList(),
+            [
+              viewport.quantity * 1000,
+              (viewport.quantity + 1) * 1000,
+              viewport.quantity * 1000,
+              (viewport.quantity + 2) * 1000,
+            ],
+          );
+          expect(session.quantityFor(fixture.product.id), retained);
+
+          expect(find.text('Compare options'), findsNothing);
+          expect(
+            find.byKey(const ValueKey('buy-comparison-quantity')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-comparison-allow-extra')),
+            findsNothing,
+          );
+          expect(
+            fixture.calls.last.query.fulfilment,
+            BuyV2FulfilmentMode.quickLocal,
+          );
+          expect(fixture.calls.last.query.samePack, isTrue);
+          expect(fixture.calls.last.query.allowExtraQuantity, isFalse);
+          expect(tester.takeException(), isNull);
+          final staleSave = find.byKey(const ValueKey('buy-save-comparison-b'));
+          await tester.ensureVisible(staleSave);
+          await tester.pumpAndSettle();
+          currentTime = now.add(const Duration(hours: 2));
+          await tester.tap(staleSave);
+          await tester.pumpAndSettle();
+          expect(session.isSaved('comparison-b'), isFalse);
+          expect(session.quantityFor('comparison-b'), 0);
+          expect(session.quantityFor(fixture.product.id), retained);
+          expect(
+            find.text(
+              'This offer changed. Refresh the comparison before continuing.',
+            ),
+            findsOneWidget,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        },
+      );
+    }
+
+    test(
+      'controller pages all offers and returns to the previous snapshot',
+      () async {
+        final request = query();
+        final rows = List.generate(
+          25,
+          (index) => offer(request, id: index.toString().padLeft(2, '0')),
+        );
+        final calls = <BuyV2ComparisonPageRequest>[];
+        final source = _R669ComparisonSource(identity(), (load) async {
+          calls.add(load);
+          return load.cursor == 'second'
+              ? page(
+                  request,
+                  rows.skip(20).toList(),
+                  start: 20,
+                  previous: 'first',
+                  total: 25,
+                )
+              : page(
+                  request,
+                  rows.take(20).toList(),
+                  next: 'second',
+                  total: 25,
+                );
+        });
+        final controller = BuyV2ComparisonController(
+          source: source,
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        expect(controller.page!.offers, hasLength(20));
+        expect(controller.canGoNext, isTrue);
+        await controller.next();
+        expect(controller.page!.offers.map((value) => value.id), [
+          '20',
+          '21',
+          '22',
+          '23',
+          '24',
+        ]);
+        expect(controller.canGoPrevious, isTrue);
+        expect(controller.canGoNext, isFalse);
+        await controller.previous();
+        expect(controller.page!.offers.first.id, '00');
+        expect(calls.map((value) => value.snapshotId), [
+          null,
+          'snapshot-a',
+          'snapshot-a',
+        ]);
+        expect(calls.every((value) => value.pageSize == 20), isTrue);
+      },
+    );
+    test(
+      'controller serializes a changed query and rejects the late first response',
+      () async {
+        final old = query();
+        final changed = query(quantity: 30000);
+        final pending = Completer<BuyV2ComparisonPage>();
+        final calls = <BuyV2ComparisonPageRequest>[];
+        final source = _R669ComparisonSource(identity(), (load) {
+          calls.add(load);
+          return calls.length == 1
+              ? pending.future
+              : Future.value(page(changed, [offer(changed)]));
+        });
+        final controller = BuyV2ComparisonController(
+          source: source,
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        final first = controller.open(old);
+        final second = controller.open(changed);
+        expect(calls, hasLength(1));
+        pending.complete(page(old, [offer(old)]));
+        await Future.wait([first, second]);
+        expect(calls, hasLength(2));
+        expect(controller.page!.queryKey, changed.key);
+        expect(controller.query!.requestedQuantityMilli, 30000);
+      },
+    );
+    test(
+      'controller rejects account Store or address changes during loading',
+      () async {
+        final request = query();
+        var current = true;
+        final pending = Completer<BuyV2ComparisonPage>();
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(identity(), (_) => pending.future),
+          isCurrent: (_) => current,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        final loading = controller.open(request);
+        current = false;
+        controller.checkContext();
+        pending.complete(page(request, [offer(request)]));
+        await loading;
+        expect(controller.page, isNull);
+        expect(controller.loading, isFalse);
+        expect(controller.message, contains('shopping details changed'));
+      },
+    );
+    test(
+      'controller retains the valid prior page after a next-page failure',
+      () async {
+        final request = query();
+        var calls = 0;
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(identity(), (load) async {
+            if (++calls == 2) {
+              throw StateError('provider diagnostic must not leak');
+            }
+            return page(request, [offer(request)], next: 'second');
+          }),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        await controller.next();
+        expect(controller.page!.offers.single.id, 'offer-a');
+        expect(
+          controller.message,
+          'Supplier prices could not be refreshed. Try again.',
+        );
+        await controller.refresh();
+        expect(controller.message, isNull);
+        expect(calls, 3);
+      },
+    );
+    test(
+      'controller expires displayed quotes and prevents product selection',
+      () async {
+        final request = query();
+        final value = offer(request);
+        var clock = now;
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(
+            identity(),
+            (_) async => page(request, [value]),
+          ),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => clock,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        expect(controller.canOpen(value), isTrue);
+        clock = expiry;
+        expect(controller.page, isNull);
+        expect(controller.canOpen(value), isFalse);
+        expect(controller.message, contains('refreshed'));
+      },
+    );
+    test(
+      'controller rechecks mandatory Store eligibility after results arrive',
+      () async {
+        final request = query();
+        final value = offer(request);
+        var permitted = true;
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(
+            identity(),
+            (_) async => page(request, [value]),
+          ),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => permitted,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        expect(controller.canOpen(value), isTrue);
+        permitted = false;
+        expect(controller.page, isNull);
+        expect(controller.canOpen(value), isFalse);
+        await controller.refresh();
+        expect(controller.page, isNull);
+        expect(controller.message, contains('could not be refreshed'));
+      },
+    );
+    for (final failure in ['gap', 'duplicate', 'snapshot', 'ranking']) {
+      test('controller rejects next-page $failure', () async {
+        final request = query();
+        final first = offer(request, id: 'a', price: 30000);
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(identity(), (load) async {
+            if (load.cursor == null) {
+              return page(request, [first], next: 'second');
+            }
+            return page(
+              request,
+              [
+                failure == 'duplicate'
+                    ? first
+                    : offer(
+                        request,
+                        id: 'b',
+                        price: failure == 'ranking' ? 20000 : 40000,
+                        snapshot: failure == 'snapshot'
+                            ? 'other'
+                            : 'snapshot-a',
+                      ),
+              ],
+              start: failure == 'gap' ? 2 : 1,
+              previous: 'first',
+              snapshot: failure == 'snapshot' ? 'other' : 'snapshot-a',
+            );
+          }),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        await controller.next();
+        expect(controller.page!.offers.single, same(first));
+        expect(controller.message, contains('could not be refreshed'));
+      });
+    }
+    test(
+      'controller requires source ranking across the complete eligible query',
+      () async {
+        final request = query();
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(
+            identity(),
+            (_) async => page(request, [
+              offer(request, id: 'expensive', price: 40000),
+              offer(request, id: 'cheap', price: 30000),
+            ]),
+          ),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(request);
+        expect(controller.page, isNull);
+        expect(controller.message, contains('could not be refreshed'));
+      },
+    );
+    test('controller arrival ordering is independent of item cost', () async {
+      final request = query(sort: BuyV2ComparisonSort.arrival);
+      final expensive = offer(
+        request,
+        id: 'fast',
+        price: 40000,
+        arrivalStart: now,
+        arrivalEnd: now.add(const Duration(hours: 1)),
+      );
+      final cheap = offer(
+        request,
+        id: 'slow',
+        price: 20000,
+        arrivalStart: now,
+        arrivalEnd: now.add(const Duration(hours: 2)),
+      );
+      final unknown = offer(request, id: 'unknown');
+      final controller = BuyV2ComparisonController(
+        source: _R669ComparisonSource(
+          identity(),
+          (_) async => page(
+            request,
+            [expensive, cheap, unknown],
+            fastest: expensive.id,
+            cheapest: cheap.id,
+          ),
+        ),
+        isCurrent: (_) => true,
+        offerPermitted: (_) => true,
+        now: () => now,
+      );
+      addTearDown(controller.dispose);
+      await controller.open(request);
+      expect(controller.page!.offers.map((value) => value.id), [
+        'fast',
+        'slow',
+        'unknown',
+      ]);
+      expect(
+        controller.page!.isEarliestArrival(
+          expensive,
+          calculate(request, expensive),
+        ),
+        isTrue,
+      );
+      expect(
+        controller.page!.isLowestDelivered(cheap, calculate(request, cheap)),
+        isTrue,
+      );
+    });
+    test(
+      'controller disposal rejects an in-flight result without notification',
+      () async {
+        final request = query();
+        final pending = Completer<BuyV2ComparisonPage>();
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(identity(), (_) => pending.future),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        var notifications = 0;
+        controller.addListener(() => notifications++);
+        final loading = controller.open(request);
+        expect(notifications, 1);
+        controller.dispose();
+        pending.complete(page(request, [offer(request)]));
+        await loading;
+        expect(notifications, 1);
+        expect(controller.page, isNull);
+      },
+    );
+    test(
+      'controller never calls the provider for an invalid request',
+      () async {
+        var calls = 0;
+        final controller = BuyV2ComparisonController(
+          source: _R669ComparisonSource(identity(), (load) async {
+            calls++;
+            return page(load.query, []);
+          }),
+          isCurrent: (_) => true,
+          offerPermitted: (_) => true,
+          now: () => now,
+        );
+        addTearDown(controller.dispose);
+        await controller.open(query(quantity: 0));
+        expect(calls, 0);
+        expect(controller.page, isNull);
+      },
+    );
+
+    test(
+      'a claimed cheapest result cannot contradict complete delivered costs',
+      () {
+        final request = query();
+        final cheap = offer(request, id: 'cheap', price: 20000);
+        final expensive = offer(request, id: 'expensive', price: 30000);
+        expect(
+          page(
+            request,
+            [cheap, expensive],
+            cheapest: expensive.id,
+          ).validFor(BuyV2ComparisonPageRequest(query: request), now),
+          isFalse,
+        );
+        expect(
+          page(
+            request,
+            [cheap, expensive],
+            cheapest: cheap.id,
+          ).validFor(BuyV2ComparisonPageRequest(query: request), now),
+          isTrue,
+        );
+      },
+    );
+    test('a claimed fastest result cannot contradict arrival windows', () {
+      final request = query();
+      final fast = offer(
+        request,
+        id: 'fast',
+        arrivalStart: now,
+        arrivalEnd: now.add(const Duration(hours: 1)),
+      );
+      final slow = offer(
+        request,
+        id: 'slow',
+        arrivalStart: now,
+        arrivalEnd: now.add(const Duration(hours: 2)),
+      );
+      expect(
+        page(
+          request,
+          [fast, slow],
+          fastest: slow.id,
+        ).validFor(BuyV2ComparisonPageRequest(query: request), now),
+        isFalse,
+      );
+      expect(
+        page(
+          request,
+          [fast, slow],
+          fastest: fast.id,
+        ).validFor(BuyV2ComparisonPageRequest(query: request), now),
+        isTrue,
+      );
+    });
+    test(
+      'bounded pages reject oversized and empty endless provider responses',
+      () {
+        final request = query();
+        final load = BuyV2ComparisonPageRequest(query: request);
+        expect(page(request, [], next: 'endless').validFor(load, now), isFalse);
+        final oversized = List.generate(
+          21,
+          (index) => offer(request, id: index.toString()),
+        );
+        expect(page(request, oversized).validFor(load, now), isFalse);
+        expect(
+          BuyV2ComparisonPageRequest(query: request, pageSize: 41).valid,
+          isFalse,
+        );
+        expect(
+          page(request, [offer(request)], total: 2).validFor(load, now),
+          isFalse,
+        );
+      },
+    );
+
+    test(
+      'same requirement compares actual delivered totals across pack sizes',
+      () {
+        final request = query(samePack: false);
+        final retail = calculate(
+          request,
+          offer(
+            request,
+            charges: const BuyV2ComparisonCharges(
+              taxMinor: 0,
+              freightMinor: 4000,
+              mandatoryFeesMinor: 0,
+              immediateDiscountMinor: 0,
+            ),
+          ),
+        );
+        final wholesale = calculate(
+          request,
+          offer(
+            request,
+            id: 'wholesale',
+            channel: BuyV2ComparisonChannel.wholesale,
+            specification: identity(pack: 'bag-10kg', size: 10000),
+            price: 55000,
+            charges: const BuyV2ComparisonCharges(
+              taxMinor: 0,
+              freightMinor: 18000,
+              mandatoryFeesMinor: 0,
+              immediateDiscountMinor: 0,
+            ),
+          ),
+        );
+        expect(retail.packCount, 4);
+        expect(wholesale.packCount, 2);
+        expect(retail.suppliedQuantityMilli, 20000);
+        expect(wholesale.suppliedQuantityMilli, 20000);
+        expect(retail.payableMinor, 124000);
+        expect(wholesale.payableMinor, 128000);
+        expect(retail.comparableUnitMinor, 6200);
+        expect(wholesale.comparableUnitMinor, 6400);
+      },
+    );
+    for (final alternate in [
+      identity(specification: 'brand-b:whole-wheat:grade-a'),
+      identity(specification: 'brand-a:whole-wheat:grade-b'),
+      identity(specification: 'brand-a:rice:grade-a'),
+      identity(unit: BuyV2ComparisonUnit.litre),
+    ]) {
+      test(
+        'rejects non-equivalent ${alternate.specificationId}/${alternate.unit.name}',
+        () {
+          final request = query(samePack: false);
+          expect(
+            calculate(
+              request,
+              offer(request, specification: alternate),
+            ).unavailable,
+            BuyV2ComparisonUnavailable.differentProduct,
+          );
+        },
+      );
+    }
+    test('canonical product cannot disagree with declared specification', () {
+      final request = query();
+      expect(
+        calculate(
+          request,
+          offer(request, listing: product.copyWith(canonicalId: 'rice')),
+        ).unavailable,
+        BuyV2ComparisonUnavailable.differentProduct,
+      );
+    });
+    test('same pack fixes pack identity and normalized contents', () {
+      final request = query();
+      for (final alternate in [
+        identity(pack: 'carton-5kg'),
+        identity(size: 10000),
+      ]) {
+        expect(
+          calculate(
+            request,
+            offer(request, specification: alternate),
+          ).unavailable,
+          BuyV2ComparisonUnavailable.differentProduct,
+        );
+      }
+    });
+    test('MOQ plus increments discloses excess quantity and reached tier', () {
+      final request = query(quantity: 20001);
+      final value = calculate(
+        request,
+        offer(
+          request,
+          minimum: 3,
+          increment: 4,
+          tiers: const [
+            BuyV2ComparisonPriceTier(minimumPacks: 10, packPriceMinor: 22000),
+            BuyV2ComparisonPriceTier(minimumPacks: 7, packPriceMinor: 25000),
+          ],
+        ),
+      );
+      expect(value.packCount, 7);
+      expect(value.suppliedQuantityMilli, 35000);
+      expect(value.excessQuantityMilli, 14999);
+      expect(value.packPriceMinor, 25000);
+      expect(value.itemSubtotalMinor, 175000);
+    });
+    test('tier boundary changes only at the purchased count', () {
+      for (final quantity in [15000, 15001]) {
+        final request = query(quantity: quantity);
+        final value = calculate(
+          request,
+          offer(
+            request,
+            tiers: const [
+              BuyV2ComparisonPriceTier(minimumPacks: 4, packPriceMinor: 28000),
+            ],
+          ),
+        );
+        expect(value.packPriceMinor, quantity == 15000 ? 30000 : 28000);
+      }
+    });
+    test('minimum order honors requirements smaller than one pack', () {
+      final request = query(quantity: 1000);
+      final value = calculate(request, offer(request, minimum: 5));
+      expect(value.packCount, 5);
+      expect(value.excessQuantityMilli, 24000);
+    });
+    test('fixed minor-unit arithmetic rounds per-unit cost half up', () {
+      final request = query(
+        quantity: 2000,
+        specification: identity(size: 2000),
+      );
+      final value = calculate(
+        request,
+        offer(request, specification: identity(size: 2000), price: 101),
+      );
+      expect(value.payableMinor, 101);
+      expect(value.comparableUnitMinor, 51);
+    });
+    test('large wholesale amounts remain exact', () {
+      final request = query(quantity: 5000000);
+      final value = calculate(
+        request,
+        offer(request, stock: 1000, price: 98765432),
+      );
+      expect(value.packCount, 1000);
+      expect(value.payableMinor, 98765432000);
+      expect(value.comparableUnitMinor, 19753086);
+    });
+    test('arithmetic rejects common integer precision overflow', () {
+      final request = query(quantity: 10000);
+      expect(
+        calculate(request, offer(request, price: 9007199254740991)).unavailable,
+        BuyV2ComparisonUnavailable.invalidTerms,
+      );
+    });
+    test('unknown charges retain goods quote without a final payable', () {
+      final request = query();
+      for (final charges in [
+        const BuyV2ComparisonCharges(),
+        const BuyV2ComparisonCharges(
+          taxMinor: 0,
+          mandatoryFeesMinor: 0,
+          immediateDiscountMinor: 0,
+        ),
+        const BuyV2ComparisonCharges(
+          taxMinor: 0,
+          freightMinor: 0,
+          mandatoryFeesMinor: 0,
+        ),
+      ]) {
+        final value = calculate(request, offer(request, charges: charges));
+        expect(value.available, isTrue);
+        expect(value.itemSubtotalMinor, 120000);
+        expect(value.payableMinor, isNull);
+        expect(value.comparableUnitMinor, isNull);
+      }
+    });
+    test('disclosed charges and immediate discount determine payable', () {
+      final request = query();
+      final value = calculate(
+        request,
+        offer(
+          request,
+          charges: const BuyV2ComparisonCharges(
+            taxMinor: 6000,
+            freightMinor: 4000,
+            mandatoryFeesMinor: 300,
+            immediateDiscountMinor: 2000,
+          ),
+        ),
+      );
+      expect(value.payableMinor, 128300);
+    });
+    test('discount cannot yield negative payable', () {
+      final request = query();
+      expect(
+        calculate(
+          request,
+          offer(
+            request,
+            charges: const BuyV2ComparisonCharges(
+              taxMinor: 0,
+              freightMinor: 0,
+              mandatoryFeesMinor: 0,
+              immediateDiscountMinor: 120001,
+            ),
+          ),
+        ).unavailable,
+        BuyV2ComparisonUnavailable.invalidTerms,
+      );
+    });
+    final invalidOffers =
+        <String, BuyV2ComparisonOffer Function(BuyV2ComparisonQuery)>{
+          'blank workspace': (q) => offer(q, workspace: ''),
+          'store mismatch': (q) => offer(q, store: 'other-store'),
+          'missing revision': (q) => offer(q, revision: ''),
+          'missing origin': (q) => offer(q, origin: ''),
+          'zero MOQ': (q) => offer(q, minimum: 0),
+          'zero increment': (q) => offer(q, increment: 0),
+          'negative stock': (q) => offer(q, stock: -1),
+          'negative price': (q) => offer(q, price: -1),
+          'future observation': (q) => offer(q, observed: expiry),
+          'negative charge': (q) =>
+              offer(q, charges: const BuyV2ComparisonCharges(freightMinor: -1)),
+          'duplicate tiers': (q) => offer(
+            q,
+            tiers: const [
+              BuyV2ComparisonPriceTier(minimumPacks: 2, packPriceMinor: 2),
+              BuyV2ComparisonPriceTier(minimumPacks: 2, packPriceMinor: 1),
+            ],
+          ),
+          'bad tier': (q) => offer(
+            q,
+            tiers: const [
+              BuyV2ComparisonPriceTier(minimumPacks: 0, packPriceMinor: 1),
+            ],
+          ),
+          'partial arrival': (q) => offer(q, arrivalEnd: expiry),
+          'reversed arrival': (q) => offer(
+            q,
+            arrivalStart: expiry,
+            arrivalEnd: now.add(const Duration(minutes: 5)),
+          ),
+        };
+    for (final entry in invalidOffers.entries) {
+      test('invalid terms: ${entry.key}', () {
+        final request = query();
+        expect(
+          calculate(request, entry.value(request)).unavailable,
+          BuyV2ComparisonUnavailable.invalidTerms,
+        );
+      });
+    }
+    test('serviceability, approval, stock and expiry fail closed', () {
+      final request = query();
+      final cases = [
+        (
+          offer(request, serviceable: false),
+          BuyV2ComparisonUnavailable.unserviceable,
+        ),
+        (
+          offer(request, eligible: false),
+          BuyV2ComparisonUnavailable.customerIneligible,
+        ),
+        (
+          offer(request, stock: 3),
+          BuyV2ComparisonUnavailable.insufficientStock,
+        ),
+        (
+          offer(
+            request,
+            observed: now.subtract(const Duration(minutes: 5)),
+            until: now,
+          ),
+          BuyV2ComparisonUnavailable.expired,
+        ),
+      ];
+      for (final (value, reason) in cases) {
+        expect(calculate(request, value).unavailable, reason);
+      }
+    });
+    test('local, channel and fulfilment filters remain independent', () {
+      final local = query(scope: BuyV2ComparisonScope.local);
+      final retail = query(channel: BuyV2ComparisonChannel.retail);
+      final quick = query(fulfilment: BuyV2FulfilmentMode.quickLocal);
+      for (final (request, value) in [
+        (local, offer(local, local: false)),
+        (retail, offer(retail, channel: BuyV2ComparisonChannel.wholesale)),
+        (quick, offer(quick, fulfilment: BuyV2FulfilmentMode.standardCourier)),
+      ]) {
+        expect(
+          calculate(request, value).unavailable,
+          BuyV2ComparisonUnavailable.filtered,
+        );
+      }
+    });
+    test('unknown or late arrival fails a requested deadline', () {
+      final request = query();
+      expect(calculate(request, offer(request)).arrivalEnd, isNull);
+      final deadline = query(deadline: now.add(const Duration(hours: 2)));
+      expect(
+        calculate(deadline, offer(deadline)).unavailable,
+        BuyV2ComparisonUnavailable.arrivalUnavailable,
+      );
+      expect(
+        calculate(
+          deadline,
+          offer(
+            deadline,
+            arrivalStart: now.add(const Duration(hours: 1)),
+            arrivalEnd: now.add(const Duration(hours: 3)),
+          ),
+        ).unavailable,
+        BuyV2ComparisonUnavailable.arrivalUnavailable,
+      );
+    });
+    test('arrival window in progress remains valid', () {
+      final request = query();
+      expect(
+        calculate(
+          request,
+          offer(
+            request,
+            observed: now.subtract(const Duration(minutes: 10)),
+            arrivalStart: now.subtract(const Duration(minutes: 5)),
+            arrivalEnd: now.add(const Duration(minutes: 5)),
+          ),
+        ).available,
+        isTrue,
+      );
+    });
+    test(
+      'query binds purchaser, destination revision, quantity and filters',
+      () {
+        final original = query();
+        for (final changed in [
+          query(account: 'buyer-b'),
+          query(destination: 'address-a:revision-2'),
+          query(pin: '560001'),
+          query(quantity: 20001),
+          query(samePack: false),
+          query(channel: BuyV2ComparisonChannel.wholesale),
+          query(sort: BuyV2ComparisonSort.arrival),
+          query(
+            procurement: const BuyV2ProcurementContext(
+              accountId: 'buyer-a',
+              storeId: 'retailer-a',
+              purpose: BuyV2ProcurementPurpose.restock,
+              originOperationId: 'op-a',
+            ),
+          ),
+        ]) {
+          expect(changed.key, isNot(original.key));
+          expect(
+            calculate(changed, offer(original)).unavailable,
+            BuyV2ComparisonUnavailable.wrongQuery,
+          );
+        }
+      },
+    );
+    test('count quantities exclude fractional items and invalid PINs', () {
+      for (final invalid in [
+        query(quantity: 0),
+        query(quantity: -1),
+        query(pin: '000000'),
+        query(pin: '56000'),
+        query(
+          specification: identity(unit: BuyV2ComparisonUnit.count, size: 1500),
+        ),
+        query(
+          specification: identity(unit: BuyV2ComparisonUnit.count),
+          quantity: 1500,
+        ),
+      ]) {
+        expect(invalid.valid, isFalse);
+      }
+    });
+    test('unbranded products require a published commodity specification', () {
+      expect(query(specification: identity(specification: '')).valid, isFalse);
+      expect(
+        query(
+          specification: identity(
+            specification: 'unbranded:wheat:sharbati:grade-a',
+          ),
+        ).valid,
+        isTrue,
+      );
+    });
+    test('page binds the snapshot and copies its immutable offers', () {
+      final request = query();
+      final rows = [offer(request)];
+      final value = page(request, rows, next: 'page-2');
+      rows.clear();
+      expect(value.offers, hasLength(1));
+      expect(
+        value.validFor(BuyV2ComparisonPageRequest(query: request), now),
+        isTrue,
+      );
+      expect(() => value.offers.clear(), throwsUnsupportedError);
+    });
+    test(
+      'page rejects duplicates, mixed snapshots, foreign queries and expiry',
+      () {
+        final request = query();
+        final first = offer(request);
+        for (final value in [
+          page(request, [first, first]),
+          page(request, [offer(request, snapshot: 'other-snapshot')]),
+          page(request, [first], key: query(account: 'buyer-b').key),
+          page(request, [first], until: now),
+          page(request, [
+            offer(request, observed: now.subtract(const Duration(seconds: 1))),
+          ]),
+        ]) {
+          expect(
+            value.validFor(BuyV2ComparisonPageRequest(query: request), now),
+            isFalse,
+          );
+        }
+      },
+    );
+    test('continuation requires exact snapshot and non-repeating cursor', () {
+      final request = query();
+      expect(
+        BuyV2ComparisonPageRequest(query: request, cursor: '2').valid,
+        isFalse,
+      );
+      final continuation = BuyV2ComparisonPageRequest(
+        query: request,
+        snapshotId: 'snapshot-a',
+        cursor: '2',
+      );
+      expect(
+        page(request, [offer(request)], next: '2').validFor(continuation, now),
+        isFalse,
+      );
+      expect(
+        page(request, [
+          offer(request),
+        ], snapshot: 'snapshot-b').validFor(continuation, now),
+        isFalse,
+      );
+      expect(
+        page(request, [offer(request)], next: '3').validFor(continuation, now),
+        isTrue,
+      );
+    });
+    test('partial ranking or missing facts cannot earn winner badges', () {
+      final request = query();
+      final incomplete = offer(
+        request,
+        charges: const BuyV2ComparisonCharges(),
+      );
+      final complete = offer(
+        request,
+        arrivalStart: now,
+        arrivalEnd: now.add(const Duration(hours: 1)),
+      );
+      final incompletePage = page(
+        request,
+        [incomplete],
+        cheapest: incomplete.id,
+        fastest: incomplete.id,
+      );
+      expect(
+        incompletePage.isLowestDelivered(
+          incomplete,
+          calculate(request, incomplete),
+        ),
+        isFalse,
+      );
+      expect(
+        incompletePage.isEarliestArrival(
+          incomplete,
+          calculate(request, incomplete),
+        ),
+        isFalse,
+      );
+      final partial = page(
+        request,
+        [complete],
+        ranked: false,
+        cheapest: complete.id,
+        fastest: complete.id,
+      );
+      expect(
+        partial.isLowestDelivered(complete, calculate(request, complete)),
+        isFalse,
+      );
+      expect(
+        partial.isEarliestArrival(complete, calculate(request, complete)),
+        isFalse,
+      );
+      final ranked = page(
+        request,
+        [complete],
+        cheapest: complete.id,
+        fastest: complete.id,
+      );
+      expect(
+        ranked.isLowestDelivered(complete, calculate(request, complete)),
+        isTrue,
+      );
+      expect(
+        ranked.isEarliestArrival(complete, calculate(request, complete)),
+        isTrue,
+      );
+    });
+  });
+}
+
+final class _R669ComparisonSource implements BuyV2ComparisonSource {
+  _R669ComparisonSource(this.identity, this.loader);
+  final BuyV2ComparisonIdentity identity;
+  final Future<BuyV2ComparisonPage> Function(BuyV2ComparisonPageRequest) loader;
+  @override
+  BuyV2ComparisonIdentity? identityFor(BuyV2Product product) => identity;
+  @override
+  Future<BuyV2ComparisonPage> load(BuyV2ComparisonPageRequest request) =>
+      loader(request);
 }

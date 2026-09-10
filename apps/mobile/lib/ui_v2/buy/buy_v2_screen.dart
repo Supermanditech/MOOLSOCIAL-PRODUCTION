@@ -2217,6 +2217,16 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                                                 ).pop(false),
                                                             onAskSeller:
                                                                 _openProductQuestion,
+                                                            onVisitComparisonProduct:
+                                                                (
+                                                                  product,
+                                                                ) async {
+                                                                  await _openStoreProduct(
+                                                                    product,
+                                                                    returnLabel:
+                                                                        'Compare suppliers',
+                                                                  );
+                                                                },
                                                             onOpenPartnerCatalogue:
                                                                 _openPartnerCatalogue,
                                                             wholesaleTradeDecisionAdapter:
@@ -2471,6 +2481,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         scrollController: _rootProductScrollController,
         returnLabel: _offersActive ? 'Offers' : null,
         onAskSeller: _openProductQuestion,
+        onVisitComparisonProduct: (product) async {
+          await _openStoreProduct(product, returnLabel: 'Compare suppliers');
+        },
         onOpenPartnerCatalogue: _openPartnerCatalogue,
         wholesaleTradeDecisionAdapter: widget.wholesaleTradeDecisionAdapter,
       ),

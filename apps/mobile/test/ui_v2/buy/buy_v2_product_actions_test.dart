@@ -979,17 +979,34 @@ void main() {
       find.byKey(const ValueKey('buy-product-action-compare-s-milk')),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Compare products'), findsOneWidget);
+    expect(find.text('Compare prices'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('buy-product-compare-s-milk')),
+      find.text(
+        'Prices from other suppliers are unavailable right now. Try again.',
+      ),
       findsOneWidget,
     );
     expect(
+      find.byKey(const ValueKey('buy-product-compare-s-milk')),
+      findsNothing,
+    );
+    expect(
       find.byKey(const ValueKey('buy-product-compare-s-milk-500ml')),
+      findsNothing,
+    );
+    await tester.tap(find.text('Refresh comparison'));
+    await tester.pumpAndSettle();
+    expect(
+      find.text(
+        'Prices from other suppliers are unavailable right now. Try again.',
+      ),
       findsOneWidget,
     );
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.product);
+    expect(session.selectedProductId, 's-milk');
+    expect(session.isSaved('s-milk'), isTrue);
 
     await tester.ensureVisible(
       find.byKey(const ValueKey('buy-product-action-ask-seller-s-milk')),

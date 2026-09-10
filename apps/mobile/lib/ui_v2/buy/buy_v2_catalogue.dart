@@ -8463,6 +8463,11 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
     this.savedContext = false,
     this.onOpenProduct,
     this.storeContext = false,
+    this.vertical = false,
+    this.productSupplement,
+    this.beforeCartChange,
+    this.initialAddQuantity,
+    this.beforeSave,
   });
 
   final BuyV2Session session;
@@ -8478,6 +8483,11 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
   final bool savedContext;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
+  final bool vertical;
+  final Widget Function(BuyV2Product)? productSupplement;
+  final Future<bool> Function(BuyV2Product, int)? beforeCartChange;
+  final int? initialAddQuantity;
+  final bool Function(BuyV2Product)? beforeSave;
 
   @override
   Widget build(BuildContext context) {
@@ -8494,6 +8504,49 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           denseStore: storeContext,
           cartQuantityWidth: quantityWidth,
         );
+        if (vertical) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            child: Wrap(
+              key: ValueKey('buy-vertical-product-grid-$storageKey'),
+              spacing: 7,
+              runSpacing: 10,
+              children: [
+                for (final product in products)
+                  SizedBox(
+                    key: ValueKey('buy-product-compare-${product.id}'),
+                    width: layout.cardWidth,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        SizedBox(
+                          height: layout.tileHeight,
+                          child: BuyV2ProductCard(
+                            session: session,
+                            product: product,
+                            compact: true,
+                            savedContext: savedContext,
+                            storeContext: storeContext,
+                            onOpenProduct: onOpenProduct,
+                            initialAddQuantity: initialAddQuantity,
+                            beforeSave: beforeSave == null
+                                ? null
+                                : () => beforeSave!(product),
+                            beforeCartChange: beforeCartChange == null
+                                ? null
+                                : (quantity) =>
+                                      beforeCartChange!(product, quantity),
+                          ),
+                        ),
+                        if (productSupplement != null)
+                          productSupplement!(product),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          );
+        }
         final fittedRows =
             fitSmallCatalogue &&
                 products.isNotEmpty &&
@@ -10125,6 +10178,9 @@ class BuyV2ProductCard extends StatelessWidget {
     this.savedContext = false,
     this.onOpenProduct,
     this.storeContext = false,
+    this.beforeCartChange,
+    this.initialAddQuantity,
+    this.beforeSave,
   });
 
   final BuyV2Session session;
@@ -10133,6 +10189,9 @@ class BuyV2ProductCard extends StatelessWidget {
   final bool savedContext;
   final ValueChanged<BuyV2Product>? onOpenProduct;
   final bool storeContext;
+  final Future<bool> Function(int)? beforeCartChange;
+  final int? initialAddQuantity;
+  final bool Function()? beforeSave;
 
   @override
   Widget build(BuildContext context) => LayoutBuilder(builder: _buildCard);
@@ -10491,17 +10550,27 @@ class BuyV2ProductCard extends StatelessWidget {
                                                 ),
                                                 color: Colors.transparent,
                                                 child: InkWell(
-                                                  onTap: () {
+                                                  onTap: () async {
                                                     HapticFeedback.selectionClick();
                                                     if (requiresOfferReview) {
-                                                      session.openProduct(
-                                                        product.id,
-                                                      );
+                                                      openProduct();
+                                                      return;
+                                                    }
+                                                    final count =
+                                                        initialAddQuantity ??
+                                                        product.minimumOrder;
+                                                    if (await beforeCartChange
+                                                            ?.call(count) ==
+                                                        false) {
                                                       return;
                                                     }
                                                     final added = session
-                                                        .addProduct(product.id);
+                                                        .addProduct(
+                                                          product.id,
+                                                          quantity: count,
+                                                        );
                                                     if (!added &&
+                                                        context.mounted &&
                                                         session.pendingPrescriptionProductId ==
                                                             product.id) {
                                                       showBuyV2PrescriptionSheet(
@@ -10614,6 +10683,7 @@ class BuyV2ProductCard extends StatelessWidget {
                     session: session,
                     product: product,
                     showRemoveLabel: savedContext,
+                    beforeToggle: beforeSave,
                   ),
                 ),
                 if (quantity > 0)
@@ -10635,10 +10705,30 @@ class BuyV2ProductCard extends StatelessWidget {
                       productTitle: product.title,
                       quantity: quantity,
                       minimumOrder: product.minimumOrder,
-                      onEdit: () =>
-                          showBuyV2QuantityEditor(context, session, product),
-                      onDecrease: () => session.decrease(product.id),
-                      onIncrease: () => session.increase(product.id),
+                      onEdit: () => showBuyV2QuantityEditor(
+                        context,
+                        session,
+                        product,
+                        beforeSave: beforeCartChange,
+                      ),
+                      onDecrease: () async {
+                        final next = quantity <= product.minimumOrder
+                            ? 0
+                            : quantity - 1;
+                        if (await beforeCartChange?.call(next) != false) {
+                          session.decrease(product.id);
+                        }
+                      },
+                      onIncrease: () async {
+                        if (beforeCartChange == null) {
+                          session.increase(product.id);
+                        } else if (await beforeCartChange!(quantity + 1)) {
+                          session.setCartQuantity(
+                            product.id,
+                            '${quantity + 1}',
+                          );
+                        }
+                      },
                     ),
                   ),
               ],
@@ -10848,11 +10938,13 @@ class _ProductSaveButton extends StatelessWidget {
     required this.session,
     required this.product,
     this.showRemoveLabel = false,
+    this.beforeToggle,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final bool showRemoveLabel;
+  final bool Function()? beforeToggle;
 
   @override
   Widget build(BuildContext context) =>
@@ -10861,6 +10953,7 @@ class _ProductSaveButton extends StatelessWidget {
   Widget _buildAction(BuildContext context) {
     final saved = session.isSaved(product.id);
     void toggleSaved() {
+      if (beforeToggle?.call() == false) return;
       HapticFeedback.selectionClick();
       session.toggleSaved(product.id);
     }

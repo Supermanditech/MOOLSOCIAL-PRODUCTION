@@ -1544,3 +1544,610 @@ abstract final class BuyV2ExperienceBudgets {
   static const autoplayAudioAllowed = false;
   static const perpetualDecorativeMotionAllowed = false;
 }
+
+enum BuyV2ComparisonUnit { kilogram, litre, count }
+
+enum BuyV2ComparisonChannel { retail, wholesale }
+
+enum BuyV2ComparisonSort { itemPrice, deliveredCost, arrival }
+
+/// Chosen entry purpose, never inferred from quantity or a supplier name.
+enum BuyV2ComparisonPurpose { standardPurchase, bulkPurchase, storeProcurement }
+
+enum BuyV2ComparisonScope { allServiceable, local }
+
+/// Published identity includes brand/model or commodity specification, grade
+/// and variant. Neither category, display title nor a blank brand can create it.
+/// Quantities use thousandths of [unit]; count products require whole items.
+@immutable
+class BuyV2ComparisonIdentity {
+  const BuyV2ComparisonIdentity({
+    required this.specificationId,
+    required this.packId,
+    required this.unit,
+    required this.packQuantityMilli,
+    this.containedRetailUnitId,
+  });
+
+  final String specificationId;
+  final String packId;
+  final BuyV2ComparisonUnit unit;
+  final int packQuantityMilli;
+
+  /// Published identity of each sealed resale unit inside an outer carton.
+  /// Equal total mass alone does not establish equivalent resale inventory.
+  final String? containedRetailUnitId;
+
+  bool get valid =>
+      _comparisonId(specificationId) &&
+      _comparisonId(packId) &&
+      _comparisonPositive(packQuantityMilli) &&
+      (containedRetailUnitId == null ||
+          _comparisonId(containedRetailUnitId!)) &&
+      (unit != BuyV2ComparisonUnit.count || packQuantityMilli % 1000 == 0);
+
+  bool equivalentTo(BuyV2ComparisonIdentity other, {required bool samePack}) =>
+      valid &&
+      other.valid &&
+      specificationId == other.specificationId &&
+      unit == other.unit &&
+      (!samePack ||
+          (packId == other.packId &&
+              packQuantityMilli == other.packQuantityMilli));
+}
+
+@immutable
+class BuyV2ComparisonQuery {
+  const BuyV2ComparisonQuery({
+    required this.productId,
+    required this.productCanonicalId,
+    required this.identity,
+    required this.purchaserScope,
+    required this.destinationKey,
+    required this.pinCode,
+    required this.requestedQuantityMilli,
+    this.samePack = true,
+    this.scope = BuyV2ComparisonScope.allServiceable,
+    this.channel,
+    this.fulfilment,
+    this.sort = BuyV2ComparisonSort.itemPrice,
+    this.purpose = BuyV2ComparisonPurpose.standardPurchase,
+    this.allowExtraQuantity = false,
+    this.arriveBy,
+    this.procurementContext,
+  });
+
+  final String productId;
+  final String productCanonicalId;
+  final BuyV2ComparisonIdentity identity;
+
+  /// Exact authenticated account scope or isolated guest session identity.
+  final String purchaserScope;
+
+  /// Stable revision/hash of the selected delivery address, not its label.
+  final String destinationKey;
+  final String pinCode;
+  final int requestedQuantityMilli;
+  final bool samePack;
+  final BuyV2ComparisonScope scope;
+  final BuyV2ComparisonChannel? channel;
+  final BuyV2FulfilmentMode? fulfilment;
+  final BuyV2ComparisonSort sort;
+  final BuyV2ComparisonPurpose purpose;
+  final bool allowExtraQuantity;
+  bool get standardPurchase =>
+      purpose == BuyV2ComparisonPurpose.standardPurchase;
+  final DateTime? arriveBy;
+  final BuyV2ProcurementContext? procurementContext;
+
+  bool get valid =>
+      _comparisonId(productId) &&
+      _comparisonId(productCanonicalId) &&
+      identity.valid &&
+      _comparisonId(purchaserScope) &&
+      _comparisonId(destinationKey) &&
+      RegExp(r'^[1-9][0-9]{5}$').hasMatch(pinCode) &&
+      _comparisonPositive(requestedQuantityMilli) &&
+      (identity.unit != BuyV2ComparisonUnit.count ||
+          requestedQuantityMilli % 1000 == 0) &&
+      (standardPurchase
+          ? (channel == null || channel == BuyV2ComparisonChannel.retail) &&
+                !allowExtraQuantity
+          : true) &&
+      (purpose == BuyV2ComparisonPurpose.storeProcurement
+          ? procurementContext?.hasIdentity == true &&
+                (channel == null || channel == BuyV2ComparisonChannel.wholesale)
+          : procurementContext == null);
+
+  String get key => jsonEncode([
+    2,
+    productId,
+    productCanonicalId,
+    identity.specificationId,
+    identity.packId,
+    identity.unit.name,
+    identity.packQuantityMilli,
+    identity.containedRetailUnitId,
+    purpose.name,
+    allowExtraQuantity,
+    purchaserScope,
+    destinationKey,
+    pinCode,
+    requestedQuantityMilli,
+    samePack,
+    scope.name,
+    channel?.name,
+    fulfilment?.name,
+    sort.name,
+    arriveBy?.toUtc().toIso8601String(),
+    procurementContext?.customerStateOwnerScope,
+  ]);
+}
+
+@immutable
+class BuyV2ComparisonPriceTier {
+  const BuyV2ComparisonPriceTier({
+    required this.minimumPacks,
+    required this.packPriceMinor,
+  });
+  final int minimumPacks;
+  final int packPriceMinor;
+}
+
+/// These values are a provider quote for the exact query/quantity, never rates
+/// extrapolated from another basket. Null means unknown; zero means confirmed
+/// zero. Immediate discounts exclude speculative cashback and recoverable tax.
+@immutable
+class BuyV2ComparisonCharges {
+  const BuyV2ComparisonCharges({
+    this.taxMinor,
+    this.freightMinor,
+    this.mandatoryFeesMinor,
+    this.immediateDiscountMinor,
+  });
+  final int? taxMinor;
+  final int? freightMinor;
+  final int? mandatoryFeesMinor;
+  final int? immediateDiscountMinor;
+
+  bool get valid => [
+    taxMinor,
+    freightMinor,
+    mandatoryFeesMinor,
+    immediateDiscountMinor,
+  ].every((amount) => amount == null || _comparisonNonnegative(amount));
+  bool get complete => [
+    taxMinor,
+    freightMinor,
+    mandatoryFeesMinor,
+    immediateDiscountMinor,
+  ].every((amount) => amount != null);
+}
+
+@immutable
+class BuyV2ComparisonOffer {
+  BuyV2ComparisonOffer({
+    required this.id,
+    required this.revision,
+    required this.queryKey,
+    required this.snapshotId,
+    required this.product,
+    required this.identity,
+    required this.supplierWorkspaceId,
+    required this.storeId,
+    required this.channel,
+    required this.fulfilment,
+    required this.originLabel,
+    required this.local,
+    required this.serviceable,
+    required this.customerEligible,
+    required this.availablePacks,
+    required this.minimumPacks,
+    required this.incrementPacks,
+    required this.packPriceMinor,
+    required this.charges,
+    required this.observedAt,
+    required this.validUntil,
+    this.arrivalStart,
+    this.arrivalEnd,
+    this.dispatchLabel,
+    List<BuyV2ComparisonPriceTier> tiers = const [],
+  }) : tiers = List.unmodifiable(tiers);
+
+  final String id;
+  final String revision;
+  final String queryKey;
+  final String snapshotId;
+  final BuyV2Product product;
+  final BuyV2ComparisonIdentity identity;
+  final String supplierWorkspaceId;
+  final String storeId;
+  final BuyV2ComparisonChannel channel;
+  final BuyV2FulfilmentMode fulfilment;
+  final String originLabel;
+  final bool local;
+  final bool serviceable;
+  final bool customerEligible;
+  final int availablePacks;
+  final int minimumPacks;
+
+  /// Legal counts are minimumPacks + n * incrementPacks, for integer n >= 0.
+  final int incrementPacks;
+  final int packPriceMinor;
+  final List<BuyV2ComparisonPriceTier> tiers;
+  final BuyV2ComparisonCharges charges;
+  final DateTime observedAt;
+  final DateTime validUntil;
+  final DateTime? arrivalStart;
+  final DateTime? arrivalEnd;
+  final String? dispatchLabel;
+}
+
+enum BuyV2ComparisonUnavailable {
+  invalidTerms,
+  wrongQuery,
+  differentProduct,
+  filtered,
+  unserviceable,
+  customerIneligible,
+  expired,
+  insufficientStock,
+  arrivalUnavailable,
+  unwantedQuantity,
+}
+
+/// Safe comparison arithmetic only. This is not a checkout authorization.
+/// The existing cart/checkout must obtain fresh terms before a purchase.
+@immutable
+class BuyV2ComparisonCalculation {
+  const BuyV2ComparisonCalculation._({
+    this.unavailable,
+    this.packCount,
+    this.suppliedQuantityMilli,
+    this.excessQuantityMilli,
+    this.packPriceMinor,
+    this.itemSubtotalMinor,
+    this.payableMinor,
+    this.comparableUnitMinor,
+    this.arrivalEnd,
+  });
+
+  final BuyV2ComparisonUnavailable? unavailable;
+  final int? packCount;
+  final int? suppliedQuantityMilli;
+  final int? excessQuantityMilli;
+  final int? packPriceMinor;
+  final int? itemSubtotalMinor;
+  final int? payableMinor;
+
+  /// Final payable per supplied base unit, rounded half-up to one minor unit.
+  /// Rank by final payable for the requested requirement, not this unit value.
+  final int? comparableUnitMinor;
+  final DateTime? arrivalEnd;
+  bool get available => unavailable == null;
+
+  static BuyV2ComparisonCalculation evaluate({
+    required BuyV2ComparisonQuery query,
+    required BuyV2ComparisonOffer offer,
+    required DateTime now,
+  }) {
+    BuyV2ComparisonCalculation reject(BuyV2ComparisonUnavailable reason) =>
+        BuyV2ComparisonCalculation._(unavailable: reason);
+    if (!query.valid ||
+        !offer.identity.valid ||
+        [
+          offer.id,
+          offer.revision,
+          offer.snapshotId,
+          offer.supplierWorkspaceId,
+          offer.storeId,
+          offer.originLabel,
+        ].any((id) => !_comparisonId(id)) ||
+        offer.product.storeId != offer.storeId ||
+        !_comparisonPositive(offer.minimumPacks) ||
+        !_comparisonPositive(offer.incrementPacks) ||
+        !_comparisonNonnegative(offer.availablePacks) ||
+        !_comparisonNonnegative(offer.packPriceMinor) ||
+        !offer.charges.valid ||
+        !offer.validUntil.isAfter(offer.observedAt) ||
+        offer.observedAt.isAfter(now)) {
+      return reject(BuyV2ComparisonUnavailable.invalidTerms);
+    }
+    if (offer.queryKey != query.key) {
+      return reject(BuyV2ComparisonUnavailable.wrongQuery);
+    }
+    if (query.productCanonicalId != offer.product.canonicalId ||
+        !query.identity.equivalentTo(
+          offer.identity,
+          samePack: query.samePack,
+        )) {
+      return reject(BuyV2ComparisonUnavailable.differentProduct);
+    }
+    if ((query.standardPurchase &&
+            offer.channel != BuyV2ComparisonChannel.retail) ||
+        (query.purpose == BuyV2ComparisonPurpose.storeProcurement &&
+            offer.channel != BuyV2ComparisonChannel.wholesale) ||
+        (query.channel != null && offer.channel != query.channel) ||
+        (query.fulfilment != null && offer.fulfilment != query.fulfilment) ||
+        (query.scope == BuyV2ComparisonScope.local && !offer.local)) {
+      return reject(BuyV2ComparisonUnavailable.filtered);
+    }
+    if (query.purpose == BuyV2ComparisonPurpose.storeProcurement &&
+        !query.samePack &&
+        (query.identity.containedRetailUnitId == null ||
+            query.identity.containedRetailUnitId !=
+                offer.identity.containedRetailUnitId)) {
+      return reject(BuyV2ComparisonUnavailable.differentProduct);
+    }
+    if (!offer.serviceable) {
+      return reject(BuyV2ComparisonUnavailable.unserviceable);
+    }
+    if (!offer.customerEligible) {
+      return reject(BuyV2ComparisonUnavailable.customerIneligible);
+    }
+    if (!now.isBefore(offer.validUntil)) {
+      return reject(BuyV2ComparisonUnavailable.expired);
+    }
+    final arrivalStart = offer.arrivalStart;
+    final arrivalEnd = offer.arrivalEnd;
+    if ((arrivalStart == null) != (arrivalEnd == null) ||
+        (arrivalStart != null &&
+            arrivalEnd != null &&
+            (arrivalEnd.isBefore(arrivalStart) || !now.isBefore(arrivalEnd)))) {
+      return reject(BuyV2ComparisonUnavailable.invalidTerms);
+    }
+    if (query.arriveBy != null &&
+        (arrivalEnd == null || arrivalEnd.isAfter(query.arriveBy!))) {
+      return reject(BuyV2ComparisonUnavailable.arrivalUnavailable);
+    }
+    final requested = BigInt.from(query.requestedQuantityMilli);
+    final packSize = BigInt.from(offer.identity.packQuantityMilli);
+    final minimum = BigInt.from(offer.minimumPacks);
+    final increment = BigInt.from(offer.incrementPacks);
+    final needed = (requested + packSize - BigInt.one) ~/ packSize;
+    final count = needed <= minimum
+        ? minimum
+        : minimum +
+              ((needed - minimum + increment - BigInt.one) ~/ increment) *
+                  increment;
+    if (count > BigInt.from(offer.availablePacks)) {
+      return reject(BuyV2ComparisonUnavailable.insufficientStock);
+    }
+    var price = offer.packPriceMinor;
+    var applicableMinimum = 0;
+    final tierMinimums = <int>{};
+    for (final tier in offer.tiers) {
+      if (!_comparisonPositive(tier.minimumPacks) ||
+          !_comparisonNonnegative(tier.packPriceMinor) ||
+          !tierMinimums.add(tier.minimumPacks)) {
+        return reject(BuyV2ComparisonUnavailable.invalidTerms);
+      }
+      if (BigInt.from(tier.minimumPacks) <= count &&
+          tier.minimumPacks > applicableMinimum) {
+        price = tier.packPriceMinor;
+        applicableMinimum = tier.minimumPacks;
+      }
+    }
+    final supplied = count * packSize;
+    if (supplied != requested && !query.allowExtraQuantity) {
+      return reject(BuyV2ComparisonUnavailable.unwantedQuantity);
+    }
+    final subtotal = count * BigInt.from(price);
+    BigInt? payable;
+    BigInt? unitPrice;
+    if (offer.charges.complete) {
+      payable =
+          subtotal +
+          BigInt.from(offer.charges.taxMinor!) +
+          BigInt.from(offer.charges.freightMinor!) +
+          BigInt.from(offer.charges.mandatoryFeesMinor!) -
+          BigInt.from(offer.charges.immediateDiscountMinor!);
+      if (payable.isNegative) {
+        return reject(BuyV2ComparisonUnavailable.invalidTerms);
+      }
+      final numerator = payable * BigInt.from(1000);
+      unitPrice =
+          (numerator * BigInt.two + supplied) ~/ (supplied * BigInt.two);
+    }
+    final maximum = BigInt.from(9007199254740991);
+    if ([
+      count,
+      supplied,
+      subtotal,
+      ?payable,
+      ?unitPrice,
+    ].any((value) => value > maximum)) {
+      return reject(BuyV2ComparisonUnavailable.invalidTerms);
+    }
+    return BuyV2ComparisonCalculation._(
+      packCount: count.toInt(),
+      suppliedQuantityMilli: supplied.toInt(),
+      excessQuantityMilli: (supplied - requested).toInt(),
+      packPriceMinor: price,
+      itemSubtotalMinor: subtotal.toInt(),
+      payableMinor: payable?.toInt(),
+      comparableUnitMinor: unitPrice?.toInt(),
+      arrivalEnd: arrivalEnd,
+    );
+  }
+}
+
+@immutable
+class BuyV2ComparisonPageRequest {
+  const BuyV2ComparisonPageRequest({
+    required this.query,
+    this.snapshotId,
+    this.cursor,
+    this.pageSize = 20,
+  });
+  final BuyV2ComparisonQuery query;
+  final String? snapshotId;
+  final String? cursor;
+  final int pageSize;
+  bool get valid =>
+      query.valid &&
+      pageSize > 0 &&
+      pageSize <= 40 &&
+      ((snapshotId == null && cursor == null) ||
+          (_comparisonId(snapshotId ?? '') && _comparisonId(cursor ?? '')));
+}
+
+/// The provider must rank the complete eligible query before pagination.
+/// Ranking a downloaded page cannot establish a cheapest/fastest result.
+@immutable
+class BuyV2ComparisonPage {
+  BuyV2ComparisonPage({
+    required this.queryKey,
+    required this.snapshotId,
+    required this.observedAt,
+    required this.validUntil,
+    required List<BuyV2ComparisonOffer> offers,
+    required this.globallyRanked,
+    this.startIndex = 0,
+    this.totalCount,
+    this.previousCursor,
+    this.nextCursor,
+    this.lowestItemPriceOfferId,
+    this.lowestDeliveredOfferId,
+    this.earliestArrivalOfferId,
+  }) : offers = List.unmodifiable(offers);
+
+  final String queryKey;
+  final String snapshotId;
+  final DateTime observedAt;
+  final DateTime validUntil;
+  final List<BuyV2ComparisonOffer> offers;
+  final bool globallyRanked;
+  final int startIndex;
+  final int? totalCount;
+  final String? previousCursor;
+  final String? nextCursor;
+  final String? lowestItemPriceOfferId;
+  final String? lowestDeliveredOfferId;
+  final String? earliestArrivalOfferId;
+
+  bool validFor(BuyV2ComparisonPageRequest request, DateTime now) {
+    if (!request.valid ||
+        queryKey != request.query.key ||
+        !_comparisonId(snapshotId) ||
+        (request.snapshotId != null && request.snapshotId != snapshotId) ||
+        observedAt.isAfter(now) ||
+        !validUntil.isAfter(observedAt) ||
+        !now.isBefore(validUntil) ||
+        startIndex < 0 ||
+        (request.cursor == null && startIndex != 0) ||
+        offers.length > request.pageSize ||
+        (offers.isEmpty && nextCursor != null) ||
+        (startIndex == 0 && previousCursor != null) ||
+        (startIndex > 0 && previousCursor == null) ||
+        (previousCursor != null &&
+            (!_comparisonId(previousCursor!) ||
+                previousCursor == request.cursor ||
+                previousCursor == nextCursor)) ||
+        (totalCount != null &&
+            (totalCount! < startIndex + offers.length ||
+                (nextCursor == null &&
+                    totalCount != startIndex + offers.length) ||
+                (nextCursor != null &&
+                    totalCount! <= startIndex + offers.length))) ||
+        (nextCursor != null &&
+            (!_comparisonId(nextCursor!) || nextCursor == request.cursor))) {
+      return false;
+    }
+    final ids = <String>{};
+    final calculations = <String, BuyV2ComparisonCalculation>{};
+    for (final offer in offers) {
+      final calculation = BuyV2ComparisonCalculation.evaluate(
+        query: request.query,
+        offer: offer,
+        now: now,
+      );
+      if (!ids.add(offer.id) ||
+          offer.snapshotId != snapshotId ||
+          offer.observedAt != observedAt ||
+          offer.validUntil.isAfter(validUntil) ||
+          !calculation.available) {
+        return false;
+      }
+      calculations[offer.id] = calculation;
+    }
+    if (globallyRanked) {
+      final cheapestItem = calculations[lowestItemPriceOfferId];
+      if (cheapestItem != null &&
+          calculations.values.any(
+            (value) =>
+                value.itemSubtotalMinor! < cheapestItem.itemSubtotalMinor!,
+          )) {
+        return false;
+      }
+      final cheapest = calculations[lowestDeliveredOfferId];
+      final fastest = calculations[earliestArrivalOfferId];
+      if (cheapest != null &&
+          (cheapest.payableMinor == null ||
+              calculations.values.any(
+                (value) =>
+                    value.payableMinor != null &&
+                    value.payableMinor! < cheapest.payableMinor!,
+              ))) {
+        return false;
+      }
+      if (fastest != null &&
+          (fastest.arrivalEnd == null ||
+              calculations.values.any(
+                (value) =>
+                    value.arrivalEnd != null &&
+                    value.arrivalEnd!.isBefore(fastest.arrivalEnd!),
+              ))) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  bool isLowestItemPrice(
+    BuyV2ComparisonOffer offer,
+    BuyV2ComparisonCalculation calculation,
+  ) =>
+      globallyRanked &&
+      offers.contains(offer) &&
+      calculation.available &&
+      calculation.itemSubtotalMinor != null &&
+      offer.id == lowestItemPriceOfferId;
+
+  bool isLowestDelivered(
+    BuyV2ComparisonOffer offer,
+    BuyV2ComparisonCalculation calculation,
+  ) =>
+      globallyRanked &&
+      offers.contains(offer) &&
+      calculation.available &&
+      calculation.payableMinor != null &&
+      offer.id == lowestDeliveredOfferId;
+
+  bool isEarliestArrival(
+    BuyV2ComparisonOffer offer,
+    BuyV2ComparisonCalculation calculation,
+  ) =>
+      globallyRanked &&
+      offers.contains(offer) &&
+      calculation.available &&
+      calculation.arrivalEnd != null &&
+      offer.id == earliestArrivalOfferId;
+}
+
+/// Authentication, supplier eligibility, geographical serviceability and
+/// complete-query ranking belong to this provider, not display-label parsing.
+/// A successful response is not payment or cart authority.
+abstract interface class BuyV2ComparisonSource {
+  /// Returns published metadata for this exact listing, or null when the
+  /// product's specification or pack conversion has not been established.
+  BuyV2ComparisonIdentity? identityFor(BuyV2Product product);
+
+  Future<BuyV2ComparisonPage> load(BuyV2ComparisonPageRequest request);
+}
+
+bool _comparisonId(String value) => value.isNotEmpty && value.trim() == value;
+bool _comparisonNonnegative(int value) =>
+    value >= 0 && value <= 9007199254740991;
+bool _comparisonPositive(int value) =>
+    value > 0 && _comparisonNonnegative(value);

@@ -17,6 +17,7 @@ import '../../features/work/scan_and_pick_contract.dart';
 import '../../features/journey01/journey_services.dart';
 import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
+import 'buy_v2_catalogue.dart' show BuyV2ProgressiveProductGrid;
 import 'buy_v2_design.dart';
 import 'buy_v2_filter_sheet_motion.dart';
 import 'buy_v2_invoice.dart';
@@ -420,6 +421,7 @@ class BuyV2ProductView extends StatelessWidget {
     this.returnLabel,
     this.onReturn,
     this.onAskSeller,
+    this.onVisitComparisonProduct,
     this.onOpenPartnerCatalogue,
     this.wholesaleTradeDecisionAdapter =
         const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
@@ -431,6 +433,7 @@ class BuyV2ProductView extends StatelessWidget {
   final String? returnLabel;
   final VoidCallback? onReturn;
   final ValueChanged<BuyV2Product>? onAskSeller;
+  final Future<void> Function(BuyV2Product)? onVisitComparisonProduct;
   final BuyV2PartnerCatalogueHandler? onOpenPartnerCatalogue;
   final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
@@ -1113,6 +1116,7 @@ class BuyV2ProductView extends StatelessWidget {
                       session: session,
                       product: product,
                       onAskSeller: onAskSeller,
+                      onVisitProduct: onVisitComparisonProduct,
                     ),
                   ],
                   const SizedBox(height: 10),
@@ -1316,11 +1320,13 @@ class _ProductQuickActions extends StatelessWidget {
     required this.session,
     required this.product,
     required this.onAskSeller,
+    this.onVisitProduct,
   });
 
   final BuyV2Session session;
   final BuyV2Product product;
   final ValueChanged<BuyV2Product>? onAskSeller;
+  final Future<void> Function(BuyV2Product)? onVisitProduct;
 
   @override
   Widget build(BuildContext context) {
@@ -1332,19 +1338,6 @@ class _ProductQuickActions extends StatelessWidget {
         ? 'Ask supplier'
         : 'Ask seller';
     final accessibleActions = MediaQuery.textScalerOf(context).scale(10) > 14;
-    final compareProducts = <BuyV2Product>[
-      product,
-      ...session
-          .productVariantsFor(product)
-          .where((candidate) => candidate.id != product.id),
-      ...session.productContinuationsFor(product, limit: 4),
-    ];
-    final uniqueCompareProducts = <BuyV2Product>[];
-    final seenIds = <String>{};
-    for (final candidate in compareProducts) {
-      if (seenIds.add(candidate.id)) uniqueCompareProducts.add(candidate);
-      if (uniqueCompareProducts.length == 4) break;
-    }
     final actions = <({IconData icon, String label, VoidCallback onPressed})>[
       (
         icon: saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
@@ -1358,19 +1351,18 @@ class _ProductQuickActions extends StatelessWidget {
           _shareBuyV2Product(context, session: session, product: product),
         ),
       ),
-      if (uniqueCompareProducts.length > 1)
-        (
-          icon: Icons.compare_arrows_rounded,
-          label: 'Compare',
-          onPressed: () => unawaited(
-            _showBuyV2ProductComparison(
-              context,
-              session: session,
-              current: product,
-              products: uniqueCompareProducts,
-            ),
+      (
+        icon: Icons.compare_arrows_rounded,
+        label: 'Compare',
+        onPressed: () => unawaited(
+          _showBuyV2ProductComparison(
+            context,
+            session: session,
+            current: product,
+            onVisitProduct: onVisitProduct,
           ),
         ),
+      ),
       if (onAskSeller != null)
         (
           icon: Icons.chat_bubble_outline_rounded,
@@ -1504,115 +1496,458 @@ Future<void> _showBuyV2ProductComparison(
   BuildContext context, {
   required BuyV2Session session,
   required BuyV2Product current,
-  required List<BuyV2Product> products,
-}) async {
-  final selectedId = await showModalBottomSheet<String>(
-    context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    showDragHandle: true,
-    backgroundColor: Colors.white,
-    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
-    shape: const RoundedRectangleBorder(
-      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  Future<void> Function(BuyV2Product)? onVisitProduct,
+}) => showModalBottomSheet<void>(
+  context: context,
+  useSafeArea: true,
+  isScrollControlled: true,
+  showDragHandle: true,
+  backgroundColor: Colors.white,
+  constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+  shape: const RoundedRectangleBorder(
+    borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+  ),
+  builder: (_) => FractionallySizedBox(
+    heightFactor: .88,
+    child: _ProductComparisonSheet(
+      session: session,
+      product: current,
+      onVisitProduct: onVisitProduct,
     ),
-    builder: (sheetContext) => SafeArea(
+  ),
+);
+
+String _comparisonMoney(int minor) {
+  final whole = buyV2Money(minor ~/ 100);
+  final fraction = minor % 100;
+  return fraction == 0
+      ? whole
+      : '$whole.${fraction.toString().padLeft(2, '0')}';
+}
+
+/// Reuses the existing Compare sheet; only eligible same-pack offers change.
+class _ProductComparisonSheet extends StatefulWidget {
+  const _ProductComparisonSheet({
+    required this.session,
+    required this.product,
+    this.onVisitProduct,
+  });
+  final BuyV2Session session;
+  final BuyV2Product product;
+  final Future<void> Function(BuyV2Product)? onVisitProduct;
+  @override
+  State<_ProductComparisonSheet> createState() =>
+      _ProductComparisonSheetState();
+}
+
+class _ProductComparisonSheetState extends State<_ProductComparisonSheet>
+    with WidgetsBindingObserver {
+  final _scroll = ScrollController();
+  BuyV2ComparisonController? _controller;
+  Timer? _expiry;
+  String? _message;
+  bool _opening = false;
+  bool _cartChanging = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.session.addListener(_parentChanged);
+    WidgetsBinding.instance.addObserver(this);
+    _reload();
+  }
+
+  void _parentChanged() {
+    _controller?.checkContext();
+    _changed();
+  }
+
+  void _changed() {
+    _expiry?.cancel();
+    final page = _controller?.page;
+    if (page != null) {
+      var until = page.validUntil;
+      for (final offer in page.offers) {
+        if (offer.validUntil.isBefore(until)) until = offer.validUntil;
+      }
+      final remaining = until.difference(widget.session.catalogueNow());
+      if (!remaining.isNegative) {
+        _expiry = Timer(remaining + const Duration(milliseconds: 1), _changed);
+      }
+    }
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) _parentChanged();
+  }
+
+  Future<void> _reload() async {
+    final session = widget.session;
+    final source = session.comparisonSource;
+    final query = session.comparisonQueryFor(widget.product);
+    if (source == null || query == null) {
+      _controller?.dispose();
+      _controller = null;
+      _message =
+          session.procurementProductUnavailableMessage(widget.product) ??
+          (session.selectedAddressOrNull == null
+              ? 'Choose a delivery address before comparing prices.'
+              : 'Prices from other suppliers are unavailable right now. Try again.');
+      _changed();
+      return;
+    }
+    _message = null;
+    _controller ??= BuyV2ComparisonController(
+      source: source,
+      isCurrent: session.comparisonQueryIsCurrent,
+      offerPermitted: session.comparisonOfferPermitted,
+      now: session.catalogueNow,
+    )..addListener(_changed);
+    await _controller!.open(query);
+  }
+
+  Future<void> _openProduct(BuyV2ComparisonOffer offer) async {
+    final controller = _controller;
+    final visit = widget.onVisitProduct;
+    if (_opening || controller == null || visit == null) return;
+    if (!widget.session.admitComparisonProduct(controller, offer)) {
+      _message =
+          'This offer changed. Refresh the comparison before continuing.';
+      _changed();
+      return;
+    }
+    setState(() => _opening = true);
+    try {
+      await visit(offer.product);
+    } finally {
+      if (mounted) {
+        _opening = false;
+        _parentChanged();
+      }
+    }
+  }
+
+  bool _beforeSave(BuyV2ComparisonOffer offer) {
+    final controller = _controller;
+    if (controller == null ||
+        !widget.session.admitComparisonProduct(controller, offer)) {
+      _message =
+          'This offer changed. Refresh the comparison before continuing.';
+      _changed();
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> _beforeCartChange(
+    BuyV2ComparisonOffer offer,
+    int quantity,
+  ) async {
+    if (_cartChanging || !_beforeSave(offer)) return false;
+    if (quantity == 0) return true;
+    _cartChanging = true;
+    try {
+      final controller = _controller!;
+      final session = widget.session;
+      final amount =
+          BigInt.from(quantity) * BigInt.from(offer.identity.packQuantityMilli);
+      final query = amount > BigInt.from(9007199254740991)
+          ? null
+          : session.comparisonQueryFor(
+              widget.product,
+              requestedQuantityMilli: amount.toInt(),
+              samePack: true,
+              scope: controller.query!.scope,
+              channel: controller.query!.channel,
+              fulfilment: controller.query!.fulfilment,
+              sort: controller.query!.sort,
+            );
+      if (query == null) {
+        _message =
+            'This quantity is unavailable. Choose an available quantity.';
+        _changed();
+        return false;
+      }
+      if (query.key != controller.query!.key) {
+        await controller.open(query);
+        if (!mounted) return false;
+      }
+      final refreshed = controller.page?.offers
+          .where(
+            (value) =>
+                value.product.id == offer.product.id &&
+                value.storeId == offer.storeId,
+          )
+          .firstOrNull;
+      if (refreshed == null ||
+          !session.admitComparisonProduct(controller, refreshed)) {
+        _message =
+            'This supplier could not confirm that quantity. Refresh the comparison and try again.';
+        _changed();
+        return false;
+      }
+      final result = BuyV2ComparisonCalculation.evaluate(
+        query: query,
+        offer: refreshed,
+        now: session.catalogueNow(),
+      );
+      if (!result.available || result.packCount != quantity) {
+        _message =
+            'This quantity is unavailable from this supplier. Choose an available quantity.';
+        _changed();
+        return false;
+      }
+      final retained = session.cartLines
+          .where((line) => line.product.id == refreshed.product.id)
+          .firstOrNull;
+      if ((retained != null &&
+              retained.product.price != refreshed.product.price) ||
+          BigInt.from(refreshed.product.price) *
+                  BigInt.from(quantity) *
+                  BigInt.from(100) !=
+              BigInt.from(result.itemSubtotalMinor!)) {
+        _message =
+            'The Cart price needs to refresh before this offer can be added. Try again.';
+        _changed();
+        return false;
+      }
+      _message = null;
+      return true;
+    } finally {
+      _cartChanging = false;
+    }
+  }
+
+  String _date(DateTime time) {
+    final local = time.toLocal();
+    final labels = MaterialLocalizations.of(context);
+    return '${labels.formatMediumDate(local)}, '
+        '${labels.formatTimeOfDay(TimeOfDay.fromDateTime(local))}';
+  }
+
+  Future<void> _page(bool next) async {
+    final controller = _controller;
+    if (controller == null) return;
+    if (next) {
+      await controller.next();
+    } else {
+      await controller.previous();
+    }
+    if (mounted && _scroll.hasClients) _scroll.jumpTo(0);
+  }
+
+  @override
+  void dispose() {
+    widget.session.removeListener(_parentChanged);
+    WidgetsBinding.instance.removeObserver(this);
+    _expiry?.cancel();
+    _controller?.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final controller = _controller;
+    final query = controller?.query;
+    final page = controller?.page;
+    final message = _message ?? controller?.message;
+    return SafeArea(
+      key: const ValueKey('buy-product-comparison-sheet'),
       top: false,
       child: SingleChildScrollView(
+        controller: _scroll,
         padding: EdgeInsets.fromLTRB(
           14,
           0,
           14,
-          18 + MediaQuery.viewPaddingOf(sheetContext).bottom,
+          18 + MediaQuery.viewPaddingOf(context).bottom,
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Compare products',
-              style: sheetContext.buyTitle.copyWith(fontSize: 18),
+              'Compare prices',
+              style: context.buyTitle.copyWith(fontSize: 18),
             ),
             const SizedBox(height: 3),
-            Text(
-              'Review pack, price, delivery and seller details side by side.',
-              style: sheetContext.buyMeta,
-            ),
-            const SizedBox(height: 10),
-            for (final product in products) ...[
-              _ProductComparisonCard(
-                session: session,
-                product: product,
-                selected: product.id == current.id,
-                onView: () => Navigator.of(sheetContext).pop(product.id),
+            Text(widget.product.title, style: context.buyBody),
+            Text(widget.product.pack, style: context.buyMeta),
+            if (query != null)
+              Text(
+                '${query.requestedQuantityMilli ~/ query.identity.packQuantityMilli} '
+                'pack(s) · Same product and pack',
+                style: context.buyMeta,
               ),
-              if (product != products.last) const SizedBox(height: 8),
+            const SizedBox(height: 10),
+            if (message != null) ...[
+              Text(message, key: const ValueKey('buy-comparison-message')),
+              TextButton(
+                onPressed: () => unawaited(_reload()),
+                child: const Text('Refresh comparison'),
+              ),
+            ],
+            if (controller?.loading == true)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(),
+                ),
+              )
+            else if (page != null && query != null) ...[
+              if (!page.globallyRanked)
+                const Text(
+                  'Complete price ranking is unavailable. No lowest-price result is confirmed.',
+                ),
+              if (page.offers.isEmpty)
+                const Text(
+                  'No other suppliers match this pack, quantity and delivery choice.',
+                ),
+              BuyV2ProgressiveProductGrid(
+                session: widget.session,
+                products: [for (final offer in page.offers) offer.product],
+                storageKey: 'comparison',
+                semanticLabel:
+                    'Compare the same product and pack across suppliers',
+                vertical: true,
+                initialAddQuantity:
+                    query.requestedQuantityMilli ~/
+                    query.identity.packQuantityMilli,
+                onOpenProduct: (product) {
+                  if (!_opening) {
+                    unawaited(
+                      _openProduct(
+                        page.offers.firstWhere(
+                          (offer) => offer.product.id == product.id,
+                        ),
+                      ),
+                    );
+                  }
+                },
+                beforeSave: (product) => _beforeSave(
+                  page.offers.firstWhere(
+                    (offer) => offer.product.id == product.id,
+                  ),
+                ),
+                beforeCartChange: (product, quantity) => _beforeCartChange(
+                  page.offers.firstWhere(
+                    (offer) => offer.product.id == product.id,
+                  ),
+                  quantity,
+                ),
+                productSupplement: (product) => _ProductComparisonPrices(
+                  offer: page.offers.firstWhere(
+                    (offer) => offer.product.id == product.id,
+                  ),
+                  query: query,
+                  page: page,
+                  now: widget.session.catalogueNow(),
+                  dateLabel: _date,
+                ),
+              ),
+              if (page.previousCursor != null || page.nextCursor != null)
+                Wrap(
+                  spacing: 8,
+                  children: [
+                    if (page.previousCursor != null)
+                      TextButton(
+                        key: const ValueKey('buy-comparison-previous'),
+                        onPressed: controller!.canGoPrevious
+                            ? () => unawaited(_page(false))
+                            : null,
+                        child: const Text('Previous'),
+                      ),
+                    if (page.nextCursor != null)
+                      TextButton(
+                        key: const ValueKey('buy-comparison-next'),
+                        onPressed: controller!.canGoNext
+                            ? () => unawaited(_page(true))
+                            : null,
+                        child: const Text('More suppliers'),
+                      ),
+                  ],
+                ),
+              Text(
+                'Prices and availability are checked again before checkout.',
+                style: context.buyMeta,
+              ),
             ],
           ],
         ),
       ),
-    ),
-  );
-  if (selectedId != null && selectedId != current.id && context.mounted) {
-    session.openProduct(selectedId, preserveComparisonOrigin: true);
+    );
   }
 }
 
-class _ProductComparisonCard extends StatelessWidget {
-  const _ProductComparisonCard({
-    required this.session,
-    required this.product,
-    required this.selected,
-    required this.onView,
+class _ProductComparisonPrices extends StatelessWidget {
+  const _ProductComparisonPrices({
+    required this.offer,
+    required this.query,
+    required this.page,
+    required this.now,
+    required this.dateLabel,
   });
-
-  final BuyV2Session session;
-  final BuyV2Product product;
-  final bool selected;
-  final VoidCallback onView;
+  final BuyV2ComparisonOffer offer;
+  final BuyV2ComparisonQuery query;
+  final BuyV2ComparisonPage page;
+  final DateTime now;
+  final String Function(DateTime) dateLabel;
 
   @override
   Widget build(BuildContext context) {
-    final facts = session.productFactsFor(product);
-    return Container(
-      key: ValueKey('buy-product-compare-${product.id}'),
-      padding: const EdgeInsets.all(10),
-      decoration: buyV2CardDecoration(
-        color: selected ? BuyV2Colors.softBlue : Colors.white,
-        radius: 15,
-      ),
-      child: BuyV2AdaptiveIdentityRow(
-        spacing: 10,
-        leading: SizedBox.square(
-          dimension: 76,
-          child: BuyV2ProductPackshot(product: product, borderRadius: 12),
-        ),
-        body: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              product.title,
-              style: context.buyBody.copyWith(fontWeight: FontWeight.w900),
+    final result = BuyV2ComparisonCalculation.evaluate(
+      query: query,
+      offer: offer,
+      now: now,
+    );
+    if (!result.available) return const SizedBox.shrink();
+    final badges = [
+      if (page.isLowestItemPrice(offer, result)) 'Lowest item price',
+      if (page.isLowestDelivered(offer, result)) 'Lowest delivered cost',
+    ];
+    final style = context.buyMeta.copyWith(fontSize: 9, height: 1.2);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(5, 7, 5, 3),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${_comparisonMoney(result.itemSubtotalMinor!)} item price',
+            key: ValueKey('buy-comparison-item-price-${offer.id}'),
+            style: style.copyWith(
+              fontWeight: FontWeight.w800,
+              color: BuyV2Colors.navy,
             ),
-            Text(product.pack, style: context.buyMeta),
-            const SizedBox(height: 4),
+          ),
+          Text(
+            offer.charges.freightMinor == null
+                ? 'Delivery: Not confirmed'
+                : 'Delivery: ${_comparisonMoney(offer.charges.freightMinor!)}',
+            style: style,
+          ),
+          Text(
+            result.payableMinor == null
+                ? 'Delivered total not confirmed'
+                : '${_comparisonMoney(result.payableMinor!)} delivered',
+            style: style,
+          ),
+          Text(
+            offer.arrivalEnd == null
+                ? 'Arrival time not confirmed'
+                : 'Arrives ${dateLabel(offer.arrivalStart!)} – ${dateLabel(offer.arrivalEnd!)}',
+            style: style,
+          ),
+          if (badges.isNotEmpty)
             Text(
-              '${buyV2Money(facts.price)} · ${buyV2BuyerDeliveryPromise(facts)}',
-              style: context.buyMeta.copyWith(
+              badges.join(' · '),
+              style: style.copyWith(
                 color: BuyV2Colors.green,
                 fontWeight: FontWeight.w800,
               ),
             ),
-            Text(facts.partner, style: context.buyMeta),
-          ],
-        ),
-        trailing: SizedBox(
-          height: BuyV2Metrics.minimumTap,
-          child: TextButton(
-            key: ValueKey('buy-product-compare-view-${product.id}'),
-            onPressed: selected ? null : onView,
-            child: Text(selected ? 'Viewing' : 'View'),
-          ),
-        ),
+        ],
       ),
     );
   }
@@ -15506,8 +15841,9 @@ class _ProductPurchaseActionRow extends StatelessWidget {
 Future<void> showBuyV2QuantityEditor(
   BuildContext context,
   BuyV2Session session,
-  BuyV2Product product,
-) async {
+  BuyV2Product product, {
+  Future<bool> Function(int)? beforeSave,
+}) async {
   final bottomClearance = BuyV2AddressSheetMotion.resolveModalActionBottomInset(
     context,
   );
@@ -15523,16 +15859,25 @@ Future<void> showBuyV2QuantityEditor(
       padding: EdgeInsets.only(
         bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + bottomClearance,
       ),
-      child: _QuantityEditor(session: session, product: product),
+      child: _QuantityEditor(
+        session: session,
+        product: product,
+        beforeSave: beforeSave,
+      ),
     ),
   );
 }
 
 class _QuantityEditor extends StatefulWidget {
-  const _QuantityEditor({required this.session, required this.product});
+  const _QuantityEditor({
+    required this.session,
+    required this.product,
+    this.beforeSave,
+  });
 
   final BuyV2Session session;
   final BuyV2Product product;
+  final Future<bool> Function(int)? beforeSave;
 
   @override
   State<_QuantityEditor> createState() => _QuantityEditorState();
@@ -15542,6 +15887,7 @@ class _QuantityEditorState extends State<_QuantityEditor> {
   late final TextEditingController _controller;
   String? _error;
   bool _closing = false;
+  bool _saving = false;
 
   @override
   void initState() {
@@ -15557,23 +15903,39 @@ class _QuantityEditorState extends State<_QuantityEditor> {
     super.dispose();
   }
 
-  void _save() {
-    if (_closing) return;
-    final error = widget.session.cartQuantityError(
-      widget.product.id,
-      _controller.text,
-    );
-    if (error != null) {
-      setState(() => _error = error);
-      return;
-    }
-    if (widget.session.setCartQuantity(widget.product.id, _controller.text)) {
-      _dismiss();
-    } else {
-      setState(
-        () =>
-            _error = widget.session.notice ?? 'Quantity could not be updated.',
+  Future<void> _save() async {
+    if (_closing || _saving) return;
+    setState(() => _saving = true);
+    try {
+      final error = widget.session.cartQuantityError(
+        widget.product.id,
+        _controller.text,
       );
+      if (error != null) {
+        setState(() => _error = error);
+        return;
+      }
+      final accepted = await widget.beforeSave?.call(
+        int.parse(_controller.text.trim()),
+      );
+      if (!mounted || _closing) return;
+      if (accepted == false) {
+        setState(
+          () => _error =
+              'This offer or quantity changed. Return to the comparison and refresh.',
+        );
+        return;
+      }
+      if (widget.session.setCartQuantity(widget.product.id, _controller.text)) {
+        _dismiss();
+      } else {
+        setState(
+          () => _error =
+              widget.session.notice ?? 'Quantity could not be updated.',
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
     }
   }
 
@@ -15619,7 +15981,7 @@ class _QuantityEditorState extends State<_QuantityEditor> {
           const SizedBox(height: 16),
           FilledButton(
             key: const ValueKey('buy-quantity-save'),
-            onPressed: _save,
+            onPressed: _saving ? null : _save,
             child: const Text('Update quantity'),
           ),
           TextButton(onPressed: _dismiss, child: const Text('Cancel')),

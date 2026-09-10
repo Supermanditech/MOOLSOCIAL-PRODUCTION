@@ -1613,11 +1613,268 @@ class BuyV2CollectionCheckoutController extends ChangeNotifier {
   }
 }
 
+/// One bounded comparison page, using the same request-generation discipline as
+/// catalogue paging. UI filters replace the query; they never relax mandatory
+/// Store procurement or purchaser/destination checks.
+class BuyV2ComparisonController extends ChangeNotifier {
+  BuyV2ComparisonController({
+    required this.source,
+    required this.isCurrent,
+    required this.offerPermitted,
+    this.now = DateTime.now,
+  });
+
+  final BuyV2ComparisonSource source;
+  final bool Function(BuyV2ComparisonQuery query) isCurrent;
+  final bool Function(BuyV2ComparisonOffer offer) offerPermitted;
+  final DateTime Function() now;
+  BuyV2ComparisonQuery? _query;
+  BuyV2ComparisonPage? _page;
+  BuyV2ComparisonPageRequest? _pageRequest;
+  ({BuyV2ComparisonPageRequest request, int generation})? _pending;
+  Future<void>? _running;
+  int _generation = 0;
+  bool _disposed = false;
+  bool _loading = false;
+  String? _message;
+
+  BuyV2ComparisonQuery? get query => _query;
+  bool get loading => !_disposed && _loading && _contextCurrent;
+  bool get _contextCurrent =>
+      _query != null && _query!.valid && isCurrent(_query!);
+  BuyV2ComparisonPage? get page {
+    final value = _page;
+    final request = _pageRequest;
+    if (_disposed ||
+        !_contextCurrent ||
+        value == null ||
+        request == null ||
+        !value.validFor(request, now()) ||
+        !value.offers.every(offerPermitted)) {
+      return null;
+    }
+    return value;
+  }
+
+  String? get message {
+    if (_disposed) return null;
+    if (_query != null && !_contextCurrent) {
+      return 'Your shopping details changed. Return to the product and compare again.';
+    }
+    if (_page != null && page == null) {
+      return 'These prices or delivery details need to be refreshed.';
+    }
+    return _message;
+  }
+
+  bool get canGoNext => !loading && page?.nextCursor != null;
+  bool get canGoPrevious => !loading && page?.previousCursor != null;
+
+  Future<void> open(BuyV2ComparisonQuery query) {
+    if (_disposed) return Future.value();
+    _query = query;
+    _page = null;
+    _pageRequest = null;
+    return _request(BuyV2ComparisonPageRequest(query: query));
+  }
+
+  Future<void> refresh() {
+    final current = _query;
+    return current == null ? Future.value() : open(current);
+  }
+
+  Future<void> next() {
+    final current = page;
+    if (_query == null || current?.nextCursor == null || loading) {
+      return Future.value();
+    }
+    return _request(
+      BuyV2ComparisonPageRequest(
+        query: _query!,
+        snapshotId: current!.snapshotId,
+        cursor: current.nextCursor,
+      ),
+    );
+  }
+
+  Future<void> previous() {
+    final current = page;
+    if (_query == null || current?.previousCursor == null || loading) {
+      return Future.value();
+    }
+    return _request(
+      BuyV2ComparisonPageRequest(
+        query: _query!,
+        snapshotId: current!.snapshotId,
+        cursor: current.previousCursor,
+      ),
+    );
+  }
+
+  /// Called when the parent notifies an account/Store/address change.
+  /// An old in-flight response is discarded even if its request later succeeds.
+  void checkContext() {
+    if (_disposed || _query == null || _contextCurrent) return;
+    _generation++;
+    _pending = null;
+    _page = null;
+    _pageRequest = null;
+    _loading = false;
+    notifyListeners();
+  }
+
+  bool canOpen(BuyV2ComparisonOffer offer) =>
+      page?.offers.contains(offer) == true &&
+      BuyV2ComparisonCalculation.evaluate(
+        query: _query!,
+        offer: offer,
+        now: now(),
+      ).available &&
+      offerPermitted(offer);
+
+  Future<void> _request(BuyV2ComparisonPageRequest request) {
+    _generation++;
+    _message = null;
+    if (!request.valid || !_contextCurrent) {
+      _pending = null;
+      _loading = false;
+      _message =
+          'Supplier comparison is unavailable for these shopping details.';
+      notifyListeners();
+      return Future.value();
+    }
+    _pending = (request: request, generation: _generation);
+    _loading = true;
+    notifyListeners();
+    return _running ??= _drain().whenComplete(() => _running = null);
+  }
+
+  Future<void> _drain() async {
+    while (!_disposed && _pending != null) {
+      final next = _pending!;
+      _pending = null;
+      final previousPage = _page;
+      try {
+        final result = await source.load(next.request);
+        if (_disposed || next.generation != _generation) continue;
+        if (!_contextCurrent) {
+          checkContext();
+          continue;
+        }
+        if (!result.validFor(next.request, now()) ||
+            !result.offers.every(offerPermitted)) {
+          throw const FormatException('Invalid comparison response');
+        }
+        if (previousPage != null && next.request.cursor != null) {
+          if (previousPage.snapshotId != result.snapshotId ||
+              previousPage.observedAt != result.observedAt ||
+              previousPage.validUntil != result.validUntil ||
+              previousPage.totalCount != result.totalCount ||
+              previousPage.globallyRanked != result.globallyRanked ||
+              previousPage.lowestItemPriceOfferId !=
+                  result.lowestItemPriceOfferId ||
+              previousPage.lowestDeliveredOfferId !=
+                  result.lowestDeliveredOfferId ||
+              previousPage.earliestArrivalOfferId !=
+                  result.earliestArrivalOfferId) {
+            throw const FormatException('Comparison snapshot changed');
+          }
+          if ((next.request.cursor == previousPage.nextCursor &&
+                  result.startIndex !=
+                      previousPage.startIndex + previousPage.offers.length) ||
+              (next.request.cursor == previousPage.previousCursor &&
+                  result.startIndex + result.offers.length !=
+                      previousPage.startIndex) ||
+              result.offers.any(
+                (offer) => previousPage.offers.any((old) => old.id == offer.id),
+              )) {
+            throw const FormatException('Invalid comparison page boundary');
+          }
+          if (result.globallyRanked &&
+              previousPage.offers.isNotEmpty &&
+              result.offers.isNotEmpty) {
+            final forwards = next.request.cursor == previousPage.nextCursor;
+            final before = forwards
+                ? previousPage.offers.last
+                : result.offers.last;
+            final after = forwards
+                ? result.offers.first
+                : previousPage.offers.first;
+            if (_compare(before, after, next.request.query) > 0) {
+              throw const FormatException('Comparison ranking changed');
+            }
+          }
+        }
+        if (result.globallyRanked) {
+          for (var index = 1; index < result.offers.length; index++) {
+            if (_compare(
+                  result.offers[index - 1],
+                  result.offers[index],
+                  next.request.query,
+                ) >
+                0) {
+              throw const FormatException('Comparison result order is invalid');
+            }
+          }
+        }
+        _page = result;
+        _pageRequest = next.request;
+        _message = null;
+      } on Object {
+        if (_disposed || next.generation != _generation) continue;
+        _message = 'Supplier prices could not be refreshed. Try again.';
+      }
+      if (!_disposed && next.generation == _generation) {
+        _loading = false;
+        notifyListeners();
+      }
+    }
+  }
+
+  int _compare(
+    BuyV2ComparisonOffer first,
+    BuyV2ComparisonOffer second,
+    BuyV2ComparisonQuery query,
+  ) {
+    final a = BuyV2ComparisonCalculation.evaluate(
+      query: query,
+      offer: first,
+      now: now(),
+    );
+    final b = BuyV2ComparisonCalculation.evaluate(
+      query: query,
+      offer: second,
+      now: now(),
+    );
+    int? rank(BuyV2ComparisonCalculation value) => switch (query.sort) {
+      BuyV2ComparisonSort.itemPrice => value.itemSubtotalMinor,
+      BuyV2ComparisonSort.deliveredCost => value.payableMinor,
+      BuyV2ComparisonSort.arrival => value.arrivalEnd?.millisecondsSinceEpoch,
+    };
+    final left = rank(a);
+    final right = rank(b);
+    if (left == null && right != null) return 1;
+    if (left != null && right == null) return -1;
+    final value = left == null ? 0 : left.compareTo(right!);
+    return value == 0 ? first.id.compareTo(second.id) : value;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _generation++;
+    _pending = null;
+    _page = null;
+    super.dispose();
+  }
+}
+
 class BuyV2Session extends ChangeNotifier {
   BuyV2Session({
     required this.core,
     this.productFactsAdapter = const BuyV2CatalogueProductFactsAdapter(),
     this.productContentAdapter = const BuyV2CatalogueProductContentAdapter(),
+    this.comparisonSource,
     this.marketplaceTrustAdapter =
         const BuyV2CatalogueMarketplaceTrustAdapter(),
     this.sponsoredContentAdapter = const BuyV2DisabledSponsoredContentAdapter(),
@@ -1868,6 +2125,187 @@ class BuyV2Session extends ChangeNotifier {
         BuyV2ProcurementEligibility.eligible => true,
         _ => false,
       };
+
+  String get _comparisonPurchaserScope => procurementContext == null
+      ? customerStateStore?.ownerScope ??
+            'guest-buy-session:${identityHashCode(this)}'
+      : '${procurementContext!.customerStateOwnerScope}:$_procurementEpoch';
+
+  String? get _comparisonDestinationKey {
+    final address = selectedAddressOrNull;
+    if (address == null) return null;
+    return sha256
+        .convert(
+          utf8.encode(
+            jsonEncode([
+              address.id,
+              address.kind.name,
+              address.recipient,
+              address.phone,
+              address.line,
+              address.area,
+              address.pinCode,
+              address.landmark,
+            ]),
+          ),
+        )
+        .toString();
+  }
+
+  BuyV2ComparisonPurpose get comparisonPurpose => isStoreProcurement
+      ? BuyV2ComparisonPurpose.storeProcurement
+      : (view == BuyV2View.product ? _productReturnDestination : destination) ==
+            BuyV2Destination.wholesale
+      ? BuyV2ComparisonPurpose.bulkPurchase
+      : BuyV2ComparisonPurpose.standardPurchase;
+
+  BuyV2FulfilmentMode? get comparisonFulfilmentMode =>
+      selectedFulfilmentMode ??
+      (comparisonPurpose == BuyV2ComparisonPurpose.standardPurchase
+          ? (shopSaleType == BuyV2ShopSaleType.quickDelivery
+                ? BuyV2FulfilmentMode.quickLocal
+                : BuyV2FulfilmentMode.standardCourier)
+          : null);
+
+  BuyV2ComparisonQuery? comparisonQueryFor(
+    BuyV2Product product, {
+    int? requestedQuantityMilli,
+    bool samePack = true,
+    BuyV2ComparisonScope scope = BuyV2ComparisonScope.allServiceable,
+    BuyV2ComparisonChannel? channel,
+    BuyV2FulfilmentMode? fulfilment,
+    BuyV2ComparisonSort? sort,
+    bool allowExtraQuantity = false,
+    DateTime? arriveBy,
+  }) {
+    if (_collectionDisposed ||
+        !procurementScopeCurrent ||
+        _procurementProductMessage(product) != null) {
+      return null;
+    }
+    final source = comparisonSource;
+    final address = selectedAddressOrNull;
+    final destinationKey = _comparisonDestinationKey;
+    if (source == null || address == null || destinationKey == null) {
+      return null;
+    }
+    BuyV2ComparisonIdentity? identity;
+    try {
+      identity = source.identityFor(product);
+    } on Object {
+      return null;
+    }
+    if (identity == null || !identity.valid) return null;
+    final retainedPacks = quantityFor(product.id);
+    final initialPacks = retainedPacks > 0
+        ? retainedPacks
+        : math.max(1, product.minimumOrder);
+    final quantity = requestedQuantityMilli == null
+        ? BigInt.from(identity.packQuantityMilli) * BigInt.from(initialPacks)
+        : BigInt.from(requestedQuantityMilli);
+    if (quantity > BigInt.from(9007199254740991)) return null;
+    final purpose = isStoreProcurement
+        ? BuyV2ComparisonPurpose.storeProcurement
+        : product.destination == BuyV2Destination.wholesale
+        ? BuyV2ComparisonPurpose.bulkPurchase
+        : comparisonPurpose;
+    final entryFulfilment =
+        selectedFulfilmentMode ??
+        (purpose == BuyV2ComparisonPurpose.standardPurchase
+            ? comparisonFulfilmentMode
+            : null);
+    final value = BuyV2ComparisonQuery(
+      productId: product.id,
+      productCanonicalId: product.canonicalId,
+      identity: identity,
+      purchaserScope: _comparisonPurchaserScope,
+      destinationKey: destinationKey,
+      pinCode: address.pinCode,
+      requestedQuantityMilli: quantity.toInt(),
+      samePack: samePack,
+      scope: scope,
+      channel: channel,
+      fulfilment: fulfilment ?? entryFulfilment,
+      sort: sort ?? BuyV2ComparisonSort.itemPrice,
+      purpose: purpose,
+      allowExtraQuantity: allowExtraQuantity,
+      arriveBy: arriveBy,
+      procurementContext: procurementContext,
+    );
+    return value.valid ? value : null;
+  }
+
+  bool comparisonQueryIsCurrent(BuyV2ComparisonQuery query) {
+    final product = findProduct(query.productId);
+    if (product == null) return false;
+    return comparisonQueryFor(
+          product,
+          requestedQuantityMilli: query.requestedQuantityMilli,
+          samePack: query.samePack,
+          scope: query.scope,
+          channel: query.channel,
+          sort: query.sort,
+          allowExtraQuantity: query.allowExtraQuantity,
+          arriveBy: query.arriveBy,
+        )?.key ==
+        query.key;
+  }
+
+  bool comparisonOfferPermitted(BuyV2ComparisonOffer offer) {
+    if (_collectionDisposed ||
+        !procurementScopeCurrent ||
+        !_procurementDiscoveryAllows(offer.product)) {
+      return false;
+    }
+    if (!isStoreProcurement) return true;
+    final grant = offer.product.procurementSupplierGrant;
+    return grant != null &&
+        grant.workspaceId == offer.supplierWorkspaceId &&
+        grant.storeId == offer.storeId &&
+        grant.offerId == offer.id &&
+        grant.offerRevision == offer.revision &&
+        offer.channel == BuyV2ComparisonChannel.wholesale;
+  }
+
+  /// Reuses the existing product entry and its refreshed facts. The comparison
+  /// quote is not applied to the Cart and does not authorize a purchase.
+  bool admitComparisonProduct(
+    BuyV2ComparisonController controller,
+    BuyV2ComparisonOffer offer,
+  ) {
+    if (!identical(controller.source, comparisonSource) ||
+        controller.query == null ||
+        !comparisonQueryIsCurrent(controller.query!) ||
+        !controller.canOpen(offer) ||
+        !comparisonOfferPermitted(offer)) {
+      return false;
+    }
+    try {
+      final currentIdentity = comparisonSource!.identityFor(offer.product);
+      if (currentIdentity == null ||
+          !currentIdentity.equivalentTo(offer.identity, samePack: true)) {
+        return false;
+      }
+      final existing = findProduct(offer.product.id);
+      if (existing != null &&
+          (existing.canonicalId != offer.product.canonicalId ||
+              existing.storeId != offer.product.storeId)) {
+        return false;
+      }
+      _validatePagedProduct(
+        offer.product,
+        catalogueQuery(
+          storeId: offer.storeId,
+          catalogueDestination: offer.product.destination,
+        ),
+      );
+      _pagedProducts[offer.product.id] = offer.product;
+      _productFacts.remove(offer.product.id);
+      return true;
+    } on Object {
+      return false;
+    }
+  }
 
   String? procurementProductUnavailableMessage(BuyV2Product product) =>
       _procurementProductMessage(product);
@@ -2970,6 +3408,7 @@ class BuyV2Session extends ChangeNotifier {
   final BuySession core;
   final BuyV2ProductFactsAdapter productFactsAdapter;
   final BuyV2ProductContentAdapter productContentAdapter;
+  final BuyV2ComparisonSource? comparisonSource;
   final BuyV2MarketplaceTrustAdapter marketplaceTrustAdapter;
   final BuyV2SponsoredContentAdapter sponsoredContentAdapter;
   final BuyV2CartBenefitsAdapter cartBenefitsAdapter;
@@ -9088,7 +9527,7 @@ class BuyV2Session extends ChangeNotifier {
     return true;
   }
 
-  bool addProduct(String id) {
+  bool addProduct(String id, {int? quantity}) {
     if (_holdCartForPaymentResolution()) return false;
     final item = findProduct(id);
     if (item == null) {
@@ -9124,16 +9563,37 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     final current = _cart[id];
+    final addedQuantity = quantity ?? item.minimumOrder;
+    if (addedQuantity < item.minimumOrder ||
+        BigInt.from(addedQuantity) > BigInt.from(9007199254740991)) {
+      notice = 'Choose a valid number of packs.';
+      notifyListeners();
+      return false;
+    }
+    final nextTotal =
+        _cart.values.fold<BigInt>(
+          BigInt.zero,
+          (sum, line) =>
+              sum +
+              BigInt.from(line.product.price) * BigInt.from(line.quantity),
+        ) +
+        BigInt.from(item.price) * BigInt.from(addedQuantity);
+    if (nextTotal * BigInt.from(10000) > BigInt.from(9007199254740991)) {
+      notice =
+          'This quantity is too large to calculate. Enter a smaller quantity.';
+      notifyListeners();
+      return false;
+    }
     final approvedMaximum = _prescriptionApprovedQuantities[item.id];
     if (approvedMaximum != null &&
-        (current?.quantity ?? 0) + item.minimumOrder > approvedMaximum) {
+        (current?.quantity ?? 0) + addedQuantity > approvedMaximum) {
       notice = 'Prescription quantity reached for ${item.title}.';
       notifyListeners();
       return false;
     }
     _cart[id] = BuyV2CartLine(
       product: item,
-      quantity: (current?.quantity ?? 0) + item.minimumOrder,
+      quantity: (current?.quantity ?? 0) + addedQuantity,
     );
     _pruneCartSelections();
     _acknowledgeCart('${item.title} added', destination: item.destination);

@@ -14,6 +14,9 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
+import 'buy_v2_product_continuity_test.dart'
+    show r669ComparisonContinuitySession;
+
 class _R5DockArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
   Future<bool> prepare() async => true;
@@ -438,9 +441,9 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         final core = BuySession();
-        final session = BuyV2Session(core: core)
-          ..openDestination(BuyV2Destination.wholesale)
-          ..openProduct('w-oil');
+        final session = await r669ComparisonContinuitySession(core);
+        session.openDestination(BuyV2Destination.wholesale);
+        expect(session.openProduct('w-oil'), isTrue);
         addTearDown(core.dispose);
         addTearDown(session.dispose);
         final description = session
@@ -484,7 +487,7 @@ void main() {
         await tester.tap(find.text('Compare'));
         await tester.pumpAndSettle();
         final alternate = find.byKey(
-          const ValueKey('buy-product-compare-view-w-oil-10l'),
+          const ValueKey('buy-product-compare-w-oil-comparison'),
         );
         await Scrollable.ensureVisible(
           tester.element(alternate),
@@ -492,15 +495,27 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(alternate.hitTestable(), findsOneWidget);
-        await tester.tap(alternate);
+        final alternateCard = find.descendant(
+          of: alternate,
+          matching: find.byKey(const ValueKey('buy-product-w-oil-comparison')),
+        );
+        await tester.ensureVisible(alternateCard);
+        await tester.tap(alternateCard);
         await tester.pumpAndSettle();
-        expect(session.selectedProduct?.id, 'w-oil-10l');
-        await tester.tap(cart);
+        expect(session.selectedProduct?.id, 'w-oil-comparison');
+        await tester.tap(find.byKey(const ValueKey('buy-store-cart-bar')));
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
-        expect(session.selectedProduct?.id, 'w-oil-10l');
+        expect(session.selectedProduct?.id, 'w-oil-comparison');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedProduct?.id, 'w-oil');
+        expect(
+          find.byKey(const ValueKey('buy-product-comparison-sheet')),
+          findsOneWidget,
+        );
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(session.selectedProduct?.id, 'w-oil');
