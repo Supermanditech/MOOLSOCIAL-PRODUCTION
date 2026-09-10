@@ -747,7 +747,7 @@ class WorkspaceOrderItemSnapshot {
 }
 
 /// Local composer recovery only. These stages grant no order/payment authority.
-enum WorkspaceCounterDraftStage { editing, submitting, retired }
+enum WorkspaceCounterDraftStage { editing, submitting, reviewRequired, retired }
 
 class WorkspaceCounterDraft {
   WorkspaceCounterDraft({
@@ -798,7 +798,8 @@ class WorkspaceCounterDraft {
       }.contains(payment) &&
       (stage != WorkspaceCounterDraftStage.editing ||
           submissionOrderId == null) &&
-      (stage != WorkspaceCounterDraftStage.submitting ||
+      ((stage != WorkspaceCounterDraftStage.submitting &&
+              stage != WorkspaceCounterDraftStage.reviewRequired) ||
           (submissionOrderId?.trim().isNotEmpty == true &&
               customer.trim().isNotEmpty &&
               lines.isNotEmpty)) &&

@@ -16954,6 +16954,85 @@ void main() {
       );
       expect(work.workspaceInvoices, hasLength(1));
     });
+    testWidgets(
+      'DASH15 counter review requires the changed total to be reviewed $scale',
+      (tester) async {
+        final work =
+            WorkSession(
+                gateway: ReviewWorkGateway(),
+                contactDraftStore: _ContactDraftFixtureStore(),
+                counterDraftStore: _CounterDraftFixtureStore(),
+              )
+              ..seedVerifiedWorkspace()
+              ..retailerSetupSaved = true
+              ..reviewStage = WorkReviewStage.live;
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        await enterSaleCustomer(tester, '9829012345');
+        final add = find.byKey(const Key('work-order-add-oil-fortune-1l'));
+        await reveal(tester, add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-order-review')));
+        await tester.tap(find.byKey(const Key('work-order-review')));
+        await tester.pumpAndSettle();
+        final index = work.workspaceCatalogueItems.indexWhere(
+          (p) => p.id == 'oil-fortune-1l',
+        );
+        final original = work.workspaceCatalogueItems[index];
+        final updatedPrice = original.sellingPrice - 1;
+        work.workspaceCatalogueItems[index] = original.copyWith(
+          sellingPrice: updatedPrice,
+        );
+        work.notifyListeners();
+        await tester.pumpAndSettle();
+        final save = find.byKey(const Key('work-order-save'));
+        await reveal(tester, save);
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(work.workspaceInvoices, isEmpty);
+        expect(
+          find.byKey(const Key('work-order-review-summary')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('work-order-review-summary')),
+            matching: find.text('₹$updatedPrice'),
+          ),
+          findsOneWidget,
+        );
+        final update = find.text('Bill updated. Review the items and total.');
+        expect(update, findsOneWidget);
+        expect(
+          tester
+              .widget<Semantics>(
+                find.byKey(const Key('work-bill-review-update')),
+              )
+              .properties
+              .liveRegion,
+          isTrue,
+        );
+        expect(find.text('Payment'), findsOneWidget);
+        await reveal(tester, update);
+        await captureStoreView(tester, 'counter-updated-total-$scale');
+        expect(tester.takeException(), isNull);
+        await reveal(tester, save);
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(work.workspaceInvoices, hasLength(1));
+        expect(work.workspaceInvoices.single.amount, updatedPrice);
+        expect(work.workspaceCatalogueItems[index].stock, original.stock - 1);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   testWidgets(

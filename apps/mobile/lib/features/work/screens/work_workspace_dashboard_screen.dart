@@ -20502,7 +20502,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     _ => value,
   };
 
-  Future<void> _save() async {
+  Future<void> _save({String? expectedReview}) async {
     if (_saving || _openingDraft || widget.session.counterDraftEditingBlocked) {
       return;
     }
@@ -20520,7 +20520,9 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
     _rememberDetails();
     setState(() => _saving = true);
     final identity = _currentDraftIdentity;
-    final submitted = await widget.session.submitWorkspaceCounterBill();
+    final submitted = await widget.session.submitWorkspaceCounterBill(
+      expectedReview: expectedReview,
+    );
     if (!mounted || identity != _currentDraftIdentity) return;
     setState(() => _saving = false);
     if (submitted == null) {
@@ -20588,6 +20590,8 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
       return;
     }
     final systemBottom = MediaQuery.viewPaddingOf(context).bottom;
+    var reviewedBill = widget.session.counterBillReviewSignature;
+    final reviewedOrderId = widget.session.currentWorkspaceOrderId;
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -20659,10 +20663,14 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                             if (_error != null)
                               Padding(
                                 padding: const EdgeInsets.only(top: 8),
-                                child: Text(
-                                  _error!,
-                                  style: const TextStyle(
-                                    color: Color(0xFFB42318),
+                                child: Semantics(
+                                  key: const Key('work-bill-review-update'),
+                                  liveRegion: true,
+                                  child: Text(
+                                    _error!,
+                                    style: const TextStyle(
+                                      color: Color(0xFFB42318),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -20682,6 +20690,18 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                       child: FilledButton.icon(
                         key: const Key('work-order-save'),
                         onPressed: () {
+                          final currentBill =
+                              widget.session.counterBillReviewSignature;
+                          if (widget.session.currentWorkspaceOrderId ==
+                                  reviewedOrderId &&
+                              currentBill != reviewedBill) {
+                            setSheetState(() {
+                              reviewedBill = currentBill;
+                              _error =
+                                  'Bill updated. Review the items and total.';
+                            });
+                            return;
+                          }
                           if (_fulfilment != 'At the shop' &&
                               _address.text.trim().isEmpty) {
                             setSheetState(
@@ -20690,7 +20710,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
                             return;
                           }
                           Navigator.of(context).pop();
-                          _save();
+                          _save(expectedReview: reviewedBill);
                         },
                         icon: Icon(
                           _fulfilment == 'At the shop'
@@ -21598,7 +21618,7 @@ class _OrderCompletionChoices extends StatelessWidget {
         key: ValueKey('work-review-payment-$payment'),
         initialValue: payment,
         isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Payment arrangement'),
+        decoration: const InputDecoration(labelText: 'Payment'),
         items: [
           for (final option in const [
             'Cash',

@@ -277,16 +277,37 @@ class SecureWorkCounterDraftStore implements WorkCounterDraftStore {
     if (current != null && jsonEncode(current.toJson()) == value) {
       return; // Same write retried after an uncertain local result.
     }
+    if (current?.stage == WorkspaceCounterDraftStage.submitting &&
+        draft.stage == WorkspaceCounterDraftStage.reviewRequired &&
+        jsonEncode({
+              ...current!.toJson(),
+              'revision': draft.revision,
+              'stage': draft.stage.name,
+            }) !=
+            value) {
+      throw const WorkGatewayException(
+        'Keep the saved bill unchanged during recovery.',
+      );
+    }
     if (current?.revision != expectedRevision ||
+        (draft.stage == WorkspaceCounterDraftStage.reviewRequired &&
+            current?.stage != WorkspaceCounterDraftStage.submitting) ||
         (current == null &&
             draft.stage != WorkspaceCounterDraftStage.editing) ||
         (current != null &&
             (current.id == draft.id
                 ? current.stage == WorkspaceCounterDraftStage.retired ||
                       (current.stage == WorkspaceCounterDraftStage.submitting &&
-                          (draft.stage != WorkspaceCounterDraftStage.retired ||
+                          ((draft.stage != WorkspaceCounterDraftStage.retired &&
+                                  draft.stage !=
+                                      WorkspaceCounterDraftStage
+                                          .reviewRequired) ||
                               draft.submissionOrderId !=
-                                  current.submissionOrderId))
+                                  current.submissionOrderId)) ||
+                      (current.stage ==
+                              WorkspaceCounterDraftStage.reviewRequired &&
+                          draft.stage != WorkspaceCounterDraftStage.editing &&
+                          draft.stage != WorkspaceCounterDraftStage.retired)
                 : current.stage != WorkspaceCounterDraftStage.retired ||
                       draft.stage != WorkspaceCounterDraftStage.editing))) {
       throw const WorkGatewayException(

@@ -471,6 +471,9 @@ class _CounterDraftRecovery {
   String? error;
   String? editingId;
   String? customerInput;
+  // Volatile proof only: cleared before the first order/sale effect is invoked.
+  // Never restored from a journal or interpreted as backend authority.
+  String? unappliedOrderId;
   bool catalogueChanged = false;
   ({String orderId, WorkspaceCustomerInvoice? invoice})? completed;
 }
@@ -588,6 +591,34 @@ class WorkSession extends ChangeNotifier {
       counterDraftCatalogueChanged ||
       (_counterRecovery != null && !_counterRecovery!.loaded);
 
+  // Exact local review snapshot, not a cryptographic or backend authorization.
+  String get counterBillReviewSignature {
+    final catalogue = {
+      for (final product in workspaceCatalogueItems) product.id: product,
+    };
+    final ids = workspaceOrderQuantities.keys.toList()..sort();
+    return jsonEncode([
+      _contactAccountScope,
+      activeWorkspace?.id,
+      currentWorkspaceOrderId,
+      workspaceOrderCustomer,
+      for (final id in ids)
+        [
+          id,
+          workspaceOrderQuantities[id],
+          catalogue[id]?.title,
+          catalogue[id]?.pack,
+          catalogue[id]?.sellingPrice,
+          catalogue[id]?.available,
+          catalogue[id] == null
+              ? false
+              : catalogue[id]!.stockMode ==
+                        WorkspaceStockMode.availabilityOnly ||
+                    catalogue[id]!.stock >= workspaceOrderQuantities[id]!,
+        ],
+    ]);
+  }
+
   bool _counterCatalogueMatches(WorkspaceCounterDraft draft) {
     final catalogue = {
       for (final item in workspaceCatalogueItems) item.id: item,
@@ -655,20 +686,33 @@ class WorkSession extends ChangeNotifier {
         recovery.completed = null;
       }
       recovery.record = record;
+      if (record?.submissionOrderId != recovery.unappliedOrderId) {
+        recovery.unappliedOrderId = null;
+      }
       if (!hadEdits && record?.stage == WorkspaceCounterDraftStage.retired) {
         recovery.editingId = null;
         recovery.customerInput = null;
       }
       recovery.loaded = true;
       recovery.catalogueChanged =
-          record?.stage == WorkspaceCounterDraftStage.editing &&
-          !_counterCatalogueMatches(record!);
+          (record?.stage == WorkspaceCounterDraftStage.editing &&
+              !_counterCatalogueMatches(record!)) ||
+          (record?.stage == WorkspaceCounterDraftStage.reviewRequired &&
+              record!.lines.any(
+                (line) => !workspaceCatalogueItems.any(
+                  (product) => product.id == line.productId,
+                ),
+              ));
       if (record?.stage == WorkspaceCounterDraftStage.submitting) {
         recovery.error = 'Check this bill’s status before creating another.';
       } else if (recovery.catalogueChanged) {
         recovery.error =
             'Prices or stock changed. Your saved bill is kept for review.';
-      } else if (record?.stage == WorkspaceCounterDraftStage.editing) {
+      } else if (record?.stage == WorkspaceCounterDraftStage.editing ||
+          record?.stage == WorkspaceCounterDraftStage.reviewRequired) {
+        if (record?.stage == WorkspaceCounterDraftStage.reviewRequired) {
+          recovery.error = 'Bill changed. Review the items and prices.';
+        }
         recovery.editingId = record!.id;
         if (!hadEdits &&
             currentWorkspaceOrderId == null &&
@@ -900,8 +944,13 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<({String orderId, WorkspaceCustomerInvoice? invoice})?>
-  submitWorkspaceCounterBill() async {
+  submitWorkspaceCounterBill({String? expectedReview}) async {
     if (counterDraftEditingBlocked || !_canEditCounterOrder()) return null;
+    if (expectedReview != null &&
+        expectedReview != counterBillReviewSignature) {
+      showError('Bill updated. Review the items and total.');
+      return null;
+    }
     if ((counterCustomerInput != null &&
             counterCustomerInput != workspaceOrderCustomer) ||
         workspaceCustomerMobile(workspaceOrderCustomer) == null ||
@@ -927,6 +976,15 @@ class WorkSession extends ChangeNotifier {
           !identical(data, _storeData)) {
         return null;
       }
+      if (expectedReview != null &&
+          expectedReview != counterBillReviewSignature) {
+        if (recovery != null) {
+          recovery.error = 'Bill updated. Review the items and total.';
+        } else {
+          showError('Bill updated. Review the items and total.');
+        }
+        return null;
+      }
       var record = recovery?.record;
       final id =
           currentWorkspaceOrderId ??
@@ -943,6 +1001,7 @@ class WorkSession extends ChangeNotifier {
           stage: WorkspaceCounterDraftStage.submitting,
           order: id,
         );
+        recovery.unappliedOrderId = id;
         await _counterDraftStorage.save(
           submitted,
           expectedRevision: record.revision,
@@ -965,11 +1024,22 @@ class WorkSession extends ChangeNotifier {
         if (current == null ||
             jsonEncode(current.toJson()) != jsonEncode(record.toJson()) ||
             !_counterCatalogueMatches(record)) {
-          recovery.error =
-              'This bill changed during saving. Its details are kept; no sale was created.';
+          final review = _counterDraftRevision(
+            record,
+            record.revision + 1,
+            stage: WorkspaceCounterDraftStage.reviewRequired,
+          );
+          await _counterDraftStorage.save(
+            review,
+            expectedRevision: record.revision,
+          );
+          recovery.record = review;
+          recovery.unappliedOrderId = null;
+          recovery.error = 'Bill changed. Review the items and prices.';
           return null;
         }
       }
+      if (recovery != null) recovery.unappliedOrderId = null;
       _counterSubmissionOrderId = id;
       final saved = saveWorkspaceOrderDraft(
         customer: workspaceOrderCustomer,
@@ -1037,6 +1107,40 @@ class WorkSession extends ChangeNotifier {
         recovery.submitting) {
       return false;
     }
+    final unapplied = recovery.record;
+    if (unapplied?.stage == WorkspaceCounterDraftStage.submitting &&
+        recovery.unappliedOrderId == unapplied!.submissionOrderId &&
+        currentWorkspaceOrderId == null) {
+      recovery.submitting = true;
+      notifyListeners();
+      try {
+        final review = _counterDraftRevision(
+          unapplied,
+          unapplied.revision + 1,
+          stage: WorkspaceCounterDraftStage.reviewRequired,
+        );
+        await _counterDraftStorage.save(
+          review,
+          expectedRevision: unapplied.revision,
+        );
+        recovery.record = review;
+        recovery.unappliedOrderId = null;
+      } catch (_) {
+        recovery.error = 'No sale was created. Retry to recover this bill.';
+        return false;
+      } finally {
+        recovery.submitting = false;
+        if (!_disposed && _counterDraftScope == scope) notifyListeners();
+      }
+      if (_disposed || _counterDraftScope != scope) return false;
+      await loadWorkspaceCounterDraft(
+        retry: true,
+        shouldRestore: shouldRestore,
+      );
+      return !_disposed &&
+          _counterDraftScope == scope &&
+          !counterDraftEditingBlocked;
+    }
     if (recovery.record?.stage == WorkspaceCounterDraftStage.submitting &&
         recovery.completed != null &&
         recovery.completed!.orderId == recovery.record!.submissionOrderId) {
@@ -1067,6 +1171,13 @@ class WorkSession extends ChangeNotifier {
     }
     final preserveEdits = recovery.loaded && !counterDraftEditingBlocked;
     await loadWorkspaceCounterDraft(retry: true, shouldRestore: shouldRestore);
+    if (!_disposed &&
+        _counterDraftScope == scope &&
+        recovery.record?.stage == WorkspaceCounterDraftStage.submitting &&
+        recovery.unappliedOrderId == recovery.record?.submissionOrderId &&
+        currentWorkspaceOrderId == null) {
+      return retryWorkspaceCounterDraft(shouldRestore: shouldRestore);
+    }
     if (_disposed ||
         _counterDraftScope != scope ||
         counterDraftEditingBlocked) {

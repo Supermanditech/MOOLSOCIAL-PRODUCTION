@@ -82,7 +82,7 @@ class _CounterDraftBoundaryStore implements WorkCounterDraftStore {
   _CounterDraftBoundaryStore(this.delegate);
   final WorkCounterDraftStore delegate;
   Completer<void>? readGate, submitGate;
-  bool failRetire = false;
+  bool failRetire = false, failAfterSubmit = false;
   @override
   Future<WorkspaceCounterDraft?> read(String account, String store) async {
     final value = await delegate.read(account, store);
@@ -102,6 +102,10 @@ class _CounterDraftBoundaryStore implements WorkCounterDraftStore {
       throw StateError('test retirement write failure');
     }
     await delegate.save(draft, expectedRevision: expectedRevision);
+    if (failAfterSubmit &&
+        draft.stage == WorkspaceCounterDraftStage.submitting) {
+      throw StateError('test reply lost after marker write');
+    }
   }
 }
 
@@ -521,6 +525,112 @@ void main() {
       },
     );
 
+    test(
+      'price changes before effects recover without duplicating a sale',
+      () async {
+        final work = session();
+        await fill(work);
+        journal.submitGate = Completer<void>();
+        final submission = work.submitWorkspaceCounterBill();
+        await _drainOrderJournal();
+        work.workspaceCatalogueItems[0] = _product(sellingPrice: 300);
+        journal.submitGate!.complete();
+        expect(await submission, isNull);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceOrders, isEmpty);
+        expect(work.workspaceCatalogueItems.single.stock, 10);
+        expect(await work.retryWorkspaceCounterDraft(), isTrue);
+        expect(work.counterDraftNeedsReconciliation, isFalse);
+        expect(work.workspaceOrderQuantities, {'atta-5kg': 2});
+        expect(work.workspaceOrderTotal, 600);
+        expect(await work.submitWorkspaceCounterBill(), isNotNull);
+        expect(work.workspaceInvoices, hasLength(1));
+        expect(work.workspaceCatalogueItems.single.stock, 8);
+      },
+    );
+
+    test(
+      'next bill has a new identity and cannot resurrect a completed bill',
+      () async {
+        final work = session();
+        await fill(work);
+        final first = await work.submitWorkspaceCounterBill();
+        expect(first, isNotNull);
+        expect(work.startNewWorkspaceOrder(), isTrue);
+        expect(work.counterCustomerInput, isNull);
+        await fill(work);
+        work.updateWorkspaceCounterDetails(customer: '9000000014');
+        final second = await work.submitWorkspaceCounterBill();
+        expect(second, isNotNull);
+        expect(second!.orderId, isNot(first!.orderId));
+        expect(work.workspaceInvoices, hasLength(2));
+        expect(work.workspaceCatalogueItems.single.stock, 6);
+        final next = session();
+        await next.loadWorkspaceCounterDraft();
+        expect(next.workspaceOrderCustomer, isEmpty);
+        expect(next.workspaceOrderQuantities, isEmpty);
+      },
+    );
+
+    test('lost marker reply recovers once without claiming a sale', () async {
+      final work = session();
+      await fill(work);
+      journal.failAfterSubmit = true;
+      expect(await work.submitWorkspaceCounterBill(), isNull);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceOrders, isEmpty);
+      expect(
+        (await journal.read('account-A', 'store-A'))!.stage,
+        WorkspaceCounterDraftStage.submitting,
+      );
+      journal.failAfterSubmit = false;
+      expect(await work.retryWorkspaceCounterDraft(), isTrue);
+      expect(
+        (await journal.read('account-A', 'store-A'))!.stage,
+        WorkspaceCounterDraftStage.reviewRequired,
+      );
+      final next = session();
+      await next.loadWorkspaceCounterDraft();
+      expect(next.workspaceOrderQuantities, {'atta-5kg': 2});
+      expect(next.workspaceOrderCustomer, '9000000013');
+      expect(next.counterDraftNeedsReconciliation, isFalse);
+      expect(next.workspaceInvoices, isEmpty);
+    });
+
+    test(
+      'reviewed price cannot change while the draft write is pending',
+      () async {
+        final work = session();
+        await fill(work);
+        final reviewed = work.counterBillReviewSignature;
+        storage.holdWrite = Completer<void>();
+        final submission = work.submitWorkspaceCounterBill(
+          expectedReview: reviewed,
+        );
+        await _drainOrderJournal();
+        work.workspaceCatalogueItems[0] = _product(sellingPrice: 301);
+        storage.holdWrite!.complete();
+        expect(await submission, isNull);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceOrders, isEmpty);
+        expect(
+          work.counterDraftError,
+          'Bill updated. Review the items and total.',
+        );
+        expect(
+          await work.submitWorkspaceCounterBill(expectedReview: reviewed),
+          isNull,
+        );
+        expect(
+          await work.submitWorkspaceCounterBill(
+            expectedReview: work.counterBillReviewSignature,
+          ),
+          isNotNull,
+        );
+        expect(work.workspaceInvoices, hasLength(1));
+      },
+    );
+
     test('failed save retry keeps latest incomplete customer input', () async {
       final work = session();
       await fill(work);
@@ -702,6 +812,79 @@ void main() {
               lineTotalPaise: 55000,
             ),
           ],
+    );
+
+    test(
+      'review-required recovery preserves the aborted snapshot through restart',
+      () async {
+        final storage = _OrderJournalStorage();
+        final journal = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        await journal.save(draft(), expectedRevision: null);
+        await expectLater(
+          journal.save(
+            draft(
+              revision: 2,
+              stage: WorkspaceCounterDraftStage.reviewRequired,
+              order: 'order-A',
+            ),
+            expectedRevision: 1,
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await journal.save(
+          draft(
+            revision: 2,
+            stage: WorkspaceCounterDraftStage.submitting,
+            order: 'order-A',
+          ),
+          expectedRevision: 1,
+        );
+        await expectLater(
+          journal.save(
+            draft(
+              revision: 3,
+              stage: WorkspaceCounterDraftStage.reviewRequired,
+              order: 'order-A',
+              customer: '9000000014',
+            ),
+            expectedRevision: 2,
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        final review = draft(
+          revision: 3,
+          stage: WorkspaceCounterDraftStage.reviewRequired,
+          order: 'order-A',
+        );
+        await journal.save(review, expectedRevision: 2);
+        final restarted = SecureWorkCounterDraftStore(
+          accountScope: () => 'account-A',
+          storage: storage,
+        );
+        expect(
+          (await restarted.read('account-A', 'store-A'))!.toJson(),
+          review.toJson(),
+        );
+        await expectLater(
+          restarted.save(
+            draft(
+              revision: 4,
+              stage: WorkspaceCounterDraftStage.submitting,
+              order: 'order-B',
+            ),
+            expectedRevision: 3,
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await restarted.save(draft(revision: 4), expectedRevision: 3);
+        expect(
+          (await restarted.read('account-A', 'store-A'))!.submissionOrderId,
+          isNull,
+        );
+      },
     );
 
     test('retains exact snapshot through a new storage instance', () async {
