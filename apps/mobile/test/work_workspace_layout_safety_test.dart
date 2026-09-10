@@ -4863,6 +4863,166 @@ void main() {
     );
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('REG4550 support failure A B return and retry $scale', (
+      tester,
+    ) async {
+      final work = WorkSession()
+        ..selectFamily('products-trade')
+        ..selectProfile('retailer-grocery')
+        ..reviewCaseId = 'APPLICATION-A'
+        ..reviewStage = WorkReviewStage.gstPending
+        ..remoteReviewStatus = WorkRemoteReviewStatus.rejected
+        ..reviewReason = 'The business address could not be confirmed.';
+      final gateway = ReviewChatSendGateway(
+        failNextRequest: true,
+        latency: Duration.zero,
+      );
+      final chat = ChatSession(sendGateway: gateway);
+      const thread = 'workspace-support';
+      const draftA = 'Please review the address for my first application.';
+      const newerA = 'Please also check the revised address document.';
+      const draftB = 'My separate second application question';
+      for (final entry in const {
+        'APPLICATION-A': draftA,
+        'APPLICATION-B': draftB,
+      }.entries) {
+        chat.setDraftTextForSession(
+          thread,
+          entry.value,
+          workspaceApplicationId: entry.key,
+        );
+      }
+      String route(String application) => Uri(
+        path: '/app/chat/thread/workspace-support',
+        queryParameters: {
+          'return': '/app/work/workspace/proof',
+          'directReturn': 'true',
+          'workspaceApplication': application,
+          'workspaceBusiness': 'Review store',
+        },
+      ).toString();
+      await mount(
+        tester,
+        route: route('APPLICATION-A'),
+        work: work,
+        chat: chat,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      final field = find.byKey(const Key('chat-message-field'));
+      expect(tester.widget<TextField>(field).controller!.text, draftA);
+      await tester.tap(field);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      await tester.pumpAndSettle();
+      final send = find.byKey(const Key('chat-send'));
+      expect(send.hitTestable(), findsOneWidget);
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      const failure = 'Message was not sent. Check your connection and retry.';
+      expect(find.byKey(const Key('chat-error')), findsOneWidget);
+      expect(find.text(failure), findsOneWidget);
+      expect(tester.widget<TextField>(field).controller!.text, draftA);
+      final failed = chat
+          .messages(thread)
+          .where((message) => message.mine)
+          .single;
+      expect(
+        chat.retryDraftMatchesApplication(failed.id, 'APPLICATION-A'),
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'support-failure-keyboard-$scale');
+      final feedback = find.byKey(const Key('chat-feedback-text-scroll'));
+      final feedbackScroll = tester.state<ScrollableState>(
+        find.descendant(of: feedback, matching: find.byType(Scrollable)).first,
+      );
+      if (feedbackScroll.position.maxScrollExtent > 0) {
+        await tester.drag(feedback, const Offset(0, -300));
+        await tester.pumpAndSettle();
+      }
+      final errorText = find.text(failure);
+      final paragraph = tester.renderObject<RenderParagraph>(errorText);
+      final ending = paragraph
+          .getBoxesForSelection(
+            TextSelection(
+              baseOffset: failure.lastIndexOf('retry'),
+              extentOffset: failure.length,
+            ),
+          )
+          .single;
+      final endingBottom = paragraph.localToGlobal(
+        Offset(ending.right, ending.bottom),
+      );
+      final endingTop = paragraph.localToGlobal(
+        Offset(ending.left, ending.top),
+      );
+      expect(
+        endingTop.dy,
+        greaterThanOrEqualTo(tester.getRect(feedback).top - .5),
+      );
+      expect(
+        endingBottom.dy,
+        lessThanOrEqualTo(tester.getRect(feedback).bottom + .5),
+      );
+      expect(endingBottom.dy, greaterThan(tester.getRect(feedback).top));
+      await captureStoreView(tester, 'support-failure-instruction-$scale');
+      await tester.enterText(field, newerA);
+      FocusManager.instance.primaryFocus?.unfocus();
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      final router = GoRouter.of(tester.element(field));
+      router.go(route('APPLICATION-B'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, draftB);
+      expect(find.byKey(const Key('chat-error')), findsNothing);
+      expect(find.text('Application APPLICATION-B'), findsOneWidget);
+      router.go(route('APPLICATION-A'));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, newerA);
+      expect(find.text('Application APPLICATION-A'), findsOneWidget);
+      final retry = find.byKey(Key('chat-retry-${failed.id}'));
+      final messageScroll = find
+          .descendant(
+            of: find.byKey(const Key('chat-message-list')),
+            matching: find.byType(Scrollable),
+          )
+          .first;
+      await tester.scrollUntilVisible(retry, 160, scrollable: messageScroll);
+      await tester.pumpAndSettle();
+      expect(retry.hitTestable(), findsOneWidget);
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, newerA);
+      expect(
+        chat.draftTextForSession(
+          thread,
+          workspaceApplicationId: 'APPLICATION-B',
+        ),
+        draftB,
+      );
+      expect(
+        chat.messages(thread).where((message) => message.mine),
+        hasLength(1),
+      );
+      expect(
+        chat.retryDraftMatchesApplication(failed.id, 'APPLICATION-A'),
+        isFalse,
+      );
+      expect(find.byKey(Key('chat-retry-${failed.id}')), findsNothing);
+      await captureStoreView(tester, 'support-retry-preserved-draft-$scale');
+      await tester.tap(find.byKey(const Key('chat-back')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-inline-review-status')),
+        findsOneWidget,
+      );
+      expect(work.reviewCaseId, 'APPLICATION-A');
+      expect(work.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final decision in [
     WorkRemoteReviewStatus.rejected,
     WorkRemoteReviewStatus.suspended,
