@@ -481,6 +481,7 @@ class _WorkWorkspaceDashboardScreenState
   bool _procurementReady = false;
   _WorkspaceOperation? _procurementReturnOperation;
   String? _procurementProductId;
+  WorkspacePurchaseRecord? _trackedPurchase;
   bool _directFilterApplied = false;
   String? _filterBeforeDirect;
   WorkspaceOrderRecord? _reviewedOrder;
@@ -744,6 +745,7 @@ class _WorkWorkspaceDashboardScreenState
           }.contains(target.queryParameters['sub'])) {
         _showProcurement(
           productId: target.queryParameters['product'],
+          searchQuery: target.queryParameters['search'],
           returnOperation: _view == _WorkspaceControlView.operation
               ? _operation
               : null,
@@ -810,7 +812,7 @@ class _WorkWorkspaceDashboardScreenState
       _WorkspaceControlView.search => 'Search your store',
       _WorkspaceControlView.status => 'Store settings',
       _WorkspaceControlView.alerts => 'Needs your attention',
-      _WorkspaceControlView.procurement => 'Wholesale and Bulk',
+      _WorkspaceControlView.procurement => workspace.name,
       _WorkspaceControlView.operation =>
         _operation == _WorkspaceOperation.counterOrder &&
                 session.workspaceOrderNeedsDelivery
@@ -825,7 +827,7 @@ class _WorkWorkspaceDashboardScreenState
         'Find orders, products, customers or business records',
       _WorkspaceControlView.status => 'Open, pause and run your store',
       _WorkspaceControlView.alerts => 'Orders and tasks needing action',
-      _WorkspaceControlView.procurement => 'Store purchase · ${workspace.name}',
+      _WorkspaceControlView.procurement => '',
       _WorkspaceControlView.operation =>
         _operation == _WorkspaceOperation.counterOrder &&
                 session.workspaceOrderNeedsDelivery
@@ -950,6 +952,7 @@ class _WorkWorkspaceDashboardScreenState
     final saleOpen =
         _view == _WorkspaceControlView.operation &&
         _operation == _WorkspaceOperation.counterOrder;
+    final procurementOpen = _view == _WorkspaceControlView.procurement;
     final hasHeaderBack =
         _view == _WorkspaceControlView.operation ||
         _view == _WorkspaceControlView.alerts ||
@@ -968,19 +971,41 @@ class _WorkWorkspaceDashboardScreenState
         )..layout(
           maxWidth:
               (MediaQuery.sizeOf(context).width -
-                      127 -
-                      (hasHeaderBack ? 47 : 0))
+                      (procurementOpen
+                          ? 72 + MediaQuery.paddingOf(context).horizontal
+                          : 127) -
+                      (!procurementOpen && hasHeaderBack ? 47 : 0))
                   .clamp(64.0, double.infinity),
         );
     final storeHeaderHeight =
         47 + (namePainter.height + 8).clamp(44.0, double.infinity);
+    final procurementHeaderHeight = (namePainter.height + 16).clamp(
+      48.0,
+      double.infinity,
+    );
     namePainter.dispose();
     return WorkPageScaffold(
       session: session,
       title: title,
       subtitle: subtitle,
-      headerHeight: storeRootSurface ? storeHeaderHeight : 88,
-      headerTitle: storeRootSurface
+      headerHeight: procurementOpen
+          ? procurementHeaderHeight
+          : storeRootSurface
+          ? storeHeaderHeight
+          : 88,
+      headerTitle: procurementOpen
+          ? Text(
+              workspace.name,
+              key: const Key('work-procurement-store-name'),
+              softWrap: true,
+              overflow: TextOverflow.clip,
+              textScaler: MediaQuery.textScalerOf(context),
+              style: Theme.of(context).textTheme.titleLarge!.copyWith(
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            )
+          : storeRootSurface
           ? _WorkspaceDashboardHeader(
               session: session,
               workspace: workspace,
@@ -1076,7 +1101,7 @@ class _WorkWorkspaceDashboardScreenState
             _view == _WorkspaceControlView.operation ||
             _view == _WorkspaceControlView.procurement,
         active: _view == _WorkspaceControlView.procurement
-            ? 'restock'
+            ? (_trackedPurchase == null ? 'restock' : 'sourcing')
             : _operation.name,
         procurement: _view == _WorkspaceControlView.procurement
             ? widget.procurementSession
@@ -1202,12 +1227,29 @@ class _WorkWorkspaceDashboardScreenState
             onOpenStatus: _showStatus,
             onDismiss: session.dismissWorkspaceAlert,
           ),
+          _WorkspaceControlView.procurement
+              when _trackedPurchase != null && !_trackingPurchaseAvailable =>
+            ListView(
+              primary: false,
+              padding: const EdgeInsets.all(16),
+              children: [
+                WorkEmptyState(
+                  keyName: 'work-tracking-unavailable',
+                  title: 'Purchase tracking unavailable',
+                  detail:
+                      'Return to your Store purchases for the latest update.',
+                  actionLabel: 'Back to purchases',
+                  onAction: _leaveProcurement,
+                ),
+              ],
+            ),
           _WorkspaceControlView.procurement => _StoreProcurementSurface(
             session: widget.procurementSession,
             accountIdentity: widget.accountIdentity,
             accountAuthenticated: widget.accountAuthenticated,
             ready: _procurementReady,
             productId: _procurementProductId,
+            orderId: _trackedPurchase?.orderId,
             onExit: _leaveProcurement,
             onDestinationChanged: _handleProcurementDestinationChanged,
           ),
@@ -1231,6 +1273,7 @@ class _WorkWorkspaceDashboardScreenState
             onOpenStore: _showDashboard,
             onOpenOperation: _showOperation,
             onOpenRoute: openScopedRoute,
+            onTrackPurchase: _showPurchaseTracking,
           ),
         },
       ),
@@ -1487,11 +1530,16 @@ class _WorkWorkspaceDashboardScreenState
   void _showProcurement({
     _WorkspaceOperation? returnOperation,
     String? productId,
+    String? searchQuery,
   }) {
     _searchFocus.unfocus();
     session.clearMessages();
     if (returnOperation != _WorkspaceOperation.direct) _releaseDirectFilter();
+    if (searchQuery != null) {
+      widget.procurementSession.updateQuery(searchQuery.trim());
+    }
     setState(() {
+      _trackedPurchase = null;
       _procurementReturnOperation = returnOperation;
       _procurementProductId = productId;
       _view = _WorkspaceControlView.procurement;
@@ -1504,9 +1552,67 @@ class _WorkWorkspaceDashboardScreenState
     });
   }
 
+  bool get _trackingPurchaseAvailable {
+    final original = _trackedPurchase;
+    if (original == null ||
+        !widget.accountAuthenticated ||
+        original.shipmentId != original.orderId ||
+        session.activeWorkspace?.id != original.workspaceId) {
+      return false;
+    }
+    final current = session.workspacePurchases
+        .where((record) => record.shipmentId == original.shipmentId)
+        .firstOrNull;
+    if (current == null ||
+        current.accountScope != original.accountScope ||
+        current.workspaceId != original.workspaceId ||
+        current.orderId != original.orderId ||
+        current.supplierId != original.supplierId ||
+        current.purchaseId != original.purchaseId) {
+      return false;
+    }
+    return widget.procurementSession.orders.any(
+      (order) =>
+          order.id == original.orderId &&
+          order.destination == BuyV2Destination.wholesale &&
+          order.purchaseId == original.purchaseId,
+    );
+  }
+
+  void _showPurchaseTracking(String shipmentId) {
+    final purchase = session.workspacePurchases
+        .where((record) => record.shipmentId == shipmentId)
+        .firstOrNull;
+    if (purchase == null) {
+      session.showNotice('This Store purchase is no longer available.');
+      return;
+    }
+    _trackedPurchase = purchase;
+    if (!_trackingPurchaseAvailable) {
+      _trackedPurchase = null;
+      session.showNotice('Tracking is not available for this Store purchase.');
+      return;
+    }
+    _searchFocus.unfocus();
+    _releaseDirectFilter();
+    session.clearMessages();
+    if (!widget.procurementSession.openTracking(purchase.orderId)) {
+      _trackedPurchase = null;
+      session.showNotice('Tracking is not available for this Store purchase.');
+      return;
+    }
+    setState(() {
+      _procurementReturnOperation = _WorkspaceOperation.sourcing;
+      _procurementProductId = null;
+      _procurementReady = true;
+      _view = _WorkspaceControlView.procurement;
+    });
+  }
+
   void _leaveProcurement() {
     final parent = _procurementReturnOperation;
     setState(() {
+      _trackedPurchase = null;
       _procurementReturnOperation = null;
       if (parent == null) {
         _view = _WorkspaceControlView.dashboard;
@@ -1920,25 +2026,91 @@ enum _WorkspaceControlView {
   operation,
 }
 
-class _StoreProcurementSurface extends StatelessWidget {
+class _StoreProcurementSurface extends StatefulWidget {
   const _StoreProcurementSurface({
     required this.session,
     required this.accountIdentity,
     required this.accountAuthenticated,
     required this.ready,
     this.productId,
+    this.orderId,
     required this.onExit,
     required this.onDestinationChanged,
   });
   final BuyV2Session session;
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated, ready;
-  final String? productId;
+  final String? productId, orderId;
   final VoidCallback onExit;
   final ValueChanged<BuyV2Destination> onDestinationChanged;
 
   @override
+  State<_StoreProcurementSurface> createState() =>
+      _StoreProcurementSurfaceState();
+}
+
+class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
+  bool _trackingOpened = false;
+  bool _returnScheduled = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _trackingOpened =
+        widget.orderId != null &&
+        widget.session.view == BuyV2View.tracking &&
+        widget.session.selectedOrderId == widget.orderId;
+    widget.session.addListener(_trackingChanged);
+  }
+
+  @override
+  void didUpdateWidget(covariant _StoreProcurementSurface oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session) {
+      oldWidget.session.removeListener(_trackingChanged);
+      widget.session.addListener(_trackingChanged);
+    }
+    if (oldWidget.orderId != widget.orderId) {
+      _trackingOpened = false;
+      _returnScheduled = false;
+    }
+  }
+
+  void _trackingChanged() {
+    final orderId = widget.orderId;
+    if (orderId == null) return;
+    final session = widget.session;
+    if (session.view == BuyV2View.tracking &&
+        session.selectedOrderId == orderId) {
+      _trackingOpened = true;
+    }
+    if (!_trackingOpened || _returnScheduled) return;
+    if (session.view != BuyV2View.catalogue &&
+        session.selectedOrderId == orderId) {
+      return;
+    }
+    setState(() => _returnScheduled = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && widget.orderId == orderId) widget.onExit();
+    });
+  }
+
+  @override
+  void dispose() {
+    widget.session.removeListener(_trackingChanged);
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (_returnScheduled) return const SizedBox.shrink();
+    final session = widget.session;
+    final accountIdentity = widget.accountIdentity;
+    final accountAuthenticated = widget.accountAuthenticated;
+    final productId = widget.productId;
+    final ready = widget.ready;
+    final onExit = widget.onExit;
+    final onDestinationChanged = widget.onDestinationChanged;
     final media = MediaQuery.of(context);
     final keyboardVisible = media.viewInsets.bottom > 0;
     final view = View.of(context);
@@ -1979,8 +2151,12 @@ class _StoreProcurementSurface extends StatelessWidget {
                         session: session,
                         accountIdentity: accountIdentity,
                         accountAuthenticated: accountAuthenticated,
-                        initialDestination: BuyV2Destination.wholesale,
-                        initialView: productId == null
+                        initialDestination: widget.orderId == null
+                            ? BuyV2Destination.wholesale
+                            : BuyV2Destination.orders,
+                        initialView: widget.orderId != null
+                            ? BuyV2View.tracking
+                            : productId == null
                             ? BuyV2View.catalogue
                             : BuyV2View.product,
                         productId: productId,
@@ -2895,8 +3071,6 @@ class _StoreControlDashboard extends StatelessWidget {
                       onRestock: onBuyStock,
                       onPurchases: () =>
                           onOpenOperation(_WorkspaceOperation.sourcing),
-                      onDirect: () =>
-                          onOpenOperation(_WorkspaceOperation.direct),
                       onGroup: () =>
                           onOpenOperation(_WorkspaceOperation.groupBuying),
                     ),
@@ -2933,18 +3107,20 @@ class _StoreActionEdge extends StatelessWidget {
     required this.session,
     required this.onRestock,
     required this.onPurchases,
-    required this.onDirect,
     required this.onGroup,
   });
   final WorkSession session;
-  final VoidCallback onRestock, onPurchases, onDirect, onGroup;
+  final VoidCallback onRestock, onPurchases, onGroup;
 
   @override
   Widget build(BuildContext context) {
     final deal = session.activeGroupBuy;
     final normalWidth = MediaQuery.sizeOf(context).width < 360 ? 80.0 : 92.0;
     final readableWidth = MediaQuery.textScalerOf(context).scale(11) > 16
-        ? _storeRailWordWidth(context, 'Restock Buy Direct Group Bulk Buying') +
+        ? _storeRailWordWidth(
+                context,
+                'Restock Track stock Group Bulk Buying',
+              ) +
               20
         : normalWidth;
     return Material(
@@ -2970,35 +3146,17 @@ class _StoreActionEdge extends StatelessWidget {
                     ? '${session.workspaceLowStockCount} low stock'
                     : null,
               ),
-              TextButton(
-                key: const Key('work-incoming-purchases'),
-                onPressed: onPurchases,
-                style: TextButton.styleFrom(
-                  minimumSize: const Size(48, 48),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 2,
-                    vertical: 4,
-                  ),
-                ),
-                child: Text(
-                  session.workspaceIncomingPurchaseCount > 0
-                      ? session.workspacePurchasesComplete
-                            ? '${session.workspaceIncomingPurchaseCount} incoming'
-                            : 'Track ${session.workspaceIncomingPurchaseCount}'
-                      : 'Track purchases',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
               const Divider(height: 24, indent: 16, endIndent: 16),
               _StoreEdgeAction(
-                keyName: 'work-quick-direct',
-                icon: Icons.factory_outlined,
-                label: 'Buy Direct',
-                onTap: onDirect,
+                keyName: 'work-incoming-purchases',
+                icon: Icons.local_shipping_outlined,
+                label: 'Track stock',
+                onTap: onPurchases,
+                detail: session.workspaceIncomingPurchaseCount > 0
+                    ? session.workspacePurchasesComplete
+                          ? '${session.workspaceIncomingPurchaseCount} incoming'
+                          : '${session.workspaceIncomingPurchaseCount} loaded'
+                    : null,
               ),
               const Divider(height: 24, indent: 16, endIndent: 16),
               _StoreEdgeAction(
@@ -8761,9 +8919,14 @@ String _purchaseAmount(int minor) {
 }
 
 class _StorePurchasesSurface extends StatefulWidget {
-  const _StorePurchasesSurface({required this.session, this.statement = false});
+  const _StorePurchasesSurface({
+    required this.session,
+    this.statement = false,
+    this.onTrackPurchase,
+  });
   final WorkSession session;
   final bool statement;
+  final ValueChanged<String>? onTrackPurchase;
 
   @override
   State<_StorePurchasesSurface> createState() => _StorePurchasesSurfaceState();
@@ -9031,7 +9194,14 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 key: record.shipmentId == _lastViewedId ? _returnRowKey : null,
                 child: FilledButton(
                   key: ValueKey('work-purchase-open-${record.shipmentId}'),
-                  onPressed: openPurchase,
+                  onPressed:
+                      record.stage.incoming && widget.onTrackPurchase != null
+                      ? () {
+                          if (session.activeWorkspace?.id != storeId) return;
+                          _lastViewedId = record.shipmentId;
+                          widget.onTrackPurchase!(record.shipmentId);
+                        }
+                      : openPurchase,
                   style: FilledButton.styleFrom(
                     backgroundColor: MoolColors.navy,
                     foregroundColor: Colors.white,
@@ -9604,6 +9774,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.onOpenStore,
     required this.onOpenOperation,
     required this.onOpenRoute,
+    required this.onTrackPurchase,
     this.focusedOrderId,
     this.focusedCustomerId,
   });
@@ -9619,7 +9790,28 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final VoidCallback onOpenStore;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
+  final ValueChanged<String> onTrackPurchase;
   final String? focusedOrderId, focusedCustomerId;
+
+  static String _restockSearch(WorkspaceCatalogueItem product) {
+    final brand = product.brand.trim();
+    final title = product.title.trim();
+    final pack = product.pack.trim();
+    final includesBrand =
+        title.toLowerCase() == brand.toLowerCase() ||
+        title.toLowerCase().startsWith('${brand.toLowerCase()} ');
+    final name = [
+      if (brand.isNotEmpty && !includesBrand) brand,
+      title,
+    ].where((part) => part.isNotEmpty).join(' ');
+    final includesPack =
+        name.toLowerCase() == pack.toLowerCase() ||
+        name.toLowerCase().endsWith(' ${pack.toLowerCase()}');
+    return [
+      name,
+      if (pack.isNotEmpty && !includesPack) pack,
+    ].where((part) => part.isNotEmpty).join(' ');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -9627,7 +9819,10 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _StoreStatementSurface(session: session);
     }
     if (operation == _WorkspaceOperation.sourcing) {
-      return _StorePurchasesSurface(session: session);
+      return _StorePurchasesSurface(
+        session: session,
+        onTrackPurchase: onTrackPurchase,
+      );
     }
     if (operation == _WorkspaceOperation.settings) {
       return ListView(
@@ -9770,7 +9965,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
             queryParameters: {
               'sub': 'wholesale',
               'context': 'wholesale',
-              'search': '${product.brand} ${product.title} ${product.pack}',
+              'search': _restockSearch(product),
             },
           ).toString(),
         ),

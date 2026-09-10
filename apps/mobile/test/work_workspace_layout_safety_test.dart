@@ -10,6 +10,7 @@ import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -513,6 +514,15 @@ void main() {
     }
     expect(finder, findsOneWidget);
     await tester.ensureVisible(finder);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openRetainedManufacturerOffers(WidgetTester tester) async {
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
+    final direct = find.byKey(const Key('work-shortcut-direct'));
+    await reveal(tester, direct);
+    await tester.tap(direct);
     await tester.pumpAndSettle();
   }
 
@@ -1986,7 +1996,7 @@ void main() {
           ('work-pulse-dues', 'Collect dues'),
           ('work-pulse-settlement', 'Settle'),
           ('work-quick-buy', 'Restock'),
-          ('work-quick-direct', 'Buy Direct'),
+          ('work-incoming-purchases', 'Track stock'),
           ('work-quick-group-buy', 'Group Bulk Buying'),
           ('work-quick-store-link', 'Send store link'),
           ('work-quick-promote', 'Promote store'),
@@ -2610,7 +2620,7 @@ void main() {
           )
           .procurementSession;
       buy.chooseFilter('freight');
-      await tester.tap(find.byKey(const Key('work-quick-direct')));
+      await openRetainedManufacturerOffers(tester);
       await tester.pumpAndSettle();
       final restock = find.byKey(const Key('work-shortcut-restock'));
       await reveal(tester, restock);
@@ -2880,7 +2890,7 @@ void main() {
             )
             .procurementSession;
         buy.chooseFilter(filters.$1);
-        await tester.tap(find.byKey(const Key('work-quick-direct')));
+        await openRetainedManufacturerOffers(tester);
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('work-store-buy-direct')), findsOneWidget);
         expect(buy.selectedFilter, 'manufacturer');
@@ -2937,7 +2947,7 @@ void main() {
       if (origin == 'stock') {
         await tester.tap(find.byKey(const Key('work-store-stock')));
       } else if (origin == 'direct') {
-        await tester.tap(find.byKey(const Key('work-quick-direct')));
+        await openRetainedManufacturerOffers(tester);
       }
       await tester.pumpAndSettle();
       final products = List<WorkspaceCatalogueItem>.of(
@@ -6671,7 +6681,7 @@ void main() {
       'Collect dues',
       'Settle',
       'Restock',
-      'Buy Direct',
+      'Track stock',
       'Group Bulk Buying',
       'Send store link',
       'Promote store',
@@ -6682,6 +6692,8 @@ void main() {
       expect(find.text(label).hitTestable(), findsOneWidget, reason: label);
     }
     expect(find.text('Orders'), findsOneWidget);
+    expect(find.text('Buy Direct'), findsNothing);
+    expect(find.byKey(const Key('work-incoming-purchases')), findsOneWidget);
     expect(find.text('More'), findsNothing);
     expect(find.text('Open · Public'), findsNothing);
     expect(find.byKey(const Key('work-dashboard-hero')), findsNothing);
@@ -6701,7 +6713,7 @@ void main() {
     ('work-pulse-dues', 'work-store-dues', '06-collect-dues'),
     ('work-pulse-settlement', 'work-money-destination', '07-settlement'),
     ('work-quick-buy', 'work-store-procurement-screen', '08-restock'),
-    ('work-quick-direct', 'work-store-buy-direct', '09-buy-direct'),
+    ('work-incoming-purchases', '', '09-track-stock'),
     ('work-quick-group-buy', '', '10-group-bulk-buying'),
     ('work-quick-store-link', 'work-store-link', '11-store-link'),
     ('work-quick-promote', 'work-store-offers-screen', '12-promote-store'),
@@ -6737,12 +6749,16 @@ void main() {
       if (entry.$2.isNotEmpty) {
         expect(find.byKey(Key(entry.$2)), findsOneWidget);
       }
+      if (entry.$1 == 'work-incoming-purchases') {
+        expect(find.text('Purchase updates unavailable'), findsOneWidget);
+      }
       if (entry.$1 != 'work-quick-requirement') {
         final expectedTab = switch (entry.$1) {
           'work-store-orders' => 'orders',
           'work-store-sell' => 'sell',
           'work-store-stock' ||
           'work-quick-buy' ||
+          'work-incoming-purchases' ||
           'work-quick-group-buy' => 'stock',
           _ => 'store',
         };
@@ -11898,7 +11914,7 @@ void main() {
     );
     for (final key in [
       'work-quick-buy',
-      'work-quick-direct',
+      'work-incoming-purchases',
       'work-quick-group-buy',
       'work-pulse-sales',
       'work-pulse-settlement',
@@ -13464,7 +13480,11 @@ void main() {
           .isHidden,
       isFalse,
     );
-    expect(find.text('Wholesale and Bulk'), findsWidgets);
+    expect(find.text('Wholesale and Bulk'), findsNothing);
+    final storeName = find.byKey(const Key('work-procurement-store-name'));
+    expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
+    expect(tester.widget<Text>(storeName).maxLines, isNull);
+    expect(tester.widget<AppBar>(find.byType(AppBar).first).toolbarHeight, 48);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -14892,12 +14912,135 @@ void main() {
               complete: true,
             );
         expect(apply(1, [for (var i = 0; i < 4; i++) offer(i)]), isTrue);
+        final selectedCustomerOrder = work.currentWorkspaceOrderId;
+        work.workspacePackedProductIds.add('summary-0');
+        final packedBefore = work.workspacePackedProductIds.toSet();
+        final now = DateTime.now();
+        for (var i = 1; i < 100; i++) {
+          work.workspaceOrders.add(
+            customerOrder(
+              id: 'MIX-$i',
+              customer: 'Customer $i',
+              createdAt: now,
+              stage: i < 30
+                  ? 'Confirmed'
+                  : i < 60
+                  ? 'Preparing'
+                  : i < 80
+                  ? 'Ready'
+                  : 'Out for delivery',
+            ),
+          );
+        }
+        final customerStates = work.workspaceOrders
+            .map((order) => (order.id, order.stage, order.payment))
+            .toList();
+        WorkspacePurchaseRecord incoming(int i, int revision) =>
+            WorkspacePurchaseRecord(
+              accountScope: 'review-draft-account',
+              workspaceId: store,
+              supplierId: 'wholesaler-$i',
+              supplierName: 'Wholesale supplier $i',
+              orderId: 'PO-MIX-$i',
+              shipmentId: 'SHIP-MIX-$i',
+              revision: revision,
+              createdAt: now,
+              updatedAt: now.add(Duration(seconds: revision)),
+              stage: revision > 1 && i == 7
+                  ? WorkspaceSupplyStage.delayed
+                  : WorkspaceSupplyStage.dispatched,
+              amountMinor: 550000,
+              itemSummary: 'Sunflower oil · 1 l × 100 packs',
+              paymentLabel: 'Paid online',
+              expectedArrival: revision > 1 && i == 7
+                  ? 'Updated arrival awaited'
+                  : 'Tomorrow, 10 am–12 pm',
+              lines: [
+                WorkspacePurchaseLine(
+                  id: 'LINE-MIX-$i',
+                  productId: 'oil-fortune-1l',
+                  name: 'Sunflower oil',
+                  pack: '1 l',
+                  orderedPacks: 100,
+                  unitPriceMinor: 5500,
+                ),
+              ],
+            );
+        bool applyIncoming(int revision) => work.applyWorkspacePurchases(
+          accountScope: 'review-draft-account',
+          storeId: store,
+          feedRevision: revision,
+          records: [for (var i = 0; i < 8; i++) incoming(i, revision)],
+          complete: true,
+        );
+        WorkspaceFinanceSnapshot finance(int revision) =>
+            WorkspaceFinanceSnapshot(
+              accountScope: 'review-draft-account',
+              workspaceId: store,
+              revision: revision,
+              asOf: now.add(Duration(seconds: revision)),
+              salesTodayMinor: 146800,
+              duesMinor: 0,
+              availableMinor: 500000,
+              heldMinor: 20000,
+              requestedMinor: revision == 1 ? 100000 : 0,
+              paidOutMinor: revision == 1 ? 0 : 100000,
+              feesMinor: 0,
+              deliveryAdjustmentsMinor: 0,
+              refundsMinor: 0,
+              taxWithheldMinor: 0,
+              payments: const [],
+              payouts: [
+                for (var i = 0; i < 2; i++)
+                  WorkspacePayoutRecord(
+                    id: 'SET-MIX-$i',
+                    operationId: 'SET-OP-MIX-$i',
+                    revision: revision,
+                    amountMinor: 50000,
+                    updatedAt: now.add(Duration(seconds: revision)),
+                    state: revision == 1
+                        ? WorkspacePayoutState.processing
+                        : WorkspacePayoutState.paid,
+                  ),
+              ],
+            );
+        expect(applyIncoming(1), isTrue);
+        expect(work.applyWorkspaceFinance(finance(1)), isTrue);
         await mount(
           tester,
           route: '/app/work/workspace/dashboard',
           work: work,
           viewport: viewport,
           textScale: scale,
+        );
+        expect(
+          work.visibleWorkspaceOrders.where((order) => !order.isClosed),
+          hasLength(100),
+        );
+        for (final (stage, count) in [
+          ('Confirmed', 30),
+          ('Preparing', 30),
+          ('Ready', 20),
+          ('Out for delivery', 20),
+        ]) {
+          expect(
+            work.visibleWorkspaceOrders.where((order) => order.stage == stage),
+            hasLength(count),
+          );
+        }
+        expect(
+          work.visibleWorkspaceOrders
+              .where((order) => order.isClosed)
+              .map((order) => order.id),
+          ['SALE-1042'],
+        );
+        expect(work.workspacePurchases, hasLength(8));
+        expect(work.workspaceFinance!.payouts, hasLength(2));
+        expect(work.workspaceGroupOffers, hasLength(4));
+        expect(work.currentWorkspaceOrderId, selectedCustomerOrder);
+        await captureStoreView(
+          tester,
+          'group-mixed-dashboard-$stockViewSuffix',
         );
         await tester.ensureVisible(
           find.byKey(const Key('work-quick-group-buy')),
@@ -14919,6 +15062,43 @@ void main() {
         await tester.pumpAndSettle();
         expect(work.selectedWorkspaceGroupOfferId, 'offer-1');
         expect(find.text('Marwar Wholesale · Wholesaler'), findsOneWidget);
+        final switcherBefore = tester.getRect(
+          find.byKey(const Key('work-group-offer-switch')),
+        );
+        expect(applyIncoming(2), isTrue);
+        expect(work.applyWorkspaceFinance(finance(2)), isTrue);
+        expect(applyIncoming(1), isFalse);
+        expect(work.applyWorkspaceFinance(finance(1)), isFalse);
+        expect(applyIncoming(2), isFalse);
+        expect(work.applyWorkspaceFinance(finance(2)), isFalse);
+        await tester.pumpAndSettle();
+        expect(work.selectedWorkspaceGroupOfferId, 'offer-1');
+        expect(work.currentWorkspaceOrderId, selectedCustomerOrder);
+        expect(work.workspacePackedProductIds, unorderedEquals(packedBefore));
+        expect(
+          work.workspaceOrders
+              .map((order) => (order.id, order.stage, order.payment))
+              .toList(),
+          customerStates,
+        );
+        expect(work.workspaceFinance!.salesTodayMinor, 146800);
+        expect(work.workspaceFinance!.paidOutMinor, 100000);
+        expect(work.workspaceFinance!.payouts, hasLength(2));
+        expect(work.workspacePurchases, hasLength(8));
+        expect(
+          work.workspacePurchases
+              .singleWhere((purchase) => purchase.shipmentId == 'SHIP-MIX-7')
+              .stage,
+          WorkspaceSupplyStage.delayed,
+        );
+        expect(work.workspaceInvoices, hasLength(invoiceCount));
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(
+          tester.getRect(find.byKey(const Key('work-group-offer-switch'))),
+          switcherBefore,
+        );
+        expect(tester.takeException(), isNull);
+        await captureStoreView(tester, 'group-mixed-updates-$stockViewSuffix');
         expect(
           apply(2, [offer(3, revision: 2), offer(2), offer(1), offer(0)]),
           isTrue,
@@ -15418,52 +15598,151 @@ void main() {
     await captureStoreView(tester, 'stock-five-thousand-products');
   });
 
-  testWidgets('stock statement returns from exact Wholesale recommendation', (
-    tester,
-  ) async {
-    final work = liveStore();
-    work.updateWorkspaceStock(
-      productId: 'oil-fortune-1l',
-      quantity: 3,
-      reason: 'Counted in store',
-    );
-    await mount(
+  for (final (scale, viewport) in [
+    (1.0, const Size(412, 915)),
+    (2.0, const Size(320, 568)),
+  ]) {
+    testWidgets('DASH10 restock search retains product cart and Back $scale', (
       tester,
-      route: '/app/work/workspace/dashboard',
-      work: work,
-      viewport: const Size(412, 915),
-    );
-    await tester.tap(find.byKey(const Key('work-store-stock')));
-    await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const Key('work-catalogue-stock-statement')));
-    await tester.pumpAndSettle();
+    ) async {
+      final work = liveStore();
+      work.addOrUpdateWorkspaceProduct(workspaceMasterCatalogue.first);
+      expect(
+        work.updateWorkspaceStock(
+          productId: 'oil-fortune-1l',
+          quantity: 3,
+          reason: 'Counted in store',
+        ),
+        isTrue,
+      );
+      work.workspaceCatalogueItems.add(catalogueProduct(3, stock: 2));
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: viewport,
+        textScale: scale,
+      );
+      final buy = tester
+          .widget<WorkWorkspaceDashboardScreen>(
+            find.byType(WorkWorkspaceDashboardScreen),
+          )
+          .procurementSession;
+      buy.openDestination(BuyV2Destination.wholesale);
+      final cartProduct = buy.visibleProducts.first;
+      expect(buy.addProduct(cartProduct.id), isTrue);
+      final cartQuantity = buy.quantityFor(cartProduct.id);
+      buy.chooseFilter('nearby');
+      buy.updateQuery('previous purchase search');
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-catalogue-stock-statement')));
+      await tester.pumpAndSettle();
 
-    expect(
-      find.byKey(const Key('work-stock-statement-screen')),
-      findsOneWidget,
-    );
-    expect(find.text('3'), findsWidgets);
-    expect(
-      find.byKey(const Key('work-stock-position-oil-fortune-1l')),
-      findsOneWidget,
-    );
-    await tester.tap(
-      find.byKey(const Key('work-stock-restock-oil-fortune-1l')),
-    );
-    await tester.pump(const Duration(milliseconds: 700));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('work-store-procurement-screen')),
-      findsOneWidget,
-    );
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('work-stock-statement-screen')),
-      findsOneWidget,
-    );
-    expect(tester.takeException(), isNull);
-  });
+      expect(
+        find.byKey(const Key('work-stock-statement-screen')),
+        findsOneWidget,
+      );
+      final oilRow = find.byKey(
+        const Key('work-stock-position-oil-fortune-1l'),
+      );
+      await reveal(tester, oilRow);
+      expect(
+        find.descendant(
+          of: oilRow,
+          matching: find.textContaining('3 available'),
+        ),
+        findsOneWidget,
+      );
+      final oilRestock = find.byKey(
+        const Key('work-stock-restock-oil-fortune-1l'),
+      );
+      await reveal(tester, oilRestock);
+      await tester.tap(oilRestock);
+      await tester.pump(const Duration(milliseconds: 700));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-store-procurement-screen')),
+        findsOneWidget,
+      );
+      const oilQuery = 'Fortune Sunflower Oil 1 L pouch';
+      expect(find.text('Wholesale and Bulk'), findsNothing);
+      final storeName = find.byKey(const Key('work-procurement-store-name'));
+      expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
+      expect(tester.widget<Text>(storeName).maxLines, isNull);
+      expect(tester.widget<Text>(storeName).textScaler!.scale(1), scale);
+      expect(
+        tester.renderObject<RenderParagraph>(storeName).didExceedMaxLines,
+        isFalse,
+      );
+      expect(
+        tester.widget<AppBar>(find.byType(AppBar).first).toolbarHeight,
+        closeTo(
+          (tester.getSize(storeName).height + 16).clamp(48.0, double.infinity),
+          1,
+        ),
+        reason:
+            'The Store header must fit its actual text without empty height. '
+            'Size=${tester.getSize(storeName)}; '
+            'widget=${tester.widget<Text>(storeName).style}; '
+            'rendered=${tester.renderObject<RenderParagraph>(storeName).text.style}',
+      );
+      expect(
+        tester.getSize(find.byKey(const Key('work-back'))).height,
+        greaterThanOrEqualTo(48),
+      );
+      expect(buy.query, oilQuery);
+      expect(buy.destination, BuyV2Destination.wholesale);
+      expect(buy.selectedFilter, 'nearby');
+      expect(buy.quantityFor(cartProduct.id), cartQuantity);
+      final searchControl = find.byKey(const ValueKey('buy-search-control'));
+      expect(
+        find.descendant(of: searchControl, matching: find.text(oilQuery)),
+        findsOneWidget,
+      );
+      await captureStoreView(tester, 'restock-product-search-$scale');
+      await tester.tap(searchControl);
+      await tester.pumpAndSettle();
+      final search = find.byKey(const ValueKey('buy-search-field'));
+      expect(tester.widget<TextField>(search).controller!.text, oilQuery);
+      await tester.enterText(search, 'sunflower oil');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      await tester.pumpAndSettle();
+      expect(buy.query, 'sunflower oil');
+      expect(buy.quantityFor(cartProduct.id), cartQuantity);
+      expect(find.byKey(const Key('work-local-navigation')), findsNothing);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'restock-search-keyboard-$scale');
+      tester.view.viewInsets = FakeViewPadding.zero;
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-back')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-stock-statement-screen')),
+        findsOneWidget,
+      );
+      expect(buy.query, 'sunflower oil');
+      final secondRestock = find.byKey(
+        const Key('work-stock-restock-store-product-3'),
+      );
+      await reveal(tester, secondRestock);
+      await tester.tap(secondRestock);
+      await tester.pumpAndSettle();
+      expect(buy.query, 'Store Brand Daily grocery product 3 4 kg pack');
+      expect(buy.quantityFor(cartProduct.id), cartQuantity);
+      expect(buy.selectedFilter, 'nearby');
+      await captureStoreView(tester, 'restock-second-product-search-$scale');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-stock-statement-screen')),
+        findsOneWidget,
+      );
+      expect(buy.quantityFor(cartProduct.id), cartQuantity);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets(
     'five catalogue rows remain visible in the normal Store viewport',
@@ -16282,7 +16561,7 @@ void main() {
         await captureStoreView(tester, 'supply-first-view-$scale');
         final row = find.byKey(const Key('work-purchase-open-SHIP-7'));
         await reveal(tester, row);
-        await tester.tap(row);
+        await tester.tap(find.text('Supplier 7'));
         await tester.pumpAndSettle();
         expect(find.text('Order PO-7'), findsOneWidget);
         expect(find.text('Supplier 7'), findsOneWidget);
@@ -17155,7 +17434,7 @@ void main() {
         await tester.pumpAndSettle();
         final shipment = find.byKey(const Key('work-purchase-open-SHIP-22'));
         await reveal(tester, shipment);
-        await tester.tap(shipment);
+        await tester.tap(find.text('Jodhpur Wholesale'));
         await tester.pumpAndSettle();
         final supplierReview = find.byKey(
           const Key('work-issue-review-SUPPLIER-CASE'),
@@ -17514,6 +17793,208 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('DASH07 reused Buy tracking stays in Store $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final storeId = work.activeWorkspace!.id;
+      final originalCustomerOrder = work.currentWorkspaceOrderId;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      final buy = tester
+          .widget<WorkWorkspaceDashboardScreen>(
+            find.byType(WorkWorkspaceDashboardScreen),
+          )
+          .procurementSession;
+      final order = buy.orders.firstWhere(
+        (order) => order.destination == BuyV2Destination.wholesale,
+      );
+      final now = DateTime.now();
+      final linked = WorkspacePurchaseRecord.fromBuyOrder(
+        order: order,
+        accountScope: 'review-draft-account',
+        workspaceId: storeId,
+        supplierId: 'verified-supplier-workspace',
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+      );
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: linked.accountScope,
+          storeId: storeId,
+          feedRevision: 1,
+          records: [linked],
+          complete: true,
+        ),
+        isTrue,
+      );
+      final cartProduct = buy.visibleProducts.first;
+      expect(buy.addProduct(cartProduct.id), isTrue);
+      final cartBefore = buy.quantityFor(cartProduct.id);
+      final totalBefore = buy.cartTotal;
+      final filterBefore = buy.selectedFilter;
+      await reveal(tester, find.byKey(const Key('work-incoming-purchases')));
+      await tester.tap(find.byKey(const Key('work-incoming-purchases')));
+      await tester.pumpAndSettle();
+      final track = find.byKey(
+        ValueKey('work-purchase-open-${linked.shipmentId}'),
+      );
+      await reveal(tester, track);
+      await tester.tap(track);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+      expect(buy.view, BuyV2View.tracking);
+      expect(buy.selectedOrderId, linked.orderId);
+      expect(work.currentWorkspaceOrderId, originalCustomerOrder);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      await captureStoreView(tester, 'supply-reused-tracking-$scale');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-v2-screen')), findsNothing);
+      expect(
+        find.byKey(PageStorageKey('work-purchases-$storeId-false')),
+        findsOneWidget,
+      );
+      expect(buy.quantityFor(cartProduct.id), cartBefore);
+      expect(buy.cartTotal, totalBefore);
+      expect(buy.selectedFilter, filterBefore);
+      expect(work.currentWorkspaceOrderId, originalCustomerOrder);
+      expect(track.hitTestable(), findsOneWidget);
+      await reveal(tester, track);
+      await tester.tap(track);
+      await tester.pumpAndSettle();
+      work.activeWorkspace = const WorkWorkspace(
+        id: 'other-store',
+        name: 'Second Store',
+        profileId: 'retailer-grocery',
+        profileLabel: 'Grocery',
+        area: 'Market',
+        verified: true,
+      );
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: linked.accountScope,
+          storeId: 'other-store',
+          feedRevision: 1,
+          records: const [],
+          complete: true,
+        ),
+        isTrue,
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-v2-screen')), findsNothing);
+      expect(find.text('Purchase tracking unavailable'), findsOneWidget);
+      if (scale == 1) {
+        expect(
+          tester
+              .getSize(find.byKey(const Key('work-tracking-unavailable')))
+              .height,
+          lessThan(300),
+        );
+      }
+      await captureStoreView(tester, 'supply-tracking-scope-changed-$scale');
+      final returnAction = find.byKey(
+        const Key('work-tracking-unavailable-action'),
+      );
+      await reveal(tester, returnAction);
+      expect(returnAction.hitTestable(), findsOneWidget);
+      await tester.tap(returnAction);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(PageStorageKey('work-purchases-other-store-false')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const ValueKey('buy-v2-screen')), findsNothing);
+      expect(work.workspacePurchases, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final mismatch in [
+    'missing-order',
+    'retail-order',
+    'purchase',
+    'shipment',
+  ]) {
+    testWidgets('DASH07 tracking refuses $mismatch', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final storeId = work.activeWorkspace!.id;
+      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      final buy = tester
+          .widget<WorkWorkspaceDashboardScreen>(
+            find.byType(WorkWorkspaceDashboardScreen),
+          )
+          .procurementSession;
+      final order = buy.orders.firstWhere(
+        (order) =>
+            order.destination ==
+            (mismatch == 'retail-order'
+                ? BuyV2Destination.shop
+                : BuyV2Destination.wholesale),
+      );
+      final orderId = mismatch == 'missing-order' ? 'UNLINKED' : order.id;
+      final now = DateTime.now();
+      final record = WorkspacePurchaseRecord(
+        accountScope: 'review-draft-account',
+        workspaceId: storeId,
+        supplierId: 'supplier-A',
+        supplierName: 'Supplier A',
+        orderId: orderId,
+        shipmentId: mismatch == 'shipment' ? '$orderId-part-2' : orderId,
+        purchaseId: mismatch == 'purchase'
+            ? 'different-purchase'
+            : order.purchaseId,
+        revision: 1,
+        createdAt: now,
+        updatedAt: now,
+        stage: WorkspaceSupplyStage.dispatched,
+        amountMinor: 15500,
+        itemSummary: 'Sunflower oil',
+        paymentLabel: 'Payment update unavailable',
+        lines: const [],
+      );
+      expect(
+        work.applyWorkspacePurchases(
+          accountScope: record.accountScope,
+          storeId: storeId,
+          feedRevision: 1,
+          records: [record],
+          complete: true,
+        ),
+        isTrue,
+      );
+      final originalBuyOrder = buy.selectedOrderId;
+      final originalStoreOrder = work.currentWorkspaceOrderId;
+      await reveal(tester, find.byKey(const Key('work-incoming-purchases')));
+      await tester.tap(find.byKey(const Key('work-incoming-purchases')));
+      await tester.pumpAndSettle();
+      final track = find.byKey(
+        ValueKey('work-purchase-open-${record.shipmentId}'),
+      );
+      await reveal(tester, track);
+      await tester.tap(track);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const ValueKey('buy-v2-screen')), findsNothing);
+      expect(
+        find.byKey(PageStorageKey('work-purchases-$storeId-false')),
+        findsOneWidget,
+      );
+      expect(buy.selectedOrderId, originalBuyOrder);
+      expect(work.currentWorkspaceOrderId, originalStoreOrder);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   for (final action in ['Call', 'WhatsApp']) {
