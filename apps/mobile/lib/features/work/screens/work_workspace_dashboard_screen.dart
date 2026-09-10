@@ -13776,6 +13776,12 @@ class _WorkspaceGroupOffersSurface extends StatelessWidget {
   final WorkSession session;
 
   Future<void> _choose(BuildContext context) async {
+    final origin = session.workspaceGroupOffers.firstOrNull;
+    if (origin == null) return;
+    bool matchesScope() => session.matchesWorkspaceGroupScope(
+      accountScope: origin.accountScope,
+      storeId: origin.workspaceId,
+    );
     final id = await showModalBottomSheet<String>(
       context: context,
       useSafeArea: true,
@@ -13792,30 +13798,46 @@ class _WorkspaceGroupOffersSurface extends StatelessWidget {
             shrinkWrap: true,
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             children: [
-              for (final offer in session.workspaceGroupOffers)
-                ListTile(
-                  key: ValueKey('work-group-choose-${offer.id}'),
-                  contentPadding: EdgeInsets.zero,
-                  title: Text(
-                    offer.details.productName,
-                    style: const TextStyle(fontWeight: FontWeight.w800),
+              if (!matchesScope())
+                const Text(
+                  'Your workspace changed. Close this list and reopen offers.',
+                  key: Key('work-group-chooser-scope-changed'),
+                )
+              else ...[
+                for (final offer in session.workspaceGroupOffers)
+                  ListTile(
+                    key: ValueKey('work-group-choose-${offer.id}'),
+                    contentPadding: EdgeInsets.zero,
+                    title: Text(
+                      offer.details.productName,
+                      style: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    subtitle: Text(
+                      '${offer.supplierName} · ${offer.supplierType.label}\n${offer.stage.label}',
+                    ),
+                    trailing: offer.id == session.selectedWorkspaceGroupOfferId
+                        ? const Icon(Icons.check_circle, color: MoolColors.navy)
+                        : const Icon(Icons.chevron_right),
+                    onTap: () {
+                      if (!context.mounted || !matchesScope()) return;
+                      Navigator.pop(context, offer.id);
+                    },
                   ),
-                  subtitle: Text(
-                    '${offer.supplierName} · ${offer.supplierType.label}\n${offer.stage.label}',
-                  ),
-                  trailing: offer.id == session.selectedWorkspaceGroupOfferId
-                      ? const Icon(Icons.check_circle, color: MoolColors.navy)
-                      : const Icon(Icons.chevron_right),
-                  onTap: () => Navigator.pop(context, offer.id),
-                ),
-              if (session.workspaceGroupOffers.isEmpty)
-                const Text('No group offers available.'),
+                if (session.workspaceGroupOffers.isEmpty)
+                  const Text('No group offers available.'),
+              ],
             ],
           ),
         ),
       ),
     );
-    if (id != null) session.selectWorkspaceGroupOffer(id);
+    if (id != null) {
+      session.selectWorkspaceGroupOffer(
+        id,
+        accountScope: origin.accountScope,
+        storeId: origin.workspaceId,
+      );
+    }
   }
 
   static String _date(DateTime value) {

@@ -477,7 +477,14 @@ void main() {
         for (final id in ['A', 'B', 'C', 'D']) _groupOffer(id),
       ];
       expect(apply(1, records), isTrue);
-      expect(work.selectWorkspaceGroupOffer('B'), isTrue);
+      expect(
+        work.selectWorkspaceGroupOffer(
+          'B',
+          accountScope: 'account-A',
+          storeId: 'group-store',
+        ),
+        isTrue,
+      );
       expect(
         apply(2, [
           records[3],
@@ -554,6 +561,46 @@ void main() {
       expect(work.workspaceGroupOffers, isEmpty);
       expect(work.selectedWorkspaceGroupOffer, isNull);
       expect(apply(7, records), isFalse);
+      expect(
+        work.applyWorkspaceGroupOffers(
+          accountScope: 'account-B',
+          storeId: 'group-store',
+          feedRevision: 1,
+          records: [
+            _groupOffer('A', account: 'account-B'),
+            _groupOffer('B', account: 'account-B'),
+          ],
+          complete: true,
+        ),
+        isTrue,
+      );
+      expect(
+        work.selectWorkspaceGroupOffer(
+          'B',
+          accountScope: 'account-A',
+          storeId: 'group-store',
+        ),
+        isFalse,
+      );
+      expect(work.selectedWorkspaceGroupOfferId, 'A');
+      expect(
+        work.selectWorkspaceGroupOffer(
+          'B',
+          accountScope: 'account-B',
+          storeId: 'another-store',
+        ),
+        isFalse,
+      );
+      expect(work.selectedWorkspaceGroupOfferId, 'A');
+      expect(
+        work.selectWorkspaceGroupOffer(
+          'B',
+          accountScope: 'account-B',
+          storeId: 'group-store',
+        ),
+        isTrue,
+      );
+      expect(work.selectedWorkspaceGroupOfferId, 'B');
     },
   );
   test(

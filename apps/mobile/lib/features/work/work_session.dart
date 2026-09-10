@@ -2216,8 +2216,24 @@ class WorkSession extends ChangeNotifier {
       ? _storeData.groupOffers[_storeData.selectedGroupOfferId]
       : null;
 
-  bool selectWorkspaceGroupOffer(String id) {
-    if (!workspaceGroupOffersConnected ||
+  bool matchesWorkspaceGroupScope({
+    required String accountScope,
+    required String storeId,
+  }) =>
+      !_disposed &&
+      workspaceGroupOffersConnected &&
+      accountScope == _contactAccountScope &&
+      storeId == activeWorkspace?.id;
+
+  bool selectWorkspaceGroupOffer(
+    String id, {
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (!matchesWorkspaceGroupScope(
+          accountScope: accountScope,
+          storeId: storeId,
+        ) ||
         !_storeData.groupOffers.containsKey(id)) {
       return false;
     }

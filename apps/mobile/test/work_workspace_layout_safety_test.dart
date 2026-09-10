@@ -14799,85 +14799,90 @@ void main() {
     testWidgets(
       'DASH11 scoped supplier offers selection states and Back $stockViewSuffix',
       (tester) async {
-        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final contact = _ContactDraftFixtureStore();
+        final work = storeViewFixture(null, contact);
         final store = work.activeWorkspace!.id;
         final invoiceCount = work.workspaceInvoices.length;
-        WorkspaceGroupOffer offer(int index, {int revision = 1}) =>
-            WorkspaceGroupOffer(
-              accountScope: 'review-draft-account',
-              workspaceId: store,
-              supplierId: 'supplier-$index',
-              supplierName: [
-                'Jodhpur Mandi',
-                'Marwar Wholesale',
-                'Factory Direct',
-                'Market Wholesale',
-              ][index],
-              supplierType: [
-                WorkspaceStockSupplierType.mandi,
-                WorkspaceStockSupplierType.wholesaler,
-                WorkspaceStockSupplierType.manufacturer,
-                WorkspaceStockSupplierType.wholesaler,
-              ][index],
-              productId: 'product-$index',
-              revision: revision,
-              updatedAt: DateTime.utc(2026, 9, 10, 12, 0, revision),
-              closingAt: DateTime.utc(2026, 9, 12),
-              stage: index == 3
-                  ? WorkspaceGroupOfferStage.cancelled
-                  : WorkspaceGroupOfferStage.secured,
-              publicationConfirmed: true,
-              participation: index == 0
-                  ? const WorkspaceGroupParticipation(
-                      state: WorkspaceGroupParticipationState.notJoined,
-                    )
-                  : const WorkspaceGroupParticipation(
-                      state: WorkspaceGroupParticipationState.balanceDue,
-                      quantity: 10,
-                      goodsMinor: 14000,
-                      tradeFeeMinor: 500,
-                      deliveryMinor: 0,
-                      taxMinor: 0,
-                      totalMinor: 14500,
-                      referenceMinor: 18000,
-                      paidMinor: 5000,
-                      dueMinor: 9500,
-                    ),
-              details: WorkspaceGroupBuy(
-                id: 'offer-$index',
-                productName: [
-                  'Red onions',
-                  'Premium rice',
-                  'Whole wheat atta',
-                  'Cooking oil',
-                ][index],
-                specification: index == 3
-                    ? 'Refined oil · sealed 5 kg tins'
-                    : 'Grade A · sealed 5 kg bags',
-                leadRetailer: 'Shree Grocery',
-                confirmedRetailers: const ['Shree Grocery'],
-                targetQuantity: 1000,
-                securedQuantity: 300,
+        WorkspaceGroupOffer offer(
+          int index, {
+          int revision = 1,
+          String? scopeStore,
+          String account = 'review-draft-account',
+        }) => WorkspaceGroupOffer(
+          accountScope: account,
+          workspaceId: scopeStore ?? store,
+          supplierId: 'supplier-$index',
+          supplierName: [
+            'Jodhpur Mandi',
+            'Marwar Wholesale',
+            'Factory Direct',
+            'Market Wholesale',
+          ][index],
+          supplierType: [
+            WorkspaceStockSupplierType.mandi,
+            WorkspaceStockSupplierType.wholesaler,
+            WorkspaceStockSupplierType.manufacturer,
+            WorkspaceStockSupplierType.wholesaler,
+          ][index],
+          productId: 'product-$index',
+          revision: revision,
+          updatedAt: DateTime.utc(2026, 9, 10, 12, 0, revision),
+          closingAt: DateTime.utc(2026, 9, 12),
+          stage: index == 3
+              ? WorkspaceGroupOfferStage.cancelled
+              : WorkspaceGroupOfferStage.secured,
+          publicationConfirmed: true,
+          participation: index == 0
+              ? const WorkspaceGroupParticipation(
+                  state: WorkspaceGroupParticipationState.notJoined,
+                )
+              : const WorkspaceGroupParticipation(
+                  state: WorkspaceGroupParticipationState.balanceDue,
+                  quantity: 10,
+                  goodsMinor: 14000,
+                  tradeFeeMinor: 500,
+                  deliveryMinor: 0,
+                  taxMinor: 0,
+                  totalMinor: 14500,
+                  referenceMinor: 18000,
+                  paidMinor: 5000,
+                  dueMinor: 9500,
+                ),
+          details: WorkspaceGroupBuy(
+            id: 'offer-$index',
+            productName: [
+              'Red onions',
+              'Premium rice',
+              'Whole wheat atta',
+              'Cooking oil',
+            ][index],
+            specification: index == 3
+                ? 'Refined oil · sealed 5 kg tins'
+                : 'Grade A · sealed 5 kg bags',
+            leadRetailer: 'Shree Grocery',
+            confirmedRetailers: const ['Shree Grocery'],
+            targetQuantity: 1000,
+            securedQuantity: 300,
+            unitLabel: 'kg',
+            regularUnitPrice: 18,
+            groupUnitPrice: 14,
+            facilitationFee: 600,
+            deliveryFee: 200,
+            confirmationAmount: 3000,
+            closingLabel: '12 Sep',
+            storeDeliveryLabel: '14 Sep',
+            paymentConfirmed: true,
+            participants: const [
+              WorkspaceGroupBuyParticipant(
+                businessName: 'Shree Grocery',
+                locality: 'Market road',
+                quantity: 50,
                 unitLabel: 'kg',
-                regularUnitPrice: 18,
-                groupUnitPrice: 14,
-                facilitationFee: 600,
-                deliveryFee: 200,
-                confirmationAmount: 3000,
-                closingLabel: '12 Sep',
-                storeDeliveryLabel: '14 Sep',
-                paymentConfirmed: true,
-                participants: const [
-                  WorkspaceGroupBuyParticipant(
-                    businessName: 'Shree Grocery',
-                    locality: 'Market road',
-                    quantity: 50,
-                    unitLabel: 'kg',
-                    milestone: 'Confirmed',
-                  ),
-                ],
+                milestone: 'Confirmed',
               ),
-            );
+            ],
+          ),
+        );
         bool apply(int revision, List<WorkspaceGroupOffer> offers) =>
             work.applyWorkspaceGroupOffers(
               accountScope: 'review-draft-account',
@@ -15036,6 +15041,76 @@ void main() {
         expect(emptyScroll.position.pixels, 0);
         await captureStoreView(tester, 'group-offers-empty-$stockViewSuffix');
         expect(work.workspaceInvoices.length, invoiceCount);
+        expect(
+          apply(5, [offer(0, revision: 2), offer(1, revision: 2)]),
+          isTrue,
+        );
+        await tester.pumpAndSettle();
+        for (final change in ['account', 'store']) {
+          await tester.tap(find.byKey(const Key('work-group-offer-switch')));
+          await tester.pumpAndSettle();
+          final retainedChoice = tester
+              .widget<ListTile>(
+                find.byKey(const Key('work-group-choose-offer-1')),
+              )
+              .onTap!;
+          if (change == 'account') {
+            contact.accountScope = 'replacement-account';
+          } else {
+            work.activeWorkspace = const WorkWorkspace(
+              id: 'replacement-store',
+              name: 'Second Store',
+              profileId: 'retailer-grocery',
+              profileLabel: 'Grocery',
+              area: 'Market',
+              verified: true,
+            );
+          }
+          final newStore = work.activeWorkspace!.id;
+          expect(
+            work.applyWorkspaceGroupOffers(
+              accountScope: contact.accountScope,
+              storeId: newStore,
+              feedRevision: 1,
+              records: [
+                for (var i = 0; i < 2; i++)
+                  offer(i, scopeStore: newStore, account: contact.accountScope),
+              ],
+              complete: true,
+            ),
+            isTrue,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-group-chooser-scope-changed')),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: find.byKey(const Key('work-group-offer-choices')),
+              matching: find.byType(ListTile),
+            ),
+            findsNothing,
+          );
+          retainedChoice();
+          await tester.pumpAndSettle();
+          expect(work.selectedWorkspaceGroupOfferId, 'offer-0');
+          expect(
+            find.byKey(const Key('work-group-chooser-scope-changed')),
+            findsOneWidget,
+          );
+          await captureStoreView(
+            tester,
+            'group-chooser-$change-changed-$stockViewSuffix',
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-group-chooser-scope-changed')),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+        }
         expect(tester.takeException(), isNull);
       },
     );
@@ -19080,7 +19155,7 @@ class _StockHistoryFixtureGateway implements WorkStockHistoryGateway {
 
 class _ContactDraftFixtureStore implements WorkPendingProofStore {
   @override
-  String get accountScope => 'review-draft-account';
+  String accountScope = 'review-draft-account';
   Map<String, Object?>? value;
   @override
   Future<Map<String, Object?>?> read(String scope) async => value;
