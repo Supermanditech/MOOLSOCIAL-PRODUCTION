@@ -722,6 +722,10 @@ class WorkSession extends ChangeNotifier {
   WorkOrderOperationState? workspaceOrderOperationState(String orderId) =>
       _scopedOrderOperations?.state(orderId);
 
+  bool workspaceOrderHasTimeRequest(String orderId) =>
+      _scopedOrderOperations?.pending(orderId)?.action ==
+      WorkOrderAction.requestTime;
+
   /// Called by the authenticated Store adapter, not by a route or a review
   /// status label. Session owns the controller after successful binding.
   bool bindWorkspaceOrderOperations(WorkOrderOperations operations) {
@@ -869,22 +873,71 @@ class WorkSession extends ChangeNotifier {
       _orderTimeAccountScope == _contactAccountScope &&
       _pendingOrderTime!.workspaceId == (activeWorkspace?.id ?? workspaceId);
 
-  int? get pendingOrderTimeMinutes =>
-      hasPendingOrderTime ? _pendingOrderTime!.additionalMinutes : null;
+  int? get pendingOrderTimeMinutes => hasPendingOrderTime
+      ? _pendingOrderTime!.additionalMinutes
+      : _scopedOrderOperations
+            ?.pending(currentWorkspaceOrderId ?? '')
+            ?.additionalMinutes;
+
+  // The legacy global lock remains separate; a scoped A must not lock B.
+  bool get hasPendingCurrentOrderTime =>
+      hasPendingOrderTime ||
+      workspaceOrderHasTimeRequest(currentWorkspaceOrderId ?? '');
+
+  bool get orderTimeRequestBusy =>
+      busy ||
+      (workspaceOrderHasTimeRequest(currentWorkspaceOrderId ?? '') &&
+          workspaceOrderOperationState(currentWorkspaceOrderId ?? '') !=
+              WorkOrderOperationState.uncertain);
 
   bool get orderTimeServiceAvailable =>
-      gateway is WorkOrderTimeGateway &&
-      !hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '');
+      hasScopedWorkspaceOrder(currentWorkspaceOrderId ?? '')
+      ? _scopedOrderOperations?.timeRequestsAvailable == true ||
+            workspaceOrderHasTimeRequest(currentWorkspaceOrderId ?? '')
+      : gateway is WorkOrderTimeGateway;
 
   Future<bool> requestWorkspaceOrderTime(
     String orderId,
     int additionalMinutes,
   ) async {
     if (hasScopedWorkspaceOrder(orderId)) {
-      showError(
-        'More time is not available for this order yet. The current time still applies.',
-      );
-      return false;
+      final operations = _scopedOrderOperations;
+      if (operations == null ||
+          currentWorkspaceOrderId != orderId ||
+          busy ||
+          workspaceOperationsSyncing ||
+          workspaceHandoverBusy ||
+          hasPendingOrderTime ||
+          _collection?.needsReconciliation == true) {
+        return false;
+      }
+      if (!operations.timeRequestsAvailable &&
+          !workspaceOrderHasTimeRequest(orderId)) {
+        showError(
+          'More time is not available for this order yet. The current time still applies.',
+        );
+        return false;
+      }
+      final pending = operations.pending(orderId);
+      if (pending != null && pending.action != WorkOrderAction.requestTime) {
+        return false;
+      }
+      final applied = pending != null
+          ? await operations.retry(orderId)
+          : await operations.act(
+              orderId,
+              WorkOrderAction.requestTime,
+              additionalMinutes: additionalMinutes,
+            );
+      if (identical(_scopedOrderOperations, operations) &&
+          currentWorkspaceOrderId == orderId &&
+          !applied &&
+          operations.pending(orderId) == null) {
+        showError(
+          'More time was not approved. The current time still applies.',
+        );
+      }
+      return applied;
     }
     if (busy) return false;
     final order = currentWorkspaceOrder;

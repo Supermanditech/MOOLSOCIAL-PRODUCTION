@@ -108,6 +108,12 @@ class _CommandGateway implements WorkOrderCommandGateway {
   }
 }
 
+class _TimeCommandGateway extends _CommandGateway
+    implements WorkOrderTimeCommandGateway {
+  @override
+  bool supportsOrderTimeRequests = true;
+}
+
 WorkOrderReply _commandReply(
   String id, {
   WorkOrderCommand? command,
@@ -116,6 +122,8 @@ WorkOrderReply _commandReply(
   bool collection = false,
   Map<String, int> quantities = const {'sku-A': 1},
   WorkOrderReplyState state = WorkOrderReplyState.applied,
+  DateTime? deadline,
+  DateTime? fulfilmentDeadline,
 }) => WorkOrderReply(
   accountScope: 'account-A',
   workspaceId: 'store-A',
@@ -137,6 +145,8 @@ WorkOrderReply _commandReply(
     needsDelivery: !collection,
     createdAt: DateTime.utc(2026, 9, 10),
     collectionStoreId: collection ? 'store-A' : null,
+    actionDeadline: deadline,
+    fulfilmentDeadline: fulfilmentDeadline,
   ),
 );
 
@@ -164,6 +174,385 @@ class _OrderTimeGateway extends ReviewWorkGateway
 }
 
 void main() {
+  group('DASH05 scoped time requests', () {
+    late _TimeCommandGateway gateway;
+    late WorkOrderOperations operations;
+    late DateTime deadline;
+    setUp(() {
+      deadline = DateTime.now().toUtc().add(const Duration(minutes: 1));
+      gateway = _TimeCommandGateway();
+      operations = WorkOrderOperations(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        gateway: gateway,
+      );
+      operations.observe(_commandReply('A', deadline: deadline));
+    });
+    tearDown(() {
+      if (!operations.isDisposed) operations.dispose();
+    });
+
+    WorkOrderReply approved(
+      WorkOrderCommand command, {
+      int? minutes,
+      int revision = 2,
+      String stage = 'Confirmed',
+    }) => _commandReply(
+      command.orderId,
+      command: command,
+      revision: revision,
+      stage: stage,
+      deadline: command.expectedAcceptanceDeadline!.add(
+        Duration(minutes: minutes ?? command.additionalMinutes!),
+      ),
+      fulfilmentDeadline: command.expectedAcceptanceDeadline!.add(
+        const Duration(minutes: 12),
+      ),
+    );
+
+    test(
+      'time A is independent of accept B and retains actual deadline until confirmation',
+      () async {
+        operations.observe(_commandReply('B'));
+        final a = operations.act(
+          'A',
+          WorkOrderAction.requestTime,
+          additionalMinutes: 5,
+        );
+        final command = gateway.submitted.single;
+        expect(command.version, 2);
+        expect(command.expectedAcceptanceDeadline, deadline);
+        expect(command.additionalMinutes, 5);
+        expect(operations.order('A')!.order!.actionDeadline, deadline);
+        expect(await operations.act('A', WorkOrderAction.accept), isFalse);
+        final b = operations.act('B', WorkOrderAction.accept);
+        gateway.responses[1].complete(
+          _commandReply(
+            'B',
+            command: gateway.submitted[1],
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await b, isTrue);
+        gateway.responses[0].complete(approved(command));
+        expect(await a, isTrue);
+        expect(operations.order('A')!.order!.stage, 'Confirmed');
+        expect(
+          operations.order('A')!.order!.actionDeadline,
+          deadline.add(const Duration(minutes: 5)),
+        );
+        expect(operations.order('B')!.order!.stage, 'Preparing');
+      },
+    );
+
+    test(
+      'unsupported duration expired absent deadline and collection cannot request time',
+      () async {
+        for (final minutes in [0, 1, 3, 10]) {
+          expect(
+            await operations.act(
+              'A',
+              WorkOrderAction.requestTime,
+              additionalMinutes: minutes,
+            ),
+            isFalse,
+          );
+        }
+        operations.observe(
+          _commandReply(
+            'A',
+            revision: 2,
+            deadline: DateTime.now().subtract(const Duration(seconds: 1)),
+          ),
+        );
+        expect(
+          await operations.act(
+            'A',
+            WorkOrderAction.requestTime,
+            additionalMinutes: 2,
+          ),
+          isFalse,
+        );
+        operations.observe(_commandReply('B'));
+        expect(
+          await operations.act(
+            'B',
+            WorkOrderAction.requestTime,
+            additionalMinutes: 2,
+          ),
+          isFalse,
+        );
+        operations.observe(
+          _commandReply('C', deadline: deadline, collection: true),
+        );
+        expect(
+          await operations.act(
+            'C',
+            WorkOrderAction.requestTime,
+            additionalMinutes: 2,
+          ),
+          isFalse,
+        );
+        operations.observe(
+          _commandReply('D', stage: 'Preparing', deadline: deadline),
+        );
+        expect(
+          await operations.act(
+            'D',
+            WorkOrderAction.requestTime,
+            additionalMinutes: 2,
+          ),
+          isFalse,
+        );
+        expect(gateway.submitted, isEmpty);
+      },
+    );
+
+    test(
+      'explicit capability is required for new requests but not reconciliation',
+      () async {
+        gateway.supportsOrderTimeRequests = false;
+        expect(
+          await operations.act(
+            'A',
+            WorkOrderAction.requestTime,
+            additionalMinutes: 2,
+          ),
+          isFalse,
+        );
+        gateway.supportsOrderTimeRequests = true;
+        final send = operations.act(
+          'A',
+          WorkOrderAction.requestTime,
+          additionalMinutes: 2,
+        );
+        final command = gateway.submitted.single;
+        gateway.responses.single.completeError(StateError('unknown'));
+        expect(await send, isFalse);
+        gateway.supportsOrderTimeRequests = false;
+        final retry = operations.retry('A');
+        expect(gateway.reconciled.single, same(command));
+        gateway.replies.single.complete(approved(command));
+        expect(await retry, isTrue);
+        expect(gateway.submitted.length, 1);
+      },
+    );
+
+    for (final invalid in [
+      'missing deadline',
+      'unchanged deadline',
+      'too long',
+      'missing fulfilment',
+      'fulfilment before acceptance',
+      'wrong stage',
+    ]) {
+      test(
+        'invalid time acknowledgement: $invalid remains uncertain',
+        () async {
+          final send = operations.act(
+            'A',
+            WorkOrderAction.requestTime,
+            additionalMinutes: 2,
+          );
+          final command = gateway.submitted.single;
+          final newDeadline = invalid == 'missing deadline'
+              ? null
+              : deadline.add(
+                  Duration(
+                    minutes: invalid == 'unchanged deadline'
+                        ? 0
+                        : invalid == 'too long'
+                        ? 3
+                        : 2,
+                  ),
+                );
+          final fulfilment = invalid == 'missing fulfilment'
+              ? null
+              : deadline.add(
+                  Duration(
+                    minutes: invalid == 'fulfilment before acceptance' ? 1 : 10,
+                  ),
+                );
+          gateway.responses.single.complete(
+            _commandReply(
+              'A',
+              command: command,
+              revision: 2,
+              stage: invalid == 'wrong stage' ? 'Preparing' : 'Confirmed',
+              deadline: newDeadline,
+              fulfilmentDeadline: fulfilment,
+            ),
+          );
+          expect(await send, isFalse);
+          expect(operations.order('A')!.order!.actionDeadline, deadline);
+          expect(operations.pending('A'), same(command));
+          expect(operations.state('A'), WorkOrderOperationState.uncertain);
+        },
+      );
+    }
+
+    test(
+      'late valid grant does not regress a newer order or restart its timer',
+      () async {
+        final send = operations.act(
+          'A',
+          WorkOrderAction.requestTime,
+          additionalMinutes: 2,
+        );
+        final command = gateway.submitted.single;
+        operations.observe(
+          _commandReply(
+            'A',
+            revision: 4,
+            stage: 'Preparing',
+            deadline: deadline,
+          ),
+        );
+        gateway.responses.single.complete(approved(command));
+        expect(await send, isTrue);
+        expect(operations.order('A')!.revision, 4);
+        expect(operations.order('A')!.order!.stage, 'Preparing');
+        expect(operations.order('A')!.order!.actionDeadline, deadline);
+      },
+    );
+
+    test(
+      'recovered expired request retains its original promise and resolves read-only',
+      () async {
+        final storage = _OrderJournalStorage();
+        final journal = SecureWorkOrderPendingStore(
+          storage: storage,
+          currentAccount: () => 'account-A',
+        );
+        final original = WorkOrderCommand(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          orderId: 'A',
+          operationId: 'time-before-restart',
+          expectedRevision: 1,
+          action: WorkOrderAction.requestTime,
+          additionalMinutes: 2,
+          expectedAcceptanceDeadline: DateTime.now().toUtc().subtract(
+            const Duration(minutes: 10),
+          ),
+        );
+        await journal.savePending(original);
+        operations.dispose();
+        operations = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: gateway,
+          pendingStore: journal,
+        );
+        expect(await operations.restore(), isTrue);
+        final restored = operations.pending('A')!;
+        expect(restored.additionalMinutes, 2);
+        expect(
+          restored.expectedAcceptanceDeadline,
+          original.expectedAcceptanceDeadline,
+        );
+        final retry = operations.retry('A');
+        gateway.replies.single.complete(approved(restored));
+        expect(await retry, isTrue);
+        expect(gateway.submitted, isEmpty);
+        expect(
+          operations
+              .order('A')!
+              .order!
+              .actionDeadline!
+              .isBefore(DateTime.now()),
+          isTrue,
+        );
+        expect(await journal.readPending('account-A', 'store-A'), isEmpty);
+      },
+    );
+
+    test(
+      'version-one saved commands preserve their version on reconciliation',
+      () async {
+        final storage = _OrderJournalStorage();
+        final journal = SecureWorkOrderPendingStore(
+          storage: storage,
+          currentAccount: () => 'account-A',
+        );
+        await journal.savePending(_journalCommand('A'));
+        final key = storage.values.keys.single;
+        final envelope =
+            jsonDecode(storage.values[key]!) as Map<String, dynamic>;
+        final entry =
+            (envelope['entries'] as List).single as Map<String, dynamic>;
+        entry.remove('version');
+        entry.remove('additionalMinutes');
+        entry.remove('expectedAcceptanceDeadline');
+        storage.values[key] = jsonEncode(envelope);
+        operations.dispose();
+        operations = WorkOrderOperations(
+          accountScope: 'account-A',
+          workspaceId: 'store-A',
+          gateway: gateway,
+          pendingStore: journal,
+        );
+        expect(await operations.restore(), isTrue);
+        final retry = operations.retry('A');
+        final command = gateway.reconciled.single;
+        expect(command.version, 1);
+        expect(command.action, WorkOrderAction.accept);
+        gateway.replies.single.complete(
+          _commandReply('A', command: command, revision: 2, stage: 'Preparing'),
+        );
+        expect(await retry, isTrue);
+        expect(await journal.readPending('account-A', 'store-A'), isEmpty);
+      },
+    );
+
+    test(
+      'session uncertain time A allows B and same request retry ignores a changed choice',
+      () async {
+        final work = WorkSession(contactDraftStore: _CommandAccountStore())
+          ..activeWorkspace = _commandStore
+          ..workspaceId = 'store-A';
+        operations.observe(_commandReply('B', deadline: deadline));
+        expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+        addTearDown(work.dispose);
+        work.selectWorkspaceOrder('A');
+        final a = work.requestWorkspaceOrderTime('A', 5);
+        final command = gateway.submitted.single;
+        expect(work.hasPendingOrderTime, isFalse);
+        expect(work.hasPendingCurrentOrderTime, isTrue);
+        expect(work.orderTimeRequestBusy, isTrue);
+        gateway.responses.single.completeError(StateError('unknown'));
+        expect(await a, isFalse);
+        expect(work.orderTimeRequestBusy, isFalse);
+        work.selectWorkspaceOrder('B');
+        expect(work.currentWorkspaceOrderId, 'B');
+        expect(work.hasPendingCurrentOrderTime, isFalse);
+        final b = work.submitWorkspaceOrderAction('B', WorkOrderAction.accept);
+        gateway.responses[1].complete(
+          _commandReply(
+            'B',
+            command: gateway.submitted[1],
+            revision: 2,
+            stage: 'Preparing',
+          ),
+        );
+        expect(await b, isTrue);
+        work.selectWorkspaceOrder('A');
+        final retry = work.requestWorkspaceOrderTime('A', 2);
+        expect(gateway.reconciled.single, same(command));
+        expect(gateway.reconciled.single.additionalMinutes, 5);
+        gateway.replies.single.complete(approved(command));
+        expect(await retry, isTrue);
+        expect(
+          work.currentWorkspaceOrder!.actionDeadline,
+          deadline.add(const Duration(minutes: 5)),
+        );
+        expect(work.workspaceInvoices, isEmpty);
+        expect(work.workspaceSalesToday, 0);
+      },
+    );
+  });
+
   group('DASH04 durable order journal', () {
     late _OrderJournalStorage storage;
     late SecureWorkOrderPendingStore journal;

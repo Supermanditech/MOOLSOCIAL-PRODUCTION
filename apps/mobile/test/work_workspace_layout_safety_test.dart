@@ -60,6 +60,12 @@ class _OrderCommandFixtureGateway implements WorkOrderCommandGateway {
   }
 }
 
+class _ScopedTimingFixtureGateway extends _OrderCommandFixtureGateway
+    implements WorkOrderTimeCommandGateway {
+  @override
+  bool get supportsOrderTimeRequests => true;
+}
+
 class _TimingFixtureGateway extends ReviewWorkGateway
     implements WorkOrderTimeGateway {
   final requests = <WorkOrderTimeRequest>[];
@@ -7865,6 +7871,117 @@ void main() {
     (412.0, 915.0, 1.0),
     (320.0, 568.0, 2.0),
   ]) {
+    testWidgets('DASH05 scoped time panel retry and confirmation $scale', (
+      tester,
+    ) async {
+      final previousErrorHandler = FlutterError.onError;
+      FlutterError.onError = (details) {
+        debugPrint(details.toString());
+        previousErrorHandler?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = previousErrorHandler);
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final original = work.currentWorkspaceOrder!;
+      final deadline = original.actionDeadline!;
+      final gateway = _ScopedTimingFixtureGateway();
+      final operations = WorkOrderOperations(
+        accountScope: 'review-draft-account',
+        workspaceId: work.activeWorkspace!.id,
+        gateway: gateway,
+      );
+      operations.observe(
+        WorkOrderReply(
+          accountScope: operations.accountScope,
+          workspaceId: operations.workspaceId,
+          orderId: original.id,
+          operationId: '',
+          revision: 1,
+          state: WorkOrderReplyState.applied,
+          order: original,
+        ),
+      );
+      expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: Size(width, height),
+        textScale: scale,
+      );
+      final more = find.byKey(const Key('work-order-more-time'));
+      await tester.ensureVisible(more);
+      await tester.pumpAndSettle();
+      await tester.tap(more);
+      await tester.pumpAndSettle();
+      final five = find.widgetWithText(ChoiceChip, '+5 min');
+      await tester.ensureVisible(five);
+      await tester.pumpAndSettle();
+      await tester.tap(five);
+      await tester.pumpAndSettle();
+      final request = find.byKey(const Key('work-order-time-request'));
+      await tester.ensureVisible(request);
+      await tester.pumpAndSettle();
+      expect(request.hitTestable(), findsOneWidget);
+      await tester.tap(request);
+      await tester.pumpAndSettle();
+      final command = gateway.submitted.single;
+      expect(command.action, WorkOrderAction.requestTime);
+      expect(command.additionalMinutes, 5);
+      expect(work.currentWorkspaceOrder!.actionDeadline, deadline);
+      expect(tester.widget<FilledButton>(request).onPressed, isNull);
+      expect(work.hasPendingOrderTime, isFalse);
+      expect(tester.takeException(), isNull);
+      gateway.responses.single.completeError(StateError('network unknown'));
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(request);
+      await tester.pumpAndSettle();
+      expect(find.text('Retry request'), findsOneWidget);
+      await captureStoreView(tester, 'scoped-time-uncertain-$scale');
+      expect(tester.takeException(), isNull);
+      await tester.tap(request);
+      await tester.pumpAndSettle();
+      expect(gateway.reconciled.single, same(command));
+      gateway.replies.single.complete(
+        WorkOrderReply(
+          accountScope: command.accountScope,
+          workspaceId: command.workspaceId,
+          orderId: command.orderId,
+          operationId: command.operationId,
+          revision: 2,
+          state: WorkOrderReplyState.applied,
+          order: original.copyWith(
+            actionDeadline: deadline.add(const Duration(minutes: 5)),
+            fulfilmentDeadline: deadline.add(const Duration(minutes: 12)),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        work.currentWorkspaceOrder!.actionDeadline,
+        deadline.add(const Duration(minutes: 5)),
+      );
+      expect(work.workspaceOrderStage, 'Confirmed');
+      expect(gateway.submitted.length, 1);
+      expect(find.text('Time confirmed'), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'scoped-time-confirmed-$scale');
+      final close = find.descendant(
+        of: find.byKey(const Key('work-order-time-sheet')),
+        matching: find.byTooltip('Close'),
+      );
+      await tester.ensureVisible(close);
+      await tester.pumpAndSettle();
+      await tester.tap(close);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-order-time-sheet')), findsNothing);
+      expect(
+        find.byKey(const Key('work-activity-order-accept')),
+        findsOneWidget,
+      );
+      expect(work.workspaceInvoices, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
     testWidgets('DASH04 restored order card recovery $scale', (tester) async {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
       final gateway = _OrderCommandFixtureGateway();

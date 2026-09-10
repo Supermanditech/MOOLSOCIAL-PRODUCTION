@@ -394,10 +394,10 @@ class WorkReviewResult {
   final String? primaryActivity;
 }
 
-/// Version 1 order commands deliberately exclude payment, stock posting and
+/// Version 2 adds authoritative time requests; commands exclude payment, stock posting and
 /// handover. Customer collection continues through its separately owned,
 /// authenticated collection contract; a normal order reply cannot authorise it.
-enum WorkOrderAction { accept, ready, reject }
+enum WorkOrderAction { accept, ready, reject, requestTime }
 
 enum WorkOrderReplyState { applied, rejected, pending }
 
@@ -412,13 +412,19 @@ class WorkOrderCommand {
     required this.expectedRevision,
     required this.action,
     this.reason,
+    this.additionalMinutes,
+    this.expectedAcceptanceDeadline,
+    this.version = contractVersion,
   });
 
-  static const contractVersion = 1;
+  static const contractVersion = 2;
   final String accountScope, workspaceId, orderId, operationId;
   final int expectedRevision;
   final WorkOrderAction action;
   final String? reason;
+  final int version;
+  final int? additionalMinutes;
+  final DateTime? expectedAcceptanceDeadline;
 }
 
 class WorkOrderReply {
@@ -448,6 +454,12 @@ abstract interface class WorkOrderCommandGateway {
   Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command);
 }
 
+/// Explicit capability: legacy timing endpoints are not revisioned commands.
+abstract interface class WorkOrderTimeCommandGateway
+    implements WorkOrderCommandGateway {
+  bool get supportsOrderTimeRequests;
+}
+
 /// A dedicated order journal, never a document draft or proof of success.
 abstract interface class WorkOrderPendingStore {
   Future<List<WorkOrderCommand>> readPending(
@@ -470,6 +482,7 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
   // Across instances: timed-out callers must not release a still-running native
   // read/write and let a later write erase an independently pending order.
   static final Map<String, Future<void>> _tails = {};
+  static const _journalVersion = 1;
   static String? _signedInAccount() {
     try {
       return FirebaseAuth.instance.currentUser?.uid;
@@ -504,20 +517,32 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
   }
 
   static Map<String, Object?> _encode(WorkOrderCommand command) => {
+    'version': command.version,
     'orderId': command.orderId,
     'operationId': command.operationId,
     'expectedRevision': command.expectedRevision,
     'action': command.action.name,
     'reason': command.reason,
+    'additionalMinutes': command.additionalMinutes,
+    'expectedAcceptanceDeadline': command.expectedAcceptanceDeadline
+        ?.toUtc()
+        .toIso8601String(),
   };
 
   static bool _valid(WorkOrderCommand command) =>
+      {1, WorkOrderCommand.contractVersion}.contains(command.version) &&
       command.orderId.trim().isNotEmpty &&
       command.operationId.trim().isNotEmpty &&
       command.expectedRevision >= 0 &&
       (command.action == WorkOrderAction.reject
           ? command.reason != null && command.reason!.trim().isNotEmpty
-          : command.reason == null);
+          : command.reason == null) &&
+      (command.action == WorkOrderAction.requestTime
+          ? command.version == 2 &&
+                {2, 5}.contains(command.additionalMinutes) &&
+                command.expectedAcceptanceDeadline != null
+          : command.additionalMinutes == null &&
+                command.expectedAcceptanceDeadline == null);
 
   Future<List<WorkOrderCommand>> _read(String account, String store) async {
     _checkAccount(account, store);
@@ -526,7 +551,7 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
     if (raw == null) return [];
     final data = jsonDecode(raw);
     if (data is! Map ||
-        data['version'] != WorkOrderCommand.contractVersion ||
+        data['version'] != _journalVersion ||
         data['accountScope'] != account ||
         data['workspaceId'] != store ||
         data['entries'] is! List) {
@@ -540,8 +565,21 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
           entry['operationId'] is! String ||
           entry['expectedRevision'] is! int ||
           entry['action'] is! String ||
-          (entry['reason'] != null && entry['reason'] is! String)) {
+          (entry['reason'] != null && entry['reason'] is! String) ||
+          (entry['version'] != null && entry['version'] is! int) ||
+          (entry['additionalMinutes'] != null &&
+              entry['additionalMinutes'] is! int) ||
+          (entry['expectedAcceptanceDeadline'] != null &&
+              entry['expectedAcceptanceDeadline'] is! String)) {
         throw const FormatException('Invalid pending order entry');
+      }
+      final deadlineText = entry['expectedAcceptanceDeadline'] as String?;
+      final deadline = deadlineText == null
+          ? null
+          : DateTime.tryParse(deadlineText);
+      if (deadlineText != null &&
+          deadline?.toUtc().toIso8601String() != deadlineText) {
+        throw const FormatException('Invalid pending order deadline');
       }
       final command = WorkOrderCommand(
         accountScope: account,
@@ -551,6 +589,9 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
         expectedRevision: entry['expectedRevision'] as int,
         action: WorkOrderAction.values.byName(entry['action'] as String),
         reason: entry['reason'] as String?,
+        version: (entry['version'] as int?) ?? 1,
+        additionalMinutes: entry['additionalMinutes'] as int?,
+        expectedAcceptanceDeadline: deadline,
       );
       if (!_valid(command) ||
           !orders.add(command.orderId) ||
@@ -572,7 +613,7 @@ class SecureWorkOrderPendingStore implements WorkOrderPendingStore {
     await _storage.write(
       key: _key(account, store),
       value: jsonEncode({
-        'version': WorkOrderCommand.contractVersion,
+        'version': _journalVersion,
         'accountScope': account,
         'workspaceId': store,
         'entries': commands.map(_encode).toList(),
@@ -655,6 +696,9 @@ class WorkOrderOperations extends ChangeNotifier {
 
   bool get isDisposed => _disposed;
   bool get recoveryReady => pendingStore == null || _restored;
+  bool get timeRequestsAvailable =>
+      gateway is WorkOrderTimeCommandGateway &&
+      (gateway as WorkOrderTimeCommandGateway).supportsOrderTimeRequests;
   String? get changedOrderId => _changedOrderId;
   List<WorkOrderReply> get orders => List.unmodifiable(_orders.values);
 
@@ -714,6 +758,7 @@ class WorkOrderOperations extends ChangeNotifier {
   bool restorePending(WorkOrderCommand command) {
     if (_disposed ||
         pendingStore != null ||
+        !SecureWorkOrderPendingStore._valid(command) ||
         accountScope.isEmpty ||
         workspaceId.isEmpty ||
         command.accountScope != accountScope ||
@@ -772,16 +817,28 @@ class WorkOrderOperations extends ChangeNotifier {
       WorkOrderAction.accept ||
       WorkOrderAction.reject => record.stage == 'Confirmed',
       WorkOrderAction.ready => record.stage == 'Preparing',
+      WorkOrderAction.requestTime =>
+        timeRequestsAvailable && record.stage == 'Confirmed',
     };
   }
 
-  Future<bool> act(String orderId, WorkOrderAction action, {String? reason}) {
+  Future<bool> act(
+    String orderId,
+    WorkOrderAction action, {
+    String? reason,
+    int? additionalMinutes,
+  }) {
     final snapshot = _orders[orderId];
     if (_disposed ||
         !recoveryReady ||
         _pending.containsKey(orderId) ||
         snapshot == null ||
         !_allowed(snapshot, action) ||
+        (action == WorkOrderAction.requestTime &&
+            (!{2, 5}.contains(additionalMinutes) ||
+                snapshot.order!.actionDeadline?.isAfter(DateTime.now()) !=
+                    true)) ||
+        (action != WorkOrderAction.requestTime && additionalMinutes != null) ||
         (action == WorkOrderAction.reject &&
             (reason == null || reason.trim().isEmpty))) {
       return Future.value(false);
@@ -796,6 +853,10 @@ class WorkOrderOperations extends ChangeNotifier {
       expectedRevision: snapshot.revision,
       action: action,
       reason: action == WorkOrderAction.reject ? reason!.trim() : null,
+      additionalMinutes: additionalMinutes,
+      expectedAcceptanceDeadline: action == WorkOrderAction.requestTime
+          ? snapshot.order!.actionDeadline
+          : null,
     );
     _pending[orderId] = command;
     return _run(command, reconcile: false);
@@ -840,6 +901,24 @@ class WorkOrderOperations extends ChangeNotifier {
               reply.revision <= command.expectedRevision) ||
           reply.state == WorkOrderReplyState.pending) {
         return false;
+      }
+      if (command.action == WorkOrderAction.requestTime &&
+          reply.state == WorkOrderReplyState.applied) {
+        final deadline = reply.order!.actionDeadline;
+        final fulfilment = reply.order!.fulfilmentDeadline;
+        final expected = command.expectedAcceptanceDeadline!;
+        // A late but valid acknowledgement may already be expired. Display its
+        // real deadline, never extend it from the client's receipt time.
+        if (reply.order!.stage != 'Confirmed' ||
+            deadline == null ||
+            fulfilment == null ||
+            !deadline.isAfter(expected) ||
+            deadline.isAfter(
+              expected.add(Duration(minutes: command.additionalMinutes!)),
+            ) ||
+            !fulfilment.isAfter(deadline)) {
+          return false;
+        }
       }
       // A later full snapshot wins over this delayed acknowledgement. Resolving
       // its operation must not restore an older stage or replay business effects.

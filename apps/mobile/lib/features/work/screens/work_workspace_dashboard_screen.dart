@@ -3552,6 +3552,12 @@ class _StoreActivityDeck extends StatelessWidget {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
+          final scrollCard =
+              _hasStoreWorkload(session) ||
+              (largeText &&
+                  session.workspaceOrderHasTimeRequest(
+                    selectedOrder?.id ?? '',
+                  ));
           final desiredHeight = switch (content) {
             WorkCollectionLiveCard(:final controller) =>
               switch (controller?.snapshot?.state.name) {
@@ -3572,7 +3578,7 @@ class _StoreActivityDeck extends StatelessWidget {
             _ => 420.0,
           };
           final card = SizedBox(
-            height: _hasStoreWorkload(session)
+            height: scrollCard
                 ? desiredHeight
                 : desiredHeight.clamp(0, constraints.maxHeight),
             child: _ActivityDeckShell(
@@ -3581,8 +3587,7 @@ class _StoreActivityDeck extends StatelessWidget {
               child: content,
             ),
           );
-          if (_hasStoreWorkload(session) &&
-              constraints.maxHeight < desiredHeight) {
+          if (scrollCard && constraints.maxHeight < desiredHeight) {
             return SingleChildScrollView(
               key: const Key('work-store-activity-scroll'),
               child: card,
@@ -3770,6 +3775,7 @@ class _OrderOperationStatus extends StatelessWidget {
     final state = session.workspaceOrderOperationState(orderId);
     if (state == null) return const SizedBox.shrink();
     final uncertain = state == WorkOrderOperationState.uncertain;
+    final timeRequest = session.workspaceOrderHasTimeRequest(orderId);
     return Semantics(
       key: Key('work-order-operation-$orderId'),
       liveRegion: true,
@@ -3778,9 +3784,14 @@ class _OrderOperationStatus extends StatelessWidget {
         child: _StoreScaledPair(
           flexibleSecond: false,
           first: Text(switch (state) {
-            WorkOrderOperationState.submitting => 'Sending update…',
-            WorkOrderOperationState.reconciling => 'Checking update…',
-            WorkOrderOperationState.uncertain => 'Update not confirmed',
+            WorkOrderOperationState.submitting =>
+              timeRequest ? 'Requesting time…' : 'Sending update…',
+            WorkOrderOperationState.reconciling =>
+              timeRequest ? 'Checking time request…' : 'Checking update…',
+            WorkOrderOperationState.uncertain =>
+              timeRequest
+                  ? 'Time request not confirmed'
+                  : 'Update not confirmed',
           }, style: const TextStyle(fontSize: 13, color: MoolColors.ink)),
           second: uncertain
               ? TextButton(
@@ -3988,7 +3999,7 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                               ),
                             ),
                             Text(
-                              session.hasPendingOrderTime
+                              session.hasPendingCurrentOrderTime
                                   ? 'Check request'
                                   : expired
                                   ? 'View status'
@@ -4083,7 +4094,7 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                       children: [
                         Expanded(
                           child: Text(
-                            expired && !session.hasPendingOrderTime
+                            expired && !session.hasPendingCurrentOrderTime
                                 ? 'Order status'
                                 : confirmed
                                 ? 'Time confirmed'
@@ -4160,8 +4171,8 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                                 selected: minutes == choice,
                                 onSelected:
                                     expired ||
-                                        session.busy ||
-                                        session.hasPendingOrderTime
+                                        session.orderTimeRequestBusy ||
+                                        session.hasPendingCurrentOrderTime
                                     ? null
                                     : (_) =>
                                           setSheetState(() => minutes = choice),
@@ -4188,7 +4199,18 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                             ),
                           ),
                         ),
-                      if (!expired || session.hasPendingOrderTime) ...[
+                      if (session.hasPendingCurrentOrderTime &&
+                          feedback == null)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Text(
+                            session.orderTimeRequestBusy
+                                ? 'Checking time request…'
+                                : 'Time request not confirmed. Check its status before trying again.',
+                            style: const TextStyle(color: MoolColors.navy),
+                          ),
+                        ),
+                      if (!expired || session.hasPendingCurrentOrderTime) ...[
                         const SizedBox(height: 10),
                         FilledButton(
                           key: const Key('work-order-time-request'),
@@ -4197,10 +4219,11 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                             disabledBackgroundColor: const Color(0xFFE6E9F2),
                           ),
                           onPressed:
-                              session.busy ||
+                              session.orderTimeRequestBusy ||
                                   !sameOrder() ||
                                   !session.orderTimeServiceAvailable ||
-                                  (expired && !session.hasPendingOrderTime) ||
+                                  (expired &&
+                                      !session.hasPendingCurrentOrderTime) ||
                                   orderId == null
                               ? null
                               : () async {
@@ -4224,9 +4247,9 @@ Future<void> _showOrderTimeRequest(BuildContext context, WorkSession session) {
                                   });
                                 },
                           child: Text(
-                            session.busy
+                            session.orderTimeRequestBusy
                                 ? 'Checking request…'
-                                : session.hasPendingOrderTime
+                                : session.hasPendingCurrentOrderTime
                                 ? 'Retry request'
                                 : 'Request time',
                           ),
