@@ -844,7 +844,7 @@ abstract final class BuyV2Catalogue {
       pack: '500 ml pouch',
       price: 35,
       unitPrice: '₹70/L',
-      badge: 'Quick local choice',
+      badge: '500 ml pack',
     ),
     _commerceVariant(
       canonicalId: 'milk',

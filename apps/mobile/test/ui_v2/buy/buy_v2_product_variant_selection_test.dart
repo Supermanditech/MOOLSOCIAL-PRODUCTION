@@ -280,89 +280,124 @@ void main() {
     }
   }
 
-  testWidgets('product options preserve exact pack Cart and Back state', (
-    tester,
-  ) async {
-    tester.view.devicePixelRatio = 1;
-    tester.view.physicalSize = const Size(320, 700);
-    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
-    tester.platformDispatcher.accessibilityFeaturesTestValue =
-        FakeAccessibilityFeatures(disableAnimations: true);
-    addTearDown(tester.view.reset);
-    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
-    final core = BuySession();
-    final session = BuyV2Session(core: core);
-    addTearDown(session.dispose);
-    addTearDown(core.dispose);
-    expect(session.openProduct('s-milk'), isTrue);
+  for (final scale in [1.0, 1.4, 2.0]) {
+    testWidgets(
+      'product options preserve exact pack Cart and Back state at $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 700);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        tester.platformDispatcher.accessibilityFeaturesTestValue =
+            FakeAccessibilityFeatures(disableAnimations: true);
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        addTearDown(
+          tester.platformDispatcher.clearAccessibilityFeaturesTestValue,
+        );
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        expect(session.openProduct('s-milk'), isTrue);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: MoolTheme.light(),
-        home: BuyV2Screen(
-          session: session,
-          initialDestination: session.destination,
-          initialView: session.view,
-          productId: session.selectedProductId,
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (_, child) => r66VisualCaptureRoot(child!),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: session.destination,
+              initialView: session.view,
+              productId: session.selectedProductId,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-    final selector = find.byKey(const ValueKey('buy-product-variants-milk'));
-    await tester.scrollUntilVisible(
-      selector,
-      180,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const PageStorageKey('buy-product-s-milk')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    expect(selector, findsOneWidget);
-    for (final id in const ['s-milk', 's-milk-500ml', 's-milk-2l']) {
-      expect(find.byKey(ValueKey('buy-product-variant-$id')), findsOneWidget);
-    }
+        final selector = find.byKey(
+          const ValueKey('buy-product-variants-milk'),
+        );
+        await tester.scrollUntilVisible(
+          selector,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-product-s-milk')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(selector, findsOneWidget);
+        for (final id in const ['s-milk', 's-milk-500ml', 's-milk-2l']) {
+          expect(
+            find.byKey(ValueKey('buy-product-variant-$id')),
+            findsOneWidget,
+          );
+        }
 
-    final halfLitre = find.byKey(
-      const ValueKey('buy-product-variant-s-milk-500ml'),
-    );
-    await tester.ensureVisible(halfLitre);
-    await tester.pumpAndSettle();
-    await tester.tap(halfLitre);
-    await tester.pumpAndSettle();
-    expect(session.selectedProduct?.id, 's-milk-500ml');
-    expect(find.text('500 ml pouch'), findsWidgets);
+        final halfLitre = find.byKey(
+          const ValueKey('buy-product-variant-s-milk-500ml'),
+        );
+        await tester.ensureVisible(halfLitre);
+        await tester.pumpAndSettle();
+        await tester.tap(halfLitre);
+        await tester.pumpAndSettle();
+        expect(session.selectedProduct?.id, 's-milk-500ml');
+        expect(session.selectedProduct?.pack, '500 ml pouch');
+        expect(session.selectedProduct?.price, 35);
+        expect(session.selectedProduct?.unitPrice, '₹70/L');
+        final badge = find.byKey(
+          const ValueKey('buy-product-gallery-badge-s-milk-500ml'),
+        );
+        await tester.ensureVisible(badge);
+        await tester.pumpAndSettle();
+        final badgeText = find.descendant(
+          of: badge,
+          matching: find.text('500 ml pack'),
+        );
+        expect(badgeText, findsOneWidget);
+        expect(
+          tester.renderObject<RenderParagraph>(badgeText).didExceedMaxLines,
+          isFalse,
+        );
+        expect(find.text('Quick local choice'), findsNothing);
+        await capturePack(tester, 'r669-milk-variant-badge-$scale');
+        expect(find.text('500 ml pouch · ₹70/L'), findsOneWidget);
 
-    final add = find.byKey(const ValueKey('buy-product-primary-s-milk-500ml'));
-    await tester.scrollUntilVisible(
-      add,
-      180,
-      scrollable: find
-          .descendant(
-            of: find.byKey(const PageStorageKey('buy-product-s-milk-500ml')),
-            matching: find.byType(Scrollable),
-          )
-          .first,
-    );
-    await tester.ensureVisible(add);
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const ValueKey('buy-product-hero-delivery-s-milk-500ml')),
-      findsOneWidget,
-    );
-    expect(find.textContaining('Standard/courier delivery'), findsWidgets);
-    await tester.tap(add);
-    await tester.pumpAndSettle();
-    expect(session.quantityFor('s-milk-500ml'), 1);
-    expect(session.quantityFor('s-milk'), 0);
+        final add = find.byKey(
+          const ValueKey('buy-product-primary-s-milk-500ml'),
+        );
+        await tester.scrollUntilVisible(
+          add,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(
+                  const PageStorageKey('buy-product-s-milk-500ml'),
+                ),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-product-hero-delivery-s-milk-500ml')),
+          findsOneWidget,
+        );
+        expect(find.textContaining('Standard/courier delivery'), findsWidgets);
+        expect(find.text('Quick local choice'), findsNothing);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-milk-500ml'), 1);
+        expect(session.quantityFor('s-milk'), 0);
 
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(session.view.name, 'catalogue');
-    expect(tester.takeException(), isNull);
-  });
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view.name, 'catalogue');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 }
