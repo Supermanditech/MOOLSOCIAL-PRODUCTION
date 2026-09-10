@@ -379,12 +379,16 @@ void main() {
     WorkGateway? gateway,
     WorkPendingProofStore? contactStore,
     WorkIssueDraftStore? issueDraftStore,
+    WorkIssueCommandGateway? issueCommandGateway,
+    WorkIssueCommandStore? issueCommandStore,
   ]) {
     final work =
         WorkSession(
             gateway: gateway,
             contactDraftStore: contactStore,
-            issueDraftStore: issueDraftStore,
+            issueDraftStore: issueDraftStore ?? _IssueDraftFixtureStore(),
+            issueCommandGateway: issueCommandGateway,
+            issueCommandStore: issueCommandStore ?? _IssueCommandFixtureStore(),
           )
           ..seedVerifiedWorkspace()
           ..retailerSetupSaved = true
@@ -15984,6 +15988,255 @@ void main() {
       },
     );
 
+    testWidgets('DASH09 decline confirmation and response recovery fit $scale', (
+      tester,
+    ) async {
+      final drafts = _IssueDraftFixtureStore();
+      final journal = _IssueCommandFixtureStore();
+      final gateway = _IssueResponseFixtureGateway();
+      final work = storeViewFixture(
+        null,
+        _ContactDraftFixtureStore(),
+        drafts,
+        gateway,
+        journal,
+      );
+      work.workspaceOrders[0] = work.workspaceOrders[0].copyWith(
+        quantities: const {'oil-fortune-1l': 1},
+      );
+      final issue = WorkspaceIssueRecord(
+        accountScope: 'review-draft-account',
+        workspaceId: work.activeWorkspace!.id,
+        id: 'REPLY-CASE',
+        referenceId: 'APP-1043',
+        target: WorkspaceIssueTarget.customerOrder,
+        kind: WorkspaceIssueKind.packingShortage,
+        state: WorkspaceIssueState.retailerReview,
+        revision: 1,
+        updatedAt: DateTime(2026, 9, 10, 12),
+        reason: 'One sealed pack is damaged.',
+        nextStep: 'Review the affected pack.',
+        permittedResponses: const [WorkspaceIssueResponse.declineRequest],
+        lines: const [
+          WorkspaceIssueLine(
+            lineId: 'oil-fortune-1l',
+            productId: 'oil-fortune-1l',
+            name: 'Sunflower oil',
+            pack: '1 l',
+            orderedQuantity: 1,
+            affectedQuantity: 1,
+          ),
+        ],
+      );
+      drafts.values[issue.draftKey] = WorkspaceIssueDraft(
+        key: issue.draftKey,
+        referenceId: issue.referenceId,
+        target: issue.target,
+        expectedRevision: 1,
+        response: WorkspaceIssueResponse.declineRequest,
+        note: 'This pack was already replaced. Please review.',
+      );
+      expect(
+        work.applyWorkspaceIssues(
+          accountScope: issue.accountScope,
+          storeId: issue.workspaceId,
+          feedRevision: 1,
+          records: [issue],
+        ),
+        isTrue,
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      Future<void> open() async {
+        final entry = find.byKey(const Key('work-dashboard-review-issues'));
+        await reveal(tester, entry);
+        await tester.tap(entry);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> show(Finder target) async {
+        if (target.evaluate().isNotEmpty) {
+          await tester.ensureVisible(target);
+          await tester.pumpAndSettle();
+        }
+        final scroll = find
+            .descendant(
+              of: find.byKey(const ValueKey('store-detail-APP-1043')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        for (
+          var i = 0;
+          i < 35 && target.hitTestable().evaluate().isEmpty;
+          i++
+        ) {
+          final rect = tester
+              .getRect(scroll)
+              .intersect(
+                tester.getRect(
+                  find.byKey(const Key('work-workspace-dashboard')),
+                ),
+              );
+          final direction =
+              target.evaluate().isNotEmpty &&
+                  tester.getRect(target).center.dy < rect.center.dy
+              ? 1.0
+              : -1.0;
+          await tester.dragFrom(
+            Offset(rect.left + 2, rect.center.dy),
+            Offset(0, direction * rect.height * .35),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(target.hitTestable(), findsOneWidget);
+        await tester.ensureVisible(target);
+        await tester.pumpAndSettle();
+        final viewport = tester.getRect(scroll);
+        final targetRect = tester.getRect(target);
+        expect(targetRect.top, greaterThanOrEqualTo(viewport.top - .1));
+        expect(targetRect.bottom, lessThanOrEqualTo(viewport.bottom + .1));
+      }
+
+      await open();
+      final send = find.byKey(const Key('work-issue-send-response-REPLY-CASE'));
+      await show(send);
+      await captureStoreView(tester, 'issue-response-ready-$scale');
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      final confirmation = find.byKey(
+        const Key('work-issue-decline-confirmation'),
+      );
+      expect(confirmation, findsOneWidget);
+      expect(find.text('Send decline').hitTestable(), findsOneWidget);
+      expect(find.text('Keep editing').hitTestable(), findsOneWidget);
+      final dialogRect = tester.getRect(
+        find
+            .descendant(of: confirmation, matching: find.byType(IntrinsicWidth))
+            .first,
+      );
+      expect(dialogRect.height, lessThan(scale == 1 ? 260 : 460));
+      expect(gateway.submitted, isEmpty);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'issue-response-confirm-$scale');
+      await tester.tap(find.text('Keep editing'));
+      await tester.pumpAndSettle();
+      expect(gateway.submitted, isEmpty);
+      expect(
+        work.workspaceIssueDraft(issue)?.note,
+        contains('already replaced'),
+      );
+      await show(send);
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Send decline'));
+      await tester.pumpAndSettle();
+      expect(gateway.submitted.length, 1);
+      final firstCommand = gateway.submitted.single;
+      gateway.result.complete(
+        WorkIssueReply(
+          key: firstCommand.key,
+          operationId: firstCommand.operationId,
+          commandDigest: firstCommand.digest,
+          state: WorkIssueReplyState.rejected,
+          error: WorkIssueResponseError.invalidDetails,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Check your response details and try again.'),
+        findsOneWidget,
+      );
+      final note = find.byKey(const Key('work-issue-response-note-REPLY-CASE'));
+      await show(note);
+      drafts.failWrite = true;
+      await tester.enterText(
+        note,
+        'Please check the replacement recorded for this order.',
+      );
+      await tester.pumpAndSettle();
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      final retrySave = find.text('Retry save');
+      await show(retrySave);
+      expect(find.textContaining('Draft not saved'), findsOneWidget);
+      await captureStoreView(
+        tester,
+        'issue-response-rejected-save-error-$scale',
+      );
+      drafts.failWrite = false;
+      await tester.tap(retrySave);
+      await tester.pumpAndSettle();
+      expect(
+        drafts.values[issue.draftKey]?.note,
+        contains('replacement recorded'),
+      );
+      gateway.result = Completer<WorkIssueReply>();
+      await show(send);
+      await tester.tap(send);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Send decline'));
+      await tester.pumpAndSettle();
+      expect(gateway.submitted.length, 2);
+      final command = gateway.submitted.last;
+      expect(command.operationId, isNot(firstCommand.operationId));
+      expect(journal.values[issue.draftKey]?.command.digest, command.digest);
+      gateway.result.completeError(StateError('fixture response lost'));
+      await tester.pumpAndSettle();
+      final check = find.byKey(
+        const Key('work-issue-check-response-REPLY-CASE'),
+      );
+      await captureStoreView(tester, 'issue-response-before-check-$scale');
+      expect(
+        check,
+        findsOneWidget,
+        reason:
+            'pending=${work.workspaceIssueResponse(issue)?.pending}; stage=${work.workspaceOrders[0].stage}; busy=${work.workspaceIssueResponseBusy(issue)}',
+      );
+      await show(check);
+      expect(find.text('Check status'), findsOneWidget);
+      expect(work.workspaceIssueMayRetrySend(issue), isFalse);
+      await captureStoreView(tester, 'issue-response-uncertain-$scale');
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await open();
+      await show(check);
+      await tester.tap(check);
+      await tester.pumpAndSettle();
+      final receipt = find.byKey(
+        const Key('work-issue-response-result-REPLY-CASE'),
+      );
+      await show(receipt);
+      expect(
+        find.text('Response sent. Waiting for the case update.'),
+        findsOneWidget,
+      );
+      expect(find.textContaining('Not sent'), findsNothing);
+      expect(gateway.reconciled.single.digest, command.digest);
+      expect(gateway.submitted.length, 2);
+      expect(work.workspaceOrders[0].stage, 'Confirmed');
+      expect(work.workspaceInvoices, isEmpty);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(
+        find.byKey(const Key('work-issue-response-note-REPLY-CASE')),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const Key('work-issue-sent-note-REPLY-CASE')),
+            )
+            .data,
+        command.draft.note,
+      );
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'issue-response-sent-$scale');
+    });
+
     testWidgets(
       'DASH09 inline customer and supplier cases preserve exact order and Back $scale',
       (tester) async {
@@ -18186,6 +18439,42 @@ class _IssueDraftFixtureStore implements WorkIssueDraftStore {
   Future<void> save(WorkspaceIssueDraft draft) async {
     if (failWrite) throw StateError('fixture save failure');
     values[draft.key] = draft;
+  }
+}
+
+class _IssueCommandFixtureStore implements WorkIssueCommandStore {
+  final values = <WorkspaceIssueDraftKey, WorkIssueSubmission>{};
+  @override
+  Future<WorkIssueSubmission?> read(WorkspaceIssueDraftKey key) async =>
+      values[key];
+  @override
+  Future<void> save(WorkIssueSubmission submission) async {
+    values[submission.command.key] = submission;
+  }
+}
+
+class _IssueResponseFixtureGateway implements WorkIssueCommandGateway {
+  final submitted = <WorkIssueCommand>[];
+  final reconciled = <WorkIssueCommand>[];
+  var result = Completer<WorkIssueReply>();
+  @override
+  Future<WorkIssueReply> submitIssueResponse(WorkIssueCommand command) {
+    submitted.add(command);
+    return result.future;
+  }
+
+  @override
+  Future<WorkIssueReply> reconcileIssueResponse(
+    WorkIssueCommand command,
+  ) async {
+    reconciled.add(command);
+    return WorkIssueReply(
+      key: command.key,
+      operationId: command.operationId,
+      commandDigest: command.digest,
+      state: WorkIssueReplyState.applied,
+      revision: command.draft.expectedRevision + 1,
+    );
   }
 }
 

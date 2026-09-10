@@ -78,6 +78,84 @@ class _CommandAccountStore implements WorkPendingProofStore {
   Future<void> clear(String scope) async {}
 }
 
+class _IssueCommandGateway implements WorkIssueCommandGateway {
+  final submitted = <WorkIssueCommand>[];
+  final reconciled = <WorkIssueCommand>[];
+  Future<WorkIssueReply> Function(WorkIssueCommand)? submit, reconcile;
+  @override
+  Future<WorkIssueReply> submitIssueResponse(WorkIssueCommand command) {
+    submitted.add(command);
+    return submit?.call(command) ?? Future.value(_issueReply(command));
+  }
+
+  @override
+  Future<WorkIssueReply> reconcileIssueResponse(WorkIssueCommand command) {
+    reconciled.add(command);
+    return reconcile?.call(command) ?? Future.value(_issueReply(command));
+  }
+}
+
+WorkIssueReply _issueReply(
+  WorkIssueCommand command, {
+  WorkIssueReplyState state = WorkIssueReplyState.applied,
+  WorkIssueResponseError? error,
+}) => WorkIssueReply(
+  key: command.key,
+  operationId: command.operationId,
+  commandDigest: command.digest,
+  state: state,
+  revision: state == WorkIssueReplyState.applied
+      ? command.draft.expectedRevision + 1
+      : null,
+  error: error,
+);
+
+class _IssueCommandFixture {
+  final account = _CommandAccountStore();
+  final draftStorage = _OrderJournalStorage();
+  final journalStorage = _OrderJournalStorage();
+  final gateway = _IssueCommandGateway();
+  WorkSession make(WorkspaceIssueRecord issue) {
+    final work = WorkSession(
+      pendingProofStore: account,
+      issueDraftStore: SecureWorkIssueDraftStore(
+        accountScope: () => account.accountScope,
+        storage: draftStorage,
+      ),
+      issueCommandStore: SecureWorkIssueCommandStore(
+        accountScope: () => account.accountScope,
+        storage: journalStorage,
+      ),
+      issueCommandGateway: gateway,
+    )..activeWorkspace = _commandStore;
+    work.workspaceOrders.add(_scopeOrder('ORDER-A', stage: 'Preparing'));
+    expect(
+      work.applyWorkspaceIssues(
+        accountScope: 'account-A',
+        storeId: 'store-A',
+        feedRevision: issue.revision,
+        records: [issue],
+      ),
+      isTrue,
+    );
+    return work;
+  }
+
+  Future<void> prepare(
+    WorkSession work,
+    WorkspaceIssueRecord issue, {
+    WorkspaceIssueResponse response = WorkspaceIssueResponse.provideDetails,
+  }) async {
+    await work.loadWorkspaceIssueDraft(issue);
+    await work.loadWorkspaceIssueResponse(issue);
+    await work.saveWorkspaceIssueDraft(
+      issue,
+      response: response,
+      note: 'One sealed pack is damaged.',
+    );
+  }
+}
+
 const _commandStore = WorkWorkspace(
   id: 'store-A',
   name: 'Store A',
@@ -181,6 +259,7 @@ void main() {
     String id = 'CASE-A',
     String order = 'ORDER-A',
     int revision = 1,
+    String reason = 'One sealed pack is damaged.',
     WorkspaceIssueState state = WorkspaceIssueState.retailerReview,
   }) => WorkspaceIssueRecord(
     accountScope: 'account-A',
@@ -192,7 +271,7 @@ void main() {
     state: state,
     revision: revision,
     updatedAt: DateTime(2026, 9, 10, 12, revision),
-    reason: 'One sealed pack is damaged.',
+    reason: reason,
     nextStep: 'Review the affected pack.',
     resolution: state.closed ? 'The correct pack is available.' : null,
     permittedResponses: state == WorkspaceIssueState.retailerReview
@@ -255,6 +334,308 @@ void main() {
       ]) {
         expect(WorkspaceIssueDraft.fromJson(value), isNull);
       }
+    },
+  );
+
+  test(
+    'DASH09 command journal precedes send and duplicate taps reconcile after restart',
+    () async {
+      final fixture = _IssueCommandFixture();
+      final issue = draftCase();
+      final work = fixture.make(issue);
+      addTearDown(work.dispose);
+      await fixture.prepare(work, issue);
+      final draft = work.workspaceIssueDraft(issue)!;
+      fixture.journalStorage.holdWrite = Completer<void>();
+      final lost = Completer<WorkIssueReply>();
+      fixture.gateway.submit = (_) => lost.future;
+      final send = work.sendWorkspaceIssueResponse(issue, expectedDraft: draft);
+      await _drainOrderJournal();
+      expect(fixture.gateway.submitted, isEmpty);
+      expect(
+        await work.sendWorkspaceIssueResponse(issue, expectedDraft: draft),
+        isFalse,
+      );
+      fixture.journalStorage.holdWrite!.complete();
+      await _drainOrderJournal();
+      final command = fixture.gateway.submitted.single;
+      expect(
+        WorkIssueSubmission.fromJson(
+          jsonDecode(fixture.journalStorage.values.values.single),
+        )?.command.digest,
+        command.digest,
+      );
+      expect(command.lines.single.pack, '5 kg');
+      lost.completeError(StateError('test connection lost after receipt'));
+      expect(await send, isFalse);
+      expect(work.workspaceIssueResponseLocksDraft(issue), isTrue);
+      expect(work.workspaceIssueMayRetrySend(issue), isFalse);
+      final restarted = fixture.make(issue);
+      addTearDown(restarted.dispose);
+      await restarted.loadWorkspaceIssueDraft(issue);
+      await restarted.loadWorkspaceIssueResponse(issue);
+      expect(
+        restarted.workspaceIssueResponse(issue)?.command.operationId,
+        command.operationId,
+      );
+      expect(await restarted.checkWorkspaceIssueResponse(issue), isTrue);
+      expect(fixture.gateway.reconciled.single.digest, command.digest);
+      expect(fixture.gateway.submitted.length, 1);
+      expect(restarted.workspaceIssueCanSend(issue), isFalse);
+      expect(
+        restarted
+            .workspaceIssuesFor(WorkspaceIssueTarget.customerOrder, 'ORDER-A')
+            .single
+            .state,
+        WorkspaceIssueState.retailerReview,
+      );
+      expect(restarted.workspaceOrders.single.stage, 'Preparing');
+    },
+  );
+
+  test(
+    'DASH09 failed journal and not-recorded retries reuse exact command',
+    () async {
+      final fixture = _IssueCommandFixture();
+      final issue = draftCase();
+      final work = fixture.make(issue);
+      addTearDown(work.dispose);
+      await fixture.prepare(work, issue);
+      fixture.journalStorage.failWrite = true;
+      expect(
+        await work.sendWorkspaceIssueResponse(
+          issue,
+          expectedDraft: work.workspaceIssueDraft(issue)!,
+        ),
+        isFalse,
+      );
+      expect(fixture.gateway.submitted, isEmpty);
+      expect(work.workspaceIssueMayRetrySend(issue), isTrue);
+      final command = work.workspaceIssueResponse(issue)!.command;
+      fixture.journalStorage.failWrite = false;
+      fixture.gateway.submit = (c) async =>
+          _issueReply(c, state: WorkIssueReplyState.notRecorded);
+      expect(
+        await work.checkWorkspaceIssueResponse(issue, retrySend: true),
+        isFalse,
+      );
+      expect(work.workspaceIssueMayRetrySend(issue), isTrue);
+      fixture.journalStorage.failWrite = true;
+      expect(
+        await work.checkWorkspaceIssueResponse(issue, retrySend: true),
+        isFalse,
+      );
+      expect(
+        work.workspaceIssueResponseMessage(issue),
+        isNot(contains('Nothing was sent')),
+      );
+      expect(fixture.gateway.submitted.length, 1);
+      fixture.journalStorage.failWrite = false;
+      fixture.gateway.submit = (c) async => _issueReply(c);
+      expect(
+        await work.checkWorkspaceIssueResponse(issue, retrySend: true),
+        isTrue,
+      );
+      expect(fixture.gateway.submitted.map((c) => c.operationId).toSet(), {
+        command.operationId,
+      });
+      expect(fixture.gateway.submitted.map((c) => c.digest).toSet(), {
+        command.digest,
+      });
+    },
+  );
+
+  test(
+    'DASH09 invalid receipts and receipt-write failure stay pending',
+    () async {
+      for (final invalid in [
+        'account',
+        'store',
+        'case',
+        'operation',
+        'digest',
+        'revision',
+        'receipt-write',
+      ]) {
+        final fixture = _IssueCommandFixture();
+        final issue = draftCase();
+        final work = fixture.make(issue);
+        addTearDown(work.dispose);
+        await fixture.prepare(work, issue);
+        fixture.gateway.submit = (c) async {
+          if (invalid == 'receipt-write') {
+            fixture.journalStorage.failWrite = true;
+          }
+          return WorkIssueReply(
+            key: (
+              account: invalid == 'account' ? 'other' : c.key.account,
+              store: invalid == 'store' ? 'other' : c.key.store,
+              caseId: invalid == 'case' ? 'other' : c.key.caseId,
+            ),
+            operationId: invalid == 'operation' ? 'other' : c.operationId,
+            commandDigest: invalid == 'digest' ? 'other' : c.digest,
+            state: WorkIssueReplyState.applied,
+            revision: invalid == 'revision' ? 1 : 2,
+          );
+        };
+        expect(
+          await work.sendWorkspaceIssueResponse(
+            issue,
+            expectedDraft: work.workspaceIssueDraft(issue)!,
+          ),
+          isFalse,
+          reason: invalid,
+        );
+        expect(
+          work.workspaceIssueResponse(issue)?.pending,
+          isTrue,
+          reason: invalid,
+        );
+        expect(work.workspaceIssueMayRetrySend(issue), isFalse);
+        fixture.journalStorage.failWrite = false;
+        expect(await work.checkWorkspaceIssueResponse(issue), isTrue);
+        expect(fixture.gateway.submitted.length, 1);
+      }
+    },
+  );
+
+  test(
+    'DASH09 decline confirmation revisions permissions and account changes fail closed',
+    () async {
+      final fixture = _IssueCommandFixture();
+      final issue = draftCase();
+      final work = fixture.make(issue);
+      addTearDown(work.dispose);
+      await fixture.prepare(
+        work,
+        issue,
+        response: WorkspaceIssueResponse.declineRequest,
+      );
+      final draft = work.workspaceIssueDraft(issue)!;
+      expect(
+        await work.sendWorkspaceIssueResponse(issue, expectedDraft: draft),
+        isFalse,
+      );
+      expect(
+        work.workspaceIssueCanSend(
+          draftCase(reason: 'Unverified case content'),
+        ),
+        isFalse,
+      );
+      await work.saveWorkspaceIssueDraft(
+        issue,
+        response: draft.response,
+        note: 'Changed during confirmation',
+      );
+      expect(
+        await work.sendWorkspaceIssueResponse(
+          issue,
+          expectedDraft: draft,
+          declineConfirmed: true,
+        ),
+        isFalse,
+      );
+      expect(fixture.gateway.submitted, isEmpty);
+      fixture.gateway.submit = (c) async => _issueReply(
+        c,
+        state: WorkIssueReplyState.rejected,
+        error: WorkIssueResponseError.permissionDenied,
+      );
+      expect(
+        await work.sendWorkspaceIssueResponse(
+          issue,
+          expectedDraft: work.workspaceIssueDraft(issue)!,
+          declineConfirmed: true,
+        ),
+        isFalse,
+      );
+      expect(work.workspaceIssueCanSend(issue), isFalse);
+      final next = draftCase(revision: 2);
+      expect(
+        work.applyWorkspaceIssues(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 2,
+          records: [next],
+        ),
+        isTrue,
+      );
+      await work.saveWorkspaceIssueDraft(
+        next,
+        response: draft.response,
+        note: 'Reviewed the updated case',
+        reviewedUpdate: true,
+      );
+      expect(work.workspaceIssueCanSend(next), isTrue);
+      final held = Completer<WorkIssueReply>();
+      fixture.gateway.submit = (_) => held.future;
+      final send = work.sendWorkspaceIssueResponse(
+        next,
+        expectedDraft: work.workspaceIssueDraft(next)!,
+        declineConfirmed: true,
+      );
+      await _drainOrderJournal();
+      fixture.account.accountScope = 'account-B';
+      held.complete(_issueReply(fixture.gateway.submitted.last));
+      expect(await send, isFalse);
+      expect(work.workspaceIssueResponse(next), isNull);
+      fixture.account.accountScope = 'account-A';
+      expect(work.workspaceIssueResponse(next)?.pending, isTrue);
+      expect(await work.checkWorkspaceIssueResponse(next), isTrue);
+    },
+  );
+
+  test(
+    'DASH09 encrypted response journal rejects corruption and closed cases recover',
+    () async {
+      final fixture = _IssueCommandFixture();
+      final issue = draftCase();
+      final work = fixture.make(issue);
+      addTearDown(work.dispose);
+      await fixture.prepare(work, issue);
+      expect(
+        await work.sendWorkspaceIssueResponse(
+          issue,
+          expectedDraft: work.workspaceIssueDraft(issue)!,
+        ),
+        isTrue,
+      );
+      final closed = draftCase(
+        revision: 3,
+        state: WorkspaceIssueState.resolved,
+      );
+      final restarted = fixture.make(closed);
+      addTearDown(restarted.dispose);
+      await restarted.loadWorkspaceIssueDraft(closed);
+      await restarted.loadWorkspaceIssueResponse(closed);
+      expect(
+        restarted.workspaceIssueDraft(closed)?.note,
+        'One sealed pack is damaged.',
+      );
+      expect(
+        restarted.workspaceIssueResponse(closed)?.reply?.state,
+        WorkIssueReplyState.applied,
+      );
+      expect(restarted.workspaceIssueCanSend(closed), isFalse);
+      final key = fixture.journalStorage.values.keys.single;
+      final saved =
+          jsonDecode(fixture.journalStorage.values[key]!)
+              as Map<String, dynamic>;
+      final corrupted = {
+        ...saved,
+        'reply': {...saved['reply'] as Map, 'commandDigest': 'wrong'},
+      };
+      expect(WorkIssueSubmission.fromJson(corrupted), isNull);
+      fixture.journalStorage.values[key] = jsonEncode(corrupted);
+      final unread = fixture.make(closed);
+      addTearDown(unread.dispose);
+      await unread.loadWorkspaceIssueResponse(closed);
+      expect(unread.workspaceIssueResponseLoaded(closed), isFalse);
+      expect(
+        unread.workspaceIssueResponseMessage(closed),
+        contains('Could not open'),
+      );
+      expect(unread.workspaceIssueCanSend(closed), isFalse);
     },
   );
 

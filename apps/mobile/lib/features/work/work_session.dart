@@ -453,6 +453,8 @@ class WorkSession extends ChangeNotifier {
     WorkPendingProofStore? pendingProofStore,
     WorkPendingProofStore? contactDraftStore,
     this.issueDraftStore,
+    this.issueCommandGateway,
+    this.issueCommandStore,
   }) : gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -482,6 +484,8 @@ class WorkSession extends ChangeNotifier {
     WorkPendingProofStore? pendingProofStore,
     WorkPendingProofStore? contactDraftStore,
     this.issueDraftStore,
+    this.issueCommandGateway,
+    this.issueCommandStore,
   }) : gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -500,6 +504,17 @@ class WorkSession extends ChangeNotifier {
   final WorkPendingProofStore? pendingProofStore;
   final WorkPendingProofStore? contactDraftStore;
   final WorkIssueDraftStore? issueDraftStore;
+  final WorkIssueCommandGateway? issueCommandGateway;
+  final WorkIssueCommandStore? issueCommandStore;
+  late final WorkIssueCommandStore _issueCommandStorage =
+      issueCommandStore ??
+      SecureWorkIssueCommandStore(accountScope: () => _contactAccountScope);
+  final Map<WorkspaceIssueDraftKey, WorkIssueSubmission> _issueResponses = {};
+  final Set<WorkspaceIssueDraftKey> _issueResponseLoaded = {};
+  final Map<WorkspaceIssueDraftKey, Future<void>> _issueResponseReads = {};
+  final Set<WorkspaceIssueDraftKey> _issueResponseBusy = {};
+  final Set<WorkspaceIssueDraftKey> _issueNotDispatched = {};
+  final Map<WorkspaceIssueDraftKey, String> _issueResponseMessages = {};
   late final WorkIssueDraftStore _issueDraftStorage =
       issueDraftStore ??
       SecureWorkIssueDraftStore(accountScope: () => _contactAccountScope);
@@ -868,6 +883,219 @@ class WorkSession extends ChangeNotifier {
 
   bool get workspaceIssuesStale => _storeData.issuesStale;
 
+  WorkIssueSubmission? workspaceIssueResponse(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueResponses[issue.draftKey] : null;
+  bool workspaceIssueResponseLoaded(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) && _issueResponseLoaded.contains(issue.draftKey);
+  bool workspaceIssueResponseBusy(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) && _issueResponseBusy.contains(issue.draftKey);
+  String? workspaceIssueResponseMessage(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueResponseMessages[issue.draftKey] : null;
+  bool workspaceIssueMayRetrySend(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) &&
+      (_issueNotDispatched.contains(issue.draftKey) ||
+          workspaceIssueResponse(issue)?.reply?.state ==
+              WorkIssueReplyState.notRecorded);
+
+  bool workspaceIssueResponseLocksDraft(WorkspaceIssueRecord issue) {
+    final saved = workspaceIssueResponse(issue);
+    return workspaceIssueResponseBusy(issue) ||
+        saved?.pending == true ||
+        (saved?.reply?.state == WorkIssueReplyState.applied &&
+            issue.revision < saved!.reply!.revision!);
+  }
+
+  Future<void> loadWorkspaceIssueResponse(WorkspaceIssueRecord issue) async {
+    if (!_issueIsCurrent(issue) ||
+        _issueResponseLoaded.contains(issue.draftKey)) {
+      return;
+    }
+    final key = issue.draftKey;
+    final existing = _issueResponseReads[key];
+    if (existing != null) return existing;
+    final task = () async {
+      try {
+        final saved = await _issueCommandStorage.read(key);
+        if (!_issueIsCurrent(issue)) return;
+        if (saved != null &&
+            (!saved.valid ||
+                saved.command.key != key ||
+                saved.command.draft.referenceId != issue.referenceId ||
+                saved.command.draft.target != issue.target ||
+                saved.command.kind != issue.kind)) {
+          throw const FormatException('Case response identity mismatch');
+        }
+        if (saved != null) _issueResponses[key] = saved;
+        _issueResponseLoaded.add(key);
+        _issueResponseMessages.remove(key);
+      } on Object {
+        if (_issueIsCurrent(issue)) {
+          _issueResponseMessages[key] =
+              'Could not open response status. Try again before sending.';
+        }
+      }
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }();
+    _issueResponseReads[key] = task;
+    await task;
+    _issueResponseReads.remove(key);
+  }
+
+  bool workspaceIssueCanSend(WorkspaceIssueRecord issue) {
+    final draft = workspaceIssueDraft(issue);
+    final saved = workspaceIssueResponse(issue);
+    if (issueCommandGateway == null ||
+        !_issueIsCurrent(issue) ||
+        !workspaceIssueDraftLoaded(issue) ||
+        !workspaceIssueResponseLoaded(issue) ||
+        workspaceIssueResponseLocksDraft(issue) ||
+        workspaceIssuesStale ||
+        issue.revision != _storeData.issues[issue.id]?.revision ||
+        !issue.sameRevisionContent(_storeData.issues[issue.id]!) ||
+        issue.state != WorkspaceIssueState.retailerReview ||
+        draft == null ||
+        !draft.valid ||
+        draft.expectedRevision != issue.revision ||
+        !issue.permittedResponses.contains(draft.response) ||
+        (draft.response != WorkspaceIssueResponse.acceptRequest &&
+            draft.note.trim().isEmpty)) {
+      return false;
+    }
+    if (saved?.reply?.state == WorkIssueReplyState.rejected &&
+        {
+          WorkIssueResponseError.permissionDenied,
+          WorkIssueResponseError.caseChanged,
+          WorkIssueResponseError.caseClosed,
+          WorkIssueResponseError.responseUnavailable,
+        }.contains(saved?.reply?.error) &&
+        issue.revision <= saved!.command.draft.expectedRevision) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<bool> sendWorkspaceIssueResponse(
+    WorkspaceIssueRecord issue, {
+    required WorkspaceIssueDraft expectedDraft,
+    bool declineConfirmed = false,
+  }) async {
+    if (!workspaceIssueCanSend(issue) ||
+        (expectedDraft.response == WorkspaceIssueResponse.declineRequest &&
+            !declineConfirmed) ||
+        jsonEncode(workspaceIssueDraft(issue)?.toJson()) !=
+            jsonEncode(expectedDraft.toJson())) {
+      return false;
+    }
+    final key = issue.draftKey;
+    _issueResponseBusy.add(key);
+    _issueResponseMessages[key] = 'Preparing response…';
+    notifyListeners();
+    try {
+      await _issueDraftWrites[key];
+      if (!_issueIsCurrent(issue) ||
+          workspaceIssuesStale ||
+          issue.revision != _storeData.issues[issue.id]?.revision ||
+          !issue.sameRevisionContent(_storeData.issues[issue.id]!) ||
+          jsonEncode(_issueDrafts[key]?.toJson()) !=
+              jsonEncode(expectedDraft.toJson())) {
+        return false;
+      }
+      final random = Random.secure();
+      final command = WorkIssueCommand(
+        operationId:
+            'STORE-ISSUE-${base64UrlEncode(List.generate(16, (_) => random.nextInt(256))).replaceAll('=', '')}',
+        draft: expectedDraft,
+        kind: issue.kind,
+        lines: issue.lines,
+      );
+      if (!command.valid) return false;
+      _issueResponses[key] = WorkIssueSubmission(command);
+      _issueNotDispatched.add(key);
+      return await _performIssueResponse(issue, command, submit: true);
+    } finally {
+      _issueResponseBusy.remove(key);
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }
+  }
+
+  Future<bool> checkWorkspaceIssueResponse(
+    WorkspaceIssueRecord issue, {
+    bool retrySend = false,
+  }) async {
+    final saved = workspaceIssueResponse(issue);
+    if (issueCommandGateway == null ||
+        !_issueIsCurrent(issue) ||
+        saved?.pending != true ||
+        workspaceIssueResponseBusy(issue) ||
+        (retrySend && !workspaceIssueMayRetrySend(issue))) {
+      return false;
+    }
+    final key = issue.draftKey;
+    _issueResponseBusy.add(key);
+    notifyListeners();
+    try {
+      return await _performIssueResponse(
+        issue,
+        saved!.command,
+        submit: retrySend,
+      );
+    } finally {
+      _issueResponseBusy.remove(key);
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }
+  }
+
+  Future<bool> _performIssueResponse(
+    WorkspaceIssueRecord issue,
+    WorkIssueCommand command, {
+    required bool submit,
+  }) async {
+    final key = command.key;
+    if (key.account != _contactAccountScope || _disposed) return false;
+    if (submit) {
+      final pending = WorkIssueSubmission(command);
+      try {
+        await _issueCommandStorage.save(pending);
+      } on Object {
+        _issueResponseMessages[key] = _issueNotDispatched.contains(key)
+            ? 'Could not save response status. Nothing was sent. Retry when ready.'
+            : 'Could not save response status. Check status before trying again.';
+        return false;
+      }
+      if (key.account != _contactAccountScope || _disposed) return false;
+      _issueResponses[key] = pending;
+      _issueNotDispatched.remove(key);
+    }
+    _issueResponseMessages[key] = submit
+        ? 'Sending response…'
+        : 'Checking response…';
+    if (_issueIsCurrent(issue)) notifyListeners();
+    try {
+      final reply =
+          await (submit
+                  ? issueCommandGateway!.submitIssueResponse(command)
+                  : issueCommandGateway!.reconcileIssueResponse(command))
+              .timeout(const Duration(seconds: 20));
+      if (_disposed || key.account != _contactAccountScope) return false;
+      if (!reply.matches(command)) {
+        _issueResponseMessages[key] =
+            'Response status could not be verified. Check status before trying again.';
+        return false;
+      }
+      final result = WorkIssueSubmission(command, reply);
+      // Persist the authoritative receipt before unlocking another response.
+      await _issueCommandStorage.save(result);
+      if (_disposed || key.account != _contactAccountScope) return false;
+      _issueResponses[key] = result;
+      _issueResponseMessages.remove(key);
+      return reply.state == WorkIssueReplyState.applied;
+    } on Object {
+      _issueResponseMessages[key] =
+          'Response status is uncertain. Check status before trying again.';
+      return false;
+    }
+  }
+
   bool _issueIsCurrent(WorkspaceIssueRecord issue) =>
       !_disposed &&
       issue.accountScope == _contactAccountScope &&
@@ -931,6 +1159,7 @@ class WorkSession extends ChangeNotifier {
   }) async {
     if (!_issueIsCurrent(issue) ||
         !workspaceIssueDraftLoaded(issue) ||
+        workspaceIssueResponseLocksDraft(issue) ||
         issue.revision != _storeData.issues[issue.id]?.revision ||
         issue.state != WorkspaceIssueState.retailerReview ||
         !WorkspaceIssueDraft.acceptsNote(note) ||

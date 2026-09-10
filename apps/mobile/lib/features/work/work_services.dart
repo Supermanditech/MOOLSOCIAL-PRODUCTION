@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:crypto/crypto.dart' as crypto;
 import 'package:image_picker/image_picker.dart';
 
 import '../shared/social_content_gateway.dart';
@@ -181,6 +182,274 @@ class SecureWorkIssueDraftStore implements WorkIssueDraftStore {
       throw const WorkGatewayException(
         'Sign in again to check your saved response.',
       );
+    }
+  }
+}
+
+enum WorkIssueReplyState { applied, rejected, pending, notRecorded }
+
+enum WorkIssueResponseError {
+  permissionDenied,
+  caseChanged,
+  caseClosed,
+  responseUnavailable,
+  invalidDetails;
+
+  String get instruction => switch (this) {
+    permissionDenied => 'You do not have permission to respond to this case.',
+    caseChanged =>
+      'This case changed. Review the latest update before responding.',
+    caseClosed => 'This case is closed. Your draft has been kept.',
+    responseUnavailable =>
+      'This response is no longer available. Review the case.',
+    invalidDetails => 'Check your response details and try again.',
+  };
+}
+
+/// V1 case-response command. The purchasing line snapshot is immutable, and
+/// this command never doubles as a refund, receipt, substitution or handover.
+class WorkIssueCommand {
+  WorkIssueCommand({
+    required this.operationId,
+    required this.draft,
+    required this.kind,
+    required List<WorkspaceIssueLine> lines,
+  }) : lines = List.unmodifiable(lines);
+  final String operationId;
+  final WorkspaceIssueDraft draft;
+  final WorkspaceIssueKind kind;
+  final List<WorkspaceIssueLine> lines;
+  WorkspaceIssueDraftKey get key => draft.key;
+  bool get valid =>
+      draft.valid &&
+      draft.response != null &&
+      RegExp(r'^STORE-ISSUE-[A-Za-z0-9_-]{22,64}$').hasMatch(operationId) &&
+      (draft.response == WorkspaceIssueResponse.acceptRequest ||
+          draft.note.trim().isNotEmpty) &&
+      lines.isNotEmpty &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.lineId).toSet().length == lines.length;
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'operationId': operationId,
+    'draft': draft.toJson(),
+    'kind': kind.name,
+    'lines': [
+      for (final line in lines)
+        {
+          'lineId': line.lineId,
+          'productId': line.productId,
+          'name': line.name,
+          'pack': line.pack,
+          'orderedQuantity': line.orderedQuantity,
+          'affectedQuantity': line.affectedQuantity,
+        },
+    ],
+  };
+
+  /// SHA-256 over UTF-8 JSON in the exact V1 field order above. Not a credential.
+  String get digest =>
+      crypto.sha256.convert(utf8.encode(jsonEncode(toJson()))).toString();
+
+  static WorkIssueCommand? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['operationId'] is! String ||
+        value['lines'] is! List) {
+      return null;
+    }
+    final draft = WorkspaceIssueDraft.fromJson(value['draft']);
+    final kind = WorkspaceIssueKind.values
+        .where((k) => k.name == value['kind'])
+        .firstOrNull;
+    if (draft == null || kind == null) return null;
+    final lines = <WorkspaceIssueLine>[];
+    for (final line in value['lines'] as List) {
+      if (line is! Map ||
+          line['lineId'] is! String ||
+          line['productId'] is! String ||
+          line['name'] is! String ||
+          line['pack'] is! String ||
+          line['orderedQuantity'] is! int ||
+          line['affectedQuantity'] is! int) {
+        return null;
+      }
+      lines.add(
+        WorkspaceIssueLine(
+          lineId: line['lineId'],
+          productId: line['productId'],
+          name: line['name'],
+          pack: line['pack'],
+          orderedQuantity: line['orderedQuantity'],
+          affectedQuantity: line['affectedQuantity'],
+        ),
+      );
+    }
+    final command = WorkIssueCommand(
+      operationId: value['operationId'],
+      draft: draft,
+      kind: kind,
+      lines: lines,
+    );
+    return command.valid ? command : null;
+  }
+}
+
+/// Applied means the response was recorded once, not that the case was approved.
+/// The case feed separately supplies its next status. Unknown/timeout stays pending.
+class WorkIssueReply {
+  const WorkIssueReply({
+    required this.key,
+    required this.operationId,
+    required this.commandDigest,
+    required this.state,
+    this.revision,
+    this.error,
+  });
+  final WorkspaceIssueDraftKey key;
+  final String operationId, commandDigest;
+  final WorkIssueReplyState state;
+  final int? revision;
+  final WorkIssueResponseError? error;
+  bool matches(WorkIssueCommand command) =>
+      key == command.key &&
+      operationId == command.operationId &&
+      commandDigest == command.digest &&
+      switch (state) {
+        WorkIssueReplyState.applied =>
+          error == null &&
+              revision != null &&
+              revision! > command.draft.expectedRevision,
+        WorkIssueReplyState.rejected => error != null,
+        WorkIssueReplyState.pending ||
+        WorkIssueReplyState.notRecorded => error == null,
+      };
+  Map<String, Object?> toJson() => {
+    'account': key.account,
+    'store': key.store,
+    'caseId': key.caseId,
+    'operationId': operationId,
+    'commandDigest': commandDigest,
+    'state': state.name,
+    'revision': revision,
+    'error': error?.name,
+  };
+  static WorkIssueReply? fromJson(Object? value) {
+    if (value is! Map ||
+        value['account'] is! String ||
+        value['store'] is! String ||
+        value['caseId'] is! String ||
+        value['operationId'] is! String ||
+        value['commandDigest'] is! String ||
+        (value['revision'] != null && value['revision'] is! int)) {
+      return null;
+    }
+    final state = WorkIssueReplyState.values
+        .where((s) => s.name == value['state'])
+        .firstOrNull;
+    final error = WorkIssueResponseError.values
+        .where((s) => s.name == value['error'])
+        .firstOrNull;
+    if (state == null || (value['error'] != null && error == null)) return null;
+    return WorkIssueReply(
+      key: (
+        account: value['account'],
+        store: value['store'],
+        caseId: value['caseId'],
+      ),
+      operationId: value['operationId'],
+      commandDigest: value['commandDigest'],
+      state: state,
+      revision: value['revision'],
+      error: error,
+    );
+  }
+}
+
+class WorkIssueSubmission {
+  const WorkIssueSubmission(this.command, [this.reply]);
+  final WorkIssueCommand command;
+  final WorkIssueReply? reply;
+  bool get pending =>
+      reply == null ||
+      {
+        WorkIssueReplyState.pending,
+        WorkIssueReplyState.notRecorded,
+      }.contains(reply!.state);
+  bool get valid => command.valid && (reply == null || reply!.matches(command));
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'command': command.toJson(),
+    'reply': reply?.toJson(),
+  };
+  static WorkIssueSubmission? fromJson(Object? value) {
+    if (value is! Map || value['version'] != 1) return null;
+    final command = WorkIssueCommand.fromJson(value['command']);
+    final reply = WorkIssueReply.fromJson(value['reply']);
+    if (command == null || (value['reply'] != null && reply == null)) {
+      return null;
+    }
+    final submission = WorkIssueSubmission(command, reply);
+    return submission.valid ? submission : null;
+  }
+}
+
+/// Authenticate independently; validate Store role, exact case/line/revision and
+/// permitted response; atomically deduplicate operation+digest with the response.
+/// Reconcile is read-only. Unknown is pending, never permission for a fresh ID.
+/// A notRecorded reply permits retry of the SAME operation and payload only;
+/// atomic deduplication must protect a racing/delayed original attempt as well.
+/// A rejected receipt guarantees this operation recorded no case response.
+abstract interface class WorkIssueCommandGateway {
+  Future<WorkIssueReply> submitIssueResponse(WorkIssueCommand command);
+  Future<WorkIssueReply> reconcileIssueResponse(WorkIssueCommand command);
+}
+
+abstract interface class WorkIssueCommandStore {
+  Future<WorkIssueSubmission?> read(WorkspaceIssueDraftKey key);
+  Future<void> save(WorkIssueSubmission submission);
+}
+
+class SecureWorkIssueCommandStore implements WorkIssueCommandStore {
+  SecureWorkIssueCommandStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  String _key(WorkspaceIssueDraftKey key) =>
+      'moolsocial.workspace.issue-command.v1.'
+      '${[key.account, key.store, key.caseId].map(Uri.encodeComponent).join('/')}';
+  @override
+  Future<WorkIssueSubmission?> read(WorkspaceIssueDraftKey key) async {
+    if (key.account != accountScope()) return null;
+    final value = await _storage
+        .read(key: _key(key))
+        .timeout(const Duration(seconds: 10));
+    if (value == null || key.account != accountScope()) return null;
+    final submission = WorkIssueSubmission.fromJson(jsonDecode(value));
+    if (submission == null || submission.command.key != key) {
+      throw const WorkGatewayException(
+        'Your response status could not be opened.',
+      );
+    }
+    return submission;
+  }
+
+  @override
+  Future<void> save(WorkIssueSubmission submission) async {
+    if (!submission.valid || submission.command.key.account != accountScope()) {
+      throw const WorkGatewayException('Sign in again to check your response.');
+    }
+    await _storage
+        .write(
+          key: _key(submission.command.key),
+          value: jsonEncode(submission.toJson()),
+        )
+        .timeout(const Duration(seconds: 10));
+    if (submission.command.key.account != accountScope()) {
+      throw const WorkGatewayException('Sign in again to check your response.');
     }
   }
 }

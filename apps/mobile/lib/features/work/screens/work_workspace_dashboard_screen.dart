@@ -4707,21 +4707,11 @@ class _StoreIssueReviewState extends State<_StoreIssueReview> {
                 'Do not replace items without the customer’s confirmation.',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
-            if (issue.permittedResponses.isNotEmpty ||
-                widget.session.workspaceIssueDraft(issue) != null)
-              _StoreIssueResponseEditor(
-                key: ValueKey(issue.draftKey),
-                session: widget.session,
-                issue: issue,
-              )
-            else if (issue.state == WorkspaceIssueState.retailerReview) ...[
-              const SizedBox(height: 8),
-              const Text(
-                'Case actions are unavailable. No decision has been sent.',
-                key: Key('work-issue-actions-unavailable'),
-                style: TextStyle(fontSize: 12),
-              ),
-            ],
+            _StoreIssueResponseEditor(
+              key: ValueKey(issue.draftKey),
+              session: widget.session,
+              issue: issue,
+            ),
             if (issue.state == WorkspaceIssueState.resolved)
               const Text(
                 'Check the linked payment and stock records for any adjustments.',
@@ -4760,12 +4750,76 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
   }
 
   Future<void> _restore() async {
-    await widget.session.loadWorkspaceIssueDraft(widget.issue);
+    await Future.wait([
+      widget.session.loadWorkspaceIssueDraft(widget.issue),
+      widget.session.loadWorkspaceIssueResponse(widget.issue),
+    ]);
     if (!mounted) return;
     final draft = widget.session.workspaceIssueDraft(widget.issue);
     if (!_restored) _note.text = draft?.note ?? '';
     setState(
       () => _restored = widget.session.workspaceIssueDraftLoaded(widget.issue),
+    );
+  }
+
+  Future<void> _send() async {
+    final session = widget.session;
+    final issue = widget.issue;
+    final draft = session.workspaceIssueDraft(issue);
+    if (draft == null || !session.workspaceIssueCanSend(issue)) return;
+    FocusScope.of(context).unfocus();
+    var confirmed = false;
+    if (draft.response == WorkspaceIssueResponse.declineRequest) {
+      confirmed =
+          await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              key: const Key('work-issue-decline-confirmation'),
+              scrollable: true,
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 24,
+              ),
+              title: const Text(
+                'Decline request?',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700),
+              ),
+              content: Text(
+                'Your reason will be sent for ${issue.referenceId}.',
+                style: const TextStyle(fontSize: 13),
+              ),
+              actions: [
+                TextButton(
+                  style: TextButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Keep editing'),
+                ),
+                FilledButton(
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(0, 48),
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                  ),
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Send decline'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!confirmed || !mounted) return;
+    }
+    if (!mounted) return;
+    // Keep this case in the lazy order list when its form becomes a summary.
+    // Only the retailer's Send action moves focus; background updates do not.
+    await Scrollable.ensureVisible(context, alignment: 0);
+    if (!mounted) return;
+    await session.sendWorkspaceIssueResponse(
+      issue,
+      expectedDraft: draft,
+      declineConfirmed: confirmed,
     );
   }
 
@@ -4782,13 +4836,41 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
       final session = widget.session;
       final issue = widget.issue;
       final draft = session.workspaceIssueDraft(issue);
-      final loaded = _restored && session.workspaceIssueDraftLoaded(issue);
+      final submission = session.workspaceIssueResponse(issue);
+      final reply = submission?.reply;
+      final responseMessage = session.workspaceIssueResponseMessage(issue);
+      final busy = session.workspaceIssueResponseBusy(issue);
+      final locked = session.workspaceIssueResponseLocksDraft(issue);
+      final sent =
+          reply?.state == WorkIssueReplyState.applied &&
+          draft?.expectedRevision == submission?.command.draft.expectedRevision;
+      final pending = submission?.pending == true;
+      final loaded =
+          _restored &&
+          session.workspaceIssueDraftLoaded(issue) &&
+          session.workspaceIssueResponseLoaded(issue);
+      if (loaded &&
+          issue.permittedResponses.isEmpty &&
+          draft == null &&
+          submission == null) {
+        return issue.state == WorkspaceIssueState.retailerReview
+            ? const Padding(
+                padding: EdgeInsets.only(top: 8),
+                child: Text(
+                  'Case actions are unavailable. No decision has been sent.',
+                  key: Key('work-issue-actions-unavailable'),
+                  style: TextStyle(fontSize: 12),
+                ),
+              )
+            : const SizedBox.shrink();
+      }
       final changed = draft != null && draft.expectedRevision != issue.revision;
       final available =
           issue.state == WorkspaceIssueState.retailerReview &&
           !session.workspaceIssuesStale &&
           loaded &&
-          !changed;
+          !changed &&
+          !locked;
       final choice = issue.permittedResponses.contains(draft?.response)
           ? draft?.response
           : null;
@@ -4811,10 +4893,10 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
           children: [
             if (!loaded) ...[
               Text(
-                message ?? 'Opening saved response…',
+                responseMessage ?? message ?? 'Opening saved response…',
                 style: const TextStyle(fontSize: 12),
               ),
-              if (message != null)
+              if (message != null || responseMessage != null)
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -4823,9 +4905,11 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                   ),
                 ),
             ] else ...[
-              if (changed) ...[
-                const Text(
-                  'Case updated. Review the items before using this draft.',
+              if (changed && !locked) ...[
+                Text(
+                  sent
+                      ? 'Case updated. Review your previous response before sending again.'
+                      : 'Case updated. Review the items before using this draft.',
                 ),
                 Align(
                   alignment: Alignment.centerRight,
@@ -4833,66 +4917,84 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                     key: Key('work-issue-review-update-${issue.id}'),
                     onPressed:
                         issue.state == WorkspaceIssueState.retailerReview &&
-                            !session.workspaceIssuesStale
+                            !session.workspaceIssuesStale &&
+                            !locked
                         ? () => save(choice, reviewed: true)
                         : null,
-                    child: const Text('Use draft'),
+                    child: Text(sent ? 'Review response' : 'Use draft'),
                   ),
                 ),
               ],
-              if (issue.permittedResponses.isNotEmpty) ...[
-                const Text('Your response', style: TextStyle(fontSize: 12)),
-                const SizedBox(height: 4),
-                DropdownButtonFormField<WorkspaceIssueResponse>(
-                  key: ValueKey((issue.id, issue.revision, choice)),
-                  initialValue: choice,
-                  isExpanded: true,
-                  isDense: MediaQuery.textScalerOf(context).scale(1) < 2,
-                  itemHeight: null,
-                  hint: const Text('Choose'),
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              if (pending || sent) ...[
+                Text(
+                  submission!.command.draft.response!.label,
+                  style: const TextStyle(
                     fontSize: 14,
-                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w700,
                   ),
-                  decoration: const InputDecoration(),
-                  items: [
-                    for (final response in issue.permittedResponses)
-                      DropdownMenuItem(
-                        value: response,
-                        child: Text(response.label),
-                      ),
-                  ],
-                  onChanged: available ? save : null,
+                ),
+                if (submission.command.draft.note.isNotEmpty)
+                  Text(
+                    submission.command.draft.note,
+                    key: Key('work-issue-sent-note-${issue.id}'),
+                    style: const TextStyle(fontSize: 14),
+                  ),
+              ] else ...[
+                if (issue.permittedResponses.isNotEmpty) ...[
+                  const Text('Your response', style: TextStyle(fontSize: 12)),
+                  const SizedBox(height: 4),
+                  DropdownButtonFormField<WorkspaceIssueResponse>(
+                    key: ValueKey((issue.id, issue.revision, choice)),
+                    initialValue: choice,
+                    isExpanded: true,
+                    isDense: MediaQuery.textScalerOf(context).scale(1) < 2,
+                    itemHeight: null,
+                    hint: const Text('Choose'),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontSize: 14,
+                      color: MoolColors.ink,
+                    ),
+                    decoration: const InputDecoration(),
+                    items: [
+                      for (final response in issue.permittedResponses)
+                        DropdownMenuItem(
+                          value: response,
+                          child: Text(response.label),
+                        ),
+                    ],
+                    onChanged: available ? save : null,
+                  ),
+                ],
+                const SizedBox(height: 8),
+                TextField(
+                  key: Key('work-issue-response-note-${issue.id}'),
+                  controller: _note,
+                  readOnly: !available,
+                  minLines: MediaQuery.textScalerOf(context).scale(1) >= 2
+                      ? 1
+                      : 2,
+                  maxLines: MediaQuery.textScalerOf(context).scale(1) >= 2
+                      ? 2
+                      : 4,
+                  maxLength: 2000,
+                  decoration: InputDecoration(
+                    labelText: 'Response details',
+                    hintText: 'Explain what happened',
+                    counterStyle: const TextStyle(fontSize: 12, height: 1.2),
+                    helperText: issue.state.closed && submission == null
+                        ? 'Saved response — not sent'
+                        : null,
+                  ),
+                  onChanged: available ? (_) => save(choice) : null,
                 ),
               ],
-              const SizedBox(height: 8),
-              TextField(
-                key: Key('work-issue-response-note-${issue.id}'),
-                controller: _note,
-                readOnly: !available,
-                minLines: MediaQuery.textScalerOf(context).scale(1) >= 2
-                    ? 1
-                    : 2,
-                maxLines: MediaQuery.textScalerOf(context).scale(1) >= 2
-                    ? 2
-                    : 4,
-                maxLength: 2000,
-                decoration: InputDecoration(
-                  labelText: 'Response details',
-                  hintText: 'Explain what happened',
-                  helperText: issue.state.closed
-                      ? 'Saved response — not sent'
-                      : null,
-                ),
-                onChanged: available ? (_) => save(choice) : null,
-              ),
-              if (message != null)
+              if (message != null && !pending && !sent)
                 Text(
                   message,
                   key: Key('work-issue-draft-status-${issue.id}'),
                   style: const TextStyle(fontSize: 12),
                 ),
-              if (message?.startsWith('Draft not saved') == true)
+              if (message?.startsWith('Draft not saved') == true && !locked)
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -4901,10 +5003,73 @@ class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
                   ),
                 ),
               const SizedBox(height: 8),
-              const Text(
-                'Sending is unavailable.',
-                style: TextStyle(fontSize: 12),
-              ),
+              if (sent)
+                Text(
+                  issue.revision < reply!.revision!
+                      ? 'Response sent. Waiting for the case update.'
+                      : 'Response sent.',
+                  key: Key('work-issue-response-result-${issue.id}'),
+                )
+              else if (reply?.state == WorkIssueReplyState.rejected)
+                Text(
+                  reply!.error!.instruction,
+                  key: Key('work-issue-response-result-${issue.id}'),
+                ),
+              if (responseMessage != null)
+                Text(responseMessage, style: const TextStyle(fontSize: 12))
+              else if (pending)
+                Text(
+                  session.workspaceIssueMayRetrySend(issue)
+                      ? 'Your response has not been recorded. Retry when ready.'
+                      : 'Your response is awaiting confirmation. Check its status.',
+                ),
+              if (session.issueCommandGateway == null)
+                const Text(
+                  'Sending is unavailable.',
+                  style: TextStyle(fontSize: 12),
+                )
+              else if (pending)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    key: Key('work-issue-check-response-${issue.id}'),
+                    onPressed: busy
+                        ? null
+                        : () => session.checkWorkspaceIssueResponse(
+                            issue,
+                            retrySend: session.workspaceIssueMayRetrySend(
+                              issue,
+                            ),
+                          ),
+                    child: Text(
+                      busy
+                          ? 'Please wait…'
+                          : session.workspaceIssueMayRetrySend(issue)
+                          ? 'Retry response'
+                          : 'Check status',
+                    ),
+                  ),
+                )
+              else if (!sent &&
+                  issue.state == WorkspaceIssueState.retailerReview) ...[
+                if (choice != null &&
+                    choice != WorkspaceIssueResponse.acceptRequest &&
+                    _note.text.trim().isEmpty)
+                  const Text(
+                    'Add details before sending.',
+                    style: TextStyle(fontSize: 12),
+                  ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: FilledButton(
+                    key: Key('work-issue-send-response-${issue.id}'),
+                    onPressed: session.workspaceIssueCanSend(issue)
+                        ? _send
+                        : null,
+                    child: const Text('Send response'),
+                  ),
+                ),
+              ],
             ],
           ],
         ),
