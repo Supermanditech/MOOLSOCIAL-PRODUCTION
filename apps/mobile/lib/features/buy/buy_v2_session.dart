@@ -1895,6 +1895,7 @@ class BuyV2Session extends ChangeNotifier {
     this.catalogueNow = DateTime.now,
     this.cataloguePageSource,
     this.publishedCatalogueSource,
+    this.shoppingAreaSource,
     Map<String, String> catalogueAreas = const {},
     String? initialCatalogueRegionId,
     BuyV2OrderResolutionAdapter? orderResolutionAdapter,
@@ -2450,6 +2451,11 @@ class BuyV2Session extends ChangeNotifier {
 
   final Map<String, String> _catalogueAreas = {};
   String? _catalogueRegionId;
+  String? _shoppingGooglePlaceId;
+  BuyV2ShoppingArea? _selectedShoppingArea;
+  int _shoppingAreaRevision = 0;
+  int _shoppingAreaRequestRevision = 0;
+  final Map<String, BuyV2ShoppingArea> _resolvedShoppingAreas = {};
   BuyV2CatalogueAreaScope _catalogueAreaScope =
       BuyV2CatalogueAreaScope.regional;
   Map<String, String> get catalogueAreaChoices =>
@@ -2459,9 +2465,111 @@ class BuyV2Session extends ChangeNotifier {
   String get catalogueAreaLabel =>
       _catalogueAreaScope == BuyV2CatalogueAreaScope.allAreas
       ? 'Any area'
-      : _catalogueAreas[_catalogueRegionId] ?? 'Choose area';
+      : (_selectedShoppingArea?.regionId == _catalogueRegionId
+                ? _selectedShoppingArea?.label
+                : null) ??
+            _catalogueAreas[_catalogueRegionId] ??
+            (_catalogueRegionId == null
+                ? 'Choose area'
+                : 'Saved shopping area');
+
+  String? get shoppingGooglePlaceId => _shoppingGooglePlaceId;
+
+  Future<List<BuyV2ShoppingArea>> searchShoppingAreas(String text) async {
+    final query = text.trim();
+    if (query.length < 2 || query.length > 80) return const [];
+    final source = shoppingAreaSource;
+    if (source == null) throw BuyV2ShoppingAreaFailure.unavailable;
+    return _lookupShoppingAreas(() => source.search(query));
+  }
+
+  Future<List<BuyV2ShoppingArea>> locateShoppingArea() async {
+    final source = shoppingAreaSource;
+    if (source == null) throw BuyV2ShoppingAreaFailure.unavailable;
+    return _lookupShoppingAreas(() async {
+      final area = await source.locate();
+      return [?area];
+    });
+  }
+
+  Future<List<BuyV2ShoppingArea>> _lookupShoppingAreas(
+    Future<List<BuyV2ShoppingArea>> Function() lookup,
+  ) async {
+    final request = ++_shoppingAreaRequestRevision;
+    final owner = customerStateStore?.ownerScope;
+    final selection = _shoppingAreaRevision;
+    final result = await lookup().timeout(const Duration(seconds: 15));
+    if (_collectionDisposed ||
+        !procurementScopeCurrent ||
+        customerStateStore?.ownerScope != owner ||
+        request != _shoppingAreaRequestRevision ||
+        selection != _shoppingAreaRevision) {
+      return const [];
+    }
+    if (result.length > 20 ||
+        result.any((area) => !area.valid) ||
+        result.map((area) => area.googlePlaceId).toSet().length !=
+            result.length) {
+      throw BuyV2ShoppingAreaFailure.unavailable;
+    }
+    _resolvedShoppingAreas
+      ..clear()
+      ..addEntries(result.map((area) => MapEntry(area.googlePlaceId, area)));
+    return List.unmodifiable(result);
+  }
+
+  bool chooseShoppingArea(
+    BuyV2ShoppingArea area,
+    BuyV2CatalogueAreaScope scope,
+  ) {
+    if (_collectionDisposed ||
+        !procurementScopeCurrent ||
+        !area.valid ||
+        scope == BuyV2CatalogueAreaScope.allAreas ||
+        !identical(_resolvedShoppingAreas[area.googlePlaceId], area)) {
+      return false;
+    }
+    _selectedShoppingArea = area;
+    _catalogueRegionId = area.regionId;
+    _shoppingGooglePlaceId = area.googlePlaceId;
+    _catalogueAreaScope = scope;
+    _shoppingAreaRevision++;
+    _shoppingAreaRequestRevision++;
+    _persistCustomerState();
+    notifyListeners();
+    return true;
+  }
+
+  Future<void> _refreshShoppingAreaLabel() async {
+    final source = shoppingAreaSource;
+    final placeId = _shoppingGooglePlaceId;
+    if (source == null || placeId == null) return;
+    final owner = customerStateStore?.ownerScope;
+    final revision = _shoppingAreaRevision;
+    try {
+      final area = await source
+          .resolve(placeId)
+          .timeout(const Duration(seconds: 15));
+      if (_collectionDisposed ||
+          !procurementScopeCurrent ||
+          owner != customerStateStore?.ownerScope ||
+          revision != _shoppingAreaRevision ||
+          placeId != _shoppingGooglePlaceId ||
+          area == null ||
+          !area.valid ||
+          area.googlePlaceId != placeId ||
+          area.regionId != _catalogueRegionId) {
+        return;
+      }
+      _selectedShoppingArea = area;
+      notifyListeners();
+    } on Object {
+      // Retain the selected region and place ID without caching Google labels.
+    }
+  }
 
   void chooseCatalogueArea(String? regionId, BuyV2CatalogueAreaScope scope) {
+    if (_collectionDisposed || !procurementScopeCurrent) return;
     if (scope != BuyV2CatalogueAreaScope.allAreas &&
         (regionId == null || !_catalogueAreas.containsKey(regionId))) {
       return;
@@ -2469,6 +2577,11 @@ class BuyV2Session extends ChangeNotifier {
     if (_catalogueRegionId == regionId && _catalogueAreaScope == scope) return;
     _catalogueRegionId = regionId;
     _catalogueAreaScope = scope;
+    _shoppingGooglePlaceId = null;
+    _selectedShoppingArea = null;
+    _shoppingAreaRevision++;
+    _shoppingAreaRequestRevision++;
+    _persistCustomerState();
     notifyListeners();
   }
 
@@ -3441,6 +3554,7 @@ class BuyV2Session extends ChangeNotifier {
   final DateTime Function() catalogueNow;
   final BuyV2CataloguePageSource? cataloguePageSource;
   final BuyV2PublishedCatalogueSource? publishedCatalogueSource;
+  final BuyV2ShoppingAreaSource? shoppingAreaSource;
   BuyV2PublishedCatalogueSource? _devicePublishedCatalogueSource;
   final Map<BuyV2Destination, BuyV2CataloguePageSource>
   _deviceCatalogueSources = {};
@@ -5278,7 +5392,9 @@ class BuyV2Session extends ChangeNotifier {
         notice = null;
       }
       _procurementBrowseReady = true;
+      if (_shoppingAreaRevision > 0) _persistCustomerState();
       notifyListeners();
+      unawaited(_refreshShoppingAreaLabel());
     } on Object {
       if (_collectionDisposed ||
           !procurementScopeCurrent ||
@@ -5317,6 +5433,30 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2CustomerStateSnapshot snapshot, {
     bool retainUnknownProducts = false,
   }) {
+    if (_shoppingAreaRevision == 0) {
+      final region = snapshot.shoppingRegionId;
+      final place = snapshot.shoppingGooglePlaceId;
+      final scope = BuyV2CatalogueAreaScope.values
+          .where((scope) => scope.name == snapshot.shoppingAreaScope)
+          .firstOrNull;
+      if (scope != null &&
+          (scope == BuyV2CatalogueAreaScope.allAreas ||
+              (region != null &&
+                  region.trim().isNotEmpty &&
+                  region.length <= 512))) {
+        _catalogueRegionId = scope == BuyV2CatalogueAreaScope.allAreas
+            ? null
+            : region;
+        _catalogueAreaScope = scope;
+        _shoppingGooglePlaceId =
+            place != null &&
+                place.trim().isNotEmpty &&
+                place.length <= 512 &&
+                scope != BuyV2CatalogueAreaScope.allAreas
+            ? place
+            : null;
+      }
+    }
     final retainedDraft = snapshot.procurementDraft;
     _cart.clear();
     for (final entry in snapshot.cartQuantities.entries) {
@@ -5561,6 +5701,9 @@ class BuyV2Session extends ChangeNotifier {
       _unresolvedCustomerCart.removeWhere((id, _) => _cart.containsKey(id));
     }
     final snapshot = BuyV2CustomerStateSnapshot(
+      shoppingRegionId: _catalogueRegionId,
+      shoppingGooglePlaceId: _shoppingGooglePlaceId,
+      shoppingAreaScope: _catalogueAreaScope.name,
       procurementDraft: isStoreProcurement
           ? BuyV2ProcurementDraftSnapshot(
               ownerScope: procurementContext!.customerStateOwnerScope,

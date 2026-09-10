@@ -121,6 +121,9 @@ class BuyV2ProcurementDraftSnapshot {
 @immutable
 class BuyV2CustomerStateSnapshot {
   const BuyV2CustomerStateSnapshot({
+    this.shoppingRegionId,
+    this.shoppingGooglePlaceId,
+    this.shoppingAreaScope,
     this.cartQuantities = const {},
     this.procurementDraft,
     this.addresses = const [],
@@ -147,6 +150,10 @@ class BuyV2CustomerStateSnapshot {
   });
 
   final Map<String, int> cartQuantities;
+  // Persist selection identifiers, not Google response labels or coordinates.
+  final String? shoppingRegionId;
+  final String? shoppingGooglePlaceId;
+  final String? shoppingAreaScope;
   final BuyV2ProcurementDraftSnapshot? procurementDraft;
   final List<BuyV2Address> addresses;
   final String? selectedAddressId;
@@ -233,6 +240,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
   }
 
   Map<String, Object?> _encodeSnapshot(BuyV2CustomerStateSnapshot snapshot) => {
+    'shoppingRegionId': snapshot.shoppingRegionId,
+    'shoppingGooglePlaceId': snapshot.shoppingGooglePlaceId,
+    'shoppingAreaScope': snapshot.shoppingAreaScope,
     'cartQuantities': snapshot.cartQuantities,
     if (snapshot.procurementDraft case final draft?)
       'procurementDraft': _encodeProcurementDraft(draft),
@@ -268,6 +278,9 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   BuyV2CustomerStateSnapshot _decodeSnapshot(Map<String, Object?> source) =>
       BuyV2CustomerStateSnapshot(
+        shoppingRegionId: _string(source['shoppingRegionId']),
+        shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
+        shoppingAreaScope: _string(source['shoppingAreaScope']),
         cartQuantities: _stringIntMap(source['cartQuantities']),
         procurementDraft: _decodeProcurementDraft(source['procurementDraft']),
         addresses: _objectList(

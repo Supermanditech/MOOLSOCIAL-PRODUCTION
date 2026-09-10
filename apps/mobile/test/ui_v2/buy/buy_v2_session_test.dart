@@ -14,6 +14,8 @@ import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
+    show showBuyV2CatalogueArea;
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 import 'buy_v2_discovery_refinement_test.dart'
@@ -935,7 +937,379 @@ Future<BuyV2Session> _openOrderSearchFixture({
   return session;
 }
 
+final class _R669ShoppingAreas implements BuyV2ShoppingAreaSource {
+  List<BuyV2ShoppingArea> areas = [];
+  Object? failure;
+  final queries = <String>[];
+  final pending = <String, Completer<List<BuyV2ShoppingArea>>>{};
+  @override
+  Future<List<BuyV2ShoppingArea>> search(String query) async {
+    queries.add(query);
+    if (failure case final error?) throw error;
+    return pending[query]?.future ?? Future.value(areas);
+  }
+
+  @override
+  Future<BuyV2ShoppingArea?> locate() async {
+    if (failure case final error?) throw error;
+    return areas.firstOrNull;
+  }
+
+  @override
+  Future<BuyV2ShoppingArea?> resolve(String googlePlaceId) async =>
+      areas.where((area) => area.googlePlaceId == googlePlaceId).firstOrNull;
+}
+
+void r669ShoppingAreaTests() {
+  group('R669 India shopping area', () {
+    const area = BuyV2ShoppingArea(
+      regionId: 'region-up-village',
+      googlePlaceId: 'google-up-village',
+      label: 'Rural locality, Uttar Pradesh',
+      countryCode: 'IN',
+      postalCode: '221005',
+    );
+    BuyV2Session makeSession(
+      _R669ShoppingAreas? source, {
+      BuyV2CustomerStateStore? store,
+    }) {
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        shoppingAreaSource: source,
+        customerStateStore: store,
+        catalogueAreas: const {'jodhpur': 'Jodhpur'},
+        initialCatalogueRegionId: 'jodhpur',
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      return session;
+    }
+
+    for (final place in [
+      ('221005', 'Rural locality, Uttar Pradesh'),
+      ('700001', 'Kolkata, West Bengal'),
+      ('380001', 'Ahmedabad, Gujarat'),
+      ('560001', 'Bengaluru, Karnataka'),
+    ]) {
+      test('finds new ${place.$1} without a bundled city entry', () async {
+        final found = BuyV2ShoppingArea(
+          regionId: 'region-${place.$1}',
+          googlePlaceId: 'google-${place.$1}',
+          label: place.$2,
+          countryCode: 'IN',
+          postalCode: place.$1,
+        );
+        final source = _R669ShoppingAreas()..areas = [found];
+        final session = makeSession(source);
+        final matches = await session.searchShoppingAreas(place.$1);
+        expect(source.queries, [place.$1]);
+        expect(session.catalogueRegionId, 'jodhpur');
+        expect(
+          session.chooseShoppingArea(
+            matches.single,
+            BuyV2CatalogueAreaScope.national,
+          ),
+          isTrue,
+        );
+        expect(session.catalogueRegionId, found.regionId);
+        expect(session.catalogueAreaLabel, found.label);
+        expect(session.catalogueQuery().regionId, found.regionId);
+        expect(session.catalogueOffersQuery().regionId, found.regionId);
+        expect(
+          session
+              .catalogueQuery(catalogueDestination: BuyV2Destination.wholesale)
+              .areaScope,
+          BuyV2CatalogueAreaScope.national,
+        );
+      });
+    }
+    for (final invalid in [
+      const BuyV2ShoppingArea(
+        regionId: 'foreign',
+        googlePlaceId: 'foreign',
+        label: 'Outside India',
+        countryCode: 'GB',
+      ),
+      const BuyV2ShoppingArea(
+        regionId: 'bad-pin',
+        googlePlaceId: 'bad-pin',
+        label: 'Invalid PIN',
+        countryCode: 'IN',
+        postalCode: '000000',
+      ),
+      const BuyV2ShoppingArea(
+        regionId: '',
+        googlePlaceId: 'missing-region',
+        label: 'No mapped region',
+        countryCode: 'IN',
+      ),
+    ]) {
+      test('rejects invalid ${invalid.googlePlaceId}', () async {
+        final session = makeSession(_R669ShoppingAreas()..areas = [invalid]);
+        await expectLater(
+          session.searchShoppingAreas('area'),
+          throwsA(BuyV2ShoppingAreaFailure.unavailable),
+        );
+        expect(session.catalogueRegionId, 'jodhpur');
+      });
+    }
+    test('rejects unreturned and duplicate places', () async {
+      final session = makeSession(_R669ShoppingAreas()..areas = [area, area]);
+      expect(
+        session.chooseShoppingArea(area, BuyV2CatalogueAreaScope.regional),
+        isFalse,
+      );
+      await expectLater(
+        session.searchShoppingAreas('area'),
+        throwsA(BuyV2ShoppingAreaFailure.unavailable),
+      );
+    });
+    test(
+      'current location requires selection and permission failure keeps Cart',
+      () async {
+        final source = _R669ShoppingAreas()..areas = [area];
+        final session = makeSession(source);
+        final product = BuyV2Catalogue.products.first;
+        session.addProduct(product.id);
+        final quantity = session.quantityFor(product.id);
+        final found = await session.locateShoppingArea();
+        expect(session.catalogueRegionId, 'jodhpur');
+        source.failure = BuyV2ShoppingAreaFailure.permissionDenied;
+        await expectLater(
+          session.locateShoppingArea(),
+          throwsA(BuyV2ShoppingAreaFailure.permissionDenied),
+        );
+        expect(session.catalogueRegionId, 'jodhpur');
+        expect(session.quantityFor(product.id), quantity);
+        source.failure = null;
+        expect(
+          session.chooseShoppingArea(
+            found.single,
+            BuyV2CatalogueAreaScope.regional,
+          ),
+          isTrue,
+        );
+      },
+    );
+    test('late search cannot replace a newer selection', () async {
+      final source = _R669ShoppingAreas()..areas = [area];
+      source.pending['old'] = Completer<List<BuyV2ShoppingArea>>();
+      final session = makeSession(source);
+      final old = session.searchShoppingAreas('old');
+      final fresh = await session.searchShoppingAreas('new');
+      expect(
+        session.chooseShoppingArea(
+          fresh.single,
+          BuyV2CatalogueAreaScope.regional,
+        ),
+        isTrue,
+      );
+      source.pending['old']!.complete([area]);
+      expect(await old, isEmpty);
+      expect(session.catalogueRegionId, area.regionId);
+    });
+    test('retains selection IDs and Cart through codec and relaunch', () async {
+      final preferences = _R669StringPreferences();
+      final store = BuyV2SharedPreferencesCustomerStateStore(
+        preferences,
+        ownerScope: 'area-buyer',
+      );
+      final source = _R669ShoppingAreas()..areas = [area];
+      final session = makeSession(source, store: store);
+      await session.restoreCustomerState();
+      final product = BuyV2Catalogue.products.first;
+      session.addProduct(product.id);
+      final quantity = session.quantityFor(product.id);
+      final found = await session.searchShoppingAreas('221005');
+      session.chooseShoppingArea(
+        found.single,
+        BuyV2CatalogueAreaScope.regional,
+      );
+      await Future<void>.delayed(Duration.zero);
+      final encoded = preferences.values.values.single;
+      expect(encoded, contains(area.googlePlaceId));
+      expect(encoded, isNot(contains(area.label)));
+      final restored = makeSession(source, store: store);
+      await restored.restoreCustomerState();
+      await Future<void>.delayed(Duration.zero);
+      expect(restored.catalogueRegionId, area.regionId);
+      expect(restored.shoppingGooglePlaceId, area.googlePlaceId);
+      expect(restored.catalogueAreaLabel, area.label);
+      expect(restored.quantityFor(product.id), quantity);
+    });
+    test(
+      'manual area during Cart restore survives the late snapshot',
+      () async {
+        final source = _R669ShoppingAreas()..areas = [area];
+        final store = _MemoryCustomerStateStore('area-delayed-restore');
+        final product = BuyV2Catalogue.products.first;
+        final prior = BuyV2CustomerStateSnapshot(
+          cartQuantities: {product.id: 3},
+          shoppingRegionId: 'jodhpur',
+          shoppingAreaScope: BuyV2CatalogueAreaScope.regional.name,
+        );
+        store.snapshot = prior;
+        store.pendingRead = Completer<BuyV2CustomerStateSnapshot?>();
+        final session = makeSession(source, store: store);
+        final restoring = session.restoreCustomerState();
+        await Future<void>.delayed(Duration.zero);
+        final found = await session.searchShoppingAreas('221005');
+        expect(
+          session.chooseShoppingArea(
+            found.single,
+            BuyV2CatalogueAreaScope.regional,
+          ),
+          isTrue,
+        );
+        expect(store.snapshot!.cartQuantities[product.id], 3);
+        store.pendingRead!.complete(prior);
+        await restoring;
+        await Future<void>.delayed(Duration.zero);
+        expect(session.catalogueRegionId, area.regionId);
+        expect(session.quantityFor(product.id), 3);
+        expect(store.snapshot!.shoppingRegionId, area.regionId);
+        expect(store.snapshot!.cartQuantities[product.id], 3);
+      },
+    );
+    test(
+      'provider absence is recoverable and does not select a guessed PIN',
+      () async {
+        final session = makeSession(null);
+        await expectLater(
+          session.searchShoppingAreas('221005'),
+          throwsA(BuyV2ShoppingAreaFailure.unavailable),
+        );
+        expect(session.catalogueRegionId, 'jodhpur');
+        session.chooseCatalogueArea(null, BuyV2CatalogueAreaScope.allAreas);
+        expect(session.catalogueAreaLabel, 'Any area');
+      },
+    );
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('sheet search keyboard retry selection and Back $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final source = _R669ShoppingAreas()..areas = [area];
+        final session = makeSession(source);
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (_, child) => r66VisualCaptureRoot(child!),
+            home: Scaffold(
+              body: Builder(
+                builder: (context) => TextButton(
+                  onPressed: () => showBuyV2CatalogueArea(context, session),
+                  child: const Text('Choose shopping area'),
+                ),
+              ),
+            ),
+          ),
+        );
+        await tester.tap(find.text('Choose shopping area'));
+        await tester.pumpAndSettle();
+        final search = find.byKey(const ValueKey('buy-catalogue-area-search'));
+        await tester.enterText(search, '221005');
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.pumpAndSettle();
+        expect(source.queries, ['221005']);
+        await captureR66Visual(tester, 'r669-location-search-$scale');
+        await tester.scrollUntilVisible(
+          find.text('Google Maps'),
+          140,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Google Maps'), findsOneWidget);
+        final result = find.byKey(
+          ValueKey('buy-google-area-${area.googlePlaceId}'),
+        );
+        Future<void> revealResult() async {
+          final scrollable = find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          await tester.scrollUntilVisible(
+            find.text('Shopping area'),
+            -180,
+            scrollable: scrollable,
+          );
+          await tester.scrollUntilVisible(result, 100, scrollable: scrollable);
+          await tester.pumpAndSettle();
+        }
+
+        tester.view.viewInsets = const FakeViewPadding(bottom: 230);
+        await tester.pumpAndSettle();
+        await revealResult();
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'r669-location-keyboard-$scale');
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        await revealResult();
+        await tester.tap(result);
+        await tester.pumpAndSettle();
+        expect(session.catalogueRegionId, area.regionId);
+        expect(find.text('Shopping area'), findsNothing);
+        await tester.tap(find.text('Choose shopping area'));
+        await tester.pumpAndSettle();
+        source.failure = BuyV2ShoppingAreaFailure.permissionDenied;
+        final locate = find.byKey(const ValueKey('buy-catalogue-current-area'));
+        await tester.ensureVisible(locate);
+        await tester.tap(locate);
+        await tester.pumpAndSettle();
+        final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'r669-location-permission-$scale');
+        expect(session.catalogueRegionId, area.regionId);
+        source.failure = null;
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(
+          find.text('Google Maps'),
+          120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(find.text('Google Maps'), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.catalogueRegionId, area.regionId);
+        source.pending['700001'] = Completer<List<BuyV2ShoppingArea>>();
+        await tester.tap(find.text('Choose shopping area'));
+        await tester.pumpAndSettle();
+        await tester.enterText(search, '700001');
+        await tester.pump(const Duration(milliseconds: 400));
+        await tester.binding.handlePopRoute();
+        await tester.pump(const Duration(milliseconds: 500));
+        source.pending['700001']!.complete([area]);
+        await tester.pumpAndSettle();
+        expect(find.text('Shopping area'), findsNothing);
+        expect(session.catalogueRegionId, area.regionId);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  });
+}
+
 void main() {
+  r669ShoppingAreaTests();
   r669ComparisonContractTests();
   group('STORE-PROCUREMENT-ELIGIBILITY-01 contract', () {
     final now = DateTime.utc(2026, 9, 10, 10);

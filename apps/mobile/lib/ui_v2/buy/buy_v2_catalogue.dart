@@ -781,7 +781,8 @@ class _OffersAvailabilityState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loading = session.customerStateRestoring ||
+    final loading =
+        session.customerStateRestoring ||
         session.commerceLoadState == BuyV2CommerceLoadState.loading;
     return Center(
       child: SingleChildScrollView(
@@ -1465,114 +1466,281 @@ Future<void> showBuyV2CatalogueArea(
 ) async {
   var search = '';
   var national = session.catalogueAreaScope == BuyV2CatalogueAreaScope.national;
-  await showModalBottomSheet<void>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
-    backgroundColor: Colors.white,
-    builder: (sheetContext) => StatefulBuilder(
-      builder: (context, setState) {
-        final areas = session.catalogueAreaChoices.entries
-            .where(
-              (entry) =>
-                  entry.value.toLowerCase().contains(search.toLowerCase()),
-            )
-            .toList(growable: false);
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.viewInsetsOf(context).bottom,
-          ),
-          child: FractionallySizedBox(
-            heightFactor: .9,
-            child: BuyV2VerticalScrollIndicator(
-              child: ListView(
-                key: const ValueKey('buy-catalogue-area-list'),
-                padding: EdgeInsets.fromLTRB(
-                  12,
-                  8,
-                  12,
-                  16 + BuyV2AddressSheetMotion.resolveBottomSafeInset(context),
-                ),
-                keyboardDismissBehavior:
-                    ScrollViewKeyboardDismissBehavior.onDrag,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text('Shopping area', style: context.buyTitle),
-                      ),
-                      IconButton(
-                        tooltip: 'Close shopping area',
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded),
-                      ),
-                    ],
+  var request = 0;
+  var loading = false;
+  var locating = false;
+  var results = <BuyV2ShoppingArea>[];
+  String? failure;
+  Timer? debounce;
+  try {
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.white,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setState) {
+          Future<void> lookup({bool currentLocation = false}) async {
+            debounce?.cancel();
+            final generation = ++request;
+            setState(() {
+              loading = true;
+              locating = currentLocation;
+              failure = null;
+              results = [];
+            });
+            try {
+              final found = currentLocation
+                  ? await session.locateShoppingArea()
+                  : await session.searchShoppingAreas(search);
+              if (!context.mounted || generation != request) return;
+              setState(() {
+                loading = false;
+                results = found;
+              });
+            } on Object catch (error) {
+              if (!context.mounted || generation != request) return;
+              setState(() {
+                loading = false;
+                failure = switch (error) {
+                  BuyV2ShoppingAreaFailure.permissionDenied =>
+                    'Location access is off. Search by locality or PIN code.',
+                  BuyV2ShoppingAreaFailure.offline =>
+                    'Areas could not load. Check your connection and try again.',
+                  _ =>
+                    'Area search is unavailable right now. Try again shortly.',
+                };
+              });
+            }
+          }
+
+          final areas = session.catalogueAreaChoices.entries
+              .where(
+                (entry) =>
+                    entry.value.toLowerCase().contains(search.toLowerCase()),
+              )
+              .toList(growable: false);
+          return Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.viewInsetsOf(context).bottom,
+            ),
+            child: FractionallySizedBox(
+              heightFactor: .9,
+              child: BuyV2VerticalScrollIndicator(
+                child: ListView(
+                  key: const ValueKey('buy-catalogue-area-list'),
+                  padding: EdgeInsets.fromLTRB(
+                    12,
+                    8,
+                    12,
+                    16 +
+                        BuyV2AddressSheetMotion.resolveBottomSafeInset(context),
                   ),
-                  TextField(
-                    key: const ValueKey('buy-catalogue-area-search'),
-                    maxLength: 80,
-                    decoration: const InputDecoration(
-                      hintText: 'City or area',
-                      counterText: '',
+                  keyboardDismissBehavior:
+                      ScrollViewKeyboardDismissBehavior.onDrag,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text('Shopping area', style: context.buyTitle),
+                        ),
+                        IconButton(
+                          tooltip: 'Close shopping area',
+                          onPressed: () => Navigator.of(context).pop(),
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
                     ),
-                    onChanged: (value) => setState(() => search = value.trim()),
-                  ),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      ChoiceChip(
-                        label: const Text('In this area'),
-                        selected: !national,
-                        onSelected: (_) => setState(() => national = false),
+                    TextField(
+                      key: const ValueKey('buy-catalogue-area-search'),
+                      maxLength: 80,
+                      decoration: const InputDecoration(
+                        hintText: 'Locality, city or PIN code',
+                        counterText: '',
                       ),
-                      ChoiceChip(
-                        label: const Text('National delivery'),
-                        selected: national,
-                        onSelected: (_) => setState(() => national = true),
+                      onChanged: (value) {
+                        debounce?.cancel();
+                        request++;
+                        setState(() {
+                          search = value.trim();
+                          results = [];
+                          failure = null;
+                          loading = false;
+                          locating = false;
+                        });
+                        if (search.length >= 2) {
+                          debounce = Timer(
+                            const Duration(milliseconds: 350),
+                            () {
+                              if (context.mounted) unawaited(lookup());
+                            },
+                          );
+                        }
+                      },
+                      onSubmitted: (_) {
+                        if (search.length >= 2) unawaited(lookup());
+                      },
+                    ),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton.icon(
+                        key: const ValueKey('buy-catalogue-current-area'),
+                        onPressed: loading
+                            ? null
+                            : () => lookup(currentLocation: true),
+                        icon: const Icon(Icons.my_location_rounded),
+                        label: const Text('Use current location'),
                       ),
-                    ],
-                  ),
-                  ListTile(
-                    key: const ValueKey('buy-catalogue-any-area'),
-                    title: const Text('Any area'),
-                    subtitle: const Text('Find stores in other areas.'),
-                    onTap: () {
-                      session.chooseCatalogueArea(
-                        null,
-                        BuyV2CatalogueAreaScope.allAreas,
-                      );
-                      Navigator.of(context).pop();
-                    },
-                  ),
-                  for (final area in areas)
+                    ),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        ChoiceChip(
+                          label: const Text('In this area'),
+                          selected: !national,
+                          onSelected: (_) => setState(() => national = false),
+                        ),
+                        ChoiceChip(
+                          label: const Text('National delivery'),
+                          selected: national,
+                          onSelected: (_) => setState(() => national = true),
+                        ),
+                      ],
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 6),
+                      child: Text(
+                        'Delivery availability is checked for your address.',
+                      ),
+                    ),
+                    if (loading)
+                      const Padding(
+                        padding: EdgeInsets.all(12),
+                        child: Center(child: CircularProgressIndicator()),
+                      ),
+                    if (failure != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              failure!,
+                              key: const ValueKey('buy-area-lookup-failure'),
+                            ),
+                            TextButton(
+                              key: const ValueKey('buy-area-lookup-retry'),
+                              onPressed: () =>
+                                  lookup(currentLocation: locating),
+                              child: const Text('Try again'),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (results.isNotEmpty)
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          border: Border.all(color: BuyV2Colors.line),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          children: [
+                            for (final area in results)
+                              ListTile(
+                                key: ValueKey(
+                                  'buy-google-area-${area.googlePlaceId}',
+                                ),
+                                title: Text(area.label),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (area.postalCode case final pin?)
+                                      Text(pin),
+                                    const Padding(
+                                      padding: EdgeInsets.only(
+                                        top: 5,
+                                        bottom: 5,
+                                      ),
+                                      child: Text(
+                                        'Google Maps',
+                                        maxLines: 1,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w400,
+                                          fontStyle: FontStyle.normal,
+                                          color: Color(0xff5e5e5e),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                onTap: () {
+                                  if (session.chooseShoppingArea(
+                                    area,
+                                    national
+                                        ? BuyV2CatalogueAreaScope.national
+                                        : BuyV2CatalogueAreaScope.regional,
+                                  )) {
+                                    Navigator.of(context).pop();
+                                  } else {
+                                    setState(
+                                      () => failure =
+                                          'This area could not be selected. Search again.',
+                                    );
+                                  }
+                                },
+                              ),
+                          ],
+                        ),
+                      ),
                     ListTile(
-                      key: ValueKey('buy-catalogue-area-${area.key}'),
-                      title: Text(area.value),
+                      key: const ValueKey('buy-catalogue-any-area'),
+                      title: const Text('Any area'),
+                      subtitle: const Text('Find stores in other areas.'),
                       onTap: () {
                         session.chooseCatalogueArea(
-                          area.key,
-                          national
-                              ? BuyV2CatalogueAreaScope.national
-                              : BuyV2CatalogueAreaScope.regional,
+                          null,
+                          BuyV2CatalogueAreaScope.allAreas,
                         );
                         Navigator.of(context).pop();
                       },
                     ),
-                  if (areas.isEmpty)
-                    const Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text(
-                        'No matching areas. You can still browse stores in any area.',
+                    for (final area in areas)
+                      ListTile(
+                        key: ValueKey('buy-catalogue-area-${area.key}'),
+                        title: Text(area.value),
+                        onTap: () {
+                          session.chooseCatalogueArea(
+                            area.key,
+                            national
+                                ? BuyV2CatalogueAreaScope.national
+                                : BuyV2CatalogueAreaScope.regional,
+                          );
+                          Navigator.of(context).pop();
+                        },
                       ),
-                    ),
-                ],
+                    if (areas.isEmpty &&
+                        results.isEmpty &&
+                        !loading &&
+                        failure == null)
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text(
+                          'No matching areas. You can still browse stores in any area.',
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
-    ),
-  );
+          );
+        },
+      ),
+    );
+  } finally {
+    request++;
+    debounce?.cancel();
+  }
 }
 
 typedef BuyV2ProductVisit =

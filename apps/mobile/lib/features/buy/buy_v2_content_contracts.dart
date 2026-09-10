@@ -21,6 +21,46 @@ enum BuyV2StoreOperatingState { unknown, open, closed }
 /// Geographic scope is explicit; a destination search does not claim routing.
 enum BuyV2CatalogueAreaScope { regional, national, allAreas }
 
+/// A Google Maps place resolved to the catalogue's authoritative region ID.
+/// This is a browsing location, never a delivery-serviceability guarantee.
+@immutable
+class BuyV2ShoppingArea {
+  const BuyV2ShoppingArea({
+    required this.regionId,
+    required this.googlePlaceId,
+    required this.label,
+    required this.countryCode,
+    this.postalCode,
+  });
+
+  final String regionId;
+  final String googlePlaceId;
+  final String label;
+  final String countryCode;
+  final String? postalCode;
+
+  bool get valid =>
+      regionId.trim().isNotEmpty &&
+      regionId.length <= 512 &&
+      googlePlaceId.trim().isNotEmpty &&
+      googlePlaceId.length <= 512 &&
+      label.trim().isNotEmpty &&
+      label.length <= 240 &&
+      countryCode == 'IN' &&
+      (postalCode == null || RegExp(r'^[1-9][0-9]{5}$').hasMatch(postalCode!));
+}
+
+enum BuyV2ShoppingAreaFailure { unavailable, offline, permissionDenied }
+
+/// The provider owns Google Places/Geocoding, India filtering, session tokens,
+/// location permission and the place-to-catalogue-region mapping. Do not infer
+/// a PIN or region ID from display text. No API keys belong in this contract.
+abstract interface class BuyV2ShoppingAreaSource {
+  Future<List<BuyV2ShoppingArea>> search(String query);
+  Future<BuyV2ShoppingArea?> locate();
+  Future<BuyV2ShoppingArea?> resolve(String googlePlaceId);
+}
+
 /// The source authenticates publication authority; a display name never grants it.
 enum BuyV2OfferPublisherType { manufacturer, wholesaler, retailer, moolSocial }
 
