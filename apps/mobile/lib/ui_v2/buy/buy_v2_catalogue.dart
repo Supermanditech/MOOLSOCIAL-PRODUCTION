@@ -4218,11 +4218,9 @@ class _BuyV2ShoppingSettingsSheetState
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
-        final recentCount =
-            session.recentlyViewedProductsFor(BuyV2Destination.shop).length +
-            session
-                .recentlyViewedProductsFor(BuyV2Destination.wholesale)
-                .length;
+        final recentCount = session
+            .recentlyViewedProductsFor(session.destination)
+            .length;
         final savedCount =
             session.savedCountFor(BuyV2Destination.shop) +
             session.savedCountFor(BuyV2Destination.wholesale);
@@ -4330,8 +4328,8 @@ class _BuyV2ShoppingSettingsSheetState
                   icon: Icons.history_rounded,
                   title: 'Recently viewed',
                   detail: recentCount == 0
-                      ? 'No recently viewed products'
-                      : '$recentCount recently viewed',
+                      ? '${session.destination.label} · No recently viewed products'
+                      : '${session.destination.label} · $recentCount recently viewed',
                   onTap: recentCount == 0 ? null : widget.onOpenRecentlyViewed,
                 ),
                 _ShoppingSettingsRow(

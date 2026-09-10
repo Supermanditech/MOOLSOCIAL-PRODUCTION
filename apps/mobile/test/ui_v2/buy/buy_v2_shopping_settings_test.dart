@@ -195,6 +195,10 @@ void main() {
                   : 's-tomato';
               session.addProduct(otherId);
               final otherQuantity = session.quantityFor(otherId);
+              if (collection == 'recently-viewed') {
+                session.openProduct(otherId);
+                session.closeProduct();
+              }
               session.openDestination(destination);
               session.openProduct(productId);
               session.closeProduct();
@@ -220,10 +224,39 @@ void main() {
               final entry = find.byKey(ValueKey('buy-settings-$collection'));
               await tester.ensureVisible(entry);
               await tester.pumpAndSettle();
+              if (collection == 'recently-viewed') {
+                expect(
+                  find.descendant(
+                    of: entry,
+                    matching: find.text(
+                      '${destination.label} · 1 recently viewed',
+                    ),
+                  ),
+                  findsOneWidget,
+                );
+                expectCollectionText(tester, entry);
+                await captureR66Visual(
+                  tester,
+                  'r669-recent-scope-${destination.name}-'
+                  '${viewport.width.toInt()}x${viewport.height.toInt()}-$scale',
+                );
+              }
               final position = Scrollable.of(tester.element(entry)).position;
               final originalOffset = position.pixels;
               await tester.tap(entry);
               await tester.pumpAndSettle();
+              if (collection == 'recently-viewed') {
+                expect(
+                  find.text('${destination.label} · 1 product'),
+                  findsOneWidget,
+                );
+                expect(
+                  find.byKey(
+                    ValueKey('buy-settings-recently-viewed-product-$otherId'),
+                  ),
+                  findsNothing,
+                );
+              }
               final product = session.product(productId);
               final open = find.byKey(
                 ValueKey(
@@ -342,6 +375,41 @@ void main() {
               await tester.pumpAndSettle();
               expect(position.pixels, originalOffset);
               if (collection == 'saved') session.toggleSaved(productId);
+              if (collection == 'recently-viewed') {
+                session.clearRecentlyViewed(destination);
+                await tester.pumpAndSettle();
+                expect(
+                  session
+                      .recentlyViewedProductsFor(
+                        session.product(otherId).destination,
+                      )
+                      .map((product) => product.id),
+                  contains(otherId),
+                );
+                await tester.ensureVisible(entry);
+                await tester.pumpAndSettle();
+                expect(
+                  find.descendant(
+                    of: entry,
+                    matching: find.text(
+                      '${destination.label} · No recently viewed products',
+                    ),
+                  ),
+                  findsOneWidget,
+                );
+                expectCollectionText(tester, entry);
+                await tester.tap(entry);
+                await tester.pumpAndSettle();
+                expect(
+                  find.byKey(const ValueKey('buy-recently-viewed-info-sheet')),
+                  findsNothing,
+                );
+                session.openProduct(productId);
+                session.closeProduct();
+                await tester.pumpAndSettle();
+                await tester.ensureVisible(entry);
+                await tester.pumpAndSettle();
+              }
               await tester.tap(entry);
               await tester.pumpAndSettle();
               await tester.ensureVisible(open);
