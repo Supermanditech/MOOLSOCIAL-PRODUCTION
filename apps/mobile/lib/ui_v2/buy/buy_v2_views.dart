@@ -6948,7 +6948,10 @@ class _CheckoutCollectionDetails extends StatelessWidget {
           ),
         if (!resolving) ...[
           const SizedBox(height: 3),
-          Text('Order ahead. Scan & collect.', style: context.buyMeta),
+          Text(
+            'Collect from this store when your order is ready.',
+            style: context.buyMeta,
+          ),
         ],
         const SizedBox(height: 10),
         if (resolving && notice != null) ...[

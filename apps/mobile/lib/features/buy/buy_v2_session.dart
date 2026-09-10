@@ -2720,6 +2720,7 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2CollectionCheckoutController? collectionCheckout;
   bool _collectionCheckoutSelected = false;
   String? _collectionCheckoutStoreId;
+  String? _collectionBrowseStoreId;
   final DateTime Function() catalogueNow;
   final BuyV2CataloguePageSource? cataloguePageSource;
   final BuyV2PublishedCatalogueSource? publishedCatalogueSource;
@@ -4586,6 +4587,31 @@ class BuyV2Session extends ChangeNotifier {
 
   bool get collectionCheckoutSelected => _collectionCheckoutSelected;
 
+  /// Public browsing intent, never payment or collection authority.
+  bool beginStoreCollection(String productId) {
+    final product = findProduct(productId);
+    if (product == null || checkoutBusy || checkoutRequiresResolution) {
+      return false;
+    }
+    final facts = productFactsFor(product);
+    if (facts.stale ||
+        facts.productId != product.id ||
+        facts.storeCollection?.isSupportedFor(
+              product.storeId,
+              now: catalogueNow(),
+            ) !=
+            true) {
+      notice = 'Collection is unavailable at this store right now.';
+      notifyListeners();
+      return false;
+    }
+    _collectionBrowseStoreId = product.storeId;
+    notice =
+        'Choose items from this store, then review your collection in Cart.';
+    notifyListeners();
+    return true;
+  }
+
   List<BuyV2StoreListing> get collectionCheckoutStores => [
     for (final id in _linesForScope(
       checkoutScope,
@@ -4664,6 +4690,7 @@ class BuyV2Session extends ChangeNotifier {
     _collectionCheckoutStoreId = selected
         ? storeId ?? (stores.length == 1 ? stores.single.id : null)
         : null;
+    _collectionBrowseStoreId = _collectionCheckoutStoreId;
     checkoutStep = BuyV2CheckoutStep.address;
     notice = null;
     notifyListeners();
@@ -4835,6 +4862,7 @@ class BuyV2Session extends ChangeNotifier {
     final shouldOpen = view == BuyV2View.checkout && collectionCheckoutSelected;
     _collectionCheckoutSelected = false;
     _collectionCheckoutStoreId = null;
+    _collectionBrowseStoreId = null;
     checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
     _persistCustomerState();
     if (shouldOpen) return openTracking(snapshot.orderId);
@@ -7078,6 +7106,18 @@ class BuyV2Session extends ChangeNotifier {
       return false;
     }
     checkoutScope = cartScope;
+    if (!retainingCheckout &&
+        !checkoutRequiresResolution &&
+        _collectionBrowseStoreId != null) {
+      // Revalidate capability at checkout; never silently turn a customer's
+      // collection choice into delivery when availability has expired.
+      _collectionCheckoutSelected = _linesForScope(
+        checkoutScope,
+      ).any((line) => line.product.storeId == _collectionBrowseStoreId);
+      _collectionCheckoutStoreId = _collectionCheckoutSelected
+          ? _collectionBrowseStoreId
+          : null;
+    }
     view = BuyV2View.checkout;
     checkoutStep = checkoutRequiresResolution
         ? BuyV2CheckoutStep.payment

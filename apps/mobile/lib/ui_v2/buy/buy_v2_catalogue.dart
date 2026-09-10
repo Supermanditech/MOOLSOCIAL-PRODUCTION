@@ -5426,6 +5426,13 @@ Future<void> showBuyV2PartnerCatalogue(
                               now: session.catalogueNow,
                               trust: storeTrust,
                               fulfilmentLabels: storeFulfilment,
+                              onOrderForCollection: () {
+                                if (session.beginStoreCollection(current.id)) {
+                                  unawaited(
+                                    openFullStoreCatalogue(sheetContext),
+                                  );
+                                }
+                              },
                               onAskStore: onAskStore == null
                                   ? null
                                   : () => Navigator.of(
@@ -5684,6 +5691,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
     required this.trust,
     required this.fulfilmentLabels,
     required this.onAskStore,
+    required this.onOrderForCollection,
   });
 
   final BuyV2Product product;
@@ -5692,6 +5700,7 @@ class _PublicStoreTruthPanel extends StatefulWidget {
   final BuyV2MarketplaceTrustSnapshot trust;
   final List<String> fulfilmentLabels;
   final VoidCallback? onAskStore;
+  final VoidCallback onOrderForCollection;
 
   @override
   State<_PublicStoreTruthPanel> createState() => _PublicStoreTruthPanelState();
@@ -5817,31 +5826,53 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             if (_showsCollection)
-              Padding(
+              Container(
                 key: const ValueKey('buy-public-store-collection-benefit'),
-                padding: const EdgeInsets.only(bottom: 5),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.all(10),
+                decoration: buyV2CardDecoration(
+                  color: Colors.white,
+                  radius: 12,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    const Padding(
-                      padding: EdgeInsets.only(top: 2),
-                      child: Icon(
-                        Icons.qr_code_scanner_rounded,
-                        size: 16,
-                        color: BuyV2Colors.green,
-                      ),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.shopping_bag_outlined,
+                          size: 20,
+                          color: BuyV2Colors.green,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Order & Collect',
+                            style: context.buyTitle.copyWith(fontSize: 16),
+                          ),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Expanded(
-                      child: Text(
-                        'Order ahead. Scan & collect.',
-                        style: context.buyBody.copyWith(
-                          color: BuyV2Colors.navy,
-                          fontSize: 12.5,
-                          height: 1.15,
-                          fontWeight: FontWeight.w800,
+                    const SizedBox(height: 6),
+                    Text(
+                      'Order through MoolSocial and collect from the store when ready—less time spent shopping and waiting.',
+                      style: context.buyBody.copyWith(height: 1.3),
+                    ),
+                    const SizedBox(height: 8),
+                    FilledButton(
+                      key: const ValueKey('buy-public-store-order-collection'),
+                      onPressed: widget.onOrderForCollection,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: BuyV2Colors.navy,
+                        foregroundColor: Colors.white,
+                        minimumSize: const Size(0, BuyV2Metrics.minimumTap),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 10,
                         ),
                       ),
+                      child: const Text('Order for collection'),
                     ),
                   ],
                 ),

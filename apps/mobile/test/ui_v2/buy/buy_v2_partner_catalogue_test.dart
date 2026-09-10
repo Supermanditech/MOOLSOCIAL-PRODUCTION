@@ -1362,7 +1362,7 @@ void main() {
   for (final size in [const Size(320, 844), const Size(640, 360)]) {
     for (final scale in [1.0, 2.0]) {
       final profile = '${size.width.toInt()}x${size.height.toInt()}-$scale';
-      testWidgets('R5 collection visibility keeps the exact branch $profile', (
+      testWidgets('R669 collection discovery keeps the exact branch $profile', (
         tester,
       ) async {
         tester.view.devicePixelRatio = 1;
@@ -1397,30 +1397,54 @@ void main() {
         expect(benefit, findsOneWidget);
         final text = find.descendant(
           of: benefit,
-          matching: find.text('Order ahead. Scan & collect.'),
+          matching: find.text('Order & Collect'),
         );
         expect(text, findsOneWidget);
-        final bounds = tester.getRect(benefit);
-        expect(bounds.top, greaterThanOrEqualTo(24));
-        expect(bounds.bottom, lessThanOrEqualTo(size.height - 34));
-        final viewport = tester.getRect(
-          find.ancestor(of: benefit, matching: find.byType(Scrollable)).first,
+        final description = find.descendant(
+          of: benefit,
+          matching: find.text(
+            'Order through MoolSocial and collect from the store when ready—less time spent shopping and waiting.',
+          ),
         );
-        expect(bounds.top, greaterThanOrEqualTo(viewport.top));
-        expect(bounds.bottom, lessThanOrEqualTo(viewport.bottom));
-        final paragraph = tester.renderObject<RenderParagraph>(text);
-        final natural = TextPainter(
-          text: paragraph.text,
-          textDirection: paragraph.textDirection,
-          textScaler: paragraph.textScaler,
-        )..layout(maxWidth: paragraph.size.width);
-        expect(paragraph.didExceedMaxLines, isFalse);
+        final button = find.byKey(
+          const ValueKey('buy-public-store-order-collection'),
+        );
+        for (final entry in [
+          ('title', text),
+          ('description', description),
+          ('button', find.text('Order for collection')),
+        ]) {
+          await tester.ensureVisible(entry.$2);
+          await tester.pumpAndSettle();
+          expect(entry.$2.hitTestable(), findsOneWidget);
+          final paragraph = tester.renderObject<RenderParagraph>(entry.$2);
+          final natural = TextPainter(
+            text: paragraph.text,
+            textDirection: paragraph.textDirection,
+            textScaler: paragraph.textScaler,
+          )..layout(maxWidth: paragraph.size.width);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(
+            paragraph.size.height + .1,
+            greaterThanOrEqualTo(natural.height),
+          );
+          natural.dispose();
+          await captureR66Visual(tester, 'collect-header-$profile-${entry.$1}');
+        }
+        expect(tester.getSize(button).height, greaterThanOrEqualTo(44));
+        final ordersBefore = session.orders.length;
+        await tester.tap(button);
+        await tester.pumpAndSettle();
         expect(
-          paragraph.size.height + .1,
-          greaterThanOrEqualTo(natural.height),
+          find.byKey(const ValueKey('buy-shop-seller-full-catalogue-list')),
+          findsOneWidget,
         );
-        natural.dispose();
-        await captureR66Visual(tester, 'collect-header-$profile-supported');
+        expect(session.quantityFor(current.id), 0);
+        expect(session.orders.length, ordersBefore);
+        await captureR66Visual(tester, 'collect-header-$profile-products');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(benefit, findsOneWidget);
 
         // Identical display names cannot mix different branches' products.
         expect(
@@ -1432,6 +1456,16 @@ void main() {
         expect(session.quantityFor(other.id), 1);
         expect(session.isSaved(other.id), isTrue);
         final close = find.byKey(const ValueKey('buy-shop-seller-sheet-close'));
+        await tester.scrollUntilVisible(
+          close,
+          -120,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-shop-seller-sheet-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
         await tester.ensureVisible(close);
         await tester.pumpAndSettle();
         expect(close.hitTestable(), findsOneWidget);
@@ -1442,6 +1476,16 @@ void main() {
         expect(session.product(current.id).storeId, 'collection-store-a');
         expect(session.quantityFor(other.id), 1);
         expect(session.isSaved(other.id), isTrue);
+        expect(session.addProduct(current.id), isTrue);
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.checkoutLines.map((line) => line.product.id), [
+          current.id,
+        ]);
+        expect(session.quantityFor(other.id), 1);
+        expect(session.orders.length, ordersBefore);
+        expect(session.collectionCheckoutMessage, contains('Sign in'));
         expect(tester.takeException(), isNull);
       });
     }
@@ -1501,7 +1545,7 @@ void main() {
         find.byKey(const ValueKey('buy-public-store-collection-benefit')),
         findsNothing,
       );
-      expect(find.text('Order ahead. Scan & collect.'), findsNothing);
+      expect(find.text('Order & Collect'), findsNothing);
       expect(tester.takeException(), isNull);
     });
   }

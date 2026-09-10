@@ -1353,6 +1353,76 @@ void main() {
       addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
     }
 
+    test(
+      'R669 collection discovery preserves branch and explicit delivery choice',
+      () async {
+        final session = await checkoutSession(openCheckout: false);
+        expect(session.beginStoreCollection('sku-a'), isTrue);
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.collectionCheckoutStore!.id, 'store-a');
+        expect(session.checkoutLines.single.product.id, 'sku-a');
+        expect(session.quantityFor('sku-b'), 1);
+        expect(session.quantityFor('wholesale-sku'), 2);
+        expect(harness.placements, 0);
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isFalse);
+        expect(session.checkoutLines.single.product.id, 'wholesale-sku');
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.collectionCheckoutStore!.id, 'store-a');
+        expect(session.chooseCheckoutCollection(false), isTrue);
+        session.openCart();
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isFalse);
+        expect(session.checkoutLines, hasLength(3));
+      },
+    );
+
+    test(
+      'R669 collection discovery expiry cannot silently become delivery',
+      () async {
+        final session = await checkoutSession(openCheckout: false);
+        expect(session.beginStoreCollection('sku-a'), isTrue);
+        harness.clock = harness.clock.add(const Duration(days: 2));
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isTrue);
+        expect(session.collectionCheckoutStore!.id, 'store-a');
+        expect(session.collectionCheckoutMessage, contains('availability'));
+        expect(await session.prepareCollectionCheckout(), isFalse);
+        expect(session.quantityFor('sku-a'), 1);
+        expect(harness.placements, 0);
+      },
+    );
+
+    test(
+      'R669 collection discovery does not select an unrelated basket scope',
+      () async {
+        final session = await checkoutSession(openCheckout: false);
+        expect(session.beginStoreCollection('sku-a'), isTrue);
+        session.openCart(scope: BuyV2CartScope.wholesale);
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isFalse);
+        expect(session.checkoutLines.single.product.id, 'wholesale-sku');
+        expect(harness.placements, 0);
+      },
+    );
+
+    test(
+      'R669 collection discovery refuses invalid identity and capability',
+      () async {
+        final session = await checkoutSession(openCheckout: false);
+        expect(session.beginStoreCollection('missing-sku'), isFalse);
+        harness.clock = harness.clock.add(const Duration(days: 2));
+        expect(session.beginStoreCollection('sku-a'), isFalse);
+        expect(session.openCheckout(), isTrue);
+        expect(session.collectionCheckoutSelected, isFalse);
+        expect(harness.placements, 0);
+      },
+    );
+
     for (final fault in ['services', 'identity', 'capability', 'quote']) {
       testWidgets('checkout failure recovery visual $fault', (tester) async {
         final session = await checkoutSession(
