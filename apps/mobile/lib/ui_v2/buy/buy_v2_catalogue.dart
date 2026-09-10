@@ -781,7 +781,8 @@ class _OffersAvailabilityState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final loading = session.commerceLoadState == BuyV2CommerceLoadState.loading;
+    final loading = session.customerStateRestoring ||
+        session.commerceLoadState == BuyV2CommerceLoadState.loading;
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -1591,6 +1592,15 @@ class BuyV2CatalogueView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (session.customerStateRecoveryPending) {
+      return BuyV2CatalogueAvailabilityView(
+        session: session,
+        loading: session.customerStateRestoring,
+        title: session.customerStateRestoring
+            ? 'Restoring your Cart'
+            : 'Your Cart is still saved',
+      );
+    }
     final savedOnly = session.showingSavedProducts;
     return Column(
       children: [

@@ -2387,7 +2387,16 @@ class BuyV2Session extends ChangeNotifier {
     return false;
   }
 
+  bool _holdCheckoutForCustomerRecovery() {
+    if (!customerStateRecoveryPending) return false;
+    notice =
+        'Restore your saved Cart before continuing to Checkout. Your items are kept.';
+    notifyListeners();
+    return true;
+  }
+
   bool _allowProcurementLines(Iterable<BuyV2CartLine> lines) {
+    if (_holdCheckoutForCustomerRecovery()) return false;
     if (!isStoreProcurement) return true;
     final unavailable = procurementUnavailableMessage;
     if (unavailable != null) {
@@ -3489,8 +3498,16 @@ class BuyV2Session extends ChangeNotifier {
   BuyV2BankTransferInstructions? get bankTransferInstructions =>
       _bankTransferInstructions;
 
+  bool get customerStateRecoveryPending =>
+      _customerStateRecoveryOwnerScope != null &&
+      _customerStateRecoveryOwnerScope == customerStateStore?.ownerScope;
+
+  bool get customerStateRestoring =>
+      customerStateRecoveryPending && _customerStateRestoreInFlight;
+
   bool get catalogueAvailable =>
-      commerceLoadState == BuyV2CommerceLoadState.ready;
+      commerceLoadState == BuyV2CommerceLoadState.ready &&
+      !customerStateRecoveryPending;
 
   bool canReviewProduct(String productId) =>
       _reviewableProductIds.contains(productId);
@@ -3815,6 +3832,14 @@ class BuyV2Session extends ChangeNotifier {
   String? _savedProductsOwnerScope;
   int _savedProductsMutationRevision = 0;
   String? _customerStateOwnerScope;
+  String? _customerStateRecoveryOwnerScope;
+  bool _customerStateRestoreInFlight = false;
+  bool _customerStateSnapshotLoaded = false;
+  final Map<String, int> _unresolvedCustomerCart = {};
+  Future<void> _consumerStateWrites = Future<void>.value();
+  int _consumerStateWritesPending = 0;
+  BuyV2CustomerStateSnapshot? _consumerPendingSnapshot;
+  String? _consumerPendingSnapshotOwnerScope;
   int _customerStateMutationRevision = 0;
   int _procurementBrowseRevision = 0;
   bool _procurementBrowseReady = false;
@@ -4625,7 +4650,13 @@ class BuyV2Session extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> retryCommerce() => restoreCommerce();
+  Future<void> retryCommerce() async {
+    await restoreCommerce();
+    if (customerStateRecoveryPending &&
+        commerceLoadState == BuyV2CommerceLoadState.ready) {
+      await restoreCustomerState();
+    }
+  }
 
   Future<BuyV2AddressRequestResult> createAddressRequest({
     String recipient = '',
@@ -5076,7 +5107,14 @@ class BuyV2Session extends ChangeNotifier {
       ?cataloguePageSource,
       ..._deviceCatalogueSources.values,
     };
-    if (sources.isEmpty) return {};
+    if (sources.isEmpty) {
+      if (!isStoreProcurement) {
+        throw StateError(
+          'Retained supplier listings need a catalogue resolver',
+        );
+      }
+      return {};
+    }
     final resolved = <String, BuyV2Product>{};
     for (final source in sources) {
       final pending = missing.where((id) => !resolved.containsKey(id)).toList();
@@ -5142,7 +5180,31 @@ class BuyV2Session extends ChangeNotifier {
     _customerStateOwnerScope = ownerScope;
     final mutationRevision = _customerStateMutationRevision;
     final browseRevision = _procurementBrowseRevision;
+    if (!isStoreProcurement) {
+      _customerStateRecoveryOwnerScope = ownerScope;
+      _customerStateRestoreInFlight = true;
+      _customerStateSnapshotLoaded = false;
+      commerceMessage = 'Restoring your saved Cart and Shop choices.';
+      notifyListeners();
+    }
     try {
+      if (!isStoreProcurement) {
+        await _consumerStateWrites;
+        if (_collectionDisposed ||
+            customerStateStore?.ownerScope != ownerScope) {
+          return;
+        }
+        final pending = _consumerPendingSnapshot;
+        if (pending != null &&
+            _consumerPendingSnapshotOwnerScope == ownerScope) {
+          if (!await store.write(pending)) {
+            throw StateError('Customer choices still need to be retained');
+          }
+          if (identical(_consumerPendingSnapshot, pending)) {
+            _consumerPendingSnapshot = null;
+          }
+        }
+      }
       final snapshot = await store.read();
       if (_collectionDisposed ||
           !procurementScopeCurrent ||
@@ -5151,6 +5213,13 @@ class BuyV2Session extends ChangeNotifier {
         return;
       }
       if (snapshot == null) {
+        if (customerStateRecoveryPending) {
+          _unresolvedCustomerCart.clear();
+          _customerStateRecoveryOwnerScope = null;
+          _customerStateRestoreInFlight = false;
+          commerceMessage = null;
+          notifyListeners();
+        }
         _procurementBrowseReady = true;
         return;
       }
@@ -5162,6 +5231,19 @@ class BuyV2Session extends ChangeNotifier {
             'This retained purchase belongs to another Store operation. Return to your Store.';
         notifyListeners();
         return;
+      }
+      if (!isStoreProcurement) {
+        // The local snapshot is authoritative even while supplier details load.
+        // Apply known choices now, retaining unresolved quantities separately.
+        _unresolvedCustomerCart
+          ..clear()
+          ..addEntries(
+            snapshot.cartQuantities.entries.where(
+              (entry) => findProduct(entry.key) == null && entry.value > 0,
+            ),
+          );
+        _applyCustomerStateSnapshot(snapshot, retainUnknownProducts: true);
+        _customerStateSnapshotLoaded = true;
       }
       final resolved = await _resolvePersistedCatalogueProducts({
         ...snapshot.cartQuantities.keys,
@@ -5181,138 +5263,19 @@ class BuyV2Session extends ChangeNotifier {
         return;
       }
       _pagedProducts.addAll(resolved);
-      _cart.clear();
-      for (final entry in snapshot.cartQuantities.entries) {
-        final current = findProduct(entry.key);
-        if (entry.value < 1 ||
-            (!isStoreProcurement &&
-                (current == null || entry.value < current.minimumOrder))) {
-          continue;
-        }
-        final stored = retainedDraft?.cartProducts[entry.key];
-        final product = isStoreProcurement
-            ? BuyV2ProcurementDraftSnapshot.retainedProduct(
-                entry.key,
-                stored ??
-                    current?.copyWith(
-                      procurementSupplierGrant:
-                          BuyV2ProcurementDraftSnapshot.retainedProduct(
-                            entry.key,
-                            null,
-                          ).procurementSupplierGrant,
-                    ),
-              )
-            : current!;
-        _cart[entry.key] = BuyV2CartLine(
-          product: product,
-          quantity: entry.value,
-        );
-      }
-      for (final order in snapshot.orders.reversed) {
-        final validOrder =
-            order.collection == null &&
-            order.destination != BuyV2Destination.orders &&
-            order.id.trim().isNotEmpty &&
-            order.total >= 0 &&
-            order.progress.isFinite &&
-            order.progress >= 0 &&
-            order.progress <= 1 &&
-            !_orders.any((existing) => existing.id == order.id);
-        if (validOrder) _orders.insert(0, order);
-      }
-      _addresses
-        ..clear()
-        ..addAll(snapshot.addresses);
-      _selectedAddressId = snapshot.selectedAddressId;
-      if (_selectedAddressId != null &&
-          !_addresses.any((address) => address.id == _selectedAddressId)) {
-        _selectedAddressId = null;
-      }
-      final validSavedKeys = _knownCatalogueProducts
-          .map(_buyV2SavedKey)
-          .toSet();
-      _savedKeys
-        ..clear()
-        ..addAll(snapshot.savedProductKeys.where(validSavedKeys.contains));
-      _deliveryInstructionIds
-        ..clear()
-        ..addAll(snapshot.deliveryInstructionIds);
-      final storedPayment = snapshot.selectedPayment;
-      if (storedPayment != null &&
-          paymentMethods.contains(storedPayment) &&
-          availablePaymentMethods.contains(storedPayment)) {
-        selectedPayment = storedPayment;
-      }
-      purchaseOrderReference = snapshot.purchaseOrderReference ?? '';
-      _checkoutIdempotencyKey = snapshot.checkoutIdempotencyKey;
-      _paymentReference = snapshot.paymentReference;
-      _paymentActionUri = snapshot.paymentActionUri;
-      _bankTransferInstructions = snapshot.bankTransferInstructions;
-      activeShoppingIntent = BuyV2ShoppingIntent.values
-          .where((intent) => intent.name == snapshot.shoppingIntent)
-          .firstOrNull;
-      // Browsing filters belong to the current catalogue, not account defaults.
-      // Ignore historical stored filters without resetting a live browse draft.
-      final validRecentIds = _knownCatalogueProducts
-          .where(
-            (product) =>
-                product.destination == BuyV2Destination.shop ||
-                product.destination == BuyV2Destination.wholesale,
-          )
-          .map((product) => product.id)
-          .toSet();
-      _recentlyViewedProductIds
-        ..clear()
-        ..addAll(
-          snapshot.recentlyViewedProductIds
-              .where(validRecentIds.contains)
-              .toSet()
-              .take(10),
-        );
-      _recentSearches.clear();
-      for (final entry in snapshot.recentSearches.entries) {
-        if (entry.key != BuyV2Destination.shop &&
-            entry.key != BuyV2Destination.wholesale &&
-            entry.key != BuyV2Destination.orders) {
-          continue;
-        }
-        final seen = <String>{};
-        final values = <String>[];
-        for (final value in entry.value) {
-          final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
-          if (clean.length < 2 || clean.length > 80) continue;
-          if (!seen.add(clean.toLowerCase())) continue;
-          values.add(clean);
-          if (values.length == 6) break;
-        }
-        if (values.isNotEmpty) _recentSearches[entry.key] = values;
-      }
-      final storedSubmissionState = BuyV2CheckoutSubmissionState.values
-          .where((state) => state.name == snapshot.checkoutSubmissionState)
-          .firstOrNull;
-      checkoutSubmissionState = switch (storedSubmissionState) {
-        BuyV2CheckoutSubmissionState.submitting
-            when _paymentReference != null =>
-          BuyV2CheckoutSubmissionState.paymentUnknown,
-        BuyV2CheckoutSubmissionState.submitting =>
-          BuyV2CheckoutSubmissionState.failed,
-        final state? => state,
-        null => BuyV2CheckoutSubmissionState.idle,
-      };
-      if (checkoutRequiresResolution) {
-        // Retired choices cannot start a new payment, but an unresolved
-        // persisted attempt must keep its original provider identity.
-        if (const {'Bank transfer', 'UPI'}.contains(storedPayment)) {
-          selectedPayment = storedPayment!;
-        }
-        checkoutStep = BuyV2CheckoutStep.payment;
-      }
-      _pruneCartSelections();
+      _applyCustomerStateSnapshot(snapshot);
       if (isStoreProcurement &&
           restoreBrowsing &&
           browseRevision == _procurementBrowseRevision &&
           retainedDraft?.navigation != null) {
         _restoreProcurementBrowsing(retainedDraft!.navigation!, snapshot);
+      }
+      if (customerStateRecoveryPending) {
+        _unresolvedCustomerCart.clear();
+        _customerStateRecoveryOwnerScope = null;
+        _customerStateRestoreInFlight = false;
+        commerceMessage = null;
+        notice = null;
       }
       _procurementBrowseReady = true;
       notifyListeners();
@@ -5325,8 +5288,161 @@ class BuyV2Session extends ChangeNotifier {
       }
       if (store.ownerScope == ownerScope) _customerStateOwnerScope = null;
       notice = 'Your Shop choices could not be restored. Try again.';
+      if (!isStoreProcurement) {
+        _customerStateRecoveryOwnerScope = ownerScope;
+        _customerStateRestoreInFlight = false;
+        commerceMessage =
+            'Your saved Cart could not be restored. It is still retained. '
+            'Try again before changing your order.';
+      }
       notifyListeners();
+    } finally {
+      if (!_collectionDisposed &&
+          !isStoreProcurement &&
+          customerStateStore?.ownerScope == ownerScope &&
+          customerStateRecoveryPending &&
+          mutationRevision != _customerStateMutationRevision) {
+        // A newer live choice owns the Cart. The late provider response must
+        // not replace it, and the retained items must remain retryable.
+        _customerStateOwnerScope = null;
+        _customerStateRestoreInFlight = false;
+        commerceMessage =
+            'Your Cart changes are kept. Try again to restore the remaining items.';
+        notifyListeners();
+      }
     }
+  }
+
+  void _applyCustomerStateSnapshot(
+    BuyV2CustomerStateSnapshot snapshot, {
+    bool retainUnknownProducts = false,
+  }) {
+    final retainedDraft = snapshot.procurementDraft;
+    _cart.clear();
+    for (final entry in snapshot.cartQuantities.entries) {
+      final current = findProduct(entry.key);
+      if (entry.value < 1 ||
+          (!isStoreProcurement &&
+              (current == null || entry.value < current.minimumOrder))) {
+        continue;
+      }
+      final stored = retainedDraft?.cartProducts[entry.key];
+      final product = isStoreProcurement
+          ? BuyV2ProcurementDraftSnapshot.retainedProduct(
+              entry.key,
+              stored ??
+                  current?.copyWith(
+                    procurementSupplierGrant:
+                        BuyV2ProcurementDraftSnapshot.retainedProduct(
+                          entry.key,
+                          null,
+                        ).procurementSupplierGrant,
+                  ),
+            )
+          : current!;
+      _cart[entry.key] = BuyV2CartLine(product: product, quantity: entry.value);
+    }
+    for (final order in snapshot.orders.reversed) {
+      final validOrder =
+          order.collection == null &&
+          order.destination != BuyV2Destination.orders &&
+          order.id.trim().isNotEmpty &&
+          order.total >= 0 &&
+          order.progress.isFinite &&
+          order.progress >= 0 &&
+          order.progress <= 1 &&
+          !_orders.any((existing) => existing.id == order.id);
+      if (validOrder) _orders.insert(0, order);
+    }
+    _addresses
+      ..clear()
+      ..addAll(snapshot.addresses);
+    _selectedAddressId = snapshot.selectedAddressId;
+    if (_selectedAddressId != null &&
+        !_addresses.any((address) => address.id == _selectedAddressId)) {
+      _selectedAddressId = null;
+    }
+    final validSavedKeys = _knownCatalogueProducts.map(_buyV2SavedKey).toSet();
+    _savedKeys
+      ..clear()
+      ..addAll(
+        retainUnknownProducts
+            ? snapshot.savedProductKeys
+            : snapshot.savedProductKeys.where(validSavedKeys.contains),
+      );
+    _deliveryInstructionIds
+      ..clear()
+      ..addAll(snapshot.deliveryInstructionIds);
+    final storedPayment = snapshot.selectedPayment;
+    if (storedPayment != null &&
+        paymentMethods.contains(storedPayment) &&
+        availablePaymentMethods.contains(storedPayment)) {
+      selectedPayment = storedPayment;
+    }
+    purchaseOrderReference = snapshot.purchaseOrderReference ?? '';
+    _checkoutIdempotencyKey = snapshot.checkoutIdempotencyKey;
+    _paymentReference = snapshot.paymentReference;
+    _paymentActionUri = snapshot.paymentActionUri;
+    _bankTransferInstructions = snapshot.bankTransferInstructions;
+    activeShoppingIntent = BuyV2ShoppingIntent.values
+        .where((intent) => intent.name == snapshot.shoppingIntent)
+        .firstOrNull;
+    // Browsing filters belong to the current catalogue, not account defaults.
+    // Ignore historical stored filters without resetting a live browse draft.
+    final validRecentIds = _knownCatalogueProducts
+        .where(
+          (product) =>
+              product.destination == BuyV2Destination.shop ||
+              product.destination == BuyV2Destination.wholesale,
+        )
+        .map((product) => product.id)
+        .toSet();
+    _recentlyViewedProductIds
+      ..clear()
+      ..addAll(
+        snapshot.recentlyViewedProductIds
+            .where((id) => retainUnknownProducts || validRecentIds.contains(id))
+            .toSet()
+            .take(10),
+      );
+    _recentSearches.clear();
+    for (final entry in snapshot.recentSearches.entries) {
+      if (entry.key != BuyV2Destination.shop &&
+          entry.key != BuyV2Destination.wholesale &&
+          entry.key != BuyV2Destination.orders) {
+        continue;
+      }
+      final seen = <String>{};
+      final values = <String>[];
+      for (final value in entry.value) {
+        final clean = value.trim().replaceAll(RegExp(r'\s+'), ' ');
+        if (clean.length < 2 || clean.length > 80) continue;
+        if (!seen.add(clean.toLowerCase())) continue;
+        values.add(clean);
+        if (values.length == 6) break;
+      }
+      if (values.isNotEmpty) _recentSearches[entry.key] = values;
+    }
+    final storedSubmissionState = BuyV2CheckoutSubmissionState.values
+        .where((state) => state.name == snapshot.checkoutSubmissionState)
+        .firstOrNull;
+    checkoutSubmissionState = switch (storedSubmissionState) {
+      BuyV2CheckoutSubmissionState.submitting when _paymentReference != null =>
+        BuyV2CheckoutSubmissionState.paymentUnknown,
+      BuyV2CheckoutSubmissionState.submitting =>
+        BuyV2CheckoutSubmissionState.failed,
+      final state? => state,
+      null => BuyV2CheckoutSubmissionState.idle,
+    };
+    if (checkoutRequiresResolution) {
+      // Retired choices cannot start a new payment, but an unresolved
+      // persisted attempt must keep its original provider identity.
+      if (const {'Bank transfer', 'UPI'}.contains(storedPayment)) {
+        selectedPayment = storedPayment!;
+      }
+      checkoutStep = BuyV2CheckoutStep.payment;
+    }
+    _pruneCartSelections();
   }
 
   void retainProcurementNavigation() => _persistProcurementBrowsing();
@@ -5430,10 +5546,20 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void _persistCustomerState() {
-    if (!procurementScopeCurrent) return;
+    if (!procurementScopeCurrent ||
+        (customerStateRecoveryPending &&
+            (!_customerStateSnapshotLoaded ||
+                !_customerStateRestoreInFlight))) {
+      return;
+    }
     final store = customerStateStore;
     if (store == null || store.ownerScope == null) return;
     _customerStateMutationRevision += 1;
+    if (customerStateRecoveryPending) {
+      // Once a retained SKU is present in the live Cart, later removal must
+      // not resurrect its earlier unresolved quantity.
+      _unresolvedCustomerCart.removeWhere((id, _) => _cart.containsKey(id));
+    }
     final snapshot = BuyV2CustomerStateSnapshot(
       procurementDraft: isStoreProcurement
           ? BuyV2ProcurementDraftSnapshot(
@@ -5450,6 +5576,7 @@ class BuyV2Session extends ChangeNotifier {
             )
           : null,
       cartQuantities: Map.unmodifiable({
+        if (customerStateRecoveryPending) ..._unresolvedCustomerCart,
         for (final line in _cart.values) line.product.id: line.quantity,
       }),
       addresses: List.unmodifiable(_addresses),
@@ -5507,7 +5634,30 @@ class BuyV2Session extends ChangeNotifier {
         onError: (Object _, StackTrace _) {},
       );
     } else {
-      write = store.write(snapshot);
+      _consumerPendingSnapshot = snapshot;
+      _consumerPendingSnapshotOwnerScope = ownerScope;
+      final priorWrites = _consumerStateWrites;
+      final alreadyWriting = _consumerStateWritesPending > 0;
+      _consumerStateWritesPending++;
+      Future<bool> persist() async {
+        if (alreadyWriting) await priorWrites;
+        if (!currentWrite()) return true;
+        final saved = await store.write(snapshot);
+        if (saved && identical(_consumerPendingSnapshot, snapshot)) {
+          _consumerPendingSnapshot = null;
+        }
+        return saved;
+      }
+
+      write = persist();
+      _consumerStateWrites = write.then<void>(
+        (_) {
+          _consumerStateWritesPending--;
+        },
+        onError: (Object _, StackTrace _) {
+          _consumerStateWritesPending--;
+        },
+      );
     }
     void reportFailure() {
       if (isStoreProcurement &&
@@ -5720,6 +5870,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitCollectionPurchase() async {
+    if (_holdCheckoutForCustomerRecovery()) return false;
     if (view != BuyV2View.checkout ||
         checkoutStep != BuyV2CheckoutStep.confirm ||
         checkoutBusy) {
@@ -9533,6 +9684,14 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool _holdCartForPaymentResolution() {
+    if (customerStateRecoveryPending &&
+        (!_customerStateSnapshotLoaded || !_customerStateRestoreInFlight)) {
+      notice =
+          commerceMessage ??
+          'Your saved Cart is still retained. Try again before changing your order.';
+      notifyListeners();
+      return true;
+    }
     if (!procurementScopeCurrent) {
       notice = procurementUnavailableMessage;
       notifyListeners();
@@ -10162,6 +10321,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (_holdCheckoutForCustomerRecovery()) return Future<bool>.value(false);
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
       return submitCollectionPurchase();
     }
@@ -10928,7 +11088,10 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool reorder(BuyV2Order order) {
-    if (isStoreProcurement && _holdCartForPaymentResolution()) return false;
+    if ((isStoreProcurement || customerStateRecoveryPending) &&
+        _holdCartForPaymentResolution()) {
+      return false;
+    }
     final exactProducts = productsForOrder(order);
     for (final product in exactProducts) {
       if (!_allowProcurementProduct(product)) return false;

@@ -292,6 +292,9 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
 
   BuyV2CustomerStateSnapshot? snapshot;
   Completer<BuyV2CustomerStateSnapshot?>? pendingRead;
+  Completer<void>? pendingWrite;
+  int writeCalls = 0;
+  bool rejectWrites = false;
 
   @override
   Future<BuyV2CustomerStateSnapshot?> read() async =>
@@ -299,6 +302,9 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
 
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    writeCalls++;
+    if (pendingWrite case final pending?) await pending.future;
+    if (rejectWrites) return false;
     this.snapshot = snapshot;
     return true;
   }
@@ -4748,6 +4754,83 @@ void main() {
           await restore;
           expect(session.pagedProductCount, 0);
           expect(session.quantityFor(id), 0);
+          if (!dispose) {
+            final localId = BuyV2Catalogue.products.first.id;
+            expect(store.snapshot!.cartQuantities, {id: 1, localId: 1});
+            expect(session.customerStateRecoveryPending, isTrue);
+            expect(session.customerStateRestoring, isFalse);
+            await session.retryCommerce();
+            expect(session.quantityFor(id), 1);
+            expect(session.quantityFor(localId), 1);
+            expect(session.customerStateRecoveryPending, isFalse);
+          }
+        },
+      );
+    }
+
+    for (final failedWrite in [false, true]) {
+      test(
+        'late restore retains new Cart through ${failedWrite ? 'failed' : 'delayed'} writes',
+        () async {
+          final source = _PagingRecoverySource()
+            ..resolutionGate = Completer<void>();
+          final remoteId = source.productIdAt(0, 0);
+          final localId = BuyV2Catalogue.products.first.id;
+          final store = _MemoryCustomerStateStore('late-write-account')
+            ..snapshot = BuyV2CustomerStateSnapshot(
+              cartQuantities: {remoteId: 3, localId: 2},
+              recentSearches: {
+                BuyV2Destination.shop: ['retained search'],
+              },
+            );
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: true,
+            cataloguePageSource: source,
+            customerStateStore: store,
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          final restore = session.restoreCustomerState();
+          await Future<void>.delayed(Duration.zero);
+          expect(session.quantityFor(localId), 2);
+          store.rejectWrites = failedWrite;
+          if (!failedWrite) store.pendingWrite = Completer<void>();
+          expect(session.addProduct(localId), isTrue);
+          expect(session.addProduct(localId), isTrue);
+          expect(session.quantityFor(localId), 4);
+          expect(session.openCheckout(), isFalse);
+          expect(session.confirmOrder(), isFalse);
+          expect(await session.submitOrder(), isFalse);
+          expect(await session.submitCollectionPurchase(), isFalse);
+          source.resolutionGate!.complete();
+          await restore;
+          expect(session.quantityFor(remoteId), 0);
+          expect(session.customerStateRestoring, isFalse);
+          var retryDone = false;
+          final retry = session.retryCommerce().then((_) => retryDone = true);
+          await Future<void>.delayed(Duration.zero);
+          if (!failedWrite) {
+            expect(retryDone, isFalse);
+            expect(store.writeCalls, 1);
+            store.pendingWrite!.complete();
+          }
+          await retry;
+          if (failedWrite) {
+            expect(session.customerStateRecoveryPending, isTrue);
+            expect(session.quantityFor(localId), 4);
+            expect(store.snapshot!.cartQuantities[localId], 2);
+            store.rejectWrites = false;
+            await session.retryCommerce();
+          }
+          expect(session.customerStateRecoveryPending, isFalse);
+          expect(session.quantityFor(localId), 4);
+          expect(session.quantityFor(remoteId), 3);
+          expect(store.snapshot!.cartQuantities, {remoteId: 3, localId: 4});
+          expect(store.snapshot!.recentSearches[BuyV2Destination.shop], [
+            'retained search',
+          ]);
         },
       );
     }
@@ -8377,7 +8460,11 @@ void r669ComparisonContractTests() {
       BuyV2Product product,
       List<BuyV2ComparisonPageRequest> calls,
     })
-    consumerFixture({DateTime Function()? clock}) {
+    consumerFixture({
+      DateTime Function()? clock,
+      BuyV2CustomerStateStore? customerStateStore,
+      BuyV2CataloguePageSource? cataloguePageSource,
+    }) {
       final base = BuyV2Catalogue.products.firstWhere(
         (value) => value.title.toLowerCase().contains('biscuits'),
       );
@@ -8436,11 +8523,166 @@ void r669ComparisonContractTests() {
       final session = BuyV2Session(
         core: core,
         comparisonSource: source,
+        customerStateStore: customerStateStore,
+        cataloguePageSource: cataloguePageSource,
         catalogueNow: clock ?? () => now,
       );
       addTearDown(core.dispose);
       addTearDown(session.dispose);
       return (session: session, product: base, calls: calls);
+    }
+
+    for (final recovery in ['resolved', 'no resolver', 'missing listing']) {
+      test(
+        'consumer comparison relaunch retains Cart with $recovery',
+        () async {
+          final store = _MemoryCustomerStateStore('consumer-relaunch');
+          final first = consumerFixture(customerStateStore: store);
+          await first.session.restoreCustomerState();
+          final controller = BuyV2ComparisonController(
+            source: first.session.comparisonSource!,
+            isCurrent: first.session.comparisonQueryIsCurrent,
+            offerPermitted: first.session.comparisonOfferPermitted,
+            now: () => now,
+          );
+          addTearDown(controller.dispose);
+          await controller.open(
+            first.session.comparisonQueryFor(first.product)!,
+          );
+          final chosen = controller.page!.offers.first;
+          expect(
+            first.session.admitComparisonProduct(controller, chosen),
+            isTrue,
+          );
+          expect(
+            first.session.addProduct(chosen.product.id, quantity: 3),
+            isTrue,
+          );
+          await Future<void>.delayed(Duration.zero);
+          expect(store.snapshot!.cartQuantities[chosen.product.id], 3);
+          final retainedSnapshot = store.snapshot!;
+          final products = <BuyV2Product>[
+            if (recovery == 'resolved') chosen.product,
+          ];
+          final restored = consumerFixture(
+            customerStateStore: store,
+            cataloguePageSource: recovery == 'no resolver'
+                ? null
+                : _R669ProcurementCatalogue(products),
+          );
+          await restored.session.restoreCustomerState();
+          if (recovery == 'resolved') {
+            expect(restored.session.quantityFor(chosen.product.id), 3);
+            expect(
+              restored.session.product(chosen.product.id).storeId,
+              chosen.product.storeId,
+            );
+            expect(
+              restored.session.product(chosen.product.id).price,
+              chosen.product.price,
+            );
+            expect(restored.session.notice, isNull);
+          } else {
+            expect(restored.session.notice, contains('could not be restored'));
+            expect(restored.session.catalogueAvailable, isFalse);
+            expect(restored.session.addProduct(restored.product.id), isFalse);
+            expect(store.snapshot, same(retainedSnapshot));
+            restored.session.submitSearch('biscuits');
+            await Future<void>.delayed(Duration.zero);
+            expect(
+              store.snapshot!.cartQuantities[chosen.product.id],
+              3,
+              reason:
+                  'A later choice must not erase an unresolved retained Cart.',
+            );
+            if (recovery == 'missing listing') {
+              products.add(chosen.product);
+              await restored.session.retryCommerce();
+              expect(restored.session.catalogueAvailable, isTrue);
+              expect(restored.session.quantityFor(chosen.product.id), 3);
+            }
+          }
+        },
+      );
+    }
+
+    test(
+      'consumer comparison relaunch holds Cart while restore is delayed',
+      () async {
+        final listing = product.copyWith(id: 'retained-external');
+        final store = _MemoryCustomerStateStore('consumer-delayed');
+        final snapshot = BuyV2CustomerStateSnapshot(
+          cartQuantities: {listing.id: 3},
+        );
+        store.snapshot = snapshot;
+        final gate = Completer<BuyV2CustomerStateSnapshot?>();
+        store.pendingRead = gate;
+        final fixture = consumerFixture(
+          customerStateStore: store,
+          cataloguePageSource: _R669ProcurementCatalogue([listing]),
+        );
+        final restoring = fixture.session.restoreCustomerState();
+        expect(fixture.session.addProduct(fixture.product.id), isFalse);
+        fixture.session.submitSearch('biscuits');
+        expect(store.snapshot, same(snapshot));
+        gate.complete(snapshot);
+        await restoring;
+        expect(fixture.session.quantityFor(listing.id), 3);
+        expect(fixture.session.catalogueAvailable, isTrue);
+      },
+    );
+
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('consumer comparison relaunch Retry restores Cart $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final listing = product.copyWith(id: 'retained-external');
+        final store = _MemoryCustomerStateStore('consumer-retry');
+        store.snapshot = BuyV2CustomerStateSnapshot(
+          cartQuantities: {listing.id: 3},
+        );
+        final products = <BuyV2Product>[];
+        final fixture = consumerFixture(
+          customerStateStore: store,
+          cataloguePageSource: _R669ProcurementCatalogue(products),
+        );
+        await tester.pumpWidget(
+          MaterialApp(
+            debugShowCheckedModeBanner: false,
+            theme: MoolTheme.light(),
+            builder: (context, child) => r66VisualCaptureRoot(child!),
+            home: BuyV2Screen(session: fixture.session, onExit: () {}),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final retry = find.byKey(const ValueKey('buy-catalogue-retry'));
+        expect(retry, findsOneWidget);
+        await tester.ensureVisible(retry);
+        await tester.pumpAndSettle();
+        expect(find.textContaining('It is still retained.'), findsOneWidget);
+        expect(store.snapshot!.cartQuantities[listing.id], 3);
+        expect(tester.takeException(), isNull);
+        // Inspect the persistent recovery panel after its existing transient notice.
+        await tester.pump(const Duration(milliseconds: 2700));
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'r669-consumer-relaunch-retry-$scale');
+        products.add(listing);
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(fixture.session.quantityFor(listing.id), 3);
+        expect(fixture.session.catalogueAvailable, isTrue);
+        expect(find.byKey(const ValueKey('buy-catalogue-retry')), findsNothing);
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(
+          tester,
+          'r669-consumer-relaunch-restored-$scale',
+        );
+      });
     }
 
     test(
