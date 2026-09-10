@@ -485,6 +485,7 @@ class WorkSession extends ChangeNotifier {
     WorkPendingProofStore? pendingProofStore,
     WorkPendingProofStore? contactDraftStore,
     this.issueDraftStore,
+    this.receiptDraftStore,
     this.issueCommandGateway,
     this.issueCommandStore,
     this.stockHistoryGateway,
@@ -518,6 +519,7 @@ class WorkSession extends ChangeNotifier {
     WorkPendingProofStore? pendingProofStore,
     WorkPendingProofStore? contactDraftStore,
     this.issueDraftStore,
+    this.receiptDraftStore,
     this.issueCommandGateway,
     this.issueCommandStore,
     this.stockHistoryGateway,
@@ -540,6 +542,7 @@ class WorkSession extends ChangeNotifier {
   final WorkPendingProofStore? pendingProofStore;
   final WorkPendingProofStore? contactDraftStore;
   final WorkIssueDraftStore? issueDraftStore;
+  final WorkReceiptDraftStore? receiptDraftStore;
   final WorkIssueCommandGateway? issueCommandGateway;
   final WorkIssueCommandStore? issueCommandStore;
   final WorkStockHistoryGateway? stockHistoryGateway;
@@ -2116,6 +2119,174 @@ class WorkSession extends ChangeNotifier {
   void clearWorkspacePurchaseSelection() {
     _storeData.focusedPurchaseId = null;
     notifyListeners();
+  }
+
+  late final WorkReceiptDraftStore _receiptDraftStorage =
+      receiptDraftStore ??
+      SecureWorkReceiptDraftStore(accountScope: () => _contactAccountScope);
+  final Map<WorkspaceReceiptDraftKey, WorkspaceReceiptDraft> _receiptDrafts =
+      {};
+  final Set<WorkspaceReceiptDraftKey> _receiptDraftLoaded = {};
+  final Map<WorkspaceReceiptDraftKey, int> _receiptSavedRevisions = {};
+  final Map<WorkspaceReceiptDraftKey, Future<void>> _receiptReads = {};
+  final Map<WorkspaceReceiptDraftKey, Future<void>> _receiptWrites = {};
+  final Map<WorkspaceReceiptDraftKey, WorkspaceReceiptDraft>
+  _receiptUnconfirmedWrites = {};
+  final Map<WorkspaceReceiptDraftKey, String> _receiptMessages = {};
+
+  WorkspaceReceiptDraftKey _receiptKey(WorkspacePurchaseRecord purchase) => (
+    account: purchase.accountScope,
+    store: purchase.workspaceId,
+    shipment: purchase.shipmentId,
+  );
+
+  bool _receiptCurrent(WorkspacePurchaseRecord purchase) {
+    if (_disposed ||
+        purchase.accountScope != _contactAccountScope ||
+        purchase.workspaceId != activeWorkspace?.id ||
+        !workspacePurchasesConnected) {
+      return false;
+    }
+    final current = _storeData.purchases[purchase.shipmentId];
+    return current != null &&
+        current.orderId == purchase.orderId &&
+        current.supplierId == purchase.supplierId &&
+        current.purchaseId == purchase.purchaseId;
+  }
+
+  WorkspaceReceiptDraft? workspaceReceiptDraft(
+    WorkspacePurchaseRecord purchase,
+  ) => _receiptCurrent(purchase) ? _receiptDrafts[_receiptKey(purchase)] : null;
+
+  bool workspaceReceiptDraftLoaded(WorkspacePurchaseRecord purchase) =>
+      _receiptCurrent(purchase) &&
+      _receiptDraftLoaded.contains(_receiptKey(purchase));
+
+  String? workspaceReceiptDraftMessage(WorkspacePurchaseRecord purchase) =>
+      _receiptCurrent(purchase)
+      ? _receiptMessages[_receiptKey(purchase)]
+      : null;
+
+  Future<void> loadWorkspaceReceiptDraft(
+    WorkspacePurchaseRecord purchase,
+  ) async {
+    if (!_receiptCurrent(purchase)) return;
+    final key = _receiptKey(purchase);
+    if (_receiptDraftLoaded.contains(key)) return;
+    final pending = _receiptReads[key];
+    if (pending != null) return pending;
+    final task = () async {
+      try {
+        final draft = await _receiptDraftStorage.read(key);
+        if (!_receiptCurrent(purchase)) return;
+        if (draft != null && (!draft.valid || !draft.belongsTo(purchase))) {
+          throw const FormatException('Receiving draft identity mismatch');
+        }
+        if (draft != null) {
+          _receiptDrafts[key] = draft;
+          _receiptSavedRevisions[key] = draft.revision;
+        }
+        _receiptDraftLoaded.add(key);
+        _receiptMessages.remove(key);
+      } on Object {
+        if (_receiptCurrent(purchase)) {
+          _receiptMessages[key] =
+              'Could not open your delivery draft. Try again.';
+        }
+      }
+      if (_receiptCurrent(purchase)) notifyListeners();
+    }();
+    _receiptReads[key] = task;
+    await task;
+    if (identical(_receiptReads[key], task)) _receiptReads.remove(key);
+  }
+
+  /// Local observations only. A supplier update never changes the original
+  /// checked lines/revision, and a delivery draft never posts receipt or stock.
+  Future<void> saveWorkspaceReceiptDraft(
+    WorkspacePurchaseRecord purchase, {
+    required Map<String, String> countedPacks,
+    required Map<String, WorkspaceReceiptProblem> problems,
+    required String note,
+  }) async {
+    if (!_receiptCurrent(purchase) ||
+        !workspaceReceiptDraftLoaded(purchase) ||
+        purchase.revision !=
+            _storeData.purchases[purchase.shipmentId]?.revision) {
+      return;
+    }
+    final key = _receiptKey(purchase);
+    final previous = _receiptDrafts[key];
+    final base =
+        previous ??
+        WorkspaceReceiptDraft(
+          key: key,
+          supplierId: purchase.supplierId,
+          orderId: purchase.orderId,
+          purchaseId: purchase.purchaseId,
+          shipmentRevision: purchase.revision,
+          revision: 1,
+          lines: purchase.lines,
+          countedPacks: const {},
+          problems: const {},
+        );
+    final draft = base.edit(
+      revision: base.revision,
+      countedPacks: countedPacks,
+      problems: problems,
+      note: note,
+    );
+    if (!draft.valid) return;
+    _receiptDrafts[key] = draft;
+    _receiptMessages[key] = 'Saving draft…';
+    notifyListeners();
+    final preceding = _receiptWrites[key];
+    final task = () async {
+      if (preceding != null) await preceding;
+      if (!identical(_receiptDrafts[key], draft)) return;
+      try {
+        if (_contactAccountScope != key.account) {
+          throw const FormatException('Account changed before draft save');
+        }
+        final uncertain = _receiptUnconfirmedWrites[key];
+        if (uncertain != null) {
+          final retained = await _receiptDraftStorage.read(key);
+          if (retained != null &&
+              jsonEncode(retained.toJson()) == jsonEncode(uncertain.toJson())) {
+            _receiptSavedRevisions[key] = retained.revision;
+          } else if (retained?.revision != _receiptSavedRevisions[key]) {
+            throw const FormatException(
+              'A different receiving draft was saved',
+            );
+          }
+          _receiptUnconfirmedWrites.remove(key);
+        }
+        final expected = _receiptSavedRevisions[key];
+        final candidate = draft.edit(
+          revision: (expected ?? 0) + 1,
+          countedPacks: draft.countedPacks,
+          problems: draft.problems,
+          note: draft.note,
+        );
+        _receiptUnconfirmedWrites[key] = candidate;
+        await _receiptDraftStorage.save(candidate, expectedRevision: expected);
+        _receiptSavedRevisions[key] = candidate.revision;
+        _receiptUnconfirmedWrites.remove(key);
+        if (identical(_receiptDrafts[key], draft)) {
+          _receiptDrafts[key] = candidate;
+          _receiptMessages[key] = 'Draft saved on this device. Not sent.';
+        }
+      } on Object {
+        if (identical(_receiptDrafts[key], draft)) {
+          _receiptMessages[key] =
+              'Draft not saved. Your edits remain here. Retry saving.';
+        }
+      }
+      if (_receiptCurrent(purchase)) notifyListeners();
+    }();
+    _receiptWrites[key] = task;
+    await task;
+    if (identical(_receiptWrites[key], task)) _receiptWrites.remove(key);
   }
 
   WorkOrderOperations? get _scopedOrderOperations {

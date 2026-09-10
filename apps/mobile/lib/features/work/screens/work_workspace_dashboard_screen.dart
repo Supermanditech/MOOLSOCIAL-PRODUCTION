@@ -9032,6 +9032,283 @@ String _purchaseAmount(int minor) {
       '${magnitude % 100 == 0 ? '' : '.${(magnitude % 100).toString().padLeft(2, '0')}'}';
 }
 
+class _StoreReceiptEditor extends StatefulWidget {
+  const _StoreReceiptEditor({
+    super.key,
+    required this.session,
+    required this.purchase,
+  });
+  final WorkSession session;
+  final WorkspacePurchaseRecord purchase;
+  @override
+  State<_StoreReceiptEditor> createState() => _StoreReceiptEditorState();
+}
+
+class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
+  bool _open = false, _loading = false, _restored = false;
+  final _counts = <String, TextEditingController>{};
+  final _problems = <String, WorkspaceReceiptProblem>{};
+  final _note = TextEditingController();
+  final _noteKey = GlobalKey();
+
+  Future<void> _start({bool issue = false}) async {
+    setState(() {
+      _open = true;
+      _loading = true;
+    });
+    final session = widget.session;
+    await session.loadWorkspaceReceiptDraft(widget.purchase);
+    if (!mounted) return;
+    if (session.workspaceReceiptDraftLoaded(widget.purchase) &&
+        session.workspaceReceiptDraft(widget.purchase) == null) {
+      // Bind even an empty draft to the lines currently being checked.
+      await session.saveWorkspaceReceiptDraft(
+        widget.purchase,
+        countedPacks: const {},
+        problems: const {},
+        note: '',
+      );
+    }
+    if (!mounted) return;
+    final draft = session.workspaceReceiptDraft(widget.purchase);
+    if (!_restored && draft != null) {
+      for (final line in draft.lines) {
+        _counts[line.id] = TextEditingController(
+          text: draft.countedPacks[line.id] ?? '',
+        );
+      }
+      _problems.addAll(draft.problems);
+      _note.text = draft.note;
+      _restored = true;
+    }
+    setState(() => _loading = false);
+    if (issue && _restored) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final target = _noteKey.currentContext;
+        if (mounted && target != null) {
+          unawaited(Scrollable.ensureVisible(target, alignment: .3));
+        }
+      });
+    }
+  }
+
+  Future<void> _save() async {
+    await widget.session.saveWorkspaceReceiptDraft(
+      widget.purchase,
+      countedPacks: _counts.map(
+        (id, controller) => MapEntry(id, controller.text),
+      ),
+      problems: _problems,
+      note: _note.text,
+    );
+    if (mounted) setState(() {});
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _counts.values) {
+      controller.dispose();
+    }
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final session = widget.session;
+    final purchase = widget.purchase;
+    final draft = session.workspaceReceiptDraft(purchase);
+    final lines = _open && draft != null ? draft.lines : purchase.lines;
+    final message = session.workspaceReceiptDraftMessage(purchase);
+    final enlarged = MediaQuery.textScalerOf(context).scale(14) > 21;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (!_open)
+          Wrap(
+            spacing: 8,
+            children: [
+              TextButton.icon(
+                key: const Key('work-receipt-start'),
+                onPressed: () => _start(),
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: const Text('Receive stock'),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+              ),
+              TextButton(
+                key: const Key('work-receipt-report'),
+                onPressed: () => _start(issue: true),
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                child: const Text('Report issue'),
+              ),
+            ],
+          )
+        else ...[
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Check delivery',
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    color: MoolColors.navy,
+                  ),
+                ),
+              ),
+              TextButton(
+                key: const Key('work-receipt-close'),
+                onPressed: () {
+                  FocusScope.of(context).unfocus();
+                  setState(() => _open = false);
+                },
+                style: TextButton.styleFrom(minimumSize: const Size(48, 48)),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+          const Text(
+            'Count the packs in this delivery. Stock stays unchanged until the receipt is confirmed.',
+            style: TextStyle(fontSize: 12, color: MoolColors.muted),
+          ),
+          if (_loading) const Text('Opening your draft…'),
+          if (!_loading && !_restored)
+            TextButton(
+              key: const Key('work-receipt-retry-open'),
+              onPressed: () => _start(),
+              child: const Text('Try again'),
+            ),
+          if (draft != null && !draft.matchesSnapshot(purchase))
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 8),
+              child: Text(
+                'Delivery updated. Close to compare the latest items with your saved checks.',
+                key: Key('work-receipt-stale'),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            ),
+        ],
+        for (final line in lines)
+          Padding(
+            key: ValueKey('work-purchase-line-${line.id}'),
+            padding: const EdgeInsets.symmetric(vertical: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${line.name}${line.pack.isEmpty ? '' : ' · ${line.pack}'}',
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Text('${_purchaseAmount(line.unitPriceMinor)} / pack'),
+                Text(
+                  'Ordered ${line.orderedPacks} packs · Received ${line.receivedPacks == null ? 'not confirmed' : '${line.receivedPacks} packs'}',
+                ),
+                if (line.receivedPacks != null &&
+                    line.receivedPacks != line.orderedPacks)
+                  Text(
+                    line.receivedPacks! < line.orderedPacks
+                        ? '${line.orderedPacks - line.receivedPacks!} packs outstanding'
+                        : '${line.receivedPacks! - line.orderedPacks} extra packs reported',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                if (_open && _restored) ...[
+                  const SizedBox(height: 8),
+                  TextField(
+                    key: ValueKey('work-receipt-count-${line.id}'),
+                    controller: _counts[line.id],
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: InputDecoration(
+                      labelText: 'Packs checked',
+                      errorText:
+                          (_counts[line.id]?.text.trim().isNotEmpty ?? false) &&
+                              draft?.counted(line.id) == null
+                          ? 'Enter a whole number of packs.'
+                          : null,
+                      errorMaxLines: 3,
+                    ),
+                    onChanged: (_) {
+                      unawaited(_save());
+                    },
+                  ),
+                  const SizedBox(height: 8),
+                  DropdownButtonFormField<String>(
+                    key: ValueKey('work-receipt-problem-${line.id}'),
+                    initialValue: _problems[line.id]?.name ?? 'none',
+                    isExpanded: true,
+                    isDense: !enlarged,
+                    itemHeight: null,
+                    decoration: const InputDecoration(labelText: 'Item issue'),
+                    items: [
+                      const DropdownMenuItem(
+                        value: 'none',
+                        child: Text('No issue noted'),
+                      ),
+                      for (final problem in WorkspaceReceiptProblem.values)
+                        DropdownMenuItem(
+                          value: problem.name,
+                          child: Text(problem.label),
+                        ),
+                    ],
+                    onChanged: (value) {
+                      if (value == null) return;
+                      if (value == 'none') {
+                        _problems.remove(line.id);
+                      } else {
+                        _problems[line.id] = WorkspaceReceiptProblem.values
+                            .byName(value);
+                      }
+                      unawaited(_save());
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+        if (_open && _restored) ...[
+          TextField(
+            key: _noteKey,
+            controller: _note,
+            minLines: 1,
+            maxLines: enlarged ? 2 : 3,
+            maxLength: 2000,
+            decoration: const InputDecoration(
+              labelText: 'Delivery note',
+              helperText: 'Add details if needed.',
+              helperMaxLines: 3,
+              helperStyle: TextStyle(fontSize: 12),
+              counterStyle: TextStyle(fontSize: 11),
+            ),
+            onChanged: (_) {
+              unawaited(_save());
+            },
+          ),
+          const Text(
+            'Sending this receipt is not available yet.',
+            style: TextStyle(fontSize: 12, color: MoolColors.muted),
+          ),
+        ],
+        if (_open && message != null)
+          Text(
+            message,
+            key: const Key('work-receipt-save-state'),
+            style: const TextStyle(fontSize: 12),
+          ),
+        if (_open &&
+            _restored &&
+            message?.startsWith('Draft not saved') == true)
+          TextButton(
+            key: const Key('work-receipt-retry-save'),
+            onPressed: _save,
+            child: const Text('Retry saving'),
+          ),
+      ],
+    );
+  }
+}
+
 class _StorePurchasesSurface extends StatefulWidget {
   const _StorePurchasesSurface({
     required this.session,
@@ -9214,34 +9491,15 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
             Text(selected.itemSummary),
             const Text('Item quantities are awaiting an update.'),
           ],
-          for (final line in selected.lines)
-            Padding(
-              key: ValueKey('work-purchase-line-${line.id}'),
-              padding: const EdgeInsets.symmetric(vertical: 10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${line.name}${line.pack.isEmpty ? '' : ' · ${line.pack}'}',
-                    style: const TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                  Text('${_purchaseAmount(line.unitPriceMinor)} / pack'),
-                  Text(
-                    'Ordered ${line.orderedPacks} packs · Received ${line.receivedPacks == null ? 'not confirmed' : '${line.receivedPacks} packs'}',
-                  ),
-                  if (line.receivedPacks != null &&
-                      line.receivedPacks != line.orderedPacks)
-                    Text(
-                      line.receivedPacks! < line.orderedPacks
-                          ? '${line.orderedPacks - line.receivedPacks!} packs outstanding'
-                          : '${line.receivedPacks! - line.orderedPacks} extra packs reported',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                ],
-              ),
+          if (selected.lines.isNotEmpty)
+            _StoreReceiptEditor(
+              key: ValueKey((
+                selected.accountScope,
+                selected.workspaceId,
+                selected.shipmentId,
+              )),
+              session: session,
+              purchase: selected,
             ),
         ],
       );

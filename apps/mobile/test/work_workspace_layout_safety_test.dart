@@ -444,6 +444,7 @@ void main() {
     WorkIssueCommandGateway? issueCommandGateway,
     WorkIssueCommandStore? issueCommandStore,
     WorkStockHistoryGateway? stockHistoryGateway,
+    WorkReceiptDraftStore? receiptDraftStore,
   ]) {
     final work =
         WorkSession(
@@ -454,6 +455,7 @@ void main() {
             issueCommandGateway: issueCommandGateway,
             issueCommandStore: issueCommandStore ?? _IssueCommandFixtureStore(),
             stockHistoryGateway: stockHistoryGateway,
+            receiptDraftStore: receiptDraftStore ?? _ReceiptDraftFixtureStore(),
           )
           ..seedVerifiedWorkspace()
           ..retailerSetupSaved = true
@@ -18062,6 +18064,242 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
+      'DASH07 receiving editor retains exact draft and keyboard $scale',
+      (tester) async {
+        final storage = _ReceiptDraftFixtureStore()..failRead = true;
+        WorkSession fresh() => storeViewFixture(
+          null,
+          _ContactDraftFixtureStore(),
+          null,
+          null,
+          null,
+          null,
+          storage,
+        );
+        var work = fresh();
+        final storeId = work.activeWorkspace!.id;
+        final originalOrder = work.currentWorkspaceOrderId;
+        WorkspacePurchaseRecord shipment(String id, {int revision = 1}) =>
+            WorkspacePurchaseRecord(
+              accountScope: 'review-draft-account',
+              workspaceId: storeId,
+              supplierId: 'supplier-$id',
+              supplierName: 'Oil wholesaler $id',
+              orderId: 'PO-$id',
+              shipmentId: id,
+              revision: revision,
+              createdAt: DateTime(2026),
+              updatedAt: DateTime(2026, 9, revision),
+              stage: WorkspaceSupplyStage.arriving,
+              amountMinor: 1550050,
+              itemSummary: 'Sunflower oil',
+              paymentLabel: 'Paid online',
+              receiptState: WorkspaceReceiptState.awaiting,
+              lines: [
+                WorkspacePurchaseLine(
+                  id: 'line-$id',
+                  productId: 'oil-$id',
+                  name: 'Sunflower oil',
+                  pack: revision == 1 ? '1 l × 12' : '1 l × 6',
+                  orderedPacks: 10,
+                  unitPriceMinor: 155005,
+                  receivedPacks: null,
+                ),
+              ],
+            );
+        void feed(int revision) {
+          expect(
+            work.applyWorkspacePurchases(
+              accountScope: 'review-draft-account',
+              storeId: storeId,
+              feedRevision: revision,
+              records: [
+                shipment('A', revision: revision),
+                shipment('B'),
+              ],
+              complete: true,
+            ),
+            isTrue,
+          );
+        }
+
+        Future<void> showPurchase(String id) async {
+          if (work.focusedWorkspacePurchaseId != null) {
+            final back = find.byKey(const Key('work-purchase-back'));
+            final purchaseList = find.byKey(
+              PageStorageKey(
+                'work-purchase-details-$storeId-${work.focusedWorkspacePurchaseId}-false',
+              ),
+            );
+            for (
+              var attempt = 0;
+              attempt < 24 && back.hitTestable().evaluate().isEmpty;
+              attempt++
+            ) {
+              await tester.drag(purchaseList, const Offset(0, 240));
+              await tester.pumpAndSettle();
+            }
+            expect(back.hitTestable(), findsOneWidget);
+            await tester.tap(back);
+            await tester.pumpAndSettle();
+            expect(work.focusedWorkspacePurchaseId, isNull);
+          }
+          final supplier = find.text('Oil wholesaler $id');
+          await reveal(tester, supplier);
+          await tester.tap(supplier);
+          await tester.pumpAndSettle();
+          expect(work.focusedWorkspacePurchaseId, id);
+          final entry = find.byKey(const Key('work-receipt-start'));
+          await reveal(tester, entry);
+          await tester.tap(entry);
+          await tester.pumpAndSettle();
+        }
+
+        feed(1);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        final incoming = find.byKey(const Key('work-incoming-purchases'));
+        await reveal(tester, incoming);
+        await tester.tap(incoming);
+        await tester.pumpAndSettle();
+        await showPurchase('A');
+        final retryOpen = find.byKey(const Key('work-receipt-retry-open'));
+        await reveal(tester, retryOpen);
+        expect(storage.values, isEmpty);
+        storage.failRead = false;
+        await tester.tap(retryOpen);
+        await tester.pumpAndSettle();
+        final count = find.byKey(const Key('work-receipt-count-line-A'));
+        await reveal(tester, count);
+        await tester.enterText(count, '7');
+        await tester.pumpAndSettle();
+        final issue = find.byKey(const Key('work-receipt-problem-line-A'));
+        await reveal(tester, issue);
+        await tester.tap(issue);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Damaged packs').last);
+        await tester.pumpAndSettle();
+        final selectedIssue = find.descendant(
+          of: issue,
+          matching: find.text('Damaged packs'),
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(selectedIssue);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final textRect = tester.getRect(selectedIssue);
+        final fieldRect = tester.getRect(issue);
+        expect(textRect.top, greaterThanOrEqualTo(fieldRect.top));
+        expect(textRect.bottom, lessThanOrEqualTo(fieldRect.bottom));
+        for (final box in paragraph.getBoxesForSelection(
+          const TextSelection(baseOffset: 0, extentOffset: 13),
+        )) {
+          expect(box.bottom, lessThanOrEqualTo(paragraph.size.height));
+        }
+        await reveal(tester, count);
+        await Scrollable.ensureVisible(tester.element(count), alignment: .2);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'receiving-counts-$scale');
+        final note = find.byWidgetPredicate(
+          (widget) =>
+              widget is TextField &&
+              widget.decoration?.labelText == 'Delivery note',
+        );
+        await reveal(tester, note);
+        tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+        await tester.pumpAndSettle();
+        await reveal(tester, note);
+        await tester.enterText(note, 'Two packs damaged at arrival.');
+        await tester.pumpAndSettle();
+        await reveal(tester, note);
+        expect(note.hitTestable(), findsOneWidget);
+        final helper = tester.renderObject<RenderParagraph>(
+          find.text('Add details if needed.'),
+        );
+        expect(helper.didExceedMaxLines, isFalse);
+        expect(
+          tester.getRect(note).bottom,
+          lessThanOrEqualTo(tester.view.physicalSize.height - 220),
+        );
+        await captureStoreView(tester, 'receiving-keyboard-$scale');
+        tester.view.viewInsets = FakeViewPadding.zero;
+        tester.testTextInput.hide();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        storage.failSave = true;
+        await reveal(tester, count);
+        await tester.enterText(count, '8');
+        await tester.pumpAndSettle();
+        final retrySave = find.byKey(const Key('work-receipt-retry-save'));
+        await reveal(tester, retrySave);
+        await captureStoreView(tester, 'receiving-unsaved-$scale');
+        storage.failSave = false;
+        await tester.tap(retrySave);
+        await tester.pumpAndSettle();
+        feed(2);
+        await tester.pumpAndSettle();
+        final stale = find.byKey(const Key('work-receipt-stale'));
+        await reveal(tester, stale);
+        await captureStoreView(tester, 'receiving-updated-$scale');
+        final close = find.byKey(const Key('work-receipt-close'));
+        await reveal(tester, close);
+        await tester.tap(close);
+        await tester.pumpAndSettle();
+        expect(count, findsNothing);
+        await reveal(tester, find.text('Sunflower oil · 1 l × 6'));
+        expect(
+          find.text('Sunflower oil · 1 l × 6').hitTestable(),
+          findsOneWidget,
+        );
+        expect(
+          work
+              .workspaceReceiptDraft(shipment('A', revision: 2))!
+              .lines
+              .single
+              .pack,
+          '1 l × 12',
+        );
+        await showPurchase('B');
+        expect(
+          work.workspaceReceiptDraft(shipment('B'))!.countedPacks,
+          isEmpty,
+        );
+        expect(work.currentWorkspaceOrderId, originalOrder);
+        final restored = fresh();
+        await tester.pumpWidget(const SizedBox.shrink());
+        work = restored;
+        feed(2);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await reveal(tester, incoming);
+        await tester.tap(incoming);
+        await tester.pumpAndSettle();
+        await showPurchase('A');
+        final saved = work.workspaceReceiptDraft(shipment('A', revision: 2))!;
+        expect(saved.counted('line-A'), 8);
+        expect(saved.problems['line-A'], WorkspaceReceiptProblem.damaged);
+        expect(saved.note, 'Two packs damaged at arrival.');
+        expect(
+          work.focusedWorkspacePurchase!.receiptState,
+          WorkspaceReceiptState.awaiting,
+        );
+        expect(
+          work.focusedWorkspacePurchase!.lines.single.receivedPacks,
+          isNull,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'DASH07 eight supplier arrivals alongside 100 active orders $scale',
       (tester) async {
         final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -21479,6 +21717,29 @@ class _CounterDraftFixtureStore implements WorkCounterDraftStore {
       throw StateError('review write failure');
     }
     value = draft;
+  }
+}
+
+class _ReceiptDraftFixtureStore implements WorkReceiptDraftStore {
+  final values = <WorkspaceReceiptDraftKey, WorkspaceReceiptDraft>{};
+  bool failRead = false, failSave = false;
+  @override
+  Future<WorkspaceReceiptDraft?> read(WorkspaceReceiptDraftKey key) async {
+    if (failRead) throw StateError('Fixture read failure');
+    return values[key];
+  }
+
+  @override
+  Future<void> save(
+    WorkspaceReceiptDraft draft, {
+    required int? expectedRevision,
+  }) async {
+    if (failSave) throw StateError('Fixture write failure');
+    if (values[draft.key]?.revision != expectedRevision ||
+        draft.revision != (expectedRevision ?? 0) + 1) {
+      throw StateError('Fixture revision conflict');
+    }
+    values[draft.key] = WorkspaceReceiptDraft.fromJson(draft.toJson())!;
   }
 }
 

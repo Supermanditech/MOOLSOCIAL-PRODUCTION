@@ -4671,6 +4671,161 @@ void main() {
   );
 
   test(
+    'DASH07 receiving session retains 100 drafts and rejects stale scoped edits',
+    () async {
+      final account = _CommandAccountStore();
+      final native = _OrderJournalStorage();
+      WorkSession fresh() => WorkSession(
+        pendingProofStore: account,
+        receiptDraftStore: SecureWorkReceiptDraftStore(
+          accountScope: () => account.accountScope,
+          storage: native,
+        ),
+      )..activeWorkspace = _commandStore;
+      final session = fresh();
+      addTearDown(session.dispose);
+      final records = [for (var i = 0; i < 100; i++) supply('S$i')];
+      expect(
+        session.applyWorkspacePurchases(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 1,
+          records: records,
+          complete: true,
+        ),
+        isTrue,
+      );
+      await Future.wait(records.map(session.loadWorkspaceReceiptDraft));
+      await Future.wait([
+        for (var i = 0; i < records.length; i++)
+          session.saveWorkspaceReceiptDraft(
+            records[i],
+            countedPacks: {'line-1': '$i'},
+            problems: const {},
+            note: 'Checked S$i',
+          ),
+      ]);
+      expect(native.values, hasLength(100));
+      final writes = native.writes.length;
+      session.activeWorkspace = const WorkWorkspace(
+        id: 'store-B',
+        name: 'Store B',
+        profileLabel: 'Grocery / Kirana Shop',
+        profileId: 'retailer-grocery',
+        area: 'Jodhpur',
+        verified: true,
+      );
+      expect(session.workspaceReceiptDraft(records.first), isNull);
+      await session.saveWorkspaceReceiptDraft(
+        records.first,
+        countedPacks: const {'line-1': '9'},
+        problems: const {},
+        note: 'Wrong Store',
+      );
+      expect(native.writes.length, writes);
+      session.activeWorkspace = _commandStore;
+      expect(
+        session.workspaceReceiptDraft(records.first)!.counted('line-1'),
+        0,
+      );
+      expect(
+        session.applyWorkspacePurchases(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 2,
+          records: [supply('S0', revision: 2)],
+          complete: true,
+        ),
+        isTrue,
+      );
+      await session.saveWorkspaceReceiptDraft(
+        records.first,
+        countedPacks: const {'line-1': '9'},
+        problems: const {},
+        note: 'Stale tap',
+      );
+      expect(native.writes.length, writes);
+      final restored = fresh();
+      addTearDown(restored.dispose);
+      expect(
+        restored.applyWorkspacePurchases(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 2,
+          records: records,
+          complete: true,
+        ),
+        isTrue,
+      );
+      await Future.wait(records.map(restored.loadWorkspaceReceiptDraft));
+      for (var i = 0; i < records.length; i++) {
+        expect(
+          restored.workspaceReceiptDraft(records[i])!.counted('line-1'),
+          i,
+        );
+      }
+      expect(restored.workspaceStockMovements, isEmpty);
+      expect(restored.workspaceInvoices, isEmpty);
+      expect(restored.workspaceSettlementRequested, 0);
+    },
+  );
+
+  test(
+    'DASH07 receiving session reconciles save interrupted by account change',
+    () async {
+      final account = _CommandAccountStore();
+      final native = _OrderJournalStorage();
+      final session = WorkSession(
+        pendingProofStore: account,
+        receiptDraftStore: SecureWorkReceiptDraftStore(
+          accountScope: () => account.accountScope,
+          storage: native,
+        ),
+      )..activeWorkspace = _commandStore;
+      addTearDown(session.dispose);
+      final record = supply('A');
+      session.applyWorkspacePurchases(
+        accountScope: 'account-A',
+        storeId: 'store-A',
+        feedRevision: 1,
+        records: [record],
+        complete: true,
+      );
+      await session.loadWorkspaceReceiptDraft(record);
+      final held = Completer<void>();
+      native.holdWrite = held;
+      final writing = session.saveWorkspaceReceiptDraft(
+        record,
+        countedPacks: const {'line-1': '7'},
+        problems: const {},
+        note: 'First check',
+      );
+      await _drainOrderJournal();
+      account.accountScope = 'account-B';
+      held.complete();
+      await writing;
+      expect(session.workspaceReceiptDraft(record), isNull);
+      account.accountScope = 'account-A';
+      native.holdWrite = null;
+      await session.saveWorkspaceReceiptDraft(
+        record,
+        countedPacks: const {'line-1': '8'},
+        problems: const {},
+        note: 'Corrected check',
+      );
+      final saved = WorkspaceReceiptDraft.fromJson(
+        jsonDecode(native.values.values.single),
+      )!;
+      expect(saved.counted('line-1'), 8);
+      expect(saved.note, 'Corrected check');
+      expect(
+        session.workspaceReceiptDraftMessage(record),
+        'Draft saved on this device. Not sent.',
+      );
+    },
+  );
+
+  test(
     'DASH07 purchase snapshots isolate identities revisions and receipt effects',
     () {
       final account = _CommandAccountStore();

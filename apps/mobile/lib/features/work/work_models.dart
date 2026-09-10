@@ -586,6 +586,24 @@ class WorkspaceReceiptDraft {
   final Map<String, WorkspaceReceiptProblem> problems;
   final String note;
 
+  WorkspaceReceiptDraft edit({
+    required int revision,
+    required Map<String, String> countedPacks,
+    required Map<String, WorkspaceReceiptProblem> problems,
+    required String note,
+  }) => WorkspaceReceiptDraft(
+    key: key,
+    supplierId: supplierId,
+    orderId: orderId,
+    purchaseId: purchaseId,
+    shipmentRevision: shipmentRevision,
+    revision: revision,
+    lines: lines,
+    countedPacks: countedPacks,
+    problems: problems,
+    note: note,
+  );
+
   bool get valid =>
       [
         key.account,
