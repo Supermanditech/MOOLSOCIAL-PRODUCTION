@@ -147,12 +147,14 @@ void main() {
     await captureR66Visual(tester, 'r5-settings-before-help-keyboard');
     await tester.tap(help);
     await tester.pumpAndSettle();
-    final composer = find.byKey(const ValueKey('r5-help-composer'));
-    await tester.tap(composer);
-    await tester.enterText(composer, 'Unsent draft');
+    final orderSearch = find.byKey(const ValueKey('buy-shopping-help-search'));
+    await tester.ensureVisible(orderSearch);
+    await tester.pumpAndSettle();
+    await tester.tap(orderSearch);
+    await tester.enterText(orderSearch, 'Unmatched order search');
     tester.view.viewInsets = const FakeViewPadding(bottom: 260);
     await tester.pumpAndSettle();
-    await tester.enterText(composer, '');
+    await tester.enterText(orderSearch, '');
     FocusManager.instance.primaryFocus?.unfocus();
     tester.view.viewInsets = const FakeViewPadding();
     await tester.pumpAndSettle();
@@ -277,7 +279,7 @@ void main() {
         final helpOffset = settingsPosition.pixels;
         await tester.tap(help);
         await tester.pumpAndSettle();
-        expect(find.text('Help destination'), findsOneWidget);
+        expect(find.byKey(const ValueKey('buy-shopping-help')), findsOneWidget);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
         expect(

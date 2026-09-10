@@ -10442,7 +10442,9 @@ class _BuyV2CollectionOrderViewState extends State<_BuyV2CollectionOrderView>
                   alignment: Alignment.centerLeft,
                   child: _ReturnAffordance(
                     key: const ValueKey('buy-collection-return-orders'),
-                    label: 'Orders',
+                    label: session.canReturnToShoppingHelp
+                        ? 'Shopping help'
+                        : 'Orders',
                     minimumHeight: 44,
                     onTap: session.returnToOrders,
                   ),
@@ -10738,7 +10740,11 @@ class BuyV2TrackingView extends StatelessWidget {
     final returnToOrders = IntrinsicWidth(
       child: _ReturnAffordance(
         key: const ValueKey('buy-tracking-return-orders'),
-        label: session.canReturnToShoppingAlerts ? 'Shopping alerts' : 'Orders',
+        label: session.canReturnToShoppingHelp
+            ? 'Shopping help'
+            : session.canReturnToShoppingAlerts
+            ? 'Shopping alerts'
+            : 'Orders',
         onTap: session.returnToOrders,
       ),
     );

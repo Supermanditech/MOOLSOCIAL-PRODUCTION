@@ -384,7 +384,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     _gstInvoiceController = BuyV2GstInvoiceController(
       store: widget.session.gstInvoiceProfileStore,
     );
-    if (widget.session.hasShoppingAlertReturnOrigin) {
+    if (widget.session.hasShoppingAlertReturnOrigin ||
+        widget.session.hasShoppingHelpReturnOrigin) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) return;
         _applyInitialState();
@@ -541,6 +542,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
     _presentedQuickOrderStatus = quickOrder?.status;
     if (_offersActive &&
+        !widget.session.hasShoppingHelpReturnOrigin &&
         widget.session.view == BuyV2View.catalogue &&
         widget.session.destination != BuyV2Destination.shop) {
       _offersActive = false;

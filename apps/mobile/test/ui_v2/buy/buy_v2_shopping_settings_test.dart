@@ -1,6 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
@@ -10,6 +13,12 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
+class _R669EmptyHelpSession extends BuyV2Session {
+  _R669EmptyHelpSession({required super.core});
+  @override
+  List<BuyV2Order> get orders => const [];
+}
 
 void main() {
   Future<void> expandTools(WidgetTester tester) async {
@@ -33,6 +42,273 @@ void main() {
   }
 
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final origin in ['shop', 'wholesale', 'offers']) {
+    for (final size in [const Size(320, 711), const Size(711, 320)]) {
+      for (final scale in [1.0, 2.0]) {
+        final profile = '$origin-${size.width.toInt()}-$scale';
+        testWidgets(
+          'R669 shopping help returns through exact settings $profile',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = size;
+            tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
+            tester.view.viewPadding = const FakeViewPadding(
+              top: 24,
+              bottom: 34,
+            );
+            addTearDown(tester.view.reset);
+            final core = BuySession();
+            final session = BuyV2Session(core: core);
+            addTearDown(core.dispose);
+            addTearDown(session.dispose);
+            final destination = origin == 'wholesale'
+                ? BuyV2Destination.wholesale
+                : BuyV2Destination.shop;
+            final router = GoRouter(
+              initialLocation: '/origin',
+              routes: [
+                GoRoute(
+                  path: '/origin',
+                  builder: (context, state) => BuyV2Screen(
+                    session: session,
+                    initialDestination: destination,
+                    initialOffersActive: origin == 'offers',
+                  ),
+                ),
+                GoRoute(
+                  path: '/app/buy',
+                  builder: (context, state) => BuyV2Screen(
+                    session: session,
+                    initialDestination: BuyV2Destination.orders,
+                    initialView: BuyV2View.tracking,
+                    orderId: state.uri.queryParameters['order'],
+                    onExit: () => context.pop(),
+                  ),
+                ),
+              ],
+            );
+            addTearDown(router.dispose);
+            await tester.pumpWidget(
+              MaterialApp.router(
+                debugShowCheckedModeBanner: false,
+                theme: MoolTheme.light(),
+                routerConfig: router,
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(
+                    context,
+                  ).copyWith(textScaler: TextScaler.linear(scale)),
+                  child: r66VisualCaptureRoot(child!),
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            session.updateQuery('retained catalogue query');
+            expect(session.addProduct('s-tomato'), isTrue);
+            expect(session.addProduct('w-notebook'), isTrue);
+            session.toggleSaved('s-tomato');
+            final originalCart = session.cartLines
+                .map((line) => (line.product.id, line.quantity))
+                .toList();
+            final originalSaved = (
+              session.savedCountFor(BuyV2Destination.shop),
+              session.savedCountFor(BuyV2Destination.wholesale),
+            );
+            await tester.pumpAndSettle();
+            unawaited(
+              showBuyV2ShoppingSettings(
+                tester.element(find.byType(BuyV2Screen)),
+                session,
+              ),
+            );
+            await tester.pumpAndSettle();
+            final help = find.byKey(const ValueKey('buy-settings-help'));
+            await tester.ensureVisible(help);
+            await tester.pumpAndSettle();
+            final settingsPosition = Scrollable.of(
+              tester.element(help),
+            ).position;
+            final settingsOffset = settingsPosition.pixels;
+            final settingsTop = tester.getTopLeft(help).dy;
+            await tester.tap(help);
+            await tester.pumpAndSettle();
+            final helpSheet = find.byKey(const ValueKey('buy-shopping-help'));
+            final helpList = find
+                .descendant(
+                  of: find.byKey(const ValueKey('buy-shopping-help-list')),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            final search = find.byKey(
+              const ValueKey('buy-shopping-help-search'),
+            );
+            expect(helpSheet, findsOneWidget);
+            expect(find.text('Account help and support Chat'), findsNothing);
+            expect(session.query, 'retained catalogue query');
+            await captureR66Visual(tester, 'r669-shopping-help-$profile-open');
+            for (final id in ['MS-240782', 'PO-240728']) {
+              await tester.scrollUntilVisible(
+                search,
+                -120,
+                scrollable: helpList,
+              );
+              await tester.pumpAndSettle();
+              await tester.enterText(search, id);
+              tester.view.viewInsets = FakeViewPadding(
+                bottom: size.height > 400 ? 260 : 100,
+              );
+              await tester.pumpAndSettle();
+              final order = session.orders.firstWhere(
+                (order) => order.id == id,
+              );
+              final title = find.text('$id · ${order.destination.label}');
+              await tester.scrollUntilVisible(title, 100, scrollable: helpList);
+              await tester.pumpAndSettle();
+              expect(title.hitTestable(), findsOneWidget);
+              await tester.tap(title);
+              tester.view.viewInsets = const FakeViewPadding();
+              await tester.pumpAndSettle();
+              expect(session.view, BuyV2View.tracking);
+              expect(session.selectedOrderOrNull?.id, id);
+              expect(session.canReturnToShoppingHelp, isTrue);
+              final back = find.byKey(
+                const ValueKey('buy-tracking-return-orders'),
+              );
+              expect(
+                find.descendant(of: back, matching: find.text('Shopping help')),
+                findsOneWidget,
+              );
+              if (id.startsWith('MS')) {
+                // Follow a nested destination before Android Back returns to Help.
+                expect(session.openOrderItems(id), isTrue);
+                await tester.pumpAndSettle();
+                await tester.binding.handlePopRoute();
+                await tester.pumpAndSettle();
+                expect(session.view, BuyV2View.tracking);
+                await tester.binding.handlePopRoute();
+              } else {
+                await tester.ensureVisible(back);
+                await tester.pumpAndSettle();
+                expect(back.hitTestable(), findsOneWidget);
+                await tester.tap(back);
+              }
+              await tester.pumpAndSettle();
+              expect(helpSheet, findsOneWidget);
+              expect(session.hasShoppingHelpReturnOrigin, isFalse);
+              expect(tester.widget<TextField>(search).controller!.text, id);
+              expect(session.destination, destination);
+              expect(session.query, 'retained catalogue query');
+              expect(
+                session.cartLines
+                    .map((line) => (line.product.id, line.quantity))
+                    .toList(),
+                originalCart,
+              );
+              expect((
+                session.savedCountFor(BuyV2Destination.shop),
+                session.savedCountFor(BuyV2Destination.wholesale),
+              ), originalSaved);
+            }
+            await tester.scrollUntilVisible(search, -120, scrollable: helpList);
+            await tester.enterText(search, 'no-such-order');
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-shopping-help-empty')),
+              findsOneWidget,
+            );
+            await tester.tap(
+              find.byKey(const ValueKey('buy-shopping-help-clear')),
+            );
+            await tester.pumpAndSettle();
+            expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(const ValueKey('buy-shopping-settings')),
+              findsOneWidget,
+            );
+            expect(settingsPosition.pixels, settingsOffset);
+            expect(tester.getTopLeft(help).dy, settingsTop);
+            await captureR66Visual(
+              tester,
+              'r669-shopping-help-$profile-returned',
+            );
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.destination, destination);
+            expect(session.query, 'retained catalogue query');
+            if (origin == 'offers') {
+              expect(
+                find.byKey(const ValueKey('buy-offers-publisher-summary')),
+                findsOneWidget,
+              );
+            }
+            expect(tester.takeException(), isNull);
+            await tester.pumpWidget(const SizedBox.shrink());
+            await tester.pumpAndSettle();
+          },
+        );
+      }
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 shopping help has truthful empty guidance $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 711));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = _R669EmptyHelpSession(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: r66VisualCaptureRoot(child!),
+          ),
+          home: BuyV2Screen(session: session),
+        ),
+      );
+      await tester.pumpAndSettle();
+      unawaited(
+        showBuyV2ShoppingSettings(
+          tester.element(find.byType(BuyV2Screen)),
+          session,
+        ),
+      );
+      await tester.pumpAndSettle();
+      final help = find.byKey(const ValueKey('buy-settings-help'));
+      await tester.ensureVisible(help);
+      await tester.tap(help);
+      await tester.pumpAndSettle();
+      for (final id in ['before-order', 'order-guidance']) {
+        final topic = find.byKey(ValueKey('buy-shopping-help-$id'));
+        await tester.ensureVisible(topic);
+        await tester.tap(
+          find.descendant(of: topic, matching: find.byType(ListTile)),
+        );
+        await tester.pumpAndSettle();
+      }
+      final empty = find.byKey(const ValueKey('buy-shopping-help-empty'));
+      await tester.ensureVisible(empty);
+      await tester.pumpAndSettle();
+      expect(find.text('No orders to show yet.'), findsOneWidget);
+      expect(find.text('Account help and support Chat'), findsNothing);
+      await captureR66Visual(tester, 'r669-shopping-help-empty-$scale');
+      await tester.tap(find.byKey(const ValueKey('buy-shopping-help-close')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-shopping-settings')),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final collection in ['saved', 'recently-viewed']) {
     testWidgets(

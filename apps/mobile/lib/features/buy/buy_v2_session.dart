@@ -2835,6 +2835,14 @@ class BuyV2Session extends ChangeNotifier {
   })?
   _shoppingAlertVisit;
   bool _shoppingAlertReturnRequested = false;
+  ({
+    Object token,
+    String orderId,
+    VoidCallback returnToHelp,
+    VoidCallback restoreOrigin,
+  })?
+  _shoppingHelpVisit;
+  bool _shoppingHelpReturnRequested = false;
   String? notice;
   String? cartAcknowledgement;
   BuyV2Destination? _cartAcknowledgementDestination;
@@ -7262,6 +7270,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void returnToOrders() {
+    if (_returnToShoppingHelp()) return;
     if (_returnToShoppingAlerts()) return;
     final previous = _navigationSurfaceIdentity;
     destination = selectedOrderOrNull?.destination == BuyV2Destination.medicine
@@ -7541,6 +7550,76 @@ class BuyV2Session extends ChangeNotifier {
       List.unmodifiable(_shoppingAlerts);
 
   bool get hasShoppingAlertReturnOrigin => _shoppingAlertVisit != null;
+
+  bool get hasShoppingHelpReturnOrigin => _shoppingHelpVisit != null;
+
+  /// Retain the settings/help origin while the existing order route is visited.
+  /// Navigation is restored once; Cart, Saved and order updates are retained.
+  Object? beginShoppingHelpOrderVisit(
+    String orderId,
+    VoidCallback returnToHelp,
+  ) {
+    if (hasShoppingHelpReturnOrigin ||
+        hasShoppingAlertReturnOrigin ||
+        !orders.any(
+          (order) =>
+              order.id == orderId &&
+              order.destination != BuyV2Destination.medicine,
+        )) {
+      return null;
+    }
+    final token = Object();
+    final restoreProductNavigation = beginStoreNavigationVisit();
+    final origin = (
+      checkoutScope: checkoutScope,
+      ordersTab: ordersTab,
+      orderId: _selectedOrderId,
+      query: query,
+      filter: selectedFilter,
+      shopCategoryId: shopCategoryId,
+      wholesaleCategoryId: wholesaleCategoryId,
+      medicineCategoryId: medicineCategoryId,
+    );
+    _shoppingHelpReturnRequested = false;
+    _shoppingHelpVisit = (
+      token: token,
+      orderId: orderId,
+      returnToHelp: returnToHelp,
+      restoreOrigin: () {
+        checkoutScope = origin.checkoutScope;
+        ordersTab = origin.ordersTab;
+        _selectedOrderId = origin.orderId;
+        query = origin.query;
+        selectedFilter = origin.filter;
+        shopCategoryId = origin.shopCategoryId;
+        wholesaleCategoryId = origin.wholesaleCategoryId;
+        medicineCategoryId = origin.medicineCategoryId;
+        restoreProductNavigation();
+      },
+    );
+    return token;
+  }
+
+  void finishShoppingHelpOrderVisit(Object token, {required bool restore}) {
+    final visit = _shoppingHelpVisit;
+    if (visit == null || !identical(visit.token, token)) return;
+    _shoppingHelpVisit = null;
+    _shoppingHelpReturnRequested = false;
+    if (restore) visit.restoreOrigin();
+  }
+
+  bool get canReturnToShoppingHelp =>
+      _shoppingHelpVisit != null &&
+      !_shoppingHelpReturnRequested &&
+      view == BuyV2View.tracking &&
+      _selectedOrderId == _shoppingHelpVisit!.orderId;
+
+  bool _returnToShoppingHelp() {
+    if (!canReturnToShoppingHelp) return false;
+    _shoppingHelpReturnRequested = true;
+    _shoppingHelpVisit!.returnToHelp();
+    return true;
+  }
 
   Object beginShoppingAlertVisit(
     BuyV2ShoppingAlert alert,
@@ -7849,12 +7928,14 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool get canHandleBack =>
+      canReturnToShoppingHelp ||
       canReturnToShoppingAlerts ||
       canReturnToAccount ||
       view != BuyV2View.catalogue ||
       destination != BuyV2Destination.shop;
 
   void goBack() {
+    if (_returnToShoppingHelp()) return;
     if (_returnToShoppingAlerts()) return;
     if (view == BuyV2View.checkout && checkoutBusy) {
       notice = 'Keep Checkout open while your payment status is checked.';

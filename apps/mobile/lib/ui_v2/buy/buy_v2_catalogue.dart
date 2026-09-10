@@ -4348,9 +4348,9 @@ class _BuyV2ShoppingSettingsSheetState
                   icon: Icons.help_outline_rounded,
                   title: 'Help and support',
                   detail: 'Get help with shopping and orders',
-                  onTap: () => _openBuyV2SettingsRoute(
+                  onTap: () => _showBuyV2ShoppingHelp(
                     context,
-                    '/app/ask',
+                    widget.session,
                     returnScrollController: _scrollController,
                   ),
                 ),
@@ -4490,6 +4490,306 @@ Future<void> _confirmClearBuyV2RecentlyViewed(
   session.clearRecentlyViewed(BuyV2Destination.wholesale);
 }
 
+Future<void> _showBuyV2ShoppingHelp(
+  BuildContext context,
+  BuyV2Session session, {
+  required ScrollController returnScrollController,
+}) async {
+  final offset = returnScrollController.hasClients
+      ? returnScrollController.offset
+      : null;
+  await showModalBottomSheet<void>(
+    context: context,
+    useSafeArea: true,
+    isScrollControlled: true,
+    showDragHandle: true,
+    backgroundColor: Colors.white,
+    constraints: const BoxConstraints(maxWidth: BuyV2Metrics.maxWidth),
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+    ),
+    sheetAnimationStyle: BuyV2InfoSheetMotion.resolve(context),
+    builder: (_) => _BuyV2ShoppingHelpSheet(session: session),
+  );
+  if (!context.mounted) return;
+  _restoreBuyV2SettingsOffset(context, returnScrollController, offset);
+}
+
+class _BuyV2ShoppingHelpSheet extends StatefulWidget {
+  const _BuyV2ShoppingHelpSheet({required this.session});
+  final BuyV2Session session;
+
+  @override
+  State<_BuyV2ShoppingHelpSheet> createState() =>
+      _BuyV2ShoppingHelpSheetState();
+}
+
+class _BuyV2ShoppingHelpSheetState extends State<_BuyV2ShoppingHelpSheet> {
+  final _search = TextEditingController();
+  final _scroll = ScrollController();
+  bool _visiting = false;
+  String? _routeError;
+
+  @override
+  void dispose() {
+    _search.dispose();
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  Future<void> _openOrder(BuyV2Order order) async {
+    final router = GoRouter.maybeOf(context);
+    if (router == null || _visiting) return;
+    FocusScope.of(context).unfocus();
+    final offset = _scroll.hasClients ? _scroll.offset : null;
+    final visit = widget.session.beginShoppingHelpOrderVisit(order.id, () {
+      if (mounted && router.canPop()) router.pop();
+    });
+    if (visit == null) {
+      setState(
+        () => _routeError = 'This order cannot be opened right now. Try again.',
+      );
+      return;
+    }
+    setState(() {
+      _visiting = true;
+      _routeError = null;
+    });
+    final session = widget.session;
+    unawaited(
+      ModalRoute.of(context)!.completed.then<void>((_) {
+        session.finishShoppingHelpOrderVisit(visit, restore: false);
+      }),
+    );
+    try {
+      await router.push(
+        Uri(
+          path: '/app/buy',
+          queryParameters: {
+            'sub': 'orders',
+            'view': 'tracking',
+            'order': order.id,
+          },
+        ).toString(),
+      );
+    } finally {
+      session.finishShoppingHelpOrderVisit(visit, restore: mounted);
+      if (mounted) {
+        setState(() => _visiting = false);
+        _restoreBuyV2SettingsOffset(context, _scroll, offset);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final media = MediaQuery.of(context);
+      final query = _search.text.trim().toLowerCase();
+      final orders = widget.session.orders
+          .where(
+            (order) =>
+                order.destination == BuyV2Destination.shop ||
+                order.destination == BuyV2Destination.wholesale,
+          )
+          .where(
+            (order) =>
+                query.isEmpty ||
+                [
+                  order.id,
+                  order.purchaseId ?? '',
+                  order.title,
+                  order.itemSummary,
+                  order.partner,
+                  for (final id in order.productIds)
+                    widget.session.findProduct(id)?.title ?? '',
+                  for (final line in order.lines) line.product.title,
+                ].any((value) => value.toLowerCase().contains(query)),
+          )
+          .toList();
+      final canOpenOrders = GoRouter.maybeOf(context) != null;
+      return Padding(
+        padding: EdgeInsets.only(bottom: media.viewInsets.bottom),
+        child: SizedBox(
+          key: const ValueKey('buy-shopping-help'),
+          height:
+              ((media.size.height -
+                          media.viewInsets.bottom -
+                          media.viewPadding.top) *
+                      .9)
+                  .clamp(0.0, media.size.height),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(left: 14, right: 6),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Shopping help',
+                          style: context.buyTitle.copyWith(fontSize: 17),
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('buy-shopping-help-close'),
+                        tooltip: 'Close shopping help',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: ListView.builder(
+                    key: const ValueKey('buy-shopping-help-list'),
+                    controller: _scroll,
+                    padding: const EdgeInsets.fromLTRB(14, 0, 14, 18),
+                    itemCount: orders.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == 0) {
+                        return Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            Text(
+                              'Products, delivery, invoices and returns.',
+                              style: context.buyMeta,
+                            ),
+                            ExpansionTile(
+                              key: const ValueKey(
+                                'buy-shopping-help-before-order',
+                              ),
+                              tilePadding: EdgeInsets.zero,
+                              childrenPadding: const EdgeInsets.only(
+                                bottom: 10,
+                              ),
+                              title: Text(
+                                'Before you order',
+                                style: context.buyBody,
+                              ),
+                              children: [
+                                Text(
+                                  'Open a product to check its pack, price, minimum order and delivery details. Visit its store or supplier for seller information and available contact options.',
+                                  style: context.buyMeta,
+                                ),
+                              ],
+                            ),
+                            ExpansionTile(
+                              key: const ValueKey(
+                                'buy-shopping-help-order-guidance',
+                              ),
+                              tilePadding: EdgeInsets.zero,
+                              childrenPadding: const EdgeInsets.only(
+                                bottom: 10,
+                              ),
+                              title: Text(
+                                'Delivery, returns and refunds',
+                                style: context.buyBody,
+                              ),
+                              children: [
+                                Text(
+                                  'Choose an order below for tracking, invoices and available help with delivery, returns or refunds.',
+                                  style: context.buyMeta,
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Text(
+                              'Your Shop and Wholesale orders',
+                              style: context.buyBody,
+                            ),
+                            const SizedBox(height: 6),
+                            TextField(
+                              key: const ValueKey('buy-shopping-help-search'),
+                              controller: _search,
+                              scrollPadding: const EdgeInsets.all(16),
+                              onChanged: (_) => setState(() {}),
+                              onTapOutside: (_) =>
+                                  FocusScope.of(context).unfocus(),
+                              decoration: InputDecoration(
+                                labelText: 'Find an order',
+                                hintText: 'Order number, product or seller',
+                                suffixIcon: _search.text.isEmpty
+                                    ? null
+                                    : IconButton(
+                                        key: const ValueKey(
+                                          'buy-shopping-help-clear',
+                                        ),
+                                        tooltip: 'Clear order search',
+                                        onPressed: () =>
+                                            setState(_search.clear),
+                                        icon: const Icon(Icons.close_rounded),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            if (!canOpenOrders)
+                              Text(
+                                'Order details are unavailable here.',
+                                style: context.buyMeta,
+                              ),
+                            if (_routeError != null)
+                              Text(_routeError!, style: context.buyMeta),
+                            if (orders.isEmpty)
+                              Text(
+                                query.isEmpty
+                                    ? 'No orders to show yet.'
+                                    : 'No matching orders. Try another order number, product or seller.',
+                                key: const ValueKey('buy-shopping-help-empty'),
+                                style: context.buyBody,
+                              ),
+                          ],
+                        );
+                      }
+                      final order = orders[index - 1];
+                      final status = switch (order.status) {
+                        BuyV2OrderStatus.confirmed => 'Order confirmed',
+                        BuyV2OrderStatus.preparing => 'Preparing your order',
+                        BuyV2OrderStatus.dispatched => 'Dispatched',
+                        BuyV2OrderStatus.arriving => 'Arriving',
+                        BuyV2OrderStatus.delivered => 'Delivered',
+                      };
+                      return _ShoppingSettingsRow(
+                        key: ValueKey('buy-shopping-help-order-${order.id}'),
+                        icon: Icons.receipt_long_outlined,
+                        title: '${order.id} · ${order.destination.label}',
+                        detail:
+                            '${order.itemSummary}\n${order.partner}\n$status',
+                        onTap: !canOpenOrders || _visiting
+                            ? null
+                            : () => _openOrder(order),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+void _restoreBuyV2SettingsOffset(
+  BuildContext context,
+  ScrollController returnScrollController,
+  double? offset,
+) {
+  if (!context.mounted || offset == null) return;
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!context.mounted || !returnScrollController.hasClients) return;
+    final position = returnScrollController.position;
+    final target = offset.clamp(
+      position.minScrollExtent,
+      position.maxScrollExtent,
+    );
+    if (position.pixels != target) returnScrollController.jumpTo(target);
+  });
+}
+
 Future<void> _openBuyV2SettingsRoute(
   BuildContext context,
   String route, {
@@ -4501,18 +4801,10 @@ Future<void> _openBuyV2SettingsRoute(
       ? returnScrollController.offset
       : null;
   await router.push(route);
-  if (!context.mounted || offset == null) return;
+  if (!context.mounted) return;
   // A keyboard on the pushed page can resize and clamp the covered sheet.
   // Restore its actual origin after the returned page has laid out again.
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    if (!context.mounted || !returnScrollController.hasClients) return;
-    final position = returnScrollController.position;
-    final target = offset.clamp(
-      position.minScrollExtent,
-      position.maxScrollExtent,
-    );
-    if (position.pixels != target) returnScrollController.jumpTo(target);
-  });
+  _restoreBuyV2SettingsOffset(context, returnScrollController, offset);
 }
 
 Future<void> showBuyV2ShoppingAlerts(
