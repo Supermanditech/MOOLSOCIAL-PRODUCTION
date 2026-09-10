@@ -11,6 +11,8 @@ import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/core/design/mool_design_system.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -22,6 +24,19 @@ import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+
+class _TrackingOrdersFixture extends BuyV2Session {
+  _TrackingOrdersFixture({required super.core});
+  List<BuyV2Order>? projectedOrders;
+
+  @override
+  List<BuyV2Order> get orders => projectedOrders ?? super.orders;
+
+  void updateProjection(List<BuyV2Order> records) {
+    projectedOrders = List.unmodifiable(records);
+    notifyListeners();
+  }
+}
 
 class _OrderJournalFixture implements WorkOrderPendingStore {
   _OrderJournalFixture(this.command);
@@ -18410,6 +18425,145 @@ void main() {
       expect(work.workspaceInvoices, isEmpty);
       expect(tester.takeException(), isNull);
     });
+  }
+
+  for (final (scale, change) in [
+    for (final scale in [1.0, 2.0])
+      for (final change in ['removed', 'purchase', 'retail']) (scale, change),
+  ]) {
+    testWidgets(
+      'DASH07 active tracking revalidates Buy-only updates $scale $change',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final core = BuySession();
+        final buy = _TrackingOrdersFixture(core: core);
+        final storeId = work.activeWorkspace!.id;
+        final originalCustomerOrder = work.currentWorkspaceOrderId;
+        final router = GoRouter(
+          initialLocation: '/app/work/workspace/dashboard',
+          routes: [
+            GoRoute(
+              path: '/app/work/workspace/dashboard',
+              builder: (context, state) => WorkWorkspaceDashboardScreen(
+                session: work,
+                procurementSession: buy,
+                accountAuthenticated: true,
+              ),
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        addTearDown(work.dispose);
+        addTearDown(buy.dispose);
+        addTearDown(core.dispose);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = scale == 1
+            ? const Size(412, 915)
+            : const Size(320, 568);
+        tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final order = buy.orders.firstWhere(
+          (order) => order.destination == BuyV2Destination.wholesale,
+        );
+        final now = DateTime.now();
+        final linked = WorkspacePurchaseRecord.fromBuyOrder(
+          order: order,
+          accountScope: 'review-draft-account',
+          workspaceId: storeId,
+          supplierId: 'verified-supplier-workspace',
+          revision: 1,
+          createdAt: now,
+          updatedAt: now,
+        );
+        expect(
+          work.applyWorkspacePurchases(
+            accountScope: linked.accountScope,
+            storeId: storeId,
+            feedRevision: 1,
+            records: [linked],
+            complete: true,
+          ),
+          isTrue,
+        );
+        final product = buy.visibleProducts.first;
+        expect(buy.addProduct(product.id), isTrue);
+        final quantity = buy.quantityFor(product.id);
+        final total = buy.cartTotal;
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('store-review-root'),
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final purchases = find.byKey(const Key('work-incoming-purchases'));
+        await reveal(tester, purchases);
+        await tester.tap(purchases);
+        await tester.pumpAndSettle();
+        final track = find.byKey(
+          ValueKey('work-purchase-open-${linked.shipmentId}'),
+        );
+        await reveal(tester, track);
+        await tester.tap(track);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+        expect(buy.selectedOrderId, order.id);
+        buy.updateProjection(buy.orders);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+        expect(buy.selectedOrderId, order.id);
+        expect(buy.quantityFor(product.id), quantity);
+        buy.updateProjection([
+          for (final other in buy.orders)
+            if (other.id != order.id) other,
+          if (change != 'removed')
+            BuyV2Order(
+              id: order.id,
+              destination: change == 'retail'
+                  ? BuyV2Destination.shop
+                  : order.destination,
+              purchaseId: change == 'purchase'
+                  ? 'replacement-${order.purchaseId}'
+                  : order.purchaseId,
+              title: order.title,
+              itemSummary: order.itemSummary,
+              total: order.total,
+              partner: order.partner,
+              partnerType: order.partnerType,
+              promise: order.promise,
+              destinationLabel: order.destinationLabel,
+              progress: order.progress,
+              status: order.status,
+            ),
+        ]);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'supply-tracking-buy-$change-$scale');
+        expect(find.byKey(const ValueKey('buy-v2-screen')), findsNothing);
+        final recovery = find.byKey(
+          const Key('work-tracking-unavailable-action'),
+        );
+        await reveal(tester, recovery);
+        expect(recovery.hitTestable(), findsOneWidget);
+        await tester.tap(recovery);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(PageStorageKey('work-purchases-$storeId-false')),
+          findsOneWidget,
+        );
+        expect(buy.quantityFor(product.id), quantity);
+        expect(buy.cartTotal, total);
+        expect(work.currentWorkspaceOrderId, originalCustomerOrder);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final action in ['Call', 'WhatsApp']) {

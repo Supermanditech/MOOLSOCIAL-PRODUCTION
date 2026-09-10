@@ -1227,31 +1227,36 @@ class _WorkWorkspaceDashboardScreenState
             onOpenStatus: _showStatus,
             onDismiss: session.dismissWorkspaceAlert,
           ),
-          _WorkspaceControlView.procurement
-              when _trackedPurchase != null && !_trackingPurchaseAvailable =>
-            ListView(
-              primary: false,
-              padding: const EdgeInsets.all(16),
-              children: [
-                WorkEmptyState(
-                  keyName: 'work-tracking-unavailable',
-                  title: 'Purchase tracking unavailable',
-                  detail:
-                      'Return to your Store purchases for the latest update.',
-                  actionLabel: 'Back to purchases',
-                  onAction: _leaveProcurement,
-                ),
-              ],
-            ),
-          _WorkspaceControlView.procurement => _StoreProcurementSurface(
-            session: widget.procurementSession,
-            accountIdentity: widget.accountIdentity,
-            accountAuthenticated: widget.accountAuthenticated,
-            ready: _procurementReady,
-            productId: _procurementProductId,
-            orderId: _trackedPurchase?.orderId,
-            onExit: _leaveProcurement,
-            onDestinationChanged: _handleProcurementDestinationChanged,
+          _WorkspaceControlView.procurement => AnimatedBuilder(
+            animation: widget.procurementSession,
+            builder: (context, _) {
+              if (_trackedPurchase != null && !_trackingPurchaseAvailable) {
+                return ListView(
+                  primary: false,
+                  padding: const EdgeInsets.all(16),
+                  children: [
+                    WorkEmptyState(
+                      keyName: 'work-tracking-unavailable',
+                      title: 'Purchase tracking unavailable',
+                      detail:
+                          'Return to your Store purchases for the latest update.',
+                      actionLabel: 'Back to purchases',
+                      onAction: _leaveProcurement,
+                    ),
+                  ],
+                );
+              }
+              return _StoreProcurementSurface(
+                session: widget.procurementSession,
+                accountIdentity: widget.accountIdentity,
+                accountAuthenticated: widget.accountAuthenticated,
+                ready: _procurementReady,
+                productId: _procurementProductId,
+                orderId: _trackedPurchase?.orderId,
+                onExit: _leaveProcurement,
+                onDestinationChanged: _handleProcurementDestinationChanged,
+              );
+            },
           ),
           _WorkspaceControlView.operation => _WorkspaceOperationSurface(
             operation: _operation,
