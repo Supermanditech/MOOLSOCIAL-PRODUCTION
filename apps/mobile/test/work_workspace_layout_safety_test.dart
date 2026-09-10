@@ -15766,6 +15766,295 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
+      'DASH08 finance first taps keep 25 payment updates separate from 100 orders $scale',
+      (tester) async {
+        final semantics = tester.ensureSemantics();
+        try {
+          final work = storeViewFixture(null, _ContactDraftFixtureStore());
+          final now = DateTime.now();
+          final originalOrder = work.currentWorkspaceOrderId;
+          for (var i = 1; i < 100; i++) {
+            work.workspaceOrders.add(
+              customerOrder(
+                id: 'FIN-${i.toString().padLeft(2, '0')}',
+                customer: 'Customer $i',
+                createdAt: now,
+              ).copyWith(stage: 'Preparing'),
+            );
+          }
+          final states = work.workspaceOrders
+              .map((o) => (o.id, o.stage))
+              .toList();
+          WorkspaceFinanceSnapshot snapshot(
+            int revision, {
+            bool paid = false,
+          }) => WorkspaceFinanceSnapshot(
+            accountScope: 'review-draft-account',
+            workspaceId: work.activeWorkspace!.id,
+            revision: revision,
+            asOf: now,
+            salesTodayMinor: 1000000000050,
+            duesMinor: paid ? 0 : 46825,
+            availableMinor: 1000000000050,
+            heldMinor: 75025,
+            requestedMinor: paid ? 0 : 100000,
+            paidOutMinor: paid ? 100000 : 0,
+            feesMinor: 1025,
+            deliveryAdjustmentsMinor: -525,
+            refundsMinor: 0,
+            taxWithheldMinor: 5000,
+            payments: [
+              for (var i = 0; i < 25; i++)
+                WorkspacePaymentRecord(
+                  orderId: i == 0
+                      ? 'APP-1043'
+                      : 'FIN-${i.toString().padLeft(2, '0')}',
+                  customerId: 'customer-$i',
+                  customerName: i == 0 ? 'Rakesh' : 'Customer $i',
+                  revision: revision,
+                  updatedAt: now,
+                  amountMinor: 146800,
+                  paidMinor: paid || i != 0 ? 146800 : 99975,
+                  dueMinor: paid || i != 0 ? 0 : 46825,
+                  refundedMinor: 0,
+                  state: paid || i != 0
+                      ? WorkspacePaymentState.paid
+                      : WorkspacePaymentState.partPaid,
+                  channel: i == 0
+                      ? WorkspacePaymentChannel.platform
+                      : i.isEven
+                      ? WorkspacePaymentChannel.cash
+                      : WorkspacePaymentChannel.directUpi,
+                  invoiceId: 'INV-$i',
+                  transactionId: 'TX-$i',
+                ),
+            ],
+            payouts: [
+              WorkspacePayoutRecord(
+                id: 'SET-A',
+                operationId: 'SET-OP-A',
+                revision: revision,
+                amountMinor: 100000,
+                updatedAt: now,
+                state: paid
+                    ? WorkspacePayoutState.paid
+                    : WorkspacePayoutState.processing,
+                bankLabel: 'Bank · •••• 4321',
+                expectedBy: '12 September',
+              ),
+              WorkspacePayoutRecord(
+                id: 'SET-B',
+                operationId: 'SET-OP-B',
+                revision: revision,
+                amountMinor: 50025,
+                updatedAt: now,
+                state: WorkspacePayoutState.failed,
+                message: 'Receiving account needs review.',
+              ),
+            ],
+          );
+          expect(work.applyWorkspaceFinance(snapshot(1)), isTrue);
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+            textScale: scale,
+          );
+          await captureStoreView(tester, 'finance-dashboard-$scale');
+          await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
+          final pulseText = tester
+              .widgetList<Text>(
+                find.descendant(
+                  of: find.byKey(const Key('work-pulse-settlement')),
+                  matching: find.byType(Text),
+                ),
+              )
+              .map((w) => w.data ?? '')
+              .toList();
+          expect(
+            pulseText.any(
+              (t) => t.contains('≈') && t.contains('1,000') && t.contains('cr'),
+            ),
+            isTrue,
+          );
+          expect(
+            pulseText.any((t) => t.contains('10,00,00,00,000.50')),
+            isFalse,
+          );
+          expect(
+            find.bySemanticsLabel(
+              RegExp(r'Settle, Available, ₹10,00,00,00,000\.50'),
+            ),
+            findsOneWidget,
+          );
+          await tester.tap(find.byKey(const Key('work-pulse-settlement')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-finance-settlement')),
+            findsOneWidget,
+          );
+          await captureStoreView(
+            tester,
+            'finance-settlement-first-view-$scale',
+          );
+          await reveal(tester, find.text('₹10,00,00,00,000.50'));
+          expect(find.text('₹10,00,00,00,000.50'), findsOneWidget);
+          await captureStoreView(tester, 'finance-full-amount-$scale');
+          if (scale == 2) {
+            final amountScroll = find
+                .ancestor(
+                  of: find.text('₹10,00,00,00,000.50'),
+                  matching: find.byWidgetPredicate(
+                    (w) =>
+                        w is Scrollable &&
+                        w.axisDirection == AxisDirection.right,
+                  ),
+                )
+                .first;
+            await tester.drag(amountScroll, const Offset(-400, 0));
+            await tester.pumpAndSettle();
+            final position = tester
+                .state<ScrollableState>(amountScroll)
+                .position;
+            expect(position.pixels, position.maxScrollExtent);
+            final amountSemantics = find
+                .ancestor(
+                  of: amountScroll,
+                  matching: find.byWidgetPredicate(
+                    (w) =>
+                        w is Semantics &&
+                        w.properties.label == '₹10,00,00,00,000.50',
+                  ),
+                )
+                .first;
+            expect(
+              tester.getSemantics(amountSemantics).getSemanticsData().label,
+              contains('₹10,00,00,00,000.50'),
+            );
+            await captureStoreView(tester, 'finance-full-amount-end-$scale');
+          }
+          await reveal(tester, find.text('Request settlement'));
+          expect(
+            tester
+                .widget<FilledButton>(
+                  find.ancestor(
+                    of: find.text('Request settlement'),
+                    matching: find.byType(FilledButton),
+                  ),
+                )
+                .onPressed,
+            isNull,
+          );
+          await reveal(tester, find.text('−₹5.25'));
+          await captureStoreView(tester, 'finance-signed-adjustment-$scale');
+          await reveal(
+            tester,
+            find.byKey(const Key('work-finance-payout-SET-B')),
+          );
+          expect(find.text('SET-B · Payout failed'), findsOneWidget);
+          await captureStoreView(tester, 'finance-payout-failed-$scale');
+          await reveal(
+            tester,
+            find.byKey(const Key('work-finance-payment-APP-1043')),
+          );
+          expect(find.text('Part paid'), findsOneWidget);
+          await captureStoreView(tester, 'finance-exact-payment-$scale');
+          expect(work.workspaceOrders.map((o) => (o.id, o.stage)), states);
+          expect(work.currentWorkspaceOrderId, originalOrder);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await reveal(tester, find.byKey(const Key('work-pulse-dues')));
+          await tester.tap(find.byKey(const Key('work-pulse-dues')));
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-finance-dues')), findsOneWidget);
+          await reveal(
+            tester,
+            find.byKey(const Key('work-finance-payment-APP-1043')),
+          );
+          await captureStoreView(tester, 'finance-dues-$scale');
+          work.markWorkspaceFinanceStale(
+            accountScope: 'review-draft-account',
+            storeId: work.activeWorkspace!.id,
+          );
+          await tester.pumpAndSettle();
+          await reveal(tester, find.byKey(const Key('work-finance-stale')));
+          await captureStoreView(tester, 'finance-stale-$scale');
+          expect(work.applyWorkspaceFinance(snapshot(2, paid: true)), isTrue);
+          await tester.pumpAndSettle();
+          expect(work.workspaceFinance!.duesMinor, 0);
+          expect(
+            find.byKey(const Key('work-finance-payment-APP-1043')),
+            findsNothing,
+          );
+          expect(work.workspaceFinanceStale, isFalse);
+          expect(work.workspaceOrders.map((o) => (o.id, o.stage)), states);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await reveal(tester, find.byKey(const Key('work-pulse-sales')));
+          await tester.tap(find.byKey(const Key('work-pulse-sales')));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-finance-payments')),
+            findsOneWidget,
+          );
+          await reveal(
+            tester,
+            find.byKey(const Key('work-finance-payment-APP-1043')),
+          );
+          expect(find.text('Paid through MoolSocial'), findsOneWidget);
+          await captureStoreView(tester, 'finance-statement-$scale');
+          await reveal(
+            tester,
+            find.byKey(const Key('work-finance-order-details-APP-1043')),
+          );
+          await tester.tap(find.text('Order details').first);
+          await tester.pumpAndSettle();
+          await reveal(tester, find.text('Receive by'));
+          await captureStoreView(tester, 'finance-order-details-$scale');
+          expect(work.currentWorkspaceOrderId, originalOrder);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      },
+    );
+
+    testWidgets(
+      'DASH08 live unavailable finance never displays a false zero balance $scale',
+      (tester) async {
+        final work = storeViewFixture(
+          const UnavailableWorkGateway(),
+          _ContactDraftFixtureStore(),
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await reveal(tester, find.byKey(const Key('work-pulse-settlement')));
+        expect(find.text('Update pending'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-pulse-settlement')));
+        await tester.pumpAndSettle();
+        expect(find.text('Payment updates unavailable'), findsOneWidget);
+        expect(find.text('₹0'), findsNothing);
+        await captureStoreView(tester, 'finance-unavailable-$scale');
+        expect(find.text('Request settlement'), findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-store-activity-deck')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
       'DASH07 unavailable purchases never import personal Buy history $scale',
       (tester) async {
         final work = storeViewFixture();

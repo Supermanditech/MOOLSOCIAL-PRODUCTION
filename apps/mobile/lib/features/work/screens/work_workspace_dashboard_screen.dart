@@ -37,11 +37,18 @@ String _formatStoreAmount(int value) {
 }
 
 String _storeSummaryAmount(String exact) {
-  final amount = int.tryParse(exact.replaceAll('₹', '').replaceAll(',', ''));
-  if (amount == null || amount.abs() < 100000) return exact;
+  final parts = RegExp(r'^(-?)(\d+)(?:\.(\d{1,2}))?$').firstMatch(
+    exact.replaceAll('₹', '').replaceAll(',', '').replaceAll('−', '-'),
+  );
+  if (parts == null) return exact;
+  final rupees = int.tryParse(parts[2]!);
+  if (rupees == null) return exact;
+  final minor = rupees * 100 + int.parse((parts[3] ?? '').padRight(2, '0'));
+  final amount = parts[1] == '-' ? -minor : minor;
+  if (amount.abs() < 10000000) return exact;
   final magnitude = amount.abs();
-  final divisor = magnitude >= 10000000 ? 10000000 : 100000;
-  final unit = magnitude >= 10000000 ? 'cr' : 'lakh';
+  final divisor = magnitude >= 1000000000 ? 1000000000 : 10000000;
+  final unit = magnitude >= 1000000000 ? 'cr' : 'lakh';
   final whole = magnitude ~/ divisor;
   final fraction = (magnitude % divisor) ~/ (divisor ~/ 100);
   final approximate = magnitude % (divisor ~/ 100) != 0;
@@ -3292,8 +3299,11 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                     flex: flex[0],
                     label: 'View statement',
                     contextLabel: 'Sales today',
-                    value:
-                        '₹${_formatStoreAmount(session.workspaceSalesToday)}',
+                    value: session.workspaceFinance != null
+                        ? _purchaseAmount(
+                            session.workspaceFinance!.salesTodayMinor,
+                          )
+                        : '₹${_formatStoreAmount(session.workspaceSalesToday)}',
                     icon: Icons.point_of_sale_outlined,
                     onTap: onSales,
                   ),
@@ -3303,8 +3313,9 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                     flex: flex[1],
                     label: 'Collect dues',
                     contextLabel: 'Unpaid bills',
-                    value:
-                        '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
+                    value: session.workspaceFinance != null
+                        ? _purchaseAmount(session.workspaceFinance!.duesMinor)
+                        : '₹${_formatStoreAmount(session.workspaceCustomerBook.fold<int>(0, (total, customer) => total + customer.amountDue))}',
                     icon: Icons.payments_outlined,
                     onTap: onOrders,
                   ),
@@ -3313,9 +3324,19 @@ class _StoreLiveBusinessPulse extends StatelessWidget {
                     keyName: 'work-pulse-settlement',
                     flex: flex[2],
                     label: 'Settle',
-                    contextLabel: 'Available',
-                    value:
-                        '₹${_formatStoreAmount(session.workspaceSettlementEligible)}',
+                    contextLabel: session.workspaceFinanceStale
+                        ? 'Last update'
+                        : session.workspaceFinance != null ||
+                              session.workspaceFinanceUsesLegacyReview
+                        ? 'Available'
+                        : 'Update pending',
+                    value: session.workspaceFinance != null
+                        ? _purchaseAmount(
+                            session.workspaceFinance!.availableMinor,
+                          )
+                        : session.workspaceFinanceUsesLegacyReview
+                        ? '₹${_formatStoreAmount(session.workspaceSettlementEligible)}'
+                        : '—',
                     icon: Icons.account_balance_wallet_outlined,
                     onTap: onSettlement,
                   ),
@@ -3722,7 +3743,7 @@ class _StoreRecentSale extends StatelessWidget {
                             ),
                             const SizedBox(height: 3),
                             Text(
-                              order.payment,
+                              session.workspaceOrderPaymentLabel(order),
                               style: const TextStyle(
                                 fontSize: 11,
                                 color: MoolColors.muted,
@@ -3962,7 +3983,11 @@ class _IncomingOrderActivityCard extends StatelessWidget {
                         ),
                       ),
                       second: Text(
-                        session.workspaceOrderPayment,
+                        session.currentWorkspaceOrder == null
+                            ? session.workspaceOrderPayment
+                            : session.workspaceOrderPaymentLabel(
+                                session.currentWorkspaceOrder!,
+                              ),
                         textAlign: TextAlign.right,
                         style: const TextStyle(
                           fontSize: 11,
@@ -4602,7 +4627,7 @@ class _StoreOrderDetails extends StatelessWidget {
                 'Placed through',
                 order.source == 'App' ? 'MoolSocial' : order.source,
               ),
-              _detail('Payment', order.payment),
+              _detail('Payment', session.workspaceOrderPaymentLabel(order)),
               _detail('Fulfilment', order.fulfilment),
               if (order.address.isNotEmpty)
                 _detail('Deliver to', order.address),
@@ -5517,7 +5542,7 @@ class _DeliveryActivityCard extends StatelessWidget {
                     ),
                   ),
                   Text(
-                    order.payment,
+                    session.workspaceOrderPaymentLabel(order),
                     style: const TextStyle(
                       color: MoolColors.muted,
                       fontSize: 12,
@@ -8156,8 +8181,11 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   }
 }
 
-String _purchaseAmount(int minor) =>
-    '₹${_formatStoreAmount(minor ~/ 100)}${minor % 100 == 0 ? '' : '.${(minor % 100).toString().padLeft(2, '0')}'}';
+String _purchaseAmount(int minor) {
+  final magnitude = minor.abs();
+  return '${minor < 0 ? '−' : ''}₹${_formatStoreAmount(magnitude ~/ 100)}'
+      '${magnitude % 100 == 0 ? '' : '.${(magnitude % 100).toString().padLeft(2, '0')}'}';
+}
 
 class _StorePurchasesSurface extends StatefulWidget {
   const _StorePurchasesSurface({required this.session, this.statement = false});
@@ -8530,6 +8558,11 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         Expanded(
           child: _book == 'Purchases'
               ? _StorePurchasesSurface(session: session, statement: true)
+              : !session.workspaceFinanceUsesLegacyReview
+              ? _StoreFinanceSurface(
+                  session: session,
+                  section: _book == 'Sales' ? 'payments' : 'expenses',
+                )
               : ListView(
                   padding: const EdgeInsets.all(16),
                   children: [
@@ -8714,6 +8747,9 @@ class _StoreDuesSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!session.workspaceFinanceUsesLegacyReview) {
+      return _StoreFinanceSurface(session: session, section: 'dues');
+    }
     final customers = session.workspaceCustomerBook
         .where((customer) => customer.amountDue > 0)
         .toList();
@@ -14099,9 +14135,16 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
 }
 
 class _ExactOrderInformation extends StatelessWidget {
-  const _ExactOrderInformation({required this.order, required this.showItems});
+  const _ExactOrderInformation({
+    required this.order,
+    required this.showItems,
+    this.paymentLabel,
+    this.showPayment = true,
+  });
   final WorkspaceOrderRecord order;
   final bool showItems;
+  final String? paymentLabel;
+  final bool showPayment;
 
   static String _price(int paise) {
     final fraction = paise % 100;
@@ -14120,10 +14163,14 @@ class _ExactOrderInformation extends StatelessWidget {
             '${localizations.formatTimeOfDay(TimeOfDay.fromDateTime(placed))}',
       ),
       ('Ordered via', order.source == 'App' ? 'MoolSocial app' : order.source),
-      (
-        'Payment',
-        order.payment.isEmpty ? 'Awaiting payment update' : order.payment,
-      ),
+      if (showPayment)
+        (
+          'Payment',
+          paymentLabel ??
+              (order.payment.isEmpty
+                  ? 'Awaiting payment update'
+                  : order.payment),
+        ),
       (
         'Receive by',
         order.isCustomerCollection
@@ -14421,8 +14468,8 @@ class _LiveOrderTicket extends StatelessWidget {
               if (!detailed)
                 Text(
                   order.isCustomerCollection
-                      ? '${order.payment} · Collect at store'
-                      : '${order.source} · ${order.payment} · ${order.fulfilment}',
+                      ? '${session.workspaceOrderPaymentLabel(order)} · Collect at store'
+                      : '${order.source} · ${session.workspaceOrderPaymentLabel(order)} · ${order.fulfilment}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -14435,6 +14482,7 @@ class _LiveOrderTicket extends StatelessWidget {
                 _ExactOrderInformation(
                   order: order,
                   showItems: packingLines.isEmpty,
+                  paymentLabel: session.workspaceOrderPaymentLabel(order),
                 ),
               if (!detailed && packingLines.isEmpty)
                 Text(
@@ -16045,6 +16093,241 @@ class _PeriodStrip extends StatelessWidget {
   }
 }
 
+/// Existing financial destinations share one scoped projection, with no local
+/// money-moving capability. Summary totals are not inferred from partial rows.
+class _StoreFinanceSurface extends StatelessWidget {
+  const _StoreFinanceSurface({
+    required this.session,
+    this.section = 'settlement',
+  });
+  final WorkSession session;
+  final String section;
+
+  @override
+  Widget build(BuildContext context) {
+    final finance = session.workspaceFinance;
+    if (finance == null || section == 'expenses') {
+      return ListView(
+        key: const Key('work-finance-unavailable'),
+        padding: const EdgeInsets.all(16),
+        children: [
+          _DeskEmpty(
+            icon: Icons.account_balance_outlined,
+            title: section == 'expenses'
+                ? 'Expense updates unavailable'
+                : 'Payment updates unavailable',
+            detail: section == 'expenses'
+                ? 'Linked business expenses will appear here.'
+                : 'Your confirmed payments and settlement balance will appear here when available.',
+          ),
+        ],
+      );
+    }
+    final start = section == 'payments'
+        ? session.workspaceMoneyPeriodStart
+        : null;
+    final payments =
+        finance.payments
+            .where(
+              (p) =>
+                  (section != 'dues' || p.dueMinor > 0) &&
+                  (start == null || !p.updatedAt.isBefore(start)),
+            )
+            .toList()
+          ..sort((a, b) => a.orderId.compareTo(b.orderId));
+    final payouts = section == 'settlement'
+        ? finance.payouts
+        : const <WorkspacePayoutRecord>[];
+    final orders = {for (final o in session.visibleWorkspaceOrders) o.id: o};
+    return ListView.builder(
+      key: ValueKey('work-finance-$section'),
+      padding: const EdgeInsets.all(16),
+      itemCount: 1 + payouts.length + payments.length,
+      itemBuilder: (context, index) {
+        if (index == 0) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                section == 'settlement'
+                    ? 'Settlement balance'
+                    : section == 'dues'
+                    ? 'Collect dues'
+                    : 'Customer payments',
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: MoolColors.navy,
+                ),
+              ),
+              Text(
+                'Updated ${MaterialLocalizations.of(context).formatShortDate(finance.asOf.toLocal())} · '
+                '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(finance.asOf.toLocal()))}',
+                style: const TextStyle(fontSize: 11, color: MoolColors.muted),
+              ),
+              if (session.workspaceFinanceStale)
+                const Text(
+                  'Showing the last confirmed update. Current payment status is unavailable.',
+                  key: Key('work-finance-stale'),
+                ),
+              const SizedBox(height: 12),
+              if (section == 'settlement') ...[
+                for (final fact in <(String, int)>[
+                  ('Available for settlement', finance.availableMinor),
+                  ('On hold', finance.heldMinor),
+                  ('Requested', finance.requestedMinor),
+                  ('Paid to bank', finance.paidOutMinor),
+                ])
+                  _MoneyDestinationLine(
+                    label: fact.$1,
+                    value: _purchaseAmount(fact.$2),
+                  ),
+                const SizedBox(height: 8),
+                const FilledButton(
+                  onPressed: null,
+                  child: Text('Request settlement'),
+                ),
+                const Text(
+                  'Settlement requests are not connected yet. No money will move from this screen.',
+                  style: TextStyle(fontSize: 12, color: MoolColors.muted),
+                ),
+                const Divider(height: 24),
+                const Text(
+                  'Reported adjustments',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
+                for (final fact in <(String, int)>[
+                  ('MoolSocial fees', finance.feesMinor),
+                  ('Delivery adjustments', finance.deliveryAdjustmentsMinor),
+                  ('Refunds', finance.refundsMinor),
+                  ('Tax withheld', finance.taxWithheldMinor),
+                ])
+                  _MoneyDestinationLine(
+                    label: fact.$1,
+                    value: _purchaseAmount(fact.$2),
+                  ),
+              ],
+              if (section == 'dues')
+                _MoneyDestinationLine(
+                  label: 'Unpaid balance',
+                  value: _purchaseAmount(finance.duesMinor),
+                ),
+              if (!finance.historyComplete)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Text(
+                    'Showing available records. Full history is not available yet.',
+                  ),
+                ),
+              if (payments.isEmpty && payouts.isEmpty)
+                Text(
+                  finance.historyComplete
+                      ? 'No matching records in this view.'
+                      : 'No matching updates available.',
+                ),
+            ],
+          );
+        }
+        if (index <= payouts.length) {
+          final payout = payouts[index - 1];
+          return Padding(
+            key: ValueKey('work-finance-payout-${payout.id}'),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Divider(height: 16),
+                _MoneyDestinationLine(
+                  label: '${payout.id} · ${payout.state.label}',
+                  value: _purchaseAmount(payout.amountMinor),
+                ),
+                if (payout.bankLabel?.isNotEmpty == true)
+                  Text(payout.bankLabel!),
+                if (payout.expectedBy?.isNotEmpty == true &&
+                    {
+                      WorkspacePayoutState.requested,
+                      WorkspacePayoutState.processing,
+                    }.contains(payout.state))
+                  Text('Expected by ${payout.expectedBy}'),
+                if (payout.message?.isNotEmpty == true) Text(payout.message!),
+              ],
+            ),
+          );
+        }
+        final payment = payments[index - 1 - payouts.length];
+        final order = orders[payment.orderId];
+        return Padding(
+          key: ValueKey('work-finance-payment-${payment.orderId}'),
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Divider(height: 16),
+              _MoneyDestinationLine(
+                label: '${payment.customerName} · ${payment.orderId}',
+                value: _purchaseAmount(
+                  section == 'dues' ? payment.dueMinor : payment.amountMinor,
+                ),
+              ),
+              Text(
+                payment.label,
+                style: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: MoolColors.navy,
+                ),
+              ),
+              if (payment.state != WorkspacePaymentState.paid)
+                Text(payment.channel.label),
+              if (order != null)
+                Text(
+                  'Order · ${order.stage == 'Confirmed' ? 'Awaiting acceptance' : session.workspaceOrderStageLabel(order)}',
+                ),
+              if (section != 'dues' && payment.dueMinor > 0)
+                _MoneyDestinationLine(
+                  label: 'Still due',
+                  value: _purchaseAmount(payment.dueMinor),
+                ),
+              if (payment.paidMinor > 0 &&
+                  payment.paidMinor != payment.amountMinor)
+                _MoneyDestinationLine(
+                  label: 'Paid so far',
+                  value: _purchaseAmount(payment.paidMinor),
+                ),
+              if (payment.refundedMinor > 0)
+                _MoneyDestinationLine(
+                  label: 'Refunded',
+                  value: _purchaseAmount(payment.refundedMinor),
+                ),
+              if (payment.invoiceId?.isNotEmpty == true)
+                Text('Invoice ${payment.invoiceId}'),
+              if (payment.transactionId?.isNotEmpty == true)
+                Text('Transaction ${payment.transactionId}'),
+              if (order != null)
+                ExpansionTile(
+                  key: ValueKey(
+                    'work-finance-order-details-${payment.orderId}',
+                  ),
+                  tilePadding: EdgeInsets.zero,
+                  title: const Text(
+                    'Order details',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                  ),
+                  children: [
+                    _ExactOrderInformation(
+                      order: order,
+                      showItems: true,
+                      showPayment: false,
+                    ),
+                  ],
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 class _MoneyDestinationSurface extends StatelessWidget {
   const _MoneyDestinationSurface({required this.session});
 
@@ -16052,6 +16335,9 @@ class _MoneyDestinationSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    if (!session.workspaceFinanceUsesLegacyReview) {
+      return _StoreFinanceSurface(session: session);
+    }
     final orders = session.filteredWorkspaceMoneyOrders;
     final pendingFulfilment = orders
         .where(

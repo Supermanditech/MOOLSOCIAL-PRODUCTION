@@ -306,6 +306,11 @@ class StoreCollectionController extends ChangeNotifier {
 /// Existing Store fields partitioned by workspace, within this signed-in session.
 /// This cache is not authoritative persistence or backend membership validation.
 class _StoreOperationalData {
+  WorkspaceFinanceSnapshot? finance;
+  bool financeStale = false;
+  final Map<String, WorkspacePaymentRecord> financePayments = {};
+  final Map<String, WorkspacePaymentRecord> financePaymentHistory = {};
+  final Map<String, WorkspacePayoutRecord> financePayoutHistory = {};
   String? purchaseAccountScope;
   int purchaseFeedRevision = 0;
   bool purchasesComplete = false;
@@ -712,6 +717,95 @@ class WorkSession extends ChangeNotifier {
   bool initialWorkspaceStateLoaded = false;
   _StoreOperationalData _storeData = _StoreOperationalData();
   final Map<String, _StoreOperationalData> _storeDataById = {};
+
+  WorkspaceFinanceSnapshot? get workspaceFinance {
+    final finance = _storeData.finance;
+    return _contactAccountScope != null &&
+            finance?.accountScope == _contactAccountScope &&
+            finance?.workspaceId == activeWorkspace?.id
+        ? finance
+        : null;
+  }
+
+  bool get workspaceFinanceStale =>
+      workspaceFinance != null && _storeData.financeStale;
+  bool get workspaceFinanceUsesLegacyReview =>
+      gateway is ReviewWorkGateway && workspaceFinance == null;
+  WorkspacePaymentRecord? workspacePaymentFor(String orderId) =>
+      workspaceFinance == null ? null : _storeData.financePayments[orderId];
+  String workspaceOrderPaymentLabel(WorkspaceOrderRecord order) =>
+      workspacePaymentFor(order.id)?.label ?? order.payment;
+
+  /// One linked ledger snapshot; never infer money from fulfilment or replay
+  /// stock/invoice effects. The future authenticated adapter owns membership.
+  bool applyWorkspaceFinance(WorkspaceFinanceSnapshot snapshot) {
+    if (_disposed ||
+        !snapshot.valid ||
+        snapshot.accountScope != _contactAccountScope) {
+      return false;
+    }
+    final data = snapshot.workspaceId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[snapshot.workspaceId];
+    if (data == null) return false;
+    final old = data.finance;
+    if (old != null &&
+        (old.accountScope != snapshot.accountScope ||
+            snapshot.revision <= old.revision ||
+            snapshot.asOf.isBefore(old.asOf))) {
+      return false;
+    }
+    for (final payment in snapshot.payments) {
+      final previous = data.financePaymentHistory[payment.orderId];
+      if (previous != null &&
+          (previous.customerId != payment.customerId ||
+              payment.revision < previous.revision ||
+              (payment.revision == previous.revision &&
+                  payment.revisionData != previous.revisionData))) {
+        return false;
+      }
+    }
+    for (final payout in snapshot.payouts) {
+      final previous = data.financePayoutHistory[payout.id];
+      if (previous != null &&
+          (previous.operationId != payout.operationId ||
+              previous.amountMinor != payout.amountMinor ||
+              payout.revision < previous.revision ||
+              (payout.revision == previous.revision &&
+                  payout.revisionData != previous.revisionData))) {
+        return false;
+      }
+      if (data.financePayoutHistory.values.any(
+        (p) => p.operationId == payout.operationId && p.id != payout.id,
+      )) {
+        return false;
+      }
+    }
+    data.finance = snapshot;
+    data.financeStale = false;
+    data.financePayments
+      ..clear()
+      ..addEntries(snapshot.payments.map((p) => MapEntry(p.orderId, p)));
+    data.financePaymentHistory.addAll(data.financePayments);
+    data.financePayoutHistory.addEntries(
+      snapshot.payouts.map((p) => MapEntry(p.id, p)),
+    );
+    if (identical(data, _storeData)) notifyListeners();
+    return true;
+  }
+
+  void markWorkspaceFinanceStale({
+    required String accountScope,
+    required String storeId,
+  }) {
+    if (_disposed || accountScope != _contactAccountScope) return;
+    final data = storeId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[storeId];
+    if (data?.finance?.accountScope != accountScope) return;
+    data!.financeStale = true;
+    if (identical(data, _storeData)) notifyListeners();
+  }
 
   /// Accept only a separately authenticated, linked purchase projection.
   /// This is not membership validation, a Buy-history import or a stock write.
@@ -1898,6 +1992,7 @@ class WorkSession extends ChangeNotifier {
       workspaceInvoices.firstOrNull;
 
   int get workspaceSettlementEligible {
+    if (!workspaceFinanceUsesLegacyReview) return 0;
     final balance =
         workspaceSettlementBalance -
         workspacePlatformAdjustments -
@@ -3192,6 +3287,12 @@ class WorkSession extends ChangeNotifier {
   }
 
   Future<void> requestWorkspaceSettlement({int? amount}) async {
+    if (!workspaceFinanceUsesLegacyReview) {
+      showError(
+        'Settlement requests are not connected yet. No money has moved.',
+      );
+      return;
+    }
     final eligible = workspaceSettlementEligible;
     if (eligible <= 0) {
       showError('No completed-sale balance is available for settlement yet.');

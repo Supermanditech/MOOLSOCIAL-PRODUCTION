@@ -1863,6 +1863,242 @@ void main() {
     ],
   );
 
+  final financeTime = DateTime(2026, 9, 10, 10);
+  WorkspacePaymentRecord paymentFact(
+    int i, {
+    int revision = 1,
+    String? customer,
+    WorkspacePaymentState? state,
+  }) {
+    final status =
+        state ??
+        WorkspacePaymentState.values[i % WorkspacePaymentState.values.length];
+    final paid =
+        {
+          WorkspacePaymentState.paid,
+          WorkspacePaymentState.refundPending,
+          WorkspacePaymentState.refunded,
+          WorkspacePaymentState.disputed,
+        }.contains(status)
+        ? 27500
+        : status == WorkspacePaymentState.partPaid
+        ? 10000
+        : 0;
+    return WorkspacePaymentRecord(
+      orderId: 'ORDER-${i.toString().padLeft(3, '0')}',
+      customerId: customer ?? 'customer-$i',
+      customerName: 'Customer $i',
+      revision: revision,
+      updatedAt: financeTime,
+      amountMinor: 27500,
+      paidMinor: paid,
+      dueMinor: 27500 - paid,
+      refundedMinor: status == WorkspacePaymentState.refunded ? paid : 0,
+      state: status,
+      channel: WorkspacePaymentChannel
+          .values[i % WorkspacePaymentChannel.values.length],
+      invoiceId: 'INV-$i',
+      transactionId: 'TX-$i',
+    );
+  }
+
+  WorkspacePayoutRecord payoutFact({
+    int revision = 1,
+    String id = 'SET-1',
+    WorkspacePayoutState state = WorkspacePayoutState.requested,
+  }) => WorkspacePayoutRecord(
+    id: id,
+    operationId: 'settlement-op-1',
+    revision: revision,
+    amountMinor: 10050,
+    updatedAt: financeTime,
+    state: state,
+    bankLabel: 'Bank · •••• 4321',
+  );
+  WorkspaceFinanceSnapshot financeFact(
+    int revision, {
+    String account = 'account-A',
+    String store = 'store-A',
+    List<WorkspacePaymentRecord>? payments,
+    List<WorkspacePayoutRecord>? payouts,
+    int available = 1000000000050,
+  }) => WorkspaceFinanceSnapshot(
+    accountScope: account,
+    workspaceId: store,
+    revision: revision,
+    asOf: financeTime,
+    salesTodayMinor: 1000000000050,
+    duesMinor: 17500,
+    availableMinor: available,
+    heldMinor: 20025,
+    requestedMinor: 10050,
+    paidOutMinor: 50000,
+    feesMinor: 10025,
+    deliveryAdjustmentsMinor: -525,
+    refundsMinor: 27500,
+    taxWithheldMinor: 200,
+    payments: payments ?? [for (var i = 0; i < 25; i++) paymentFact(i)],
+    payouts: payouts ?? [payoutFact()],
+  );
+
+  test(
+    'DASH08 finance snapshot isolates payment from 100 fulfilment states and money commands',
+    () async {
+      final account = _CommandAccountStore();
+      final gateway = ReviewWorkGateway();
+      final session = WorkSession(gateway: gateway, pendingProofStore: account)
+        ..activeWorkspace = _commandStore;
+      addTearDown(session.dispose);
+      for (var i = 0; i < 100; i++) {
+        session.workspaceOrders.add(
+          _scopeOrder(
+            'ORDER-${i.toString().padLeft(3, '0')}',
+            stage: i.isEven ? 'Preparing' : 'Completed',
+          ),
+        );
+      }
+      expect(session.selectWorkspaceOrder('ORDER-075'), isTrue);
+      final stages = session.workspaceOrders
+          .map((o) => (o.id, o.stage))
+          .toList();
+      final snapshot = financeFact(1);
+      expect(session.applyWorkspaceFinance(snapshot), isTrue);
+      expect(session.workspaceFinance!.payments, hasLength(25));
+      expect(session.workspaceFinance!.availableMinor, 1000000000050);
+      expect(session.workspaceFinance!.deliveryAdjustmentsMinor, -525);
+      expect(
+        session.workspaceOrderPaymentLabel(session.workspaceOrders[12]),
+        'Paid to store',
+      );
+      expect(session.workspaceOrders.map((o) => (o.id, o.stage)), stages);
+      expect(session.currentWorkspaceOrderId, 'ORDER-075');
+      expect(session.workspaceStockMovements, isEmpty);
+      expect(session.workspaceInvoices, isEmpty);
+      expect(() => snapshot.payments.clear(), throwsUnsupportedError);
+      expect(() => snapshot.payouts.clear(), throwsUnsupportedError);
+      expect(session.applyWorkspaceFinance(financeFact(1)), isFalse);
+      expect(
+        session.applyWorkspaceFinance(financeFact(2, account: 'other-account')),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(financeFact(2, store: 'unknown-store')),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(2, payments: [paymentFact(0), paymentFact(0)]),
+        ),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(financeFact(2, available: -1)),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(2, available: 9007199254740992),
+        ),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(
+            2,
+            payments: [paymentFact(0, customer: 'retargeted', revision: 2)],
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(
+            2,
+            payments: [paymentFact(0, state: WorkspacePaymentState.paid)],
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(2, payouts: [payoutFact(id: 'different-settlement')]),
+        ),
+        isFalse,
+      );
+      session.markWorkspaceFinanceStale(
+        accountScope: 'account-A',
+        storeId: 'store-A',
+      );
+      expect(session.workspaceFinanceStale, isTrue);
+      await session.requestWorkspaceSettlement(amount: 100);
+      await session.requestWorkspaceSettlement(amount: 100);
+      expect(gateway.settlementCalls, 0);
+      expect(session.errorMessage, contains('No money has moved'));
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(
+            2,
+            payments: [
+              for (var i = 0; i < 25; i++)
+                paymentFact(i, revision: 2, state: WorkspacePaymentState.paid),
+            ],
+            payouts: [
+              payoutFact(revision: 2, state: WorkspacePayoutState.paid),
+            ],
+          ),
+        ),
+        isTrue,
+      );
+      expect(session.workspaceFinanceStale, isFalse);
+      expect(
+        session.workspaceFinance!.payouts.single.state,
+        WorkspacePayoutState.paid,
+      );
+      expect(session.workspaceOrders.map((o) => (o.id, o.stage)), stages);
+      expect(session.applyWorkspaceFinance(financeFact(3)), isFalse);
+      expect(session.workspaceSettlementBalance, 0);
+      expect(session.workspaceSettlementRequested, 0);
+      session.activeWorkspace = _scopeSecondStore;
+      expect(session.workspaceFinance, isNull);
+      expect(session.workspacePaymentFor('ORDER-000'), isNull);
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(3, payments: [], payouts: []),
+        ),
+        isTrue,
+      );
+      expect(session.workspaceFinance, isNull);
+      session.activeWorkspace = _commandStore;
+      expect(session.workspaceFinance!.revision, 3);
+      expect(session.workspaceFinance!.payments, isEmpty);
+      expect(session.applyWorkspaceFinance(financeFact(4)), isFalse);
+      account.accountScope = 'other-account';
+      expect(session.workspaceFinance, isNull);
+      expect(session.applyWorkspaceFinance(financeFact(4)), isFalse);
+    },
+  );
+
+  test(
+    'DASH08 unavailable live finance cannot infer payout from local completed sales',
+    () async {
+      final session =
+          WorkSession(
+              gateway: UnavailableWorkGateway(),
+              pendingProofStore: _CommandAccountStore(),
+            )
+            ..activeWorkspace = _commandStore
+            ..workspaceSettlementBalance = 10000000000;
+      addTearDown(session.dispose);
+      expect(session.workspaceFinance, isNull);
+      expect(session.workspaceFinanceUsesLegacyReview, isFalse);
+      expect(session.workspaceSettlementEligible, 0);
+      await session.requestWorkspaceSettlement(amount: 100);
+      expect(session.errorMessage, contains('not connected'));
+      expect(session.workspaceSettlementBalance, 10000000000);
+      expect(session.workspaceSettlementRequested, 0);
+    },
+  );
+
   test(
     'DASH07 purchase snapshots isolate identities revisions and receipt effects',
     () {

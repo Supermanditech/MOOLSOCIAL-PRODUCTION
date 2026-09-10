@@ -24,6 +24,236 @@ String? workspaceCustomerMobile(String customer) {
   return normalizeWorkspaceMobile(parts.last);
 }
 
+enum WorkspacePaymentState {
+  unpaid,
+  pending,
+  partPaid,
+  paid,
+  failed,
+  refundPending,
+  refunded,
+  disputed,
+  unknown;
+
+  String get label => switch (this) {
+    unpaid => 'Payment due',
+    pending => 'Payment pending',
+    partPaid => 'Part paid',
+    paid => 'Paid',
+    failed => 'Payment failed',
+    refundPending => 'Refund pending',
+    refunded => 'Refunded',
+    disputed => 'Payment under review',
+    unknown => 'Payment update unavailable',
+  };
+}
+
+enum WorkspacePaymentChannel {
+  platform,
+  cash,
+  directUpi,
+  credit,
+  unknown;
+
+  String get label => switch (this) {
+    platform => 'Through MoolSocial',
+    cash => 'Cash at store',
+    directUpi => 'UPI to store',
+    credit => 'On account',
+    unknown => 'Payment method unavailable',
+  };
+}
+
+enum WorkspacePayoutState {
+  requested,
+  processing,
+  paid,
+  failed,
+  held,
+  cancelled,
+  unknown;
+
+  String get label => switch (this) {
+    requested => 'Requested',
+    processing => 'Processing',
+    paid => 'Paid to bank',
+    failed => 'Payout failed',
+    held => 'On hold',
+    cancelled => 'Cancelled',
+    unknown => 'Checking payout',
+  };
+}
+
+bool _financeAmountValid(int value, {bool signed = false}) =>
+    (signed || value >= 0) && value.abs() <= 9007199254740991;
+
+/// Authority-supplied order payment facts. Fulfilment and bank settlement are
+/// deliberately absent: paid is neither delivered nor proof of platform funds.
+class WorkspacePaymentRecord {
+  const WorkspacePaymentRecord({
+    required this.orderId,
+    required this.customerId,
+    required this.customerName,
+    required this.revision,
+    required this.updatedAt,
+    required this.amountMinor,
+    required this.paidMinor,
+    required this.dueMinor,
+    required this.refundedMinor,
+    required this.state,
+    required this.channel,
+    this.invoiceId,
+    this.transactionId,
+  });
+  final String orderId, customerId, customerName;
+  final String? invoiceId, transactionId;
+  final int revision, amountMinor, paidMinor, dueMinor, refundedMinor;
+  final DateTime updatedAt;
+  final WorkspacePaymentState state;
+  final WorkspacePaymentChannel channel;
+  Object get revisionData => (
+    orderId,
+    customerId,
+    customerName,
+    updatedAt,
+    amountMinor,
+    paidMinor,
+    dueMinor,
+    refundedMinor,
+    state,
+    channel,
+    invoiceId,
+    transactionId,
+  );
+  bool get valid =>
+      [orderId, customerId, customerName].every((s) => s.trim().isNotEmpty) &&
+      revision > 0 &&
+      [
+        amountMinor,
+        paidMinor,
+        dueMinor,
+        refundedMinor,
+      ].every((n) => _financeAmountValid(n)) &&
+      paidMinor <= amountMinor &&
+      dueMinor <= amountMinor &&
+      refundedMinor <= paidMinor &&
+      (state != WorkspacePaymentState.paid ||
+          (dueMinor == 0 && paidMinor == amountMinor)) &&
+      (state != WorkspacePaymentState.partPaid ||
+          (paidMinor > 0 && dueMinor > 0)) &&
+      (state != WorkspacePaymentState.refunded ||
+          (paidMinor > 0 && refundedMinor == paidMinor));
+  String get label => state == WorkspacePaymentState.paid
+      ? switch (channel) {
+          WorkspacePaymentChannel.platform => 'Paid through MoolSocial',
+          WorkspacePaymentChannel.cash => 'Paid in cash',
+          WorkspacePaymentChannel.directUpi => 'Paid to store',
+          _ => state.label,
+        }
+      : state.label;
+}
+
+class WorkspacePayoutRecord {
+  const WorkspacePayoutRecord({
+    required this.id,
+    required this.operationId,
+    required this.revision,
+    required this.amountMinor,
+    required this.updatedAt,
+    required this.state,
+    this.bankLabel,
+    this.expectedBy,
+    this.message,
+  });
+  final String id, operationId;
+  final int revision, amountMinor;
+  final DateTime updatedAt;
+  final WorkspacePayoutState state;
+
+  /// Masked customer-facing bank label, not raw account credentials.
+  final String? bankLabel, expectedBy, message;
+  Object get revisionData => (
+    id,
+    operationId,
+    amountMinor,
+    updatedAt,
+    state,
+    bankLabel,
+    expectedBy,
+    message,
+  );
+  bool get valid =>
+      id.trim().isNotEmpty &&
+      operationId.trim().isNotEmpty &&
+      revision > 0 &&
+      _financeAmountValid(amountMinor);
+}
+
+/// One atomic, read-only finance projection from an authenticated Store ledger.
+/// Monetary values are INR minor units. Totals cover the account/Store ledger,
+/// not a sum of the possibly partial rows. A snapshot authorizes no money move.
+class WorkspaceFinanceSnapshot {
+  WorkspaceFinanceSnapshot({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.revision,
+    required this.asOf,
+    required this.salesTodayMinor,
+    required this.duesMinor,
+    required this.availableMinor,
+    required this.heldMinor,
+    required this.requestedMinor,
+    required this.paidOutMinor,
+    required this.feesMinor,
+    required this.deliveryAdjustmentsMinor,
+    required this.refundsMinor,
+    required this.taxWithheldMinor,
+    required List<WorkspacePaymentRecord> payments,
+    required List<WorkspacePayoutRecord> payouts,
+    this.historyComplete = false,
+  }) : payments = List.unmodifiable(payments),
+       payouts = List.unmodifiable(payouts);
+  final String accountScope, workspaceId;
+  final int revision,
+      salesTodayMinor,
+      duesMinor,
+      availableMinor,
+      heldMinor,
+      requestedMinor,
+      paidOutMinor,
+      feesMinor,
+      deliveryAdjustmentsMinor,
+      refundsMinor,
+      taxWithheldMinor;
+  final DateTime asOf;
+  final bool historyComplete;
+  final List<WorkspacePaymentRecord> payments;
+  final List<WorkspacePayoutRecord> payouts;
+  bool get valid =>
+      accountScope.trim().isNotEmpty &&
+      workspaceId.trim().isNotEmpty &&
+      revision > 0 &&
+      [
+        salesTodayMinor,
+        duesMinor,
+        availableMinor,
+        heldMinor,
+        requestedMinor,
+        paidOutMinor,
+        refundsMinor,
+      ].every((n) => _financeAmountValid(n)) &&
+      [
+        feesMinor,
+        deliveryAdjustmentsMinor,
+        taxWithheldMinor,
+      ].every((n) => _financeAmountValid(n, signed: true)) &&
+      payments.every((p) => p.valid && !p.updatedAt.isAfter(asOf)) &&
+      payouts.every((p) => p.valid && !p.updatedAt.isAfter(asOf)) &&
+      payments.map((p) => p.orderId).toSet().length == payments.length &&
+      payouts.map((p) => p.id).toSet().length == payouts.length &&
+      payouts.map((p) => p.operationId).toSet().length == payouts.length;
+}
+
 enum WorkspaceSupplyStage {
   ordered,
   confirmed,
