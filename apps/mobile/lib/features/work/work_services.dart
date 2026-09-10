@@ -134,6 +134,57 @@ class SecureWorkPendingProofStore implements WorkPendingProofStore {
   }
 }
 
+abstract interface class WorkIssueDraftStore {
+  Future<WorkspaceIssueDraft?> read(WorkspaceIssueDraftKey key);
+  Future<void> save(WorkspaceIssueDraft draft);
+}
+
+/// Separate encrypted keys per account, Store and case. Drafts contain no OTP,
+/// customer collection challenge, payment credential or decision authority.
+class SecureWorkIssueDraftStore implements WorkIssueDraftStore {
+  SecureWorkIssueDraftStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  String _key(WorkspaceIssueDraftKey key) =>
+      'moolsocial.workspace.issue-draft.v1.'
+      '${[key.account, key.store, key.caseId].map(Uri.encodeComponent).join('/')}';
+
+  @override
+  Future<WorkspaceIssueDraft?> read(WorkspaceIssueDraftKey key) async {
+    if (key.account != accountScope()) return null;
+    final value = await _storage
+        .read(key: _key(key))
+        .timeout(const Duration(seconds: 10));
+    if (value == null || key.account != accountScope()) return null;
+    final draft = WorkspaceIssueDraft.fromJson(jsonDecode(value));
+    if (draft == null || draft.key != key) {
+      throw const WorkGatewayException(
+        'Your saved response could not be opened.',
+      );
+    }
+    return draft;
+  }
+
+  @override
+  Future<void> save(WorkspaceIssueDraft draft) async {
+    if (!draft.valid || draft.key.account != accountScope()) {
+      throw const WorkGatewayException('Sign in again to save your response.');
+    }
+    await _storage
+        .write(key: _key(draft.key), value: jsonEncode(draft.toJson()))
+        .timeout(const Duration(seconds: 10));
+    if (draft.key.account != accountScope()) {
+      throw const WorkGatewayException(
+        'Sign in again to check your saved response.',
+      );
+    }
+  }
+}
+
 class NativeWorkProofPicker implements WorkRecoverableProofPicker {
   NativeWorkProofPicker({ImagePicker? imagePicker, this.documentPicker})
     : _imagePicker = imagePicker ?? ImagePicker();

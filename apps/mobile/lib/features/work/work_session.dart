@@ -46,6 +46,7 @@ class StoreCollectionController extends ChangeNotifier {
   Duration _responseAllowance = Duration.zero;
   bool busy = false;
   bool _closed = false;
+  bool Function()? _packingIssueBlocked;
   String? message;
   ScanPickSnapshot? get snapshot => _result?.snapshot;
   bool get needsReconciliation => _uncertainMutation != null;
@@ -74,6 +75,7 @@ class StoreCollectionController extends ChangeNotifier {
   bool get canHandOver => !busy && hasCurrentMatch;
   bool get canMarkGoodsReady =>
       !_closed &&
+      _packingIssueBlocked?.call() != true &&
       !busy &&
       !needsReconciliation &&
       message == null &&
@@ -450,6 +452,7 @@ class WorkSession extends ChangeNotifier {
     WorkProofPicker? proofPicker,
     WorkPendingProofStore? pendingProofStore,
     WorkPendingProofStore? contactDraftStore,
+    this.issueDraftStore,
   }) : gateway = gateway ?? ReviewWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -478,6 +481,7 @@ class WorkSession extends ChangeNotifier {
     WorkProofPicker? proofPicker,
     WorkPendingProofStore? pendingProofStore,
     WorkPendingProofStore? contactDraftStore,
+    this.issueDraftStore,
   }) : gateway = gateway ?? buildWorkGateway(),
        contactDraftStore =
            contactDraftStore ??
@@ -495,6 +499,15 @@ class WorkSession extends ChangeNotifier {
   final WorkProofPicker proofPicker;
   final WorkPendingProofStore? pendingProofStore;
   final WorkPendingProofStore? contactDraftStore;
+  final WorkIssueDraftStore? issueDraftStore;
+  late final WorkIssueDraftStore _issueDraftStorage =
+      issueDraftStore ??
+      SecureWorkIssueDraftStore(accountScope: () => _contactAccountScope);
+  final Map<WorkspaceIssueDraftKey, WorkspaceIssueDraft> _issueDrafts = {};
+  final Set<WorkspaceIssueDraftKey> _issueDraftLoaded = {};
+  final Map<WorkspaceIssueDraftKey, Future<void>> _issueDraftReads = {};
+  final Map<WorkspaceIssueDraftKey, Future<void>> _issueDraftWrites = {};
+  final Map<WorkspaceIssueDraftKey, String> _issueDraftMessages = {};
   StoreCollectionController? _collection;
   StoreCollectionController? get currentCollection =>
       currentWorkspaceOrder?.isCustomerCollection == true &&
@@ -541,6 +554,8 @@ class WorkSession extends ChangeNotifier {
       );
     }
     _clearCollection();
+    controller._packingIssueBlocked = () =>
+        workspaceOrderHasPackingIssue(controller.orderId);
     _collection = controller..addListener(_collectionChanged);
     _collectionChanged();
   }
@@ -852,6 +867,131 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool get workspaceIssuesStale => _storeData.issuesStale;
+
+  bool _issueIsCurrent(WorkspaceIssueRecord issue) =>
+      !_disposed &&
+      issue.accountScope == _contactAccountScope &&
+      issue.workspaceId == activeWorkspace?.id &&
+      _storeData.issueAccountScope == issue.accountScope &&
+      _storeData.issues[issue.id]?.referenceId == issue.referenceId &&
+      _storeData.issues[issue.id]?.target == issue.target;
+
+  WorkspaceIssueDraft? workspaceIssueDraft(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueDrafts[issue.draftKey] : null;
+
+  bool workspaceIssueDraftLoaded(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) && _issueDraftLoaded.contains(issue.draftKey);
+
+  String? workspaceIssueDraftMessage(WorkspaceIssueRecord issue) =>
+      _issueIsCurrent(issue) ? _issueDraftMessages[issue.draftKey] : null;
+
+  Future<void> loadWorkspaceIssueDraft(WorkspaceIssueRecord issue) async {
+    if (!_issueIsCurrent(issue)) return;
+    final key = issue.draftKey;
+    if (_issueDraftLoaded.contains(key)) return;
+    final pending = _issueDraftReads[key];
+    if (pending != null) return pending;
+    final task = _loadWorkspaceIssueDraft(issue);
+    _issueDraftReads[key] = task;
+    await task;
+    _issueDraftReads.remove(key);
+  }
+
+  Future<void> _loadWorkspaceIssueDraft(WorkspaceIssueRecord issue) async {
+    final key = issue.draftKey;
+    try {
+      final draft = await _issueDraftStorage.read(key);
+      if (!_issueIsCurrent(issue)) return;
+      if (draft != null &&
+          (!draft.valid ||
+              draft.key != key ||
+              draft.referenceId != issue.referenceId ||
+              draft.target != issue.target)) {
+        throw const FormatException('Case draft identity mismatch');
+      }
+      if (draft != null) _issueDrafts[key] = draft;
+      _issueDraftLoaded.add(key);
+      _issueDraftMessages.remove(key);
+    } on Object {
+      if (_issueIsCurrent(issue)) {
+        _issueDraftMessages[key] =
+            'Could not open your saved response. Try again.';
+      }
+    }
+    if (_issueIsCurrent(issue)) notifyListeners();
+  }
+
+  /// An edit is unsent. The original case revision is retained until the
+  /// retailer explicitly reviews a newer case; background updates never rebase it.
+  Future<void> saveWorkspaceIssueDraft(
+    WorkspaceIssueRecord issue, {
+    required WorkspaceIssueResponse? response,
+    required String note,
+    bool reviewedUpdate = false,
+  }) async {
+    if (!_issueIsCurrent(issue) ||
+        !workspaceIssueDraftLoaded(issue) ||
+        issue.revision != _storeData.issues[issue.id]?.revision ||
+        issue.state != WorkspaceIssueState.retailerReview ||
+        !WorkspaceIssueDraft.acceptsNote(note) ||
+        (response != null && !issue.permittedResponses.contains(response))) {
+      return;
+    }
+    final key = issue.draftKey;
+    final previous = _issueDrafts[key];
+    final draft = WorkspaceIssueDraft(
+      key: key,
+      referenceId: issue.referenceId,
+      target: issue.target,
+      expectedRevision: reviewedUpdate
+          ? issue.revision
+          : previous?.expectedRevision ?? issue.revision,
+      response: response,
+      note: note,
+    );
+    _issueDrafts[key] = draft;
+    _issueDraftMessages[key] = 'Saving draft…';
+    notifyListeners();
+    final preceding = _issueDraftWrites[key];
+    final task = () async {
+      if (preceding != null) await preceding;
+      // Coalesce queued keystrokes, without allowing an older write to win.
+      if (!identical(_issueDrafts[key], draft)) return;
+      try {
+        if (key.account != _contactAccountScope) {
+          throw const FormatException('Account changed before draft save');
+        }
+        await _issueDraftStorage.save(draft);
+        if (identical(_issueDrafts[key], draft)) {
+          _issueDraftMessages[key] = 'Draft saved on this device. Not sent.';
+        }
+      } on Object {
+        if (identical(_issueDrafts[key], draft)) {
+          _issueDraftMessages[key] =
+              'Draft not saved. Keep this screen open and retry.';
+        }
+      }
+      if (_issueIsCurrent(issue)) notifyListeners();
+    }();
+    _issueDraftWrites[key] = task;
+    await task;
+    if (identical(_issueDraftWrites[key], task)) _issueDraftWrites.remove(key);
+  }
+
+  bool workspaceOrderHasPackingIssue(String orderId) =>
+      _storeData.issueAccountScope == _contactAccountScope &&
+      _contactAccountScope != null &&
+      _storeData.issueHistory.values.any(
+        (issue) =>
+            issue.referenceId == orderId &&
+            issue.target == WorkspaceIssueTarget.customerOrder &&
+            !issue.state.closed &&
+            const {
+              WorkspaceIssueKind.packingShortage,
+              WorkspaceIssueKind.substitution,
+            }.contains(issue.kind),
+      );
+
   void markWorkspaceIssuesStale({
     required String accountScope,
     required String storeId,
@@ -1189,6 +1329,11 @@ class WorkSession extends ChangeNotifier {
         workspaceHandoverBusy ||
         hasPendingOrderTime ||
         _collection?.needsReconciliation == true) {
+      return false;
+    }
+    if (action == WorkOrderAction.ready &&
+        workspaceOrderHasPackingIssue(orderId)) {
+      showError('Resolve the item issue before marking this order ready.');
       return false;
     }
     if (action == WorkOrderAction.ready && !workspacePackingComplete) {
@@ -2134,6 +2279,10 @@ class WorkSession extends ChangeNotifier {
   bool get workspacePackingComplete =>
       workspacePackingLines.isNotEmpty &&
       workspacePackingLines.every((line) => line.packed);
+
+  bool get workspaceCanMarkReady =>
+      workspacePackingComplete &&
+      !workspaceOrderHasPackingIssue(currentWorkspaceOrderId ?? '');
 
   WorkspaceCustomerInvoice? get latestWorkspaceInvoice =>
       workspaceInvoices.firstOrNull;
@@ -3200,6 +3349,10 @@ class WorkSession extends ChangeNotifier {
     }
     if (previous == 'Delivery requested') {
       showError('Confirm the customer delivery OTP before handover.');
+      return;
+    }
+    if (previous == 'Preparing' && workspaceOrderHasPackingIssue(order.id)) {
+      showError('Resolve the item issue before marking this order ready.');
       return;
     }
     if (previous == 'Preparing' && !workspacePackingComplete) {

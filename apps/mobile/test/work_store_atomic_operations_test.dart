@@ -177,6 +177,268 @@ class _OrderTimeGateway extends ReviewWorkGateway
 }
 
 void main() {
+  WorkspaceIssueRecord draftCase({
+    String id = 'CASE-A',
+    String order = 'ORDER-A',
+    int revision = 1,
+    WorkspaceIssueState state = WorkspaceIssueState.retailerReview,
+  }) => WorkspaceIssueRecord(
+    accountScope: 'account-A',
+    workspaceId: 'store-A',
+    id: id,
+    referenceId: order,
+    target: WorkspaceIssueTarget.customerOrder,
+    kind: WorkspaceIssueKind.packingShortage,
+    state: state,
+    revision: revision,
+    updatedAt: DateTime(2026, 9, 10, 12, revision),
+    reason: 'One sealed pack is damaged.',
+    nextStep: 'Review the affected pack.',
+    resolution: state.closed ? 'The correct pack is available.' : null,
+    permittedResponses: state == WorkspaceIssueState.retailerReview
+        ? const [
+            WorkspaceIssueResponse.provideDetails,
+            WorkspaceIssueResponse.declineRequest,
+          ]
+        : const [],
+    lines: const [
+      WorkspaceIssueLine(
+        lineId: 'atta-5kg',
+        productId: 'atta-5kg',
+        name: 'Atta',
+        pack: '5 kg',
+        orderedQuantity: 1,
+        affectedQuantity: 1,
+      ),
+    ],
+  );
+
+  test(
+    'DASH09 encrypted drafts reject corrupt identities and isolate keys',
+    () async {
+      var account = 'account-A';
+      final storage = _OrderJournalStorage();
+      final store = SecureWorkIssueDraftStore(
+        accountScope: () => account,
+        storage: storage,
+      );
+      const key = (account: 'account-A', store: 'store/A', caseId: 'case/B');
+      const other = (account: 'account-A', store: 'store', caseId: 'A/case/B');
+      const draft = WorkspaceIssueDraft(
+        key: key,
+        referenceId: 'ORDER-A',
+        target: WorkspaceIssueTarget.customerOrder,
+        expectedRevision: 1,
+        response: WorkspaceIssueResponse.provideDetails,
+        note: 'Keep my unsent note.',
+      );
+      await store.save(draft);
+      expect((await store.read(key))?.note, draft.note);
+      expect(await store.read(other), isNull);
+      expect(storage.values.length, 1);
+      account = 'account-B';
+      expect(await store.read(key), isNull);
+      await expectLater(
+        store.save(draft),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      account = 'account-A';
+      final path = storage.values.keys.single;
+      storage.values[path] = jsonEncode({...draft.toJson(), 'caseId': 'other'});
+      await expectLater(store.read(key), throwsA(isA<WorkGatewayException>()));
+      for (final value in [
+        {...draft.toJson(), 'revision': 0},
+        {...draft.toJson(), 'response': 'refundAutomatically'},
+        {...draft.toJson(), 'target': 'anyStore'},
+        {...draft.toJson(), 'note': 'x' * 2001},
+        {...draft.toJson(), 'version': 2},
+      ]) {
+        expect(WorkspaceIssueDraft.fromJson(value), isNull);
+      }
+    },
+  );
+
+  test(
+    'DASH09 response drafts persist restart edits failure and revision review without effects',
+    () async {
+      final account = _CommandAccountStore();
+      final storage = _OrderJournalStorage();
+      final drafts = SecureWorkIssueDraftStore(
+        accountScope: () => account.accountScope,
+        storage: storage,
+      );
+      WorkSession make() {
+        final work = WorkSession(
+          pendingProofStore: account,
+          issueDraftStore: drafts,
+        )..activeWorkspace = _commandStore;
+        work.workspaceOrders.addAll([
+          _scopeOrder('ORDER-A', stage: 'Preparing'),
+          _scopeOrder('ORDER-B', stage: 'Preparing'),
+        ]);
+        expect(
+          work.applyWorkspaceIssues(
+            accountScope: 'account-A',
+            storeId: 'store-A',
+            feedRevision: 1,
+            records: [
+              draftCase(),
+              draftCase(id: 'CASE-B', order: 'ORDER-B'),
+            ],
+          ),
+          isTrue,
+        );
+        return work;
+      }
+
+      final work = make();
+      addTearDown(work.dispose);
+      final issue = draftCase();
+      storage.failRead = true;
+      await work.loadWorkspaceIssueDraft(issue);
+      expect(work.workspaceIssueDraftLoaded(issue), isFalse);
+      await work.saveWorkspaceIssueDraft(
+        issue,
+        response: null,
+        note: 'Do not overwrite unread text',
+      );
+      expect(storage.writes, isEmpty);
+      storage.failRead = false;
+      await work.loadWorkspaceIssueDraft(issue);
+      expect(work.workspaceIssueDraftLoaded(issue), isTrue);
+      final unicode = 'क़🙏🏽' * 1000;
+      expect(WorkspaceIssueDraft.acceptsNote(unicode), isTrue);
+      await work.saveWorkspaceIssueDraft(issue, response: null, note: unicode);
+      expect((await drafts.read(issue.draftKey))?.note, unicode);
+      await work.saveWorkspaceIssueDraft(
+        issue,
+        response: null,
+        note: '${unicode}x',
+      );
+      expect(work.workspaceIssueDraft(issue)?.note, unicode);
+      storage.holdWrite = Completer<void>();
+      final a = work.saveWorkspaceIssueDraft(
+        issue,
+        response: WorkspaceIssueResponse.provideDetails,
+        note: 'First',
+      );
+      final b = work.saveWorkspaceIssueDraft(
+        issue,
+        response: WorkspaceIssueResponse.provideDetails,
+        note: 'Latest unsent note',
+      );
+      storage.holdWrite!.complete();
+      await Future.wait([a, b]);
+      storage.holdWrite = null;
+      expect((await drafts.read(issue.draftKey))?.note, 'Latest unsent note');
+      final second = draftCase(id: 'CASE-B', order: 'ORDER-B');
+      await work.loadWorkspaceIssueDraft(second);
+      await work.saveWorkspaceIssueDraft(
+        second,
+        response: null,
+        note: 'Other case',
+      );
+      expect((await drafts.read(issue.draftKey))?.note, 'Latest unsent note');
+      storage.failWrite = true;
+      await work.saveWorkspaceIssueDraft(
+        issue,
+        response: null,
+        note: 'Recover this edit',
+      );
+      expect(work.workspaceIssueDraft(issue)?.note, 'Recover this edit');
+      expect(
+        work.workspaceIssueDraftMessage(issue),
+        startsWith('Draft not saved'),
+      );
+      storage.failWrite = false;
+      await work.saveWorkspaceIssueDraft(
+        issue,
+        response: null,
+        note: 'Recover this edit',
+      );
+      expect(work.workspaceIssueDraftMessage(issue), contains('Not sent'));
+      account.accountScope = 'account-B';
+      expect(work.workspaceIssueDraft(issue), isNull);
+      await work.saveWorkspaceIssueDraft(
+        issue,
+        response: null,
+        note: 'Wrong account',
+      );
+      account.accountScope = 'account-A';
+      final restored = make();
+      addTearDown(restored.dispose);
+      await restored.loadWorkspaceIssueDraft(issue);
+      expect(restored.workspaceIssueDraft(issue)?.note, 'Recover this edit');
+      final updated = draftCase(revision: 2);
+      expect(
+        restored.applyWorkspaceIssues(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 2,
+          records: [updated, second],
+        ),
+        isTrue,
+      );
+      await restored.saveWorkspaceIssueDraft(
+        updated,
+        response: null,
+        note: 'Revised details',
+      );
+      expect(restored.workspaceIssueDraft(updated)?.expectedRevision, 1);
+      await restored.saveWorkspaceIssueDraft(
+        updated,
+        response: WorkspaceIssueResponse.acceptRequest,
+        note: 'Unpermitted option',
+        reviewedUpdate: true,
+      );
+      expect(restored.workspaceIssueDraft(updated)?.expectedRevision, 1);
+      await restored.saveWorkspaceIssueDraft(
+        updated,
+        response: WorkspaceIssueResponse.provideDetails,
+        note: 'Reviewed new case',
+        reviewedUpdate: true,
+      );
+      expect(restored.workspaceIssueDraft(updated)?.expectedRevision, 2);
+      expect(restored.selectWorkspaceOrder('ORDER-A'), isTrue);
+      expect(restored.workspaceOrderHasPackingIssue('ORDER-A'), isTrue);
+      restored.advanceWorkspaceOrder();
+      expect(restored.workspaceOrders.first.stage, 'Preparing');
+      expect(restored.errorMessage, contains('Resolve the item issue'));
+      expect(
+        restored.applyWorkspaceIssues(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 3,
+          records: [],
+        ),
+        isTrue,
+      );
+      expect(
+        restored.workspaceOrderHasPackingIssue('ORDER-A'),
+        isTrue,
+        reason: 'Leaving a visible window is not case resolution',
+      );
+      expect(
+        restored.applyWorkspaceIssues(
+          accountScope: 'account-A',
+          storeId: 'store-A',
+          feedRevision: 4,
+          records: [
+            draftCase(revision: 3, state: WorkspaceIssueState.resolved),
+          ],
+        ),
+        isTrue,
+      );
+      expect(restored.workspaceOrderHasPackingIssue('ORDER-A'), isFalse);
+      expect(
+        restored.workspaceOrders.every((o) => o.stage == 'Preparing'),
+        isTrue,
+      );
+      expect(restored.workspaceInvoices, isEmpty);
+      expect(restored.workspaceStockMovements, isEmpty);
+    },
+  );
+
   group('DASH06 delivery projection', () {
     WorkspaceDeliveryAssignment delivery(String id, String stage) =>
         WorkspaceDeliveryAssignment(

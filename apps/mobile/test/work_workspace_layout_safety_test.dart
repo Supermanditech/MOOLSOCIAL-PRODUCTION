@@ -378,28 +378,34 @@ void main() {
   WorkSession storeViewFixture([
     WorkGateway? gateway,
     WorkPendingProofStore? contactStore,
+    WorkIssueDraftStore? issueDraftStore,
   ]) {
-    final work = WorkSession(gateway: gateway, contactDraftStore: contactStore)
-      ..seedVerifiedWorkspace()
-      ..retailerSetupSaved = true
-      ..reviewStage = WorkReviewStage.live
-      ..workspaceStoreState = WorkspaceStoreState.open
-      ..workspaceAcceptingOrders = true
-      ..workspaceVisibleToCustomers = true
-      ..workspaceSalesToday = 28450
-      ..workspaceSettlementBalance = 17820
-      ..workspacePayoutBankName = 'Review Bank'
-      ..workspacePayoutAccountEnding = '1234'
-      ..workspaceOrderCustomer = 'Rakesh · 98290 12345'
-      ..workspaceOrderSource = 'App'
-      ..workspaceOrderItems = 'Fortune Oil × 2 · Aashirvaad Atta × 1'
-      ..workspaceOrderAmount = '1468'
-      ..workspaceOrderStage = 'Confirmed'
-      ..workspaceOrderActionDeadline = DateTime.now().add(
-        const Duration(seconds: 60),
-      )
-      ..workspaceOrderPayment = 'Paid online'
-      ..workspaceOrderFulfilment = 'Pickup';
+    final work =
+        WorkSession(
+            gateway: gateway,
+            contactDraftStore: contactStore,
+            issueDraftStore: issueDraftStore,
+          )
+          ..seedVerifiedWorkspace()
+          ..retailerSetupSaved = true
+          ..reviewStage = WorkReviewStage.live
+          ..workspaceStoreState = WorkspaceStoreState.open
+          ..workspaceAcceptingOrders = true
+          ..workspaceVisibleToCustomers = true
+          ..workspaceSalesToday = 28450
+          ..workspaceSettlementBalance = 17820
+          ..workspacePayoutBankName = 'Review Bank'
+          ..workspacePayoutAccountEnding = '1234'
+          ..workspaceOrderCustomer = 'Rakesh · 98290 12345'
+          ..workspaceOrderSource = 'App'
+          ..workspaceOrderItems = 'Fortune Oil × 2 · Aashirvaad Atta × 1'
+          ..workspaceOrderAmount = '1468'
+          ..workspaceOrderStage = 'Confirmed'
+          ..workspaceOrderActionDeadline = DateTime.now().add(
+            const Duration(seconds: 60),
+          )
+          ..workspaceOrderPayment = 'Paid online'
+          ..workspaceOrderFulfilment = 'Pickup';
     work.currentWorkspaceOrderId = 'APP-1043';
     work.workspaceOrders.add(
       WorkspaceOrderRecord(
@@ -15766,6 +15772,219 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(
+      'DASH09 response editor preserves unsent text Back and updated case $scale',
+      (tester) async {
+        final drafts = _IssueDraftFixtureStore();
+        final work = storeViewFixture(
+          null,
+          _ContactDraftFixtureStore(),
+          drafts,
+        );
+        final store = work.activeWorkspace!.id;
+        work.workspaceOrders[0] = work.workspaceOrders[0].copyWith(
+          quantities: const {'oil-fortune-1l': 1},
+        );
+        WorkspaceIssueRecord issue(int revision) => WorkspaceIssueRecord(
+          accountScope: 'review-draft-account',
+          workspaceId: store,
+          id: 'DRAFT-CASE',
+          referenceId: 'APP-1043',
+          target: WorkspaceIssueTarget.customerOrder,
+          kind: WorkspaceIssueKind.packingShortage,
+          state: WorkspaceIssueState.retailerReview,
+          revision: revision,
+          updatedAt: DateTime(2026, 9, 10, 12, revision),
+          reason: 'One sealed pack is damaged.',
+          nextStep: 'Review the affected pack.',
+          permittedResponses: const [
+            WorkspaceIssueResponse.provideDetails,
+            WorkspaceIssueResponse.declineRequest,
+          ],
+          lines: const [
+            WorkspaceIssueLine(
+              lineId: 'oil-fortune-1l',
+              productId: 'oil-fortune-1l',
+              name: 'Sunflower oil',
+              pack: '1 l',
+              orderedQuantity: 1,
+              affectedQuantity: 1,
+            ),
+          ],
+        );
+        void apply(int revision) => expect(
+          work.applyWorkspaceIssues(
+            accountScope: 'review-draft-account',
+            storeId: store,
+            feedRevision: revision,
+            records: [issue(revision)],
+          ),
+          isTrue,
+        );
+        apply(1);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        Future<void> show(Finder target) async {
+          final scroll = find
+              .descendant(
+                of: find.byKey(const ValueKey('store-detail-APP-1043')),
+                matching: find.byType(Scrollable),
+              )
+              .first;
+          for (
+            var i = 0;
+            i < 35 && target.hitTestable().evaluate().isEmpty;
+            i++
+          ) {
+            final rect = tester
+                .getRect(scroll)
+                .intersect(
+                  tester.getRect(
+                    find.byKey(const Key('work-workspace-dashboard')),
+                  ),
+                );
+            expect(rect.height, greaterThan(40));
+            final direction =
+                target.evaluate().isNotEmpty &&
+                    tester.getRect(target).center.dy < rect.center.dy
+                ? 1.0
+                : -1.0;
+            await tester.dragFrom(
+              Offset(rect.left + 2, rect.center.dy),
+              Offset(0, direction * rect.height * .35),
+            );
+            await tester.pumpAndSettle();
+          }
+          expect(target.hitTestable(), findsOneWidget);
+        }
+
+        await reveal(
+          tester,
+          find.byKey(const Key('work-dashboard-review-issues')),
+        );
+        await tester.tap(find.byKey(const Key('work-dashboard-review-issues')));
+        await tester.pumpAndSettle();
+        final note = find.byKey(
+          const Key('work-issue-response-note-DRAFT-CASE'),
+        );
+        final selector = find.byType(
+          DropdownButtonFormField<WorkspaceIssueResponse>,
+        );
+        await show(selector);
+        await tester.tap(selector);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'issue-draft-choices-$scale');
+        await tester.tap(find.text('Decline request').last);
+        await tester.pumpAndSettle();
+        final selectedLabel = find.descendant(
+          of: selector,
+          matching: find.text('Decline request'),
+        );
+        final fieldRect = tester.getRect(selector);
+        final labelRect = tester.getRect(selectedLabel);
+        expect(labelRect.top, greaterThanOrEqualTo(fieldRect.top));
+        expect(labelRect.bottom, lessThanOrEqualTo(fieldRect.bottom));
+        expect(labelRect.right, lessThanOrEqualTo(fieldRect.right));
+        await tester.ensureVisible(selector);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'issue-draft-selected-$scale');
+        expect(
+          work.workspaceIssueDraft(issue(1))?.response,
+          WorkspaceIssueResponse.declineRequest,
+        );
+        expect(
+          work
+              .workspaceIssuesFor(
+                WorkspaceIssueTarget.customerOrder,
+                'APP-1043',
+              )
+              .single
+              .state,
+          WorkspaceIssueState.retailerReview,
+          reason: 'Selecting a draft is not rejection',
+        );
+        await show(note);
+        await tester.enterText(
+          note,
+          'The sealed pack is damaged. Please review.',
+        );
+        await tester.pumpAndSettle();
+        expect(
+          drafts.values.values.single.note,
+          'The sealed pack is damaged. Please review.',
+        );
+        await captureStoreView(tester, 'issue-draft-edit-$scale');
+        tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+        addTearDown(tester.view.resetViewInsets);
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Accept'),
+          findsNothing,
+          reason: 'Unrelated order decisions must not crowd the draft keyboard',
+        );
+        await show(note);
+        expect(tester.takeException(), isNull);
+        await captureStoreView(tester, 'issue-draft-keyboard-$scale');
+        tester.view.viewInsets = FakeViewPadding.zero;
+        tester.testTextInput.hide();
+        FocusManager.instance.primaryFocus?.unfocus();
+        await tester.pumpAndSettle();
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('work-dashboard-review-issues')),
+          findsOneWidget,
+        );
+        await reveal(
+          tester,
+          find.byKey(const Key('work-dashboard-review-issues')),
+        );
+        await tester.tap(find.byKey(const Key('work-dashboard-review-issues')));
+        await tester.pumpAndSettle();
+        await show(note);
+        expect(
+          tester.widget<TextField>(note).controller!.text,
+          contains('sealed pack'),
+        );
+        apply(2);
+        await tester.pumpAndSettle();
+        final review = find.byKey(
+          const Key('work-issue-review-update-DRAFT-CASE'),
+        );
+        // New content is inserted above the editor without changing typed text.
+        await tester.ensureVisible(review);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(note).readOnly, isTrue);
+        await captureStoreView(tester, 'issue-draft-updated-$scale');
+        await tester.tap(review);
+        await tester.pumpAndSettle();
+        expect(work.workspaceIssueDraft(issue(2))?.expectedRevision, 2);
+        drafts.failWrite = true;
+        await show(note);
+        await tester.enterText(note, 'Preserve this when saving fails.');
+        await tester.pumpAndSettle();
+        tester.testTextInput.hide();
+        FocusManager.instance.primaryFocus?.unfocus();
+        final retry = find.text('Retry save');
+        await show(retry);
+        await captureStoreView(tester, 'issue-draft-save-error-$scale');
+        drafts.failWrite = false;
+        await tester.tap(retry);
+        await tester.pumpAndSettle();
+        expect(
+          drafts.values.values.single.note,
+          'Preserve this when saving fails.',
+        );
+        expect(work.workspaceOrders[0].stage, 'Confirmed');
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
       'DASH09 inline customer and supplier cases preserve exact order and Back $scale',
       (tester) async {
         final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -17954,6 +18173,19 @@ class _WorkspaceEntryFixtureGateway extends ReviewWorkGateway {
         area: '302001',
       ),
     ];
+  }
+}
+
+class _IssueDraftFixtureStore implements WorkIssueDraftStore {
+  final values = <WorkspaceIssueDraftKey, WorkspaceIssueDraft>{};
+  bool failWrite = false;
+  @override
+  Future<WorkspaceIssueDraft?> read(WorkspaceIssueDraftKey key) async =>
+      values[key];
+  @override
+  Future<void> save(WorkspaceIssueDraft draft) async {
+    if (failWrite) throw StateError('fixture save failure');
+    values[draft.key] = draft;
   }
 }
 

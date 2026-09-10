@@ -4602,6 +4602,7 @@ class _StoreIssueReviews extends StatelessWidget {
           _StoreIssueReview(
             key: ValueKey((issue.accountScope, issue.workspaceId, issue.id)),
             issue: issue,
+            session: session,
             initiallyExpanded: initiallyExpanded,
           ),
       ],
@@ -4613,9 +4614,11 @@ class _StoreIssueReview extends StatefulWidget {
   const _StoreIssueReview({
     super.key,
     required this.issue,
+    required this.session,
     required this.initiallyExpanded,
   });
   final WorkspaceIssueRecord issue;
+  final WorkSession session;
   final bool initiallyExpanded;
   @override
   State<_StoreIssueReview> createState() => _StoreIssueReviewState();
@@ -4704,7 +4707,14 @@ class _StoreIssueReviewState extends State<_StoreIssueReview> {
                 'Do not replace items without the customer’s confirmation.',
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
-            if (issue.state == WorkspaceIssueState.retailerReview) ...[
+            if (issue.permittedResponses.isNotEmpty ||
+                widget.session.workspaceIssueDraft(issue) != null)
+              _StoreIssueResponseEditor(
+                key: ValueKey(issue.draftKey),
+                session: widget.session,
+                issue: issue,
+              )
+            else if (issue.state == WorkspaceIssueState.retailerReview) ...[
               const SizedBox(height: 8),
               const Text(
                 'Case actions are unavailable. No decision has been sent.',
@@ -4723,6 +4733,184 @@ class _StoreIssueReviewState extends State<_StoreIssueReview> {
       ),
     );
   }
+}
+
+class _StoreIssueResponseEditor extends StatefulWidget {
+  const _StoreIssueResponseEditor({
+    super.key,
+    required this.session,
+    required this.issue,
+  });
+  final WorkSession session;
+  final WorkspaceIssueRecord issue;
+
+  @override
+  State<_StoreIssueResponseEditor> createState() =>
+      _StoreIssueResponseEditorState();
+}
+
+class _StoreIssueResponseEditorState extends State<_StoreIssueResponseEditor> {
+  final _note = TextEditingController();
+  bool _restored = false;
+
+  @override
+  void initState() {
+    super.initState();
+    unawaited(_restore());
+  }
+
+  Future<void> _restore() async {
+    await widget.session.loadWorkspaceIssueDraft(widget.issue);
+    if (!mounted) return;
+    final draft = widget.session.workspaceIssueDraft(widget.issue);
+    if (!_restored) _note.text = draft?.note ?? '';
+    setState(
+      () => _restored = widget.session.workspaceIssueDraftLoaded(widget.issue),
+    );
+  }
+
+  @override
+  void dispose() {
+    _note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final session = widget.session;
+      final issue = widget.issue;
+      final draft = session.workspaceIssueDraft(issue);
+      final loaded = _restored && session.workspaceIssueDraftLoaded(issue);
+      final changed = draft != null && draft.expectedRevision != issue.revision;
+      final available =
+          issue.state == WorkspaceIssueState.retailerReview &&
+          !session.workspaceIssuesStale &&
+          loaded &&
+          !changed;
+      final choice = issue.permittedResponses.contains(draft?.response)
+          ? draft?.response
+          : null;
+      final message = session.workspaceIssueDraftMessage(issue);
+      void save(WorkspaceIssueResponse? response, {bool reviewed = false}) {
+        unawaited(
+          session.saveWorkspaceIssueDraft(
+            issue,
+            response: response,
+            note: _note.text,
+            reviewedUpdate: reviewed,
+          ),
+        );
+      }
+
+      return Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (!loaded) ...[
+              Text(
+                message ?? 'Opening saved response…',
+                style: const TextStyle(fontSize: 12),
+              ),
+              if (message != null)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: _restore,
+                    child: const Text('Try again'),
+                  ),
+                ),
+            ] else ...[
+              if (changed) ...[
+                const Text(
+                  'Case updated. Review the items before using this draft.',
+                ),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    key: Key('work-issue-review-update-${issue.id}'),
+                    onPressed:
+                        issue.state == WorkspaceIssueState.retailerReview &&
+                            !session.workspaceIssuesStale
+                        ? () => save(choice, reviewed: true)
+                        : null,
+                    child: const Text('Use draft'),
+                  ),
+                ),
+              ],
+              if (issue.permittedResponses.isNotEmpty) ...[
+                const Text('Your response', style: TextStyle(fontSize: 12)),
+                const SizedBox(height: 4),
+                DropdownButtonFormField<WorkspaceIssueResponse>(
+                  key: ValueKey((issue.id, issue.revision, choice)),
+                  initialValue: choice,
+                  isExpanded: true,
+                  isDense: MediaQuery.textScalerOf(context).scale(1) < 2,
+                  itemHeight: null,
+                  hint: const Text('Choose'),
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontSize: 14,
+                    color: MoolColors.ink,
+                  ),
+                  decoration: const InputDecoration(),
+                  items: [
+                    for (final response in issue.permittedResponses)
+                      DropdownMenuItem(
+                        value: response,
+                        child: Text(response.label),
+                      ),
+                  ],
+                  onChanged: available ? save : null,
+                ),
+              ],
+              const SizedBox(height: 8),
+              TextField(
+                key: Key('work-issue-response-note-${issue.id}'),
+                controller: _note,
+                readOnly: !available,
+                minLines: MediaQuery.textScalerOf(context).scale(1) >= 2
+                    ? 1
+                    : 2,
+                maxLines: MediaQuery.textScalerOf(context).scale(1) >= 2
+                    ? 2
+                    : 4,
+                maxLength: 2000,
+                decoration: InputDecoration(
+                  labelText: 'Response details',
+                  hintText: 'Explain what happened',
+                  helperText: issue.state.closed
+                      ? 'Saved response — not sent'
+                      : null,
+                ),
+                onChanged: available ? (_) => save(choice) : null,
+              ),
+              if (message != null)
+                Text(
+                  message,
+                  key: Key('work-issue-draft-status-${issue.id}'),
+                  style: const TextStyle(fontSize: 12),
+                ),
+              if (message?.startsWith('Draft not saved') == true)
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: available ? () => save(choice) : null,
+                    child: const Text('Retry save'),
+                  ),
+                ),
+              const SizedBox(height: 8),
+              const Text(
+                'Sending is unavailable.',
+                style: TextStyle(fontSize: 12),
+              ),
+            ],
+          ],
+        ),
+      );
+    },
+  );
 }
 
 class _StoreOrderDetails extends StatelessWidget {
@@ -4879,7 +5067,9 @@ class _StoreOrderDetails extends StatelessWidget {
         const Divider(height: 1),
         if (session.workspaceOrderOperationState(order.id) != null)
           _OrderOperationStatus(session: session, orderId: order.id)
-        else if (awaiting)
+        else if (awaiting &&
+            MediaQuery.viewInsetsOf(context).bottom == 0 &&
+            View.of(context).viewInsets.bottom == 0)
           _OrderDecisionButtons(
             busy: session.busy || session.hasPendingOrderTime,
             onAccept: () {
@@ -5087,7 +5277,7 @@ class _PackingActivityCard extends StatelessWidget {
                           ),
                         ),
                         onPressed:
-                            !session.busy && session.workspacePackingComplete
+                            !session.busy && session.workspaceCanMarkReady
                             ? () => _advanceDeskOrder(session)
                             : null,
                         child: const Text(
@@ -14831,12 +15021,12 @@ class _LiveOrderTicket extends StatelessWidget {
                               session.workspaceOperationsSyncing ||
                               session.workspaceHandoverBusy ||
                               (stage == 'Preparing' &&
-                                  !session.workspacePackingComplete)
+                                  !session.workspaceCanMarkReady)
                           ? null
                           : () {
                               if (!currentActionIsValid() ||
                                   (stage == 'Preparing' &&
-                                      !session.workspacePackingComplete)) {
+                                      !session.workspaceCanMarkReady)) {
                                 return;
                               }
                               if (stage == 'Ready for pickup') {

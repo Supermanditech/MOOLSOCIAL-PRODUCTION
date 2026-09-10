@@ -5,6 +5,102 @@ import '../buy/buy_v2_models.dart';
 
 enum WorkspaceIssueTarget { customerOrder, supplierShipment }
 
+/// Choices are supplied with the case, not inferred from an order's status.
+enum WorkspaceIssueResponse {
+  acceptRequest,
+  declineRequest,
+  provideDetails;
+
+  String get label => switch (this) {
+    acceptRequest => 'Accept request',
+    declineRequest => 'Decline request',
+    provideDetails => 'Send details',
+  };
+}
+
+typedef WorkspaceIssueDraftKey = ({
+  String account,
+  String store,
+  String caseId,
+});
+
+/// Unsent text only. It cannot authorise a case, payment or stock mutation.
+class WorkspaceIssueDraft {
+  const WorkspaceIssueDraft({
+    required this.key,
+    required this.referenceId,
+    required this.target,
+    required this.expectedRevision,
+    this.response,
+    this.note = '',
+  });
+  final WorkspaceIssueDraftKey key;
+  final String referenceId;
+  final WorkspaceIssueTarget target;
+  final int expectedRevision;
+  final WorkspaceIssueResponse? response;
+  final String note;
+
+  static bool acceptsNote(String value) => value.characters.length <= 2000;
+
+  bool get valid =>
+      [
+        key.account,
+        key.store,
+        key.caseId,
+        referenceId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      expectedRevision > 0 &&
+      acceptsNote(note);
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'account': key.account,
+    'store': key.store,
+    'caseId': key.caseId,
+    'referenceId': referenceId,
+    'target': target.name,
+    'revision': expectedRevision,
+    'response': response?.name,
+    'note': note,
+  };
+
+  static WorkspaceIssueDraft? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['account'] is! String ||
+        value['store'] is! String ||
+        value['caseId'] is! String ||
+        value['referenceId'] is! String ||
+        value['revision'] is! int ||
+        value['note'] is! String) {
+      return null;
+    }
+    final target = WorkspaceIssueTarget.values
+        .where((v) => v.name == value['target'])
+        .firstOrNull;
+    final response = WorkspaceIssueResponse.values
+        .where((v) => v.name == value['response'])
+        .firstOrNull;
+    if (target == null || (value['response'] != null && response == null)) {
+      return null;
+    }
+    final draft = WorkspaceIssueDraft(
+      key: (
+        account: value['account'],
+        store: value['store'],
+        caseId: value['caseId'],
+      ),
+      referenceId: value['referenceId'],
+      target: target,
+      expectedRevision: value['revision'],
+      response: response,
+      note: value['note'],
+    );
+    return draft.valid ? draft : null;
+  }
+}
+
 enum WorkspaceIssueKind {
   returnRequest,
   missingItem,
@@ -83,8 +179,10 @@ class WorkspaceIssueRecord {
     required this.reason,
     required this.nextStep,
     required List<WorkspaceIssueLine> lines,
+    List<WorkspaceIssueResponse> permittedResponses = const [],
     this.resolution,
-  }) : lines = List.unmodifiable(lines);
+  }) : lines = List.unmodifiable(lines),
+       permittedResponses = List.unmodifiable(permittedResponses);
 
   final String accountScope, workspaceId, id, referenceId, reason, nextStep;
   final WorkspaceIssueTarget target;
@@ -93,7 +191,10 @@ class WorkspaceIssueRecord {
   final int revision;
   final DateTime updatedAt;
   final List<WorkspaceIssueLine> lines;
+  final List<WorkspaceIssueResponse> permittedResponses;
   final String? resolution;
+  WorkspaceIssueDraftKey get draftKey =>
+      (account: accountScope, store: workspaceId, caseId: id);
   bool get valid =>
       [
         accountScope,
@@ -107,6 +208,9 @@ class WorkspaceIssueRecord {
       lines.isNotEmpty &&
       lines.every((line) => line.valid) &&
       lines.map((line) => line.lineId).toSet().length == lines.length &&
+      permittedResponses.toSet().length == permittedResponses.length &&
+      (state == WorkspaceIssueState.retailerReview ||
+          permittedResponses.isEmpty) &&
       (!state.closed || resolution?.trim().isNotEmpty == true);
 
   Object get _revisionData => (
@@ -124,6 +228,10 @@ class WorkspaceIssueRecord {
   );
   bool sameRevisionContent(WorkspaceIssueRecord other) =>
       _revisionData == other._revisionData &&
+      permittedResponses.length == other.permittedResponses.length &&
+      permittedResponses.asMap().entries.every(
+        (entry) => entry.value == other.permittedResponses[entry.key],
+      ) &&
       lines.length == other.lines.length &&
       lines.asMap().entries.every(
         (entry) => entry.value.identity == other.lines[entry.key].identity,
