@@ -6,6 +6,16 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## r66.9 round 1 checkpoint24 - Settings Help and Recently viewed cart
+
+Counts remain **11 original entries closed, 31 open; 11 open UAT child defects** (15 partial, 15 failed connected replay, 1 supplier-media case not exercised). Frozen scope remains 33 findings + 9 requests plus the required Buy procurement dependency. No implementation or new APK.
+
+Captures933-949 replay the original Shopping settings Help origin. Shopping help exposes product/delivery/invoice/return guidance and actual Shop/Wholesale orders. Both guidance sections expand. Searching PO-NEW-01 opens that Wholesale order; Android Back preserves the query and expanded guidance. Search focus reopens the keyboard on return, dismissible with Back. Further Back restores the Settings scroll position. At 200% text, captures950-956 verify the Help entry, expanded delivery guidance, MS-NEW-09 Shop order, on-screen Shopping help return and Settings Back without clipped guidance or lost expansion/scroll. Font restored to1.0 at957.
+
+Captures958-966 complete the available Recently viewed direct-Add/cart branch: Fresh tomatoes / 500g / Shree Balaji Fresh / Rs37 is added once, opens with quantity1, returns to the same Recent list showing Added, and survives Settings exit into the exact cart line. Confirmed removal restores the original empty cart; Saved remains1. Existing Recent last-row-action and cart media-label failures remain open. No new child is registered from this extension and no complete ticket closure is claimed before remaining acceptance reconciliation.
+
+Immutable checkpoint: external redmi-r66-9-round-1/round-progress-checkpoint-24.json SHA256 8398C138E06B06CAFC6DA0D3F0EBF96C11FE8AA903117B881FE97235C9E4AA5D. It binds all34 captures and terminal-zero receipts to the unchanged r66.9 APK checksum. Capture939 output truncation was recovered from its existing terminal receipt and inspected PNG without repeating the input. The scoped round remains incomplete; implementation is paused until its complete deduplicated defect list is compiled.
+
 ## r66.9 round 1 checkpoint23 - mixed-cart relaunch, Share and Offers
 
 Current scoped counts: **11 original entries closed, 31 open; 11 UAT child defects registered**. Share moves from partial to failed connected replay, giving 15 partial, 15 failed and 1 supplier-media case not exercised. This is still the frozen 33 findings + 9 requests plus required Buy procurement dependency. No implementation or new APK.
