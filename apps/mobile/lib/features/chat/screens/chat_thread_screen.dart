@@ -806,6 +806,34 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                 ? Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      if (widget.session.canReviewSupportFailure(
+                            thread.id,
+                            _applicationId,
+                          ) &&
+                          MediaQuery.viewInsetsOf(context).bottom == 0)
+                        TextButton(
+                          key: const Key('chat-review-support-failure'),
+                          onPressed: widget.session.busy
+                              ? null
+                              : () => widget.session.setReviewSupportFailure(
+                                  thread.id,
+                                  _applicationId,
+                                  armed: !widget.session
+                                      .reviewSupportFailureArmed(
+                                        thread.id,
+                                        _applicationId,
+                                      ),
+                                ),
+                          child: Text(
+                            widget.session.reviewSupportFailureArmed(
+                                  thread.id,
+                                  _applicationId,
+                                )
+                                ? 'Review only: failure armed · cancel'
+                                : 'Review only: fail next send',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
                       if (thread.suggestedPrompts.isNotEmpty &&
                           widget.session.showSuggestedPromptsForSession &&
                           MediaQuery.viewInsetsOf(context).bottom == 0)

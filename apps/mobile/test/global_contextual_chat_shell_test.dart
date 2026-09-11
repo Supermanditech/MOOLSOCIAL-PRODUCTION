@@ -5,11 +5,13 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/chat/chat_entry_context.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/chat/screens/chat_thread_screen.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
@@ -44,6 +46,235 @@ void main() {
       'draft': 'Please help with application $id for Review Store $id.',
     },
   ).toString();
+
+  const reviewFailuresEnabled =
+      bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+      bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+
+  test('r6616 support fixture rejects production and unrelated scopes', () {
+    final production = ChatSession.production(
+      gateway: const UnavailableChatGateway(),
+    );
+    final custom = ChatSession(sendGateway: _R6611DeferredSend());
+    final review = ChatSession();
+    addTearDown(production.dispose);
+    addTearDown(custom.dispose);
+    addTearDown(review.dispose);
+    for (final chat in [production, custom]) {
+      expect(chat.canReviewSupportFailure('workspace-support', 'A'), isFalse);
+      expect(
+        chat.setReviewSupportFailure('workspace-support', 'A', armed: true),
+        isFalse,
+      );
+    }
+    for (final scope in [('home-basket', 'A'), ('workspace-support', '')]) {
+      expect(review.canReviewSupportFailure(scope.$1, scope.$2), isFalse);
+    }
+    expect(review.canReviewSupportFailure('workspace-support', null), isFalse);
+    expect(
+      review.canReviewSupportFailure('workspace-support', 'A'),
+      reviewFailuresEnabled,
+    );
+    expect(
+      review.setReviewSupportFailure('workspace-support', 'A', armed: true),
+      reviewFailuresEnabled,
+    );
+  });
+
+  test(
+    'r6616 support fixture is one-shot and exact-application isolated',
+    () async {
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(chat.dispose);
+      expect(
+        chat.setReviewSupportFailure('workspace-support', 'A', armed: true),
+        reviewFailuresEnabled,
+      );
+      if (!reviewFailuresEnabled) return;
+      chat.busy = true;
+      expect(
+        chat.setReviewSupportFailure('workspace-support', 'A', armed: false),
+        isFalse,
+      );
+      chat.busy = false;
+      expect(await chat.send('home-basket', 'Unrelated review send'), isTrue);
+      expect(
+        await chat.send(
+          'workspace-support',
+          'B review send',
+          workspaceApplicationId: 'B',
+        ),
+        isTrue,
+      );
+      expect(chat.reviewSupportFailureArmed('workspace-support', 'A'), isTrue);
+      expect(
+        await chat.send('workspace-support', '', workspaceApplicationId: 'A'),
+        isFalse,
+      );
+      expect(chat.reviewSupportFailureArmed('workspace-support', 'A'), isTrue);
+      expect(
+        await chat.send(
+          'workspace-support',
+          'A review send',
+          workspaceApplicationId: 'A',
+        ),
+        isFalse,
+      );
+      expect(chat.reviewSupportFailureArmed('workspace-support', 'A'), isFalse);
+      expect(
+        chat.threadActionError(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        isNull,
+      );
+      final failed = chat
+          .messages('workspace-support')
+          .singleWhere((message) => message.text == 'A review send');
+      expect(failed.deliveryState, ChatDeliveryState.failed);
+      expect(await chat.retry('workspace-support', failed.id), isTrue);
+      final retried = chat
+          .messages('workspace-support')
+          .where((message) => message.text == 'A review send')
+          .toList();
+      expect(retried, hasLength(1));
+      expect(retried.single.deliveryState, ChatDeliveryState.delivered);
+      chat.setReviewSupportFailure('workspace-support', 'A', armed: true);
+      chat.setReviewSupportFailure('workspace-support', 'B', armed: false);
+      expect(chat.reviewSupportFailureArmed('workspace-support', 'A'), isTrue);
+      chat.setReviewSupportFailure('workspace-support', 'A', armed: false);
+      expect(chat.reviewSupportFailureArmed('workspace-support', 'A'), isFalse);
+      chat.setReviewSupportFailure('workspace-support', 'A', armed: true);
+      chat.resetForAuthenticationBoundary();
+      expect(chat.reviewSupportFailureArmed('workspace-support', 'A'), isFalse);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('r6616 review failure control and keyboard recovery $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = scale == 2
+          ? const Size(320, 568)
+          : const Size(412, 915);
+      tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 24);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(chat.dispose);
+      final router = GoRouter(
+        initialLocation: applicationRoute('A'),
+        routes: [
+          GoRoute(
+            path: '/app/chat/thread/:threadId',
+            builder: (context, state) => ChatThreadScreen(
+              session: chat,
+              threadId: state.pathParameters['threadId']!,
+              returnRoute: state.uri.queryParameters['return']!,
+              returnDirectToOrigin: true,
+              initialMessageDraft: state.uri.queryParameters['draft'],
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        MaterialApp.router(theme: MoolTheme.light(), routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+      final control = find.byKey(const Key('chat-review-support-failure'));
+      expect(control, reviewFailuresEnabled ? findsOneWidget : findsNothing);
+      if (!reviewFailuresEnabled) {
+        expect(tester.takeException(), isNull);
+        return;
+      }
+      expect(control.hitTestable(), findsOneWidget);
+      await tester.tap(control);
+      await tester.pumpAndSettle();
+      expect(find.text('Review only: failure armed · cancel'), findsOneWidget);
+      final field = find.byKey(const Key('chat-message-field'));
+      await tester.enterText(field, 'QA application A recovery check');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      await tester.pumpAndSettle();
+      expect(control, findsNothing);
+      await tester.tap(find.byKey(const Key('chat-send')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-error')), findsOneWidget);
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        'QA application A recovery check',
+      );
+      expect(
+        tester.getRect(field).bottom,
+        lessThanOrEqualTo(tester.view.physicalSize.height - 220),
+      );
+      expect(tester.takeException(), isNull);
+      if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+        const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+        await expectLater(
+          find.byKey(const Key('chat-page-surface')),
+          matchesGoldenFile(
+            '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/r6616-support-error-$scale.png',
+          ),
+        );
+      }
+      final failed = chat
+          .messages('workspace-support')
+          .singleWhere(
+            (message) => message.text == 'QA application A recovery check',
+          );
+      final retry = find.byKey(Key('chat-retry-${failed.id}'));
+      await tester.scrollUntilVisible(
+        retry,
+        80,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('chat-message-list')),
+          matching: find.byType(Scrollable),
+        ),
+        maxScrolls: 30,
+      );
+      await tester.pumpAndSettle();
+      expect(retry.hitTestable(), findsOneWidget);
+      expect(tester.getSize(retry).height, greaterThanOrEqualTo(48));
+      expect(tester.view.viewInsets.bottom, 220);
+      if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+        const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+        await expectLater(
+          find.byKey(const Key('chat-page-surface')),
+          matchesGoldenFile(
+            '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/r6616-support-retry-reachable-$scale.png',
+          ),
+        );
+      }
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-error')), findsNothing);
+      expect(
+        chat
+            .messages('workspace-support')
+            .where(
+              (message) => message.text == 'QA application A recovery check',
+            ),
+        hasLength(1),
+      );
+      expect(
+        chat
+            .messages('workspace-support')
+            .singleWhere(
+              (message) => message.text == 'QA application A recovery check',
+            )
+            .deliveryState,
+        ChatDeliveryState.delivered,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   for (final scale in [1.0, 2.0]) {
     testWidgets(

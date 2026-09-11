@@ -281,6 +281,38 @@ class ChatSession extends ChangeNotifier {
   final Map<String, (Object, int)> _retryDraftRevisions = {};
   int _draftGeneration = 0;
   bool _disposed = false;
+  String? _reviewSupportFailureApplication;
+
+  /// Explicit failure fixture, never available to a production transport.
+  bool canReviewSupportFailure(String threadId, String? applicationId) =>
+      !_disposed &&
+      kDebugMode &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+      const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      _gateway == null &&
+      _reviewSendGateway is ReviewChatSendGateway &&
+      threadId == 'workspace-support' &&
+      applicationId?.trim().isNotEmpty == true;
+
+  bool reviewSupportFailureArmed(String threadId, String? applicationId) =>
+      canReviewSupportFailure(threadId, applicationId) &&
+      _reviewSupportFailureApplication == applicationId!.trim();
+
+  bool setReviewSupportFailure(
+    String threadId,
+    String? applicationId, {
+    required bool armed,
+  }) {
+    if (!canReviewSupportFailure(threadId, applicationId) || busy) return false;
+    final id = applicationId!.trim();
+    if (armed) {
+      _reviewSupportFailureApplication = id;
+    } else if (_reviewSupportFailureApplication == id) {
+      _reviewSupportFailureApplication = null;
+    }
+    notifyListeners();
+    return true;
+  }
 
   int get draftSessionGeneration => _draftGeneration;
   int draftRevision(String threadId, {String? workspaceApplicationId}) =>
@@ -2305,6 +2337,13 @@ class ChatSession extends ChangeNotifier {
         if (reviewSendGateway == null) {
           throw StateError('Chat has no configured send gateway.');
         }
+        if (reviewSupportFailureArmed(threadId, workspaceApplicationId)) {
+          _reviewSupportFailureApplication = null;
+          await ReviewChatSendGateway(
+            failNextRequest: true,
+            latency: Duration.zero,
+          ).send(threadId: threadId, text: message.text);
+        }
         await reviewSendGateway.send(threadId: threadId, text: message.text);
       }
 
@@ -2584,6 +2623,7 @@ class ChatSession extends ChangeNotifier {
   }
 
   void resetForAuthenticationBoundary() {
+    _reviewSupportFailureApplication = null;
     _draftGeneration += 1;
     _retryDraftApplications.clear();
     _retryDraftRevisions.clear();
@@ -2698,6 +2738,7 @@ class ChatSession extends ChangeNotifier {
 
   @override
   void dispose() {
+    _reviewSupportFailureApplication = null;
     _disposed = true;
     _draftGeneration += 1;
     _voiceRecorder?.dispose();

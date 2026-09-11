@@ -79,7 +79,17 @@ function Test-CodexOppoR6615PendingEvidence([hashtable]$Facts) {
     'artifacts/quality/codex-oppo-r66-15-review-20260911/uaw-codex-oppo-r66.15-review-20260911-build-provenance.txt',
     'artifacts/quality/codex-oppo-r66-15-review-20260911/post-install.json',
     'artifacts/quality/codex-oppo-r66-15-review-20260911/device-review.md',
-    'artifacts/quality/codex-oppo-r66-15-review-20260911/ticket-and-screen-coverage.md'
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/ticket-and-screen-coverage.md',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/candidate-contract.md',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/source-manifest.txt',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/local-validation.md',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/prebuild-validation.md',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/motion-disposition.md',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/apk-regression-state.json',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/uaw-codex-oppo-r66.16-review-20260911-build-provenance.txt',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/post-install.json',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/device-review.md',
+    'artifacts/quality/codex-oppo-r66-16-review-20260911/ticket-and-screen-coverage.md'
   )
 }
 
@@ -1673,6 +1683,16 @@ if ($ProductionLane -ceq 'baseline') {
           'artifacts/quality/codex-oppo-r66-15-review-20260911/post-install.json',
           'artifacts/quality/codex-oppo-r66-15-review-20260911/device-review.md',
           'artifacts/quality/codex-oppo-r66-15-review-20260911/ticket-and-screen-coverage.md',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/candidate-contract.md',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/source-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/local-validation.md',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/prebuild-validation.md',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/motion-disposition.md',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/apk-regression-state.json',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/uaw-codex-oppo-r66.16-review-20260911-build-provenance.txt',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/post-install.json',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/device-review.md',
+          'artifacts/quality/codex-oppo-r66-16-review-20260911/ticket-and-screen-coverage.md',
           'artifacts/quality/codex-oppo-r66-9-review-20260908/source-manifest.txt',
           'artifacts/quality/codex-oppo-r66-9-review-20260908/local-validation.md',
           'artifacts/quality/codex-oppo-r66-9-review-20260908/prebuild-validation.md',
