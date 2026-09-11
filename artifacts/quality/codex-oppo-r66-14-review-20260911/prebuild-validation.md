@@ -1,6 +1,12 @@
 # r66.14 prebuild validation
 
-Build remains unauthorized. Both regression cycles and review-only isolation pass. The comment-only correction below also passes 214 atomic-operation tests, full analysis with zero issues, and the unchanged copy gate. The full prebuild controls must be replayed from the clean corrected seal before one-build activation. No APK or device result is claimed.
+Prebuild qualification passed from clean, remote-equal 4aead991b54aec15654331345658b44ba4660d43. Build remains unauthorized until the evidence seal is committed, pushed and clean, then explicitly activated once. Both regression cycles, review-only isolation and the comment-only follow-up checks pass. No APK or device result is claimed.
+
+## Attempt 2 — passed
+
+All existing controls passed: clean handoff and regression memory, 18-approved/2-rejected commit coverage with positive/omitted/rejected fixtures, approved UI locks, unchanged customer-copy gate, Flutter tracked-support cleanup guard, Android resource integrity (11 XML, zero unexpected deletions, one launch owner), build-foundation controls, incremental pre_build for 1.0.0-r66.14+2026091101 and existing MVP execution controls. PlayQualification remains false. Locked dependency resolution used --enforce-lockfile inside the existing support guard; no upgrade. All 391 live source-manifest hashes remain unchanged at 962D8984C32169F3307C79BF50BB81B41DE61332C2F69E1CFC1AB253682D00E2. Post-run Git digest: zero bytes/records/stderr and exit 0.
+
+Retained decision-bearing control log: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6614-prebuild-controls-attempt2.log; SHA-256 DA612BFC8FA07FE5E420792B7288E3AAE8132C1CF90912EC7E74944E4F9ABB71; terminal exit 0. REG4557 output handling: native dependency notices exceeded the response budget; the complete retained control log and exact terminal result were recovered without rerunning. Native package notices bypassed that log, so it is not claimed as complete native stdout. No unavailable notice is qualification evidence; dependency content is bound by the unchanged manifest/lock hashes. Capture the build subprocess stdout/stderr at the OS process boundary to retain native output completely.
 
 ## Attempt 1 — stopped, not qualified
 
