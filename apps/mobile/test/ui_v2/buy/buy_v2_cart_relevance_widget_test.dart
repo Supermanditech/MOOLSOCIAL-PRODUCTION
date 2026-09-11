@@ -42,10 +42,14 @@ void main() {
             !candidate.requiresPrescription,
       );
 
-  Future<void> showInMainCartList(WidgetTester tester, Finder target) async {
+  Future<void> showInMainCartList(
+    WidgetTester tester,
+    Finder target, {
+    double scrollDelta = 450,
+  }) async {
     await tester.scrollUntilVisible(
       target,
-      450,
+      scrollDelta,
       scrollable: find
           .byWidgetPredicate(
             (widget) =>
@@ -400,6 +404,10 @@ void main() {
           greaterThanOrEqualTo(required.height),
         );
       }
+      await _captureR66MainCart(
+        tester,
+        'item-${destination.name}-text2-values',
+      );
       for (final key in [
         'buy-cart-header-value-motion',
         'buy-cart-scope-value-motion-all',
@@ -409,6 +417,9 @@ void main() {
         'buy-cart-benefit-entry-Payment offers-motion',
       ]) {
         final finder = find.byKey(ValueKey(key));
+        if (finder.evaluate().isEmpty) {
+          await showInMainCartList(tester, finder);
+        }
         expect(finder, findsOneWidget);
         final texts = find.descendant(
           of: finder,
@@ -433,6 +444,7 @@ void main() {
         }
       }
       final browse = find.byKey(const ValueKey('buy-cart-browse-more'));
+      await showInMainCartList(tester, browse, scrollDelta: -450);
       final browseText = find.descendant(
         of: browse,
         matching: find.text('Browse more products'),
@@ -1230,7 +1242,12 @@ Future<void> _captureR66MainCart(WidgetTester tester, String label) async {
     find.byKey(const ValueKey('r66-main-cart-capture')),
   );
   await tester.runAsync(() async {
-    final directory = Directory('build/r66-cart-wording-review-v3-20260905');
+    final directory = Directory(
+      const String.fromEnvironment(
+        'BUY_R66_MAIN_CART_DIRECTORY',
+        defaultValue: 'build/r66-cart-wording-review-v3-20260905',
+      ),
+    );
     await directory.create(recursive: true);
     final output = File('${directory.path}/$label.png');
     if (await output.exists()) {

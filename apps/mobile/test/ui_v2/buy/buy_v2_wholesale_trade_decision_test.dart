@@ -114,7 +114,22 @@ void main() {
     expect(find.textContaining(product.seller), findsWidgets);
 
     final gallery = find.byKey(ValueKey('buy-product-packshot-${product.id}'));
-    expect(tester.getSize(gallery).height, lessThanOrEqualTo(238));
+    final imageViewport = find.byKey(
+      ValueKey('buy-product-gallery-${product.id}'),
+    );
+    expect(tester.getSize(imageViewport).height, lessThanOrEqualTo(238));
+    expect(
+      tester.getRect(imageViewport).bottom,
+      lessThanOrEqualTo(tester.getRect(gallery).bottom),
+    );
+    final badge = find.byKey(
+      ValueKey('buy-product-gallery-badge-${product.id}'),
+    );
+    expect(
+      tester.getRect(badge).bottom,
+      lessThanOrEqualTo(tester.getRect(imageViewport).top),
+    );
+    await captureR66Visual(tester, 'r669-trade-gallery-and-decision');
     final add = find.byKey(ValueKey('buy-product-primary-${product.id}'));
     expect(add, findsOneWidget);
     expect(tester.getSize(add).height, greaterThanOrEqualTo(50));
@@ -400,7 +415,8 @@ void main() {
         expect(
           boxes.single.right,
           lessThanOrEqualTo(paragraph.size.width + 1),
-          reason: 'Allow fractional glyph-edge overhang without a clipped digit',
+          reason:
+              'Allow fractional glyph-edge overhang without a clipped digit',
         );
         expect(total.hitTestable(), findsOneWidget);
         expect(tester.getSize(dock).height, lessThanOrEqualTo(104));

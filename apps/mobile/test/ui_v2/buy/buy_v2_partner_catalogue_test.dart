@@ -2071,47 +2071,71 @@ void main() {
     });
   }
 
-  test('store and brand catalogues remain exact and destination-scoped', () {
-    final core = BuySession();
-    final session = BuyV2Session(core: core);
-    addTearDown(session.dispose);
-    addTearDown(core.dispose);
+  test(
+    'store and brand catalogues remain exact and destination-scoped',
+    () async {
+      final core = BuySession();
+      final products = BuyV2Catalogue.products
+          .map(
+            (product) =>
+                const {'s-milk', 's-curd', 'w-milk'}.contains(product.id)
+                ? product.copyWith(brand: 'Published dairy brand')
+                : product,
+          )
+          .toList();
+      final session = BuyV2Session(
+        core: core,
+        reviewDataEnabled: false,
+        commerceAdapter: _CollectionHeaderCommerce(products),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await session.restoreCommerce();
 
-    final eggs = session.product('s-eggs');
-    final storeProducts = session.partnerCatalogueFor(eggs);
-    expect(storeProducts.first.id, eggs.id);
-    expect(
-      storeProducts.map((product) => product.id),
-      containsAll(['s-eggs', 's-chicken']),
-    );
-    expect(
-      storeProducts.every(
-        (product) =>
-            product.destination == BuyV2Destination.shop &&
-            product.seller == 'Safe Protein Store' &&
-            product.catalogueListing,
-      ),
-      isTrue,
-    );
+      final eggs = session.product('s-eggs');
+      final storeProducts = session.partnerCatalogueFor(eggs);
+      expect(storeProducts.first.id, eggs.id);
+      expect(
+        storeProducts.map((product) => product.id),
+        containsAll(['s-eggs', 's-chicken']),
+      );
+      expect(
+        storeProducts.every(
+          (product) =>
+              product.destination == BuyV2Destination.shop &&
+              product.seller == 'Safe Protein Store' &&
+              product.catalogueListing,
+        ),
+        isTrue,
+      );
 
-    final tomato = session.product('s-tomato');
-    final brandProducts = session.brandCatalogueFor(tomato);
-    expect(brandProducts.first.id, tomato.id);
-    expect(brandProducts.length, greaterThan(1));
-    expect(
-      brandProducts.every(
-        (product) =>
-            product.destination == BuyV2Destination.shop &&
-            product.brand == tomato.brand &&
-            product.catalogueListing,
-      ),
-      isTrue,
-    );
-    expect(
-      session.partnerCatalogueFor(session.product('m-paracetamol-500')),
-      isEmpty,
-    );
-  });
+      final tomato = session.product('s-tomato');
+      expect(tomato.brand, isEmpty);
+      expect(session.brandCatalogueFor(tomato), isEmpty);
+      final milk = session.product('s-milk');
+      final brandProducts = session.brandCatalogueFor(milk);
+      expect(brandProducts.first.id, milk.id);
+      expect(brandProducts.length, greaterThan(1));
+      expect(brandProducts.map((product) => product.id), contains('s-curd'));
+      expect(
+        brandProducts.map((product) => product.id),
+        isNot(contains('w-milk')),
+      );
+      expect(
+        brandProducts.every(
+          (product) =>
+              product.destination == BuyV2Destination.shop &&
+              product.brand == milk.brand &&
+              product.catalogueListing,
+        ),
+        isTrue,
+      );
+      expect(
+        session.partnerCatalogueFor(session.product('m-paracetamol-500')),
+        isEmpty,
+      );
+    },
+  );
 
   testWidgets('Shop store catalogue reuses product cards and opens one item', (
     tester,

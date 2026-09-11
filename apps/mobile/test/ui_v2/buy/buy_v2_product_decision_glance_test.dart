@@ -231,6 +231,7 @@ void main() {
       final product = BuyV2Catalogue.products
           .firstWhere((item) => item.destination == BuyV2Destination.shop)
           .copyWith(
+            brand: 'Test packaged brand',
             purchaseProtection: const BuyV2PurchaseProtection(
               summary: 'Supplier reviews eligible requests',
               remedies: ['Replacement', 'Repair'],

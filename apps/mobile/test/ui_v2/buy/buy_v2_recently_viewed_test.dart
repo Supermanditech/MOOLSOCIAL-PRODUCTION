@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' show ImageByteFormat;
 
@@ -386,6 +387,13 @@ void main() {
           )
           .toList(growable: false);
       expect(products.length, greaterThan(10));
+      final latestWrite = Completer<void>();
+      store.onWrite = (snapshot) {
+        if (!latestWrite.isCompleted &&
+            snapshot.recentlyViewedProductIds.firstOrNull == products.last.id) {
+          latestWrite.complete();
+        }
+      };
       for (final product in products) {
         expect(session.openProduct(product.id), isTrue);
       }
@@ -395,7 +403,11 @@ void main() {
       ];
       expect(retained, hasLength(10));
       expect(retained.map((product) => product.id), contains(products.last.id));
-      expect(store.snapshot?.recentlyViewedProductIds, hasLength(10));
+      await latestWrite.future.timeout(const Duration(seconds: 3));
+      expect(
+        store.snapshot?.recentlyViewedProductIds,
+        products.reversed.take(10).map((product) => product.id).toList(),
+      );
 
       final restoredCore = BuySession();
       final restored = BuyV2Session(
@@ -496,6 +508,7 @@ void main() {
 
 final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
   BuyV2CustomerStateSnapshot? snapshot;
+  void Function(BuyV2CustomerStateSnapshot)? onWrite;
 
   @override
   String? get ownerScope => 'customer:recently-viewed';
@@ -506,6 +519,7 @@ final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot value) async {
     snapshot = value;
+    onWrite?.call(value);
     return true;
   }
 }
