@@ -16,6 +16,118 @@ import 'package:moolsocial/features/work/work_document_preview.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  group('r6614 workspace contact mobile format', () {
+    WorkSession contacts(ReviewWorkGateway gateway) =>
+        WorkSession(gateway: gateway)
+          ..selectFamily('products-trade')
+          ..selectProfile('retailer-grocery')
+          ..primaryMobile = '9000000012'
+          ..primaryMobileVerified = true
+          ..contactEmail = 'qa@example.test'
+          ..contactEmailVerified = true;
+
+    for (final channel in [
+      WorkContactChannel.primaryMobile,
+      WorkContactChannel.alternateMobile,
+    ]) {
+      Future<bool> send(WorkSession work, String value) =>
+          channel == WorkContactChannel.primaryMobile
+          ? work.sendPrimaryMobileOtp(value)
+          : work.sendAlternateOtp(value);
+      final instruction = channel == WorkContactChannel.primaryMobile
+          ? 'Enter a valid 10-digit phone number.'
+          : 'Enter a valid 10-digit alternate mobile number.';
+
+      for (final invalid in [
+        '1111111111',
+        '1213131313',
+        '5000000013',
+        '900000013',
+        '90000000013',
+        '9000000013abc',
+        '90000/00013',
+        '+449000000013',
+      ]) {
+        test(
+          '$channel rejects $invalid before sending or continuing',
+          () async {
+            final gateway = ReviewWorkGateway();
+            final work = contacts(gateway);
+            addTearDown(work.dispose);
+            work.editWorkspaceContact(channel, invalid);
+            final retained = work.workspaceContactValue(channel);
+            expect(await send(work, invalid), isFalse);
+            expect(work.errorMessage, instruction);
+            expect(work.workspaceContactValue(channel), retained);
+            expect(work.workspaceContactVerified(channel), isFalse);
+            expect(work.workspaceContactsReady, isFalse);
+            expect(work.continueToProof(), isFalse);
+            expect(work.errorMessage, instruction);
+            expect(gateway.otpCalls, 0);
+            expect(gateway.otpVerificationCalls, 0);
+            expect(work.contactEmailVerified, isTrue);
+            if (channel == WorkContactChannel.alternateMobile) {
+              expect(work.primaryMobileVerified, isTrue);
+            }
+          },
+        );
+      }
+
+      test('$channel correction still requires its own server code', () async {
+        final gateway = ReviewWorkGateway();
+        final work = contacts(gateway);
+        addTearDown(work.dispose);
+        work.editWorkspaceContact(channel, '1111111111');
+        expect(await send(work, '1111111111'), isFalse);
+        expect(await send(work, '+91 90000-00013'), isTrue);
+        expect(work.workspaceContactValue(channel), '9000000013');
+        expect(work.workspaceContactVerified(channel), isFalse);
+        expect(work.workspaceContactsReady, isFalse);
+        expect(gateway.otpCalls, 1);
+        Future<bool> verify(String code) =>
+            channel == WorkContactChannel.primaryMobile
+            ? work.verifyPrimaryMobileOtp(code)
+            : work.verifyAlternateOtp(code);
+        expect(await verify('000000'), isFalse);
+        expect(work.workspaceContactVerified(channel), isFalse);
+        expect(await verify('123456'), isTrue);
+        expect(gateway.otpVerificationCalls, 2);
+        expect(work.workspaceContactsReady, isTrue);
+        expect(work.continueToProof(), isTrue);
+      });
+    }
+
+    test('formatted primary cannot be reused as the alternate', () async {
+      final gateway = ReviewWorkGateway();
+      final work = contacts(gateway)..primaryMobile = '+91 90000-00012';
+      addTearDown(work.dispose);
+      expect(await work.sendAlternateOtp('9000000012'), isFalse);
+      expect(
+        work.errorMessage,
+        'This is already the number customers can reach you on.',
+      );
+      expect(gateway.otpCalls, 0);
+    });
+
+    test('saved confirmation flags cannot make malformed contacts ready', () {
+      final work = contacts(ReviewWorkGateway());
+      addTearDown(work.dispose);
+      work.primaryMobile = '1111111111';
+      expect(work.workspaceContactsReady, isFalse);
+      expect(work.continueToProof(), isFalse);
+      work.primaryMobile = '9000000012';
+      work.alternateMobile = '1213131313';
+      work.alternateVerified = true;
+      expect(work.workspaceContactsReady, isFalse);
+      expect(work.continueToProof(), isFalse);
+      work.removeAlternateMobile();
+      expect(work.workspaceContactsReady, isTrue);
+      work.contactEmail = 'not-an-email';
+      expect(work.workspaceContactsReady, isFalse);
+      expect(work.continueToProof(), isFalse);
+      expect(work.errorMessage, 'Enter a valid email address.');
+    });
+  });
   group('r66.8 local PDF preview', () {
     const channel = MethodChannel('com.moolsocial.app/work_document_preview');
     final messenger =

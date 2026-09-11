@@ -5851,9 +5851,13 @@ class WorkSession extends ChangeNotifier {
   }
 
   bool get workspaceContactsReady =>
+      normalizeWorkspaceMobile(primaryMobile) != null &&
       primaryMobileVerified &&
+      _validEmail(contactEmail) &&
       contactEmailVerified &&
-      (alternateMobile.isEmpty || alternateVerified);
+      (alternateMobile.isEmpty ||
+          (normalizeWorkspaceMobile(alternateMobile) != null &&
+              alternateVerified));
 
   void savePersonName(String value) {
     _editedDraftFields.add('personName');
@@ -6208,7 +6212,7 @@ class WorkSession extends ChangeNotifier {
     });
     final normalized = channel == WorkContactChannel.email
         ? value.trim().toLowerCase()
-        : value.replaceAll(RegExp(r'\D'), '');
+        : normalizeWorkspaceMobile(value) ?? value.trim();
     final previous = switch (channel) {
       WorkContactChannel.primaryMobile => primaryMobile,
       WorkContactChannel.email => contactEmail,
@@ -6241,8 +6245,8 @@ class WorkSession extends ChangeNotifier {
 
   Future<bool> sendPrimaryMobileOtp(String mobile) async {
     if (busy) return false;
-    final normalized = mobile.replaceAll(RegExp(r'\D'), '');
-    if (normalized.length != 10) {
+    final normalized = normalizeWorkspaceMobile(mobile);
+    if (normalized == null) {
       errorMessage = 'Enter a valid 10-digit phone number.';
       notifyListeners();
       return false;
@@ -6316,13 +6320,13 @@ class WorkSession extends ChangeNotifier {
 
   Future<bool> sendAlternateOtp(String mobile) async {
     if (busy) return false;
-    final normalized = mobile.replaceAll(RegExp(r'\D'), '');
-    if (normalized.length != 10) {
+    final normalized = normalizeWorkspaceMobile(mobile);
+    if (normalized == null) {
       errorMessage = 'Enter a valid 10-digit alternate mobile number.';
       notifyListeners();
       return false;
     }
-    if (normalized == primaryMobile) {
+    if (normalized == normalizeWorkspaceMobile(primaryMobile)) {
       errorMessage = 'This is already the number customers can reach you on.';
       notifyListeners();
       return false;
@@ -6426,7 +6430,7 @@ class WorkSession extends ChangeNotifier {
       notifyListeners();
       return false;
     }
-    if (primaryMobile.replaceAll(RegExp(r'\D'), '').length != 10) {
+    if (normalizeWorkspaceMobile(primaryMobile) == null) {
       errorMessage = 'Enter a valid 10-digit phone number.';
       notifyListeners();
       return false;
@@ -6448,7 +6452,7 @@ class WorkSession extends ChangeNotifier {
       return false;
     }
     if (alternateMobile.isNotEmpty &&
-        alternateMobile.replaceAll(RegExp(r'\D'), '').length != 10) {
+        normalizeWorkspaceMobile(alternateMobile) == null) {
       errorMessage = 'Enter a valid 10-digit alternate mobile number.';
       notifyListeners();
       return false;

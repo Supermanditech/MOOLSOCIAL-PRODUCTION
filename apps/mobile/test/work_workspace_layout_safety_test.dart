@@ -11927,15 +11927,25 @@ void main() {
   for (final width in [412.0, 320.0]) {
     for (final entry in [
       ('work-primary-contact', '123', 'Enter a valid 10-digit phone number.'),
+      (
+        'work-primary-contact',
+        '1111111111',
+        'Enter a valid 10-digit phone number.',
+      ),
       ('work-contact-email', 'not-an-email', 'Enter a valid email address.'),
       (
         'work-alternate-contact',
         '123',
         'Enter a valid 10-digit alternate mobile number.',
       ),
+      (
+        'work-alternate-contact',
+        '1213131313',
+        'Enter a valid 10-digit alternate mobile number.',
+      ),
     ]) {
       testWidgets(
-        'r6611 contact format correction stays visible ${entry.$1} $width',
+        'r6611 contact format correction stays visible ${entry.$1} ${entry.$2} $width',
         (tester) async {
           final work = selectedRetailer()
             ..hydrateAccountSnapshot(
@@ -11991,7 +12001,7 @@ void main() {
           expect(tester.takeException(), isNull);
           await captureStoreView(
             tester,
-            'r6611-${entry.$1}-format-${width.toInt()}',
+            'r6611-${entry.$1}-${entry.$2}-format-${width.toInt()}',
           );
           tester.view.viewInsets = const FakeViewPadding();
           FocusManager.instance.primaryFocus?.unfocus();

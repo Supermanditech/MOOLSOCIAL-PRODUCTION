@@ -86,3 +86,31 @@ test/platform_configuration_test.dart
 The full commands, original failures, corrections and 14 actual Flutter catalogue captures are retained in ../codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md. Final focused Store restock journey: normal 412x915/100% and compact 320x568/200%, retained cart/search, keyboard, Clear search, populated results, promotion reveal and Back all pass locally. Capture manifest digest: 97EF90F63F8B87E0C315597DEDBE4F576397724295B35B07714227026A6DAC87. This is not physical OPPO/TalkBack acceptance.
 
 Two separate inherited Buy/Chat cases remain unqualified outside this unchanged 44-file current-contract set: order Help single supplier conversation, and Medicine Help exact Care return. Preserve their prior failing evidence; no new exclusion or generic-copy weakening.
+
+## Post-r66.14 contact correction — successor source, not installed APK qualification
+
+R6614-UAT-CONTACT-01 reuses normalizeWorkspaceMobile for primary/alternate Send code, Continue, readiness and the existing contact correction-focus predicate. Malformed text is retained for correction rather than stripped into a valid-looking value. Optional backup removal, duplicate-primary rejection, independent email/phone confirmation and stale account/contact response protections remain intact. Functional owners are work_session.dart and screens/work_workspace_contact_screen.dart; focused owners are work_production_gateway_test.dart and work_workspace_layout_safety_test.dart. No Buy, backend, native Android, dependency or approved geometry change.
+
+Commands run from apps/mobile with C:/Users/jisal/develop/flutter/bin/flutter.bat; logs are retained under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/dashboard-load-implementation-20260909:
+
+```text
+test --no-pub --reporter expanded --concurrency=1 test/work_production_gateway_test.dart test/work_vertical_slice_test.dart --name "r6614 workspace contact mobile format|S03 contact|r6611 contact"
+test --no-pub --reporter expanded --concurrency=1 --update-goldens --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r6614-contact-format-local-20260911-v2 test/work_workspace_layout_safety_test.dart --name "r6611 contact format correction stays visible"
+```
+
+- Focused attempt1:45 passed,0 failed,exit0. Log r6614-contact-format-focused-attempt1.log SHA-256 9E5330816BE35415D3A115F858B269CCEA705C93C62D0EFF819B2B1DC9A089A0. Includes20 new format/correction cases plus existing Change/Cancel, stale send/verify, account isolation, optional backup and field-specific Continue checks; simulated gateways are not real OTP delivery evidence.
+- Layout attempt1:9 passed,1 failed,exit1. Original log SHA-256 2786E0633D59F31E680D59ADEE80E0BC6CC2682D6DB9F693527BFDF3F57D2D39 and v1 captures retained. Exact alternate1213131313/412-width failure revealed the stale length-only UI focus predicate; the test was not weakened.
+- Layout attempt2:10 passed,0 failed,exit0. Log r6614-contact-format-layout-attempt2.log SHA-256 07A289B82FA9C460E83BB71ED12B42CB3CC334753E8D4E60FA2088C0636319C6. Four new invalid-prefix cases supplement the original short-phone/email checks at412x915/100% and320x568/200%, with keyboard insets, visible correction/field, Cancel or optional-empty recovery and no Flutter exception.
+- Ten actual Flutter images in external r6614-contact-format-local-20260911-v2 were inspected;303715 bytes, sorted filename/uppercase-hash LF aggregate SHA-256 1B4BB95C4BAB6AA953617673DA5F9254E9175F8C4F2C3A360609B67478509FBE. They show focused/scrolled correction states, not every field simultaneously or a physical keyboard/TalkBack pass. Existing approved layout remains; the top of a scrolled backup label can be outside the viewport while its value, full error and action remain visible.
+
+Connected qualification of this contact correction:
+
+```text
+test --no-pub --reporter expanded --concurrency=1 --exclude-tags protected-reference test/work_production_gateway_test.dart test/work_vertical_slice_test.dart test/work_workspace_layout_safety_test.dart
+analyze --no-pub
+```
+
+- Connected attempt1:1040 passed,79 existing skips,0 failed,exit0. Log r6614-contact-format-connected-attempt1.log SHA-256 C41ECBFBE903393D0935D91250F59BDDFEA7631CD6A5DC6AF12A312327E058B8. The existing protected-reference boundary is unchanged; default-disabled capture cases remain skipped, not newly claimed device evidence. Counts overlap the focused runs and must not be added as unique tests.
+- Full Flutter analysis:zero issues,exit0,126.2seconds. Log r6614-contact-format-analysis-attempt1.log SHA-256 E5024822B6E9AAA44B6E2A28B88405AD55AE3E5121882B6A9FD1EE8E82700F13. Correct-path formatter subsequently processed both contact UI/layout owners with zero changes.
+
+Founder then requested the complete defect report before further implementation. No additional product changes follow that request; preserve and seal this already-started correction and evidence. No new APK was built. The remaining candidate-wide prebuild cycles and successor-APK OPPO replay are still required; this child is not device-closed, and installed r66.14 does not contain these changes.

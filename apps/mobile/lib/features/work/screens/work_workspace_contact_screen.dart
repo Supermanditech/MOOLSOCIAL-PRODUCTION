@@ -232,12 +232,12 @@ class _WorkWorkspaceContactScreenState extends State<WorkWorkspaceContactScreen>
       return;
     }
     final value = session.workspaceContactValue(channel).trim();
-    final digits = value.replaceAll(RegExp(r'\D'), '');
+    final mobile = normalizeWorkspaceMobile(value);
     final readyToConfirm = channel == WorkContactChannel.email
         ? RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)
-        : digits.length == 10 &&
+        : mobile != null &&
               (channel != WorkContactChannel.alternateMobile ||
-                  digits != session.primaryMobile);
+                  mobile != normalizeWorkspaceMobile(session.primaryMobile));
     if (!readyToConfirm) {
       input.requestFocus();
       return;
