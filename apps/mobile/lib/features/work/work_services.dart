@@ -2537,6 +2537,17 @@ class ReviewWorkGateway implements WorkGateway {
   bool canSelectDeviceReviewCase(String caseId) =>
       deviceReviewControlsEnabled && _submittedReviewCases.contains(caseId);
 
+  /// Restore only the test selector, never an approval or Workspace authority.
+  bool restoreDeviceReviewCase(String caseId, {required String accountScope}) {
+    if (!deviceReviewControlsEnabled ||
+        accountScope != 'isolated-workspace-ui-review' ||
+        !RegExp(r'^WP-[a-z0-9]+-[a-z0-9]+-[1-9][0-9]*$').hasMatch(caseId)) {
+      return false;
+    }
+    _submittedReviewCases.add(caseId);
+    return true;
+  }
+
   void selectDeviceReviewCase(String caseId, WorkReviewTestCase scenario) {
     if (!canSelectDeviceReviewCase(caseId)) {
       throw const WorkGatewayException('Review test cases are unavailable.');

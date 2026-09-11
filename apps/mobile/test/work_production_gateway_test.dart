@@ -1519,6 +1519,67 @@ void main() {
         bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
 
     test(
+      'R6617 review selector restores saved case without granting approval',
+      () async {
+        final memory = _PendingProofMemory()
+          ..accountScope = 'isolated-workspace-ui-review';
+        final firstGateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final first = WorkSession(
+          gateway: firstGateway,
+          proofPicker: ReviewWorkProofPicker(),
+          pendingProofStore: _PendingProofMemory()
+            ..accountScope = 'isolated-workspace-ui-review',
+          contactDraftStore: memory,
+        );
+        await first.recoverPendingProof(accountReady: true);
+        first.activeWorkspace = existingStore;
+        final id = await addWorkspaceApplication(first, 'QA Kirana');
+        final caseId = first.reviewCaseId!;
+        await first.flushContactDraft();
+        first.dispose();
+        final nextGateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final next = WorkSession(
+          gateway: nextGateway,
+          pendingProofStore: _PendingProofMemory()
+            ..accountScope = 'isolated-workspace-ui-review',
+          contactDraftStore: memory,
+        );
+        addTearDown(next.dispose);
+        await next.recoverPendingProof(accountReady: true);
+        expect(next.resumeWorkspaceApplication(id), isTrue);
+        expect(next.reviewCaseId, caseId);
+        expect(nextGateway.canSelectDeviceReviewCase(caseId), enabled);
+        expect(next.hasVerifiedWorkspace, isFalse);
+        expect(next.reviewStatusNeedsRefresh, isTrue);
+        expect(
+          (await nextGateway.checkReview(caseId)).status,
+          WorkRemoteReviewStatus.pending,
+        );
+      },
+    );
+
+    test('R6617 review selector refuses production scope and invalid case', () {
+      final gateway = ReviewWorkGateway();
+      for (final value in ['WP-example-random-1', 'WP-240701', 'unrelated']) {
+        expect(
+          gateway.restoreDeviceReviewCase(value, accountScope: 'real-account'),
+          isFalse,
+        );
+      }
+      expect(
+        gateway.restoreDeviceReviewCase(
+          'unrelated',
+          accountScope: 'isolated-workspace-ui-review',
+        ),
+        isFalse,
+      );
+    });
+
+    test(
       'R669 device review identities survive separate gateway lifetimes',
       () async {
         final caseIds = <String>{};

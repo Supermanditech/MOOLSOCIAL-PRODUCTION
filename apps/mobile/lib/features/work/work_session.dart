@@ -6163,11 +6163,24 @@ class WorkSession extends ChangeNotifier {
             }
           }
           if (!current()) return;
+          final savedSubmission = _readSavedSubmission(
+            raw['submitted'],
+            profile.id,
+          );
+          final reviewGateway = gateway;
+          if (reviewGateway is ReviewWorkGateway &&
+              savedSubmission != null &&
+              details['caseId'] is String) {
+            reviewGateway.restoreDeviceReviewCase(
+              details['caseId'] as String,
+              accountScope: scope,
+            );
+          }
           _workspaceApplications[id] = _WorkspaceApplicationDraft(
             id: id,
             scope: scope,
             details: Map.unmodifiable(details),
-            submitted: _readSavedSubmission(raw['submitted'], profile.id),
+            submitted: savedSubmission,
             files: Map.unmodifiable(files),
             needsStatusRefresh: details['caseId'] != null,
           );
