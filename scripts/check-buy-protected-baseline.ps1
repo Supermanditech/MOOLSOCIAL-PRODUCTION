@@ -257,7 +257,8 @@ function Test-RedmiReviewBuySource {
     'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2',
     '2a8c52472b19964ca6d0046d31827197a9e3f74b',
     '6de5f0c82a57a66dd3172f0ad6080949ca09b5f0',
-    '0c36d2201c43665d38e00173df7d2df63f690344'
+    '0c36d2201c43665d38e00173df7d2df63f690344',
+    'a18aa780c0e00497ef218025bc8473a32f50a084'
   )
   $acceptedBase = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
   if ($SourceCommit -cnotin $qualifiedSources) { return $false }
@@ -305,6 +306,28 @@ function Test-RedmiReviewBuySource {
       'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
       'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
       'apps/mobile/lib/ui_v2/profile/global_security_v2.dart',
+      'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart'
+    )
+  }
+  if ($SourceCommit -ceq 'a18aa780c0e00497ef218025bc8473a32f50a084') {
+    $expectedDelta = @(
+      'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
+      'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart'
+      'apps/mobile/lib/features/buy/buy_v2_models.dart'
+      'apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart'
+      'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart'
+      'apps/mobile/lib/features/buy/buy_v2_session.dart'
+      'apps/mobile/lib/features/work/scan_and_pick_contract.dart'
+      'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart'
+      'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'
+      'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart'
+      'apps/mobile/lib/ui_v2/profile/global_security_v2.dart'
       'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart'
     )
   }
