@@ -2,6 +2,14 @@
 
 ## 2026-09-10 current 27-item skim and Cursor handoff receipt
 
+### Controlling founder clarification: Codex-only OPPO before integration — 2026-09-11
+
+Founder subsequently clarified: no Cursor/Codex integration yet; first complete Codex tickets through OPPO testing, with integration later. This supersedes the controlled-integration interpretation below. No integration worktree, branch merge, cherry-pick or source copying occurred; only the recorded object-only simulation was performed. Keep the two agents' branches and devices independent.
+
+Read-only evaluation of the retained failed DASH10 log and existing Store wrapper found a 59px empty-state overflow and a separate 35px product-card overflow at 320x568/200% text. The latter is the internal Column in `apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart:7436`, constrained to 214px at 132.5px width. The wrapper already supplies a stable Buy subtree through keyboard inset changes; adding outer scroll/height does not correct the catalogue's internal fixed card extent. Do not shrink user text, clip overflowing content, weaken the assertion or duplicate the catalogue to manufacture a Store-only pass. No new test was run; this is classification from existing exact-source failure evidence, not a new result.
+
+The primary requested a narrow, coordinated permission to correct `buy_v2_catalogue.dart` and focused tests only in the Codex worktree, without modifying Cursor's branch or integrating it. That permission is not yet given. The catalogue failure remains open and the APK gate remains unsatisfied; deferred procurement/backend dependencies are not closed by a layout correction. Current activity is evidence preservation only. A later authorized compatibility fix must be recorded for eventual reconciliation so neither implementation is silently omitted.
+
 ### Founder authorization: controlled dependency resolution — 2026-09-11
 
 Founder now authorizes resolving the integration blocker subject to preserving Git history, preventing omissions and passing regression checks. This supersedes the immediate integration deferral below for the qualified catalogue/procurement dependency only. Verify exact tested prerequisites and current owners, use isolated policy-defined integration/repair boundaries, preserve Cursor's working branch and Redmi, and do not promote an unresolved source conflict or failed candidate. No claim of zero future defects, backend readiness or device acceptance is implied.
