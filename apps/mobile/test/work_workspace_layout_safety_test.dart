@@ -19712,6 +19712,200 @@ void main() {
       },
     );
 
+    for (final confirmed in [false, true]) {
+      testWidgets(
+        'R6617 statement tabs retain independent scoped scroll $confirmed $scale',
+        (tester) async {
+          final oldFatal = WidgetController.hitTestWarningShouldBeFatal;
+          WidgetController.hitTestWarningShouldBeFatal = true;
+          addTearDown(
+            () => WidgetController.hitTestWarningShouldBeFatal = oldFatal,
+          );
+          final work = storeViewFixture(null, _ContactDraftFixtureStore());
+          final now = DateTime.now();
+          for (var i = 0; i < 80; i++) {
+            work.workspaceOrders.add(
+              customerOrder(
+                id: 'SCROLL-${i.toString().padLeft(3, '0')}',
+                customer: 'Customer $i',
+                createdAt: now,
+              ),
+            );
+          }
+          if (confirmed) {
+            expect(
+              work.applyWorkspaceFinance(
+                WorkspaceFinanceSnapshot(
+                  accountScope: 'review-draft-account',
+                  workspaceId: work.activeWorkspace!.id,
+                  revision: 1,
+                  asOf: now,
+                  salesTodayMinor: 800000,
+                  duesMinor: 0,
+                  availableMinor: 800000,
+                  heldMinor: 0,
+                  requestedMinor: 0,
+                  paidOutMinor: 0,
+                  feesMinor: 0,
+                  deliveryAdjustmentsMinor: 0,
+                  refundsMinor: 0,
+                  taxWithheldMinor: 0,
+                  historyComplete: true,
+                  payments: [
+                    for (var i = 0; i < 80; i++)
+                      WorkspacePaymentRecord(
+                        orderId: 'SCROLL-${i.toString().padLeft(3, '0')}',
+                        customerId: 'customer-$i',
+                        customerName: 'Customer $i',
+                        revision: 1,
+                        updatedAt: now,
+                        amountMinor: 10000,
+                        paidMinor: 10000,
+                        dueMinor: 0,
+                        refundedMinor: 0,
+                        state: WorkspacePaymentState.paid,
+                        channel: WorkspacePaymentChannel.platform,
+                      ),
+                  ],
+                  payouts: [],
+                ),
+              ),
+              isTrue,
+            );
+          }
+          final before = work.workspaceOrders
+              .map((o) => (o.id, o.stage, o.amount))
+              .toList();
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+            textScale: scale,
+          );
+          await reveal(tester, find.byKey(const Key('work-pulse-sales')));
+          await tester.tap(find.byKey(const Key('work-pulse-sales')));
+          await tester.pumpAndSettle();
+          Finder ledgerScroll() => find
+              .descendant(
+                of: find.byKey(const Key('work-store-statement')),
+                matching: find.byWidgetPredicate(
+                  (w) =>
+                      w is Scrollable && w.axisDirection == AxisDirection.down,
+                ),
+              )
+              .first;
+          double offset() =>
+              tester.state<ScrollableState>(ledgerScroll()).position.pixels;
+          await tester.drag(ledgerScroll(), const Offset(0, -700));
+          await tester.pumpAndSettle();
+          final salesOffset = offset();
+          expect(salesOffset, greaterThan(200));
+          for (final tab in ['purchases', 'expenses']) {
+            await tester.tap(find.byKey(Key('work-statement-$tab')));
+            await tester.pumpAndSettle();
+            expect(
+              offset(),
+              0,
+              reason: '$tab must not inherit the Sales offset',
+            );
+            await tester.tap(find.byKey(const Key('work-statement-sales')));
+            await tester.pumpAndSettle();
+            expect(offset(), closeTo(salesOffset, 1));
+          }
+          await captureStoreView(tester, 'statement-return-$confirmed-$scale');
+          if (confirmed) {
+            final details = find.byType(ExpansionTile).first;
+            final detailKey = tester.widget<ExpansionTile>(details).key!;
+            final header = find.descendant(
+              of: find.byKey(detailKey),
+              matching: find.text('Order details'),
+            );
+            await reveal(tester, header);
+            await tester.tap(header);
+            await tester.pumpAndSettle();
+            final element = tester.element(find.byKey(detailKey));
+            expect(PageStorage.of(element).readState(element), isTrue);
+            await tester.tap(find.byKey(const Key('work-statement-expenses')));
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const Key('work-statement-sales')));
+            await tester.pumpAndSettle();
+            await reveal(tester, header);
+            final restored = tester.element(find.byKey(detailKey));
+            expect(PageStorage.of(restored).readState(restored), isTrue);
+            // Collapse and return to the exact offset used by period/Back checks.
+            await tester.tap(header);
+            await tester.pumpAndSettle();
+            expect(PageStorage.of(restored).readState(restored), isFalse);
+            tester
+                .state<ScrollableState>(ledgerScroll())
+                .position
+                .jumpTo(salesOffset);
+            await tester.pumpAndSettle();
+          }
+          await tester.tap(find.byKey(const Key('work-statement-period')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Week').last);
+          await tester.pumpAndSettle();
+          expect(
+            offset(),
+            0,
+            reason: 'A different period starts at its own position',
+          );
+          await tester.drag(ledgerScroll(), const Offset(0, -350));
+          await tester.pumpAndSettle();
+          final weekOffset = offset();
+          expect(weekOffset, greaterThan(100));
+          await tester.tap(find.byKey(const Key('work-statement-period')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Today').last);
+          await tester.pumpAndSettle();
+          expect(offset(), closeTo(salesOffset, 1));
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          await reveal(tester, find.byKey(const Key('work-pulse-sales')));
+          await tester.tap(find.byKey(const Key('work-pulse-sales')));
+          await tester.pumpAndSettle();
+          expect(
+            offset(),
+            closeTo(salesOffset, 1),
+            reason: 'Back and reopening retains the same ledger position',
+          );
+          expect(
+            work.workspaceOrders.map((o) => (o.id, o.stage, o.amount)),
+            before,
+          );
+          expect(work.workspaceStockMovements, isEmpty);
+          expect(work.workspaceInvoices, isEmpty);
+          expect(work.workspaceSettlementRequested, 0);
+          final originalStore = work.activeWorkspace!;
+          work.activateWorkspace(
+            WorkWorkspace(
+              id: 'STATEMENT-OTHER-STORE',
+              name: 'Other store',
+              profileId: originalStore.profileId,
+              profileLabel: originalStore.profileLabel,
+              area: originalStore.area,
+              verified: true,
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+          expect(
+            offset(),
+            0,
+            reason: 'Another Store never inherits this ledger position',
+          );
+          expect(find.text('Customer 0'), findsNothing);
+          work.activateWorkspace(originalStore);
+          await tester.pumpAndSettle();
+          expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
+          expect(offset(), closeTo(salesOffset, 1));
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
     testWidgets(
       'DASH08 finance first taps keep 25 payment updates separate from 100 orders $scale',
       (tester) async {
@@ -20000,7 +20194,15 @@ void main() {
           await captureStoreView(tester, 'finance-statement-$scale');
           await reveal(
             tester,
-            find.byKey(const Key('work-finance-order-details-APP-1043')),
+            find.byKey(
+              PageStorageKey((
+                'work-finance-order-details',
+                'review-draft-account',
+                work.activeWorkspace!.id,
+                'payments',
+                'APP-1043',
+              )),
+            ),
           );
           await tester.tap(find.text('Order details').first);
           await tester.pumpAndSettle();

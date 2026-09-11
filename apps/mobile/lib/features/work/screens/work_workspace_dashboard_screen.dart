@@ -9826,106 +9826,121 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   ),
           ),
         Expanded(
-          child: _book == 'Purchases'
-              ? _StorePurchasesSurface(session: session, statement: true)
-              : !session.workspaceFinanceUsesLegacyReview
-              ? _StoreFinanceSurface(
-                  session: session,
-                  section: _book == 'Sales' ? 'payments' : 'expenses',
-                )
-              : ListView(
-                  padding: const EdgeInsets.all(16),
-                  children: [
-                    if (_book == 'Sales') ...[
-                      const Text(
-                        'Customer purchases',
-                        style: TextStyle(fontSize: 12, color: MoolColors.muted),
-                      ),
-                      const SizedBox(height: 16),
-                      if (orders.isEmpty)
-                        const _DeskEmpty(
-                          icon: Icons.receipt_long_outlined,
-                          title: 'No sales in this period',
-                          detail:
-                              'Recorded customer purchases will appear here.',
-                        ),
-                      for (final order in orders) ...[
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: _StoreMoneyLine(
-                            value: '₹${_formatStoreAmount(order.amount)}',
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: MoolColors.navy,
-                              fontWeight: FontWeight.w800,
-                            ),
-                            leading: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(
-                                  width: 42,
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 8,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFFF0F3FF),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: Text(
-                                    '${order.createdAt.day}\n${order.createdAt.month}',
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: MoolColors.navy,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        order.customer,
-                                        style: const TextStyle(
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${order.id} · ${order.payment}\n${session.workspaceOrderStageLabel(order)}',
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          height: 1.4,
-                                          color: MoolColors.muted,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
+          child: KeyedSubtree(
+            // Keep each ledger's place without sharing offsets across Stores,
+            // accounts, periods or the review/confirmed data boundary.
+            key: PageStorageKey((
+              'store-statement',
+              session.workspaceStockHistoryScope()?.key ??
+                  (session, session.activeWorkspace?.id),
+              session.workspaceMoneyPeriod,
+              _book,
+              session.workspaceFinanceUsesLegacyReview,
+            )),
+            child: _book == 'Purchases'
+                ? _StorePurchasesSurface(session: session, statement: true)
+                : !session.workspaceFinanceUsesLegacyReview
+                ? _StoreFinanceSurface(
+                    session: session,
+                    section: _book == 'Sales' ? 'payments' : 'expenses',
+                  )
+                : ListView(
+                    padding: const EdgeInsets.all(16),
+                    children: [
+                      if (_book == 'Sales') ...[
+                        const Text(
+                          'Customer purchases',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: MoolColors.muted,
                           ),
                         ),
-                        const Divider(height: 1),
-                      ],
-                    ] else
-                      _DeskEmpty(
-                        icon: _book == 'Purchases'
-                            ? Icons.local_shipping_outlined
-                            : Icons.receipt_outlined,
-                        title: _book == 'Purchases'
-                            ? 'No purchases linked to this store'
-                            : 'No recorded expenses',
-                        detail: _book == 'Purchases'
-                            ? 'Supplier invoices and incoming deliveries will appear when linked to this business. Personal purchases stay separate.'
-                            : 'Business expenses will appear here when recorded.',
-                      ),
-                  ],
-                ),
+                        const SizedBox(height: 16),
+                        if (orders.isEmpty)
+                          const _DeskEmpty(
+                            icon: Icons.receipt_long_outlined,
+                            title: 'No sales in this period',
+                            detail:
+                                'Recorded customer purchases will appear here.',
+                          ),
+                        for (final order in orders) ...[
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: _StoreMoneyLine(
+                              value: '₹${_formatStoreAmount(order.amount)}',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: MoolColors.navy,
+                                fontWeight: FontWeight.w800,
+                              ),
+                              leading: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Container(
+                                    width: 42,
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 8,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFF0F3FF),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '${order.createdAt.day}\n${order.createdAt.month}',
+                                      textAlign: TextAlign.center,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w700,
+                                        color: MoolColors.navy,
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          order.customer,
+                                          style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          '${order.id} · ${order.payment}\n${session.workspaceOrderStageLabel(order)}',
+                                          style: const TextStyle(
+                                            fontSize: 11,
+                                            height: 1.4,
+                                            color: MoolColors.muted,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const Divider(height: 1),
+                        ],
+                      ] else
+                        _DeskEmpty(
+                          icon: _book == 'Purchases'
+                              ? Icons.local_shipping_outlined
+                              : Icons.receipt_outlined,
+                          title: _book == 'Purchases'
+                              ? 'No purchases linked to this store'
+                              : 'No recorded expenses',
+                          detail: _book == 'Purchases'
+                              ? 'Supplier invoices and incoming deliveries will appear when linked to this business. Personal purchases stay separate.'
+                              : 'Business expenses will appear here when recorded.',
+                        ),
+                    ],
+                  ),
+          ),
         ),
         SafeArea(
           top: false,
@@ -18429,9 +18444,13 @@ class _StoreFinanceSurface extends StatelessWidget {
                 Text('Transaction ${payment.transactionId}'),
               if (order != null)
                 ExpansionTile(
-                  key: ValueKey(
-                    'work-finance-order-details-${payment.orderId}',
-                  ),
+                  key: PageStorageKey((
+                    'work-finance-order-details',
+                    finance.accountScope,
+                    finance.workspaceId,
+                    section,
+                    payment.orderId,
+                  )),
                   tilePadding: EdgeInsets.zero,
                   title: const Text(
                     'Order details',
