@@ -1,5 +1,100 @@
 # Fresh Redmi journey inventory
 
+## r66.9 built, installed and scoped Redmi round 1 checkpoint 1 — 11 September 2026
+
+This is the latest checkpoint and supersedes older pending-build/implementation notes below for current status only. Frozen scope remains **33 findings + 9 founder requests**, the separate STORE-PROCUREMENT-ELIGIBILITY-01 Buy dependency and two existing implementation children. **One new UAT child is registered; zero tickets are closed.** Host/source qualification is complete for this APK; the planned device round and provider-dependent qualification remain incomplete.
+
+### Exact APK and retained-data installation
+
+- Candidate: UAW-CURSOR-BUY-R66-9-REDMI-REVIEW-20260911.
+- Package com.moolsocial.app.cursorreview; installed version1.0.0-r66.9-cursorreview, code2026091101; Cursor Review debug build.
+- Build HEAD7eb5d1034f1aeb45b7987db22a5521649af22a25; runtime/test source a18aa780c0e00497ef218025bc8473a32f50a084. This evidence-only checkpoint does not change the APK source.
+- APK: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/r66-9-cursorreview.apk; 209,996,913 bytes; SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Candidate artifact, preserved copy and installed Redmi base APK match.
+- Build and one retained-data adb install -r succeeded on **Redmi TG8HCYTGGQT885OF only**. No data clear, downgrade, OPPO action or production promotion. Counts remain build1/install1/promotion0.
+- The observed preference-store file was byte-identical across installation, before first new launch. This does not claim every cart/address/draft has passed semantic UAT; original basket contents were not directly inspected before upgrade.
+- Installed display baseline: physical720x1600, density320, font scale1.0, auto-rotation1, user-rotation0, screen timeout2147483647. This capture batch made no display-setting, cart quantity, saved-item, address, payment/order or message writes.
+- Explicit MAIN/LAUNCHER component launch succeeded. Native debug cold launch reported8,524ms, a measurement rather than production startup-performance qualification. First Shop content001 was visually inspected;002 has the same hierarchy. Saved badge1, shopping controls, catalogue and quiet delivery rail are visible.
+
+Evidence under apps/mobile/build/r66-9-prebuild-20260911/:
+
+- apk-qualification-1.json: SHA256 F7C605AFE46A7054D17A5B716AF57F7F99C2ADD0366AA9C0C65D825C8F0DEE36.
+- redmi-installed-qualification-1.json: SHA256 719FC294DA7F038CD867CED8BBD8426E2111AA638497CAE37F3050A1B745C881.
+- redmi-first-frame-qualification-1.json: SHA256 86890C1FD0878FB8BA79A75FE30BB39C7FE4C41090F4991D0996A2F7FEC10C65.
+
+First-frame gate is passed; full catalogue, operational UAT and founder review remain pending. State snapshot candidate-state-first-frame-1.json SHA25684E538E501A5981295D4E7CCD40F5368A43144206A411AC3591ECEAAA7341134 preserves this distinction.
+
+### Scoped observations; no whole-ticket closure
+
+| Ticket area | Actual Redmi observations | Remaining qualification |
+|---|---|---|
+| DELIVERY-HIDE-RECOVERY / DELIVERY-CONTROLS | Hide003–004 leaves quiet rail; Wholesale005/settled006 keeps it quiet;007 reopens same MS-240782. Keep011 becomes Kept;012 opens12-delivery selector.013 selects MS-NEW-09;014 opens its exact tracking. | Other routes, last row, split modes, sound, relaunch and enlarged text; freshness child below. |
+| TRACKING-FRESHNESS | Tracking014 says LAST KNOWN / Last recorded estimate and explicitly reports unavailable live updates. | Original alerts/failed refresh/recovery route pending. Unqualified summary ETA reproduced012/013/015. |
+| DELIVERED-PARTNER-STATUS | Pending MS-NEW-09 shows Not assigned yet014. Delivered MS-240741 tracking017 and original Address reproduction019 show Delivery partner details unavailable. Back020 restores exact tracking/action XML018. | Named partner and enlarged text pending; no historical partner invented. |
+| INVOICE-MISSING-LINES | Tracking021, original retail Orders026 and wholesale Orders028 disclose exact-order missing items. Refresh022 preserves tracking; reopen023 preserves disclosure. Dialog Back024 and Android Back027 retain respective tracking/list XML. | Wholesale dialog return, enlarged text, confirmation and complete historical-line scenario pending. Provider retrieval/export unresolved. |
+| SHOP-COUNT-ROW | Shop001/002/004 starts products below controls without distracting range/count strip. | Paging/filter/search/category/retained scroll/enlarged checks pending. Wholesale count is not asserted fixed by this Shop request. |
+| DELIVERY-ICON | Quick rider and Wholesale driver/vehicle symbols observed in normal-text mode/selector/delivery contexts001/006/012/013. | Bulk delivery context and enlarged/accessibility pending. |
+| Existing DELIVERY-COMPLETION-PROMISE child | Delivered retail/wholesale list016 and retail tracking017/Address019 label old time Original promise. | Delivery controls/enlarged/connected cases pending; no claim of measured completion time. |
+
+**New child R669-UAT-TRACKING-FRESHNESS-SUMMARY-001**, P2, registered in DEFECTS.md before further device input: selector/panel/Orders say Delivery in12min for MS-NEW-09 without the LAST KNOWN qualification shown by tracking. Preserve exact order/facts and propagate truthful freshness to summaries. Evidence012–015; observed presentation inconsistency, not proof of a late order/provider failure. Implementation waits until the entire scoped round is compiled and deduplicated.
+
+Preserved observations:005 is a transitional blank Wholesale frame, followed by settled006. Capture008's selector-intended tap occurred after the unkept panel's45-second minimization and opened an underlying product;009 returned without cart changes. It is not counted as a selector defect. Keep011 and selector012 worked. Source buy_v2_screen.dart1317–1334 confirms45-second rule/Keep guard. Tracking014 Android Back015 reaches Orders; exact Wholesale-origin return remains an unqualified connected-navigation observation, not a claimed pass.
+
+Checkpoint C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/redmi-r66-9-round-1/round-progress-checkpoint-1.json SHA25601B0A94DE9D2479EABD0197DF0B42B8E1CC9FB6DACE715A022778EC39436392D binds all42 frozen rows,2 existing children,1 new child, APK identity and28 capture/receipt checksums. Seven frozen ticket areas are partially exercised; none closed. Original round-plan-bound-v1.json stays immutable at SHA256B407F22E8321934B8125F1B070679A25C504D5B3F1E8A759D2C46F5B5FFA7D66.
+
+Temporary UI preferences: Keep enabled for MS-240782 during replay; selected delivery changed to MS-NEW-09. Restore during round cleanup; cleanup is not claimed complete. Last observed screen028 is PO-240728 missing-invoice dialog over Delivered Orders. Review orders were already present; none created in this batch.
+
+### Git-retained capture manifest
+
+Raw PNG/XML/JSON and command logs remain preserved under external C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/redmi-r66-9/ and its parent. This Git-tracked manifest preserves filenames and image/hierarchy hashes; checkpoint JSON additionally binds metadata and full terminal receipts. Raw bytes are not claimed stored on origin. Visually inspected PNGs:001,003–008,011–019,021,026,028. Other return observations use matching XML, not independent image review.
+
+| Capture label | PNG SHA256 | XML SHA256 |
+|---|---|---|
+| 001-first-launch-shop | 2FBE78786324E2BF65CD94026E98D6AD6B0AEBC44933879EA198BC33B4FF7CCB | 32DEE877D0A743E480F82998B6BC406DD41402A41AE9ECB1F9BA7D47A2BF09D7 |
+| 002-resume-shop-state | 7BADAF1EF23870D520513A7FDB9B00DC569BCE72231371B2B41025F16CA59EE0 | 32DEE877D0A743E480F82998B6BC406DD41402A41AE9ECB1F9BA7D47A2BF09D7 |
+| 003-delivery-rail-open | 308906732AFF49B89DFE7408F0AA5E4F1720FED26AE6BFC8B7826511FA19506B | EE69BAB8BBF619024CFC091C251342D1401FAFC965E951D391C9DB3F1E20C371 |
+| 004-delivery-hide-quiet | 57AED55C70B35ADDA5833A95C93A1F713DAA9764BF382FB32512DF4701A19A64 | 32DEE877D0A743E480F82998B6BC406DD41402A41AE9ECB1F9BA7D47A2BF09D7 |
+| 005-hidden-delivery-wholesale | B123C6F83CCC6F1911B72CE405AD15B0AE733B810AE1A8E373A8EA3DD0E561C1 | A504EF881509D82C9684C50E8039210A82661216DEEA2AE42897475C84FFEF27 |
+| 006-wholesale-settled-quiet | 2F4B183D34ECC418D8904D4BBDC743EBA938BDAABA0D7256511CCE6282608696 | A504EF881509D82C9684C50E8039210A82661216DEEA2AE42897475C84FFEF27 |
+| 007-wholesale-reopen-same-delivery | D238A684E242AAAE97217464C2DDA56E09123A0961A3E2528EE4B5F08114A3C0 | 01BD5726D58A485163B3ACD96BCC2308194134B577B3E27B6F4F0DE3F694DDB8 |
+| 008-delivery-selector | 4C551BE0835FBEAD30E0C93EEE46342141C77A65A7E1A4A43ACF18BDCAE9EEC7 | 750764FCF9397D3EF2DBC76CE3B6D99FA36C28340FC3CB596C75CFDB09BA150D |
+| 009-back-from-product-no-cart-change | 6BF93FBCB45B5169B3084DD74982AC512AA37E45B4410EEF6C00C075D6964392 | A504EF881509D82C9684C50E8039210A82661216DEEA2AE42897475C84FFEF27 |
+| 010-delivery-reopen-for-selector | 4A920D56DA7DD336B2505B83469EBB4A80998AC0D57872E8DD958AAC174D78D6 | 01BD5726D58A485163B3ACD96BCC2308194134B577B3E27B6F4F0DE3F694DDB8 |
+| 011-delivery-keep-intent | 707BC2B7F154F70FA3E185B068C74908DEFF6560EB1069938D061C6646CBDCBE | 659283D43E1C5EE0FE7D691081DA23CDC91A30986CB71C767F6A9F2E159BDEB8 |
+| 012-kept-deliveries-list | EC46B0A7F7A67CDF20CDA2DECFF7458AD5C6F383284D1A584B28D921FB063D8F | 0F19EDF57AF4CBD29F381F48338E8D6379D467C3527149E9A73FD8BC0079DE87 |
+| 013-select-quick-new09 | 01C2F1810437DA62D3AC41176E9A224EF1C49CB5759815AF0C99B113788A7F04 | 92D5C19D5BAE160A2489F0D87033F4FA03EB22CC46D819E2231A4A0A00319522 |
+| 014-quick-new09-tracking | 286E3581754B2684F9E3640FA4F0535DC6EAAE85F22B948DB4D86EB206578A38 | E12DE823D1785F6329775AB13D68D382BB6F95F839D4BDD34252147DFCB3226C |
+| 015-tracking-back-origin | 47A051DA7BF3778FEFB24C1467906CECC8176A17A6747BC1EC294974DE5F1F19 | 550057B12265554DC120318DF79180A0702717944287B561E9682B3F6CD633C7 |
+| 016-delivered-order-tab | DA8AF3A269755BD3508404AA4B1D39A751E294948C9E27F2E2BB8E426BF1595D | 4355EF0E8BDA51E6ED8148B38C42A9F76F294EE90A5E3EC320FAE9BA2B5E6631 |
+| 017-delivered-ms240741-view | 45F5355FF239CA07C4BA0E0A57F1A46B41FC8C67032C84AAE62CB6D2D8C2D8DB | 3346E9E5745BBC5866967BB28EC4A126C58448CC652D70423DEA12DED0F11AB7 |
+| 018-delivered-tracking-actions | B8437F8254A95BCCF8EE42B578F954F36B2E27CDD898D37B89E4A0E8E188159B | 3652561FA0D877E3673D101BFFC43EBDB827751071B60A54508648D873FFA2F2 |
+| 019-delivered-address-original-repro | 90BEEC3ABCE1100663074EF26BB963E93F33F06905121B2824DFB5D052C92B4D | A28163986B34BE273610C0BD7FB728204D6466778AA515DB02A6709FD10F13DC |
+| 020-address-back-retains-tracking | CE7B5617C5588D2CB3D349E729D79B5ECC5BFBCD321C247EEBC3C63BBA28302B | 3652561FA0D877E3673D101BFFC43EBDB827751071B60A54508648D873FFA2F2 |
+| 021-tracking-invoice-missing-lines | 93A8EE85265F00FDB4CA4C3884C8810C1F7FE49BF20536ACB24F9A289E93A3D9 | 9FDAF602718DAD01A97EA820D19FFE290FC35483AAE2364072E854A54E6B4685 |
+| 022-invoice-refresh-order-recovery | 220E5EF2D8040C67453C578C72F39E282F078FA484D839B6072200710FAE4318 | 3652561FA0D877E3673D101BFFC43EBDB827751071B60A54508648D873FFA2F2 |
+| 023-invoice-reopen-same-missing-order | DA5B94319D868D2610C18F6F90F0C6C417BC8D902DDA900273C558DBEA81521E | 9FDAF602718DAD01A97EA820D19FFE290FC35483AAE2364072E854A54E6B4685 |
+| 024-invoice-back-button-retains-tracking | AF2352FC8A666E3E49724AACAD755E8E82C26E649DE9975B48A4E7999D72A085 | 3652561FA0D877E3673D101BFFC43EBDB827751071B60A54508648D873FFA2F2 |
+| 025-tracking-back-delivered-list | 8C7585DE7193F75B523264486A5A7E0E574987D9A84FC207CA93E69CC3528B3D | 4355EF0E8BDA51E6ED8148B38C42A9F76F294EE90A5E3EC320FAE9BA2B5E6631 |
+| 026-orders-retail-invoice-original-repro | D41EE261C81178F6E6AA1DC0A371DD027BC277E1723EA7C72139D12CA360DC43 | 9FDAF602718DAD01A97EA820D19FFE290FC35483AAE2364072E854A54E6B4685 |
+| 027-retail-invoice-android-back | 7D919145CCC95FEC3585C7A06EC0AC5186D6E2B04EE3B07CE25AB31C7BB63032 | 4355EF0E8BDA51E6ED8148B38C42A9F76F294EE90A5E3EC320FAE9BA2B5E6631 |
+| 028-orders-wholesale-invoice-original-repro | C23E0CE313B85A9191C2C1E934E61AF8F93B5091EF0853DB5D2E69FAEDE18C89 | 7471DF441C2B7D490D3D66037DDF6729F03EDCB816AD4912115ADA49DECD7652 |
+
+### Terminal command bindings
+
+Receipts/logs are under the external UAT root. All named receipts exited0. Build warning concerns future Kotlin plugin migration; current package/build checks passed, with no dependency upgrade.
+
+| Receipt stem | Exit | stdout SHA256 |
+|---|---|---|
+| singlechat-r669-build-once-1 | 0 | DE55C6AD2AADC6CE0F7023D75348B3334AD50C5549A621D46F96EC69ECB84371 |
+| singlechat-r669-install-retained-data-1 | 0 | 797032B7F6B70313EF6FB9CC908BD175215898B890000A6ADA4309CA0315BB30 |
+| singlechat-r669-first-launch-1 | 0 | E84A9C7E8F73B62D94785860AD35C07C827771F35021DCE8AFE5D7E0E4B9CB04 |
+| singlechat-r669-uat-resume-coordination-1 | 0 | CDE80E789B49C732BBDA23E8BEAFC96ED3CBECB911070BE91FF8377D5D654682 |
+| singlechat-r669-uat-resume-memory-1 | 0 | 04CA88363D26168A4D9F789BAA87C9D48775DAC2EE9CA2C278799F0A9FC460CB |
+
+Local command recovery: a malformed65-character gate pin was rejected before execution; preserved64-character argument then passed unchanged. Recovery: r669-final-preapk-20260911/r669-command-invocation-recovery-2.json SHA2567AC1C77F50385A961420FE851FA11DE4D015886A5D6AC6E924F7F7DDF8FC21B4. The earlier recovery note incorrectly described an omitted character; r669-command-pin-correction-3.json preserves the verified correction (extra character). Read-only Python console encoding was corrected with UTF-8. A JavaScript quoting error was rejected before the UAT edit tool executed; the unchanged preimage was checked before writing. No device action was repeated for either error. Capture receipts are terminal/hash-verified; truncated combined image/text output was not used as visual proof.
+
+Next: continue the same round from the preserved dialog, complete original and connected Redmi cases, register genuine scoped children, then compile the full deduplicated implementation batch. No runtime change/rebuild, provider activation, Desktop embedded DASH10 qualification, branch integration or ticket closure is claimed by this evidence update.
+
+
 ## r66.9 final host and build-source qualification - 11 September 2026
 
 The frozen scope remains 33 post-r66.8 findings and nine separate founder requests, plus the required STORE-PROCUREMENT-ELIGIBILITY-01 Buy dependency and the two already registered implementation children. Historical closed tickets are excluded. This is pre-APK qualification; no ticket receives Redmi closure here.
