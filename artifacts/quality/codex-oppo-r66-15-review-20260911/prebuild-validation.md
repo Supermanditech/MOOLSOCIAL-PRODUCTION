@@ -1,10 +1,16 @@
 # r66.15 prebuild validation
 
-Status: pending. Candidate reservation alone does not authorise a build. The 391-input source manifest and local-check evidence are separate from this prebuild decision. No r66.15 APK, install or device pass is claimed.
+Status: prebuild passed on clean remote-equal6e10f4e932ce3f00929dc123be5369a6c8e5195d. Build remains disabled until the evidence seal is committed/pushed/clean and the exact seal HEAD is activated for one attempt. No r66.15 APK, install or device pass is claimed.
 
 Required before activation: both complete 44-file cycles, review-only isolation, exact source hashes, full analysis, copy/UI locks, approved-commit coverage and fixtures, Flutter support-byte preservation, Android resources, unchanged build-foundation controls, incremental pre_build for 1.0.0-r66.15+2026091102, current MVP execution controls and clean remote-equal evidence seal. Then activate exactly one RuntimeUiReview debug build for the sealed HEAD. Preserve all earlier candidates and never reuse a consumed build authorisation.
 
 The initial reservation gate returned exit1 because the exact new evidence files were not yet present. It is retained in REG4557.r6615CandidateReservation. Only this candidate's ten exact evidence paths and the existing continuation allowlist were corrected;10 positive/20 negative identity/path checks and the implementation gate passed. No APK followed the failed gate, no product/test source changed, and no general owner/root/lane rule was relaxed.
+
+## Attempt2 passed
+
+Terminal exit0. Both1856-pass/83-skip full cycles,13 review-isolation checks, zero-issue analysis and unchanged source hashes are recorded in local-validation.md. Fresh controls passed clean handoff/regression memory, approved18/rejected2 commit coverage and fixtures, approved UI locks, customer copy, tracked-support restoration, Android resources, build-foundation fixtures, incremental pre_build1.0.0-r66.15+2026091102, and existing MVP execution controls. Final Git digest is zero bytes/records/stderr,exit0. All391 manifest input hashes match BB9B3049875A88745007EFCEFD2E4474F051595040FEF3795D3C93481630394E.
+
+The existing exact archive parameter default was supplied; no gate was changed and no archived file was copied or modified. Retained external r6615-prebuild-controls-attempt2.stdout.log SHA256 A717726B91F1DC8BD3A47D53C109E55550EF26AF0D7DBD64DEBD4475B2F669F6; stderr.log SHA256 51A8C17414958C033615ADBDE747713E9B83E30946F87DDDA9B109C659C02F73. Stderr contains PowerShell progress records, not a failing terminal result. Play qualification remains false. This is permission for the existing bounded review-build workflow only, not production promotion.
 
 ## Attempt1 stopped before build
 
