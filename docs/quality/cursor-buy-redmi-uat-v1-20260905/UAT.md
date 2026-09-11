@@ -2,9 +2,61 @@
 
 ## Latest founder stop rule — 11 September 2026
 
-Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 defect count is two, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
+Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 child-defect count is four, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
 
 
+
+## r66.9 scoped round 1 checkpoint 7 — Recently viewed, direct quantity and Cart review
+
+36 additional real Redmi captures203-238. Reach is38/42 (90.5%):29/33 findings plus9/9 requests have at least partial device coverage. Four findings remain wholly untouched; reached entries still have original-sequence/responsive/relaunch/provider gaps. **Zero whole tickets closed; four new confirmed UAT children total.** The new children this batch are RECENT-LAST-ACTION and COUPON-MINIMUM-SPEND; their complete definitions and hash-bound manifests are in DEFECTS.md. Media Cart-label fitment is recorded against the existing MEDIA-001 finding, not counted again as a child. These are exposure counts, not a completed-test pass rate.
+
+- Recently viewed203-215: Shop Settings correctly says6 and opens6 Shop products. All six names reached by scrolling. The final shampoo Add stays clipped after repeated upward swipes; capture212 exposes its accessibility bounds as zero. Child registered before next input. Back returns Settings then Shop; no history cleared.
+- Reversible frontend seed216-223: tomato initially Add/quantity0. Add1 then Cart shows only that Shop item37 and Wholesale0. Direct quantity editor accepts12; Cancel retains1/Rs37. Reopen/update12 yields12/Rs444. Keyboard and actions fit at normal text. Original Bulk MOQ4, invalid quantities, grid/product, enlarged text and relaunch still require replay.
+- Coupon224-229: basket444; coupon states minimum499, Save40. Select marks Applied; Cart subtotal444/total404. This confirms minimum-spend mismatch on review data, not a real redemption or production-provider failure. Original subtotal/payable labels are correctly distinct. Removed only the temporary coupon; total444 restored. Original nine-digit wholesale/coupon sequence remains pending.
+- Cart media217/220/223/226/229/236: small thumbnail disclosure wraps Category / illustratio / n. Record existing MEDIA-001 connected fitment failure; no fabricated SKU photo/decode claim.
+- Review230-236: previous collection intent reaches Collect at store, with sign-in requirement. Switch Delivery restores Work. Payment retains PhonePe and444; final review shows labelled Shop GST (off),12tomato packs444, Quick12min. No Place order tap. Android Back retains payment, address and exact cart. Single-Shop GST does not qualify the mixed-invoice original case; Quick estimate does not qualify original missing Scheduled estimate.
+- Cleanup237-238: confirmed Remove Shop contains only12 temporary tomato packs, Wholesale0. Removed them and returned to original Shop view;238 XML equals215. Coupon removed beforehand. Saved1 retained. No user address/payment preference, existing orders, messages or review/report submissions changed. No display changes; prior delivery Keep/selection cleanup remains outstanding.
+
+Checkpoint7: external redmi-r66-9-round-1/round-progress-checkpoint-7.json SHA256 B0656920ECC48809FAB1DF799FE66BDFB7984A0B42FF66C0115EAF9A90775683. All36 new PNGs individually inspected, file identities and terminal receipt stdout/stderr hashes verified. Same Redmi TG8HCYTGGQT885OF, APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Raw captures remain external; Git preserves the evidence manifest below. Resume7 coordination and memory-device gates passed before device action. No source/runtime edit, new APK, integration or ticket closure. Complete scoped UAT and stop/report before further implementation.
+
+| Capture | Label | PNG SHA256 | XML SHA256 |
+| --- | --- | --- | --- |
+| 203 | 203-resume-offers-before-cart | A84E5D9CDDA576AE0DAAD571BA820E7A3B733AF9925E6D0F0C7F2FB9B9BDE4F7 | 90F0CCA701EC3E160F250ED5455A07CF81BAB49E8A292DE1E9462843B8D3A618 |
+| 204 | 204-shop-for-shopping-tools | 86E1BD00C56B58B0147FD63FAF8245528042228329ECFEAE0BCF6A2FB998609F | DD2C706A32244A4FD5D9A89CD38475FD19C5B47AA38BBB92475ABA697423991D |
+| 205 | 205-shop-filter-tools-entry | 54FD4BAD2AACA5622AD879204E9A939DD06353410B1E9A8E48B0AFF0C8DDCEA6 | 1131538BD81ECFA99B8EAE99CA0491D9D87698812202D189259AB7A0FBD1DC6F |
+| 206 | 206-shopping-tools-expanded | 41BDDF79D231C682815B5B70EC4230EC4850C052E9D7D1B907169BB8EDFE5F7E | 488BF43EF3B5751AD72B81641BC699B66E1869CC815D33458BCE20430064D76A |
+| 207 | 207-shopping-tools-bottom | 8F1A8355188C8CFB2DEE22734DF4EA8AEB96028B19BDBFE9BB6CDC926BEB9A8F | 74ED72AFFC91CE512CF9CA09D3CFA7F99BA13CE61B1EF8BA3C93CA9C13244587 |
+| 208 | 208-shopping-settings-recent-count | B15B4C4E58ABFE753D07B7CFAC12E0266231636123C272D1AE088D646D591F6C | 1E9E468C741C82A84E17D78CBEE0CDA9DCC3B3A85EEAB3510DF4A4351A70D0C1 |
+| 209 | 209-recent-shop-six-destination | F8692C04DD4E9E4222AEC8ABF74879691D267D437AFE46CD78A02C4189B1E71A | FD60FA03486BB1A8078B315F887E4A8A0C93EDBAD8203523191A83E68AFEB1EC |
+| 210 | 210-recent-shop-list-bottom | 9F5B521C069F79BB1CBD7AEE22A66E7F2F9B399E76312194DC68AB90278EDDDE | 457AA402520E88F66A67B17F77BA8AF6E6D48CCAFE7F9E015E317D04658DEDF7 |
+| 211 | 211-recent-shop-final-items | 2D1495875D81198BC5E918BF1F514CD2E35B6226CB785349E7C74CAF4572E304 | 745A58322E22905355F6B473139FA9D27C45DDFF5BA4ACAA625CCDE7CA8A3BA2 |
+| 212 | 212-recent-shop-last-add-reachable | 59928B1D8D736344053268FF7AD33AE381680A145A4B27AAE5AF0AE8616E682E | 745A58322E22905355F6B473139FA9D27C45DDFF5BA4ACAA625CCDE7CA8A3BA2 |
+| 213 | 213-recent-last-row-scroll-confirm | 11A162B916194F0BAB7784175DD584B57A27D3936951C89DCB56CA8D776AFBE7 | 745A58322E22905355F6B473139FA9D27C45DDFF5BA4ACAA625CCDE7CA8A3BA2 |
+| 214 | 214-recent-back-settings | 539F7B52DCA0BD4A661BCACC0F79C314AAF91A71ED5307BEEA5319812C5961B7 | 1E9E468C741C82A84E17D78CBEE0CDA9DCC3B3A85EEAB3510DF4A4351A70D0C1 |
+| 215 | 215-settings-back-filter-tools | EB5C98C2C89B33D969ADD921314BE0609CBA18523D1E8C62CDF31A7C2923F7FA | DD2C706A32244A4FD5D9A89CD38475FD19C5B47AA38BBB92475ABA697423991D |
+| 216 | 216-temporary-tomato-add-cart-entry | D96260C540AAFAEF6848E4EA5CF3068D978CD777A46687A935F487DB93C1EF44 | 97BAF422A777553B80D9FD0566B66AF02FE766E41326F466C1A95D7C48C4F97C |
+| 217 | 217-cart-temporary-single-item-baseline | 62407C4BA26DB66FC201D87BF3BC21CF0FDF2B386D470FB182C47333213A9D54 | 3BA697A5DE7B025133F0AFB769F0FC05A634496B56BB7210F1A125CDD20F1503 |
+| 218 | 218-cart-direct-quantity-editor | CCDBC2DDC9097A2B87EDFD72C99DB1815E08828EB5724FCB5214BEE596C4D756 | FB1E06C9A18605D7FD6F6F02776ACEC943CC43D35F67AADA726C3D924537E92C |
+| 219 | 219-cart-quantity-synthetic-twelve | 6B2E95E14E561D5A95BC98E8A349F4F182C1C2D8A67EE1DEE7AC252FF406EB43 | 69D067A093EAC5625F458942C9C7BB4E3738DCC03BFF656E93B28D46C9F77A3E |
+| 220 | 220-cart-quantity-cancel-retains-one | 1B2192ED60E7080A7C4747A42205209A6F203A8464D75DB02EEDD60B1F18DF98 | 3BA697A5DE7B025133F0AFB769F0FC05A634496B56BB7210F1A125CDD20F1503 |
+| 221 | 221-cart-quantity-reopen | C9204E86DEE6235036E109E35006545B4CA6F9879F23EC962219FF11000864C2 | FB1E06C9A18605D7FD6F6F02776ACEC943CC43D35F67AADA726C3D924537E92C |
+| 222 | 222-cart-quantity-twelve-ready | 48DA0372A8CC621A196B5EA38B28B9AC17438E40030F57571CD35DC243FA9635 | 69D067A093EAC5625F458942C9C7BB4E3738DCC03BFF656E93B28D46C9F77A3E |
+| 223 | 223-cart-quantity-twelve-applied | E4F90CA99F05EA1C2CB54B9C8E051839F49515E2F27FA31B43C57D05E96324D4 | 341B35EE6EF3AEB4810CAFA5FAF8E74EED3B66F6657752309DF7A89ACE1A9C96 |
+| 224 | 224-cart-coupon-choices | C1788B71DD870D9D4651F678E17C9160C3B04414C52F114E01EA80D312B4B155 | B0C48C2EC68F0DE6FC10AA07A90A97D10CBAC4CA47D7839ACA99BA530C8F1397 |
+| 225 | 225-coupon-below-minimum-selection | AF2CFEEAD9FB71969FB3D8C02A4BD4C937D5193FD9AF4A73F73A89EA8A4A2616 | 258DFCB3BFE032D9A09FC6858D168FD32FC381B9BDF70FF3FB10980A9274EDBF |
+| 226 | 226-coupon-below-minimum-cart-result | AD15F7B1253FE7F9CF29C53D58111CE435C05DE0F4132837E7A2D35E7C8A7C6C | E0E0D9E2AE1E2B166FD74861FFEC48F6D1F3600E3FCC609F4F25682F7CBCCF11 |
+| 227 | 227-coupon-reopen-for-restoration | 1A90EDDCABE60A87D3CDF4E99DD15FFD4978336460755FADB20841E88840940D | 258DFCB3BFE032D9A09FC6858D168FD32FC381B9BDF70FF3FB10980A9274EDBF |
+| 228 | 228-temporary-coupon-removed | EE3B7E3FE142F78ACEFD28E68B677E3EB117192EDB4517AB7544E68C5C45B4ED | B0C48C2EC68F0DE6FC10AA07A90A97D10CBAC4CA47D7839ACA99BA530C8F1397 |
+| 229 | 229-coupon-back-cart-restored-total | D435D2C8E5002CC4AD4A3A3C63D0DC7D7F543D8A036498840EC8D71392EE5E2D | 341B35EE6EF3AEB4810CAFA5FAF8E74EED3B66F6657752309DF7A89ACE1A9C96 |
+| 230 | 230-temporary-cart-review-address | 24FFE79B84AC86A0CB113E24897B670FF5FEA3D7D33CEE3F16F26AD59011A4CD | E066369C5844FB9619AA0AA2B9279FEDC80984970C7AD40430F947604D68DD22 |
+| 231 | 231-checkout-switch-to-delivery | 6DF9CBC4D9CC6588F4DF16A57F49F0CF8B9D13DE418AF0F705724E3EF18B4C65 | 41E84DF1FCD3D6300F880D50202136DA63734935B3BF605C4D9315E5B6D2EDF7 |
+| 232 | 232-checkout-payment-preference-review | 485E3DC42632D6D9D32635DC8AFABF43342E263E2764A89B59CB3C8056C1F8C9 | F85B69CAA80A803D7A66F40D25B0381D0EBCBED6FF855D782C5FA59C3B54B598 |
+| 233 | 233-checkout-final-review-no-submission | 95F35F2EF69D11EFB56E2C5F572256BD188A810477CC0EC65891BC38F68C2B58 | 93A448DF39EB55FD971415A9FB6C9F7645043ABDD0A18C84C74698CAA8A5645D |
+| 234 | 234-final-review-back-payment | CB962F89E7DA49C35696CADA18070CC2E38FDC0077C34EFE084AB470B8647174 | F85B69CAA80A803D7A66F40D25B0381D0EBCBED6FF855D782C5FA59C3B54B598 |
+| 235 | 235-payment-back-address-retained | 635B47D92DFF54B90CDC21ACA2984A2C2FF54614CF2F64F44F7B4AD7F86596EE | 41E84DF1FCD3D6300F880D50202136DA63734935B3BF605C4D9315E5B6D2EDF7 |
+| 236 | 236-address-back-cart-retained | 998F322B652F408417831F503018EB2428CFE287336CA39E0E411B915BF27816 | 341B35EE6EF3AEB4810CAFA5FAF8E74EED3B66F6657752309DF7A89ACE1A9C96 |
+| 237 | 237-temporary-basket-clear-confirmation | A33C9F53E5C3CB5919E12F378D360A25E35CD59A3382FD80BE246EDC3F95E798 | 1854627A090E338C3010B177E2FE60289E2FDF6CBE15BFD6A3A50B51A06D08DB |
+| 238 | 238-temporary-basket-removed-shop-restored | 3FECFD65A048939FB3A6A41238DF84EC3558B4A7CA21177B81D6DE9E1A4CD598 | DD2C706A32244A4FD5D9A89CD38475FD19C5B47AA38BBB92475ABA697423991D |
 
 ## r66.9 scoped round 1 checkpoint 6 — original Saved reproductions, collection and Offers
 

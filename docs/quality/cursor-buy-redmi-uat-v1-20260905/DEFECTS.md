@@ -4,7 +4,7 @@
 
 The successor Cursor Review APK is built and installed without clearing data on Redmi `TG8HCYTGGQT885OF`: version `1.0.0-r66.9-cursorreview`, code `2026091101`, SHA256 `AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9`. Build HEAD is `7eb5d1034f1aeb45b7987db22a5521649af22a25`; runtime/test source is `a18aa780c0e00497ef218025bc8473a32f50a084`. The older implementation/pending-build paragraphs below are historical checkpoints; final host qualification and current device results are in UAT.md.
 
-Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. This round has **two new UAT children**, below. No ticket is closed. Finish the full scoped round and deduplicate the complete child list, then STOP and report before any further implementation, as the founder directed.
+Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. This round has **four new UAT children**, below. No ticket is closed. Finish the full scoped round and deduplicate the complete child list, then STOP and report before any further implementation, as the founder directed.
 
 ### R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 — Last-known arrival estimate is unqualified in delivery panel and Orders
 
@@ -32,6 +32,22 @@ Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/redmi-r6
 - 083-tomato-review-reopen-draft: PNG 68D90B062E0BEC14A8B9F15674D12B3E6F18FFBFE540D808C1ED463E6B2E4D37; XML 7163B447A3CBFD895D3939F91133BCF1E3CD92F561FE7DAFC7F9FD6A84F48DC2.
 
 Registered before the next device input. Implementation is paused under the founder's latest direction: complete the scoped UAT round, compile its deduplicated list, stop and report before further implementation.
+
+### R669-UAT-RECENT-LAST-ACTION-001 — Final Recently viewed Add action stays clipped after scrolling
+
+**OPEN, P2; confirmed Redmi visual/action-accessibility child of R668-AUDIT-RECENT-001.** Shop -> Sort & filter -> Shopping tools -> Shopping settings shows Shop / 6 recently viewed (208); opening Recently viewed shows Shop / 6 products (209), so the original count/scope mismatch passes this normal-text sequence. Scroll through all six products (210-211): the final Daily care shampoo 26 / 650 ml / Rs299 row has its Add action clipped at the sheet's bottom. Two further upward swipes within the list, including a slower 850 ms swipe (212-213), leave the same clipped final action. Normal Redmi portrait, fontScale1, density320; no keyboard. Capture212 accessibility hierarchy exposes the final Add action at [0,0][0,0], while the earlier product Add remains exposed. This is a customer-visible failure to make the final list action fully reachable, not evidence that every product's Add is disabled. The underlying cart was not modified; Clear was not pressed.
+
+Expected: the final product and its complete Add target must scroll into the usable sheet viewport above Android navigation, including normal/enlarged text and nested Settings entry. Preserve destination-specific count, product identity, history, Back and cart. Do not shrink the user's chosen text size. Review the sheet/viewport sizing and scroll extent; source cause is not yet established. Registered before the next device input; correction waits until the scoped round is compiled and reported.
+
+Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/redmi-r66-9/. All six PNGs were individually inspected. Hash-bound capture/terminal manifest: redmi-r66-9-round-1/recent-last-action-child-1.json, SHA256 6EBF980EFA71D044348B0BAE2A8DF1DD1E0F1680A010DE6FB6E4BFB135B25E94.
+
+### R669-UAT-COUPON-MINIMUM-SPEND-001 — Coupon below its published minimum reduces Cart total
+
+**OPEN, P2; confirmed Redmi eligibility/price-presentation child found during R668-AUDIT-CART-TOTAL-LABEL-001 connected replay.** The temporary Shop basket contains only Fresh tomatoes1 / 500 g, 12 packs at Rs37 = Rs444 (223). Coupons shows Shop basket coupon / Save Rs40 on an eligible order of Rs499 or more / Minimum order Rs499 (224). Select remains actionable; tapping it marks Applied to Cart total (225). Return to Cart shows Subtotal Rs444 and Cart total Rs404 (226), a Rs40 deduction despite the displayed basket falling Rs55 short of the coupon's stated minimum. This is a confirmed frontend eligibility/presentation mismatch on the installed generated review data, not evidence of a real redeemed coupon, charged order or production provider failure. No checkout submission/payment occurred. The original subtotal-vs-total labels are distinct in226; do not count that original wording issue as still reproduced here.
+
+Expected: use the structured authoritative offer conditions and current eligible basket scope before presenting a discount as applied. Explain the minimum/shortfall or unavailable validation; revalidate when quantity, supplier/scope or offer revision changes and at final review. Keep coupon selection separate from confirmed application. Preserve valid coupon arithmetic, unrelated baskets and disclosed charges. Backend enforcement remains separately pending. Record now, then finish the scoped UAT list and report before implementing this child.
+
+Evidence: redmi-r66-9-round-1/coupon-minimum-spend-child-1.json SHA256 8B8B7544E5A180E6D7B762E542633FB40A79D2E4CB5C2577BA862D257E6DC7F8. All four PNGs were individually inspected; the manifest binds PNG/XML/metadata and terminal0 receipts to the round's exact Redmi APK. Temporary tomato quantity and coupon must be removed/restored at round cleanup.
 
 ## Current Redmi APK onward — OPEN findings only
 
@@ -587,6 +603,8 @@ Required journeys: (1) with MoolSocial installed, an HTTPS product link opens th
 Evidence and acceptance pending: exact generated URL, recipient installed/not-installed states, browser/app destination, package/build identity, and original failure/success captures. This is one defect with two recipient-state journeys, not two duplicate findings. Counts for the original30 remain historical implementation progress; this new31st finding is unimplemented and is included in the continuing scope.
 
 ### R668-AUDIT-MEDIA-001 — Category illustration presented as the SKU photo
+
+**r66.9 connected Cart visual follow-up, capture217:** normal Redmi portrait/font1/density320 shows the temporary Fresh tomatoes1 / 500 g / Rs37 line. The illustration is honestly labelled, but the narrow thumbnail label wraps Category / illustratio / n, splitting the final word. Record this fitment issue against the existing media presentation finding; do not create a duplicate finding or claim an image decode/provider failure. Expected: an intact disclosure or the established accessible neutral fallback at this small size. PNG SHA256 62407C4BA26DB66FC201D87BF3BC21CF0FDF2B386D470FB182C47333213A9D54; XML 3BA697A5DE7B025133F0AFB769F0FC05A634496B56BB7210F1A125CDD20F1503. The APK identity is the round-1 checksum at the top of this register. Original quantity was0 (Add in215); only this temporary line was added216. Correction remains pending until the scoped UAT list is compiled/reported.
 
 **11 September2026 supplier-gallery follow-up —locally qualified, OPEN for successor Redmi:** admitted exact-SKU supplier media now reaches reused grid/gallery surfaces; a nonempty badge has its own measured header space and no longer overlaps the photo at doubled text. Empty badge/gallery-count headers reserve no space. Preserve original illustration/missing-photo disclosures. The six-owner MEDIA-002 Buy slice passes 1,270 connected and17 additional content/video checks with40 reviewed captures; provider publication and Redmi acceptance remain separate.
 
