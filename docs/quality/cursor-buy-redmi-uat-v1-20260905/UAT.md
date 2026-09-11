@@ -6,6 +6,59 @@ Complete Redmi testing of all previously scoped tickets and their connected jour
 
 
 
+## r66.9 scoped round 1 checkpoint 5 — area fit, store categories and retained search
+
+35 additional captures116-150 extend physical Redmi testing. Current reach is29/42 scoped entries (69.0%):21/33 findings and8/9 founder requests have at least partial device coverage.13 entries remain wholly unexercised (12 findings and1 request). This is reach, not completion:28 entries are partly exercised and1 has a failed connected review-draft replay. **Zero full tickets closed; two new confirmed UAT children remain open.** Historical closed35 and the2 existing implementation children are excluded from42. New children/finding entries reached is2/21 (9.5%), a provisional exposure ratio, not a defect rate or completed-ticket result.
+
+- Area: normal font1/density320 and font2/density360 portrait both show Chennai fully above Android navigation. Its visible tap opens Chennai catalogue; typed Chennai search retains text across keyboard Back. Provider-unavailable copy and Try again fit after scrolling; retry remains unavailable. Any area recovers initial visible Mool Market000001 catalogue. Google Maps/current-location/nationwide service qualification stays unresolved.
+- Store: Visit store opens the correct generated Mool Market000001 preview. Browse all products reaches the5000-product store catalogue. Category icon opens the existing picker; final Shop supplies row is fully visible and selectable at normal text. Clearing category restores All products. Enlarged/original-small-supplier cases remain pending.
+- Search/Back: within Shop supplies, thermal yields60 matches. Opening SKU40 while the keyboard is visible dismisses the keyboard after transition (141 is transitional;142 is settled). Android Back retains query/category. Page2 (41-60 of60) opens SKU3400; in-app Back retains page2/query. Clear search resets page1/179; All products resets page1/5000. This qualifies only these observed paths, not cart/relaunch or Desktop embedded DASH10.
+- Collection: approved Order & Collect copy and Order for collection CTA are visible in preview. Collection destination, eligibility and transaction journey remain untested; nothing ordered or submitted.
+- Preservation: no cart quantities, saved products, addresses, orders or messages changed in this slice. Temporary area/category/search state restored as above; final screen is Store products preview. Normal font1.0, physical density320 and automatic portrait rotation verified in display-restored-after-area-1.json SHA256 9FD2A4E6AE6A22C3694F74228C5AAF7707F9C0BCC0513AE1CC4838F0C64FFA39. Previously recorded delivery Keep/selection cleanup remains outstanding.
+- Seed authority: this slice uses the already-installed generated review catalogue. The newly preserved comparison dataset has not been injected. Generated/frontend data does not qualify real supplier/provider/backend operation.
+
+Same installed APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9, Redmi TG8HCYTGGQT885OF, runtime source a18aa780c0e00497ef218025bc8473a32f50a084. External round-progress-checkpoint-5.json SHA256 DE51782A0144CF45C0E327DFD6A09D67999E44198997F4CFDADE8602858C0C65 binds150 captures and terminal receipts. Capture117 was recovered from its terminal0 receipt and inspected image after truncated chat output; no tap was repeated. Capture126/session98878 and140/session73892 completed with terminal0 before continuing. All35 new PNGs inspected; corresponding PNG/XML hashes and terminal stdout/stderr receipts checked. Raw captures remain external user-owned evidence; this Git manifest preserves their identities, not a remote copy of each image.
+
+No runtime implementation, integration, new build, install or child fix performed. Complete the planned scoped UAT, compile the deduplicated full defect list, then STOP/report before further implementation.
+
+| Capture | Label | PNG SHA256 | XML SHA256 |
+| --- | --- | --- | --- |
+| 116 | 116-resume-before-catalogue-checks | E86F2141C9DDCAE2473E97347CEF0ABD271B8249AAC47D64BF891616C8EEB6D7 | D781CB19318CA01139F36564A879453918271AAEB27C8C2D9012732556E1BED7 |
+| 117 | 117-shop-catalogue-return | 3918A1C91997B833EF958717D61A9DCA37BE48A47280ED8076E1E05021249264 | 7DD1333443B1E5D3E8A9D8933C118D74B72B4CFB95379DCC2E8DF4E2F9A3C33E |
+| 118 | 118-shop-area-selector | 6259C3AC6B387DC9BC089D99EA842BF340E56F5A4282DEF90CAC391BE8547C52 | 40725E6CBE95211067C37134549E4AECDF36537B4F78C8B1D79B9D0655CD70CB |
+| 119 | 119-shop-area-list-bottom | ADA1A45094D2A70D8320E71DD40575311B44236D093F6C88F3B46070C65395C2 | A69342DF684E0F03A3820E4C4F386D00BD458BCA8F714C5413DA97E0ED38F1C7 |
+| 120 | 120-shop-area-enlarged-bottom | 2F5BF77EB7C931AA9B56D95B94ECEDA7F0C790714A3629E7BECB9CD587FD95BC | B22F6193AA6755BB1B4E08D05C3EFE7B78359B5D0B43FA8CD4B06E39BFE7E584 |
+| 121 | 121-shop-area-enlarged-last-city | B1542785E1D9ABB1ACDBEF189018FD5D764562A07E37C2A0A92C95EE019DD2A0 | 7E6930B4F0A04890D073A2C36305912B34259D014FDEE9DA9096FAAB78E3EA89 |
+| 122 | 122-shop-area-enlarged-select-chennai | 4F26FAA47858B73C560AD3E85C0ACE3E844C7B0C29981508486A15E342AC1E69 | 2AB9DAFB5CF1D3E9C5AA910116ACB0111C919E9B28FB5BC9076E8B91F3BF2519 |
+| 123 | 123-shop-area-selected-reopen | CD2A32D2400A3682D6778AE836747FB0155365B7AC643E9609DC9791D1F729A5 | BCE49BAB8A041A90DE467656A21E47105837BFBB66820E2B8629D0267B95E6E6 |
+| 124 | 124-shop-area-search-enlarged-focus | FCEA3C9AE42C0F4B3A81F9FA50658E7DE2234C913676558F15C0801DD4470603 | 1634EF0F3AEB8582F1EA09DA489C63AD0D81CCF714FE005606CB0EEBD9548D3B |
+| 125 | 125-shop-area-search-chennai | 4FEC520790696E7C4F9037CCCD8618888FE1BB64C272924BACDD4F14C3D1761F | 0BDF0CBACBC196467A567F82B6029F90DB3E3880144635299A6ED5DCB8EFA676 |
+| 126 | 126-shop-area-search-keyboard-back | AD7D2145EC14D43187F3212B4871F6ED6D9BB7EF76480462D5EA86CEFD21DF99 | 7481E93AC9D426F15C0DAF75968FCF4F2E51F5D5A66F9196C3B390A06FC4EC60 |
+| 127 | 127-shop-area-search-provider-state | 18356E35AC8BD84101D7560D0A24EBBCDCBF82EB962DABFB3C31D6F2627EF6CA | C9E2AC2B41A51B21F9A7E06A5FC44F733C8A78BAAF942BDF06D91ACB708B355E |
+| 128 | 128-shop-area-search-retry | 02C31379B6845EDDC4217DA1F1D26ADDC9FC8A1A8979BA7619F3D7E9C7C9782D | C9E2AC2B41A51B21F9A7E06A5FC44F733C8A78BAAF942BDF06D91ACB708B355E |
+| 129 | 129-shop-area-any-area-recovery | E3D9BAAC34968A55DC015BC724C54DBB9810D8EDBBB08811B33A5DF9F07CBAFC | 723A40123A4732B85C98E46A500952C4E93CE6358A51938CC7491B833D65599C |
+| 130 | 130-shop-area-normal-restored | 1BC657D02F63D250442E5108033B7A1F0E1C3BF746EF4DC873E0D323183663DB | DD2C706A32244A4FD5D9A89CD38475FD19C5B47AA38BBB92475ABA697423991D |
+| 131 | 131-catalogue-product-entry | 5B59452352282611D0ABF3214DAEA1872A8C60178AF8F471E6F67E9243D9D637 | 8D3396951AD65B806FD656A8B4C246123EDD5258F590B9125CB2150334A5C09A |
+| 132 | 132-product-visit-store | 2E728B4328420EAAFC526C75E9104D2921B24D0304982BBEC95E9FB79AFDDB1A | 031E4B05E34BA5A62F6D4002A61642142E5C85A7840FA128E6454568840BEA4D |
+| 133 | 133-store-browse-all-products | B3E1B9509149AA9853074DA0094FF7EFD968CF299220978DB74A33F9A2D6F218 | D9E85572DEF2170D1FBDEC906FF1B5E7949CFBF6E6CFE6860B9225B448A2AD46 |
+| 134 | 134-store-category-selector | D8C1397136429B6FB8BBE87F09F1007CC50646885C52CB18E13FD704AE072AA5 | A35B91744CAC5EAFF095CF923DCA154F0C6F412496077349DE6AC3C2DAD5D9BC |
+| 135 | 135-store-category-list-bottom | E2B96C9220892F62810F96EF3B66F5BA551853DA8402DE6B89B26C362FC68705 | 7CDF4548477CF7FD75ECF78F6A256CB925EDE39E29053FF358DCDFDE4ECD67AC |
+| 136 | 136-store-category-final-rows | BF93DF2E7FC3102A97997A317CE7F8699D9843AD4A7AE5CCE411EA99A8A07CF0 | 539326AAB2BABDFD464BA1BDC518C376DE365092287CCA2C190F9FA7648C5418 |
+| 137 | 137-store-category-shop-supplies-visible | 03DBA9719B5C67CB99ACF81623DD6A00147F1FD7E6433EBC0530A982BD460076 | 0AAE70CBE7D69EC466067B7B12F8E1BBAA1BBC399707CE1DA9DFE9197E18F68C |
+| 138 | 138-store-category-shop-supplies-select | A4C0B42C09285793FA6D2E5838F8E2498B89899AC7B7BF93E04C715B1862FA71 | C5854543A33B6D808E7C4F3F55F5DC5ADC5FC05C78AD862A189B9A8F10AA6A12 |
+| 139 | 139-store-search-focus | C8CE29FE294AA633699C6841730E68C96F00647BB27A631E8FB9AEF0C3F165ED | 1FE888AA6B1579942C1E2154A78A7408A2B792DBC9FACB34F5E5E34DBEA1862D |
+| 140 | 140-store-search-thermal | CA2C0629B4C2FA0588B12E728BE92F7586C272EA57530365FAEAEDFB27C7D7AF | 10EAEC0CEC4302445D9ACD752780165EA440DB171C30F541C17CAD11C5FC4831 |
+| 141 | 141-store-search-product-with-keyboard | B6227071E7F1DDC6F628F36DE7C8A835683B3DAC4D2E7F3FAB9616D38E8C2A23 | 57F733DB0BDA0AB2E7BBFC68ED88632426E3668D915FA41481188743E3F52042 |
+| 142 | 142-store-search-product-settled | 2F4A520386E7E765795CD13AAB7B5381BCC8F2494543BBD39217EFF6943F776E | 57F733DB0BDA0AB2E7BBFC68ED88632426E3668D915FA41481188743E3F52042 |
+| 143 | 143-store-search-product-back | 2B2835A67813CD7E89780A1540EEA5FA415FDC98C2A9A456E2F51B90627EAC9E | FEF9678496B79906C85285612140703397BC4C82D8537FCCCF460520C2A1365B |
+| 144 | 144-store-search-next-page | 32810894650BA5155733715243D3B31FECC136FC0581A2D369A9199712B9659C | 08A2419344870AB9C966AB750EB8A6340BC3165A14AD0C12E1D343580E48193B |
+| 145 | 145-store-page-two-product | 4F7FAC052BCDED9E23DC4000A1A7545F23BC51BD48008D40FDC78A29ECDD0750 | D8DC5D793A18C357D17DEEF4B9E2D77B4CAFC80001C762E913CCC993541DD5A1 |
+| 146 | 146-store-page-two-back-retained | 955144523FCEBAA98EC320E83E2294921FC96D7BDC021A91FB644499AEE69F4D | 08A2419344870AB9C966AB750EB8A6340BC3165A14AD0C12E1D343580E48193B |
+| 147 | 147-store-search-clear-from-page-two | DE997DC9427DDC5AA47068167D45E4AE29119F630ED06827381C9E9960F0BB0E | C5854543A33B6D808E7C4F3F55F5DC5ADC5FC05C78AD862A189B9A8F10AA6A12 |
+| 148 | 148-store-category-reopen-selected | 3253A3CA251B9D1891142626AD9D2175C1D52BE6372D8D4AEC1402373A8A5596 | 8BC56B46C0F23FF2824B95D9FE0096E789BA917BD11795C089859CA9E7CCDEDF |
+| 149 | 149-store-category-all-products-reset | 76339724F860DD6B3C5ADE6766D4F11B34973E4AEC1A81CD841826AF80433916 | D9E85572DEF2170D1FBDEC906FF1B5E7949CFBF6E6CFE6860B9225B448A2AD46 |
+| 150 | 150-store-catalogue-back-preview | 2656745504CE7898C024A8FCA9E75CCE4E97FD16A6174B2D91D1E2A2F681950C | 031E4B05E34BA5A62F6D4002A61642142E5C85A7840FA128E6454568840BEA4D |
+
 ## Founder seed-data authorization and reusable comparison dataset — 11 September 2026
 
 Founder authorized seed data where needed for frontend Redmi testing, reusable for later backend implementation. Keep synthetic test data labelled, isolated and reversible; preserve current customer cart, addresses, Saved and drafts. This supplements the UAT workflow. It does not supersede the instruction to finish enumeration and STOP/report before the next defect-implementation batch.
