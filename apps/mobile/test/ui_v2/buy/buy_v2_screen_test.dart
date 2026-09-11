@@ -26,6 +26,24 @@ import 'package:moolsocial/ui_v2/profile/global_help_support_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_privacy_preferences_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 
+class _InvoiceRecoverySession extends BuyV2Session {
+  _InvoiceRecoverySession({this.missingConfirmation = false})
+    : super(core: BuySession());
+
+  final bool missingConfirmation;
+  int refreshCalls = 0;
+
+  @override
+  List<BuyV2Order> get confirmedOrders =>
+      missingConfirmation ? [orders.first] : super.confirmedOrders;
+
+  @override
+  Future<void> retryCommerce() async {
+    refreshCalls++;
+    await super.retryCommerce();
+  }
+}
+
 class _R5ScreenArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
   Future<bool> prepare() async => true;
@@ -6698,7 +6716,7 @@ void main() {
   });
 
   testWidgets(
-    'Orders opens an honest full-page invoice at compact accessible size',
+    'R669 invoice missing history explains recovery and preserves Orders',
     (tester) async {
       addTearDown(() {
         tester.view.resetPhysicalSize();
@@ -6706,7 +6724,7 @@ void main() {
       });
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(320, 568);
-      final session = BuyV2Session(core: BuySession());
+      final session = _InvoiceRecoverySession();
       await tester.pumpWidget(
         app(session, textScale: 1.4, disableAnimations: true),
       );
@@ -6722,11 +6740,13 @@ void main() {
       await tester.tap(invoiceAction);
       await tester.pumpAndSettle();
 
-      final invoicePage = find.byKey(ValueKey('buy-invoice-page-${order.id}'));
+      final invoicePage = find.byKey(
+        ValueKey('buy-invoice-items-unavailable-${order.id}'),
+      );
+      expect(order.lines, isEmpty);
       expect(invoicePage, findsOneWidget);
-      expect(find.text('Order invoice'), findsOneWidget);
-      expect(find.text(order.itemSummary), findsOneWidget);
-      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      expect(find.text('Invoice details missing'), findsOneWidget);
+      expect(find.byType(BuyV2InvoicePage), findsNothing);
       final invoiceCopy = tester
           .widgetList<Text>(
             find.descendant(of: invoicePage, matching: find.byType(Text)),
@@ -6736,30 +6756,169 @@ void main() {
       expect(_forbiddenBuyCopy.hasMatch(invoiceCopy), isFalse);
       expect(tester.takeException(), isNull);
 
-      final download = find.byKey(ValueKey('buy-download-invoice-${order.id}'));
-      await tester.scrollUntilVisible(
-        download,
-        240,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.ensureVisible(download);
-      await tester.pumpAndSettle();
-      await tester.tap(download);
-      await tester.pumpAndSettle();
-      expect(
-        find.text(
-          'Invoice download is not available for this order yet. You can still view it here.',
-        ),
-        findsOneWidget,
-      );
-
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
+      expect(session.refreshCalls, 0);
       expect(session.destination, BuyV2Destination.orders);
       expect(session.view, BuyV2View.catalogue);
       expect(find.byKey(const PageStorageKey('buy-orders')), findsOneWidget);
     },
   );
+
+  for (final scale in [1.0, 2.0]) {
+    for (final id in ['MS-240741', 'PO-240728']) {
+      testWidgets('R669 invoice missing $id fits and refreshes at $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        addTearDown(tester.view.reset);
+        final session = _InvoiceRecoverySession();
+        var downloads = 0;
+        await tester.pumpWidget(
+          app(
+            session,
+            textScale: scale,
+            disableAnimations: true,
+            invoiceDownloader: (_) async {
+              downloads++;
+              return BuyV2InvoiceDownloadOutcome.saved;
+            },
+          ),
+        );
+        await tester.pumpAndSettle();
+        final retainedProduct = session.visibleProducts.first;
+        expect(session.addProduct(retainedProduct.id), isTrue);
+        session.openOrders();
+        session.showOrdersTab(BuyV2OrdersTab.delivered);
+        session.updateQuery(id);
+        await tester.pumpAndSettle();
+        final order = session.visibleOrders.single;
+        final action = find.byKey(ValueKey('buy-order-invoice-$id'));
+        await tester.scrollUntilVisible(
+          action,
+          200,
+          scrollable: scrollableWithin(const PageStorageKey('buy-orders')),
+        );
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.byType(BuyV2InvoicePage), findsNothing);
+        expect(find.text('Invoice details missing'), findsOneWidget);
+        final refresh = find.byKey(ValueKey('buy-invoice-refresh-$id'));
+        expect(refresh.hitTestable(), findsOneWidget);
+        expect(tester.getRect(refresh).bottom, lessThanOrEqualTo(568));
+        expect(tester.getSize(refresh).height, greaterThanOrEqualTo(44));
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'r669-invoice-missing-$id-$scale');
+        await tester.tap(refresh);
+        await tester.pumpAndSettle();
+        expect(session.refreshCalls, 1);
+        expect(downloads, 0);
+        expect(session.quantityFor(retainedProduct.id), 1);
+        expect(session.ordersTab, BuyV2OrdersTab.delivered);
+        expect(session.visibleOrders.single, same(order));
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.destination, BuyV2Destination.orders);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(find.text('Invoice details missing'), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.refreshCalls, 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  testWidgets('R669 invoice missing tracking returns to exact order', (
+    tester,
+  ) async {
+    final session = _InvoiceRecoverySession();
+    await tester.pumpWidget(app(session, disableAnimations: true));
+    await tester.pumpAndSettle();
+    session.openTracking('MS-240741');
+    await tester.pumpAndSettle();
+    final action = find.byKey(const ValueKey('buy-tracking-invoice-MS-240741'));
+    await tester.scrollUntilVisible(
+      action,
+      220,
+      scrollable: scrollableWithin(
+        const PageStorageKey('buy-tracking-MS-240741'),
+      ),
+    );
+    await Scrollable.ensureVisible(tester.element(action), alignment: .5);
+    await tester.pumpAndSettle();
+    expect(action.hitTestable(), findsOneWidget);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice details missing'), findsOneWidget);
+    await tester.tap(find.text('Back'));
+    await tester.pumpAndSettle();
+    expect(session.selectedOrder.id, 'MS-240741');
+    expect(session.view, BuyV2View.tracking);
+    expect(session.refreshCalls, 0);
+  });
+
+  testWidgets('R669 invoice missing confirmation uses the same recovery', (
+    tester,
+  ) async {
+    final session = _InvoiceRecoverySession(missingConfirmation: true);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(body: BuyV2ConfirmationView(session: session)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final id = session.confirmedOrders.single.id;
+    final action = find.byKey(ValueKey('buy-confirmation-invoice-$id'));
+    await tester.scrollUntilVisible(action, 220);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice details missing'), findsOneWidget);
+    expect(find.byType(BuyV2InvoicePage), findsNothing);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byType(BuyV2ConfirmationView), findsOneWidget);
+    expect(session.refreshCalls, 0);
+  });
+
+  testWidgets('R669 invoice refresh rejects an unmounted originating session', (
+    tester,
+  ) async {
+    final oldSession = _InvoiceRecoverySession(missingConfirmation: true);
+    final replacement = _InvoiceRecoverySession(missingConfirmation: true);
+    final active = ValueNotifier<BuyV2Session>(oldSession);
+    addTearDown(active.dispose);
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: ValueListenableBuilder<BuyV2Session>(
+          valueListenable: active,
+          builder: (_, session, _) => Scaffold(
+            body: BuyV2ConfirmationView(
+              key: ObjectKey(session),
+              session: session,
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    final id = oldSession.confirmedOrders.single.id;
+    final action = find.byKey(ValueKey('buy-confirmation-invoice-$id'));
+    await tester.scrollUntilVisible(action, 220);
+    await tester.tap(action);
+    await tester.pumpAndSettle();
+    active.value = replacement;
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(ValueKey('buy-invoice-refresh-$id')));
+    await tester.pumpAndSettle();
+    expect(oldSession.refreshCalls, 0);
+    expect(replacement.refreshCalls, 0);
+    expect(find.byType(BuyV2InvoicePage), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('delivered Orders expose non-mutating order inspection', (
     tester,

@@ -30,6 +30,66 @@ import 'buy_v2_scanner.dart';
 typedef BuyV2LiveDeliveryMapBuilder =
     Widget Function(BuildContext context, BuyV2LiveDeliverySnapshot snapshot);
 
+Future<void> _openOrderInvoice(
+  BuildContext context, {
+  required BuyV2Session session,
+  required BuyV2Order order,
+  BuyV2InvoiceDownloader? downloader,
+}) async {
+  if (order.lines.isNotEmpty) {
+    showBuyV2InvoicePage(context, order: order, downloader: downloader);
+    return;
+  }
+  final owner = session.customerStateStore?.ownerScope;
+  final refresh = await showDialog<bool>(
+    context: context,
+    builder: (dialogContext) => AlertDialog(
+      key: ValueKey('buy-invoice-items-unavailable-${order.id}'),
+      scrollable: true,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+      title: const Text('Invoice details missing'),
+      titleTextStyle: Theme.of(context).textTheme.titleMedium?.copyWith(
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+      ),
+      contentTextStyle: Theme.of(
+        context,
+      ).textTheme.bodyMedium?.copyWith(fontSize: 14),
+      content: Text(
+        'Item details for ${order.id} are missing. '
+        'Refresh orders, then reopen this invoice.',
+      ),
+      actions: [
+        TextButton(
+          style: TextButton.styleFrom(
+            textStyle: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontSize: 14),
+          ),
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('Back'),
+        ),
+        FilledButton(
+          key: ValueKey('buy-invoice-refresh-${order.id}'),
+          style: FilledButton.styleFrom(
+            textStyle: Theme.of(
+              context,
+            ).textTheme.labelLarge?.copyWith(fontSize: 14),
+          ),
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('Refresh orders'),
+        ),
+      ],
+    ),
+  );
+  if (refresh == true &&
+      context.mounted &&
+      session.procurementScopeCurrent &&
+      session.customerStateStore?.ownerScope == owner) {
+    await session.retryCommerce();
+  }
+}
+
 String _productCountLabel(int count) =>
     '$count ${count == 1 ? 'product' : 'products'}';
 
@@ -8733,8 +8793,9 @@ class BuyV2ConfirmationView extends StatelessWidget {
             order: order,
             deliveryIndex: index,
             deliveryCount: session.confirmedOrders.length,
-            onViewInvoice: () => showBuyV2InvoicePage(
+            onViewInvoice: () => _openOrderInvoice(
               context,
+              session: session,
               order: order,
               downloader: invoiceDownloader,
             ),
@@ -11768,8 +11829,9 @@ class BuyV2TrackingView extends StatelessWidget {
             constraints: const BoxConstraints(minHeight: 44),
             child: OutlinedButton.icon(
               key: ValueKey('buy-tracking-invoice-${order.id}'),
-              onPressed: () => showBuyV2InvoicePage(
+              onPressed: () => _openOrderInvoice(
                 context,
+                session: session,
                 order: order,
                 downloader: invoiceDownloader,
               ),
@@ -19048,8 +19110,9 @@ class _OrderCard extends StatelessWidget {
                         height: 44,
                         child: OutlinedButton.icon(
                           key: ValueKey('buy-order-invoice-${order.id}'),
-                          onPressed: () => showBuyV2InvoicePage(
+                          onPressed: () => _openOrderInvoice(
                             context,
+                            session: session,
                             order: order,
                             downloader: invoiceDownloader,
                           ),
