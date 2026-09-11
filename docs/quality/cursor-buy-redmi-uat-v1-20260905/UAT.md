@@ -8,6 +8,12 @@ Atomic delivery checkpoint requalification,10 September12:10UTC: source hashes r
 
 ### Founder-authorized implementation phase — 10 September 2026 IST
 
+#### Chat canonical product-link qualification — 11 September 2026
+
+R668-AUDIT-SHARE-LINK-001: the newly admitted Buy Chat adapter now delegates product links to `buyV2SharedProductUri`, using the same HTTPS `moolsocial.com/app/buy` contract as Product Share. Both Chat metadata and its draft contain only public destination/view/exact supplier SKU identity in that link. Supplier conversation identity, structured product context, quantity and exact product return navigation remain unchanged. Three new checks cover Shop, Wholesale and Medicine, including encoded SKU punctuation and the unchanged return destination; no message was sent.
+
+Pinned parent `3f0fc8a719924743c0ad4e425945effdef2e05e6`; required shared-link helper and recipient resolver dependency `f4780609be7abf8d0d6f701b64457ef83baa15f4` remains in its ancestry. Complete Chat/product-actions/content-contracts/screen selection passes 299 checks, zero failures, skips, errors or missed taps; inherited historical R58.8.6/7 candidate-golden name exclusion remains explicitly applied. Receipt `singlechat-r669-chat-link-connected-1`, native 0, 2026-09-11T06:41:12.2439576Z–06:45:28.9474025Z, stdout SHA256 `599D62B95CE6AF3FE8C4CE00122B8D88D15A5013D66F4F260BBC36EE115E15F1`. Tested adapter SHA256 `C35F11718914186FB529EF06CD74C28EB3E1D821845C3E1FD5340D3FF4F524BD`; test SHA256 `AF0AF6114AA7A161A705FABB4BC2708413BCFF019F71EA28743AB9866D3B591A`. Full preimages and receipts are preserved externally in `r669-chat-link-20260911` and the `singlechat-r669-chat-link-*` files. Native/domain association, public no-app fallback, install/sign-in return and exact successor Redmi acceptance remain OPEN. This host pass does not qualify Desktop's embedded DASH10 check or close the sharing ticket.
+
 #### Address Save interaction qualification — 11 September 2026
 
 After the founder-authorized owner admission `f59d8d9362b26f1ffbd991d9642f7705aaeb0d2c`, the existing address-form test helper now scrolls a mounted target into view and asserts hit-testability before returning it. The preserved product implementation remains `c5a7372b4b81e52e96489ae85a8be086fe8efd0d`; no production address logic or user data changed. The four previously missed Save interactions now exercise the original phone/PIN validation, single edit, complete add and stale-owner rejection assertions without suppressing tap warnings.

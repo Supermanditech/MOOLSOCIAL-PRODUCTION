@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import 'buy_v2_design.dart';
 
@@ -318,11 +319,8 @@ class BuyV2ChatRouteAdapter {
     ].join('\n');
   }
 
-  String _productLink(BuyV2Product product) => Uri.https(
-    'moolsocial.app',
-    '/app/buy',
-    {'sub': product.destination.name, 'view': 'product', 'product': product.id},
-  ).toString();
+  String _productLink(BuyV2Product product) =>
+      buyV2SharedProductUri(product).toString();
 
   String _orderHelpDraft(BuyV2Order order) {
     return [
