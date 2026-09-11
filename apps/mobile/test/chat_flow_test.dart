@@ -15,7 +15,181 @@ import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 
+class _SupportDraftMemory implements ChatSupportDraftStore {
+  @override
+  String? accountScope = 'account';
+  final data = <(String, String), String>{};
+  Completer<String?>? delayed;
+  bool failWrite = false;
+  bool failRead = false;
+  @override
+  Future<String?> read(String scope, String applicationId) async {
+    if (failRead) throw StateError('test read unavailable');
+    return delayed == null
+        ? data[(scope, applicationId)]
+        : await delayed!.future;
+  }
+
+  @override
+  Future<void> write(String scope, String applicationId, String text) async {
+    if (failWrite) throw StateError('test write unavailable');
+    data[(scope, applicationId)] = text;
+  }
+}
+
 void main() {
+  for (final boundary in ['clear', 'account', 'dispose']) {
+    test('R6617 late support read respects $boundary', () async {
+      final store = _SupportDraftMemory()..delayed = Completer<String?>();
+      final chat = ChatSession(supportDraftStore: store);
+      final pending = chat.restoreSupportDraft('A');
+      await Future<void>.delayed(Duration.zero);
+      if (boundary == 'clear') {
+        chat.discardDraftForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        );
+      } else if (boundary == 'account') {
+        store.accountScope = 'other';
+        chat.resetForAuthenticationBoundary();
+      } else {
+        chat.dispose();
+      }
+      store.delayed!.complete('Must not return');
+      expect(await pending, isFalse);
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        isEmpty,
+      );
+      await chat.flushSupportDrafts();
+      if (boundary == 'clear') expect(store.data[('account', 'A')], '');
+      if (boundary != 'dispose') chat.dispose();
+    });
+  }
+  test(
+    'R6617 support storage errors and retry remain application scoped',
+    () async {
+      final store = _SupportDraftMemory()..failWrite = true;
+      final chat = ChatSession(supportDraftStore: store);
+      addTearDown(chat.dispose);
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'Keep this text',
+        workspaceApplicationId: 'A',
+      );
+      await chat.flushSupportDrafts();
+      expect(chat.supportDraftStorageErrorFor('A'), isNotNull);
+      expect(chat.supportDraftStorageErrorFor('B'), isNull);
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'Keep this text',
+      );
+      store.failWrite = false;
+      await chat.retrySupportDraftStorage('A');
+      expect(chat.supportDraftStorageErrorFor('A'), isNull);
+      expect(store.data[('account', 'A')], 'Keep this text');
+      store.failRead = true;
+      expect(await chat.restoreSupportDraft('B'), isFalse);
+      expect(chat.supportDraftStorageErrorFor('B'), isNotNull);
+      store.failRead = false;
+      store.data[('account', 'B')] = 'Recovered B';
+      expect(await chat.retrySupportDraftStorage('B'), isTrue);
+      expect(chat.supportDraftStorageErrorFor('B'), isNull);
+    },
+  );
+  for (final signOut in [false, true]) {
+    test(
+      'R6617 queued support save ${signOut ? 'invalidated by signout' : 'survives disposal'}',
+      () async {
+        final store = _SupportDraftMemory();
+        final chat = ChatSession(supportDraftStore: store);
+        chat.setDraftTextForSession(
+          'workspace-support',
+          'Unsent note',
+          workspaceApplicationId: 'A',
+        );
+        if (signOut) chat.resetForAuthenticationBoundary();
+        chat.dispose();
+        await chat.flushSupportDrafts();
+        expect(store.data[('account', 'A')], signOut ? isNull : 'Unsent note');
+      },
+    );
+  }
+  test(
+    'R6617 support drafts restart with application and account isolation',
+    () async {
+      final store = _SupportDraftMemory();
+      final first = ChatSession(supportDraftStore: store);
+      first.setDraftTextForSession(
+        'workspace-support',
+        'First draft',
+        workspaceApplicationId: 'A',
+      );
+      first.setDraftTextForSession(
+        'workspace-support',
+        '',
+        workspaceApplicationId: 'B',
+      );
+      await first.flushSupportDrafts();
+      first.dispose();
+      final restored = ChatSession(supportDraftStore: store);
+      addTearDown(restored.dispose);
+      expect(await restored.restoreSupportDraft('A'), isTrue);
+      expect(await restored.restoreSupportDraft('B'), isTrue);
+      expect(
+        restored.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'First draft',
+      );
+      expect(
+        restored.hasSavedDraftForSession(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        isTrue,
+      );
+      store.accountScope = 'other';
+      restored.resetForAuthenticationBoundary();
+      expect(await restored.restoreSupportDraft('A'), isFalse);
+      expect(
+        restored.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        isEmpty,
+      );
+    },
+  );
+  test('R6617 late support draft read never overwrites typing', () async {
+    final store = _SupportDraftMemory()..delayed = Completer<String?>();
+    final chat = ChatSession(supportDraftStore: store);
+    addTearDown(chat.dispose);
+    final loading = chat.restoreSupportDraft('A');
+    await Future<void>.delayed(Duration.zero);
+    chat.setDraftTextForSession(
+      'workspace-support',
+      'New typing',
+      workspaceApplicationId: 'A',
+    );
+    store.delayed!.complete('Old saved text');
+    expect(await loading, isFalse);
+    expect(
+      chat.draftTextForSession(
+        'workspace-support',
+        workspaceApplicationId: 'A',
+      ),
+      'New typing',
+    );
+    await chat.flushSupportDrafts();
+  });
   test(
     'r6611 support drafts preserve applications, generic text and explicit empty',
     () {
@@ -443,15 +617,109 @@ void main() {
   }) async {
     await tester.binding.setSurfaceSize(size);
     await tester.pumpWidget(
-      MoolSocialApp(
-        key: ValueKey(route),
-        session: journey,
-        chatSession: chat,
-        sharedSession: sharedSession,
-        initialLocation: route,
+      RepaintBoundary(
+        key: const Key('support-draft-review-root'),
+        child: MoolSocialApp(
+          key: ValueKey(route),
+          session: journey,
+          chatSession: chat,
+          sharedSession: sharedSession,
+          initialLocation: route,
+        ),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('R6617 support composer restores saved application draft', (
+    tester,
+  ) async {
+    final store = _SupportDraftMemory()
+      ..data[('account', 'A')] = 'Saved application question';
+    final chat = ChatSession(supportDraftStore: store);
+    final journey = await readyJourney();
+    addTearDown(() {
+      chat.dispose();
+      journey.dispose();
+      tester.binding.setSurfaceSize(null);
+    });
+    final route = Uri(
+      path: '/app/chat/thread/workspace-support',
+      queryParameters: {
+        'return': '/app/work/workspace/proof',
+        'workspaceApplication': 'A',
+        'workspaceBusiness': 'Test Kirana',
+      },
+    ).toString();
+    await mount(tester, route: route, journey: journey, chat: chat);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('chat-message-field')))
+          .controller!
+          .text,
+      'Saved application question',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R6617 support draft storage retry with keyboard $scale', (
+      tester,
+    ) async {
+      final store = _SupportDraftMemory()..failRead = true;
+      final chat = ChatSession(supportDraftStore: store);
+      final journey = await readyJourney();
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(() {
+        chat.dispose();
+        journey.dispose();
+        tester.binding.setSurfaceSize(null);
+        tester.platformDispatcher.clearTextScaleFactorTestValue();
+        tester.view.resetViewInsets();
+      });
+      final route = Uri(
+        path: '/app/chat/thread/workspace-support',
+        queryParameters: {
+          'return': '/app/work/workspace/proof',
+          'workspaceApplication': 'A',
+          'workspaceBusiness': 'Test Kirana',
+        },
+      ).toString();
+      await mount(
+        tester,
+        route: route,
+        journey: journey,
+        chat: chat,
+        size: const Size(320, 568),
+      );
+      final field = find.byKey(const Key('chat-message-field'));
+      await tester.tap(field);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 230);
+      await tester.pumpAndSettle();
+      final retry = find.byKey(const Key('chat-support-draft-storage-retry'));
+      expect(retry.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+        const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+        expect(RegExp(r'^[a-z0-9-]+$').hasMatch(folder), isTrue);
+        await expectLater(
+          find.byKey(const Key('support-draft-review-root')),
+          matchesGoldenFile(
+            '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/support-storage-retry-$scale.png',
+          ),
+        );
+      }
+      store.failRead = false;
+      store.data[('account', 'A')] = 'Recovered question';
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        'Recovered question',
+      );
+      expect(retry, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   Future<void> tapVisible(WidgetTester tester, Key key) async {

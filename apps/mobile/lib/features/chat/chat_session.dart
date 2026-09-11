@@ -1,18 +1,90 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'chat_entry_context.dart';
 import 'chat_models.dart';
 import 'chat_services.dart';
 
+abstract interface class ChatSupportDraftStore {
+  String? get accountScope;
+  Future<String?> read(String scope, String applicationId);
+  Future<void> write(String scope, String applicationId, String text);
+}
+
+class SecureChatSupportDraftStore implements ChatSupportDraftStore {
+  SecureChatSupportDraftStore({this.reviewOnly = false});
+  final bool reviewOnly;
+  static const _storage = FlutterSecureStorage();
+  bool get _review =>
+      reviewOnly &&
+      kDebugMode &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+      const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW');
+  @override
+  String? get accountScope {
+    if (_review) return 'isolated-workspace-ui-review';
+    try {
+      return FirebaseAuth.instance.currentUser?.uid;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  String _key(String scope, String app) =>
+      'moolsocial.chat.support-draft.${_review ? 'review.' : ''}v1.${Uri.encodeComponent(scope)}.${Uri.encodeComponent(app)}';
+  @override
+  Future<String?> read(String scope, String applicationId) async {
+    if (scope != accountScope) return null;
+    final raw = await _storage
+        .read(key: _key(scope, applicationId))
+        .timeout(const Duration(seconds: 10));
+    if (raw == null || scope != accountScope) return null;
+    final value = jsonDecode(raw);
+    if (value is! Map ||
+        value['scope'] != scope ||
+        value['application'] != applicationId ||
+        value['text'] is! String) {
+      return null;
+    }
+    return value['text'] as String;
+  }
+
+  @override
+  Future<void> write(String scope, String applicationId, String text) async {
+    if (scope != accountScope) return;
+    await _storage
+        .write(
+          key: _key(scope, applicationId),
+          value: jsonEncode({
+            'scope': scope,
+            'application': applicationId,
+            'text': text,
+          }),
+        )
+        .timeout(const Duration(seconds: 10));
+  }
+}
+
 class ChatSession extends ChangeNotifier {
   ChatSession({
+    ChatSupportDraftStore? supportDraftStore,
     ChatSendGateway? sendGateway,
     this._photoPicker,
     this._attachmentPicker,
     this._voiceRecorder,
     this._attachmentPlayback,
     this._notificationClient,
-  }) : _gateway = null,
+  }) : _supportDraftStore =
+           supportDraftStore ??
+           (kDebugMode &&
+                   const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+                   const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW')
+               ? SecureChatSupportDraftStore(reviewOnly: true)
+               : null),
+       _gateway = null,
        _reviewSendGateway = sendGateway ?? ReviewChatSendGateway() {
     _threads.addAll(reviewThreads);
     _messages.addAll({
@@ -239,13 +311,15 @@ class ChatSession extends ChangeNotifier {
   }
 
   ChatSession.production({
+    ChatSupportDraftStore? supportDraftStore,
     ChatGateway? gateway,
     ChatPhotoPicker? photoPicker,
     ChatAttachmentPicker? attachmentPicker,
     ChatVoiceRecorder? voiceRecorder,
     ChatAttachmentPlayback? attachmentPlayback,
     ChatNotificationClient? notificationClient,
-  }) : _gateway = gateway ?? buildChatGateway(),
+  }) : _supportDraftStore = supportDraftStore ?? SecureChatSupportDraftStore(),
+       _gateway = gateway ?? buildChatGateway(),
        _reviewSendGateway = null,
        _photoPicker = photoPicker ?? NativeChatPhotoPicker(),
        _attachmentPicker = attachmentPicker ?? NativeChatAttachmentPicker(),
@@ -256,6 +330,91 @@ class ChatSession extends ChangeNotifier {
            notificationClient ?? FirebaseChatNotificationClient();
 
   final ChatGateway? _gateway;
+  final ChatSupportDraftStore? _supportDraftStore;
+  Future<void> _supportDraftWrites = Future<void>.value();
+  int _supportDraftAccountGeneration = 0;
+  final Map<String, String> _supportDraftStorageErrors = {};
+  String? supportDraftStorageErrorFor(String applicationId) =>
+      _supportDraftStorageErrors[applicationId.trim()];
+
+  Future<bool> retrySupportDraftStorage(String applicationId) async {
+    final id = applicationId.trim();
+    final key = _draftKey('workspace-support', id);
+    if (!_draftTextByThread.containsKey(key)) return restoreSupportDraft(id);
+    _persistSupportDraft(key, _draftTextByThread[key]!);
+    await flushSupportDrafts();
+    return false;
+  }
+
+  Future<void> flushSupportDrafts() => _supportDraftWrites;
+
+  Future<bool> restoreSupportDraft(String applicationId) async {
+    final store = _supportDraftStore;
+    final scope = store?.accountScope;
+    final id = applicationId.trim();
+    if (store == null || scope == null || id.isEmpty || _disposed) return false;
+    final key = _draftKey('workspace-support', id);
+    if (_draftTextByThread.containsKey(key)) return false;
+    final generation = _draftGeneration;
+    final revision = _draftRevisions[key] ?? 0;
+    try {
+      await _supportDraftWrites;
+      final text = await store.read(scope, id);
+      if (_disposed ||
+          generation != _draftGeneration ||
+          scope != store.accountScope ||
+          revision != (_draftRevisions[key] ?? 0) ||
+          _draftTextByThread.containsKey(key)) {
+        return false;
+      }
+      _supportDraftStorageErrors.remove(id);
+      if (text == null) return false;
+      _draftTextByThread[key] = text;
+      _draftRevisions[key] = revision + 1;
+      notifyListeners();
+      return true;
+    } catch (_) {
+      if (!_disposed &&
+          generation == _draftGeneration &&
+          scope == store.accountScope) {
+        _supportDraftStorageErrors[id] =
+            'Saved draft could not be loaded. Your current message has not changed.';
+        notifyListeners();
+      }
+      return false;
+    }
+  }
+
+  void _persistSupportDraft(Object key, String text) {
+    if (key is! (String, String) || key.$1 != 'workspace-support') return;
+    final store = _supportDraftStore;
+    final scope = store?.accountScope;
+    if (store == null || scope == null) return;
+    final generation = _supportDraftAccountGeneration;
+    _supportDraftWrites = _supportDraftWrites.then((_) async {
+      if (scope != store.accountScope ||
+          generation != _supportDraftAccountGeneration) {
+        return;
+      }
+      try {
+        await store.write(scope, key.$2, text);
+        if (!_disposed && generation == _supportDraftAccountGeneration) {
+          if (_supportDraftStorageErrors.remove(key.$2) != null) {
+            notifyListeners();
+          }
+        }
+      } catch (_) {
+        if (!_disposed &&
+            generation == _supportDraftAccountGeneration &&
+            scope == store.accountScope) {
+          _supportDraftStorageErrors[key.$2] =
+              'Draft is kept on this screen but could not be saved for restart.';
+          notifyListeners();
+        }
+      }
+    });
+  }
+
   final ChatSendGateway? _reviewSendGateway;
   final ChatPhotoPicker? _photoPicker;
   final ChatAttachmentPicker? _attachmentPicker;
@@ -849,6 +1008,7 @@ class ChatSession extends ChangeNotifier {
     if (value.isNotEmpty || retainEmpty) _draftTextByThread[key] = value;
     if (changed) {
       _draftRevisions[key] = (_draftRevisions[key] ?? 0) + 1;
+      _persistSupportDraft(key, value);
       notifyListeners();
     }
   }
@@ -861,6 +1021,7 @@ class ChatSession extends ChangeNotifier {
     final hadText = _draftTextByThread.remove(key) != null;
     _draftRevisions[key] = (_draftRevisions[key] ?? 0) + 1;
     if (key is! String) _draftTextByThread[key] = '';
+    _persistSupportDraft(key, '');
     final hadReply = _replyTargets.remove(key) != null;
     final hadPhoto = _pendingPhotos.remove(key) != null;
     final hadAttachment = _pendingAttachments.remove(key) != null;
@@ -2623,6 +2784,8 @@ class ChatSession extends ChangeNotifier {
   }
 
   void resetForAuthenticationBoundary() {
+    _supportDraftAccountGeneration++;
+    _supportDraftStorageErrors.clear();
     _reviewSupportFailureApplication = null;
     _draftGeneration += 1;
     _retryDraftApplications.clear();

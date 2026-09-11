@@ -49,6 +49,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
   String? _boundCommerceRoute;
   ChatWorkspaceApplicationContext? _workspaceApplicationContext;
   bool _draftBound = false;
+  bool _restoringSupportDraft = false;
+  int _supportDraftRequest = 0;
   String? get _applicationId => _workspaceApplicationContext?.applicationId;
 
   @override
@@ -110,7 +112,13 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
     if (!_draftBound || previousApplication != _applicationId) {
       _restoreDraft(widget.threadId);
       _draftBound = true;
-      _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+      if (widget.threadId == 'workspace-support' && _applicationId != null) {
+        unawaited(_restoreSavedSupportDraft());
+      } else {
+        _restoringSupportDraft = false;
+        _supportDraftRequest++;
+        _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+      }
     }
     if (uri != null) {
       widget.session.bindCommerceContext(
@@ -122,7 +130,8 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
 
   void _applyInitialDraftIfEmpty(String? initialDraft) {
     final draft = initialDraft?.trim();
-    if (draft == null ||
+    if (_restoringSupportDraft ||
+        draft == null ||
         draft.isEmpty ||
         _messageController.text.isNotEmpty ||
         (_applicationId != null &&
@@ -136,6 +145,43 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
       text: draft,
       selection: TextSelection.collapsed(offset: draft.length),
     );
+  }
+
+  Future<void> _restoreSavedSupportDraft({bool retry = false}) async {
+    final session = widget.session;
+    final application = _applicationId!;
+    final request = ++_supportDraftRequest;
+    final generation = session.draftSessionGeneration;
+    final revision = session.draftRevision(
+      widget.threadId,
+      workspaceApplicationId: application,
+    );
+    _restoringSupportDraft = true;
+    if (retry) setState(() {});
+    final restored = retry
+        ? await session.retrySupportDraftStorage(application)
+        : await session.restoreSupportDraft(application);
+    if (!mounted ||
+        request != _supportDraftRequest ||
+        !identical(session, widget.session) ||
+        _applicationId != application ||
+        !session.isDraftSessionCurrent(generation)) {
+      return;
+    }
+    _restoringSupportDraft = false;
+    if (retry) setState(() {});
+    final expectedRevision = revision + (restored ? 1 : 0);
+    if (session.draftRevision(
+          widget.threadId,
+          workspaceApplicationId: application,
+        ) !=
+        expectedRevision) {
+      return;
+    }
+    if (restored) _restoreDraft(widget.threadId);
+    if (session.supportDraftStorageErrorFor(application) == null) {
+      _applyInitialDraftIfEmpty(widget.initialMessageDraft);
+    }
   }
 
   void _handleDraftTextChanged() {
@@ -840,6 +886,28 @@ class _ChatThreadScreenState extends State<ChatThreadScreen> {
                         _SuggestedPromptStrip(
                           values: thread.suggestedPrompts,
                           onSelected: _applySuggestedPrompt,
+                        ),
+                      if (_applicationId != null &&
+                          widget.session.supportDraftStorageErrorFor(
+                                _applicationId!,
+                              ) !=
+                              null)
+                        Tooltip(
+                          message: widget.session.supportDraftStorageErrorFor(
+                            _applicationId!,
+                          )!,
+                          child: TextButton.icon(
+                            key: const Key('chat-support-draft-storage-retry'),
+                            onPressed: _restoringSupportDraft
+                                ? null
+                                : () => unawaited(
+                                    _restoreSavedSupportDraft(retry: true),
+                                  ),
+                            icon: const Icon(Icons.error_outline),
+                            label: const Text(
+                              'Draft storage unavailable · Retry',
+                            ),
+                          ),
                         ),
                       _Composer(
                         key: _composerKey,
