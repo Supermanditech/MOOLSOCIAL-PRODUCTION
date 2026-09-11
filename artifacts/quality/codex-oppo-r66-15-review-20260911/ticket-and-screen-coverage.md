@@ -1,5 +1,11 @@
 # r66.15 scoped OPPO qualification ledger
 
+## Native continuation through153 — current
+
+Historical findings:10 total, one narrowly corrected/retested, nine open (six new r66.15 children). New R6615-UAT-STATEMENT-RETURN-10 / REG4513 / DASH-LOAD-10/14: Sales reaches order1000, but switching to Purchases and back in the same period loses its deep position (150-153). Preserve independent tab scroll/expansion; source cause remains unclassified and product implementation held.
+
+DASH-LOAD-10 now has native continuation evidence through all1000 seeded Sales rows, not a backend/history-volume guarantee. Native144 verifies the other Store cannot find TEST Store12's invoice. TalkBack enabled/render/navigation check was partial; real assistive gestures/audio remain unqualified, and normal settings were restored off at141. Cloud-file access is newly authorized for the specified Drive account/local phone documents, but selection and completion have not yet passed. See device-review.md for details. These updates supersede older checkpoint gaps/counts below; no full27-ticket closure is claimed.
+
 ## Current consolidated report — 11 September 2026, testing hold
 
 This section controls the current disposition. Later sections retain earlier checkpoints; their pending build/install statements are historical, not current. The exact r66.15 APK is installed and checksum verified. Product fixes, Cursor integration and another APK remain held for the founder's consolidated defect review.

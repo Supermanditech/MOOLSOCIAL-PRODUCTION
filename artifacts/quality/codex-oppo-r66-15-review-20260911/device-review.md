@@ -1,5 +1,19 @@
 # r66.15 build and device review
 
+## Continuation through native153
+
+Continuation evidence is preserved separately without altering manifestv1: native-capture-manifest-v2.json in the same external native folder, SHA256 D363833610BAFB279814E0A7A06B442FF5327454D563F203762FEC1C85EA6F9F. All48 files /4,004,009 bytes were independently rehashed. Range126-153 includes PNG/XML pairs except133-140, which are explicitly PNG-only. This is partial test evidence, not a complete accessibility or27-item qualification. OPPO remained absent on the next read-only connection check; only Redmi was listed and remained untouched.
+
+Cloud/local document continuation stopped before capture154: the exact OPPO serial2b3e0f71 was not found. Read-only adb devices inventory showed only Redmi TG8HCYTGGQT885OF; it was not targeted. No document was selected/read/uploaded and no154 evidence file was created. Device gate had passed with registry4514 / SHA934931550091C1BC4D8A783748D59D183E2798F190E2B8A36F3411BAD8A42D17. Await OPPO reconnection; do not infer a product defect or cloud test pass.
+
+This supersedes the earlier125 checkpoint where different. Historical findings now total10: one narrowly corrected/device-retested and nine open, including six new r66.15 children. R6615-UAT-STATEMENT-RETURN-10 records same-period Sales/Purchases/Sales losing deep scroll position (150-153). The statement did reach the last of1000 seeded rows; this proves native frontend continuation, not backend throughput or unlimited authoritative retention.
+
+Native126-141 include a partial TalkBack check via normal Android settings. Tutorial completion and rendering/navigation were observed; injected gestures did not establish real accessibility swipe/double-tap or spoken-label qualification. No transcription was requested or recorded. Some UIAutomator captures coincided with tutorial reappearance; causality is unconfirmed. Captures133-140 are screenshot-only to avoid that possible interference. TalkBack was restored off, accessibility_enabled=0 and font_scale=1.0 verified. Full TalkBack acceptance remains pending, not a product failure inferred from test-tool limitations.
+
+Native142-144 verified another Store does not find the synthetic invoice from TEST Store12. Native145-150 traversed to Test customer1000 / QA-ORDER-0999. Native151 expanded that row, but its full details were not yet inspected;152-153 exposed the new tab-return defect. Product/test files and installed APK remain unchanged.
+
+The founder now authorizes a PDF/document from the already signed-in Drive account vetonewslive@gmail.com and from local phone storage for cloud selection/preview/return testing. Keep document contents private and do not send, publish or submit to production. This replaces the earlier private-provider restriction for this narrow test only; provider completion is not yet a pass.
+
 ## Consolidated native audit checkpoint — current
 
 Exact r66.15 installed APK and source remain unchanged. Native testing reached capture125 on11 September2026. All27 original items now have a current evidence/defect/gap/held disposition in ticket-and-screen-coverage.md; this is not full qualification of every item. The native defect tally is nine historical findings: CONTACT-01 corrected and narrowly retested; three prior and five new findings remain open. Stop before their product implementation for the founder's consolidated review.
