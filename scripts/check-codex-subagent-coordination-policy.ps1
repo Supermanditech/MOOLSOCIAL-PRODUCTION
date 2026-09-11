@@ -72,6 +72,32 @@ function Get-Sha256([string]$Path) {
   return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash
 }
 
+function Assert-R679OwnerAdmission($Before, $After) {
+  # The founder authorized these two existing Buy dependencies on 11 September.
+  # Compare the whole policy after removing only those additions; no wider
+  # claim, registry, role, release or historical-policy change is admitted.
+  $candidate = $After | ConvertTo-Json -Depth 100 -Compress | ConvertFrom-Json
+  $claim = @($candidate.activeClaims | Where-Object {
+    $_.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905'
+  })
+  $added = @(
+    'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart',
+    'apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart'
+  )
+  Assert-Coordination ($claim.Count -eq 1 -and $claim[0].owners.Count -eq 69) `
+    'Redmi dependency admission requires its exact 69-owner claim.'
+  foreach ($owner in $added) {
+    Assert-Coordination (@($claim[0].owners | Where-Object {
+      $_ -ceq $owner
+    }).Count -eq 1) "Redmi dependency admission is missing or duplicates: $owner"
+  }
+  $claim[0].owners = @($claim[0].owners | Where-Object { $_ -cnotin $added })
+  Assert-Coordination (
+    ($Before | ConvertTo-Json -Depth 100 -Compress) -ceq
+    ($candidate | ConvertTo-Json -Depth 100 -Compress)
+  ) 'Redmi dependency admission changed unrelated ownership or policy.'
+}
+
 function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
   # R66-BUILD-003: retain two pushed label mistakes without rewriting history.
   # This is not an alternative prefix for any other task or future commit.
@@ -1698,6 +1724,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
       $r677SourceParent = '0c36d2201c43665d38e00173df7d2df63f690344'
       $r678PersistenceParent = 'e00a6981b92399f71c68233907bc79b6588c096c'
+      $r679DependencyParent = 'a71fc9732d54380eebd97abd57d1406f39ca19a7'
+      & git -C $root merge-base --is-ancestor $r679DependencyParent $head
+      $r679DependencyContext = $LASTEXITCODE -eq 0
+      $r678FreezeHead = if ($r679DependencyContext) { $r679DependencyParent } else { $head }
       & git -C $root merge-base --is-ancestor $r678PersistenceParent $head
       $r678PersistenceContext = $LASTEXITCODE -eq 0
       $r677FreezeHead = if ($r678PersistenceContext) { $r678PersistenceParent } else { $head }
@@ -3179,7 +3209,9 @@ if ($ProductionLane -ceq 'baseline') {
         $r678SourceOwner = 'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart'
         $r678Subject = 'ui(buy-redmi-fixes-v1-20260905): admit procurement persistence owner'
         $r678Before = Get-R66Utf8GitJson $r678PersistenceParent $r678Owners[0]
-        $r678After = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r678After = if ($r679DependencyContext) {
+          Get-R66Utf8GitJson $r679DependencyParent $r678Owners[0]
+        } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         $r678Claim = @($r678After.activeClaims | Where-Object task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905')
         Assert-Coordination ($r678Claim.Count -eq 1 -and $r678Claim[0].owners.Count -eq 67 -and
           @($r678Claim[0].owners | Where-Object { $_ -ceq $r678SourceOwner }).Count -eq 1) 'Procurement admission must add only its persistence owner.'
@@ -3213,10 +3245,58 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r678Text.Count -eq 1 -and $r678Text[0] -ceq $r678Subject) 'Procurement admission subject changed.'
           $r678Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r678Commit)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r678Committed | Sort-Object) -join '|') -ceq (@($r678Owners | Sort-Object) -join '|')) 'Procurement admission committed extra owners.'
-          & git -C $root diff --quiet $r678Commit -- @r678Owners
+          if ($r679DependencyContext) {
+            & git -C $root diff --quiet $r678Commit $r678FreezeHead -- @r678Owners
+          } else {
+            & git -C $root diff --quiet $r678Commit -- @r678Owners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Procurement coordination changed after admission.'
-          $r678Later = @(& git -C $root log --format=%H "${r678Commit}..$head" -- @r678Owners)
+          $r678Later = @(& git -C $root log --format=%H "${r678Commit}..$r678FreezeHead" -- @r678Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r678Later.Count -eq 0) 'Procurement admission cannot be reused.'
+        }
+      }
+      if ($r679DependencyContext) {
+        $r679Owners = @(
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'docs/quality/cursor-buy-redmi-uat-v1-20260905/UAT.md'
+        )
+        $r679Subject = 'ui(buy-redmi-fixes-v1-20260905): admit founder-authorized share and address owners'
+        $r679Before = Get-R66Utf8GitJson $r679DependencyParent $r679Owners[0]
+        $r679After = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        Assert-R679OwnerAdmission $r679Before $r679After
+        if ($head -ceq $r679DependencyParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
+            'Pending Redmi dependency admission is not qualification.'
+          $r679Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r679Dirty | Sort-Object) -join '|') -ceq
+            (@($r679Owners | Sort-Object) -join '|')) `
+            'Redmi dependency admission must contain only its three coordination owners.'
+          $r679Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r679Untracked.Count -eq 0) `
+            'Redmi dependency admission cannot include untracked files.'
+        } else {
+          $r679Following = @(& git -C $root rev-list --first-parent --reverse "${r679DependencyParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r679Following.Count -gt 0) `
+            'Redmi dependency admission commit is missing.'
+          $r679Commit = [string]$r679Following[0]
+          $r679Parents = @(& git -C $root show -s --format=%P $r679Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r679Parents.Count -eq 1 -and
+            $r679Parents[0] -ceq $r679DependencyParent) 'Redmi dependency admission parent changed.'
+          $r679Text = @(& git -C $root show -s --format=%s $r679Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r679Text.Count -eq 1 -and
+            $r679Text[0] -ceq $r679Subject) 'Redmi dependency admission subject changed.'
+          $r679Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r679Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and
+            (@($r679Committed | Sort-Object) -join '|') -ceq
+            (@($r679Owners | Sort-Object) -join '|')) 'Redmi dependency admission committed extra owners.'
+          $r679FrozenOwners = @($r679Owners[0], $r679Owners[1])
+          & git -C $root diff --quiet $r679Commit -- @r679FrozenOwners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Redmi dependency coordination changed after admission.'
+          $r679Later = @(& git -C $root log --format=%H "${r679Commit}..$head" -- @r679FrozenOwners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r679Later.Count -eq 0) `
+            'Redmi dependency admission cannot be replayed or revised.'
         }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
