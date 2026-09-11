@@ -164,6 +164,9 @@ void main() {
       await tester.pumpAndSettle();
     }
     expect(target, findsOneWidget);
+    await Scrollable.ensureVisible(tester.element(target), alignment: 0.5);
+    await tester.pumpAndSettle();
+    expect(target.hitTestable(), findsOneWidget);
     return target;
   }
 
