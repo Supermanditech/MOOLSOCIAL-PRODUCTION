@@ -2871,7 +2871,7 @@ class _StoreFirstTapAccessState extends State<_StoreFirstTapAccess> {
     ('dues', 'Collect dues', _WorkspaceOperation.dues),
     ('payments', 'Settle', _WorkspaceOperation.payments),
     ('restock', 'Restock', null),
-    ('direct', 'Buy Direct', _WorkspaceOperation.direct),
+    ('sourcing', 'Track stock', _WorkspaceOperation.sourcing),
     ('groupBuying', 'Group Bulk Buying', _WorkspaceOperation.groupBuying),
     ('storeLink', 'Send store link', _WorkspaceOperation.storeLink),
     ('offers', 'Promote store', _WorkspaceOperation.offers),
@@ -10401,10 +10401,13 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return _StoreStatementSurface(session: session);
     }
     if (operation == _WorkspaceOperation.sourcing) {
-      return _StorePurchasesSurface(
-        session: session,
-        onTrackPurchase: onTrackPurchase,
-        onPurchaseBack: onPurchaseBack,
+      return KeyedSubtree(
+        key: const Key('work-store-track-stock'),
+        child: _StorePurchasesSurface(
+          session: session,
+          onTrackPurchase: onTrackPurchase,
+          onPurchaseBack: onPurchaseBack,
+        ),
       );
     }
     if (operation == _WorkspaceOperation.services) {

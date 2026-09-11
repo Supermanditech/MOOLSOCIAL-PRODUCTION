@@ -596,12 +596,12 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  Future<void> openRetainedManufacturerOffers(WidgetTester tester) async {
+  Future<void> openTrackedPurchases(WidgetTester tester) async {
     await tester.tap(find.byKey(const Key('work-store-stock')));
     await tester.pumpAndSettle();
-    final direct = find.byKey(const Key('work-shortcut-direct'));
-    await reveal(tester, direct);
-    await tester.tap(direct);
+    final tracking = find.byKey(const Key('work-shortcut-sourcing'));
+    await reveal(tester, tracking);
+    await tester.tap(tracking);
     await tester.pumpAndSettle();
   }
 
@@ -2538,7 +2538,7 @@ void main() {
       for (final action in [
         ('dues', 'Collect dues', 'work-store-dues'),
         ('payments', 'Settle', 'work-money-destination'),
-        ('direct', 'Buy Direct', 'work-store-buy-direct'),
+        ('sourcing', 'Track stock', 'work-store-track-stock'),
         ('storeLink', 'Send store link', 'work-store-link'),
         ('offers', 'Promote store', 'work-store-offers-screen'),
       ]) {
@@ -2699,7 +2699,7 @@ void main() {
           )
           .procurementSession;
       buy.chooseFilter('freight');
-      await openRetainedManufacturerOffers(tester);
+      await openTrackedPurchases(tester);
       await tester.pumpAndSettle();
       final restock = find.byKey(const Key('work-shortcut-restock'));
       await reveal(tester, restock);
@@ -2953,9 +2953,10 @@ void main() {
     (null, null),
     ('freight', null),
     (null, 'nearby'),
+    ('manufacturer', null),
   ]) {
     testWidgets(
-      'S09 Buy Direct filter remains local ${filters.$1} ${filters.$2}',
+      'R6617 Track stock leaves procurement filter unchanged ${filters.$1} ${filters.$2}',
       (tester) async {
         await mount(
           tester,
@@ -2969,10 +2970,12 @@ void main() {
             )
             .procurementSession;
         buy.chooseFilter(filters.$1);
-        await openRetainedManufacturerOffers(tester);
+        await openTrackedPurchases(tester);
         await tester.pumpAndSettle();
-        expect(find.byKey(const Key('work-store-buy-direct')), findsOneWidget);
-        expect(buy.selectedFilter, 'manufacturer');
+        expect(find.byKey(const Key('work-store-track-stock')), findsOneWidget);
+        expect(find.byKey(const Key('work-shortcut-direct')), findsNothing);
+        expect(find.text('Buy Direct'), findsNothing);
+        expect(buy.selectedFilter, filters.$1);
         if (filters.$2 != null) buy.chooseFilter(filters.$2);
         await tester.binding.handlePopRoute();
         await tester.pumpAndSettle();
@@ -2997,7 +3000,7 @@ void main() {
     );
   }
 
-  for (final origin in ['dashboard', 'stock', 'direct']) {
+  for (final origin in ['dashboard', 'stock', 'sourcing']) {
     testWidgets('S09 scanner cancel restores $origin', (tester) async {
       const channel = MethodChannel('flutter.baseflow.com/permissions/methods');
       tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(channel, (
@@ -3025,8 +3028,8 @@ void main() {
       );
       if (origin == 'stock') {
         await tester.tap(find.byKey(const Key('work-store-stock')));
-      } else if (origin == 'direct') {
-        await openRetainedManufacturerOffers(tester);
+      } else if (origin == 'sourcing') {
+        await openTrackedPurchases(tester);
       }
       await tester.pumpAndSettle();
       final products = List<WorkspaceCatalogueItem>.of(
@@ -3041,20 +3044,20 @@ void main() {
         find.byKey(
           Key(switch (origin) {
             'stock' => 'work-dashboard-catalogue-screen',
-            'direct' => 'work-store-buy-direct',
+            'sourcing' => 'work-store-track-stock',
             _ => 'work-store-activity-deck',
           }),
         ),
         findsOneWidget,
       );
       expect(work.workspaceCatalogueItems, orderedEquals(products));
-      if (origin == 'direct') {
+      if (origin == 'sourcing') {
         final buy = tester
             .widget<WorkWorkspaceDashboardScreen>(
               find.byType(WorkWorkspaceDashboardScreen),
             )
             .procurementSession;
-        expect(buy.selectedFilter, 'manufacturer');
+        expect(buy.selectedFilter, isNull);
       }
       await captureStoreView(tester, 'r665-scanner-cancel-$origin');
       expect(tester.takeException(), isNull);
@@ -19431,6 +19434,16 @@ void main() {
         expect(find.text('Incoming stock'), findsWidgets);
         expect(work.currentWorkspaceOrderId, originalOrder);
         await captureStoreView(tester, 'supply-first-view-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('work-store-stock')));
+        await openTrackedPurchases(tester);
+        expect(find.byKey(const Key('work-store-track-stock')), findsOneWidget);
+        expect(find.byKey(const Key('work-shortcut-direct')), findsNothing);
+        final tracking = find.byKey(const Key('work-shortcut-sourcing'));
+        expect(tester.widget<TextButton>(tracking).onPressed, isNull);
+        expect(work.currentWorkspaceOrderId, originalOrder);
+        await captureStoreView(tester, 'track-stock-shortcut-populated-$scale');
         final row = find.byKey(const Key('work-purchase-open-SHIP-7'));
         await reveal(tester, row);
         await tester.tap(find.text('Supplier 7'));
