@@ -1,5 +1,15 @@
 # r66.16 bounded support review disposition
 
+## Current disposition — native092,15 observed findings
+
+New device-confirmed dependency case **R6616-UAT-PROCUREMENT-SCOPE-15**: two QA Stores share the installed procurement cart/query; changing3to4packs in Store B changes the cart when returning normally to Store A. Work dashboard balances remain Store-specific. Link to REG4512 and the existing STORE-PROCUREMENT-ELIGIBILITY-01 / DASH-LOAD07/13/14 work, not a duplicate global ticket. No checkout/payment or different-account exposure was tested. Deferred Cursor integration and the Codex Store context wrapper must jointly qualify this later; implementation remains held.
+
+Current consolidated native list (earlier totals below are historical):01 malformed phone prefix narrowly corrected/device-tested;02 obsolete procurement shortcut;03 promotion draft Back loss;04 requirement feedback offscreen;05 central-order nested scrolling;06 missing purchased pack/unit-price snapshot;07 ready-state rider-request claim;08 supplier UTC/local freshness wording;09 Stock Save hidden after keyboard dismissal;10 statement tab scroll-position loss;11 global Files picker no-op;12 attachment metadata/preview lost after restart;13 support unsent draft lost after restart;14 product quantity action obscured by Cart;15 cross-Store procurement draft mixing.
+
+**15 native findings:1 narrowly closed,14 open.** Separate **R6616-QA-RECOVERY-01** remains open with an existing-UI workaround. Findings14/15 are native reproductions linked to existing global/dependency records; do not inflate the global defect count. All27 original parent items remain mapped.24 have related device evidence,2 are host investigations,1 product-add redesign is founder-held; related evidence is not full parent qualification.
+
+Reachability boundaries still controlling this collection-only round: no new APK/fixtures or implementation; backend authority/payment/receipt/collection/event feeds unavailable; Cursor procurement integration deferred; physical200%/TalkBack not fully executable/verified through available ordinary-device controls. Native092 newly changes Store-switch procurement from untested to defect-recorded; account switching and process-death procurement remain unqualified. See device-review.md/native086–092 and manifestv6. Preserve these gaps for the consolidated follow-up; never close them from empty screens or host-only assertions.
+
 ## Latest native085 — Restock retention tested;14 native findings
 
 Existing APK Store Restock > exact product > minimum2packs > cart > Back, bread search > exact product > Back, originating Store return/reentry, and2to3pack update/cart reconciliation passed the observed default-font in-session checks. Query, product, quantity and ₹1,440/₹2,160 totals stayed consistent. Evidence: device-review.md/native069–085, manifestv5. This qualifies neither process-death/account switching nor deferred procurement authority/Cursor integration/physical200%.
