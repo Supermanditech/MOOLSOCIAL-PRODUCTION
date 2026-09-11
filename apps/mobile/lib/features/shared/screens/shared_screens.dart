@@ -6,6 +6,8 @@ import '../../../../core/design/mool_theme.dart';
 import '../../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../shared_models.dart';
 import '../shared_session.dart';
+import '../../work/work_services.dart';
+import '../../work/screens/work_onboarding_screens.dart';
 
 class SharedHubScreen extends StatefulWidget {
   const SharedHubScreen({
@@ -13,6 +15,7 @@ class SharedHubScreen extends StatefulWidget {
     required this.screen,
     this.initialItemId,
     this.onSignOut,
+    this.filePicker,
     super.key,
   });
 
@@ -20,6 +23,7 @@ class SharedHubScreen extends StatefulWidget {
   final int screen;
   final String? initialItemId;
   final Future<void> Function()? onSignOut;
+  final WorkProofPicker? filePicker;
 
   @override
   State<SharedHubScreen> createState() => _SharedHubScreenState();
@@ -27,6 +31,21 @@ class SharedHubScreen extends StatefulWidget {
 
 class _SharedHubScreenState extends State<SharedHubScreen> {
   bool openedInitialItem = false;
+  bool _pickingFile = false;
+  String? _fileError;
+  final _filesScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _filesScroll.dispose();
+    super.dispose();
+  }
+
+  void _showFileError(String message) {
+    if (!mounted) return;
+    setState(() => _fileError = message);
+    if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
+  }
 
   SharedScreenSpec get spec => sharedScreenSpec(widget.screen);
 
@@ -113,7 +132,9 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
             if (spec.topAction != null)
               TextButton.icon(
                 key: Key('shared-${spec.screen}-top-action'),
-                onPressed: widget.session.busy ? null : _topAction,
+                onPressed: widget.session.busy || _pickingFile
+                    ? null
+                    : _topAction,
                 icon: Icon(
                   spec.topAction == 'Scan'
                       ? Icons.qr_code_scanner_rounded
@@ -146,6 +167,7 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
           ],
         ),
         body: ListView(
+          controller: spec.screen == 160 ? _filesScroll : null,
           key: Key('shared-${spec.screen}-list'),
           padding: const EdgeInsets.fromLTRB(
             MoolSpacing.md,
@@ -154,6 +176,11 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
             MoolSpacing.xl,
           ),
           children: [
+            if (spec.screen == 160 && _fileError != null)
+              Semantics(
+                liveRegion: true,
+                child: Text(_fileError!, key: const Key('shared-file-error')),
+              ),
             _SharedHero(spec: spec),
             const SizedBox(height: MoolSpacing.sm),
             MoolLocalNavigationRail(
@@ -402,7 +429,7 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               const Text(
-                'Add a secure file',
+                'Choose a file',
                 style: TextStyle(
                   color: MoolColors.navy,
                   fontSize: 23,
@@ -410,13 +437,17 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
                 ),
               ),
               const Text(
-                'Purpose, access and retention are shown before sharing.',
+                'Preview only. Nothing is uploaded or shared. PDF, JPG, PNG or WebP · up to 10 MB.',
                 style: TextStyle(color: MoolColors.muted),
               ),
               const SizedBox(height: MoolSpacing.md),
               for (final choice in const [
                 ('camera', 'Camera', Icons.photo_camera_outlined),
-                ('scan', 'Scan document', Icons.document_scanner_outlined),
+                (
+                  'scan',
+                  'Photograph document',
+                  Icons.document_scanner_outlined,
+                ),
                 ('gallery', 'Gallery', Icons.photo_library_outlined),
                 ('file', 'Choose file', Icons.attach_file_rounded),
               ])
@@ -428,10 +459,12 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
                   leading: Icon(choice.$3),
                   title: Text(choice.$2),
                   onTap: () {
-                    widget.session.completeLocal(
-                      '${choice.$2} opened. No file was shared.',
-                    );
                     Navigator.pop(sheetContext);
+                    _pickLocalFile(switch (choice.$1) {
+                      'camera' || 'scan' => WorkProofSource.camera,
+                      'gallery' => WorkProofSource.gallery,
+                      _ => WorkProofSource.upload,
+                    });
                   },
                 ),
               TextButton(
@@ -444,6 +477,48 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _pickLocalFile(WorkProofSource source) async {
+    if (_pickingFile) return;
+    setState(() {
+      _pickingFile = true;
+      _fileError = null;
+    });
+    try {
+      final file = await (widget.filePicker ?? NativeWorkProofPicker()).pick(
+        source,
+      );
+      if (!mounted || file == null) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * .75,
+            child: WorkDocumentPreview(
+              label: 'Local preview · not uploaded or shared',
+              file: file,
+              onClose: () => Navigator.pop(sheetContext),
+              onReplace: () {
+                Navigator.pop(sheetContext);
+                _addFileSheet();
+              },
+            ),
+          ),
+        ),
+      );
+    } on WorkGatewayException catch (error) {
+      _showFileError(error.message);
+    } catch (_) {
+      _showFileError(
+        'Could not open the file. Try again. Nothing was uploaded or shared.',
+      );
+    } finally {
+      if (mounted) setState(() => _pickingFile = false);
+    }
   }
 
   Future<void> _permissionRecovery(String permission) {

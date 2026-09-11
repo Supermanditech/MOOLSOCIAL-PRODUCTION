@@ -1,9 +1,12 @@
+import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -11,6 +14,8 @@ import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/shared_services.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/features/shared/screens/shared_screens.dart';
+import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
 
 void main() {
@@ -741,18 +746,146 @@ void main() {
     },
   );
 
-  testWidgets('screen 160 completes all file-source and cancel choices', (
+  testWidgets(
+    'screen 160 invokes file sources without claiming cancelled selection',
+    (tester) async {
+      final session = SharedSession();
+      addTearDown(session.dispose);
+      final picker = _CancelledFilePicker();
+      await tester.pumpWidget(
+        MaterialApp(
+          home: SharedHubScreen(
+            session: session,
+            screen: 160,
+            filePicker: picker,
+          ),
+        ),
+      );
+      await settle(tester);
+      for (final source in const ['camera', 'scan', 'gallery', 'file']) {
+        await tap(tester, const Key('shared-160-top-action'));
+        await tap(tester, Key('shared-file-add-$source'));
+        expect(session.noticeMessage, isNull);
+      }
+      expect(picker.sources, [
+        WorkProofSource.camera,
+        WorkProofSource.camera,
+        WorkProofSource.gallery,
+        WorkProofSource.upload,
+      ]);
+      await tap(tester, const Key('shared-160-top-action'));
+      await tap(tester, const Key('shared-file-add-cancel'));
+      expect(find.byKey(const Key('shared-file-add-sheet')), findsNothing);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R6617 Files preview replace and error retry stay local $scale', (
+      tester,
+    ) async {
+      final session = SharedSession();
+      addTearDown(session.dispose);
+      final picker = _ControlledFilePicker();
+      await tester.binding.setSurfaceSize(const Size(320, 568));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(
+              context,
+            ).copyWith(textScaler: TextScaler.linear(scale)),
+            child: RepaintBoundary(
+              key: const Key('files-review-capture'),
+              child: child!,
+            ),
+          ),
+          home: SharedHubScreen(
+            session: session,
+            screen: 160,
+            filePicker: picker,
+          ),
+        ),
+      );
+      await settle(tester);
+      await tester.drag(
+        find.byKey(const Key('shared-160-list')),
+        const Offset(0, -350),
+      );
+      await settle(tester);
+      await tap(tester, const Key('shared-160-top-action'));
+      await tap(tester, const Key('shared-file-add-file'));
+      picker.pending.completeError(
+        const WorkGatewayException('Choose a PDF or image up to 10 MB.'),
+      );
+      await settle(tester);
+      expect(find.text('Choose a PDF or image up to 10 MB.'), findsOneWidget);
+      expect(
+        find.byKey(const Key('shared-file-error')).hitTestable(),
+        findsOneWidget,
+      );
+      expect(session.noticeMessage, isNull);
+      picker.pending = Completer<WorkPickedProof?>();
+      await tap(tester, const Key('shared-160-top-action'));
+      await tap(tester, const Key('shared-file-add-gallery'));
+      picker.pending.complete(
+        WorkPickedProof(
+          fileName: 'test.png',
+          contentType: 'image/png',
+          bytes: base64Decode(
+            'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aS1sAAAAASUVORK5CYII=',
+          ),
+        ),
+      );
+      await settle(tester);
+      expect(find.byKey(const Key('work-document-preview')), findsOneWidget);
+      expect(
+        find.text('Local preview · not uploaded or shared'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('shared-file-error')), findsNothing);
+      if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+        const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+        expect(RegExp(r'^[a-z0-9-]+$').hasMatch(folder), isTrue);
+        await expectLater(
+          find.byKey(const Key('files-review-capture')),
+          matchesGoldenFile(
+            '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/files-preview-$scale.png',
+          ),
+        );
+      }
+      await tap(tester, const Key('work-document-replace'));
+      expect(find.byKey(const Key('shared-file-add-sheet')), findsOneWidget);
+      await tap(tester, const Key('shared-file-add-cancel'));
+      expect(find.byKey(const Key('work-document-preview')), findsNothing);
+      expect(session.noticeMessage, isNull);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('R6617 Files ignores picker completion after screen disposal', (
     tester,
   ) async {
-    final session = await mount(tester, route: '/app/files');
-    for (final source in const ['camera', 'scan', 'gallery', 'file']) {
-      await tap(tester, const Key('shared-160-top-action'));
-      await tap(tester, Key('shared-file-add-$source'));
-      expect(session.noticeMessage, contains('opened'));
-    }
+    final session = SharedSession();
+    addTearDown(session.dispose);
+    final picker = _ControlledFilePicker();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: SharedHubScreen(
+          session: session,
+          screen: 160,
+          filePicker: picker,
+        ),
+      ),
+    );
+    await settle(tester);
     await tap(tester, const Key('shared-160-top-action'));
-    await tap(tester, const Key('shared-file-add-cancel'));
-    expect(find.byKey(const Key('shared-file-add-sheet')), findsNothing);
+    await tap(tester, const Key('shared-file-add-file'));
+    await tester.pumpWidget(const SizedBox());
+    picker.pending.complete(null);
+    await settle(tester);
+    expect(tester.takeException(), isNull);
+    expect(session.noticeMessage, isNull);
   });
 
   testWidgets(
@@ -991,6 +1124,21 @@ void main() {
     expect(location(tester), contains('/app/chat/inbox'));
     expect(tester.takeException(), isNull);
   });
+}
+
+class _CancelledFilePicker implements WorkProofPicker {
+  final sources = <WorkProofSource>[];
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) async {
+    sources.add(source);
+    return null;
+  }
+}
+
+class _ControlledFilePicker implements WorkProofPicker {
+  Completer<WorkPickedProof?> pending = Completer<WorkPickedProof?>();
+  @override
+  Future<WorkPickedProof?> pick(WorkProofSource source) => pending.future;
 }
 
 String _slug(String value) => value

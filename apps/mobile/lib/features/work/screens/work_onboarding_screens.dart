@@ -2358,7 +2358,7 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
           constraints: BoxConstraints(
             maxHeight: MediaQuery.sizeOf(sheetContext).height * .75,
           ),
-          child: _DocumentPreview(
+          child: WorkDocumentPreview(
             label: proof.label,
             file: file,
             onClose: () => Navigator.of(sheetContext).pop(),
@@ -2405,12 +2405,13 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
   }
 }
 
-class _DocumentPreview extends StatefulWidget {
-  const _DocumentPreview({
+class WorkDocumentPreview extends StatefulWidget {
+  const WorkDocumentPreview({
     required this.label,
     required this.file,
     required this.onClose,
     required this.onReplace,
+    super.key,
   });
 
   final String label;
@@ -2418,10 +2419,10 @@ class _DocumentPreview extends StatefulWidget {
   final VoidCallback onClose, onReplace;
 
   @override
-  State<_DocumentPreview> createState() => _DocumentPreviewState();
+  State<WorkDocumentPreview> createState() => _DocumentPreviewState();
 }
 
-class _DocumentPreviewState extends State<_DocumentPreview> {
+class _DocumentPreviewState extends State<WorkDocumentPreview> {
   final _transform = TransformationController();
   final _viewportKey = GlobalKey();
   final _pdf = WorkPdfPreview();
