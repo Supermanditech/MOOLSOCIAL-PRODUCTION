@@ -1,5 +1,29 @@
 # r66.15 build and device review
 
+## Consolidated native audit checkpoint — current
+
+Exact r66.15 installed APK and source remain unchanged. Native testing reached capture125 on11 September2026. All27 original items now have a current evidence/defect/gap/held disposition in ticket-and-screen-coverage.md; this is not full qualification of every item. The native defect tally is nine historical findings: CONTACT-01 corrected and narrowly retested; three prior and five new findings remain open. Stop before their product implementation for the founder's consolidated review.
+
+Manifest: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-15-native-20260911/native-capture-manifest-v1.json. SHA2566CE7EF1FDEF00ECCCB83A7313197756AAF623E8ADA0D27566A5FFD231490898E;249 files/20,174,805 bytes. Capture001 is an incomplete startup PNG;002–125 have PNG/XML pairs. Names052/077/098/121 are provisional; the ledger supplies actual observations and exclusions. No omitted/truncated tool output is used as success evidence.
+
+PNG visual inspection specifically included004,005,010,012,014,018,035,038,054,056,065,073,092,098,108 and111; other observations use native text/bounds and recorded action/results. Screenshot098 confirms Save is clipped by the bottom navigation after hiding the keyboard. Screenshot111 instead shows the full customer confirmation button, so its clipped XML bounds are not registered as another visual defect. No physical200%/TalkBack or grey-tint/contrast conclusion is inferred from these default-scale captures.
+
+Seeded12/100/1000 Stores provided populated frontend order/supplier/offer/finance states. Independent accepted/rejected/uncertain commands, timed expiry, explicit extension and reconciliation were exercised with the labelled review gateway only. One synthetic stock correction(-1) and one synthetic counter invoice₹264 were created locally. No real payment, invoice sending, WhatsApp, publication, rider booking, customer collection or provider login occurred. No device setting changed in this round; no Redmi or Cursor action.
+
+Unverified scenarios remain explicit: complete process-restored review Store/support lifecycle, controlled support transport failure, full stock/finance history and event bursts, authenticated cloud completion, physical200%/TalkBack, deferred Cursor behavior and authoritative backend enforcement. These are not fabricated product failures or green checks. The current nonpromotable review is defects-recorded, not production accepted.
+
+OPPO was left on TEST Store ·12 orders dashboard at125 with the new local invoice visible. No force-stop/data clear was used after seeding, so the current in-memory fixtures remain available until the runtime ends. Product/test trees were not edited during this audit.
+
+Pre-seal readback verified all391 source-manifest inputs unchanged and every249 native-manifest file's size/SHA256 exact. Registry count remains4514; the policy diff is one hash-binding line only. git diff --check passed. No new analysis/test run or rebuild is claimed for this evidence-only checkpoint; the existing two1856-pass/83-skip prebuild cycles and zero-issue analysis remain source-matched.
+
+## Current native checkpoint
+
+Installed on OPPO 2b3e0f71 / CPH2375 with retained data; install exit0. Installed version1.0.0-r66.15-runtime/code2026091102 and pulled APK match the built210174349-byte APK SHA256 D483815725B86A1CB337ED513912EC34041BBCF7719D1D454317EF4499D397DF. See post-install.json. This supersedes the pre-install status paragraphs retained below; native qualification remains incomplete.
+
+Evidence folder: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-15-native-20260911. Capture001 retained as an incomplete startup capture (null UI root), not a product defect or pass. Captures002–008 have screenshot/XML pairs: Runtime Shop start, Mool menu, Work entry, Workspace home, Grocery entry, documents-ready, retained contact. The004 tool output was truncated; both files were recovered and the foreground verified before continuing, without repeating that tap. The008 contact retains prior test details. No real message, payment, production application, Cursor integration or Redmi action occurred.
+
+An evidence-only multi-file patch attempt failed verification before applying any file; existence/state readback confirmed no partial write, then the exact corrected patch was applied. No product or test owner changed.
+
 Binary retention: the APK remains intact at its immutable build-provenance path and is not committed as a210MB Git object. The only local info/exclude addition is /artifacts/quality/codex-oppo-r66-15-review-20260911/uaw-codex-oppo-r66.15-review-20260911-device-review-debug.apk; git check-ignore verified that exact rule. Source, tests, metadata and other evidence are not excluded. No APK/evidence was moved or deleted. The first postbuild pre_commit rejection and corrected packaging are retained under existing REG4557; count4514, binding53EC7BA0E9993B8244B6F03924F3C992714C1A7BF6B406C8D1C6244C9587E2E1.
 
 Build complete, installation and native qualification pending. Candidate UAW-CODEX-OPPO-R66.15-REVIEW-20260911; RuntimeUiReview debug; com.moolsocial.app.runtime;1.0.0-r66.15+2026091102. Source/evidence seal752c8830610e15d5836e9f16f26c1cba1cc28e16. Manifest391 inputs, BB9B3049875A88745007EFCEFD2E4474F051595040FEF3795D3C93481630394E.

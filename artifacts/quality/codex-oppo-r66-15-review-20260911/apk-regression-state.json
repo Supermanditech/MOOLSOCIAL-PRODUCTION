@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "built_device_review_pending",
+  "machineState": "installed_device_review_defects_recorded",
   "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
@@ -153,11 +153,14 @@
     },
     {
       "id": "oppo-install",
-      "state": "pending"
+      "state": "passed",
+      "evidence": "artifacts/quality/codex-oppo-r66-15-review-20260911/post-install.json"
     },
     {
       "id": "oppo-real-user-review",
-      "state": "pending"
+      "state": "failed",
+      "evidence": "artifacts/quality/codex-oppo-r66-15-review-20260911/ticket-and-screen-coverage.md",
+      "disposition": "27 items accounted for; nine historical native findings, one corrected and narrowly retested, eight open; unsupported qualification scenarios remain explicit. Stop before product fixes for founder review."
     },
     {
       "id": "founder-review",
