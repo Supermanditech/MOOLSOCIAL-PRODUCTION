@@ -55,6 +55,34 @@ function Assert-Coordination([bool]$Condition, [string]$Message) {
   }
 }
 
+function Test-CodexOppoR6615PendingEvidence([hashtable]$Facts) {
+  $expected = @{
+    Role = 'primary'
+    Task = '/root'
+    ClaimTask = '/root'
+    Lane = 'codex_ui'
+    WorkId = 'codex-oppo-review-v1-20260905'
+    TicketId = 'UAW-CODEX-OPPO-REVIEW-V1-20260905'
+    Branch = 'work/codex-ui/codex-oppo-review-v1-20260905'
+  }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or
+        [string]$Facts[$key] -cne [string]$expected[$key]) { return $false }
+  }
+  return $Facts.ContainsKey('Owner') -and [string]$Facts.Owner -cin @(
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/candidate-contract.md',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/source-manifest.txt',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/local-validation.md',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/prebuild-validation.md',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/motion-disposition.md',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/apk-regression-state.json',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/uaw-codex-oppo-r66.15-review-20260911-build-provenance.txt',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/post-install.json',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/device-review.md',
+    'artifacts/quality/codex-oppo-r66-15-review-20260911/ticket-and-screen-coverage.md'
+  )
+}
+
 function Test-CodexOppoR6610EvidenceAdmission([hashtable]$Facts) {
   # Founder-authorized historical naming correction only. This immutable SHA
   # cannot authorize another commit, owner, lane or product-tree change.
@@ -1173,6 +1201,8 @@ Assert-Coordination (
     [int]$gitDiscipline.agentTicketQueues.integrationRepairMaximumOpenTickets
 ) 'an agent lane has more than one open production ticket.'
 $ownerToTask = @{}
+$pendingEvidenceBranch = (& git -C $root rev-parse --abbrev-ref HEAD).Trim()
+Assert-Coordination ($LASTEXITCODE -eq 0) 'pending-evidence branch read failed.'
 foreach ($claim in $claims) {
   Assert-ExactNames $claim @('task','role','owners') 'active claim'
   Assert-Coordination (
@@ -1183,6 +1213,12 @@ foreach ($claim in $claims) {
   foreach ($ownerValue in @($claim.owners)) {
     $owner = Get-CanonicalOwner ([string]$ownerValue)
     $resolvedOwner = [IO.Path]::GetFullPath((Join-Path $root $owner))
+    $predeclaredR6615EvidenceOwner = Test-CodexOppoR6615PendingEvidence @{
+      Role = $AgentRole; Task = $AgentTask; ClaimTask = [string]$claim.task
+      Lane = $ProductionLane; WorkId = $ProductionWorkId
+      TicketId = $ProductionTicketId; Branch = $pendingEvidenceBranch
+      Owner = $owner
+    }
     $predeclaredR65FourEvidenceOwner = (
       [string]$claim.task -ceq
         '/root/cursor_shop_mvp_go_live_v1_20260829' -and
@@ -1244,7 +1280,8 @@ foreach ($claim in $claims) {
         $predeclaredR65EightEvidenceOwner -or
         $predeclaredR65NineEvidenceOwner -or
         $predeclaredR65TenEvidenceOwner -or
-        $predeclaredR65ElevenEvidenceOwner)
+        $predeclaredR65ElevenEvidenceOwner -or
+        $predeclaredR6615EvidenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
@@ -1626,6 +1663,16 @@ if ($ProductionLane -ceq 'baseline') {
           'artifacts/quality/codex-oppo-r66-14-review-20260911/post-install.json',
           'artifacts/quality/codex-oppo-r66-14-review-20260911/device-review.md',
           'artifacts/quality/codex-oppo-r66-14-review-20260911/ticket-and-screen-coverage.md',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/candidate-contract.md',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/source-manifest.txt',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/local-validation.md',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/prebuild-validation.md',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/motion-disposition.md',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/apk-regression-state.json',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/uaw-codex-oppo-r66.15-review-20260911-build-provenance.txt',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/post-install.json',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/device-review.md',
+          'artifacts/quality/codex-oppo-r66-15-review-20260911/ticket-and-screen-coverage.md',
           'artifacts/quality/codex-oppo-r66-9-review-20260908/source-manifest.txt',
           'artifacts/quality/codex-oppo-r66-9-review-20260908/local-validation.md',
           'artifacts/quality/codex-oppo-r66-9-review-20260908/prebuild-validation.md',
