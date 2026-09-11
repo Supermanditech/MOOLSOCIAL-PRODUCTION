@@ -6,6 +6,18 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## r66.9 round 1 checkpoint21 - address validation, Save and removal
+
+Frozen42 remains **11 closed,31 open;9 UAT children open separately**. This batch adds49 successful captures791-839, bringing retained successful captures to836; failed382/504/725 stay excluded. No new defect or closure. Full scoped device testing/listing remains incomplete and implementation remains paused. No APK build/install.
+
+Phone801-803: nine-digit draft rejected with visible Enter a 10-digit phone number; Cancel804 restores exact797 manager XML. Reopen807 restores original phone. PIN809-811: five-digit draft rejected with visible Enter a valid 6-digit PIN code; Cancel812 restores exact805 manager XML.
+
+Add813-826: temporary Third party recipient Redmi UAT 813, phone9000000000, Temporary UAT receiving desk, Basni Jodhpur342005 saved through normal-size form; optional landmark left blank. Manager828 shows the temporary record selected. Reopen830 retains entered values and displays No nearby landmark for the omitted optional field. Historical orderMS-240741 retains its original delivery details827/835/838. Removal833 asks confirmation;834 removes only the temporary record. Manager836 retains Home/Work, with Home selected after removal;837 explicitly restores original Work selection. Final839 manager XML equals pre-test812 byte-for-byte. No original address edited/deleted, order/payment/message submitted, or display setting changed.
+
+This verifies normal-size Save/reopen/removal, not cold-relaunch persistence or enlarged Add-address coverage; those remain pending. Existing ADDRESS-NEXT-FIELD-VISIBILITY child stays open. No fixture/local result is promoted to device closure.
+
+Evidence: external redmi-r66-9-round-1/round-progress-checkpoint-21.json SHA256BDCB3F48759EF768FCF7B5AFFBD8970B5D016308D402D4D0ABB6E01F4172B07A. It binds all49 PNG/XML metadata, terminal receipts and log hashes, plus phone extension B8FE88444A7C24A323732AF05F8BDBEC9822D8CC58C58240FED4EB22D18D34ED, PIN extension791DEBEBDBC8DE8A72F4B2E239B2F0820128404405485B1EC2130CA2F2449327 and Save/reopen extension726BD679C9BB02214AC14E6A223633D6F101CE261EC6CC19FB8D4F253146CED9. Same installed APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9 on Redmi TG8HCYTGGQT885OF. Source baseline0f7ac1a46c96b6a7b44b2e4b4853cdc16057a7e2; this checkpoint changes only UAT.md.
+
 ## r66.9 round 1 checkpoint20 - address keyboard and preservation
 
 **Current frozen42: 11 closed (10 findings +1 request),31 open (16 partially exercised,14 failed connected replay,1 not exercised). Nine UAT children remain open separately.** No closure in this batch.53 successful captures738-790;787 successful captures total, failed382/504/725 excluded.41/42 reached is coverage only. The complete scoped device round/list remains unfinished; **implementation remains paused**.
