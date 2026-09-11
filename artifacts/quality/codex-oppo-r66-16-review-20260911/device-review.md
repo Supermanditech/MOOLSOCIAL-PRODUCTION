@@ -1,5 +1,17 @@
 # r66.16 OPPO review
 
+## Native068 correction — existing UI restores QA Store access without rebuilding
+
+The earlier conclusion that a new APK was required was too strong. The existing Earn Today persistent Create your Workspace banner calls startAnotherWork(), which remembers the active application before starting a separate draft. Native053–065 followed that normal route to create OPPO-QA-Recovery-Store using retained QA contact details, explicit review OTP verification, and the existing option to provide documents later. No additional private document was uploaded and no real application was submitted to a backend.
+
+Native066 exposes the already-installed review control with the explicit warning: Test data only; no real application, payment or approval is changed. Selecting its Approved scenario restores the Store dashboard in067. Native068 visually and semantically confirms OPPO-QA-Recovery-Store is selected while OPPO-QA-Cloud-Document remains separately Under review and OPPO Review Store B remains Application saved. This verifies visible preservation of the earlier applications, not a blanket assertion of every persisted field or production approval behavior.
+
+No new APK, source/test/Android edit, stored-approval mutation, data clearing, hot reload, security-setting change, backend action or Cursor/Redmi operation was used. The installed r66.16 checksum is unchanged. This is an isolated QA workflow, not a production approval workaround. R6616-QA-RECOVERY-01 remains open because the original review control still loses eligibility after restart; its Store-testing reachability blocker now has a verified existing-UI workaround. Restock/product/cart/Back testing can continue but has not yet passed through this recovery evidence alone.
+
+Native049–051 additionally verify the support attachment sheet honestly reports unavailable review pickers; closing it preserves the unsent draft, and Android Back returns to the same application. No real attachment selection was completed through Chat. Native052 confirms Profile itself only offers View application while pending; the Earn banner is the distinct recovery entry.
+
+Immutable external native-capture-manifest-v4.json binds049–068,40 PNG/XML files. SHA256:28027537D823B819359A24E5B773F27988A9C87942ADA3AD6895E60670BE974C. Actual067/068 captures inspected. Earlier failed checks and manifests remain preserved. Counts unchanged:13 customer-facing/native findings,1 narrowly closed and12 open, plus the separate open QA recovery defect. No product fixes or further APK builds authorized in this testing round.
+
 ## Native048 continuation — dashboard replay blocked by review-fixture recovery
 
 Current source HEAD at audit start421aa770f112bbc7baf4c75688caed4be01548be was clean; OPPO2b3e0f71 connected. No product/test/Android edits or APK build. The new support restart child was additionally recorded under existing REG4549 with only its registry hash binding refreshed before this device continuation.

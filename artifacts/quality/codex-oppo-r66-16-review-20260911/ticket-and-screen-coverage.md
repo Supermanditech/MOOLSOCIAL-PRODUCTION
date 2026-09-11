@@ -1,5 +1,17 @@
 # r66.16 bounded support review disposition
 
+## Latest native068 — safe existing-UI recovery verified
+
+Store testing is no longer blocked by lack of dashboard access. Earn Today > Create your Workspace starts a separate QA application; the existing explicitly labelled review-only Approved control opens its dashboard. Native068 confirms the previous OPPO-QA-Cloud-Document application remains Under review and the other saved application remains listed. No new APK, data clearing, source change or production approval bypass occurred. This corrects the stronger blocker conclusion below; historical observations remain evidence. R6616-QA-RECOVERY-01 is still open, with this verified workaround, not a product fix. See device-review.md/native049–068 and manifestv4. Continue the remaining reachable Store tests; do not count unexecuted Restock/product/cart/Back checks as passed. Customer findings remain13 total,1 narrowly closed and12 open; one separate QA recovery defect remains open.
+
+## Founder-requested test-setup defect — R6616-QA-RECOVERY-01
+
+Status: registered, implementation held. This is an additional review/test-setup defect, not another customer-facing product defect and not an addition to the original27 product scope. Current inventory:13 historical customer-facing/native findings (1 narrowly closed,12 open), plus1 open QA recovery defect.
+
+Actor/outcome: Codex testing the retailer Store in the isolated OPPO review APK must recover an already submitted synthetic application after process restart and explicitly select an approved QA state, without clearing data or granting real approval. Actual: the retained application survives but ReviewWorkGateway's in-memory case allowlist does not; normal entry can only resume pending review, and the dashboard guard correctly denies access. Exact reproduction/native042–048, affected review-only source and manifestv3 hash are in device-review.md.
+
+Later acceptance: recover only known synthetic cases under the existing debug plus both review flags; retain explicit reviewer state selection; preserve application identity and user data; production gateway/build must never gain approval controls or an approval bypass. Verify restart, unknown case, wrong identity, missing flags and unchanged real approval guard. No implementation, runtime data mutation or new APK is authorized now. Continue reachable native cases; keep dashboard-dependent checks blocked rather than count them as passed.
+
 ## Latest continuation048 — no fixes, no APK
 
 Pending-application recovery and direct dashboard denial were tested on the unchanged installed r66.16. The dashboard guard correctly blocks access without a verified workspace. Restart removed the review gateway's in-memory test-approval eligibility; the retained pending application exposes no test-state control or fresh submission. Restock product/cart/Back replay therefore remains unexecuted in this continuation. See device-review.md/native042–048 for observed routes, source classification and hash-bound evidence. A permitted approved-QA-state recovery or later authorized fixture correction is needed; do not clear data, bypass approval or create a new APK. Counts remain13 historical native findings,1 narrowly closed,12 open; all27 remain accounted for, not fully qualified.
