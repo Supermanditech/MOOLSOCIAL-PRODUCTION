@@ -6,6 +6,430 @@ Complete Redmi testing of all previously scoped tickets and their connected jour
 
 
 
+## Founder seed-data authorization and reusable comparison dataset — 11 September 2026
+
+Founder authorized seed data where needed for frontend Redmi testing, reusable for later backend implementation. Keep synthetic test data labelled, isolated and reversible; preserve current customer cart, addresses, Saved and drafts. This supplements the UAT workflow. It does not supersede the instruction to finish enumeration and STOP/report before the next defect-implementation batch.
+
+Prepared nine comparison scenarios in external redmi-r66-9-round-1/seed-data-v1/comparison-scenarios-v1-lf.json, SHA256 534AA3191FAB85155CE9F1F0B774CA9BDA05F744180A8451DE98530F7FB6458E. The original CRLF serialization remains preserved as comparison-scenarios-v1.json, SHA256 C5A498B6CF77BA5B1F8307E3C9BF1A71A2E6914101E0CCA1BC95D1B98845ADBB; JSON content is identical. The exact JSON bytes (UTF-8/LF with trailing newline) are reproduced below so Git preserves the complete data, not only an external hash. Contract mapping uses existing BuyV2ComparisonQuery/Offer/Identity/Charges and BuyV2Product. The backend transport format has not been established; later backend contract tests may load these same logical cases through their adapter. All prices, suppliers and eligibility are synthetic, with an isolated uat-r669 namespace and fixed test clock.
+
+Data checks verified scenario/offer identity uniqueness, valid field-change targets and simple90+30=120 versus100+0=100 arithmetic. These are fixture preparation checks, not Flutter or backend test passes. The scenarios cover same50g pack90/100/110, delivered-cost winner, unknown freight, wrong pack, wrong delivery mode, unserviceable supplier, excess MOQ, expired quote, stock exhaustion and customer ineligibility (nine scenarios; the delivered-cost scenario includes unknown freight).
+
+**No seed was injected and no device pass is claimed.** Current runtime construction in journey_router.dart and buy_v2_review_main.dart supplies no comparisonSource to BuyV2Session; comparisonSource is a final constructor dependency. Populated-comparison fixture loading therefore needs a qualified test-harness binding. Existing host fixture _R669ContinuityComparison demonstrates the adapter interface but is not compiled into the installed APK. Do not hot-reload unqualified runtime code into the checksum-bound r66.9 app, present fixture data as live suppliers, or close backend/provider-dependent qualification. Continue other independent current-APK tests while that binding remains pending.
+
+Dataset (complete preserved payload):
+
+```json
+{
+  "fixtureVersion": 1,
+  "fixtureId": "CURSOR-REDMI-COMPARISON-SEEDS-V1",
+  "synthetic": true,
+  "purpose": "Reusable frontend Redmi and later backend contract-test scenarios, never live catalogue or purchase data.",
+  "frozenClockUtc": "2026-09-11T12:00:00Z",
+  "currency": "INR",
+  "moneyUnit": "minor_units_paise",
+  "contractMapping": {
+    "query": "BuyV2ComparisonQuery",
+    "offers": "BuyV2ComparisonOffer including BuyV2Product/Identity/Charges",
+    "scenarioChanges": "Apply field paths to a fresh deep copy of base offers; bind a separate page/snapshot for each scenario and compute rank metadata only from eligible complete quotes.",
+    "source": "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "sourceRuntimeSha": "a18aa780c0e00497ef218025bc8473a32f50a084",
+    "backendWireFormat": "Not established; this is fixture data mapped to existing Dart contracts."
+  },
+  "preservation": {
+    "isolatedNamespace": "uat-r669-",
+    "replaceExistingUserData": false,
+    "realOrdersPaymentsMessages": false,
+    "freezeClockRequired": true,
+    "reloadEachScenarioFromBase": true
+  },
+  "baseQuery": {
+    "productId": "uat-r669-biscuit-store-a",
+    "productCanonicalId": "uat-r669-biscuit",
+    "identity": {
+      "specificationId": "uat-r669-biscuit-original",
+      "packId": "uat-r669-biscuit-50g",
+      "unit": "kilogram",
+      "packQuantityMilli": 50,
+      "containedRetailUnitId": null
+    },
+    "purchaserScope": "uat-r669-isolated-consumer",
+    "destinationKey": "uat-r669-address-revision-1",
+    "pinCode": "342005",
+    "requestedQuantityMilli": 50,
+    "samePack": true,
+    "scope": "allServiceable",
+    "channel": "retail",
+    "fulfilment": "quickLocal",
+    "sort": "itemPrice",
+    "purpose": "standardPurchase",
+    "allowExtraQuantity": false,
+    "arriveBy": null,
+    "procurementContext": null
+  },
+  "baseOffers": [
+    {
+      "id": "uat-r669-offer-a",
+      "revision": "1",
+      "queryKey": "[2,\"uat-r669-biscuit-store-a\",\"uat-r669-biscuit\",\"uat-r669-biscuit-original\",\"uat-r669-biscuit-50g\",\"kilogram\",50,null,\"standardPurchase\",false,\"uat-r669-isolated-consumer\",\"uat-r669-address-revision-1\",\"342005\",50,true,\"allServiceable\",\"retail\",\"quickLocal\",\"itemPrice\",null,null]",
+      "snapshotId": "uat-r669-comparison-v1",
+      "product": {
+        "id": "uat-r669-biscuit-store-a",
+        "canonicalId": "uat-r669-biscuit",
+        "destination": "shop",
+        "categoryId": "snacks",
+        "brand": "UAT Bakery",
+        "title": "UAT biscuits",
+        "variant": "Original",
+        "pack": "50 g pack",
+        "price": 90,
+        "unitPrice": "INR 1800/kg",
+        "badge": "",
+        "seller": "UAT Store A",
+        "sellerType": "Retailer",
+        "deliveryPromise": "Test arrival window",
+        "origin": "UAT Basni, Jodhpur",
+        "confirmedOn": "Synthetic fixture - not a live quote",
+        "visualLabel": "UAT biscuits",
+        "visualKind": "snacks",
+        "storeId": "uat-r669-store-a",
+        "minimumOrder": 1,
+        "mediaAssets": [],
+        "catalogueListing": true
+      },
+      "identity": {
+        "specificationId": "uat-r669-biscuit-original",
+        "packId": "uat-r669-biscuit-50g",
+        "unit": "kilogram",
+        "packQuantityMilli": 50,
+        "containedRetailUnitId": null
+      },
+      "supplierWorkspaceId": "uat-r669-retail-workspace-a",
+      "storeId": "uat-r669-store-a",
+      "channel": "retail",
+      "fulfilment": "quickLocal",
+      "originLabel": "UAT Jodhpur",
+      "local": true,
+      "serviceable": true,
+      "customerEligible": true,
+      "availablePacks": 100,
+      "minimumPacks": 1,
+      "incrementPacks": 1,
+      "packPriceMinor": 9000,
+      "charges": {
+        "taxMinor": 0,
+        "freightMinor": 0,
+        "mandatoryFeesMinor": 0,
+        "immediateDiscountMinor": 0
+      },
+      "observedAt": "2026-09-11T11:55:00Z",
+      "validUntil": "2026-09-11T13:00:00Z",
+      "arrivalStart": "2026-09-11T12:20:00Z",
+      "arrivalEnd": "2026-09-11T12:40:00Z",
+      "tiers": []
+    },
+    {
+      "id": "uat-r669-offer-b",
+      "revision": "1",
+      "queryKey": "[2,\"uat-r669-biscuit-store-a\",\"uat-r669-biscuit\",\"uat-r669-biscuit-original\",\"uat-r669-biscuit-50g\",\"kilogram\",50,null,\"standardPurchase\",false,\"uat-r669-isolated-consumer\",\"uat-r669-address-revision-1\",\"342005\",50,true,\"allServiceable\",\"retail\",\"quickLocal\",\"itemPrice\",null,null]",
+      "snapshotId": "uat-r669-comparison-v1",
+      "product": {
+        "id": "uat-r669-biscuit-store-b",
+        "canonicalId": "uat-r669-biscuit",
+        "destination": "shop",
+        "categoryId": "snacks",
+        "brand": "UAT Bakery",
+        "title": "UAT biscuits",
+        "variant": "Original",
+        "pack": "50 g pack",
+        "price": 100,
+        "unitPrice": "INR 2000/kg",
+        "badge": "",
+        "seller": "UAT Store B",
+        "sellerType": "Retailer",
+        "deliveryPromise": "Test arrival window",
+        "origin": "UAT Basni, Jodhpur",
+        "confirmedOn": "Synthetic fixture - not a live quote",
+        "visualLabel": "UAT biscuits",
+        "visualKind": "snacks",
+        "storeId": "uat-r669-store-b",
+        "minimumOrder": 1,
+        "mediaAssets": [],
+        "catalogueListing": true
+      },
+      "identity": {
+        "specificationId": "uat-r669-biscuit-original",
+        "packId": "uat-r669-biscuit-50g",
+        "unit": "kilogram",
+        "packQuantityMilli": 50,
+        "containedRetailUnitId": null
+      },
+      "supplierWorkspaceId": "uat-r669-retail-workspace-b",
+      "storeId": "uat-r669-store-b",
+      "channel": "retail",
+      "fulfilment": "quickLocal",
+      "originLabel": "UAT Jodhpur",
+      "local": true,
+      "serviceable": true,
+      "customerEligible": true,
+      "availablePacks": 100,
+      "minimumPacks": 1,
+      "incrementPacks": 1,
+      "packPriceMinor": 10000,
+      "charges": {
+        "taxMinor": 0,
+        "freightMinor": 0,
+        "mandatoryFeesMinor": 0,
+        "immediateDiscountMinor": 0
+      },
+      "observedAt": "2026-09-11T11:55:00Z",
+      "validUntil": "2026-09-11T13:00:00Z",
+      "arrivalStart": "2026-09-11T12:20:00Z",
+      "arrivalEnd": "2026-09-11T12:40:00Z",
+      "tiers": []
+    },
+    {
+      "id": "uat-r669-offer-c",
+      "revision": "1",
+      "queryKey": "[2,\"uat-r669-biscuit-store-a\",\"uat-r669-biscuit\",\"uat-r669-biscuit-original\",\"uat-r669-biscuit-50g\",\"kilogram\",50,null,\"standardPurchase\",false,\"uat-r669-isolated-consumer\",\"uat-r669-address-revision-1\",\"342005\",50,true,\"allServiceable\",\"retail\",\"quickLocal\",\"itemPrice\",null,null]",
+      "snapshotId": "uat-r669-comparison-v1",
+      "product": {
+        "id": "uat-r669-biscuit-store-c",
+        "canonicalId": "uat-r669-biscuit",
+        "destination": "shop",
+        "categoryId": "snacks",
+        "brand": "UAT Bakery",
+        "title": "UAT biscuits",
+        "variant": "Original",
+        "pack": "50 g pack",
+        "price": 110,
+        "unitPrice": "INR 2200/kg",
+        "badge": "",
+        "seller": "UAT Store C",
+        "sellerType": "Retailer",
+        "deliveryPromise": "Test arrival window",
+        "origin": "UAT Basni, Jodhpur",
+        "confirmedOn": "Synthetic fixture - not a live quote",
+        "visualLabel": "UAT biscuits",
+        "visualKind": "snacks",
+        "storeId": "uat-r669-store-c",
+        "minimumOrder": 1,
+        "mediaAssets": [],
+        "catalogueListing": true
+      },
+      "identity": {
+        "specificationId": "uat-r669-biscuit-original",
+        "packId": "uat-r669-biscuit-50g",
+        "unit": "kilogram",
+        "packQuantityMilli": 50,
+        "containedRetailUnitId": null
+      },
+      "supplierWorkspaceId": "uat-r669-retail-workspace-c",
+      "storeId": "uat-r669-store-c",
+      "channel": "retail",
+      "fulfilment": "quickLocal",
+      "originLabel": "UAT Jodhpur",
+      "local": true,
+      "serviceable": true,
+      "customerEligible": true,
+      "availablePacks": 100,
+      "minimumPacks": 1,
+      "incrementPacks": 1,
+      "packPriceMinor": 11000,
+      "charges": {
+        "taxMinor": 0,
+        "freightMinor": 0,
+        "mandatoryFeesMinor": 0,
+        "immediateDiscountMinor": 0
+      },
+      "observedAt": "2026-09-11T11:55:00Z",
+      "validUntil": "2026-09-11T13:00:00Z",
+      "arrivalStart": "2026-09-11T12:20:00Z",
+      "arrivalEnd": "2026-09-11T12:40:00Z",
+      "tiers": []
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "SAME-PACK-THREE-PRICES",
+      "changes": [],
+      "expected": {
+        "eligibleOfferIds": [
+          "uat-r669-offer-a",
+          "uat-r669-offer-b",
+          "uat-r669-offer-c"
+        ],
+        "itemSubtotalsMinor": [
+          9000,
+          10000,
+          11000
+        ],
+        "payablesMinor": [
+          9000,
+          10000,
+          11000
+        ],
+        "lowestItemPriceOfferId": "uat-r669-offer-a",
+        "lowestDeliveredOfferId": "uat-r669-offer-a"
+      }
+    },
+    {
+      "id": "DELIVERY-COST-AND-UNKNOWN",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-a",
+          "field": "charges.freightMinor",
+          "value": 3000
+        },
+        {
+          "offerId": "uat-r669-offer-c",
+          "field": "charges.freightMinor",
+          "value": null
+        }
+      ],
+      "expected": {
+        "payablesMinor": [
+          12000,
+          10000,
+          null
+        ],
+        "lowestItemPriceOfferId": "uat-r669-offer-a",
+        "lowestDeliveredOfferId": "uat-r669-offer-b",
+        "unknownDeliveredTotalOfferIds": [
+          "uat-r669-offer-c"
+        ]
+      }
+    },
+    {
+      "id": "DIFFERENT-PACK-EXCLUDED",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-c",
+          "field": "identity.packId",
+          "value": "uat-r669-biscuit-100g"
+        },
+        {
+          "offerId": "uat-r669-offer-c",
+          "field": "identity.packQuantityMilli",
+          "value": 100
+        },
+        {
+          "offerId": "uat-r669-offer-c",
+          "field": "product.pack",
+          "value": "100 g pack"
+        }
+      ],
+      "expected": {
+        "rejected": {
+          "uat-r669-offer-c": "differentProduct"
+        }
+      }
+    },
+    {
+      "id": "DIFFERENT-DELIVERY-MODE-EXCLUDED",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-c",
+          "field": "fulfilment",
+          "value": "standardCourier"
+        }
+      ],
+      "expected": {
+        "rejected": {
+          "uat-r669-offer-c": "filtered"
+        }
+      }
+    },
+    {
+      "id": "UNSERVICEABLE-SUPPLIER",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-a",
+          "field": "serviceable",
+          "value": false
+        }
+      ],
+      "expected": {
+        "rejected": {
+          "uat-r669-offer-a": "unserviceable"
+        },
+        "lowestItemPriceOfferId": "uat-r669-offer-b"
+      }
+    },
+    {
+      "id": "MINIMUM-QUANTITY-EXCESS",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-a",
+          "field": "minimumPacks",
+          "value": 2
+        }
+      ],
+      "expected": {
+        "rejected": {
+          "uat-r669-offer-a": "unwantedQuantity"
+        },
+        "noAutomaticExtraPack": true
+      }
+    },
+    {
+      "id": "EXPIRED-QUOTE",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-a",
+          "field": "validUntil",
+          "value": "2026-09-11T11:59:00Z"
+        }
+      ],
+      "expected": {
+        "rejected": {
+          "uat-r669-offer-a": "expired"
+        }
+      }
+    },
+    {
+      "id": "OUT-OF-STOCK",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-a",
+          "field": "availablePacks",
+          "value": 0
+        }
+      ],
+      "expected": {
+        "rejected": {
+          "uat-r669-offer-a": "insufficientStock"
+        }
+      }
+    },
+    {
+      "id": "CUSTOMER-INELIGIBLE",
+      "changes": [
+        {
+          "offerId": "uat-r669-offer-a",
+          "field": "customerEligible",
+          "value": false
+        }
+      ],
+      "expected": {
+        "rejected": {
+          "uat-r669-offer-a": "customerIneligible"
+        }
+      }
+    }
+  ],
+  "deviceExecution": {
+    "loaded": false,
+    "passesClaimed": false,
+    "blocker": "Current r66.9 entrypoint constructs BuyV2Session without comparisonSource; its final comparisonSource cannot be changed by seed-data-only injection. Reuse existing test adapter through a qualified test harness in a later authorized build; do not hot-reload different runtime source into checksum-bound APK evidence."
+  },
+  "coverageLimits": [
+    "These cases cover standard-purchase same-pack comparison only.",
+    "Wholesale/Bulk, procurement roles, scheduled arriveBy, pagination/revisions, media and invoice fixtures require their own contract-bound extensions.",
+    "No fixture result qualifies native app links, provider upload/transcoding, authenticated eligibility, live price/serviceability or backend enforcement."
+  ]
+}
+```
+
 ## r66.9 scoped round 1 checkpoint 4 — original Orders search reproductions
 
 **115 total captures; two new UAT children unchanged; zero full ticket closures.** Sixteen of33 frozen findings and five of9 requests have now been reached on Redmi;17 findings and4 requests have not yet been exercised. Thus21/42 entries are partly checked, not fully verified. Among the16 reached findings, two new children have been recorded (2/16,12.5%); among all21 reached entries,2/21,about9.5%. These are provisional discovery ratios, not failure-rate estimates. The two earlier implementation children remain separate: one partial, one untested. The procurement dependency remains separately qualified only within its previously stated limits.
