@@ -1,5 +1,33 @@
 # r66.16 bounded support review disposition
 
+## Founder authorization — consolidated correction phase
+
+Founder explicitly lifted the collection-only hold after native092, subject to clean Git, bounded ownership, regression verification and safe future integration. Begin from clean remote-equal f6cf777f093025a9caea9a5f5dfee7d292ffe519. Implement the recorded Codex-owned defects and necessary review-fixture corrections in atomic tested changes; preserve earlier failed evidence. Cursor integration, Redmi, backend deployment, real messages/payments and product-add redesign remain held. Shared/Buy changes require exact existing ownership or separate coordination, not dirty-file copying. Stock quantity editor child09/REG4558 is the first correction: preserve validation and movement behavior while making Save reachable with keyboard open/closed and large text. Closure requires local and successor OPPO evidence; the installed r66.16 is unchanged and its failures remain recorded below.
+
+### Child09 Stock quantity editor — locally qualified, OPPO pending
+
+Bounded functional owners: apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart and apps/mobile/test/work_workspace_layout_safety_test.dart. The existing editor now scrolls within safe bounds, retains bottom view padding when the keyboard changes, expands its reason selector without clipping at200%, uses concise Quantity/Reason labels, and clears an existing error only when input becomes a valid nonnegative integer. Save validation, movement reason/type and session update logic remain intact. Added tests prove invalid input makes no movement, valid Save creates exactly one movement, and Back cancels a later edit without changing stock. No new screen, dependency, backend or Cursor owner.
+
+Exact local commands from apps/mobile:
+
+- flutter test --no-pub test/work_workspace_layout_safety_test.dart --name 'R6617 stock quantity|REG4558|catalogue keeps daily product actions direct and compact' --reporter expanded --concurrency=1 --dart-define=MOOL_CAPTURE_STORE_VIEW_V2=true --dart-define=MOOL_STORE_VIEW_CAPTURE_DIR=r6617-stock-editor-local-visual-v2 --update-goldens:10passed,0failed.
+- flutter test --no-pub test/work_store_atomic_operations_test.dart test/work_workspace_layout_safety_test.dart --exclude-tags protected-reference --reporter expanded --concurrency=1:997passed,79existing skips,0failed. No new skips or exclusions; this is the connected two-file check, not a claim that final44-file APK qualification ran.
+- flutter test --no-pub test/ui_v2_customer_copy_machine_gate_test.dart test/global_customer_copy_professionalization_test.dart --reporter expanded --concurrency=1:5passed,0failed.
+- flutter analyze --no-pub:zero issues. Approved UI locks and existing MVP execution gate passed. Focused counts overlap the connected suite; do not sum as unique tests.
+
+All raw logs below are external under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905; exit0 verified for each final run:
+
+| Evidence | SHA256 |
+| --- | --- |
+| r6617-stock-editor-visual-regressions-v2.log | EE25DA8B23DEFE0389F56D1C84EFBC3F024F1BE0E4E887C5B86635411DF33159 |
+| r6617-stock-editor-connected-v1.log | 496DE2D400BB281C6C878870633FBD9A7549B4D917632797452A5C43EC85BE7B |
+| r6617-stock-editor-copy-v1.log | 11B0F84848C740BEAFFFD4D7CC249DD5B9D30A7E210A8BA8A0D021C797290B5B |
+| r6617-stock-editor-analysis-v2.log | 214CFC0A3A2F140554C6C24C0DF9B6A62403B734CEA9CF0F26F9D4FE21AE66FA |
+
+Actual Flutter images inspected in r6617-stock-editor-local-visual-v2: stock-keyboard-closed-1.0.png (7214915616A3F17112F1CF47BC94C43C0C2371EC7B63720309269277DF50007F), stock-keyboard-closed-2.0.png (0B79ADB1ABA040E6117BE0F6F525C64FDBDA34DB116CBE5EDF5599EEE31A8DCB), stock-keyboard-open-error-1.0.png (8CDA25FE1CF6A1A97086F06ADA70CE579A51CEFC8EA1FF99C60A0F524333629E), stock-keyboard-open-error-2.0.png (48A81CB7753E6C08F094CAD126094394BB0D7CEAE3C266C64AD8020BDEEE1FA9). At200%, these show the deliberate scroll position exposing the full Save/error/selected-reason content; the title can be reached by scrolling, not all fields simultaneously. Keyboard space is simulated host geometry, not a physical200% device pass. Earlier failures/visual captures remain untouched.
+
+Tested source SHA256:1FA8CA88326DD8498C8D4460042C4FC983CDBE929B58262BD1E57A956D58316E; test SHA256:3C2C9ED85D9A9D81C984DE53AE7D00F041B1F063936CB731DFC922E866B92A93. r66.16 remains installed and unchanged; no successor APK built. Child09 is implemented/local-qualified but not closed; overall native closure counts remain1closed/14open pending the consolidated successor OPPO replay. Other recorded fixes remain to implement or coordinate; integration remains held.
+
 ## Current disposition — native092,15 observed findings
 
 New device-confirmed dependency case **R6616-UAT-PROCUREMENT-SCOPE-15**: two QA Stores share the installed procurement cart/query; changing3to4packs in Store B changes the cart when returning normally to Store A. Work dashboard balances remain Store-specific. Link to REG4512 and the existing STORE-PROCUREMENT-ELIGIBILITY-01 / DASH-LOAD07/13/14 work, not a duplicate global ticket. No checkout/payment or different-account exposure was tested. Deferred Cursor integration and the Codex Store context wrapper must jointly qualify this later; implementation remains held.

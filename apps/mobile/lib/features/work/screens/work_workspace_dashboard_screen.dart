@@ -11189,104 +11189,118 @@ class _WorkspaceCatalogueSurfaceState
           return AnimatedPadding(
             duration: const Duration(milliseconds: 180),
             padding: EdgeInsets.fromLTRB(18, 0, 18, bottom + 18),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Update available quantity',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    color: MoolColors.navy,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  '${product.title} · ${product.pack}',
-                  style: const TextStyle(color: MoolColors.muted),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  key: const Key('work-quick-stock'),
-                  controller: quantity,
-                  autofocus: true,
-                  keyboardType: TextInputType.number,
-                  textInputAction: TextInputAction.done,
-                  decoration: const InputDecoration(
-                    labelText: 'Quantity available now',
-                    prefixIcon: Icon(Icons.inventory_2_outlined),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  key: const Key('work-quick-stock-reason'),
-                  initialValue: reason,
-                  decoration: const InputDecoration(
-                    labelText: 'Why did the quantity change?',
-                  ),
-                  items:
-                      const [
-                            'Counted in store',
-                            'Goods received',
-                            'Customer return',
-                            'Damage or expiry',
-                            'Correction',
-                          ]
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
-                            ),
-                          )
-                          .toList(growable: false),
-                  onChanged: (value) {
-                    if (value != null) setSheetState(() => reason = value);
-                  },
-                ),
-                if (error != null) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    error!,
-                    style: const TextStyle(
-                      color: Color(0xFFB42318),
-                      fontWeight: FontWeight.w800,
+            child: SafeArea(
+              top: false,
+              maintainBottomViewPadding: true,
+              child: SingleChildScrollView(
+                key: const Key('work-quick-stock-scroll'),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Update available quantity',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
-                  ),
-                ],
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    key: const Key('work-quick-stock-save'),
-                    onPressed: () {
-                      final parsed = int.tryParse(quantity.text.trim());
-                      if (parsed == null || parsed < 0) {
-                        setSheetState(
-                          () => error = 'Enter a valid available quantity.',
-                        );
-                        return;
-                      }
-                      final kind = switch (reason) {
-                        'Goods received' =>
-                          WorkspaceStockMovementKind.goodsReceived,
-                        'Customer return' =>
-                          WorkspaceStockMovementKind.returned,
-                        'Damage or expiry' =>
-                          WorkspaceStockMovementKind.damageOrExpiry,
-                        _ => WorkspaceStockMovementKind.adjustment,
-                      };
-                      if (widget.session.updateWorkspaceStock(
-                        productId: product.id,
-                        quantity: parsed,
-                        reason: reason,
-                        kind: kind,
-                      )) {
-                        Navigator.of(sheetContext).pop();
-                      }
-                    },
-                    child: const Text('Save quantity'),
-                  ),
+                    Text(
+                      '${product.title} · ${product.pack}',
+                      style: const TextStyle(color: MoolColors.muted),
+                    ),
+                    const SizedBox(height: 12),
+                    TextField(
+                      key: const Key('work-quick-stock'),
+                      controller: quantity,
+                      autofocus: true,
+                      keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.done,
+                      decoration: const InputDecoration(
+                        labelText: 'Quantity',
+                        prefixIcon: Icon(Icons.inventory_2_outlined),
+                      ),
+                      onChanged: (value) {
+                        final parsed = int.tryParse(value.trim());
+                        if (error != null && parsed != null && parsed >= 0) {
+                          setSheetState(() => error = null);
+                        }
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    DropdownButtonFormField<String>(
+                      key: const Key('work-quick-stock-reason'),
+                      isExpanded: true,
+                      isDense: false,
+                      itemHeight: null,
+                      initialValue: reason,
+                      decoration: const InputDecoration(labelText: 'Reason'),
+                      items:
+                          const [
+                                'Counted in store',
+                                'Goods received',
+                                'Customer return',
+                                'Damage or expiry',
+                                'Correction',
+                              ]
+                              .map(
+                                (value) => DropdownMenuItem(
+                                  value: value,
+                                  child: Text(value),
+                                ),
+                              )
+                              .toList(growable: false),
+                      onChanged: (value) {
+                        if (value != null) setSheetState(() => reason = value);
+                      },
+                    ),
+                    if (error != null) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        error!,
+                        style: const TextStyle(
+                          color: Color(0xFFB42318),
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 12),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton(
+                        key: const Key('work-quick-stock-save'),
+                        onPressed: () {
+                          final parsed = int.tryParse(quantity.text.trim());
+                          if (parsed == null || parsed < 0) {
+                            setSheetState(
+                              () => error = 'Enter a valid available quantity.',
+                            );
+                            return;
+                          }
+                          final kind = switch (reason) {
+                            'Goods received' =>
+                              WorkspaceStockMovementKind.goodsReceived,
+                            'Customer return' =>
+                              WorkspaceStockMovementKind.returned,
+                            'Damage or expiry' =>
+                              WorkspaceStockMovementKind.damageOrExpiry,
+                            _ => WorkspaceStockMovementKind.adjustment,
+                          };
+                          if (widget.session.updateWorkspaceStock(
+                            productId: product.id,
+                            quantity: parsed,
+                            reason: reason,
+                            kind: kind,
+                          )) {
+                            Navigator.of(sheetContext).pop();
+                          }
+                        },
+                        child: const Text('Save quantity'),
+                      ),
+                    ),
+                  ],
                 ),
-              ],
+              ),
             ),
           );
         },

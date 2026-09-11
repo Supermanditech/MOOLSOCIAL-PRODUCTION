@@ -15041,6 +15041,86 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R6617 stock quantity safe keyboard and validation $scale', (
+      tester,
+    ) async {
+      final work = liveStore();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(320, 568),
+        textScale: scale,
+        bottomInset: 24,
+      );
+      await tester.tap(find.byKey(const Key('work-store-stock')));
+      await tester.pumpAndSettle();
+      final edit = find.byKey(const Key('work-catalogue-stock-oil-fortune-1l'));
+      await reveal(tester, edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      final field = find.byKey(const Key('work-quick-stock'));
+      final save = find.byKey(const Key('work-quick-stock-save'));
+      final before = work.workspaceCatalogueItems.first.stock;
+      final movements = work.workspaceStockMovements.length;
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      await tester.pumpAndSettle();
+      await tester.enterText(field, '-1');
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
+      expect(save.hitTestable(), findsOneWidget);
+      expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(348));
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(find.text('Enter a valid available quantity.'), findsOneWidget);
+      expect(work.workspaceCatalogueItems.first.stock, before);
+      expect(work.workspaceStockMovements, hasLength(movements));
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'stock-keyboard-open-error-$scale');
+      await tester.enterText(field, '4');
+      tester.view.viewInsets = const FakeViewPadding();
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(save);
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(field).controller!.text, '4');
+      expect(find.text('Enter a valid available quantity.'), findsNothing);
+      final reasonField = find.byKey(const Key('work-quick-stock-reason'));
+      final reasonText = find.descendant(
+        of: reasonField,
+        matching: find.text('Counted in store'),
+      );
+      expect(reasonText, findsOneWidget);
+      expect(
+        tester.getBottomRight(reasonText).dy,
+        lessThanOrEqualTo(tester.getBottomRight(reasonField).dy),
+      );
+      expect(save.hitTestable(), findsOneWidget);
+      expect(tester.getSize(save).height, greaterThanOrEqualTo(48));
+      expect(tester.getBottomRight(save).dy, lessThanOrEqualTo(544));
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'stock-keyboard-closed-$scale');
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(field, findsNothing);
+      expect(work.workspaceCatalogueItems.first.stock, 4);
+      expect(work.workspaceStockMovements, hasLength(movements + 1));
+      expect(work.workspaceStockMovements.first.reason, 'Counted in store');
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      await tester.enterText(field, '7');
+      tester.testTextInput.hide();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(field, findsNothing);
+      expect(work.workspaceCatalogueItems.first.stock, 4);
+      expect(work.workspaceStockMovements, hasLength(movements + 1));
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('catalogue keeps daily product actions direct and compact', (
     tester,
   ) async {
