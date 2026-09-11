@@ -2,6 +2,33 @@
 
 ## Founder authorization — consolidated correction phase
 
+### 12 September sleep scope — device audit accounted for; fix batch authorized
+
+Latest instruction supersedes historical collection-only/APK permissions below: first account for device testing, then consolidate authorized child fixes and local qualification, then stop. No new APK, Cursor integration, Redmi changes, policy/gate redesign, real messages/payments, deployment or product-add redesign. Child09/10 were already sealed before this instruction and remain uninstalled. This checkpoint incorporates all earlier27-item evidence plus native093–103 on checksum-verified r66.16; no old checks are silently replaced or rerun as new passes.
+
+**27 dispositions recorded; not27 device passes.**24items have relevant native evidence,2are host-only investigations,1is founder-held.15native findings have been observed:1narrowly device-closed,14open; plus1review-only QA recovery defect. No new child arose from093–103. Child09/10 are locally qualified only; their device defects cannot close without a later separately authorized APK. The detailed27-row matrix below remains authoritative, with these final amendments:
+
+| Items | Audit disposition before consolidated fixes |
+| --- | --- |
+| 1–6,15 queue/search/alerts/commands/deadlines/fulfilment/load | Native populated12/100/1000 and available order-response cases recorded. Children05/06/07 remain. Continuous server events, actual capacity/reassignment and authenticated collection/rider completion cannot be exercised by the installed fixture; not passed. |
+| 7,9 suppliers/receipt/issues | Native nine stages, exact shipment, independent payment facts, receipt draft/Back/cross-shipment checks retained. New096–103 proves exact Mandi18-pack draft across Home/task-return and Back/reopen. Children02/08 remain; real tracking/receipt/issue responses absent and explicitly unqualified. |
+| 8,10 finance/history | Native large amounts,1000Sales rows and local adjustment checks retained. Child10 reproduced; source fix is local-only. Real payments/settlement/full historical authority remain unqualified. |
+| 11 supplier offers | Three eligible-role offers and selected-offer return tested. Commitment/payment/revision-response fixtures and backend enforcement absent, not passed. |
+| 12,18 communication | Exact order/Store context and Back/recovery checks retained. No real messaging/recipient delivery or full assistive interaction qualified. |
+| 13,14 daily actions/durability | Native stock/bill/search/first taps and retained/cold-start cases recorded. Children02–04/07/09/10/12/13/14/15 and QA recovery remain; no actual publication/sharing/payment or process-death Buy qualification. |
+| 16 Stock tools | Native child09; local fix sealed, not in installed APK. Device closure pending. |
+| 17 counter phone | Field-specific invalid-prefix correction passed narrowly on OPPO; review/Back/local invoice checks retained. Authoritative contact verification and complete physical accessibility remain unqualified. |
+| 19,20 global Files | Normal/160% heading/Cancel/Back evidence retained; global Choose file no-op child11 open. Workspace uploader success cannot close global Files. |
+| 21,22 application support | r66.16 synthetic failure/retry, keyboard and in-session draft/Back checks pass. Process-restart draft-loss child13 open; transport/physical200% not qualified. |
+| 23,27 host investigations | Not device journeys. Retained classification/five Codex corrections; two shared Buy/Chat assertions remain dependency-held. |
+| 24 product add | Explicitly founder-held separate redesign; exclude from this implementation batch, not silently closed. |
+| 25 physical200%/TalkBack | Native160% and partial TalkBack evidence retained. Ordinary phone font UI lacks200%; complete assistive gestures/audio not verified. No settings/security bypass, no full accessibility claim. |
+| 26 cloud files | Native authorized Drive image/local two-page PDF/preview/zoom/cancel/Back pass in-session. Restart loses attachment metadata/preview child12; backend upload and provider-failure mapping remain unqualified. |
+
+Consolidated fix order uses existing children, not new duplicate tickets:02shortcut,03promotion draft,04requirement feedback,05central scrolling,06purchased snapshot,07ready action,08local shipment time;09Stock and10Statement already locally sealed;11global Files,12attachment restoration,13support draft restart require exact current shared-owner checks;14Cart overlay/15procurement isolation remain coupled to preserved Buy ownership/deferred integration. QA-recovery01 may be corrected only in review code. Implement only authorized owners, retain unimplementable dependencies explicitly, test locally, and seal clean/remote-equal. No production or OPPO closure from fixtures/host tests.
+
+Device evidence supplement: device-review.md/native093–103 and external native-capture-manifest-v7.json SHA256 CFEE16B3D38BCFAFC541FAA988598C11B558BA525F51FA1F72CA91C8B63E1BB3. Installed package remains1.0.0-r66.16-runtime/2026091103, SHA2560B39D0EAAC3F0B5A8F811B87EE3486DB462F561471084A41101BBC110A9A49FE.
+
 Founder explicitly lifted the collection-only hold after native092, subject to clean Git, bounded ownership, regression verification and safe future integration. Begin from clean remote-equal f6cf777f093025a9caea9a5f5dfee7d292ffe519. Implement the recorded Codex-owned defects and necessary review-fixture corrections in atomic tested changes; preserve earlier failed evidence. Cursor integration, Redmi, backend deployment, real messages/payments and product-add redesign remain held. Shared/Buy changes require exact existing ownership or separate coordination, not dirty-file copying. Stock quantity editor child09/REG4558 is the first correction: preserve validation and movement behavior while making Save reachable with keyboard open/closed and large text. Closure requires local and successor OPPO evidence; the installed r66.16 is unchanged and its failures remain recorded below.
 
 ### Child10 Statement tab position — locally qualified, OPPO pending
