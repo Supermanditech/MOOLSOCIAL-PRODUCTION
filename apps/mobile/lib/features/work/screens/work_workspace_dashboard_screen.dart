@@ -19913,6 +19913,7 @@ class _WorkspacePaidWorkSurface extends StatefulWidget {
 }
 
 class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
+  final _errorKey = GlobalKey();
   final _title = TextEditingController();
   final _outcome = TextEditingController();
   final _terms = TextEditingController();
@@ -20010,7 +20011,16 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
       _error = error;
       _reviewing = error == null;
     });
-    if (error == null) FocusManager.instance.primaryFocus?.unfocus();
+    FocusManager.instance.primaryFocus?.unfocus();
+    if (error != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || _reviewing || _error != error) return;
+        final target = _errorKey.currentContext;
+        if (target != null) {
+          unawaited(Scrollable.ensureVisible(target, alignment: .5));
+        }
+      });
+    }
   }
 
   @override
@@ -20219,10 +20229,15 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
                     _pricing(),
                     if (_error != null)
                       Padding(
+                        key: _errorKey,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Text(
-                          _error!,
-                          style: const TextStyle(color: Color(0xFFB42318)),
+                        child: Semantics(
+                          liveRegion: true,
+                          child: Text(
+                            _error!,
+                            key: const Key('work-requirement-error'),
+                            style: const TextStyle(color: Color(0xFFB42318)),
+                          ),
                         ),
                       ),
                     if (compactHeight) ...[

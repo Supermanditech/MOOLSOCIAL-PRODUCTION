@@ -1,5 +1,26 @@
 # r66.16 OPPO review
 
+## Native110–113 — supplier issue editor recovery
+
+Existing r66.16/OPPO only.110 opens Item issue and exposes No issue noted/Missing packs/Damaged packs/Wrong item/Wrong pack size/Extra packs/Other issue.111 selects Missing packs; existing18packs and synthetic note remain.112 Close returns the exact supplier shipment without confirming receipt;113 Receive stock reopens with all three draft values intact. This is selector/Close/reopen recovery evidence, not actual issue submission, receipt authority or process-death acceptance. No new defect observed. Payment pending, Received not confirmed and Not sent remain unchanged. Native113 XML directly verifies draft values; no separate visual approval is claimed for uninspected110–113 screenshots.
+
+Same external native directory as104–109. SHA256 PNG/XML pairs:110 9298E54CEAB18EB5C6657BFCBEBFDDC396EC14BC40A6452B50642C243A3EFC84 /4CD6CB1890BBDB48869A83AB524D800AE1B1057440B66FE7F8052400AB8179F9;111 FB35E3A92D022C65E41ED2000E4EC292AB0304DB9CA2BAE1291C8938C71C5018 /D7445B7C238D99E53DBC2D3A9B4B82C2E4A6810EE339AAB5865054DD6E8F60DB;112 78C177D2D6B750241574F7C1F38210E7FB66A91CA91761000FC76D102E47CE1A /417B76D06218B27BB436EB7CBFD87B7DD7095C669ECC2C5A254ED741AF873A86;113 8D528E357E4E0228C5B749474D899236F7FF6C16275C6AF4983CDB8C3D53E518 /E9CDF5A3F6A670C55D847D8B46171F567C865462BE350D34CA8892C372509668.
+
+## Corrected goal — native104–109 supplier note recovery
+
+The corrected founder goal requires reachable device testing/listing first; blocked checks cannot be counted as complete. Native104 independently confirms Runtime foreground, installed version1.0.0-r66.16-runtime/code2026091103 and font1.0 on OPPO2b3e0f71. No install occurred; the earlier installed checksum proof remains095. Redmi untouched. Git HEAD97971e19f32bbed6b56deac76db4bdbc4af131fd; three pre-existing uncommitted requirement-validation owners preserved. The clean-only diagnostic predictably rejected those three drafts (222 status bytes,3records,SHA25628237B04C6E5C5EC4BA93F9633A82ACE14E4F7EED04A918EC2C8CFD28D6746D4); this was not clean Git proof. Existing coordination and device-memory checks passed. No product implementation, staging, commit, policy change or APK in this continuation.
+
+Additional scoped supplier draft check:104 resumes the existing exact Mandi receipt editor.105 enters synthetic note 'QA test only: two packs missing'; text, caret and31/2000 counter remain visible above keyboard.106 ordinary Android Back dismisses keyboard.107 toolbar Back returns purchases.108 selects exact QA-PURCHASE-1/QA-SHIPMENT-1/QA-TRACK-1, still payment pending/₹4960.109 Receive stock and normal scrolling expose both retained18packs and the complete unchanged note. Received not confirmed/Not sent remain explicit; no receipt, stock, invoice, payment or external message was submitted. Actual104/105/109 PNGs inspected. Other captures retained as XML/action evidence, not separately claimed visual approvals. This adds a narrow in-session note/Back pass for items7/9/14, not process-death, backend receipt or full parent closure. No new child observed; existing findings remain15native(1narrowlydeviceclosed,14open) plus QA-recovery01.
+
+Evidence directory: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-16-native-20260911. SHA256 pairs PNG/XML:
+
+-104-corrected-goal-resume:2DA56ADE1CD21A1550278BFA5173B2CED5CB18075FA52D3C5FD3035593CF937E /599271B326A5EAB30A0CA9F2B2699DA0BCAFFC2BEA16D14CC065FF2AE1DDE697.
+-105-supplier-note-keyboard:62856148899189053B898685B8DA3E99FAE7F89E548293254661FE3FA439401D /592F78F976F3E8BF514D9A8EB3D582C3805483417C67DFAB5082E596EACCF3AB.
+-106-supplier-note-dismissed:EA59D5F45E9A7B5454EC851DD853D62D9F26BD1378492CF45C2EB965B60CED38 /E73A7C422F2C8A5EE084E07567E43CE10EEFB5A0FF4EDE24C9CF344002D0E8BE.
+-107-supplier-note-return-list:42A3C2C4B847F161419DC8A431BC809D1C74653C8C1F62CD1CC86EC7FC600684 /6BE2A42AF1E247DC3F515F5723B354BA47BEAFA395AD596B86FB7B29BC9851C4.
+-108-supplier-note-reopen:2B99F4FC52A636E465DD8291371CAEAF7BD5C4E92358E8E05B02DE29314A20B4 /417B76D06218B27BB436EB7CBFD87B7DD7095C669ECC2C5A254ED741AF873A86.
+-109-supplier-note-retained:50F62557BF58F3B3D4687A01C88976BA511DAED1124379E58095AF68D4B76F6F /DB40245240DFE295D08FC25A69C26B7D938E01F5815D8ED9A590AFC8A04BDD9A.
+
 ## Sleep authorization audit resume — native093 onward
 
 Native095 independently rehashes the installed base.apk to0B39D0EAAC3F0B5A8F811B87EE3486DB462F561471084A41101BBC110A9A49FE, then loads the existing review1000 dataset:250 each Accept/Pack/Check pickup/Track,1006alerts,6incoming shipments and3offers. This is record-volume/fixture evidence, not concurrent server traffic. Source StoreReviewSeed contains Mool delivery orders only and its existing adapter supports accept/reject/ready/request-time with applied/rejected/lost-response reconciliation; it has no authenticated customer-collection, live payment, supplier receipt/commitment or continuous event authority. Those missing scenarios remain explicit qualification boundaries, not successful tests or new product defects. No successor APK is allowed under the latest scope.

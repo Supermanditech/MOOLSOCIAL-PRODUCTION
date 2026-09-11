@@ -17084,6 +17084,92 @@ void main() {
       },
     );
 
+    for (final keyboardOpen in [false, true]) {
+      testWidgets(
+        'R6617 requirement reveals validation $scale keyboard $keyboardOpen',
+        (tester) async {
+          final previousHitTestFatal =
+              WidgetController.hitTestWarningShouldBeFatal;
+          WidgetController.hitTestWarningShouldBeFatal = true;
+          addTearDown(() {
+            WidgetController.hitTestWarningShouldBeFatal = previousHitTestFatal;
+          });
+          final work = storeViewFixture();
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+            textScale: scale,
+          );
+          await reveal(tester, find.byKey(const Key('work-quick-requirement')));
+          await tester.tap(find.byKey(const Key('work-quick-requirement')));
+          await tester.pumpAndSettle();
+          final service = find.byKey(const Key('work-requirement-category-4'));
+          await tester.ensureVisible(service);
+          await tester.pumpAndSettle();
+          await tester.tap(service);
+          await tester.pumpAndSettle();
+          final title = find.byKey(const Key('work-requirement-title'));
+          if (keyboardOpen) {
+            await tester.showKeyboard(title);
+            tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+            await tester.pumpAndSettle();
+          }
+          final review = find.byKey(const Key('work-requirement-review'));
+          await tester.ensureVisible(review);
+          await tester.pumpAndSettle();
+          await tester.tap(review, warnIfMissed: true);
+          await tester.pump();
+          expect(tester.testTextInput.isVisible, isFalse);
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          // No reveal/scroll helper after Review: the screen must expose its
+          // own correction instead of relying on the tester to find it.
+          final error = find.byKey(const Key('work-requirement-error'));
+          expect(error.hitTestable(), findsOneWidget);
+          expect(find.text('Describe what your store needs.'), findsOneWidget);
+          final errorRect = tester.getRect(error);
+          final formRect = tester.getRect(
+            find.byKey(const Key('work-requirement-details')),
+          );
+          expect(errorRect.top, greaterThanOrEqualTo(formRect.top));
+          expect(errorRect.bottom, lessThanOrEqualTo(formRect.bottom));
+          final semantics = tester.widget<Semantics>(
+            find.ancestor(of: error, matching: find.byType(Semantics)).first,
+          );
+          expect(semantics.properties.liveRegion, isTrue);
+          expect(work.workspacePaidRequirementReference, isNull);
+          await captureStoreView(
+            tester,
+            'requirement-visible-error-$scale-$keyboardOpen',
+          );
+          for (final entry in const {
+            'work-requirement-title': 'Create store product photos',
+            'work-requirement-outcome': 'Deliver ten clear product photos.',
+          }.entries) {
+            final field = find.byKey(Key(entry.key));
+            await tester.ensureVisible(field);
+            await tester.pumpAndSettle();
+            await tester.enterText(field, entry.value);
+          }
+          FocusManager.instance.primaryFocus?.unfocus();
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(review);
+          await tester.pumpAndSettle();
+          await tester.tap(review, warnIfMissed: true);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-requirement-review-surface')),
+            findsOneWidget,
+          );
+          expect(error, findsNothing);
+          expect(work.workspacePaidRequirementReference, isNull);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
     testWidgets('DASH13 requirement budget validation $scale', (tester) async {
       final work = liveStore();
       await mount(
@@ -17133,7 +17219,6 @@ void main() {
           find.byKey(const Key('work-requirement-review-surface')),
           findsNothing,
         );
-        await reveal(tester, find.text(error));
         expect(find.text(error).hitTestable(), findsOneWidget);
         expect(work.workspacePaidRequirementReference, isNull);
         expect(tester.takeException(), isNull);
