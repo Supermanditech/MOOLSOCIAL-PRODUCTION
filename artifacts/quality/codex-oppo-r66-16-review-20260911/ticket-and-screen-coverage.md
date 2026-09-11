@@ -1,5 +1,19 @@
 # r66.16 bounded support review disposition
 
+### Child12 local recovery draft — first validation retained
+
+Local qualification completed for bounded cache-reference recovery:236 gateway checks (connected-v2 SHA256 `153B1DFDA6D02362D6BC7F96F970025D90E7B04386A6845A5092A388BE01F361`),2 layout checks (visual-v2 SHA256 `34E341D09EB167DE61E6BC20CD1397DD615FF8555DEA1C95D810E81FD1880EDB`), actual100%/200% PNG inspection, final full analysis zero issues. Existing encrypted application draft stores metadata/hash/private-cache reference, not document bytes or approval. Reopening validates private-cache containment, content signature, size, digest and application/reference association; account changes do not restore the prior account's files. OS-purged or changed cache stays explicitly unavailable and requires replacement. This does not promise permanent document storage: backend retrieval/upload, long-term retention and installed-APK restart qualification remain open. No new APK, Android security, dependency or policy changes. Earlier pending statements below are historical checkpoints.
+
+Visual v2 passed2 tests at320x568,100%/200%; actual Flutter PNGs recovery-unavailable-1.0.png and recovery-unavailable-2.0.png inspected in external r6617-document-recovery-visual-v2. Guidance is readable, large-text content scrolls, and tests explicitly reveal and hit-test Replace. Captures show the guidance position, not every document simultaneously; at200% the document controls require scrolling. These are seeded presentation states paired with separate restart/session tests, not physical OPPO or backend evidence. Final sealing checks remain pending.
+
+Visual v1 tests failed2 because the test targeted Add for an already-recorded document; the existing control is Replace. Corrected only the finder, retaining the requirement that recovery remains actionable at100%/200%. Failed log/captures retained under r6617-document-recovery-visual-v1; not qualification evidence.
+
+Final-review follow-up: retain unavailable-cache metadata when saving the same application with the same document reference; replacement/reference changes cannot inherit it. Restart cases now repeat save/restart to verify missing/changed previews remain explicitly unavailable. Complete gateway suite rerun connected v2 passed236, exit0; analysis v3 zero issues, exit0. These supersede earlier-source qualification for the current draft. Actual rendered recovery-state review remains pending. No new device qualification or commit.
+
+Rerun: focused v2 passed19 (SHA256 `2E325BF5DFD5E85B038F9A036D6003E2C3C2C62DD91A25E888C824B4239F1FCF`); complete work_production_gateway_test.dart connected v1 passed236 (SHA256 `A3A84A0CB0EF34A275DA3B2126A8A50FE9DA523D238732ACA6B6E902768521E3`); analysis v2 zero issues (SHA256 `EC19C3C21610EEBF488267A1D6283E7768030690DC3C48C4F05149C3E72A9ADF`). All commands exit0; counts overlap. Full logs remain in external audit root with prefix r6617-document-recovery-. Visual verification and final recovery review remain pending; no commit or device closure claimed.
+
+`r6617-document-recovery-focused-v1.log` (external audit root) completed with16 passes and3 failures: the present/changed/missing restart cases used mixed Windows separators, causing XFile display names to include a directory. SHA256 `18643EEA395B68526F0EB550D50DBD4F8D61D151E79B29FCA341CCE3ABDA8F89`. Analysis v1 reported two missing-brace lint issues. Native path separators and braces corrected before rerun. This is uncommitted local work, not OPPO qualification; cache loss and altered-content recovery must remain honest and application/account scoped. No APK or policy changes.
+
 ## Founder authorization — consolidated correction phase
 
 ### Corrected goal boundary — native113 checkpoint

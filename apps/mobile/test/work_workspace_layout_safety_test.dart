@@ -12144,6 +12144,36 @@ void main() {
     },
   );
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R6617 unavailable cached document recovery layout $scale', (
+      tester,
+    ) async {
+      final work = selectedRetailer()
+        ..recoveredDocumentStep = true
+        ..workName = 'Review Kirana'
+        ..documentRecoveryMessage =
+            'A saved document could not be reopened. Add it again to preview it.';
+      work.addedProofs['personal-kyc'] = 'qa-retained-reference';
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        work: work,
+        viewport: const Size(320, 568),
+        textScale: scale,
+      );
+      final guidance = find.byKey(const Key('work-document-recovery-guidance'));
+      await reveal(tester, guidance);
+      expect(guidance, findsOneWidget);
+      await captureStoreView(tester, 'recovery-unavailable-$scale');
+      final replace = find.byKey(const Key('work-replace-proof-personal-kyc'));
+      await reveal(tester, replace);
+      expect(replace.hitTestable(), findsOneWidget);
+      expect(work.pickedProofs, isEmpty);
+      expect(work.addedProofs['personal-kyc'], 'qa-retained-reference');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final width in [360.0, 320.0]) {
     testWidgets(
       'review gives long unbroken contact values full width at $width',

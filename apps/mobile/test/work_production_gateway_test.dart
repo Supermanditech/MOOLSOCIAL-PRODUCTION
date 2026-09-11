@@ -1098,6 +1098,133 @@ void main() {
     );
   }
 
+  for (final cacheState in ['present', 'changed', 'missing']) {
+    test(
+      'R6617 document preview restart $cacheState stays application scoped',
+      () async {
+        final root = await Directory.systemTemp.createTemp(
+          'mool-proof-recovery-',
+        );
+        addTearDown(() => root.delete(recursive: true));
+        final firstFile = File(
+          '${root.path}${Platform.pathSeparator}first.pdf',
+        );
+        final secondFile = File(
+          '${root.path}${Platform.pathSeparator}second.pdf',
+        );
+        await firstFile.writeAsString('%PDF-1.4\nFirst test document');
+        await secondFile.writeAsString('%PDF-1.4\nSecond test document');
+        var selectedFile = firstFile;
+        final picker = NativeWorkProofPicker(
+          documentPicker: () async => XFile(selectedFile.path),
+          temporaryDirectory: () async => root,
+        );
+        final memory = _PendingProofMemory();
+        final gateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final work = WorkSession(
+          gateway: gateway,
+          proofPicker: picker,
+          contactDraftStore: memory,
+        );
+        await work.recoverPendingProof(accountReady: true);
+        work.activeWorkspace = existingStore;
+        final first = await addWorkspaceApplication(work, 'First Kirana');
+        final firstBytes = work.pickedProofs['personal-kyc']!.bytes;
+        final firstReference = work.addedProofs['personal-kyc'];
+        selectedFile = secondFile;
+        final second = await addWorkspaceApplication(work, 'Second Kirana');
+        await work.flushContactDraft();
+        work.dispose();
+        if (cacheState == 'changed') {
+          await firstFile.writeAsString('%PDF-1.4\nChanged document');
+        }
+        if (cacheState == 'missing') await firstFile.delete();
+        final restored = WorkSession(
+          gateway: gateway,
+          proofPicker: picker,
+          contactDraftStore: memory,
+        );
+        addTearDown(restored.dispose);
+        await restored.recoverPendingProof(accountReady: true);
+        expect(restored.resumeWorkspaceApplication(first), isTrue);
+        expect(restored.addedProofs['personal-kyc'], firstReference);
+        if (cacheState == 'present') {
+          expect(restored.pickedProofs['personal-kyc']!.fileName, 'first.pdf');
+          expect(
+            restored.pickedProofs['personal-kyc']!.bytes,
+            orderedEquals(firstBytes),
+          );
+        } else {
+          expect(restored.pickedProofs, isEmpty);
+          expect(
+            restored.documentRecoveryMessage,
+            contains('could not be reopened'),
+          );
+        }
+        expect(restored.hasVerifiedWorkspace, isFalse);
+        expect(restored.workspaceContactsReady, isFalse);
+        expect(restored.declarationAccepted, isFalse);
+        expect(restored.resumeWorkspaceApplication(second), isTrue);
+        expect(restored.pickedProofs['personal-kyc']!.fileName, 'second.pdf');
+        expect(restored.documentRecoveryMessage, isNull);
+        await restored.flushContactDraft();
+        final again = WorkSession(
+          gateway: gateway,
+          proofPicker: picker,
+          contactDraftStore: memory,
+        );
+        addTearDown(again.dispose);
+        await again.recoverPendingProof(accountReady: true);
+        expect(again.resumeWorkspaceApplication(first), isTrue);
+        expect(again.addedProofs['personal-kyc'], firstReference);
+        if (cacheState != 'present') {
+          expect(again.pickedProofs, isEmpty);
+          expect(
+            again.documentRecoveryMessage,
+            contains('could not be reopened'),
+          );
+        }
+        memory.accountScope = 'different-account';
+        await restored.recoverPendingProof(accountReady: true);
+        expect(restored.pickedProofs, isEmpty);
+        expect(restored.savedWorkspaceApplications, isEmpty);
+      },
+    );
+  }
+
+  test(
+    'R6617 recorded preview rejects paths outside private cache and altered metadata',
+    () async {
+      final root = await Directory.systemTemp.createTemp(
+        'mool-proof-boundary-',
+      );
+      addTearDown(() => root.delete(recursive: true));
+      final private = await Directory('${root.path}/private').create();
+      final outside = File('${root.path}/outside.pdf');
+      await outside.writeAsString('%PDF-1.4\nOutside test document');
+      final picker = NativeWorkProofPicker(
+        documentPicker: () async => XFile(outside.path),
+        temporaryDirectory: () async => private,
+      );
+      final picked = (await picker.pick(WorkProofSource.upload))!;
+      expect(await picker.restoreRecorded(picked.recoveryRecord!), isNull);
+      final inside = await outside.copy('${private.path}/inside.pdf');
+      final record = {...picked.recoveryRecord!, 'path': inside.path};
+      expect(await picker.restoreRecorded(record), isNotNull);
+      for (final corrupt in [
+        {...record, 'size': 0},
+        {...record, 'size': 10 * 1024 * 1024 + 1},
+        {...record, 'sha256': 'invalid'},
+        {...record, 'contentType': 'image/png'},
+        {...record, 'name': 'not-a-pdf.exe'},
+      ]) {
+        expect(await picker.restoreRecorded(corrupt), isNull);
+      }
+    },
+  );
+
   test(
     'R669 separate applications survive restart without cached authority or document bytes',
     () async {

@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../shared/social_content_gateway.dart';
 import 'work_models.dart';
@@ -39,11 +40,23 @@ class WorkPickedProof {
     required this.fileName,
     required this.contentType,
     required this.bytes,
+    this.recoveryPath,
   });
 
   final String fileName;
   final String contentType;
   final Uint8List bytes;
+  final String? recoveryPath;
+
+  Map<String, Object?>? get recoveryRecord => recoveryPath == null
+      ? null
+      : {
+          'name': fileName,
+          'contentType': contentType,
+          'path': recoveryPath!,
+          'size': bytes.length,
+          'sha256': crypto.sha256.convert(bytes).toString(),
+        };
 }
 
 abstract interface class WorkProofPicker {
@@ -52,6 +65,10 @@ abstract interface class WorkProofPicker {
 
 abstract interface class WorkRecoverableProofPicker implements WorkProofPicker {
   Future<WorkPickedProof?> recover(WorkProofSource source);
+}
+
+abstract interface class WorkRetainedProofPicker implements WorkProofPicker {
+  Future<WorkPickedProof?> restoreRecorded(Map<String, Object?> record);
 }
 
 /// A short-lived checkpoint for one external document-picker operation.
@@ -723,13 +740,60 @@ abstract interface class WorkStockHistoryGateway {
   });
 }
 
-class NativeWorkProofPicker implements WorkRecoverableProofPicker {
-  NativeWorkProofPicker({ImagePicker? imagePicker, this.documentPicker})
-    : _imagePicker = imagePicker ?? ImagePicker();
+class NativeWorkProofPicker
+    implements WorkRecoverableProofPicker, WorkRetainedProofPicker {
+  NativeWorkProofPicker({
+    ImagePicker? imagePicker,
+    this.documentPicker,
+    Future<Directory> Function()? temporaryDirectory,
+  }) : _imagePicker = imagePicker ?? ImagePicker(),
+       _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory;
 
   final ImagePicker _imagePicker;
   final Future<XFile?> Function()? documentPicker;
+  final Future<Directory> Function() _temporaryDirectory;
   static const _maxProofBytes = 10 * 1024 * 1024;
+
+  @override
+  Future<WorkPickedProof?> restoreRecorded(Map<String, Object?> record) async {
+    final path = record['path'];
+    final name = record['name'];
+    final type = record['contentType'];
+    final size = record['size'];
+    final digest = record['sha256'];
+    if (path is! String ||
+        name is! String ||
+        type is! String ||
+        size is! int ||
+        size <= 0 ||
+        size > _maxProofBytes ||
+        digest is! String ||
+        !RegExp(r'^[a-f0-9]{64}$').hasMatch(digest)) {
+      return null;
+    }
+    try {
+      final root = await (await _temporaryDirectory()).resolveSymbolicLinks();
+      final file = File(path);
+      final resolved = await file.resolveSymbolicLinks();
+      // Never reopen arbitrary provider paths, shared storage or symlink escapes.
+      if (!resolved.startsWith('$root${Platform.pathSeparator}')) return null;
+      final bytes = await _readDocument(XFile(resolved));
+      if (bytes.length != size ||
+          crypto.sha256.convert(bytes).toString() != digest) {
+        return null;
+      }
+      final proof = _validateProof(name, bytes);
+      if (proof.contentType != type) return null;
+      return WorkPickedProof(
+        fileName: proof.fileName,
+        contentType: proof.contentType,
+        bytes: proof.bytes,
+        recoveryPath: resolved,
+      );
+    } on Object {
+      return null;
+    }
+  }
 
   Future<Uint8List> _readDocument(XFile file) async {
     final reportedLength = await file.length();
@@ -765,7 +829,13 @@ class NativeWorkProofPicker implements WorkRecoverableProofPicker {
         }
         if (file == null) return null;
         final bytes = await _readDocument(file);
-        return _validateProof(selectedName ?? file.name, bytes);
+        final proof = _validateProof(selectedName ?? file.name, bytes);
+        return WorkPickedProof(
+          fileName: proof.fileName,
+          contentType: proof.contentType,
+          bytes: proof.bytes,
+          recoveryPath: file.path,
+        );
       }
       final image = await _imagePicker.pickImage(
         source: source == WorkProofSource.camera
@@ -804,11 +874,13 @@ class NativeWorkProofPicker implements WorkRecoverableProofPicker {
     WorkProofSource source,
   ) async {
     final proof = _validateProof(image.name, await _readDocument(image));
-    if (source != WorkProofSource.camera) return proof;
     return WorkPickedProof(
-      fileName: 'Camera photo.${proof.fileName.split('.').last.toLowerCase()}',
+      fileName: source == WorkProofSource.camera
+          ? 'Camera photo.${proof.fileName.split('.').last.toLowerCase()}'
+          : proof.fileName,
       contentType: proof.contentType,
       bytes: proof.bytes,
+      recoveryPath: image.path,
     );
   }
 

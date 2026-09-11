@@ -5545,6 +5545,24 @@ class WorkSession extends ChangeNotifier {
     'area': workArea,
     'activity': primaryActivity,
     'proofs': Map<String, String>.unmodifiable(addedProofs),
+    'files': {
+      if (_workspaceApplications[_workspaceApplicationId]?.details['files']
+          case final Map previous)
+        for (final entry in previous.entries)
+          if (entry.key is String &&
+              entry.value is Map &&
+              addedProofs[entry.key] != null &&
+              (entry.value as Map)['reference'] == addedProofs[entry.key] &&
+              !pickedProofs.containsKey(entry.key))
+            entry.key as String: entry.value,
+      for (final entry in pickedProofs.entries)
+        if (addedProofs.containsKey(entry.key) &&
+            entry.value.recoveryRecord != null)
+          entry.key: {
+            ...entry.value.recoveryRecord!,
+            'reference': addedProofs[entry.key],
+          },
+    },
     'caseId': reviewCaseId,
     'plan': subscriptionPlan,
     'correction': reviewCorrectionDraft,
@@ -5687,6 +5705,14 @@ class WorkSession extends ChangeNotifier {
         (entry) => addedProofs.containsKey(entry.key),
       ),
     );
+    if (data['files'] case final Map files) {
+      if (files.keys.any(
+        (key) => addedProofs.containsKey(key) && !pickedProofs.containsKey(key),
+      )) {
+        documentRecoveryMessage =
+            'A saved document could not be reopened. Add it again to preview it.';
+      }
+    }
     primaryMobileVerified = application.confirmed.contains(
       WorkContactChannel.primaryMobile,
     );
@@ -6118,11 +6144,31 @@ class WorkSession extends ChangeNotifier {
               (details['caseId'] != null && details['caseId'] is! String)) {
             continue;
           }
+          final files = <String, WorkPickedProof>{};
+          final picker = proofPicker;
+          if (picker is WorkRetainedProofPicker &&
+              details['files'] is Map &&
+              details['proofs'] is Map) {
+            final references = details['proofs'] as Map;
+            for (final entry in (details['files'] as Map).entries) {
+              if (entry.key is! String || entry.value is! Map) continue;
+              final record = Map<String, Object?>.from(entry.value as Map);
+              if (references[entry.key] is! String ||
+                  record['reference'] != references[entry.key]) {
+                continue;
+              }
+              final proof = await picker.restoreRecorded(record);
+              if (!current()) return;
+              if (proof != null) files[entry.key as String] = proof;
+            }
+          }
+          if (!current()) return;
           _workspaceApplications[id] = _WorkspaceApplicationDraft(
             id: id,
             scope: scope,
             details: Map.unmodifiable(details),
             submitted: _readSavedSubmission(raw['submitted'], profile.id),
+            files: Map.unmodifiable(files),
             needsStatusRefresh: details['caseId'] != null,
           );
         }
