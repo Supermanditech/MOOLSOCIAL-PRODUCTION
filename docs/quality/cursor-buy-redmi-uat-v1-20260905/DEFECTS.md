@@ -1,5 +1,14 @@
 # Fresh Redmi defect register
 
+## r66.9 round 1 child - monthly basket enlarged-text continuation
+
+**R669-UAT-MONTHLY-LARGE-TEXT-CONTINUATION-001 - OPEN, P2, confirmed Redmi.** Parent R668-AUDIT-CATALOGUE-001; connected ticket R66-UAT-032-R668-PAGED-001. One child covers both delivery groups. Original Monthly scope/filtering displays the intended products; enlarged-text discovery remains defective.
+
+At 720x1600 portrait, physical density320 and font_scale2.0, Monthly Quick advertises six products. Vertical scrolling reaches its bottom with rice/onions visible (454-455), while chicken is hidden in an unindicated third column. A horizontal swipe456 reveals chicken; product457 and Back458 preserve identity/position. Exiting and reopening Monthly with font2 already active (460-467) reproduces this in Scheduled: bottom468 shows oil/milk, while sideways469 reveals ghee. Customers can overlook basket products and Add controls. This is recoverable hidden continuation, not product loss. Expected: expose every small-basket product through the existing vertical layout or a clear accessible continuation affordance, retaining scope, quantities and Back.
+
+Normal Scheduled/Quick price-filter counts and exact subsets pass443-452. Neutral image fallback at font2 is intentional, not a new media/network failure. No cart writes, order, payment or message in437-471. Font1 restored/read back, Saved1 retained, Monthly dismissed471. Evidence: external redmi-r66-9-round-1/monthly-large-text-continuation-child-1.json SHA25639B2D18CC681ACAC361D5CBFC5521393DF56656416CA8518530F3280D35B45B9 with16 bound captures; complete batch in UAT.md. Redmi TG8HCYTGGQT885OF, APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Register only; no implementation. New r66.9 UAT children total six; full round remains open.
+
+
 ## r66.9 scoped Redmi round 1 — 11 September 2026
 
 The successor Cursor Review APK is built and installed without clearing data on Redmi `TG8HCYTGGQT885OF`: version `1.0.0-r66.9-cursorreview`, code `2026091101`, SHA256 `AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9`. Build HEAD is `7eb5d1034f1aeb45b7987db22a5521649af22a25`; runtime/test source is `a18aa780c0e00497ef218025bc8473a32f50a084`. The older implementation/pending-build paragraphs below are historical checkpoints; final host qualification and current device results are in UAT.md.
@@ -688,6 +697,8 @@ Status: OPEN; P2 discoverability/space use, Redmi-confirmed. Supplier products �
 Evidence: 082-audit-supplier-all.png SHA834652014E9978D2FA048D6A572500603146B4A941BEED6D9F9FFDF4CF462D44; 083-audit-supplier-all-scroll.png SHA95240658A78C43C8C41B6EEBCEF86904BCC73AA99D719351223BE73C8B4A389B; both XML SHAEDFF1D73F3940F3C0613B815D49F3BC2AC28F7BF03D6BED49C6E8ACAA83B07DD. 084-audit-supplier-all-horizontal.png SHA02C3BFB2E618AEBCB6364B128C2DEA7B9AC7B1895730943E58C08F239F04F65B; XML SHA8E05EDFB4C3070E2129AFD401C6C4B8BB7AC9BECEDF06162B1ACB1DD4A11F9C5. 082 and084 visually inspected. Source full-catalogue call selects laneCount1 for fewer than six products.
 
 ### R66-UAT-028-R668-NINE-DIGIT-001 — Nine-digit payable truncates at doubled text
+
+**Current status, 11 September 2026: CLOSED - r66.9 Redmi verified for original cart-footer monetary readability.** Actual portrait247 replays font2/density360 and Rs100001280: every numeric digit is visible, currency remains explicit in the label, and Review order is reachable. Landscape262 shows full amount/button after vertical scrolling. Quantity/editor/Cancel249/252/253/256 retain28736; normal mixed Review282 and cold-relaunch Cart289/291 preserve correct line and combined amounts. Temporary basket removed293; display restored. Closure reconciles retained device evidence with literal original acceptance criteria; no host-only substitution. Record external redmi-r66-9-round-1/nine-digit-redmi-closure-1.json SHA256E2326865F956EEF6393A70B5B29EBB67D2C8A5514EEA807A8331BFA8BF0DF010. Exact APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9 / Redmi TG8HCYTGGQT885OF. Coupon minimum spend, checkout promise, provider qualification and broader closure remain separate. Historical OPEN evidence below is preserved.
 
 Status: OPEN, confirmed Redmi local UI defect; P1 monetary readability; child of R66-UAT-028. Discovered after local baseline147acab5, not a withdrawal of the normal-text passes. Installed r66.8 /2026090903 on RedmiTG8HCYTGGQT885OF, portrait720x1600, fontScale2.0, density360 override (physical320). Retained wholesale notebook basket28,736 packs atINR3,480 totalsINR100,001,280. Normal controls and restart previously preserved this basket.
 

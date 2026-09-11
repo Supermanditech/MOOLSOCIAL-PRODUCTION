@@ -2,9 +2,61 @@
 
 ## Latest founder stop rule — 11 September 2026
 
-Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 child-defect count is five, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
+Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 child-defect count is six, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
 
 
+
+## r66.9 scoped round 1 checkpoint 13 - monthly filters and enlarged continuation
+
+35 additional successful Redmi captures437-471;470 successful captures total, failed382 excluded. Scope reach41/42 is not a pass ratio. Current frozen42 status: **3 closed,30 partially exercised,8 failed connected replay,1 not exercised**. Six new UAT child defects are registered; none implemented in this batch. Supplier-media contract qualification remains unverified and provider/backend cases stay explicit.
+
+-437 resumes Scheduled, empty cart/Saved1.438-441 open Monthly from Shopping tools.442 shows exact six Scheduled basket products,443 filter correctly counts6. Up to Rs250 gives3 in445 and the exact notebook210, milk66 and eggs89 in446. Quick447 retains the filter and gives4 exact basket products. Last bread448 opens correct400g/Rs45; Android Back449 retains basket/filter/scroll.450 counts4; Clear451 counts6; Apply452 restores six Quick basket products without ordinary catalogue paging.
+-453 uses font2 at physical720x1600/density320.454 reaches bottom showing rice/onions; another vertical swipe455 changes nothing. Sideways456 reveals chicken, previously hidden with no continuation cue. Product457 and Back458 retain exact identity and scroll.459 switches Scheduled.460 exits Monthly;461-466 reopen it while font2 is already active and reach complete plan controls through normal scrolling.467 starts Scheduled; bottom468 shows oil/milk; sideways469 reveals hidden ghee. One deduplicated child covers both groups: R669-UAT-MONTHLY-LARGE-TEXT-CONTINUATION-001, parent CATALOGUE-001 and related PAGED-001. Original monthly unrelated-product filtering passes, but these connected journeys remain open. No missing-product or new image-network-failure claim.
+-470 restores normal font;471 dismisses Monthly and returns to Scheduled, with empty cart/Saved1. No cart/saved writes, checkout, order, payment, review or message submission in this batch. Price filter cleared and applied. Display readback matches original font1,720x1600,physical density320,no overrides,autoRotation1/userRotation0. Earlier delivery Keep/order-selection cleanup is still outstanding.
+
+R66-UAT-028-R668-NINE-DIGIT-001 is now CLOSED for its original monetary-readability defect after reconciling retained actual Redmi evidence with the literal acceptance criteria: enlarged portrait247 and landscape262 show all Rs100001280 digits plus reachable Review order. Quantity/editor/Cancel and normal mixed Review/cold-relaunch retain the values; temporary basket cleanup is recorded. This is not closure of coupon, checkout promise, provider or other monetary-screen tickets. Record nine-digit-redmi-closure-1.json SHA256E2326865F956EEF6393A70B5B29EBB67D2C8A5514EEA807A8331BFA8BF0DF010.
+
+Child record monthly-large-text-continuation-child-1.json SHA25639B2D18CC681ACAC361D5CBFC5521393DF56656416CA8518530F3280D35B45B9. Checkpoint round-progress-checkpoint-13.json SHA2567247FDAD348D7468F994EF00D4E0FBA38063C58B38201D391B6A6583BF2E26E3. Display record display-restored-after-monthly-enlarged-1.json SHA256E6AD71BAC060FB6CA8147BDBA62F1109A3DDE34F705A78707EEA0E1CB5C9DC26. All records are under the existing external redmi-r66-9-round-1 archive. All35 PNGs inspected; PNG/XML/metadata and terminal receipt/log hashes verified. Exact Redmi TG8HCYTGGQT885OF and APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9 unchanged. Resume14 coordination and device-memory gates passed. Previous checkpoint12 committed/pushed/remote-equal a3465b0ef456c12e1c3e1f5da8382eb3ad07f33b; handoff gate passed and clean digest0.
+
+Evidence preparation preserved full preimages. An initial exact-heading assertion rejected mixed line endings before changing DEFECTS.md; raw owner hash remained unchanged. The corrected bounded insertion preserves original bytes and every historical entry. No source, policy, central registry, owner claims or Desktop files changed. Full scoped round remains underway; complete its list and report before any next implementation/APK.
+
+| Capture | Label | PNG SHA256 | XML SHA256 |
+| --- | --- | --- | --- |
+| 437 | 437-resume14-scheduled | 9304BBD4B12429D199FF7009DDFD234AC876E1F7A3AD99A6722A566B60DE54E5 | 6E62FF195197E316738B2669BA6A851E7BD141AF0EBB0293E72796F89D750CE5 |
+| 438 | 438-monthly-refinement-entry | 26E44116C43CD6D5532C2EB72540A15FC5133F65EC7518BC7CC6D5DA7BEA56E4 | 1131538BD81ECFA99B8EAE99CA0491D9D87698812202D189259AB7A0FBD1DC6F |
+| 439 | 439-monthly-shopping-tools | 4AE72BAF94A894A21DA895A364DE00B10A8E7A94E1024AB5BFBF2D5F8272DAA4 | 488BF43EF3B5751AD72B81641BC699B66E1869CC815D33458BCE20430064D76A |
+| 440 | 440-monthly-tools-lower | CB9D90D77279F69C17C6FE71DDE54FA3C0B74191C037CAE23A9BC4917257D070 | 74ED72AFFC91CE512CF9CA09D3CFA7F99BA13CE61B1EF8BA3C93CA9C13244587 |
+| 441 | 441-monthly-plan-open | 2847758E93457ADC2D756D5ABB59B916931182F8749DA5B4F4ECF4F47BD220F1 | B5127A2201D655C58DCEA17F69AC1A1AA5ACE658F5BC087C01D9167EC5A54106 |
+| 442 | 442-monthly-review-scheduled | 67B2C3956A01B7E483F0D04BA1F6113924D2B9994A896F90ABD4E62BAA66E97F | CDCF3C3F93BB68D6580F8FFD007DE69E03D283824F6BE552E38B6124E64AA6D2 |
+| 443 | 443-monthly-filter-scoped-count | 8162D0887E0BB4CAEF13C1361B383C188268D79F55B1DC7D7251DB7EFFF88F45 | 2826EABA3A5D99F077C25CF1F98BD9DBF3FCB4F73EAC4D145753B4CBA50BFBDC |
+| 444 | 444-monthly-price-options | 2525EC218BC42B560EB9B47AA8F460E77984F9081F9ED4864DBAFF2750B436B1 | AB1FC2C11913D0852CDB234D1045984C902EAF422BAEBE60E226407667133BB3 |
+| 445 | 445-monthly-price-250-preview | 41609415B8F21029D761AD7FE49C13B82C75FA4A031D2C2236EF77614E73F45C | A6FDE858A43A2CC9A4B90B2ADA5FDDF3EA42B2DAF7331D3FD613A1A70877C934 |
+| 446 | 446-monthly-price-250-results | E65028E29F7C8F93F1827FA45C70765B11A516EEA05284EB46AD76B0C648950C | F950DAA711F3A0716E50FFF37D2983D8B7B570A854EB086E5ED5A63B6B638E46 |
+| 447 | 447-monthly-quick-filter-retained | DADA1341DAE7C22B6F1F7E7227BD62DE2FAD668764D6436CE2C25DFA6C677F67 | DC74DDFD57EEEE384253D53ADB9C87F7E247D3973CCD6CD0C94797F29FE39C86 |
+| 448 | 448-monthly-filtered-last-product | 0D16121C47074868708E07E519FEBFFFA5A71C4A53716A17E8BB450283BA8BC1 | 4011D9CA43E86096A6AEA429850B66CBA7649B8AA32FAF8131B3751C2241BF2C |
+| 449 | 449-monthly-product-back-filter-retained | FB0383D644D0F83DD025175C35D177ABB7D4A7CAA7414122E108DA67B6E0F745 | DC74DDFD57EEEE384253D53ADB9C87F7E247D3973CCD6CD0C94797F29FE39C86 |
+| 450 | 450-monthly-quick-filter-count | 4EFCA3B2A13CD799E890F1496C054FBF2EED74B27CE801BAD4564858FDE761B8 | C916DB583CCCD3BD5C63802CD8743E91DA851D52F518E20161403A2D87C6E14F |
+| 451 | 451-monthly-clear-price-preview | 3424E5A6992D0586CC45DA0D01CC530573C12A877855790FDFF4C0EDED923153 | 2826EABA3A5D99F077C25CF1F98BD9DBF3FCB4F73EAC4D145753B4CBA50BFBDC |
+| 452 | 452-monthly-clear-applied | 502B975AF975C4DF35372DEE9EEA6B3EECACC4C85AE30C810C14F30BC7CE2E80 | FFEEBEE99EAFB79018789E5808E3CF3818BD00AF5C17ECCA6F9C3722BDC8C675 |
+| 453 | 453-monthly-enlarged | 37DAC956607721336B9DF2795D6E16436B1CCF3A70588B3F7181BFFD436517D1 | BCF484772F0D8DCC6CC3D2D69828EC0140B2B0D91CF9BDBE00168CFBD3950364 |
+| 454 | 454-monthly-enlarged-last-row | 25048C7AC0E8A45305C43565476D000830ED8A2BE3A00A4A039A1EB239F68846 | A43DA49178DCF253BDD6BF5DF3B9F17C07A58CA123B25362514153619A5829C9 |
+| 455 | 455-monthly-enlarged-bottom-confirm | 2D0982BB9C97548EC0241DF5F22BD222A1B97E05350F3C1D4E02009FD19833D4 | A43DA49178DCF253BDD6BF5DF3B9F17C07A58CA123B25362514153619A5829C9 |
+| 456 | 456-monthly-enlarged-horizontal-continuation | 7A0CD967C65B9AE99CEC307FD75C4B11CF5C74EDAEAB2C1C0E9409DFAFF162CC | 062F837B85976AF418DDC83CB89FD6CF61EE22CE82D3F7508D44FC3BFCAFDDAB |
+| 457 | 457-monthly-enlarged-hidden-product-open | 6642FA347711C6A2DCE8CAE726FB6D175666ED0DECA7F2CF5A62567B3E8AB72F | 78B7F3B6952C6A06766CFE68B79A936C2864BD7D508472E3B20E57B420B2AFFE |
+| 458 | 458-monthly-enlarged-product-back | AA597A49010AE9639975FFCAEDDCE5FB591C599BA4E58B628C5D8341B208BBBC | 062F837B85976AF418DDC83CB89FD6CF61EE22CE82D3F7508D44FC3BFCAFDDAB |
+| 459 | 459-monthly-enlarged-scheduled | 104FFE9D969CC29F97D9F94DDD568DD0E2FF7F01AB27F9F04D8A7DAEF9007558 | 933D634A431E5F5B536C5DE265BDE9E5702CB58016D8E9CF0622E7BC26EEE28D |
+| 460 | 460-monthly-enlarged-exit | FDE198A93FED074608DE54154DB3A493F24EA1815ACF784C9FE781AD325F1624 | B8FDCBE71022C2D698F744C66F63BC204CE2730EF98DAA8DCFDC4F7D502F7A53 |
+| 461 | 461-monthly-enlarged-reentry-filter | 5E4EDC9367D3FE6B25DFB8F771C33ADD90478FE85AF4A1B686D68D13B5AE8F38 | 0AB2E5FAEA0AD7815DE790F9806774FB4F6B4D9E28B8495552587F320DCFF2B1 |
+| 462 | 462-monthly-enlarged-tools-scroll | 2DDE1609EB8F2F6A5E31A0127A31A11F0A4930C01FB1C1C60E355AEE7BEC6A3F | 300E68668FE6260E0F88CA4D834EA0BB8D9CBE24A927D8E4B13ABDA2A6A1C9EB |
+| 463 | 463-monthly-enlarged-tools-expanded | 08E1CA311553B96E1BFD1C1D48F4B95ED767C47FC776727C158FA8458E994423 | C6EEEED006E0CFE89E2C9891BA98DAAC05F987BA3D9C6EB6266DB49C4FA80FA3 |
+| 464 | 464-monthly-enlarged-tools-last | D258028BAA0D46CB61DA3CC3849A641E172B28C69FF2A9E67EBCF3A15FFB9B5E | 5CB805239D158B58F56D943B7A6A767A0D0ACDB18AA6415FE8CCFD6127DDDD90 |
+| 465 | 465-monthly-open-with-font2 | A85BB318938E0B14B86FCC81B8F2607590E2B22472E6319995AF300B2C2B5467 | 8986600A6A94226829481D184A00370C4C039AF4EAD1AD115918037D4BA3EE68 |
+| 466 | 466-monthly-enlarged-plan-actions | CD88002767ACC81726E2AFDD635CC4F60872D8FB6167FEC0461A134EF0ED0160 | 1A4E604934D4A788E9D74C4357FE94A5AAB083367A5D2D1549476767FA3E4AE7 |
+| 467 | 467-monthly-reopened-font2-scheduled | 8884EF8A028840A4C111C495598D2DEEE2380E66F02C6F69DE565A81532580F4 | 933D634A431E5F5B536C5DE265BDE9E5702CB58016D8E9CF0622E7BC26EEE28D |
+| 468 | 468-monthly-reopened-font2-bottom | F084B42465CEBA741A2BC3101A7A769EFFD3C7F95A5B5CED653D36AABED241C2 | 1CD0E9B7BD8B579ED40E3B179B464CA1BE74D1750FEE2F22DC5E53CA2801BBCC |
+| 469 | 469-monthly-reopened-font2-sideways-ghee | B4DA2ED55B177F8605FFE1BB8292AD1AF40329116CE90B4B32A696F6E37A6970 | 8BDCEA40A28FA024CA9D77BF35DC72EF5FA156BD59CF20F91025EACD17320311 |
+| 470 | 470-monthly-normal-restored | 0118D5E722A6F7AB568B691E4F05E5533274428B9D20B384A75CA2998D8C3CAC | 77B33729B3CEA1FCD39CC10A0AF7B6E388B6AA1E473638B6BDCC5A84F7487FE8 |
+| 471 | 471-monthly-exit-clean-scheduled | EA46A69FC33ACBDD00655D66C8EE4E1BC295AAF7CE0C6968E1A9D4124B4E48CF | 6E62FF195197E316738B2669BA6A851E7BD141AF0EBB0293E72796F89D750CE5 |
 
 ## r66.9 scoped round 1 checkpoint 12 — milk variant badge and cart continuity
 
