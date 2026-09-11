@@ -393,6 +393,8 @@ class _StoreOperationalData {
   final Map<String, WorkspaceDeliveryAssignment> _deliveryByOrder = {};
   final List<WorkspaceCustomerInvoice> workspaceInvoices = [];
   final List<WorkspaceStoreOffer> workspaceOffers = [];
+  // Unsent offer input belongs to this Store's in-session operational state.
+  final Map<String, String> workspaceOfferDraft = {};
   String? currentWorkspaceOrderId;
   WorkspaceDeliveryAssignment? workspaceDeliveryAssignment;
   bool workspaceOperationsSyncing = false;
@@ -3001,6 +3003,7 @@ class WorkSession extends ChangeNotifier {
   List<WorkspaceCustomerInvoice> get workspaceInvoices =>
       _storeData.workspaceInvoices;
   List<WorkspaceStoreOffer> get workspaceOffers => _storeData.workspaceOffers;
+  Map<String, String> get workspaceOfferDraft => _storeData.workspaceOfferDraft;
   String? get currentWorkspaceOrderId => _storeData.currentWorkspaceOrderId;
   set currentWorkspaceOrderId(String? value) =>
       _storeData.currentWorkspaceOrderId = value;

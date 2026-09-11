@@ -18720,6 +18720,173 @@ void main() {
       },
     );
 
+    testWidgets('R6617 promotion draft survives Back and Store switch $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      final originalStore = work.activeWorkspace!;
+      final originalDraft = work.workspaceOfferDraft;
+      final end = DateUtils.dateOnly(
+        DateTime.now(),
+      ).add(const Duration(days: 7));
+      originalDraft.addAll({
+        'productId': work.workspaceCatalogueItems.first.id,
+        'validUntil': end.toIso8601String(),
+      });
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      Future<void> openOffers() async {
+        final action = find.byKey(const Key('work-quick-promote'));
+        await reveal(tester, action);
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> revealOfferField(Finder field) async {
+        final form = find.byKey(const Key('work-store-offers-screen'));
+        final scroll = tester.state<ScrollableState>(
+          find.descendant(of: form, matching: find.byType(Scrollable)).first,
+        );
+        for (var i = 0; scroll.position.pixels > 0 && i < 30; i++) {
+          final bounds = tester.getRect(form);
+          await tester.dragFrom(
+            Offset(bounds.left + 4, bounds.center.dy),
+            const Offset(0, 200),
+          );
+          await tester.pumpAndSettle();
+        }
+        for (
+          var attempt = 0;
+          field.evaluate().isEmpty && attempt < 15;
+          attempt++
+        ) {
+          final bounds = tester.getRect(
+            find.byKey(const Key('work-store-offers-screen')),
+          );
+          await tester.dragFrom(
+            Offset(bounds.left + 4, bounds.center.dy),
+            const Offset(0, -140),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(field, findsOneWidget);
+        await tester.ensureVisible(field);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> enter(String key, String value) async {
+        final field = find.byKey(Key(key));
+        await revealOfferField(field);
+        await tester.enterText(field, value);
+        await tester.pumpAndSettle();
+      }
+
+      Future<void> check(String key, String value) async {
+        final field = find.byKey(Key(key));
+        await revealOfferField(field);
+        expect(tester.widget<TextField>(field).controller!.text, value);
+      }
+
+      await openOffers();
+      await enter('work-offer-title', 'Monthly basket saving');
+      await enter(
+        'work-offer-detail',
+        'Save on selected essentials until Sunday.',
+      );
+      await enter('work-offer-order-cap', '27');
+      tester.testTextInput.hide();
+      FocusManager.instance.primaryFocus?.unfocus();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await openOffers();
+      await check('work-offer-title', 'Monthly basket saving');
+      await check(
+        'work-offer-detail',
+        'Save on selected essentials until Sunday.',
+      );
+      await check('work-offer-order-cap', '27');
+      expect(originalDraft['validUntil'], end.toIso8601String());
+      expect(originalDraft['productId'], work.workspaceCatalogueItems.first.id);
+      await captureStoreView(tester, 'promotion-retained-$scale');
+      work.activateWorkspace(
+        const WorkWorkspace(
+          id: 'promotion-other-store',
+          name: 'Other Store',
+          profileId: 'retailer-grocery',
+          profileLabel: 'Grocery',
+          area: 'Market',
+          verified: true,
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(identical(work.workspaceOfferDraft, originalDraft), isFalse);
+      await check('work-offer-title', '');
+      await enter('work-offer-title', 'Other Store offer');
+      work.activateWorkspace(originalStore);
+      await tester.pumpAndSettle();
+      await check('work-offer-title', 'Monthly basket saving');
+      await check(
+        'work-offer-detail',
+        'Save on selected essentials until Sunday.',
+      );
+      await check('work-offer-order-cap', '27');
+      expect(work.workspaceOffers, isEmpty);
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'R6617 promotion retained stale product and date recover $scale',
+      (tester) async {
+        final work = storeViewFixture();
+        final oldDate = DateTime.now().subtract(const Duration(days: 2));
+        work.workspaceOfferDraft.addAll({
+          'title': 'Keep my headline',
+          'detail': 'Keep my conditions',
+          'orderCap': '27',
+          'productId': 'removed-product',
+          'validUntil': oldDate.toIso8601String(),
+        });
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        final promote = find.byKey(const Key('work-quick-promote'));
+        await reveal(tester, promote);
+        await tester.tap(promote);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<FilledButton>(find.byKey(const Key('work-offer-publish')))
+              .onPressed,
+          isNull,
+        );
+        final date = find.byKey(const Key('work-offer-valid-until'));
+        await reveal(tester, date);
+        await tester.tap(date);
+        await tester.pumpAndSettle();
+        expect(find.byType(DatePickerDialog), findsOneWidget);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          work.workspaceOfferDraft['validUntil'],
+          oldDate.toIso8601String(),
+        );
+        expect(work.workspaceOfferDraft['productId'], 'removed-product');
+        expect(work.workspaceOfferDraft['title'], 'Keep my headline');
+        expect(work.workspaceOffers, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
     for (final stamp in [
       DateTime.utc(2026, 12, 31, 20, 4),
       DateTime(2027, 1, 1, 1, 34),

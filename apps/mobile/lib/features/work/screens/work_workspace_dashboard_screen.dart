@@ -10691,6 +10691,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     }
     if (operation == _WorkspaceOperation.offers) {
       return _WorkspaceOffersSurface(
+        key: ObjectKey(session.workspaceOfferDraft),
         session: session,
         onCatalogue: () => onOpenOperation(_WorkspaceOperation.catalogue),
         onPromote: () => onOpenRoute(
@@ -19324,6 +19325,7 @@ class _WorkspaceBusinessRecordSurface extends StatelessWidget {
 
 class _WorkspaceOffersSurface extends StatefulWidget {
   const _WorkspaceOffersSurface({
+    super.key,
     required this.session,
     required this.onPromote,
     required this.onCatalogue,
@@ -19344,6 +19346,32 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
   final TextEditingController _orderCap = TextEditingController(text: '50');
   String? _productId;
   DateTime? _validUntil;
+  late final Map<String, String> _draft;
+
+  @override
+  void initState() {
+    super.initState();
+    _draft = widget.session.workspaceOfferDraft;
+    _title.text = _draft['title'] ?? '';
+    _detail.text = _draft['detail'] ?? '';
+    _orderCap.text = _draft['orderCap'] ?? '50';
+    _productId = _draft['productId'];
+    _validUntil = DateTime.tryParse(_draft['validUntil'] ?? '');
+    for (final controller in [_title, _detail, _orderCap]) {
+      controller.addListener(_retainDraft);
+    }
+  }
+
+  void _retainDraft() {
+    // Capture the original Store's map, never the newly selected Store on exit.
+    _draft['title'] = _title.text;
+    _draft['detail'] = _detail.text;
+    _draft['orderCap'] = _orderCap.text;
+    if (_productId case final id?) _draft['productId'] = id;
+    if (_validUntil case final date?) {
+      _draft['validUntil'] = date.toIso8601String();
+    }
+  }
 
   void _useTemplate(String template) {
     final copy = switch (template) {
@@ -19380,13 +19408,24 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
 
   Future<void> _pickDate() async {
     final now = DateTime.now();
+    final today = DateUtils.dateOnly(now);
+    final lastDate = today.add(const Duration(days: 365));
+    final retained = _validUntil;
     final selected = await showDatePicker(
       context: context,
-      firstDate: now,
-      lastDate: now.add(const Duration(days: 365)),
-      initialDate: _validUntil ?? now.add(const Duration(days: 7)),
+      firstDate: today,
+      lastDate: lastDate,
+      initialDate:
+          retained != null &&
+              !retained.isBefore(today) &&
+              !retained.isAfter(lastDate)
+          ? retained
+          : today.add(const Duration(days: 7)),
     );
-    if (selected != null) setState(() => _validUntil = selected);
+    if (selected != null && mounted) {
+      setState(() => _validUntil = selected);
+      _retainDraft();
+    }
   }
 
   @override
@@ -19485,7 +19524,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
               DropdownButtonFormField<String>(
                 key: const Key('work-offer-product'),
                 isExpanded: true,
-                initialValue: _productId,
+                initialValue: selectedProduct?.id,
                 decoration: const InputDecoration(
                   labelText: 'Product customers can buy',
                 ),
@@ -19501,7 +19540,10 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
                       ),
                     )
                     .toList(growable: false),
-                onChanged: (value) => setState(() => _productId = value),
+                onChanged: (value) {
+                  setState(() => _productId = value);
+                  _retainDraft();
+                },
               ),
               const SizedBox(height: 8),
               _AccessibleWorkTextField(
@@ -19619,6 +19661,7 @@ class _WorkspaceOffersSurfaceState extends State<_WorkspaceOffersSurface> {
                 _title.text.trim().isEmpty ||
                     _detail.text.trim().isEmpty ||
                     _validUntil == null ||
+                    _validUntil!.isBefore(DateUtils.dateOnly(DateTime.now())) ||
                     selectedProduct == null ||
                     eligibleCustomers == 0 ||
                     cap <= 0
