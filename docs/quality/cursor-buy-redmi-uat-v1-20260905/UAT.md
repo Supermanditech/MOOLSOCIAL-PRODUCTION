@@ -6,6 +6,61 @@ Complete Redmi testing of all previously scoped tickets and their connected jour
 
 
 
+## r66.9 scoped round 1 checkpoint 17 - Shop count-row device qualification
+
+34 additional successful Redmi captures603-636; **634 successful captures total**, failed382/504 excluded. **9/42 frozen items closed (8 findings +1 founder request),33 open:22 partially exercised,10 failed connected replay,1 not exercised.**41/42 reached is coverage, not full acceptance. Seven UAT children remain open separately. No new confirmed customer-facing defect in this batch.
+
+**R668-REQ-SHOP-COUNT-ROW-001 CLOSED on Redmi.** Original Shop landing top range/count/location strip stays removed in Quick/Scheduled, normal/enlarged, populated and no-match states. Normal603-608 footer Next, later-page products, horizontal continuation to bread93 and exact product Back pass. Font2 609-613 repeats product return and Previous.615-628 applies max250, correctly excludes atta279, clears the filter to recover atta, then clears query to exact prior Scheduled state.629-632 category Dairy & bakery shows milk, retains selection and For you returns exact prior state.633/634 footer Refresh restores the same Scheduled page. Footer controls have complete96x96 physical targets, with first-page Previous disabled correctly. Same-APK prior checkpoint15 full-store category/keyboard evidence covers store scope and nested returns; those destination-specific count policies are unchanged.
+
+The initial six visible cards are a viewport into horizontally scrollable rows;606 confirms further products are reachable. No product-omission defect is asserted from the initial viewport alone. Existing Monthly continuation child is unaffected. Dedicated active-search626 retains its existing range/control row, and filter615/618/624 retains its result count; the founder ticket explicitly targets the Shop landing strip. This closure does not claim removal of every count from every screen or live inventory accuracy.
+
+Original general Scheduled Brand filter615/616 at font2 now says Not provided and explains missing brand details instead of offering product categories as brands. Bread93 normal607/enlarged610 has Brand not provided. This extends BRAND-CATEGORY evidence; supplied actual-brand/Wholesale/provider qualification remains open. Store/Offers exact three-line icon reconciliation also remains open.
+
+All34 PNGs inspected; PNG/XML/metadata/terminal receipt and stdout/stderr hashes verified. Exact XML pairs606/608,609/611,614/628,614/632,614/634,603/636,555/635. Font1,physical720x1600/density320,no overrides,autoRotation1/userRotation0 restored/read back. Query/filter/category cleared, Quick starting state restored, Saved1/empty cart retained. Only ordinary bread93 visit and existing atta search reuse; no cart/saved/address/order/payment/message writes or history deletion.
+
+Closure shop-count-row-redmi-closure-1.json SHA256FFD1B94ED0C88AAD81DE19751A803D52F41161615F980D5854AF0A9804C59EF6. Checkpoint round-progress-checkpoint-17.json SHA256B459756BC8B630FD95BAF7D9363CE898FB11908BB544238F5529CF3A262A01E0. External redmi-r66-9-round-1 evidence; Redmi TG8HCYTGGQT885OF, unchanged APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Git base99f8e3f3e228f5e84e63b129fc5183e4b4f4f1a6 was clean/pushed/remote-equal with handoff gate passed. Resume19 coordination and device-memory gates passed unchanged.
+
+Task-local read recovery: Unicode arrow output from a read-only four-section Python projection failed under Windows cp1252 (terminal1,chunk7db2ae), before device work. Recorded in checkpoint17-read-encoding-recovery-1.json SHA25614C621EF015E30FB60B9F81BCFFA1088896C5FA335E95D57537A1B486098DCC6; corrected using ensure_ascii JSON. No app input repeated, no source/policy/registry/owner change. All later reads are bounded ASCII-safe projections.
+
+No runtime implementation, new APK, Desktop or provider action, branch integration or dirty-file copying. Finish remaining scoped UAT and report the complete deduplicated list before further implementation under the founder stop directive.
+
+|Capture|Action and evidence label|PNG SHA256|XML SHA256|
+|---|---|---|---|
+|603|Capture 603-shop-count-row-normal-baseline|7820F7A6598F6ED678313898C11EA269FECC0A4439D35FE04A556939B6A41EA8|1D537FDD010C8A45EC6780FD368D555D5A4B1C7A630B34056DC40A1447F4AD89|
+|604|Swipe 604-shop-footer-pagination-reach|114019D3A13FABE3D10BABC19EDB3E811AE9F56E0E5139AF8CDCF032DCC75807|19B0013750A5F4C5476FCCF3E096E4FB225253FB105C195EF4F1B8968AFC5DE4|
+|605|Tap 605-shop-next-page-normal|B16F67588102834E0240BD0A4B0151D53E9FBC3BDEBF7EDD786143E26505058D|64F40020972FBB5B3AC01D290B01A2A2C1DC1ED0334ACE656CF2C5D0C9E1E64E|
+|606|Swipe 606-shop-page-two-horizontal-continuation|8CAC541E75362D4615C4353F84B2C4AE5A220AA587D0231D660B676E2FDAD65C|61F7157183B0BBDECC8365D3CAC439C97FD6A71BACE82477B60F984C0E471A2A|
+|607|Tap 607-shop-page-two-bread-product|EF40B69F3C2E0F9C50AE553ABBD4A4162A526D516E50F0F7C7CCE704E7C4138B|55D78922B7D595DBD1A4614F3F844725D7101CB52AF4E87E0A1B05843DC8E199|
+|608|Back 608-shop-page-two-product-back|9C7B3965557A9A0D4D8485C6F6A01BC52819822DA4B1FC83AC64264C1FEB1209|61F7157183B0BBDECC8365D3CAC439C97FD6A71BACE82477B60F984C0E471A2A|
+|609|Capture 609-shop-page-two-enlarged|E53CC5E0D100858873AF8DFB50389A9C8AAEA1E89B78411F723C8B789FDFD665|2792124DFEDD22926FF5DAD0A6E8B7130A91482CA8FFB6715D20CD713E57E3E8|
+|610|Tap 610-shop-later-product-enlarged|595A91F0E7AD556E29D0309D8B6C34AEDD1FD9166C31F9E269437D27A32862A9|9EF254D86AF07980B93D7FF2999A6E702BD7E3A08C21F44615EAA587C2383689|
+|611|Back 611-shop-later-product-back-enlarged|92D9E66BA27B636F8245C0D94036FCB2106E2992B2730D90FDAFB251AD18EB97|2792124DFEDD22926FF5DAD0A6E8B7130A91482CA8FFB6715D20CD713E57E3E8|
+|612|Swipe 612-shop-footer-enlarged|A8DDEDAEE2489AD2DEAC6BA2C11B8637EFEFFE6138E58733CBF6B1E0645A81B7|687C542E68E25E61630D0C9E8BEAF75AAE7D43726F6B5127B83C9845B2C99BC8|
+|613|Tap 613-shop-previous-page-enlarged|7C87B4C042ED662CDE119DEE3AFA3B8EB95256FEC78E52E90D61398F938E8EE6|FC542349149D25CA390DD925664D1AEBB03184AAC2203715DF738D1AB5E7FEE9|
+|614|Tap 614-scheduled-shop-enlarged-count-row|17413B7A937C65835C2FF6570C2154A50EFD6F74D0C95CDD1E0E3F911B2CAD50|B8FDCBE71022C2D698F744C66F63BC204CE2730EF98DAA8DCFDC4F7D502F7A53|
+|615|Tap 615-scheduled-filter-enlarged|AB77EC3CEDD81739BE0AEA0A423240E8B3FAD9AEE1129CD90E1C14AA6EA33995|0AB2E5FAEA0AD7815DE790F9806774FB4F6B4D9E28B8495552587F320DCFF2B1|
+|616|Tap 616-scheduled-brand-disclosure-enlarged|6AED1C29118E3BAECD49770D15ECA8D3E2AC1D8B56832058B486BD299DCAED5E|19D22E1EF6B81BF78F41E79690ECC1604428BFB433DDFA2046F130DBA2E60081|
+|617|Tap 617-scheduled-price-filter-options|B1D3AF4E9E3F96CFE13CBDF5A9BDCEC5F6D8347B4FDD38D83BF2BB7527F34235|E98A88681EE7BD99C93086C20755B5D5E0B97D9BFA7944899FA9F32F34F2F464|
+|618|Tap 618-scheduled-price250-preview|EF666B6E25E24628B7B6B081131013A20E3769E1756585557509F3F4B7A19A12|0AB1E01F788781FB47916B6C97EE97A46ABB9B9171377E63DA28C5C028E7C17B|
+|619|Tap 619-scheduled-price250-applied|4E39C430F167FC8813773267FAFC822BE727BEB0B91FA482BD50F19301AF5AB6|4E4ADE0774BF0281F79A694DD52C6FC20B27A4DA8AA7D6657050ED931A688846|
+|620|Tap 620-scheduled-filtered-search-focus|94B92A44C52E54470E0DAD05899D12E0D77302638DC12A72BF6383E388464752|A0035D91F92E099FEC6F9935AA83E892733C4D075A81E9E054CA482C543137EF|
+|621|Tap 621-scheduled-filtered-atta-search|2667BDD1F918D30ADC4E5204315816A8A6C30CA21CE7CD75E271ABB063B02BFB|A280E6F878A2E34EC3901415720A4D79EAC2C33CED8899D16443F32FCA16D7F0|
+|622|Tap 622-filtered-search-done-enlarged|12B49F9A437B8DDC96EC3E80CCDBB21894D36DC21284EEFA0E78FE207C0AF784|9F36CD0670D65C493B0D8D8BE52F4FDB1BA12070EF4610C26E443FBD43E12EE5|
+|623|Tap 623-empty-results-filter-recovery|0DFDF090810153928D58C37600615B51088B3334E5A921807167EA081CC3DFD2|5A9D9DE182F38C4161D7EA8FEC8C648FC194B52ADAC499711EFB3AD90E766000|
+|624|Tap 624-clear-price-filter-preview|0F3D3C5AD27476FB0C37589C011B209DC2CE5E59EB631FBDA7EF017B347E6B96|DC38282F83FA9CD6165196C9C99DF9A7412BDAA0FA8B51CF39C62DBDD8C8FD2A|
+|625|Tap 625-atta-results-restored-after-clear|369F6AD85452C86CA670A66326CD22216629EFFCCED75D5579774D29EA5AB3A0|78CB139A57D565230157CB4F2F98AB7388CAA85AA3A4331AD8B04832EBA20811|
+|626|Tap 626-shop-query-cleanup-focus|7EA2C169B7C0B14D806ECE868EC71BE92C338F793D0FD9B03E2CBD854E8F3808|EBDB2CEE6AA2C44AF0A77545CF21C67EEFE0E2A1C72D87BC22C32907BC09F64B|
+|627|Tap 627-shop-query-cleared-enlarged|6EE5468A490C13C69537E9D35426AB6404CB4B5C519B22C5F29FD777E2C53A55|899338BD99188FC324B06D0BBE5C68D5D92E4653AFEB3503FBD85E822B740170|
+|628|Tap 628-scheduled-all-results-restored|2FE8B0846E943C98F5EA0D59C2AB91638D4585D8F99A768FDB8070D367F89616|B8FDCBE71022C2D698F744C66F63BC204CE2730EF98DAA8DCFDC4F7D502F7A53|
+|629|Tap 629-shop-category-enlarged|5961FAA3923C73DBF30EB7C175C48C953B2E79650808029005B3ACE64AA8E7FF|3C22E4C4765F6BEAD6E6BB6776CFEAC5279F56D2D416C39CAC8533C077E57C6D|
+|630|Tap 630-scheduled-dairy-category-selected|39A7AA5B5D893D376DA38922A8C43C75A5585927A1E46DE94A1BC8C39E4B9347|FAE3BA430E0C8DED122B09BE861997C0A488C0A28238C495737C564D6DA78E9D|
+|631|Tap 631-shop-category-selection-retained|9ECE68669C57FAE9B654BCBFF2155EDD0BCC732923F41A4A546C7885C829C2F3|548728AFB0B65D02E78E1DBCFE1A75575FB1BBE4928096095CDB7E9258817DA6|
+|632|Tap 632-shop-all-category-restored|9F817740EDC33DA336B777354A5FF2759BB450A5151313EF1E05D247C54FCCCF|B8FDCBE71022C2D698F744C66F63BC204CE2730EF98DAA8DCFDC4F7D502F7A53|
+|633|Swipe 633-scheduled-refresh-footer-enlarged|9DDF8ACA73147171ABB83451BA3BE664A1483D7837E00E87F75AA6EC09092837|C73EE5FA97A2786DB20ADC33F296F9AD125FD7D6173D2034146133EFD3D40C47|
+|634|Tap 634-scheduled-footer-refresh-result|C343C01F9EAF471042F97377D516125D27EF8A0C06A2730023CF86EFF98F77B6|B8FDCBE71022C2D698F744C66F63BC204CE2730EF98DAA8DCFDC4F7D502F7A53|
+|635|Capture 635-scheduled-normal-restored|CE66EF9A9583CCA1F8527724B9E2D248A42940D9903FEC55814DD25C815B9395|6E62FF195197E316738B2669BA6A851E7BD141AF0EBB0293E72796F89D750CE5|
+|636|Tap 636-shop-starting-state-restored|9408F8C43BB9AF04C82683A3138BA4091BB194434D363091DEDC12BA0AE37BB0|1D537FDD010C8A45EC6780FD368D555D5A4B1C7A630B34056DC40A1447F4AD89|
+
 ## r66.9 scoped round 1 checkpoint 16 - split purchases, order search and Back
 
 48 additional successful captures555-602; **600 successful Redmi captures total**, failed382/504 excluded. Frozen **33 findings +9 requests:8 closed,34 open**. Current open breakdown **23 partially exercised,10 failed connected replay,1 not exercised**.41/42 reached remains coverage, not a pass ratio. **Seven new UAT child defects**, separate from the42 frozen items. No ticket closed in this batch; no child implemented.
