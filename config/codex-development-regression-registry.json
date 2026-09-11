@@ -385,6 +385,7 @@
     },
     {
       "id": "REG-20260906-4519-WORK-OFFER-LOCAL-INSERT-FALSE-PUBLISHED",
+      "r6614DraftRecoveryChild": "R6614-UAT-PROMOTION-03 under DASH-LOAD-13/14: native captures070/071 retain QA-r6614-draft while editing and after keyboard dismissal; Android Back returns to the originating Store-link surface (072), but reopening Promote store resets the headline to Not entered (073), without discard confirmation. _WorkspaceOffersSurfaceState owns fresh title/detail/orderCap controllers and product/date fields and disposes them without draft recovery. Preserve the complete unpublished promotion draft for the exact account/Store across navigation/relaunch, without marking it active or publishing, and prevent cross-Store leakage. Test text, product identity, date/cap, keyboard, Back, relaunch and stale/deleted products. No publication or external message was attempted. This extends existing offer/durable-state owners, not a new backend or product feature.",
       "status": "confirmed_owned_child_in_progress",
       "appliesTo": ["primary", "work", "testing"],
       "mistake": "addWorkspaceOffer marks a local offer active and tells customers it is published without an authoritative publication acknowledgement.",
@@ -566,6 +567,7 @@
     },
     {
       "id": "REG-20260906-4513-STORE-NATIVE-FIRST-TAP-DENSITY-AND-STATE-COPY",
+      "r6614RequirementValidationChild": "R6614-UAT-REQUIREMENT-04 under DASH-LOAD-13: OPPO081 shows no visible response after Review requirement with title populated and Expected result empty; only manual scrolling in082 reveals Describe the result you expect. Source _review sets _error, while _details renders it after all fields/pricing without focus or ensure-visible recovery. Keep the existing form and validation, but reveal and announce the exact field instruction immediately with keyboard-safe focus/scroll, retaining the complete draft. Test every required field and invalid optional amount at normal/200% compact layouts plus OPPO. Review only sets local review/error state; no posting, payment or external operation was invoked. Same-category requirement Back/reopen retained its draft in077-080 and must remain intact.",
       "visualRailChild20260906": "After the 228-pass/70-capture-skip v32 local run, visual review plus source tracing found business destinations using removed activeId business and Stock/Orders parent actions inert on child destinations. Map general business actions to Store, retain Stock for supply/catalogue and Orders for fulfilment, but disable each parent action only at its own root. Also distinguish an open private storefront from a closed one in the quiet-state card. Preserve approved placement and all destinations.",
       "status": "native_confirmed_child_correction_in_progress",
       "appliesTo": [
