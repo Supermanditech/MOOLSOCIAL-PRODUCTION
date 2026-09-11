@@ -2,6 +2,20 @@
 
 ## 2026-09-10 current 27-item skim and Cursor handoff receipt
 
+### Codex-only successor pre-APK qualification — 2026-09-11
+
+Source/test checkpoint `7dbb7f87f598e0a372fdef5097d2682d35d49c5c` is committed, pushed, clean and remote-equal. Catalogue compatibility and both stale product-detail copy checks are locally qualified; none of this imports Cursor. Resume the existing pre-APK procedure: two unchanged 44-file cycles, each split into the recorded connected16 and remaining28 partitions from `artifacts/quality/codex-oppo-r66-10-review-20260908/local-validation.md`. Keep the existing `--exclude-tags protected-reference` boundary; no new skip or exclusion. Record actual results, not historical totals. Runtime-review isolation, source manifest, existing prebuild controls, a fresh unique one-build candidate and OPPO remain pending. r66.13's consumed build authority must not be reused.
+
+Cycle 1, connected16: **1,422 passed / 81 existing skips / 0 failed**, terminal exit 0. Complete output: external `dashboard-load-implementation-20260909/store-preapk-7dbb7f87-connected16-cycle1.log`, SHA-256 `B64226673B7A976D2A49117C7CACFC9403492DD277EC5E0A423B7E5615061920`. Command from `apps/mobile`: `flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference` followed by the unchanged recorded connected16 list. Remaining28 cycle 1 is running; neither that partition nor cycle 2 is counted as passed. Product/test source remains unchanged. Review-only application-state controls exist, but populated multi-order/mixed-state physical-device coverage still needs verification; host fixtures do not establish OPPO or backend acceptance.
+
+REG4557 continuation: one progress/source-search response was truncated across context reconstruction. The original connected16 process handle and complete retained log were recovered; its terminal exit 0 was observed without restarting the run. The source search was repeated read-only with bounded output. No unavailable output or device result is claimed.
+
+REG4557: a read initially assumed the r66.10 folder used the r66.13 date. The missing path changed nothing; `rg --files` located its actual 20260908 owner, which was read completely. The default APK state is historical r61.5, so the predecessor is correctly identified from r66.13's explicit per-candidate state, not by rewriting the default state.
+
+Cycle 1, remaining28: **402 passed / 2 existing skips / 0 failed**, terminal exit 0. Complete output: external `dashboard-load-implementation-20260909/store-preapk-7dbb7f87-remaining28-cycle1.log`, SHA-256 `766938A124BBA4E7AA93E8863E242BCA9359B3D8DFB19C2A1E3565A3C84C79A7`. Complete cycle 1 therefore has **1,824 passes / 83 existing skips / zero failures**. Cycle 2 has not started.
+
+REG4557 pre-APK reservation incident: the existing coordination gate was invoked after r66.14 exact evidence bindings were added but before their files existed; it rejected the first missing candidate-contract owner. No subsequent test/build ran. Complete this same bounded reservation with truthful pending evidence files, then rerun the unchanged existence check. No generic missing-file exception or gate behavior change is permitted. Two read-only review-entry searches also assumed a nonexistent `lib/ui_v2/work` path; `rg --files` and a bounded search of existing roots recovered the actual Work owners. These are harness/reconstruction mistakes, not product defects or qualification evidence.
+
 ### REG4555 bounded product-detail test contract correction — 2026-09-11
 
 **Locally qualified:** complete product-continuity owner **8 passed**, then the same six-suite catalogue/search/screen/navigation/product/cart batch **138 passed / zero failed**, both exit 0; full analysis zero issues. Only two detail-copy expectations changed. Runtime, Android, dependency and generated trees exactly match `7a39f24eac4adfa66b2d39be8f13d0d6b906ba7e`, whose 1,097-pass / 79-existing-skip Work/Store/Chat run therefore covers unchanged runtime source. This does not close the separate two Buy/Chat compatibility cases, OPPO UAT or the whole 27-item batch.

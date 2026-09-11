@@ -1,0 +1,6 @@
+CandidateId=UAW-CODEX-OPPO-R66.14-REVIEW-20260911
+State=reserved_not_built
+Version=1.0.0-r66.14
+VersionCode=2026091101
+APK=not_created
+SHA256=unavailable_until_build

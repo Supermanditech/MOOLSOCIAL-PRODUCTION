@@ -1,0 +1,9 @@
+{
+  "candidateId": "UAW-CODEX-OPPO-R66.14-REVIEW-20260911",
+  "state": "pending",
+  "device": "OPPO only; serial must be revalidated",
+  "packageId": "com.moolsocial.app.runtime",
+  "dataClearAuthorized": false,
+  "apkSha256": null,
+  "installedApkSha256": null
+}
