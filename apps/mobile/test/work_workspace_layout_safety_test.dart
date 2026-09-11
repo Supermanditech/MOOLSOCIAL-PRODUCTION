@@ -8823,7 +8823,7 @@ void main() {
         await tester.pumpAndSettle();
         for (final (source, label) in const [
           ('camera', 'Camera'),
-          ('scan', 'Scan document'),
+          ('scan', 'Photograph document'),
           ('gallery', 'Gallery'),
           ('file', 'Choose file'),
         ]) {
