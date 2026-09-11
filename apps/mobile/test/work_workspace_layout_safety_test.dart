@@ -18720,6 +18720,140 @@ void main() {
       },
     );
 
+    for (final snapshotComplete in [true, false]) {
+      testWidgets(
+        'R6617 central order scroll and purchased snapshot $snapshotComplete $scale',
+        (tester) async {
+          final work = storeViewFixture();
+          final originalOrder = work.workspaceOrders.first.copyWith(
+            items: 'Purchased Sunflower Oil × 2',
+            quantities: {'oil-fortune-1l': snapshotComplete ? 2 : 3},
+            amount: 247,
+            actionDeadline: DateTime.now().add(const Duration(minutes: 10)),
+            itemSnapshots: const [
+              WorkspaceOrderItemSnapshot(
+                productId: 'oil-fortune-1l',
+                name: 'Purchased Sunflower Oil',
+                pack: '1 L sealed pouch',
+                quantity: 2,
+                unitPricePaise: 12345,
+                lineTotalPaise: 24690,
+              ),
+            ],
+          );
+          work.workspaceOrders[0] = originalOrder;
+          work.workspaceOrders.addAll(
+            List.generate(
+              999,
+              (index) => customerOrder(
+                id: 'SCROLL-$index',
+                customer: 'Other customer $index',
+                createdAt: DateTime.now(),
+                stage: 'Preparing',
+              ),
+            ),
+          );
+          work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
+              .copyWith(sellingPrice: 9999);
+          final orders = List<WorkspaceOrderRecord>.of(work.workspaceOrders);
+          final balances = (
+            work.workspaceSalesToday,
+            work.workspaceSettlementBalance,
+          );
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: scale == 1 ? const Size(360, 760) : const Size(320, 568),
+            textScale: scale,
+            bottomInset: 24,
+          );
+          final review = find.byKey(const Key('work-activity-order-review'));
+          await reveal(tester, review);
+          await tester.tap(review);
+          await tester.pumpAndSettle();
+          final exact = find.byKey(const Key('work-store-exact-order'));
+          expect(exact, findsOneWidget);
+          expect(
+            find.byKey(const Key('work-store-activity-scroll')),
+            findsNothing,
+          );
+          final scroll = find.descendant(
+            of: exact,
+            matching: find.byWidgetPredicate(
+              (w) => w is Scrollable && w.axisDirection == AxisDirection.down,
+            ),
+          );
+          expect(scroll, findsOneWidget);
+          final viewport = tester.getRect(scroll);
+          expect(viewport.height, greaterThan(40));
+          final position = tester.state<ScrollableState>(scroll).position;
+          Future<void> show(Finder target) async {
+            for (
+              var i = 0;
+              i < 40 && target.hitTestable().evaluate().isEmpty;
+              i++
+            ) {
+              await tester.dragFrom(
+                viewport.center,
+                Offset(0, -viewport.height * .55),
+              );
+              await tester.pumpAndSettle();
+            }
+            expect(target.hitTestable(), findsOneWidget);
+          }
+
+          await show(find.text('Ordered items'));
+          await tester.dragFrom(
+            viewport.center,
+            Offset(0, -viewport.height * .55),
+          );
+          await tester.pumpAndSettle();
+          expect(position.pixels, greaterThan(44));
+          if (snapshotComplete) {
+            await show(find.text('1 L sealed pouch'));
+            await show(find.text('2 × ₹123.45'));
+            expect(find.text('₹246.90'), findsOneWidget);
+            expect(find.text('₹9,999'), findsNothing);
+            expect(
+              find.text('Ordered via'),
+              findsNothing,
+              reason: 'Central card already shows source once',
+            );
+          } else {
+            await show(
+              find.byKey(const Key('work-exact-order-prices-unavailable')),
+            );
+            expect(find.text('2 × ₹123.45'), findsNothing);
+            expect(find.text('₹9,999'), findsNothing);
+          }
+          expect(
+            find.byKey(const Key('work-activity-order-accept')).hitTestable(),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('work-activity-order-reject')).hitTestable(),
+            findsOneWidget,
+          );
+          await captureStoreView(
+            tester,
+            'central-order-snapshot-$snapshotComplete-$scale',
+          );
+          await tester.tap(find.byKey(const Key('work-order-details-close')));
+          await tester.pumpAndSettle();
+          expect(exact, findsNothing);
+          expect(work.workspaceOrders, orders);
+          expect((
+            work.workspaceSalesToday,
+            work.workspaceSettlementBalance,
+          ), balances);
+          expect(work.currentWorkspaceOrderId, originalOrder.id);
+          expect(work.workspaceInvoices, isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
     testWidgets('R6617 promotion draft survives Back and Store switch $scale', (
       tester,
     ) async {

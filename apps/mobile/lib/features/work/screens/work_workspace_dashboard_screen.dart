@@ -4043,8 +4043,7 @@ class _StoreActivityDeck extends StatelessWidget {
         builder: (context, constraints) {
           final largeText = MediaQuery.textScalerOf(context).scale(14) > 18;
           final scrollCard =
-              !(MediaQuery.textScalerOf(context).scale(14) > 23 &&
-                  content is _StoreOrderDetails) &&
+              content is! _StoreOrderDetails &&
               (_hasStoreWorkload(session) ||
                   (largeText &&
                       ((content is _DeliveryActivityCard &&
@@ -5603,27 +5602,11 @@ class _StoreOrderDetails extends StatelessWidget {
               ),
               if (order.address.isNotEmpty)
                 _detail('Deliver to', order.address),
-              const Divider(height: 24),
-              const Text(
-                'Items',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: MoolColors.navy,
-                ),
+              _ExactOrderInformation(
+                order: order,
+                showItems: true,
+                showFacts: false,
               ),
-              const SizedBox(height: 5),
-              if (active)
-                for (final line in session.workspacePackingLines)
-                  _DeskItemLine(label: line.label, quantity: line.quantity)
-              else
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Text(
-                    order.items,
-                    style: const TextStyle(fontSize: 13, height: 1.5),
-                  ),
-                ),
               if (order.actionDeadline != null) ...[
                 const SizedBox(height: 8),
                 _LiveCountdownText(
@@ -16234,11 +16217,13 @@ class _ExactOrderInformation extends StatelessWidget {
     required this.showItems,
     this.paymentLabel,
     this.showPayment = true,
+    this.showFacts = true,
   });
   final WorkspaceOrderRecord order;
   final bool showItems;
   final String? paymentLabel;
   final bool showPayment;
+  final bool showFacts;
 
   static String _price(int paise) {
     final fraction = paise % 100;
@@ -16285,8 +16270,8 @@ class _ExactOrderInformation extends StatelessWidget {
       key: Key('work-exact-order-information-${order.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Divider(height: 20, color: Color(0xFFE5E8F1)),
-        for (final fact in facts)
+        if (showFacts) const Divider(height: 20, color: Color(0xFFE5E8F1)),
+        for (final fact in showFacts ? facts : const <(String, String)>[])
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 4),
             child: MediaQuery.textScalerOf(context).scale(1) >= 1.8
