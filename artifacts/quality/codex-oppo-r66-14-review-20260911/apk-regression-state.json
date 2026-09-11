@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "prebuild_passed",
-  "buildAuthorization": "not_authorized",
+  "machineState": "installed_device_review_incomplete",
+  "buildAuthorization": "consumed",
   "preBuildValidation": {
     "state": "passed",
     "evidence": "artifacts/quality/codex-oppo-r66-14-review-20260911/prebuild-validation.md"
@@ -14,7 +14,7 @@
     "buildMode": "debug",
     "gateProfile": "uaw_runtime_ui_review_debug",
     "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
-    "head": "4aead991b54aec15654331345658b44ba4660d43"
+    "head": "73c0a2840da4e038fc90a650b069467060eb27de"
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-14-review-20260911/source-manifest.txt",
@@ -148,11 +148,13 @@
   "postBuildGates": [
     {
       "id": "apk-integrity",
-      "state": "pending"
+      "state": "passed",
+      "evidence": "artifacts/quality/codex-oppo-r66-14-review-20260911/uaw-codex-oppo-r66.14-review-20260911-build-provenance.txt"
     },
     {
       "id": "oppo-install",
-      "state": "pending"
+      "state": "passed",
+      "evidence": "artifacts/quality/codex-oppo-r66-14-review-20260911/post-install.json"
     },
     {
       "id": "oppo-real-user-review",
