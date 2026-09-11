@@ -18720,6 +18720,93 @@ void main() {
       },
     );
 
+    for (final stamp in [
+      DateTime.utc(2026, 12, 31, 20, 4),
+      DateTime(2027, 1, 1, 1, 34),
+    ]) {
+      testWidgets(
+        'R6617 supplier update uses local calendar ${stamp.isUtc} $scale',
+        (tester) async {
+          final work = storeViewFixture(null, _ContactDraftFixtureStore());
+          final originalOrder = work.currentWorkspaceOrderId;
+          final shipment = WorkspacePurchaseRecord(
+            accountScope: 'review-draft-account',
+            workspaceId: work.activeWorkspace!.id,
+            supplierId: 'time-supplier',
+            supplierName: 'Test Mandi',
+            orderId: 'TIME-ORDER',
+            shipmentId: 'TIME-SHIPMENT',
+            revision: 1,
+            createdAt: stamp.subtract(const Duration(hours: 1)),
+            updatedAt: stamp,
+            stage: WorkspaceSupplyStage.confirmed,
+            amountMinor: 496000,
+            itemSummary: 'Sunflower oil × 20',
+            paymentLabel: 'Payment pending',
+            lines: [],
+          );
+          expect(
+            work.applyWorkspacePurchases(
+              accountScope: 'review-draft-account',
+              storeId: work.activeWorkspace!.id,
+              feedRevision: 1,
+              records: [shipment],
+              complete: true,
+            ),
+            isTrue,
+          );
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+            textScale: scale,
+          );
+          await reveal(
+            tester,
+            find.byKey(const Key('work-incoming-purchases')),
+          );
+          await tester.tap(find.byKey(const Key('work-incoming-purchases')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Test Mandi'));
+          await tester.pumpAndSettle();
+          final local = stamp.toLocal();
+          final label =
+              'Updated ${local.day}/${local.month}/${local.year} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+          final update = find.byKey(const Key('work-purchase-updated-at'));
+          await reveal(tester, update);
+          expect(tester.widget<Text>(update).data, label);
+          expect(update.hitTestable(), findsOneWidget);
+          // The Windows/OPPO qualification host uses India Standard Time. A UTC
+          // timestamp crosses midnight/year here; local inputs must not shift twice.
+          if (stamp.isUtc &&
+              local.timeZoneOffset == const Duration(hours: 5, minutes: 30)) {
+            expect(label, 'Updated 1/1/2027 01:34');
+            expect(find.text('Updated 31/12/2026 20:04'), findsNothing);
+          }
+          await captureStoreView(
+            tester,
+            'supplier-local-time-${stamp.isUtc}-$scale',
+          );
+          expect(work.focusedWorkspacePurchase!.updatedAt, stamp);
+          expect(
+            work.focusedWorkspacePurchase!.paymentLabel,
+            'Payment pending',
+          );
+          expect(
+            work.focusedWorkspacePurchase!.stage,
+            WorkspaceSupplyStage.confirmed,
+          );
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(work.focusedWorkspacePurchaseId, isNull);
+          expect(work.currentWorkspaceOrderId, originalOrder);
+          expect(work.workspaceStockMovements, isEmpty);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+
     testWidgets(
       'DASH07 eight supplier arrivals alongside 100 active orders $scale',
       (tester) async {

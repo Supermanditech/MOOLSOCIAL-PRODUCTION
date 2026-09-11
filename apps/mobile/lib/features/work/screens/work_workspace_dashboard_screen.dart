@@ -9516,6 +9516,7 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           ],
         );
       }
+      final updatedAt = selected.updatedAt.toLocal();
       return ListView(
         key: PageStorageKey(
           'work-purchase-details-$storeId-${selected.shipmentId}-$statement',
@@ -9594,8 +9595,9 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
           if (selected.address?.isNotEmpty == true)
             Text('Deliver to · ${selected.address}'),
           Text(
-            'Updated ${selected.updatedAt.day}/${selected.updatedAt.month}/${selected.updatedAt.year} '
-            '${selected.updatedAt.hour.toString().padLeft(2, '0')}:${selected.updatedAt.minute.toString().padLeft(2, '0')}',
+            'Updated ${updatedAt.day}/${updatedAt.month}/${updatedAt.year} '
+            '${updatedAt.hour.toString().padLeft(2, '0')}:${updatedAt.minute.toString().padLeft(2, '0')}',
+            key: const Key('work-purchase-updated-at'),
             style: const TextStyle(fontSize: 11, color: MoolColors.muted),
           ),
           const Text(

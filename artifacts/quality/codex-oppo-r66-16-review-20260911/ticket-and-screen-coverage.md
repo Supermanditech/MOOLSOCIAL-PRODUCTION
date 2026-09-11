@@ -31,6 +31,20 @@ Device evidence supplement: device-review.md/native093–103 and external native
 
 Founder explicitly lifted the collection-only hold after native092, subject to clean Git, bounded ownership, regression verification and safe future integration. Begin from clean remote-equal f6cf777f093025a9caea9a5f5dfee7d292ffe519. Implement the recorded Codex-owned defects and necessary review-fixture corrections in atomic tested changes; preserve earlier failed evidence. Cursor integration, Redmi, backend deployment, real messages/payments and product-add redesign remain held. Shared/Buy changes require exact existing ownership or separate coordination, not dirty-file copying. Stock quantity editor child09/REG4558 is the first correction: preserve validation and movement behavior while making Save reachable with keyboard open/closed and large text. Closure requires local and successor OPPO evidence; the installed r66.16 is unchanged and its failures remain recorded below.
 
+### Child08 Supplier update time — locally qualified, OPPO pending
+
+From c2c55c66abf5a9bdefc43401b74e5870d3426908, the existing supplier surface converts updatedAt to local time only when rendering. Stored timestamps, shipment/order identity, amounts, payment/readiness and tracking behavior remain unchanged. Four new cases cover UTC crossing midnight/year and already-local timestamps at normal/200% text, retained identity and Back. Host timezone was independently verified as India Standard Time (+05:30); no OS setting changed.
+
+Commands from apps/mobile use flutter test --no-pub, expanded reporting, concurrency1 and the existing layout-safety owner. Focused --name 'R6617 supplier update|DASH07 eight supplier arrivals|DASH08 finance first taps' with actual Flutter capture defines:8 passed,0 failed,exit0. Broader --name 'DASH07|DASH08 supplier|DASH08 finance|R6617 supplier':32 passed,0 failed according to complete raw log; the orchestration result was truncated, so its process exit code is not separately retained. No process remained running on recovery. Counts overlap. Full flutter analyze --no-pub:zero issues,exit0. No test was rerun to reconstruct missing output.
+
+External evidence under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905:
+
+- r6617-supplier-local-time-focused-v1.log SHA256 77D27659AB74E4936BDCE7D695B4F8D12D67BAA1E1811717A3AB17AD39DFF76E.
+- r6617-supplier-local-time-connected-v1.log SHA256 84BBA911A7A0101F7F76774B016A09496C0CFBD40AFB3722D4CAB1DF3E844C64.
+- r6617-supplier-local-time-analysis-v1.log SHA256 02D1710717EBD1F14D83386D7590E4C90B5CC94038C23B22A6E7214453C35B90.
+
+Actual Flutter supplier-local-time-{true,false}-{1.0,2.0}.png captures in r6617-supplier-local-time-visual-v1 were individually inspected after recovering truncated image output. All show Updated 1/1/2027 01:34; 200% captures show the scroll position exposing the complete timestamp, not all shipment content at once. Tested source SHA256 031A40EF3D97B686E6B2CCB0DF193B0D75FC630FEE699A13F6E092A31D07C9FD; test SHA256 73CCDBA64EDCBA000EAB89D88F729CE8804FB3C564DB1A03BB54444F93F45B65. No policy, registry or gate changes. No new APK; native child08 remains open until a separately authorized installation/replay. This subset is not final full-batch qualification.
+
 ### Child10 Statement tab position — locally qualified, OPPO pending
 
 Continues from clean remote-equal 9d4d0edc62848f2c7227c2742ca9d7fe2f95b2c4. Functional owners remain the existing dashboard source and layout-safety test. Store statement now preserves independent scroll positions through Sales/Purchases/Expenses switches, period changes and Back/reopen using scoped Flutter PageStorage; account/Store/period/book and review/confirmed-data boundaries do not share offsets. Finance order-detail expansion has separate account/Store/section/order storage keys, preventing bool/scroll-offset collisions. No layout, amount, record, payment, supplier, backend or Cursor implementation changes. This is in-session navigation retention, not a claim of process-death persistence.
