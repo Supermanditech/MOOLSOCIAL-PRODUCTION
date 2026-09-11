@@ -6,6 +6,41 @@ Complete Redmi testing of all previously scoped tickets and their connected jour
 
 
 
+## r66.9 scoped round 1 checkpoint 4 — original Orders search reproductions
+
+**115 total captures; two new UAT children unchanged; zero full ticket closures.** Sixteen of33 frozen findings and five of9 requests have now been reached on Redmi;17 findings and4 requests have not yet been exercised. Thus21/42 entries are partly checked, not fully verified. Among the16 reached findings, two new children have been recorded (2/16,12.5%); among all21 reached entries,2/21,about9.5%. These are provisional discovery ratios, not failure-rate estimates. The two earlier implementation children remain separate: one partial, one untested. The procurement dependency remains separately qualified only within its previously stated limits.
+
+- Captures096–098 verify product → original MS-240741 Items → tracking → Delivered list using Android Back. No cart/quantity or order change.
+- Captures099–104 replay Active Orders → search tomato → Done → exact MS-NEW-09 tracking → Back. The existing purchase is found, and Back retains tomato and its matching list. This passes the original normal-display search reproduction; it is not a full ticket closure.
+- Captures105–108 edit/clear tomato, enter synthetic zzRedmiNoMatch, inspect No orders match this search, and clear it to restore the list. Keyboard, clear and Done controls remain reachable.
+- Captures109–112 replay the separate exact BUY-NEW-04 reference. Results show only its74rupee purchase and MS-NEW-09 delivery. Tracking opens that order and Back preserves BUY-NEW-04 and its result.
+- Captures113–115 clear the test query and finish editing; original blank search and normal keyboard-free Active list return. Remaining relaunch, split deliveries, other identifier/account conditions and applicable display checks stay open. No new child arose in these search sequences.
+
+Device/APK/source unchanged from checkpoint3; all20 new PNGs were individually inspected. Exact checksum remains AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9 on Redmi TG8HCYTGGQT885OF. Previous committed checkpoint23fbf0a0a58304e2e94ad64e4f4249ee96841aa5 passed normal gates and was pushed/clean/exact-remote-equal. Checkpoint4 external redmi-r66-9-round-1/round-progress-checkpoint-4.json SHA256 A90277E2412F65CAAF64C4EC912A7C371AE631D8B0AE9FA1857983F90365124D binds all115 PNG/XML/metadata and terminal command receipts. No runtime implementation or APK action. Founder instruction still requires complete scoped UAT, full deduplicated defect list, then STOP/report before further implementation.
+
+| Capture | PNG SHA256 | XML SHA256 |
+|---|---|---|
+| 096-product-back-to-order-items | 5F67ACDE21465B7B04ABB7C2B94585C73CC7A609C723D3EC7FB604396BA0A25C | 6D665C88EE1F3C74CD99C8EBF5CD32EA554A2056B4B4F05F7C94B3C3158F0F68 |
+| 097-order-items-back-to-tracking | ED0F17809F45903721A86BF5D5F76B913D1858AD965346921E4B41D9AECF6EDF | BB14D1BBAA5C9E2CCECB9D942BA0866452CBA0E3DD22AE100E67406E4018B6F6 |
+| 098-tracking-back-delivered-list | 2E63400EFD00BF2EEF664C682CF2501F068E816CAD4656E17198F56EF9B05DBF | 34EB0C504623B975C7242735EA376294E8071346956196F8A56838829C46BD34 |
+| 099-orders-active-search-start | C25629266C454C3204EF26BA50B860F5132A43347F35736F4679ECC8B3B56D71 | D781CB19318CA01139F36564A879453918271AAEB27C8C2D9012732556E1BED7 |
+| 100-orders-search-focus | A4166BC860A15566F5D637C2740B6581D47FE5E63738826B4A4681C55FFD0A9B | FE87B5726AB021BD28E20E2410A91408E45EFDB41E3CEF85F17B56E5F6B2026B |
+| 101-orders-tomato-query | 463F3EE77C3E9F6C20100C9CBC86CCCBC23A461B4DEB95E1DC84AC170F431C2B | C53A720913DBFD4DC39FD2CD9D9FFEB853F1FC437D3572FE7D13541E9EF8D3E9 |
+| 102-orders-tomato-search-done | 1A6DEC5EE4DD9082581D3AE554D3C4AF7BE54E9DD6F0212E43A2E1CE2CD8D919 | 1C9F98FC513D31C094DF3BD485EEDAB21B8EED85215B80B4AABA3A9182FC90EA |
+| 103-tomato-search-order-entry | 9DB47ED2205528D2DB13D2FE986015C7E948A06B5C53B79F2ED08ED76E9211C6 | 42DB2CA52AD6C6D2D20118BD5DAC3D2C5B9F7338443342021D61F2725720AF47 |
+| 104-tomato-search-order-back | 1337C8ECAFEC2C51C7990C8B931B5067817326D373AF1CCD854324CC56B10AA0 | 1C9F98FC513D31C094DF3BD485EEDAB21B8EED85215B80B4AABA3A9182FC90EA |
+| 105-orders-query-edit | 677AAB2F9CA0CEE137EBC58AC8CFE40255A132569F67F7BFF44821ED2F95D6DF | C53A720913DBFD4DC39FD2CD9D9FFEB853F1FC437D3572FE7D13541E9EF8D3E9 |
+| 106-orders-tomato-clear | 8A398ED41FBB1C1DE856357382808F17211C624308360043A5B35DC6FC66E9F9 | FE87B5726AB021BD28E20E2410A91408E45EFDB41E3CEF85F17B56E5F6B2026B |
+| 107-orders-no-match-query | 673C2CBB998230DA0EB507C6B82A558DBD4339B62988656AA6A585E99869B16E | 9FD5E888DB907F208942A34561DBE4AF39155B22603EEBA6133760E4581B4EEB |
+| 108-orders-empty-search-clear | 663A648E2A76BF3C775A4F2559478203F62BD548010D9EE756402ECB014C1B9E | FE87B5726AB021BD28E20E2410A91408E45EFDB41E3CEF85F17B56E5F6B2026B |
+| 109-orders-purchase-reference-query | 228D378BE23C83140C5FB506362DBDB4A8159888FB4EAF166FE16D494B1ABBE7 | 57D356EA43DAD5DA1CDB686547458F1FE9AC258B91ED0E0E21381E0B3628666F |
+| 110-purchase-reference-search-done | 0D990696FC91478F85ECCA6F269DCD0EAAD1E6B547D4822ED027C972151AD56D | 1D6BA0C3074013C2A4067D0946AE4349D4B4983BAEBC3CBBE68027415DC9C95A |
+| 111-purchase-reference-track-entry | EC4149A18DB46084507BEBF455C5D493408053BE50DE5FF4AA552E33D3C70EE3 | 42DB2CA52AD6C6D2D20118BD5DAC3D2C5B9F7338443342021D61F2725720AF47 |
+| 112-purchase-reference-back-retained | B2AABEA290293E2CBD73A6430E69EAA76419CBBC9C589275622D72EFE0925311 | 1D6BA0C3074013C2A4067D0946AE4349D4B4983BAEBC3CBBE68027415DC9C95A |
+| 113-purchase-reference-query-edit | 145D07A76D34AC671C512A3FFC2C396173DB0B95AC0563D1A0EC2B209BE9879F | 57D356EA43DAD5DA1CDB686547458F1FE9AC258B91ED0E0E21381E0B3628666F |
+| 114-purchase-reference-clear | 01AC4CFC203926F23DAEE24B3E0971DF816B3F1EE75648F4091E0582AE5E3C64 | FE87B5726AB021BD28E20E2410A91408E45EFDB41E3CEF85F17B56E5F6B2026B |
+| 115-orders-search-restored-empty | EC3A2ED2719D11FB8EA6BC5F148D835F48E1C9CA71F8C4C552C4D1270C57A099 | D781CB19318CA01139F36564A879453918271AAEB27C8C2D9012732556E1BED7 |
+
 ## r66.9 scoped round 1 checkpoint 3 — address drafts, review loss, report and comparison recovery
 
 **Two confirmed new r66.9 UAT children; zero ticket closures. Full scoped UAT remains incomplete. STOP and report the complete deduplicated list before any further implementation.** The new child in this checkpoint is R669-UAT-REVIEW-BACK-DRAFT-001; the existing child is R669-UAT-TRACKING-FRESHNESS-SUMMARY-001. This is a testing/evidence checkpoint, not a fix batch or final list. Runtime source and installed APK are unchanged.
