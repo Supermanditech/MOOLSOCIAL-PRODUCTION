@@ -98162,6 +98162,7 @@
     },
     {
       "id": "REG-20260904-4324-R65-4-FLOATING-CART-OVERLAPS-ADJACENT-WHOLESALE-SKU-ADD-TARGET",
+      "r6616StoreProductReproduction": "Native073/075/079 on installed r66.16 OPPO reproduce the same overlay/action-obstruction family in embedded Store Restock product detail: Whole wheat bread quantity Add one bounds[608,1233][696,1321] are covered by Cart bounds[402,1242][704,1338]. Actual073 PNG inspected; hidden control was not tapped through. Record R6616-UAT-CART-OVERLAY-14 in the Store27 audit, linked to this existing record and REG4396 rather than allocate a duplicate root-cause ticket. Open and implementation-held. Product/cart/query/Back retention otherwise passes bounded native072-085; no checkout, payment, Cursor edits or new APK. Consumer/shared Buy overlay owner must be coordinated before any later fix; no claim about newer Cursor code or post-integration qualification.",
       "status": "registered-redmi-hit-target-child-defect-reopened-reg4226-reg4227",
       "appliesTo": [
         "primary",

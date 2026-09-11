@@ -1,5 +1,13 @@
 # r66.16 bounded support review disposition
 
+## Latest native085 — Restock retention tested;14 native findings
+
+Existing APK Store Restock > exact product > minimum2packs > cart > Back, bread search > exact product > Back, originating Store return/reentry, and2to3pack update/cart reconciliation passed the observed default-font in-session checks. Query, product, quantity and ₹1,440/₹2,160 totals stayed consistent. Evidence: device-review.md/native069–085, manifestv5. This qualifies neither process-death/account switching nor deferred procurement authority/Cursor integration/physical200%.
+
+**R6616-UAT-CART-OVERLAY-14**: product-page floating Cart covers the quantity value and Add one action (073/075/079). Link to existing REG4324/REG4396; do not create another global root-cause record or edit Cursor code. Implementation held. Later acceptance: product quantity controls and Cart independently visible/reachable at default and large text across embedded Store and ordinary Buy, with retained cart/navigation and safe overlay positioning. Catalogue increment workaround does not close it.
+
+Current audit inventory:14 native/customer-facing findings,1 narrowly closed and13 open; plus1 open review-only QA recovery defect with a safe existing-UI workaround. All27 original items remain mapped; untestable backend/fixture/accessibility/shared-owner checks are explicitly pending, not passed. Earlier counts below are historical checkpoints.
+
 ## Latest native068 — safe existing-UI recovery verified
 
 Store testing is no longer blocked by lack of dashboard access. Earn Today > Create your Workspace starts a separate QA application; the existing explicitly labelled review-only Approved control opens its dashboard. Native068 confirms the previous OPPO-QA-Cloud-Document application remains Under review and the other saved application remains listed. No new APK, data clearing, source change or production approval bypass occurred. This corrects the stronger blocker conclusion below; historical observations remain evidence. R6616-QA-RECOVERY-01 is still open, with this verified workaround, not a product fix. See device-review.md/native049–068 and manifestv4. Continue the remaining reachable Store tests; do not count unexecuted Restock/product/cart/Back checks as passed. Customer findings remain13 total,1 narrowly closed and12 open; one separate QA recovery defect remains open.
