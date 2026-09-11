@@ -6,6 +6,44 @@ Complete Redmi testing of all previously scoped tickets and their connected jour
 
 
 
+## r66.9 scoped round 1 checkpoint 11 — enlarged supplier qualification and quantity closure
+
+24 additional successful Redmi captures393-416;415 successful captures total (failed attempt382 excluded). Reach remains41/42, now **one finding CLOSED after Redmi verification**,34partial,6failed-connected,1not-exercised. Five new UAT children remain open. R668-AUDIT-QTY-001 is closed in DEFECTS.md; this is not parent-workstream, backend, catalogue or media closure.
+
+-393 normal original four-product suppliergrid/retained28736.394 changes onlyfont1to2 at physical720x1600/density320. Supplier quantity remainsfullyreadable.395 openseditor;396 types28735;397 appliesRs99997800;398plusrestores28736/Rs100001280. Everyinputdigit,minimum,Update andCancel is visibleabove numericIME. Normaloriginal385-389 alreadyqualified independenteditor andplusminus.
+-399 enlargedfullcatalogue lastrow andbothAddbuttons fullyreachable abovequietcart.400 opensfourthSmoothblueballpens/Carton1000/MOQ2;401AndroidBack retainslastrow/cart.402returnssupplierpreview;403scrollrevealsfull28736andbothcontrols.404cartheader,405cartline/footerquantity/amount agree;406Back restores supplierpreviewoffset.407-409 reopenfullcatalogue/lastrow.410AddfourthSKU starts2andtotalRs100009680;411minusatMOQremovesthose2only, restoresnotebook28736/Rs100001280. No order submitted.
+- Mediaobservation394/399/402: neutralphoto-unavailableicons appearinstead of bundledillustrations atfont2. Source _BuyV2IllustrationDisclosure in buy_v2_design.dart deliberately substitutes this fallback when thedisclosurecannotfit;400detailstillshowscategoryillustration and412normaltextrestoresallfourillustrations. Recordasintendedfallback, notanewsupplierdownloadfailure. Existingmediafinding/technicalproviderqualification staysopen.
+-412normalfontrestored.413Cartonlytemporaryoriginalnotebook28736;414scope-specificremovalconfirmation;415removesonlytestbasket.416ShopSaved1stillpresent,cartempty. Originalfont1,density320,720x1600/nooverride,autoRotation1/userRotation0 independentlyequalbeforevalues. Restorationrecord external display-restored-after-supplier-enlarged-1.json SHA2568E69E7C2566EBB66F465AA77A9F5E4023529B2901F06A1F0CD31F1ED282A3061. EarlierdeliveryKeep/orderselection cleanup still outstanding.
+
+Quantityclosuremapsnormal/enlargedreadability, independentediting,steppercontrols,product/cart/Back agreementandcleanup toactualRedmicaptures. Closure record quantity-redmi-closure-1.json SHA256A135C68DA7F2536CC903149FF8293FD754FC1B9004786E54DEEE6831210C0706. Checkpoint11 external round-progress-checkpoint-11.json SHA256DBA2CFB1F786A30D8B9401515AD11D7AB64D51D1A071E0949F9BF664287D5844. ExactAPKAEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9/RedmiTG8HCYTGGQT885OF;all24PNGs visuallyinspected andPNG/XML/metadata/terminalreceipthashesverified. Resume12coordination/device-memory passed. No runtimechanges,newAPK,integration,realpayments/messagesorproviderqualification. ContinueplannedscopedUAT;stop/reportcomplete deduplicatedlist before furtherimplementation.
+
+| Capture | Label | PNG SHA256 | XML SHA256 |
+| --- | --- | --- | --- |
+| 393 | 393-supplier-resume-before-large-text | FB4692EA0215CFDAC26E86546DB67B6DCF03BE66013E17BA8435B8DDF7EC03A0 | 2E16F1B04F33C46806C2386FB985A06FAC75FE6B79086CF1018A75839678CAD4 |
+| 394 | 394-supplier-enlarged-full-catalogue | 8201F43230BCA61F62B0F7579115F696A4A267B50BD7A2862D31C8C018ABC262 | CC1E09755D6DFBD97FAE307C633F181956B2A3D668337C39208B43414B2CFC62 |
+| 395 | 395-supplier-enlarged-direct-quantity | F51C3580232E48DF51941D40BAB9DE1A9FA511BD9AAFE09A7DA682B689FD0C2C | C9EDC283565DDE892293DB9FEB2D471C16C936F9FCA727128A6E462CECFF2736 |
+| 396 | 396-supplier-enlarged-five-digit-entry | E3B71B03427DB831818EDDEF9DAA6F79DFB04DEAFC9E7F5AF551F5E07C05C734 | FDE736DE9A185E413EA13A52BE8F092E7AE43B191128BEBFEFF1A5880E53E162 |
+| 397 | 397-supplier-enlarged-quantity-updated | 9DF4104480D59ED2530F1FFEEE705911623CDD5A44506AE7F07AC7005B61C2F4 | A13003C664BF18D107E829FC2A6423A60A92F1E30D237826C5DB738680F74C31 |
+| 398 | 398-supplier-enlarged-plus-restores | CC4E42C7406191C2C88486DA28532F6BBE270409948B422A2EB4D0DF56A117CB | CC1E09755D6DFBD97FAE307C633F181956B2A3D668337C39208B43414B2CFC62 |
+| 399 | 399-supplier-enlarged-last-row | 054C69027CEA48F36B7D24F5FBA6F31C4E99FA621F1839F75D477F8614650027 | C8F57CBEC563C897D05744EA75922A7AA140EFBA02A37278C514D4E81D60BBBC |
+| 400 | 400-supplier-enlarged-fourth-product | ED3460DFC08ED3C3ECB9063C3AD5DA06EB0B4B4C9C649CD629602C984EDDBB81 | F9143E4FF3D1CEAA0C6000A1F38E6ABAF499D04503B35A98AE72D2E32B675C94 |
+| 401 | 401-supplier-enlarged-back-retains-last-row | F084CF5D1760499CC3724735D4B75E5BF0C140210DB63A7658E470972B8966AF | C8F57CBEC563C897D05744EA75922A7AA140EFBA02A37278C514D4E81D60BBBC |
+| 402 | 402-supplier-enlarged-return-preview | 12118EFE17C43C63A015FE5B8506A53F018821BA495D8041062BF30C36D642C9 | 758D3928866E85D8548F304BFB66B88241373C9935B592D2F48B1C9A070DC1E3 |
+| 403 | 403-supplier-enlarged-preview-controls | 98F760F3D5266844E6C7D68E9172A523D1DEDB18DF2C4D2F7FFA1B5019D63096 | 2AB01547599F7EAE9A2363E9249F07D4C2D5A01C2170B02CDC793F3A39419A2D |
+| 404 | 404-supplier-enlarged-cart-retention | 213623BD78574FE6FB628FD93E89230670BE0D180DC441CDDC9F2A2DED61DDC1 | 1B8154E2A01BB468C4FBB3EDAE753CDBB17B02BCE2F122375E53901B045AEC72 |
+| 405 | 405-supplier-enlarged-cart-line | 4A4661A893FA47E43E98998AB79EB2428C3F16D425F280E0E41C239900F9777B | C98829298D2F4DBB47E294727111D0D84E467AC2CDBE83C5EFE9CE1ED222FAF5 |
+| 406 | 406-supplier-enlarged-cart-back | 096481B7B3E6B608BF27078AFCB8EB657A39E97F1C4F33536C8A800E01B1A231 | 2AB01547599F7EAE9A2363E9249F07D4C2D5A01C2170B02CDC793F3A39419A2D |
+| 407 | 407-supplier-enlarged-preview-top | FD4CFD732B8D4ACD20421325CF181341AA3D7FF0130253BBB7FD770F8F1A761C | 758D3928866E85D8548F304BFB66B88241373C9935B592D2F48B1C9A070DC1E3 |
+| 408 | 408-supplier-enlarged-reopen-full | C5004FB472B1126343FFB2795ED4172BE833EA721544EE91B3BF25E2B38BA2F1 | CC1E09755D6DFBD97FAE307C633F181956B2A3D668337C39208B43414B2CFC62 |
+| 409 | 409-supplier-last-add-reachable | 06D68F7C697C6D092D7AD1A35E1BDB19A8A64D8EE081D65226B489967BF04BAB | C8F57CBEC563C897D05744EA75922A7AA140EFBA02A37278C514D4E81D60BBBC |
+| 410 | 410-supplier-last-sku-add-moq-two | E870EBF0A4D5A44476DFE0A95B835B438EFA291BD370FE7D6AAB5D6C7D453054 | CD0FC1D09571AAAD4813A42CE9E7CF419C2D3E25D50122E7889B75FBFB0FA1ED |
+| 411 | 411-supplier-last-sku-remove-at-moq | DF74A93A98DAC59CDD586D5B581FCD684594F989188136C2F6A378D03E10D22D | C8F57CBEC563C897D05744EA75922A7AA140EFBA02A37278C514D4E81D60BBBC |
+| 412 | 412-supplier-normal-text-restored | 83B1351A54A727064D4F3AD7A90F4AF97CC0D14F164795F959738D4649E6FED6 | 2E16F1B04F33C46806C2386FB985A06FAC75FE6B79086CF1018A75839678CAD4 |
+| 413 | 413-supplier-final-test-cart | F2765561D1B8347C5BD256DEEF840C513801A40971634BB8F4014496E4F17E5A | 8FBD9C117A9AB53572B95C6B14A0C0C3B06035987644C3C3EEA5349001D18DB6 |
+| 414 | 414-supplier-test-cart-remove-confirm | 0A3BB79BCCA34D025794CFB12CF9343AC5B6D6D1354704B27DC51CF978079A3F | AF3A1A58E13611D5231ECF8519E2355BA3EC79BA9684310BF2C795508F330DDA |
+| 415 | 415-supplier-test-cart-cleaned | 1CB769CE8C5AB1738034AB06598D04681C683CB653EA2AB8B433E16A614E852B | B6F0759F9A7D9670B424C8FF0EE2EC47C86E800008C61DD72613CA634D34555C |
+| 416 | 416-shop-preserved-after-supplier-test | 15A2D3289E2B852522C2C72CAC26D5D83666A42B324C64AF6D41A05F725F2130 | 1D537FDD010C8A45EC6780FD368D555D5A4B1C7A630B34056DC40A1447F4AD89 |
+
 ## Founder-owned capture 382 command recovery — 11 September 2026
 
 Founder authorized this chat to take ownership of the blocker while preserving safe integration. The failed capture382 attempt used X2/Y2 instead of the helper's declared ToX/ToY. Its terminal exit1 is a PowerShell parameter-binding rejection before the script body/ADB input. It produced no device capture and is not a customer defect. Immutable receipt singlechat-r669-capture-382.result.json; stderr SHA256 052511C6BF577F05DA26857C5E9C3493AF876AFD3C412817B234435EFB6348DC.
