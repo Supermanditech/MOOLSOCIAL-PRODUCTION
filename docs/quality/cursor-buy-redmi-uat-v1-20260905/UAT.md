@@ -2,9 +2,79 @@
 
 ## Latest founder stop rule — 11 September 2026
 
-Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 defect count is one, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
+Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 defect count is two, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
 
 
+
+## r66.9 scoped round 1 checkpoint 3 — address drafts, review loss, report and comparison recovery
+
+**Two confirmed new r66.9 UAT children; zero ticket closures. Full scoped UAT remains incomplete. STOP and report the complete deduplicated list before any further implementation.** The new child in this checkpoint is R669-UAT-REVIEW-BACK-DRAFT-001; the existing child is R669-UAT-TRACKING-FRESHNESS-SUMMARY-001. This is a testing/evidence checkpoint, not a fix batch or final list. Runtime source and installed APK are unchanged.
+
+APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9; Redmi TG8HCYTGGQT885OF; build HEAD7eb5d1034f1aeb45b7987db22a5521649af22a25 and sourcea18aa780c0e00497ef218025bc8473a32f50a084. Previous evidence checkpoint fd654c08c65ed471c325bfe8289ed828d5d2f2d2 was clean/pushed/remote-equal at resume.
+
+- Captures049–061: blank Request an address → Add it myself stays blank. Named request Aarav → manual entry carries Aarav. Editing only the manual draft to Aarav Test, then Back, returns the original Aarav request draft. Cancelling returns unchanged saved Home/Work and Work selection. Nothing saved or shared. The first focused-request image053 catches a keyboard transition;054 shows complete input above the keyboard, so053 alone is not a defect.
+- Captures062–070: completed MS-240741 help opens an unsent draft naming Sardarpura Supermart and the exact order; Back returns the same tracking position. Return items exposes all eight historical product references, explicitly says eligibility could not be confirmed, and provides retry/support. Retry remains unavailable. Support keeps exact order context. Conversation shows Loading messages; live chat/return eligibility remains unqualified. No return or message submitted.
+- Captures071–075: order Items → Fresh tomatoes detail retains Order items return context. Product is500g/37rupees; its single Visit store action is by Shree Balaji Fresh, with no duplicate in the inspected Ratings and seller/review sections. Packshot says Illustration and related images Category illustration. Illustration tap073 has no viewer transition. No real supplier photo/video or variant-media pass is claimed. The order header's fulfilment partner differs from the current listing supplier; that alone does not establish misrouting. Read-only source shows current product mapping for legacy missing-line order detail; historical price/policy qualification remains unresolved, not a newly counted failure.
+- Captures076–084: eligible review-data editor opens and its keyboard layout fits. Four stars plus synthetic22-character 'Redmi UAT unsent draft' enables Save. Android Back hides keyboard080, clears field focus081, closes sheet082; reopening083 loses all stars and text. R669-UAT-REVIEW-BACK-DRAFT-001 is registered in DEFECTS.md before the next device input. Initial editor was blank; nothing published. Cancel084 closes the now-empty editor. Ineligible/enlarged/relaunch review cases remain pending.
+- Captures085–090: normal Report issue → font2.0/density360 portrait. Title/product/reasons scroll; last reason can be selected and Send enables. Cancel stays one complete word and dismisses without submission. This is a tomato-product connected check; exact original scheduled-atta case, reopen/reset and landscape remain pending. Display restored and read back as font1.0/physical density320/no override; original rotation settings unchanged.
+- Captures091–093: Compare identifies Fresh tomatoes/500g, reports other supplier prices unavailable, and exposes Refresh comparison. Refresh stays unavailable; Back retains product position. No populated supplier ranking, comparison Add or provider pricing acceptance.
+- Captures094–095: Ask seller opens an unsent exact s-tomato draft. Bounded XML inspection confirms supplier, variant,500g pack,quantity1,price37,unit price74/kg and exact product URL. Back retains product position. Native Share chooser/domain/no-app routing remain untested; no messages sent.
+
+Immutable full checkpoint: external redmi-r66-9-round-1/round-progress-checkpoint-3.json, SHA256 5569281954187AB38ACA63E42E74FD9934CAC5AF32731036780071A90FF3A2E7. It binds all95 captures;47 new PNG/XML pairs049–095 were individually inspected and verified against adjacent identity metadata and terminal wrapper receipts/log hashes. Eighteen frozen rows are partially exercised, one has a failed connected replay, and23 remain not exercised. No whole-ticket closure or total-module pass follows from these counts. New child evidence record SHA256 B053FFE7A1A8CBC54FF9752D2D919859A3605C0EF9B6C3AE78FBEEFABC83C753.
+
+The latest founder stop directive remains SHA256868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0. This checkpoint changes only UAT.md/DEFECTS.md. No new runtime source, APK build/install, integration, order/payment, saved-item/cart quantity, address save, report/review submission or sent message. Contextual chat drafts were opened but not deleted; their prior provenance is not established. Earlier Keep/delivery-selection changes remain recorded for round-end restoration.
+
+New capture manifest (raw PNG/XML/JSON/log files remain preserved locally outside Git; the manifest and findings are tracked):
+
+| Capture | PNG SHA256 | XML SHA256 |
+|---|---|---|
+| 049-resume-address-selector | FA636B1EB965D114C5CE0FED9B5788D84F3186F7261CC700FDA0170A720A879F | D223A4D420B43C631D8FAA8B02FE56F3750DCE76C64CE1A9C5540E0768F997E3 |
+| 050-request-address-entry | 3CB66F26889DAF584F9413F7E4E6B2AAABF068737A1B25B7AF6D03896F930543 | 8DFE16DBE5D8DF08AF71DE941E347A7470CFEB79781758A47590A7C5D38863B8 |
+| 051-request-blank-manual-fallback | 3435B7216441A23959DC4365D89061F7446BF29919DD05EB78691F0CFE8DA06C | A20FE2EEE69087BC95F5F50335CE515FA0F44189E01F1FDE62BC6AA054BD8771 |
+| 052-blank-manual-back | 4A1F4779C52D5791C13A12CC1F72EDEF38469AA0570BBA410AB08C28305DEF42 | 8DFE16DBE5D8DF08AF71DE941E347A7470CFEB79781758A47590A7C5D38863B8 |
+| 053-request-recipient-focus | 9189F634548F1964FB97ACED3A79EF6352CD4A07A5DBD045B5D6270E5003AF8A | 2583086CCB9F884A3393263FCE0158B9241206501EC6B9E3A95B9073A8C009F0 |
+| 054-request-recipient-named | 39D31835998CB24D9214F56A95A95C29CEB00B88731785286BBC1D2E261DF09F | F4AC0B2FDA9F07E748D6C347F376961CCCD5D35A3B3EE7880B889F4FA9B7A2D3 |
+| 055-request-named-manual-fallback | 78EC72BC8CA6A9AB5EFB0759BF3BF5383E4867F1274708EF155705F28CEBE28F | 2044CB21A463ED7DBDAC003CDADBF865040A8C6701867296D183FEF951909EB9 |
+| 056-manual-recipient-edit-focus | 9A3212E7BAD9987469E8A2AD01A0E7E44B0038DB9A4B937512CBDFA300BEB612 | 0B6220C8E859A2016699BDAE440A968067859A61A13E90F128C207E0A5CE279C |
+| 057-manual-recipient-draft-edit | B4895DF8F4247EEF2534F43C2CA09FE09160E1EE052C530BBC3264FD675DA32C | CD146C2FBA20E98684EA363F6D513ECF5ECB6821B788561F6FEBC62ADAD323C1 |
+| 058-manual-edit-keyboard-back | A9FFF491F7806DDD591EB63D2FED16552EF057B6D0E4801447EB16A8DB7B2A07 | D96FEBFFD54DD5D8B2D5DB4D636A35C10AD87A81523909B8E7B2B0FEED6A4EA3 |
+| 059-manual-edit-back-retains-request | 1BF8B4628C4B3A6B4EC60D741307CA40252AEFE5A8B8D7DE9BD9C5E16CDF154E | F4AC0B2FDA9F07E748D6C347F376961CCCD5D35A3B3EE7880B889F4FA9B7A2D3 |
+| 060-request-cancel-named-draft | BE1510F7674D4017B4FACD762EE02DEB60618D1823E0EAA6615C63CE4C62B6BB | D223A4D420B43C631D8FAA8B02FE56F3750DCE76C64CE1A9C5540E0768F997E3 |
+| 061-address-selector-back | D226F4267E203531D438989F2BD6ADACB481D42D3A4312FE52551BEE26949B13 | C941395E83BCF639FABD9E57E4D3ECD9DB3663449EF61B93E036849A7C1AFCD5 |
+| 062-completed-order-help | CC228F81947D64B012EA09E76B9F42C49D64748F05121840CEAAB9B534D277FE | B482EEF4C9CB99FE9B6E3D8A0400BDDFB060C9E5D33637AFE1B87561F6D59CD8 |
+| 063-completed-order-help-settled | 06EA774A37DCF2F0D336618FE8B6E9F0F72F6A2C06DFB9BB933AC82BCB8D80EA | B482EEF4C9CB99FE9B6E3D8A0400BDDFB060C9E5D33637AFE1B87561F6D59CD8 |
+| 064-completed-order-help-back | B88B56DF352CA59950B3998EBD58C0AD682075931485520A2F151EC5CCBFCE0F | C941395E83BCF639FABD9E57E4D3ECD9DB3663449EF61B93E036849A7C1AFCD5 |
+| 065-completed-order-return-entry | 020EF5339DF1C3FB487FA0626F8BAB1A6BCAE4D432F60BE5EC495EEEDA3FC886 | A024A0D1F88BE1C2097D9BCAB52344756962EA8ED06B6297E58211CE8965FA90 |
+| 066-completed-order-return-items | C7B7FCA269B9C03EEDFA44D84B8B0544E9903D0D6D784F8B243C9260CF5760BD | DB5E1F4D2F0784C1EB081D2EAC22109B3BF3B8F8B54ECC80F9A182D444A107AF |
+| 067-return-items-bottom-recovery | 6E6604BAA54C1701B1AD6AD284112F95512756FF62711B4BD7B34FD8E4778546 | 5B5BB785EE0A786EDF1549CD97045E3F620E3F743E4C882B89BA8F43B6320909 |
+| 068-return-eligibility-retry | 68F267C635A4EB193347A8A3E5BDBAF81EFBCB5AA41852FFA4B3657221F1BE74 | 5B5BB785EE0A786EDF1549CD97045E3F620E3F743E4C882B89BA8F43B6320909 |
+| 069-return-support-context | E4E35D37A1641BEF55C9C5FCA9D7ADA81F390867B2CE7F7A0EA35868413CDA81 | B482EEF4C9CB99FE9B6E3D8A0400BDDFB060C9E5D33637AFE1B87561F6D59CD8 |
+| 070-return-support-back | BA9AF54B67CD6560F22BE29865F2A2123B3F7B9356A5D8E34B15D888A8B632B3 | C941395E83BCF639FABD9E57E4D3ECD9DB3663449EF61B93E036849A7C1AFCD5 |
+| 071-completed-order-items | D5A63FBCF2A8726796E52B46F95CAC0DF4D29F56CBACA558A24A28630B02139C | 6D665C88EE1F3C74CD99C8EBF5CD32EA554A2056B4B4F05F7C94B3C3158F0F68 |
+| 072-order-tomato-product-entry | 34EF72C9C7844F5726C9A7323E6F599D0878EEB7D464C431404AD8A58A4E713C | CBE2F920002C490B4BBF37031A4DC747AB35B1512C25825299863C9DC0728C95 |
+| 073-tomato-media-viewer | EA517C90B82A8F2614F16D6318ED6082942B5E17264F05F3264B7D85B9FDF5C0 | CBE2F920002C490B4BBF37031A4DC747AB35B1512C25825299863C9DC0728C95 |
+| 074-tomato-product-details-scroll | D0D42BA1957945EC0940E4FD2AECDE781DA29A29C842B8E2F7435BD9523E120F | D55D7A87A70C827C593D75F188964FFFB13DAF6B0680A05DA073EA54224A4039 |
+| 075-tomato-reviews-and-actions | 7277644135EFD502F67AF604B0B89FB3A25B36138447CA6F2F40809A1F92C5DF | 1B598CD2B4546D0E8C2E7AE3EB682433DD522572E1D102EAD69FBB9D39522E5E |
+| 076-tomato-write-review-eligibility | D465087A48CBC9479E612E3C055DC71CF400AB1588258E270CAF1BC9CE259EDF | 7163B447A3CBFD895D3939F91133BCF1E3CD92F561FE7DAFC7F9FD6A84F48DC2 |
+| 077-tomato-review-rating-draft | 1AD380308A8077E42C94CF7BA67BBC5972E082040CBD32052336095ABA6C162B | 1D9900B94C71370C8CA24C9DFB5D979B93A4982120E1748C635082F5455809A3 |
+| 078-tomato-review-input-focus | 61B2F0DA9E92F708F26AE5226A185CD33F7E1A2514E5022AD885377AD9CE3465 | D27084047B433F4F87D61F6CBF110CBB69802D442831625CD17928DAE9A62CDB |
+| 079-tomato-review-unsent-draft | 95685D120CBD116C86F3009506815A8F0A75EAF12867AB4ACF5BB340919E573F | E93FAE370D265586998E80BDCA98EBB82FEC8DBFA3C96804F8F599E5D0DB8E07 |
+| 080-tomato-review-keyboard-back | BEADD8A100B96D61CBD6672CFB504CDC7856594B7B82839017098CD0C051D213 | BF620283DEA33A9E45E8BE3B0F72C8B672FCD03594002578F6AC4755E82F1468 |
+| 081-tomato-review-editor-back | 38615C5DB237B4D1C7AE20CC094795EB8E8B6D1AA8CFCFD70AB881C5BF54B6E9 | A0EF2DBC28182E1F6C770EFE9622EAE61262A63763493028E11D3829B4832B40 |
+| 082-tomato-review-unfocused-back | 9B021911045E90B240B69046FE2247BEEB1F157D11FB648DCB3221C4ABEFC746 | 1B598CD2B4546D0E8C2E7AE3EB682433DD522572E1D102EAD69FBB9D39522E5E |
+| 083-tomato-review-reopen-draft | 68D90B062E0BEC14A8B9F15674D12B3E6F18FFBFE540D808C1ED463E6B2E4D37 | 7163B447A3CBFD895D3939F91133BCF1E3CD92F561FE7DAFC7F9FD6A84F48DC2 |
+| 084-empty-review-cancel | 97A286B3BDB2859FFA26A9EC62224193A3ECB314968D502D39884066FDD10064 | 1B598CD2B4546D0E8C2E7AE3EB682433DD522572E1D102EAD69FBB9D39522E5E |
+| 085-tomato-report-issue-entry | 9517BD0311E7C2EC79389F5CF559EC7BE8950AA31312DCE117043DBD33164435 | 5F79DB62129C1CF1D68E863EAB396A31EBDFDFBF3372CD2A1BE3CF1D3D7EB055 |
+| 086-report-enlarged-portrait | E90AE2EB32105884C86BF095966F6FA6B67BAC2A6B5FFEB576F9914B9BBACDFA | 831AC3683029EA3A6C1539DC222D02E623D9390F409D8E1B06F50A55419606FC |
+| 087-report-enlarged-reasons-scroll | C220672D006FF20D9E8414BC680C17E62E2406747FC3A9C7D9B302CAA3589A51 | 05DF5D5E358442272C2240A854ED805880FF709D90CC84296808F47A13983BC4 |
+| 088-report-enlarged-last-reason-selected | 2CCA7C4A67EED22D41D018764EDB205DE9D235C33B148C2D2FF0C05EC0D5EE02 | 6F52B01C7E5321423A3607AFA165ACE962E3CC2616E712524D5C3D97FD7C6CD6 |
+| 089-report-enlarged-cancel | 72563D2389F749CFBF99426766B9540A8A31E8792E892C973D660AD53D498644 | 2C5C8B5A9FE64EAEACACB716B0F92F4D15A7D649F2E425D6F9B027C4ED5BBF5A |
+| 090-product-display-restored | 7A942DE73A3EE9195CDE89DB0233E3A5A4E5B43EC3FECC270D8C0A4653181B21 | 1B598CD2B4546D0E8C2E7AE3EB682433DD522572E1D102EAD69FBB9D39522E5E |
+| 091-tomato-compare-entry | 07A595289B07F7B2128AA759D14AAACC3AC05FDDB3D53AC9D29421B2A1063B4B | 48E2141C51F54145ADD86606EA75C9D2EF2398548591506A2B045F2D55267BE7 |
+| 092-tomato-compare-refresh | 8CD31B0F49C4DC4A48A185DEB7214A774D2E5CCD03959C094B76199667D3C58E | 48E2141C51F54145ADD86606EA75C9D2EF2398548591506A2B045F2D55267BE7 |
+| 093-tomato-compare-back | EE96AF4F64E0FDFA3298E0E7B7C020A3270718313F4CFCE8AD34A24F6208D1BF | 1B598CD2B4546D0E8C2E7AE3EB682433DD522572E1D102EAD69FBB9D39522E5E |
+| 094-tomato-ask-seller-context | 4ED4AC1248BA1E677EAFF45350101C7611BBD1529127AD058882537CFCC6076F | F1D54791455106AEC3CA5B78326630E38AE4BC60802F157CB938FA56B9640726 |
+| 095-tomato-seller-chat-back | DD930E700136FB95890E072A882795F836CBE3ED8340D4FB8BD92D498B6157AF | 1B598CD2B4546D0E8C2E7AE3EB682433DD522572E1D102EAD69FBB9D39522E5E |
 
 ## r66.9 scoped round 1 checkpoint 2 — enlarged text and original keyboard configuration
 

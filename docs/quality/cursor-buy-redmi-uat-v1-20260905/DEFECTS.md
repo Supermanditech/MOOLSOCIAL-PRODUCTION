@@ -4,7 +4,7 @@
 
 The successor Cursor Review APK is built and installed without clearing data on Redmi `TG8HCYTGGQT885OF`: version `1.0.0-r66.9-cursorreview`, code `2026091101`, SHA256 `AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9`. Build HEAD is `7eb5d1034f1aeb45b7987db22a5521649af22a25`; runtime/test source is `a18aa780c0e00497ef218025bc8473a32f50a084`. The older implementation/pending-build paragraphs below are historical checkpoints; final host qualification and current device results are in UAT.md.
 
-Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. This round has **one new UAT child**, below. No ticket is closed. Finish the full scoped round and deduplicate the complete child list before implementing the next batch.
+Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. This round has **two new UAT children**, below. No ticket is closed. Finish the full scoped round and deduplicate the complete child list, then STOP and report before any further implementation, as the founder directed.
 
 ### R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 — Last-known arrival estimate is unqualified in delivery panel and Orders
 
@@ -15,6 +15,23 @@ Reproduction: Wholesale → quiet delivery rail → Keep → Deliveries (12) →
 Expected correction: reuse the authoritative existing order-refresh/freshness state for every arrival summary, including the selector, expanded/quiet delivery presentation and Orders cards. Preserve the exact order, supplier, destination, original promise and current confirmed stage. Qualify a retained/unverified relative ETA as last recorded; distinguish verified refresh, unavailable refresh and historical completed promises. Do not invent timestamps, recalculate an arrival from the time the panel opens, or treat missing live data as a confirmed delay. Test pending/failed/successful refresh and summary → tracking → Back at normal/enlarged text, including multiple deliveries. Provider-backed arrival accuracy remains deferred.
 
 Evidence root: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/redmi-r66-9/`. Capture013 `013-select-quick-new09.png` SHA256 `01C2F1810437DA62D3AC41176E9A224EF1C49CB5759815AF0C99B113788A7F04`; XML `92D5C19D5BAE160A2489F0D87033F4FA03EB22CC46D819E2231A4A0A00319522`. Capture014 `014-quick-new09-tracking.png` SHA256 `286E3581754B2684F9E3640FA4F0535DC6EAAE85F22B948DB4D86EB206578A38`; XML `E12DE823D1785F6329775AB13D68D382BB6F95F839D4BDD34252147DFCB3226C`. Capture015 `015-tracking-back-origin.png` SHA256 `47A051DA7BF3778FEFB24C1467906CECC8176A17A6747BC1EC294974DE5F1F19`; XML `550057B12265554DC120318DF79180A0702717944287B561E9682B3F6CD633C7`. These three PNGs were individually inspected. Each adjacent JSON binds the device, build/source, actual APK checksum and input; no fixture/host result substitutes for this observed UI mismatch. Registered before the next device input; implementation remains pending until round compilation.
+
+### R669-UAT-REVIEW-BACK-DRAFT-001 — Android Back discards an unsent review draft
+
+**OPEN, P2; confirmed Redmi child of R668-AUDIT-WRITE-REVIEW-001.** In the same r66.9 APK identified above, an eligible local review-data customer opens Fresh tomatoes / 500 g pack / Shree Balaji Fresh, selects four stars and enters the synthetic 22-character text 'Redmi UAT unsent draft'. The editor shows the complete rating/text and enables Save review (capture079). Android Back first hides the keyboard (080), then removes field focus (081), then closes the sheet (082). Reopening Write review on that same product (083) shows zero stars, an empty field and disabled Save. The draft was lost without tapping Cancel, Save or a discard action. All six key PNGs were individually inspected; the initial editor was blank (076), so no pre-existing review draft was overwritten.
+
+Expected: preserve the exact SKU's unsent rating/text when the editor is dismissed by Android Back and reopened, or offer an explicit discard decision before losing customer input. Preserve eligibility and account/SKU isolation; do not publish, fabricate purchase eligibility or treat a host pass as device acceptance. Check keyboard/focus Back, sheet Back, reopen and relevant relaunch/expiry policy; keep deliberate Cancel semantics distinct. This failure concerns draft retention, not a submission/backend failure. No review was submitted. One reproduction sequence is confirmed; no claim of live provider acceptance.
+
+Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/redmi-r66-9/. Identity and terminal receipts are bound in external redmi-r66-9-round-1/review-back-draft-child-1.json (SHA256 B053FFE7A1A8CBC54FF9752D2D919859A3605C0EF9B6C3AE78FBEEFABC83C753). Key capture hashes:
+
+- 076-tomato-write-review-eligibility: PNG D465087A48CBC9479E612E3C055DC71CF400AB1588258E270CAF1BC9CE259EDF; XML 7163B447A3CBFD895D3939F91133BCF1E3CD92F561FE7DAFC7F9FD6A84F48DC2.
+- 079-tomato-review-unsent-draft: PNG 95685D120CBD116C86F3009506815A8F0A75EAF12867AB4ACF5BB340919E573F; XML E93FAE370D265586998E80BDCA98EBB82FEC8DBFA3C96804F8F599E5D0DB8E07.
+- 080-tomato-review-keyboard-back: PNG BEADD8A100B96D61CBD6672CFB504CDC7856594B7B82839017098CD0C051D213; XML BF620283DEA33A9E45E8BE3B0F72C8B672FCD03594002578F6AC4755E82F1468.
+- 081-tomato-review-editor-back: PNG 38615C5DB237B4D1C7AE20CC094795EB8E8B6D1AA8CFCFD70AB881C5BF54B6E9; XML A0EF2DBC28182E1F6C770EFE9622EAE61262A63763493028E11D3829B4832B40.
+- 082-tomato-review-unfocused-back: PNG 9B021911045E90B240B69046FE2247BEEB1F157D11FB648DCB3221C4ABEFC746; XML 1B598CD2B4546D0E8C2E7AE3EB682433DD522572E1D102EAD69FBB9D39522E5E.
+- 083-tomato-review-reopen-draft: PNG 68D90B062E0BEC14A8B9F15674D12B3E6F18FFBFE540D808C1ED463E6B2E4D37; XML 7163B447A3CBFD895D3939F91133BCF1E3CD92F561FE7DAFC7F9FD6A84F48DC2.
+
+Registered before the next device input. Implementation is paused under the founder's latest direction: complete the scoped UAT round, compile its deduplicated list, stop and report before further implementation.
 
 ## Current Redmi APK onward — OPEN findings only
 
