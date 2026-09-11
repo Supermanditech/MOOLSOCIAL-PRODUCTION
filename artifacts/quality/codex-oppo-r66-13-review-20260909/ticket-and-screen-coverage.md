@@ -2,6 +2,18 @@
 
 ## 2026-09-10 current 27-item skim and Cursor handoff receipt
 
+### REG4555 bounded product-detail test contract correction — 2026-09-11
+
+**Locally qualified:** complete product-continuity owner **8 passed**, then the same six-suite catalogue/search/screen/navigation/product/cart batch **138 passed / zero failed**, both exit 0; full analysis zero issues. Only two detail-copy expectations changed. Runtime, Android, dependency and generated trees exactly match `7a39f24eac4adfa66b2d39be8f13d0d6b906ba7e`, whose 1,097-pass / 79-existing-skip Work/Store/Chat run therefore covers unchanged runtime source. This does not close the separate two Buy/Chat compatibility cases, OPPO UAT or the whole 27-item batch.
+
+Evidence under external `dashboard-load-implementation-20260909/`: `product-copy-contract-focused-v1.log` SHA-256 `412EEB54C45419C6F606B88F80EE8876E6E9E5DC6D10342762E8644D57F1AEAE`; `product-copy-contract-analysis-v1.log` `745F8775F89DA0D6DCC7997A30EEAD07C9D51B450AB198140D2C7DB8F01F72FC`; `product-copy-contract-buy-combined-v1.log` `42445292FC33A1743F378E40E11D4931BDDDBF770C4AC4CF8FD19B921C236642`. Focused command: `flutter test --no-pub test/ui_v2/buy/buy_v2_product_continuity_test.dart --reporter expanded --concurrency=1`; combined command is the same six-file command documented in the catalogue section below. The terminal response omitted middle progress lines only; exact terminal exit 0 and the complete retained log ending at 138 passes were independently read. No failed run was restarted or reclassified from truncated output.
+
+Resume from clean, remote-equal catalogue checkpoint `7a39f24eac4adfa66b2d39be8f13d0d6b906ba7e`. Current policy contains no claim for `apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart`. Admit only this exact test to the local primary claim/allowlist for the existing approved regression correction; no Cursor claim is moved and no actual Cursor worktree changes.
+
+Complete test/source readback clarifies that the two failed expectations are **detail copy**, not titles (the current titles already pass). Replace `More products selected for you` with the rendered `Compare related products, prices and delivery`; replace `Trade packs for your next order` with `Compare pack sizes, prices and delivery from relevant suppliers`. Retain exact product identity/exclusion, semantics, tap-to-product, repeated navigation, original query/Back, destination isolation, media and reduced-motion checks. No runtime source, accepted copy, catalogue layout, navigation or dependency changes. Qualify the full test owner and the same six-suite Buy batch; do not declare success based on the two replacement lookups alone. The earlier two Buy/Chat cases remain a separate shared-owner/integration dependency.
+
+REG4557 reconstruction note: an overbroad ledger search exceeded its output budget. The authoritative current shared-regression disposition was recovered in a bounded read at the known checkpoint; no result was inferred from omitted output. Subsequent reads target exact owners/sections.
+
 ### Authorized Codex-only catalogue compatibility correction — 2026-09-11
 
 **Current result: the bounded catalogue/Store compatibility fix passes its complete focused journey and original combined regression batch. OPPO qualification and the separate inherited Buy copy contracts remain open; this is not full 27-item/APK acceptance.**
