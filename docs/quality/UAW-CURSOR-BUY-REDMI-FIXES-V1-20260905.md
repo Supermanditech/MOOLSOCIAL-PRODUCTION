@@ -943,3 +943,85 @@ This exact three-control admission appends this manifest, updates its scope hash
   ]
 }
 <!-- R677-DATA-END -->
+
+
+## r66.9 frozen Buy/Shop review source qualification - 11 September 2026
+
+This mvp_supporting build qualification continues the existing 33 findings and nine founder requests plus the already-required Store procurement dependency. It adds no product scope. The source includes completed Buy eligibility and durable return/context isolation, same-product/variant/pack/quantity supplier comparison, media and branding, address, delivery, sharing, cart and invoice corrections. Two complete 51-suite cycles pass on the exact source below; prior failed results remain preserved. These are Buy-host results, not Desktop's embedded DASH10 or Redmi acceptance.
+
+The smallest build-support change adds this exact review source and its complete 18-owner historical runtime delta to the protected source gate. The backend boundary separately pins the exact Buy screen hash for the existing local arrival sound implementation, whose code is unchanged from r66.8. Both hosts pass 68 positive/negative source, dependency, backend-seam, local-sound, egress and brand checks. No broad exception, dependency omission or accepted-baseline replacement is introduced.
+
+This three-control admission appends only this manifest, updates its scope hash and extends the coordination checker. Policy, registry 4514, owner claims, native/dependency configuration and execution authority remain unchanged. Preserve every prior admission in its exact historical tree. The first-parent subject is `ui(buy-redmi-fixes-v1-20260905): admit r66.9 qualified review source`. Only the two exact proposed checker hashes may then be materialized and tested through normal gates. This grants no build/install authorization by itself: a fresh one-build state, unique Cursor Review APK, retained-data Redmi installation and checksum-bound scoped UAT remain required. Backend/provider qualification, OPPO, integration, production promotion and real transactions/messages remain excluded. No ticket is closed by this admission.
+<!-- R680-DATA-BEGIN -->
+{
+  "parent": "a18aa780c0e00497ef218025bc8473a32f50a084",
+  "implementation": [
+    {
+      "path": "scripts/check-buy-protected-baseline.ps1",
+      "beforeSha256": "E5E95B276A8B3C0CEDBD921A43B020450095F633371FF44D52823367AEDD529D",
+      "proposedSha256": "0E63D1E4AAD91B84E3DB2F0307269C61828838CD45882A85B24BB1EEEAD23CE1"
+    },
+    {
+      "path": "scripts/check-buy-backend-contract-boundary.ps1",
+      "beforeSha256": "728C96394B00B339E049A8B8D2F7ACD22249A33C41153F6A5F498A3D17C88B65",
+      "proposedSha256": "D91884A35072440F516AB3EA3D817B4C1CA61C1FF6577D9DD3FB9B1016374A5D"
+    }
+  ],
+  "runtimeDelta": [
+    "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/features/work/scan_and_pick_contract.dart",
+    "apps/mobile/lib/features/work/screens/work_onboarding_screens.dart",
+    "apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
+    "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
+    "apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart"
+  ],
+  "correctionRuntimeDelta": [
+    "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+    "apps/mobile/lib/features/buy/buy_v2_models.dart",
+    "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+  ],
+  "proposalBinding": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\r669-final-preapk-20260911\\source-proposal-v3\\binding.json",
+    "sha256": "5A3AA0333E83B4C33BA306E0F01C48D46369F4502A5D84FB388133629BFF58F0"
+  },
+  "fullRegressionEvidence": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\r669-final-preapk-20260911\\full-regression-qualification-v2.json",
+    "sha256": "BC777C2E16CAD18564F9BC6809DDF7E1671B220058634A57FBBE991E96ABC722",
+    "cycles": 2,
+    "passedPerCycle": 1882,
+    "skippedPerCycle": 11,
+    "suites": 51,
+    "sourceCommit": "a18aa780c0e00497ef218025bc8473a32f50a084"
+  },
+  "sourceBoundaryProposalEvidence": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r669-final-boundary-proposal7-3.result.json",
+      "sha256": "9EB9DF280029FADA4F93597D98D7919CFF6C99273CB4C823351E1DCE9AC5E0B2",
+      "cases": 68
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\singlechat-r669-final-boundary-proposal51-3.result.json",
+      "sha256": "1AE425DBCC1AA618D3DCA986CA534A73DF05A4EF80294A7D40545E8492362396",
+      "cases": 68
+    }
+  ]
+}
+<!-- R680-DATA-END -->

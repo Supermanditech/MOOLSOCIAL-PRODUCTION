@@ -1724,6 +1724,10 @@ if ($ProductionLane -ceq 'baseline') {
       $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
       $r677SourceParent = '0c36d2201c43665d38e00173df7d2df63f690344'
       $r678PersistenceParent = 'e00a6981b92399f71c68233907bc79b6588c096c'
+      $r680SourceParent = 'a18aa780c0e00497ef218025bc8473a32f50a084'
+      & git -C $root merge-base --is-ancestor $r680SourceParent $head
+      $r680SourceContext = $LASTEXITCODE -eq 0
+      $r679FreezeHead = if ($r680SourceContext) { $r680SourceParent } else { $head }
       $r679DependencyParent = 'a71fc9732d54380eebd97abd57d1406f39ca19a7'
       & git -C $root merge-base --is-ancestor $r679DependencyParent $head
       $r679DependencyContext = $LASTEXITCODE -eq 0
@@ -2815,6 +2819,12 @@ if ($ProductionLane -ceq 'baseline') {
           if ($r677SourceContext -and $head -cne $r677SourceParent -and $item.path -ceq 'scripts/check-buy-protected-baseline.ps1') {
             $allowed += 'E5E95B276A8B3C0CEDBD921A43B020450095F633371FF44D52823367AEDD529D'
           }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-protected-baseline.ps1') {
+            $allowed += '0E63D1E4AAD91B84E3DB2F0307269C61828838CD45882A85B24BB1EEEAD23CE1'
+          }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-backend-contract-boundary.ps1') {
+            $allowed += 'D91884A35072440F516AB3EA3D817B4C1CA61C1FF6577D9DD3FB9B1016374A5D'
+          }
           Assert-Coordination ((Get-Sha256 (Join-Path $root $item.path)) -cin $allowed) 'Qualified checker differs from exact reviewed proposal.'
         }
         if ($head -ceq $r670SourceParent) {
@@ -3001,6 +3011,12 @@ if ($ProductionLane -ceq 'baseline') {
           if ($r677SourceContext -and $head -cne $r677SourceParent -and $item.path -ceq 'scripts/check-buy-protected-baseline.ps1') {
             $allowed += 'E5E95B276A8B3C0CEDBD921A43B020450095F633371FF44D52823367AEDD529D'
           }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-protected-baseline.ps1') {
+            $allowed += '0E63D1E4AAD91B84E3DB2F0307269C61828838CD45882A85B24BB1EEEAD23CE1'
+          }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-backend-contract-boundary.ps1') {
+            $allowed += 'D91884A35072440F516AB3EA3D817B4C1CA61C1FF6577D9DD3FB9B1016374A5D'
+          }
           Assert-Coordination ((Get-Sha256 (Join-Path $root $item.path)) -cin $allowed) 'r66.6 checker differs from exact proposal.'
         }
         if ($head -ceq $r673SourceParent) {
@@ -3063,6 +3079,12 @@ if ($ProductionLane -ceq 'baseline') {
           if ($head -cne $r675SourceParent) { $allowed += $item.proposedSha256 }
           if ($r677SourceContext -and $head -cne $r677SourceParent -and $item.path -ceq 'scripts/check-buy-protected-baseline.ps1') {
             $allowed += 'E5E95B276A8B3C0CEDBD921A43B020450095F633371FF44D52823367AEDD529D'
+          }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-protected-baseline.ps1') {
+            $allowed += '0E63D1E4AAD91B84E3DB2F0307269C61828838CD45882A85B24BB1EEEAD23CE1'
+          }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-backend-contract-boundary.ps1') {
+            $allowed += 'D91884A35072440F516AB3EA3D817B4C1CA61C1FF6577D9DD3FB9B1016374A5D'
           }
           Assert-Coordination ((Get-Sha256 (Join-Path $root $item.path)) -cin $allowed) 'r66.7 checker differs from exact proposal.'
         }
@@ -3152,8 +3174,12 @@ if ($ProductionLane -ceq 'baseline') {
       if ($r677SourceContext) {
         $r677Owners = @($r670Owners[1],$r670Owners[2],$r670Owners[3])
         $r677ManifestHash = '4A8194DC4C06303455E549D56BA9D6D908522FB52971A266E2C64E44096B75D9'
-        Assert-Coordination ((Get-Sha256 (Join-Path $root $r677Owners[0])) -ceq $r677ManifestHash) 'r66.8 source manifest changed.'
-        $r677Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r677Owners[0])
+        if ($r680SourceContext) {
+          $r677Manifest = Get-R66Utf8GitJson $r680SourceParent $r677Owners[0] -AsText
+        } else {
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $r677Owners[0])) -ceq $r677ManifestHash) 'r66.8 source manifest changed.'
+          $r677Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r677Owners[0])
+        }
         Assert-Coordination ($r677Manifest.Replace("`r`n","`n").StartsWith($r676Manifest.Replace("`r`n","`n").TrimEnd())) 'r66.8 source removed historical manifest evidence.'
         $r677Match = [regex]::Matches($r677Manifest, '(?s)<!-- R677-DATA-BEGIN -->\s*(.*?)\s*<!-- R677-DATA-END -->')
         Assert-Coordination ($r677Match.Count -eq 1) 'r66.8 source data missing or duplicated.'
@@ -3170,13 +3196,19 @@ if ($ProductionLane -ceq 'baseline') {
         $r677PolicyAfter = if ($r678PersistenceContext) { Get-R66Utf8GitJson $r678PersistenceParent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         Assert-Coordination (($r677PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r677PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.8 source changed policy or owner claims.'
         $r677ScopeBefore = Get-R66Utf8GitJson $r677SourceParent $r677Owners[1]
-        $r677ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r677Owners[1]) | ConvertFrom-Json
+        $r677ScopeAfter = if ($r680SourceContext) { Get-R66Utf8GitJson $r680SourceParent $r677Owners[1] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r677Owners[1]) | ConvertFrom-Json }
         Assert-Coordination ($r677ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r677ManifestHash) 'r66.8 source scope hash changed.'
         $r677ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r677ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
         Assert-Coordination (($r677ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r677ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.8 source changed execution authority.'
         foreach ($item in $r677Data.implementation) {
           $allowed = @($item.beforeSha256)
           if ($head -cne $r677SourceParent) { $allowed += $item.proposedSha256 }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-protected-baseline.ps1') {
+            $allowed += '0E63D1E4AAD91B84E3DB2F0307269C61828838CD45882A85B24BB1EEEAD23CE1'
+          }
+          if ($r680SourceContext -and $head -cne $r680SourceParent -and $item.path -ceq 'scripts/check-buy-backend-contract-boundary.ps1') {
+            $allowed += 'D91884A35072440F516AB3EA3D817B4C1CA61C1FF6577D9DD3FB9B1016374A5D'
+          }
           Assert-Coordination ((Get-Sha256 (Join-Path $root $item.path)) -cin $allowed) 'r66.8 checker differs from exact proposal.'
         }
         if ($head -ceq $r677SourceParent) {
@@ -3292,11 +3324,67 @@ if ($ProductionLane -ceq 'baseline') {
             (@($r679Committed | Sort-Object) -join '|') -ceq
             (@($r679Owners | Sort-Object) -join '|')) 'Redmi dependency admission committed extra owners.'
           $r679FrozenOwners = @($r679Owners[0], $r679Owners[1])
-          & git -C $root diff --quiet $r679Commit -- @r679FrozenOwners
+          if ($r680SourceContext) {
+            & git -C $root diff --quiet $r679Commit $r679FreezeHead -- @r679FrozenOwners
+          } else {
+            & git -C $root diff --quiet $r679Commit -- @r679FrozenOwners
+          }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'Redmi dependency coordination changed after admission.'
-          $r679Later = @(& git -C $root log --format=%H "${r679Commit}..$head" -- @r679FrozenOwners)
+          $r679Later = @(& git -C $root log --format=%H "${r679Commit}..$r679FreezeHead" -- @r679FrozenOwners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r679Later.Count -eq 0) `
             'Redmi dependency admission cannot be replayed or revised.'
+        }
+      }
+      if ($r680SourceContext) {
+        $r680Owners = @($r670Owners[1],$r670Owners[2],$r670Owners[3])
+        $r680ManifestHash = 'DB60323398209B5C6B3E4007C6D1FE396ABD87EBB7216843A66C99062EE82F2F'
+        Assert-Coordination ((Get-Sha256 (Join-Path $root $r680Owners[0])) -ceq $r680ManifestHash) 'r66.9 source manifest changed.'
+        $r680Manifest = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r680Owners[0])
+        Assert-Coordination ($r680Manifest.Replace("`r`n","`n").StartsWith($r677Manifest.Replace("`r`n","`n").TrimEnd())) 'r66.9 source removed historical manifest evidence.'
+        $r680Match = [regex]::Matches($r680Manifest, '(?s)<!-- R680-DATA-BEGIN -->\s*(.*?)\s*<!-- R680-DATA-END -->')
+        Assert-Coordination ($r680Match.Count -eq 1) 'r66.9 source data missing or duplicated.'
+        $r680Data = $r680Match[0].Groups[1].Value | ConvertFrom-Json
+        Assert-Coordination ($r680Data.parent -ceq $r680SourceParent -and $r680Data.implementation.Count -eq 2 -and $r680Data.runtimeDelta.Count -eq 18 -and $r680Data.correctionRuntimeDelta.Count -eq 9) 'r66.9 source boundary changed.'
+        Assert-Coordination (($r680Data.implementation.path -join '|') -ceq 'scripts/check-buy-protected-baseline.ps1|scripts/check-buy-backend-contract-boundary.ps1') 'r66.9 checker owners changed.'
+        Assert-Coordination ((Get-Sha256 $r680Data.proposalBinding.path) -ceq $r680Data.proposalBinding.sha256) 'r66.9 source proposal changed.'
+        Assert-Coordination ($r680Data.fullRegressionEvidence.cycles -eq 2 -and $r680Data.fullRegressionEvidence.passedPerCycle -eq 1882 -and $r680Data.fullRegressionEvidence.skippedPerCycle -eq 11 -and $r680Data.fullRegressionEvidence.suites -eq 51 -and $r680Data.fullRegressionEvidence.sourceCommit -ceq $r680SourceParent -and (Get-Sha256 $r680Data.fullRegressionEvidence.path) -ceq $r680Data.fullRegressionEvidence.sha256) 'r66.9 full regression evidence changed.'
+        Assert-Coordination ($r680Data.sourceBoundaryProposalEvidence.Count -eq 2) 'r66.9 boundary proposal evidence missing.'
+        foreach ($evidence in $r680Data.sourceBoundaryProposalEvidence) {
+          Assert-Coordination ($evidence.cases -eq 68 -and (Get-Sha256 $evidence.path) -ceq $evidence.sha256) 'r66.9 boundary proposal evidence changed.'
+        }
+        $r680PolicyBefore = Get-R66Utf8GitJson $r680SourceParent $r670Owners[0]
+        $r680PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        Assert-Coordination (($r680PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r680PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.9 source changed policy or owner claims.'
+        $r680ScopeBefore = Get-R66Utf8GitJson $r680SourceParent $r680Owners[1]
+        $r680ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r680Owners[1]) | ConvertFrom-Json
+        Assert-Coordination ($r680ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 -ceq $r680ManifestHash) 'r66.9 source scope hash changed.'
+        $r680ScopeAfter.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256 = $r680ScopeBefore.preTicketSelectionCheckpoint.selectedTicketAssessment.manifestSha256
+        Assert-Coordination (($r680ScopeBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r680ScopeAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.9 source changed execution authority.'
+        foreach ($item in $r680Data.implementation) {
+          $allowed = @($item.beforeSha256)
+          if ($head -cne $r680SourceParent) { $allowed += $item.proposedSha256 }
+          Assert-Coordination ((Get-Sha256 (Join-Path $root $item.path)) -cin $allowed) 'r66.9 checker differs from exact proposal.'
+        }
+        if ($head -ceq $r680SourceParent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending r66.9 source admission is not a handoff.'
+          $r680Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r680Dirty | Sort-Object) -join '|') -ceq (@($r680Owners | Sort-Object) -join '|')) 'Pending r66.9 source must change exactly three coordination owners.'
+          $r680Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r680Untracked.Count -eq 0) 'r66.9 source admission cannot include untracked drafts.'
+        } else {
+          $r680Following = @(& git -C $root rev-list --first-parent --reverse "${r680SourceParent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r680Following.Count -gt 0) 'r66.9 source admission missing.'
+          $r680Commit = [string]$r680Following[0]
+          $r680Parents = @(& git -C $root show -s --format=%P $r680Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r680Parents.Count -eq 1 -and [string]$r680Parents[0] -ceq $r680SourceParent) 'r66.9 source admission parent changed.'
+          $r680Subject = @(& git -C $root show -s --format=%s $r680Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r680Subject.Count -eq 1 -and [string]$r680Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit r66.9 qualified review source') 'r66.9 source admission subject changed.'
+          $r680Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r680Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r680Committed | Sort-Object) -join '|') -ceq (@($r680Owners | Sort-Object) -join '|')) 'r66.9 source admission committed an unexpected owner.'
+          & git -C $root diff --quiet $r680Commit -- @r680Owners
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'r66.9 source coordination changed after admission.'
+          $r680Later = @(& git -C $root log --format=%H "${r680Commit}..$head" -- @r680Owners)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r680Later.Count -eq 0) 'r66.9 source admission cannot be replayed or revised.'
         }
       }
       $primaryEvidenceCoordinationOwnerKeys = @($r66CoordinationOwners | ForEach-Object {
