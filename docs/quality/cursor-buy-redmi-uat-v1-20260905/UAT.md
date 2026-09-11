@@ -6,6 +6,42 @@ Complete Redmi testing of all previously scoped tickets and their connected jour
 
 
 
+## r66.9 scoped round 1 checkpoint 12 — milk variant badge and cart continuity
+
+20 additional successful Redmi captures 417–436; 435 successful captures total, excluding failed attempt382. Scope reach remains 41/42. Two findings are now closed after Redmi verification: supplier quantity and variant delivery badge. Remaining statuses: 33 partial, 6 failed-connected and 1 not exercised. Five new UAT child defects remain open; none added in this batch.
+
+- Scheduled 417 retains Saved1. Milk8 entry 418 restores its prior product scroll and related-products row. The third related card opens the same original Family Dairy & Bake milk variant in 419. This is a related-products route, not a successful populated comparison result.
+- Select 500 ml in 420: standard/courier details remain consistent. Product top 421 shows the factual 500 ml pack badge, Rs35 / Rs70 per litre and correct seller. Add 422 creates one Rs35 cart item. Cart 423 initially retains its earlier scroll; 424–425 scroll to the exact 500 ml line. Cart arrow 426 reopens that same variant with quantity1.
+- At font2, 427 shows the complete 500 ml badge, product identity and unit price. Scroll 428 exposes the selected pack and controls; 429 shows the same standard/courier delivery facts and all pack choices. Choosing 2x1L in 430 changes only the browsed option to Rs128 / Rs64 per litre; Cart 431 still contains the original 500 ml pack at Rs35. Back 432 returns to the browsed family pack.
+- Normal font is restored in 433. Back 434 returns to the originating Cart from 426, not Scheduled as its immutable filename anticipated; the image/metadata are authoritative and remain unchanged. Scope-specific confirmation435 removes only the one temporary Shop item;436 returns to Scheduled, empty cart and Saved1. No real order, review, payment or message submitted.
+
+R668-AUDIT-VARIANT-DELIVERY-BADGE-001 is CLOSED for this frontend badge/presentation and connected Add/cart/Back scope. Its comparison entry, provider eligibility, actual media and final-checkout promise remain separately unqualified. Closure record variant-badge-redmi-closure-1.json SHA256 9E90EC721202114AF11D1E2D50241AFD373827DCBE0180B8ACF23BCB5B9BA620. Checkpoint12 external round-progress-checkpoint-12.json SHA256 AC1B585B53D6582AA894552B5EAF6FF313BA7BB7F13A5E14E1CC0AA82477BED0. All20 PNGs inspected and PNG/XML, metadata and terminal receipt/log hashes verified. Exact Redmi TG8HCYTGGQT885OF / APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Resume13 coordination and device-memory gates passed.
+
+Original display values independently restored: font1, physical720x1600/density320, no overrides, autoRotation1/userRotation0. Record display-restored-after-variant-enlarged-1.json SHA256 FA09CB57DBF1FF54E255F1505AE7B1A2FC4CE927709B79A4FAB2BBC58523F950. Earlier delivery Keep/order-selection cleanup remains outstanding. No runtime change, new APK or integration. Continue the planned scoped UAT and stop/report its complete deduplicated list before further implementation.
+
+| Capture | Label | PNG SHA256 | XML SHA256 |
+| --- | --- | --- | --- |
+| 417 | 417-scheduled-for-variant-replay | BAD682D3ECB787EE94DE0BF13DBDD54B5BF00FA64932C7C67AC0309261DF2947 | 6E62FF195197E316738B2669BA6A851E7BD141AF0EBB0293E72796F89D750CE5 |
+| 418 | 418-milk-product-variant-route | 62D589B4D1AD5B8E562D068152A774A7D946F2630A05FEE4FC6A1855B0EB50AD | AAFAAE0A42D14BE5D78BF44DE8E7C2E535AD07CDA1EECFBC21B84F86A9CE41F7 |
+| 419 | 419-original-milk-variant-product | BF5E65DF6760C7DD1BBE9074E084B4C195C30A9E55E0FA867209CECC405E2932 | 730B1070D516742FE8F0D85E23FBE6081F3ECE2132A18D7B09936D2F1728D796 |
+| 420 | 420-original-half-litre-pack-selected | 37A7494CC75F4A29AF29F5767FEF3B8794B90395AD8B93C907A17EDA38012BAF | 1D84CEEFCE612B97E25E970CC02F2545EA0B7574A495A939584B6D28E1847502 |
+| 421 | 421-half-litre-badge-price-and-seller | 46B909E5749A8A9D792E81F9B6D9A90DD00437BEFF378E70E59EC09D8AEC46F1 | 1007F5BB1417CFA96CD85E568F2F88F50CFB9A4BC68758CB5F3659470AC52032 |
+| 422 | 422-half-litre-add-exact-variant | 6A03E4A8B9880BD786A3D50B32AA6571E1879CD872701563BEF799DF200104B2 | 070F1679E49FF06F124B5C6667B76210F7656DE3269FDF4B6592483CC341DC36 |
+| 423 | 423-half-litre-cart-identity | 908645C1929210A89B6F607CEEA5270327F4894197F262B1116510E732FE24CA | 415F3F75F4E3D3883A8904E687A2C6C775928C0F11537D68737FBB5DC46C41F6 |
+| 424 | 424-half-litre-cart-line | 189ED4FD692D599B79417A12756C6ED80EA87976D042F7F9D5120DD350E2FD75 | 496972975DF428EEB5493052B544234AC4702E2562C87D75E71594DCB0B6A711 |
+| 425 | 425-half-litre-cart-top | 9841179CF07A193D06921110F3C78CD2D44D4FD98FFADA526216249A630B6C3A | 95C5B6D7A57CB453E8C52BA8E7EA4AF2783E773632CE2BD77E3A3DF980E9EA96 |
+| 426 | 426-cart-reopens-exact-half-litre | FA5EE468FC536EB3B15D586ABBB93D506968EA095DA9119F1358DA1822516D80 | 070F1679E49FF06F124B5C6667B76210F7656DE3269FDF4B6592483CC341DC36 |
+| 427 | 427-half-litre-enlarged-badge | 976485F710DB3910E777A97461EC882293A0BB168032A1D976AB498B65884E4D | 8D2A9056749255793A43661AC84C37C113CD5FFF4C6532B727E85E176427FC6A |
+| 428 | 428-half-litre-enlarged-arrival-options | D3F511FD4B486EDDE67948BB134E39AD1002E046EF07D794C4BAF8B20CE49C1D | 91001C85F119F1F30ADAD4504845BAB26F55E9C99ADED34FCB8412BAD2B94641 |
+| 429 | 429-half-litre-enlarged-courier-details | 4A276F6F52C99C3CED0B4F3EFE51EEB4A46C79CF6F5B6B12EB65777A244E295B | F515DD51109B273BAEDE88A28B70E1E27B198FBB9F650497D8FEA8A75BDDD00E |
+| 430 | 430-two-litre-option-preserves-half-litre-cart | 8A08E27E7A4436B1F429591B3266465D46FCF4D7203EB725BD844FE30DB1A43F | F72CCA286D9B8CB76748C60E132E60E3B6F9BFBEF0CE9E61374184119D2F58E3 |
+| 431 | 431-variant-browsing-retains-original-cart | C2583124530DA28CCE8177DD41FE15E1F8434F218DEF786EEEEBB279E49D392E | 69BB21532BB7F3599A37272A9360878E0B07FA6D20DC5116DA3197D1CEB6A30E |
+| 432 | 432-cart-back-retains-browsed-family-pack | E244014A97F1CC4A56671F872832DE817B7E8B4C53FC15851DE6C23931D6D167 | F72CCA286D9B8CB76748C60E132E60E3B6F9BFBEF0CE9E61374184119D2F58E3 |
+| 433 | 433-variant-normal-display-restored | 065AB5FBF2B47387CEE3602A85915E4E2FE2CEEF7B100CFDBA930DE078065410 | ABCC2875024F34C2EA302BBE1409926FB0AB9E81EEFB611469102C31257DCC22 |
+| 434 | 434-variant-product-back-to-scheduled | 5F17EC1269223F96D9AF74D2F8BA4F6E09CE6DAD3E40C8062EC0B085F1D53B3D | 95C5B6D7A57CB453E8C52BA8E7EA4AF2783E773632CE2BD77E3A3DF980E9EA96 |
+| 435 | 435-variant-test-cart-remove-confirm | BCD86898757F67B01636AA619832B8D5051972C677B7DB023AE2CD845A39B5F1 | 7D59D05061C88CD44BF8152A15F9FD9F3C720018068DE1E22D5BB668984CA83E |
+| 436 | 436-variant-test-basket-cleared | 4ED4B10042E9843913BDEEA45B61A32BF7D9663ECEEC7DF161913F74B1C9016C | 6E62FF195197E316738B2669BA6A851E7BD141AF0EBB0293E72796F89D750CE5 |
+
 ## r66.9 scoped round 1 checkpoint 11 — enlarged supplier qualification and quantity closure
 
 24 additional successful Redmi captures393-416;415 successful captures total (failed attempt382 excluded). Reach remains41/42, now **one finding CLOSED after Redmi verification**,34partial,6failed-connected,1not-exercised. Five new UAT children remain open. R668-AUDIT-QTY-001 is closed in DEFECTS.md; this is not parent-workstream, backend, catalogue or media closure.
