@@ -153,7 +153,7 @@
     },
     {
       "id": "oppo-install",
-      "state": "pending",
+      "state": "passed",
       "evidence": "artifacts/quality/codex-oppo-r66-16-review-20260911/post-install.json"
     },
     {
