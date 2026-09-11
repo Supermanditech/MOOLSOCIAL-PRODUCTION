@@ -6,6 +6,18 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## r66.9 round 1 checkpoint23 - mixed-cart relaunch, Share and Offers
+
+Current scoped counts: **11 original entries closed, 31 open; 11 UAT child defects registered**. Share moves from partial to failed connected replay, giving 15 partial, 15 failed and 1 supplier-media case not exercised. This is still the frozen 33 findings + 9 requests plus required Buy procurement dependency. No implementation or new APK.
+
+Captures896-912 pass the remaining mixed Bulk/consumer cold-retention case: rice4 / 25 kg / MOQ4 is changed to7 packs (Rs11830), alongside Shop soap5 / Pack4 / quantity1 (Rs164). Cold relaunch retains both and aggregate Rs11994. Removing only Wholesale preserves Shop; removing the temporary Shop line restores the original empty cart. The existing Bulk keyboard child remains open.
+
+Captures913-919 check sharing. Native Android chooser915 opens for soap5 and Back916 returns correctly without selecting a recipient. The exact previously observed s-tomato URL delivered via Android VIEW/BROWSABLE to the explicit review package opens the correct product while running917. After force-stop, the identical URL reports a cold launch but opens generic Shop home918 and remains there919. New child R669-UAT-SHARE-COLD-PRODUCT-ROUTE-001 is registered. This is real-device intent-delivery evidence, not proof of a recipient messenger tap. Default Android resolution returns MiuiResolverActivity; domain status reports1024. Automatic domain association and public no-app/install/auth continuity remain explicitly unqualified.
+
+Offers920-932: normal last category Stationery & office is fully reachable and selects relevant listings. With font2 and animator duration scale0, the manufacturer promotion CTA opens the exact notebook product and Android Back restores the offer. Manual Next shows the pencil promotion with exact pack, price and MOQ; it remains the same at the next capture-only observation. All categories restores the initial offer/list. These are available-data presentation/navigation checks; actual supplier/admin publication and provider benefits remain unqualified. Font and animator scales restored/read back1.0; no cart, saved item, order or message mutations remain.
+
+Immutable checkpoint: external redmi-r66-9-round-1/round-progress-checkpoint-23.json SHA256 A30D8A5156C59A0A4A45E40A637D7D6939F5CAEDF91CA94E6B37B876631F6551. It binds all37 captures, terminal receipts, prior checkpoint22 and the detailed bulk/share evidence. The scoped round and final deduplicated defect list remain incomplete; implementation stays paused pending the remaining-case reconciliation and device obligations.
+
 ## r66.9 round 1 checkpoint22 - review fitment, enlarged retention and Wholesale history
 
 Frozen scope is 33 findings + 9 requests plus the required Buy procurement dependency. Counts remain **11 original entries closed, 31 open** (16 partial, 14 failed connected replay, 1 supplier-media case not exercised); **10 UAT child defects are now registered**, all awaiting the authorized implementation batch. Device scope remains Redmi TG8HCYTGGQT885OF and the unchanged r66.9 APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. No implementation, new APK, installation or OPPO action occurred.
