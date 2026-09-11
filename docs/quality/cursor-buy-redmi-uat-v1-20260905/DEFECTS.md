@@ -1,19 +1,29 @@
 # Fresh Redmi defect register
 
+## r66.9 round 1 child - Android Back loses split-order list position
+
+**R669-UAT-ORDER-ANDROID-BACK-POSITION-001 - OPEN, P3, confirmed twice on Redmi, 12 September 2026 IST.** Parent R668-AUDIT-ORDER-PURCHASE-SEARCH-001. Normal font1/physical720x1600/density320. Search BUY-NEW-01 returns its seven deliveries correctly.567 shows the last delivery MS-NEW-06/Rs100 near the list bottom;568 opens its tracking. Android Back569 jumps to earlier MS-NEW-01/02/03, and settled570 retains that wrong position. Recovery571 returns to the exact original position; on-screen Orders after tracking572 preserves it in573. A second Android Back from574 repeats the same wrong list position575. Query/order membership remain intact; no order or user data changed.
+
+Expected: Android Back and the on-screen Orders action both preserve the originating query, status, purchase list and scroll position. Customer otherwise must scroll again to find the delivery being checked. Exact XML controls567=571=573; failures569=570=575 differ. One deduplicated child; first/top-row returns passing do not qualify lower-origin Back. MVP-required scoped navigation correction using existing contracts, no new screen or backend expansion. Source diagnosis/implementation deferred until full UAT list and founder report.
+
+Record order-android-back-position-child-1.json SHA256D1E28A0427AF241D2096CABD873875E924D0E083D9F233FE733385852F7E6152, nine visually inspected/hash-verified captures, device TG8HCYTGGQT885OF, unchanged APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. New UAT children total seven; eight frozen tickets remain closed, full round open.
+
+Additional device extent: product-name search TOMATO at font2 also loses the lower tracking origin (591 to592, MS-NEW-01 jumps toward MS-NEW-08). Related affected parent R668-AUDIT-ORDER-PRODUCT-SEARCH-001 remains open. Invoice Android Back preserves the exact same lower origin (588=590 XML) and first origin (584=586); do not report invoice Back as failing. Evidence order-android-back-position-extension-1.json SHA2562EA1BD367082443B95E1F99CEAC0E82D7BA555C043CC2DA26EA2C8E680370121. Same child, total remains seven.
+
 ## r66.9 round 1 child - monthly basket enlarged-text continuation
 
 **R669-UAT-MONTHLY-LARGE-TEXT-CONTINUATION-001 - OPEN, P2, confirmed Redmi.** Parent R668-AUDIT-CATALOGUE-001; connected ticket R66-UAT-032-R668-PAGED-001. One child covers both delivery groups. Original Monthly scope/filtering displays the intended products; enlarged-text discovery remains defective.
 
 At 720x1600 portrait, physical density320 and font_scale2.0, Monthly Quick advertises six products. Vertical scrolling reaches its bottom with rice/onions visible (454-455), while chicken is hidden in an unindicated third column. A horizontal swipe456 reveals chicken; product457 and Back458 preserve identity/position. Exiting and reopening Monthly with font2 already active (460-467) reproduces this in Scheduled: bottom468 shows oil/milk, while sideways469 reveals ghee. Customers can overlook basket products and Add controls. This is recoverable hidden continuation, not product loss. Expected: expose every small-basket product through the existing vertical layout or a clear accessible continuation affordance, retaining scope, quantities and Back.
 
-Normal Scheduled/Quick price-filter counts and exact subsets pass443-452. Neutral image fallback at font2 is intentional, not a new media/network failure. No cart writes, order, payment or message in437-471. Font1 restored/read back, Saved1 retained, Monthly dismissed471. Evidence: external redmi-r66-9-round-1/monthly-large-text-continuation-child-1.json SHA25639B2D18CC681ACAC361D5CBFC5521393DF56656416CA8518530F3280D35B45B9 with16 bound captures; complete batch in UAT.md. Redmi TG8HCYTGGQT885OF, APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Register only; no implementation. New r66.9 UAT children total six; full round remains open.
+Normal Scheduled/Quick price-filter counts and exact subsets pass443-452. Neutral image fallback at font2 is intentional, not a new media/network failure. No cart writes, order, payment or message in437-471. Font1 restored/read back, Saved1 retained, Monthly dismissed471. Evidence: external redmi-r66-9-round-1/monthly-large-text-continuation-child-1.json SHA25639B2D18CC681ACAC361D5CBFC5521393DF56656416CA8518530F3280D35B45B9 with16 bound captures; complete batch in UAT.md. Redmi TG8HCYTGGQT885OF, APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Register only; no implementation. At checkpoint13, new r66.9 UAT children totalled six; full round remained open.
 
 
 ## r66.9 scoped Redmi round 1 — 11 September 2026
 
 The successor Cursor Review APK is built and installed without clearing data on Redmi `TG8HCYTGGQT885OF`: version `1.0.0-r66.9-cursorreview`, code `2026091101`, SHA256 `AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9`. Build HEAD is `7eb5d1034f1aeb45b7987db22a5521649af22a25`; runtime/test source is `a18aa780c0e00497ef218025bc8473a32f50a084`. The older implementation/pending-build paragraphs below are historical checkpoints; final host qualification and current device results are in UAT.md.
 
-Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. This round has **five new UAT children**, below. No ticket is closed. Finish the full scoped round and deduplicate the complete child list, then STOP and report before any further implementation, as the founder directed.
+Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. Current checkpoint16 registration: **seven new UAT children**; **eight frozen findings are Redmi-verified and closed**. Later current-status lines take precedence over retained historical OPEN implementation notes. Finish the full scoped round and deduplicate the complete child list, then STOP and report before any further implementation, as the founder directed.
 
 ### R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 — Last-known arrival estimate is unqualified in delivery panel and Orders
 
