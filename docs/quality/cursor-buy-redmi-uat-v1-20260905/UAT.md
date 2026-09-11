@@ -2,9 +2,65 @@
 
 ## Latest founder stop rule — 11 September 2026
 
-Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 child-defect count is four, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
+Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 child-defect count is five, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
 
 
+
+## r66.9 scoped round 1 checkpoint 9 — Bulk MOQ, quantity recovery and compact landscape
+
+38 additional real Redmi captures305-342. Reach remains41/42:32/33 findings and9/9 requests have at least partial coverage. **Zero whole-ticket closures; five new confirmed UAT children total.** New child R669-UAT-BULK-QUANTITY-KEYBOARD-001 is defined in DEFECTS.md and external bulk-quantity-keyboard-child-1.json (SHA256 ACE330115DB152742761380690DD7A28959F8230A4F15A2743033CED7C41FEEE). Counts exclude historical closed tickets and retain the two implementation children/procurement dependency separately. Tracking parent's state is reconciled to failed-connected because its previously registered child remains open; no extra tracking child counted.
+
+- Original Bulk307-313: rice4,25kg bag,MOQ4,Rs1690/pack. Grid Add4/Rs6760; plus5/Rs8450; minus4/Rs6760; next minus removes. Product312 explicitly discloses MOQ4/minimum6760 and Add313 starts4.
+- Normal editor314-324: below-minimum3 rejected316, empty rejected318, zero rejected320; field and Update/Cancel remain readable above numeric keyboard. Cancel321 preserves4/Rs6760. Reopen/type12/update gives12/Rs20280. Back325 retains Bulk mode and full grid quantity; Cart326 and reopened product327 agree. Original normal-configuration reproduction passes. Invalid input causes no silent cart mutation.
+- Compact setup328-329: temporary720x1280 override at density320/font2.0. First capture328 stayed portrait; orientation readback confirmed rotation0, so it is excluded from landscape evidence. Reapplied user_rotation1 after resize settled;329 onward actual1280x720 landscape (640x360 logical display before Android bars).
+- Short landscape dock329-332: product body scrolls to the complete product name331 while compact dock retains amount and controls. Plus332 changes12/Rs20280 to13/Rs21970. This exercises the prior implementation child, but does not close its remaining content/Add contexts.
+- New keyboard failure333-337: tap13 to edit; both initial333 and settled334 show clipped digits. Type14 in335; accessibility input contains14 but rectangle[140,164][1100,232] clips the visible value. Swipe336 dismisses keyboard, reveals14/minimum4/Update/Cancel. Registered child before further input. Cancel337 retains13/Rs21970. Recovery is available; no unreachable-submit or data-loss claim. Complete digits must remain readable during entry.
+- Restoration338-342: original font1.0, physical720x1600/density320, no overrides, autoRotation1/userRotation0 read back. Normal product338 and Cart339 retain13/Rs21970. Remove confirmation340 identifies only the temporary13 Wholesale packs, Shop0;341 removes them.342 restores original Scheduled Shop and Saved1/atta membership. No user basket item, address/payment preference, coupon, order, review/report or message changed. Earlier delivery Keep/selection cleanup remains outstanding.
+
+Checkpoint9 external round-progress-checkpoint-9.json SHA256 63E36ED8F321809620D4956118B92F04C44AA0C2029A07FA12F0C93A5398F16B binds342 captures. All38 new PNGs individually inspected; corresponding metadata, PNG/XML and terminal receipt stdout/stderr hashes verified. Exact Redmi TG8HCYTGGQT885OF and APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Display-restoration record SHA256 F4F76FABF19251D1C14C7709D9B0305B7F9BC3CDA7445E609B2D310A0C563757. Resume9 coordination and memory-device gates passed. Raw capture files remain external; Git preserves the manifest below.
+
+Remaining work includes per-ticket connected/responsive/return gaps and provider-dependent qualification; MEDIA-002 stays unexercised. Bulk cold-relaunch and a populated unrelated consumer basket were not directly exercised in this batch. No source/runtime edit, APK/build/install or integration. Complete the scoped round and STOP/report its complete deduplicated list before further implementation.
+
+| Capture | Label | PNG SHA256 | XML SHA256 |
+| --- | --- | --- | --- |
+| 305 | 305-resume-before-bulk-quantity | 9185815F9B3BA28559FC0E956C836D4873997DB8AA1A6CBAB05E14A8F62AE157 | 4F78CD43854C88CD20022CA9050FEEE223222B65EC769BB208893050DB4242AA |
+| 306 | 306-wholesale-for-bulk-entry | E0E66A32897F3E69B7652616F07B463E88E693B875CCFCBB164D98F807EB6D71 | 090292692A87A3344BB393730B8497851C788220AA6EFE0094DD0CBA348BACB8 |
+| 307 | 307-bulk-original-rice-minimum | 3C3E667A09C4706A2E599AFAA165CA3733FC36F7EF53DE130FE1161E18CF29AD | 75816CD9F4E0E0CB00804F30D6AE84FA7080B16308FD3B7E111670B21EEF5629 |
+| 308 | 308-bulk-rice-add-minimum-four | 408D47AD1B20C1F78B876C31A25DF638020E1F7978304862ED5E75F6EF2F4B00 | 2E372AFBE878A340403222F4E403AA823D2508A43A2D38E85A91F67A47BCAFFD |
+| 309 | 309-bulk-rice-plus-five | 55E816AB7F34B6D375160D1AD539111BB81837BC6169DBC2F60184B0BABD8614 | 4B732853A1B86C6CF47D0C739F25F2182D9BA87C98A371B2ECD13DFFB2530ABB |
+| 310 | 310-bulk-rice-minus-minimum | B4F518E07D2058E6228E5412AC555769603B7E390FD54E58BE908381A21ACD42 | 2E372AFBE878A340403222F4E403AA823D2508A43A2D38E85A91F67A47BCAFFD |
+| 311 | 311-bulk-minus-below-minimum-removes | 3760FF1B193EA3A08CD9930B03C7E2A0E74F5071C9A82FB607D060335603C097 | 371FCF1CA3407C814149A2C92D3744E7BEA16354CA2DD11484D531DE99794046 |
+| 312 | 312-bulk-rice-product-entry | E1EFAA0E6EFE69C634FFD045B37D867C4E6728C5074C76452C4D0E11196121CE | AF916050C19CE14F1AF493BE39BC7DA7CD66D1DFD68E6F31A4C49E8B76AE099F |
+| 313 | 313-bulk-product-add-four | 2D14EB9EAB9E535DBFFFCBA16ED1F46767EC1FE41910AEFB9488FB146940FD01 | 2E84FE0B8C5AB2A242A3AF054864BDD109FA91EA3605EE89C17664E09F8D2F47 |
+| 314 | 314-bulk-product-direct-quantity | 2E358365EF7FE842EE2F190E5E8412C93A7FFB43059466C47E7FAAED29B10CE4 | 5D1362B983E250C6C2BD0B5EE95604CCF37FCE161475DEACC33709F0E55FEC82 |
+| 315 | 315-bulk-below-minimum-three | CD6EBFACD9FDCF3A718C14A78AC7B55C92C77F7F28EDD74064E2F9263E11874F | 56D8E425594FFF5DA42D4620206389F9B1283069D48502F0E6CB1AA804EE9A06 |
+| 316 | 316-bulk-below-minimum-validation | 2E366E3EEF88A066C6DF33EEE8F614D766F5BDDEBC9A95AE9C71F32BDA13D8A8 | 48BB7DC35AF5CD502A3923C21562AB9465A8FDE1DC5271F57433876F00151CDF |
+| 317 | 317-bulk-quantity-empty-input | 60129E997B5669A67EB61F4DC13A72F533C1E8553E2D7D94352F625CD5329867 | 7F6F88F43B27612333EBC97044801E9508E3361B9DFE70C7DF6A0D99E2C850F4 |
+| 318 | 318-bulk-empty-quantity-validation | B40C8595CA0C50EC8BDD57F2A0225CB19F22ACDDB13656EEE0D725EA8C0C49A5 | B3B821DCB3E574F0DA3A1CA5B8C82E022A2DAF7A06EF0949C8B95A4049AD3E48 |
+| 319 | 319-bulk-quantity-zero-input | 565DF6AC0603B6D97A09EB6786526C89DBC6F7BBE638089928CCA73517CA83F9 | AE8A68F3052BB1AAEB1BC33201D12DEF5FB97180085511C93AC020ABC0E0E210 |
+| 320 | 320-bulk-zero-quantity-validation | 0C1DD5EBF033FEDA5502002AD2AADC22BDEDAC773537A53572A4C98B5C3D58DA | C6707991C772E36344E49548722C835B333E8C14570834D4F35FDAAC3740A664 |
+| 321 | 321-bulk-invalid-cancel-retains-four | 878A706809801A286420375A3A9B788E85D918A6422E9DFC8F7050DDA714A5B2 | B7DB28C48715C95BE7269E41ECE5627300863A10C3F5B265BFEEBAB0EEE69E3F |
+| 322 | 322-bulk-editor-reopen-four | C2B35328EC7D45B09774F5A0E359E1AF8E0C3FDDC0238C8357CBB61E56DDDE54 | 5D1362B983E250C6C2BD0B5EE95604CCF37FCE161475DEACC33709F0E55FEC82 |
+| 323 | 323-bulk-valid-twelve-input | 5D37901372A536F1A20B5CBEF50DAF9E1F388B85236FD3145A63DCD2EE55B78F | 86C44CA7866350D3FA5246A4434DDEB0672D6F6387F0ECAAD9D1EFFF82EF146A |
+| 324 | 324-bulk-twelve-applied-product | 06470C7E45740B456F491B465FC371BB87DDE30675A307896FC3253ED6DA3299 | AFD4F39C545CA605631D198206BEB3E8DBCB990EBD652EDA7EDFFD37118F90E3 |
+| 325 | 325-bulk-product-back-retains-mode-twelve | B8A1D6F12E4AD8EC1EE1BF7D54ABCF1367DC8E66ADC0F13F6778D5701F9EFF91 | 922C7F0156C82E0326EA2A53D4C8577628067793D644B83BA99017569CE34911 |
+| 326 | 326-bulk-cart-matches-product | CE3C26616BA6E69A0929CF996024B818ADA5F4633ABC5919C73BB6713F94AB50 | 667CDB378B24813974A49DC5B885895D9E7A6F2657872D1013D1540796D3DEEF |
+| 327 | 327-bulk-cart-product-return | CE70F58F64B1E8B6522822B3E9235839EBD6C6BB6988EA79E3CBB90CCECF989C | AFD4F39C545CA605631D198206BEB3E8DBCB990EBD652EDA7EDFFD37118F90E3 |
+| 328 | 328-bulk-compact-landscape-product-top | F285BA4D78015BEC8DC494D737FE4889BAFE5E0DBDDC71B64797F2494D270AE1 | 07A96EBA10FF0A8D60BAD65AE71B2BC1CE4B06548EDDDA9F57E7A3D49B4324F8 |
+| 329 | 329-bulk-actual-compact-landscape-top | 47942AF5332FC01D0ACC38D117A87FA3564FD9590398554E5E7AC56E15C68395 | 3C91435BA46E01BF640190F4C495FB9F9BA3825387677F2FF32DD8E679D71694 |
+| 330 | 330-bulk-landscape-product-content-scroll | D63E5EA160C19E2059CE53CA599126237200D1F78423294A5E04D3D0D8C34B45 | 28EED09565CF586CD27374F50BAC71F6A50CA22D82E31B3D5501B063DA33AD05 |
+| 331 | 331-bulk-landscape-title-price-scroll | D418D095450A8294CF190ADB43AFAA499CEB9FCE1E22A28BA5D1FAE1D43D2F9E | C59B14D09B001641F5E146A4247A8A8AAB090EFCED0976075109DD7EC279A663 |
+| 332 | 332-bulk-landscape-stepper-thirteen | A317841F92E7003EDF82BB1DEF4193CF48BAA7E98955D5C0A2C62213DAF65BAE | CB99AC864E02632CF918FFC12989CEEDD6D6126A03A3333E44F6EDF1B88003D5 |
+| 333 | 333-bulk-landscape-quantity-editor | 15DDF439E4C23935C10AEEFDBD969C440F08000A13349CC4C436EE55D61DFB6F | EBA981092BA95B256B7B50A3635DDA413BC631F2C16A115A6DC3DF6D52673474 |
+| 334 | 334-bulk-landscape-editor-settled | 8E5AF363E4858153FB2B1F01E42E45B17A4CC3C837CEDC32B06F4B307693A2AF | EBA981092BA95B256B7B50A3635DDA413BC631F2C16A115A6DC3DF6D52673474 |
+| 335 | 335-bulk-landscape-entered-quantity-visibility | 76A77D094523670342DAB2DDEF2A74395BC8327DCE2A364DAC5338A49E00817C | DCD39ED1BF0A6F98F5701D16A942C48E23F5E83ECDCEF22A41FB2728F3605948 |
+| 336 | 336-bulk-landscape-editor-scroll-recovery | 655A592710D3AB162747A633DE118AF8728847004743A0F047EC723D27A081B2 | F130CDB6E5A7A4929F055EAE1CC7F22C259C4477E51EDB2C1AD2557309F250C7 |
+| 337 | 337-bulk-landscape-editor-cancel-retains-thirteen | 4A4AF0A4F64C6DD7ED38104995A97060C9224AC67F13FA2444D4677333BA0E59 | CB99AC864E02632CF918FFC12989CEEDD6D6126A03A3333E44F6EDF1B88003D5 |
+| 338 | 338-bulk-normal-display-restored | E9D6C156EF7A0E02F67F357F98DE7692B5A6342D2BB77697583C79D2AEEC7370 | 7CD46FE304FBD7CE793D1EECC26E133947E0FC345797651EB62DF06BDA74C107 |
+| 339 | 339-bulk-restored-cart-thirteen | 26D2D65DC9E05A88EE415F949A1EBB5A62241648F908AEE4591607D451406870 | E50FBDE03013B0B2408F5BA9CC13D0CB4C11D84186EC7E358784AB6304B2597E |
+| 340 | 340-bulk-test-basket-remove-confirmation | 7ADC42CEF0E87B6EC200F57756B9C8B1949729EFBA81FBE3C8D1AE65F342DCA8 | B8EAFBF75148617A23351BAFA6B9880655B8C90C251B93DCC6E35FC10DFB0F76 |
+| 341 | 341-bulk-test-basket-removed | 82176B5AF73FD35C0968A65D710CD4F7DCF1B9D2A9E4933AF83176648C3272DF | 68643D0015EC449364FB8ED6B821A1900B367B5EE74DD755BE82880F8EF2696B |
+| 342 | 342-shop-preserved-after-bulk-cleanup | 9080CF93BC07FA689269370EBBB6A79F837001F01D3822244B0A3E29EBD69620 | 6E62FF195197E316738B2669BA6A851E7BD141AF0EBB0293E72796F89D750CE5 |
 
 ## r66.9 scoped round 1 checkpoint 8 — nine-digit cart, mixed checkout, relaunch and original milk variant
 

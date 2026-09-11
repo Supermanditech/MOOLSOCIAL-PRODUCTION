@@ -4,7 +4,7 @@
 
 The successor Cursor Review APK is built and installed without clearing data on Redmi `TG8HCYTGGQT885OF`: version `1.0.0-r66.9-cursorreview`, code `2026091101`, SHA256 `AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9`. Build HEAD is `7eb5d1034f1aeb45b7987db22a5521649af22a25`; runtime/test source is `a18aa780c0e00497ef218025bc8473a32f50a084`. The older implementation/pending-build paragraphs below are historical checkpoints; final host qualification and current device results are in UAT.md.
 
-Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. This round has **four new UAT children**, below. No ticket is closed. Finish the full scoped round and deduplicate the complete child list, then STOP and report before any further implementation, as the founder directed.
+Frozen scope remains **33 findings + 9 requests**, with the separate required procurement dependency and two previously registered implementation children. This round has **five new UAT children**, below. No ticket is closed. Finish the full scoped round and deduplicate the complete child list, then STOP and report before any further implementation, as the founder directed.
 
 ### R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 — Last-known arrival estimate is unqualified in delivery panel and Orders
 
@@ -48,6 +48,26 @@ Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/redmi-r6
 Expected: use the structured authoritative offer conditions and current eligible basket scope before presenting a discount as applied. Explain the minimum/shortfall or unavailable validation; revalidate when quantity, supplier/scope or offer revision changes and at final review. Keep coupon selection separate from confirmed application. Preserve valid coupon arithmetic, unrelated baskets and disclosed charges. Backend enforcement remains separately pending. Record now, then finish the scoped UAT list and report before implementing this child.
 
 Evidence: redmi-r66-9-round-1/coupon-minimum-spend-child-1.json SHA256 8B8B7544E5A180E6D7B762E542633FB40A79D2E4CB5C2577BA862D257E6DC7F8. All four PNGs were individually inspected; the manifest binds PNG/XML/metadata and terminal0 receipts to the round's exact Redmi APK. Temporary tomato quantity and coupon must be removed/restored at round cleanup.
+
+### R669-UAT-BULK-QUANTITY-KEYBOARD-001 — Enlarged landscape quantity digits are clipped while typing
+
+**OPEN, P2; confirmed Redmi child of R668-AUDIT-BULK-QTY-001, related to R669-IMPL-WHOLESALE-LANDSCAPE-001.** Same r66.9 APK. Real Bulk buyer opens Premium basmati rice4 /25kg bag /Mool Market000001, MOQ4, updates to12 and verifies product/grid/cart consistency. Under compact landscape1280x720 pixels, density320 (640x360 logical display before Android system bars), font2.0, the shortened product dock retains readable quantity/total and works: plus gives13/Rs21970 (332). Tap quantity to edit (333), wait for settled keyboard (334), type14 (335): only the upper portion of the digits is visible. Accessibility reports focused input13/14 at [140,164][1100,232], matching the clipped native PNGs. The customer cannot read the complete number while typing.
+
+Swipe within the editor336 dismisses the keyboard and exposes the full14, minimum4, Update and Cancel. Recovery therefore works; this is not an unreachable-submit or lost-quantity claim. No update to14 has been submitted at registration. The initial compact-size capture328 stayed portrait and is not credited as landscape; landscape329 onward was visually verified after reapplying orientation. This reproduces the registered compact/enlarged-text class on the physical Redmi, not on a host test.
+
+Expected: keep the full entered quantity readable with keyboard open at the supported compact/enlarged setting. Preserve numeric validation, MOQ, exact product/pack, current cart, Cancel/Back and atomic update. Do not reduce the user's chosen text size. Fix the actual keyboard/scroll viewport constraint; source cause is not yet established. Complete the scoped round and report before implementation.
+
+Evidence manifest: external redmi-r66-9-round-1/bulk-quantity-keyboard-child-1.json SHA256 ACE330115DB152742761380690DD7A28959F8230A4F15A2743033CED7C41FEEE. All seven bound PNGs individually inspected; APK/device identities, PNG/XML and terminal0 receipt hashes verified. Key captures:
+
+- 329-bulk-actual-compact-landscape-top: PNG 47942AF5332FC01D0ACC38D117A87FA3564FD9590398554E5E7AC56E15C68395; XML 3C91435BA46E01BF640190F4C495FB9F9BA3825387677F2FF32DD8E679D71694.
+- 331-bulk-landscape-title-price-scroll: PNG D418D095450A8294CF190ADB43AFAA499CEB9FCE1E22A28BA5D1FAE1D43D2F9E; XML C59B14D09B001641F5E146A4247A8A8AAB090EFCED0976075109DD7EC279A663.
+- 332-bulk-landscape-stepper-thirteen: PNG A317841F92E7003EDF82BB1DEF4193CF48BAA7E98955D5C0A2C62213DAF65BAE; XML CB99AC864E02632CF918FFC12989CEEDD6D6126A03A3333E44F6EDF1B88003D5.
+- 333-bulk-landscape-quantity-editor: PNG 15DDF439E4C23935C10AEEFDBD969C440F08000A13349CC4C436EE55D61DFB6F; XML EBA981092BA95B256B7B50A3635DDA413BC631F2C16A115A6DC3DF6D52673474.
+- 334-bulk-landscape-editor-settled: PNG 8E5AF363E4858153FB2B1F01E42E45B17A4CC3C837CEDC32B06F4B307693A2AF; XML EBA981092BA95B256B7B50A3635DDA413BC631F2C16A115A6DC3DF6D52673474.
+- 335-bulk-landscape-entered-quantity-visibility: PNG 76A77D094523670342DAB2DDEF2A74395BC8327DCE2A364DAC5338A49E00817C; XML DCD39ED1BF0A6F98F5701D16A942C48E23F5E83ECDCEF22A41FB2728F3605948.
+- 336-bulk-landscape-editor-scroll-recovery: PNG 655A592710D3AB162747A633DE118AF8728847004743A0F047EC723D27A081B2; XML F130CDB6E5A7A4929F055EAE1CC7F22C259C4477E51EDB2C1AD2557309F250C7.
+
+Registered before the next device input. Display restoration and temporary Bulk basket cleanup will be recorded in the next UAT checkpoint. No real order/payment/message.
 
 ## Current Redmi APK onward — OPEN findings only
 
