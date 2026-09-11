@@ -1116,7 +1116,7 @@ class _WorkWorkspaceDashboardScreenState
             }
           }),
         ),
-        child: switch (_view) {
+        child: _withReviewSeedControls(switch (_view) {
           _WorkspaceControlView.dashboard => _StoreControlDashboard(
             session: session,
             workspace: workspace,
@@ -1306,8 +1306,64 @@ class _WorkWorkspaceDashboardScreenState
                 ? _leaveOperation
                 : null,
           ),
-        },
+        }),
       ),
+    );
+  }
+
+  Widget _withReviewSeedControls(Widget child) {
+    if (!session.canLoadStoreReviewSeed ||
+        _view != _WorkspaceControlView.dashboard) {
+      return child;
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Material(
+          color: Colors.white,
+          child: PopupMenuButton<int>(
+            key: const Key('store-review-seed-menu'),
+            tooltip: 'Load isolated synthetic Store data',
+            onSelected: (count) {
+              if (count < 0) {
+                session.setStoreReviewOrderResponse(
+                  count == -1
+                      ? StoreReviewOrderResponse.lostReply
+                      : StoreReviewOrderResponse.rejected,
+                );
+                return;
+              }
+              if (session.loadStoreReviewSeed(count)) _showDashboard();
+            },
+            itemBuilder: (_) => [
+              for (final count in const [12, 100, 1000])
+                PopupMenuItem(
+                  value: count,
+                  child: Text('Test Store · $count orders'),
+                ),
+              if (session.activeWorkspace?.id.startsWith('QA-STORE-V1-') ==
+                  true) ...[
+                const PopupMenuItem(
+                  value: -1,
+                  child: Text('Next order action: lose reply'),
+                ),
+                const PopupMenuItem(
+                  value: -2,
+                  child: Text('Next order action: reject request'),
+                ),
+              ],
+            ],
+            child: const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+              child: Text(
+                'Review data',
+                semanticsLabel: 'Review APK test data. No real transactions.',
+              ),
+            ),
+          ),
+        ),
+        Expanded(child: child),
+      ],
     );
   }
 

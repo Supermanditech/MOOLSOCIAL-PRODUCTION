@@ -2109,6 +2109,329 @@ class AuthenticatedWorkGateway implements WorkGateway {
 
 enum WorkReviewTestCase { pending, clarification, rejected, approved }
 
+/// Versioned, synthetic projections for frontend UAT and future adapter tests.
+/// Pure data only: no network, approval, payment or collection authority.
+/// The runtime loader separately requires both review defines and debug mode.
+class StoreReviewSeed {
+  StoreReviewSeed({
+    required this.accountScope,
+    required this.orderCount,
+    required DateTime now,
+  }) : now = now.toUtc() {
+    if (accountScope.trim().isEmpty || !{12, 100, 1000}.contains(orderCount)) {
+      throw ArgumentError('Unsupported Store review scenario');
+    }
+  }
+
+  static const version = 1;
+  final String accountScope;
+  final int orderCount;
+  final DateTime now;
+  String get storeId =>
+      'QA-STORE-V1-$orderCount-'
+      '${crypto.sha256.convert(utf8.encode(accountScope)).toString().substring(0, 16)}';
+  String get label => 'TEST Store · $orderCount orders';
+  WorkWorkspace get workspace => WorkWorkspace(
+    id: storeId,
+    name: label,
+    profileLabel: 'Grocery / Kirana Shop',
+    profileId: 'retailer-grocery',
+    area: 'Synthetic test data',
+    verified: true,
+  );
+
+  late final List<WorkspaceCatalogueItem> products = List.unmodifiable([
+    for (final product in workspaceMasterCatalogue.take(6))
+      product.copyWith(stock: 10000, available: true, publicListing: true),
+  ]);
+
+  late final List<WorkspaceOrderRecord> orders = List.unmodifiable([
+    for (var i = 0; i < orderCount; i++) _order(i),
+  ]);
+
+  WorkspaceOrderRecord _order(int i) {
+    final product = products[i % products.length];
+    final quantity = 1 + i % 3;
+    final stage = const [
+      'Confirmed',
+      'Preparing',
+      'Ready',
+      'Delivery requested',
+    ][i % 4];
+    return WorkspaceOrderRecord(
+      id: 'QA-ORDER-${i.toString().padLeft(4, '0')}',
+      customer: 'Test customer ${i + 1}',
+      items: '${product.title} × $quantity',
+      quantities: Map.unmodifiable({product.id: quantity}),
+      amount: product.sellingPrice * quantity,
+      source: 'App',
+      fulfilment: 'Mool delivery',
+      payment: i % 3 == 0 ? 'Payment due' : 'Paid online',
+      address: 'Test address ${i + 1}, QA locality',
+      stage: stage,
+      needsDelivery: true,
+      createdAt: now.subtract(Duration(seconds: i)),
+      actionDeadline: stage == 'Confirmed'
+          ? now.add(const Duration(seconds: 60))
+          : null,
+      fulfilmentDeadline: now.add(const Duration(minutes: 10)),
+      stockReserved: stage != 'Confirmed',
+      itemSnapshots: List.unmodifiable([
+        WorkspaceOrderItemSnapshot(
+          productId: product.id,
+          name: product.title,
+          pack: product.pack,
+          quantity: quantity,
+          unitPricePaise: product.sellingPrice * 100,
+          lineTotalPaise: product.sellingPrice * quantity * 100,
+        ),
+      ]),
+    );
+  }
+
+  WorkspaceFinanceSnapshot get finance => WorkspaceFinanceSnapshot(
+    accountScope: accountScope,
+    workspaceId: storeId,
+    revision: 1,
+    asOf: now,
+    // Large-ledger totals intentionally exceed the visible payment sample.
+    salesTodayMinor: orderCount == 1000
+        ? 1000000000000
+        : orders.fold<int>(0, (total, order) => total + order.amount * 100),
+    duesMinor: [
+      for (var i = 0; i < orders.length; i += 3) orders[i],
+    ].fold<int>(0, (total, order) => total + order.amount * 100),
+    availableMinor: orderCount == 1000 ? 100000000000 : 250000,
+    heldMinor: 125000,
+    requestedMinor: 0,
+    paidOutMinor: 450000,
+    feesMinor: 1200,
+    deliveryAdjustmentsMinor: -300,
+    refundsMinor: 0,
+    taxWithheldMinor: 0,
+    payments: [
+      for (var i = 0; i < orders.length; i++)
+        WorkspacePaymentRecord(
+          orderId: orders[i].id,
+          customerId: 'QA-CUSTOMER-$i',
+          customerName: orders[i].customer,
+          revision: 1,
+          updatedAt: now,
+          amountMinor: orders[i].amount * 100,
+          paidMinor: i % 3 == 0 ? 0 : orders[i].amount * 100,
+          dueMinor: i % 3 == 0 ? orders[i].amount * 100 : 0,
+          refundedMinor: 0,
+          state: i % 3 == 0
+              ? WorkspacePaymentState.unpaid
+              : WorkspacePaymentState.paid,
+          channel: i % 3 == 0
+              ? WorkspacePaymentChannel.credit
+              : WorkspacePaymentChannel.platform,
+          invoiceId: 'QA-INVOICE-$i',
+        ),
+    ],
+    payouts: const [],
+    historyComplete: false,
+  );
+
+  List<WorkspacePurchaseRecord> get purchases => List.unmodifiable([
+    for (var i = 0; i < WorkspaceSupplyStage.values.length; i++)
+      WorkspacePurchaseRecord(
+        accountScope: accountScope,
+        workspaceId: storeId,
+        supplierId: 'QA-SUPPLIER-${i % 3}',
+        supplierName: 'Test ${WorkspaceStockSupplierType.values[i % 3].label}',
+        orderId: 'QA-PURCHASE-$i',
+        shipmentId: 'QA-SHIPMENT-$i',
+        revision: 1,
+        createdAt: now.subtract(const Duration(days: 1)),
+        updatedAt: now,
+        stage: WorkspaceSupplyStage.values[i],
+        amountMinor: products.first.purchasePrice * 20 * 100,
+        itemSummary: '${products.first.title} × 20',
+        paymentLabel: i.isEven ? 'Paid to supplier' : 'Payment pending',
+        expectedArrival: 'Test estimate · today',
+        address: 'QA receiving counter',
+        trackingReference: 'QA-TRACK-$i',
+        lines: [
+          WorkspacePurchaseLine(
+            id: 'QA-LINE-$i',
+            productId: products.first.id,
+            name: products.first.title,
+            pack: products.first.pack,
+            orderedPacks: 20,
+            unitPriceMinor: products.first.purchasePrice * 100,
+          ),
+        ],
+      ),
+  ]);
+
+  List<WorkspaceGroupOffer> get offers => List.unmodifiable([
+    for (var i = 0; i < 3; i++)
+      WorkspaceGroupOffer(
+        accountScope: accountScope,
+        workspaceId: storeId,
+        supplierId: 'QA-SUPPLIER-$i',
+        supplierName: 'Test ${WorkspaceStockSupplierType.values[i].label}',
+        supplierType: WorkspaceStockSupplierType.values[i],
+        productId: products[i].id,
+        revision: 1,
+        updatedAt: now,
+        closingAt: now.add(const Duration(days: 1)),
+        stage: WorkspaceGroupOfferStage.collecting,
+        publicationConfirmed: true,
+        details: WorkspaceGroupBuy(
+          id: 'QA-OFFER-$i',
+          productName: products[i].title,
+          specification: products[i].pack,
+          leadRetailer: 'Test group organiser',
+          confirmedRetailers: const ['Test participating store'],
+          targetQuantity: 1000,
+          securedQuantity: 300 + i * 100,
+          unitLabel: 'packs',
+          regularUnitPrice: 100,
+          groupUnitPrice: 80,
+          facilitationFee: 100,
+          deliveryFee: 200,
+          confirmationAmount: 0,
+          closingLabel: 'Test offer · closes tomorrow',
+          storeDeliveryLabel: 'Test delivery · after offer closes',
+          paymentConfirmed: false,
+        ),
+        participation: const WorkspaceGroupParticipation(
+          state: WorkspaceGroupParticipationState.notJoined,
+        ),
+        note: 'Simulated offer. No purchase or payment will be made.',
+      ),
+  ]);
+}
+
+/// In-memory response simulator. It proves UI handling, never backend security.
+/// A lost reply retains one result for reconciliation without replaying effects.
+enum StoreReviewOrderResponse { applied, rejected, lostReply }
+
+class StoreReviewOrderGateway implements WorkOrderTimeCommandGateway {
+  StoreReviewOrderGateway(this.seed) {
+    for (final order in seed.orders) {
+      _orders[order.id] = WorkOrderReply(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        orderId: order.id,
+        operationId: 'QA-SEED-${order.id}',
+        revision: 1,
+        state: WorkOrderReplyState.applied,
+        order: order,
+      );
+    }
+  }
+  final StoreReviewSeed seed;
+  final _orders = <String, WorkOrderReply>{};
+  final _results = <String, WorkOrderReply>{};
+  final _commands = <String, WorkOrderCommand>{};
+  StoreReviewOrderResponse nextResponse = StoreReviewOrderResponse.applied;
+  List<WorkOrderReply> get snapshots => List.unmodifiable(_orders.values);
+  @override
+  bool get supportsOrderTimeRequests => true;
+
+  void _checkScope(WorkOrderCommand command) {
+    if (command.accountScope != seed.accountScope ||
+        command.workspaceId != seed.storeId ||
+        !_orders.containsKey(command.orderId) ||
+        !SecureWorkOrderPendingStore._valid(command)) {
+      throw StateError('Invalid synthetic order command');
+    }
+    final previous = _commands[command.operationId];
+    if (previous != null &&
+        (previous.orderId != command.orderId ||
+            previous.action != command.action ||
+            previous.expectedRevision != command.expectedRevision ||
+            previous.reason != command.reason ||
+            previous.additionalMinutes != command.additionalMinutes ||
+            previous.expectedAcceptanceDeadline !=
+                command.expectedAcceptanceDeadline)) {
+      throw StateError('Synthetic operation identity changed');
+    }
+  }
+
+  @override
+  Future<WorkOrderReply> submitOrderCommand(WorkOrderCommand command) async {
+    _checkScope(command);
+    final previous = _results[command.operationId];
+    if (previous != null) return previous;
+    final mode = nextResponse;
+    nextResponse = StoreReviewOrderResponse.applied;
+    final snapshot = _orders[command.orderId]!;
+    var order = snapshot.order!;
+    final legalStage = switch (command.action) {
+      WorkOrderAction.accept ||
+      WorkOrderAction.reject ||
+      WorkOrderAction.requestTime => order.stage == 'Confirmed',
+      WorkOrderAction.ready => order.stage == 'Preparing',
+    };
+    final rejected =
+        mode == StoreReviewOrderResponse.rejected ||
+        snapshot.revision != command.expectedRevision ||
+        !legalStage ||
+        order.isCustomerCollection ||
+        (command.action == WorkOrderAction.requestTime &&
+            command.expectedAcceptanceDeadline != order.actionDeadline) ||
+        (order.stage == 'Confirmed' &&
+            order.actionDeadline?.isAfter(DateTime.now()) != true);
+    if (!rejected) {
+      order = switch (command.action) {
+        WorkOrderAction.accept => order.copyWith(
+          stage: 'Preparing',
+          clearActionDeadline: true,
+          stockReserved: true,
+        ),
+        WorkOrderAction.ready => order.copyWith(stage: 'Ready'),
+        WorkOrderAction.reject => order.copyWith(
+          stage: 'Cancelled',
+          rejectionReason: command.reason,
+          clearActionDeadline: true,
+        ),
+        WorkOrderAction.requestTime => order.copyWith(
+          actionDeadline: order.actionDeadline!.add(
+            Duration(minutes: command.additionalMinutes!),
+          ),
+          extraMinutes: order.extraMinutes + command.additionalMinutes!,
+        ),
+      };
+    }
+    final result = WorkOrderReply(
+      accountScope: seed.accountScope,
+      workspaceId: seed.storeId,
+      orderId: command.orderId,
+      operationId: command.operationId,
+      revision: snapshot.revision + 1,
+      state: rejected
+          ? WorkOrderReplyState.rejected
+          : WorkOrderReplyState.applied,
+      order: order,
+    );
+    _results[command.operationId] = result;
+    _commands[command.operationId] = command;
+    _orders[command.orderId] = result;
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    if (mode == StoreReviewOrderResponse.lostReply) {
+      throw TimeoutException(
+        'Simulated lost response; reconcile the operation',
+      );
+    }
+    return result;
+  }
+
+  @override
+  Future<WorkOrderReply> reconcileOrderCommand(WorkOrderCommand command) async {
+    _checkScope(command);
+    final result = _results[command.operationId];
+    if (result == null || result.orderId != command.orderId) {
+      throw StateError('Synthetic operation is not known');
+    }
+    return result;
+  }
+}
+
 class ReviewWorkGateway implements WorkGateway {
   ReviewWorkGateway({WorkRemoteReviewStatus? initialReviewStatus})
     : reviewResultStatus =

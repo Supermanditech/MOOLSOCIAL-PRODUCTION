@@ -7543,6 +7543,97 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
+  /// Explicit review-APK action. Never seed the currently approved Store or
+  /// use a production gateway; fixtures occupy their own stable Store IDs.
+  bool get canLoadStoreReviewSeed =>
+      kDebugMode &&
+      const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+      gateway is ReviewWorkGateway &&
+      _contactAccountScope?.trim().isNotEmpty == true &&
+      activeWorkspace != null;
+
+  bool loadStoreReviewSeed(int orderCount, {DateTime? now}) {
+    if (!canLoadStoreReviewSeed ||
+        !{12, 100, 1000}.contains(orderCount) ||
+        busy ||
+        workspaceOperationsSyncing ||
+        workspaceHandoverBusy ||
+        counterDraftSubmitting ||
+        hasPendingOrderTime ||
+        _collection?.needsReconciliation == true) {
+      return false;
+    }
+    final seed = StoreReviewSeed(
+      accountScope: _contactAccountScope!,
+      orderCount: orderCount,
+      now: now ?? DateTime.now(),
+    );
+    // No reset of a fixture in this session: retain edits and selected order.
+    if (activeWorkspace?.id == seed.storeId) return true;
+    final previous = activeWorkspace!;
+    final exists = _storeDataById.containsKey(seed.storeId);
+    if (!otherWorkspaces.any((store) => store.id == previous.id)) {
+      otherWorkspaces.add(previous);
+    }
+    otherWorkspaces.removeWhere((store) => store.id == seed.storeId);
+    activeWorkspace = seed.workspace;
+    if (!exists) {
+      workspaceCatalogueItems.addAll(seed.products);
+      workspaceOrders.addAll(seed.orders);
+      retailerSetupSaved = true;
+      retailerProductAdded = true;
+      workspaceStoreState = WorkspaceStoreState.open;
+      workspaceAcceptingOrders = true;
+      workspaceVisibleToCustomers = true;
+      // Apply the same validated projections that backend adapters will use.
+      if (!applyWorkspaceFinance(seed.finance) ||
+          !applyWorkspacePurchases(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: 1,
+            records: seed.purchases,
+            complete: true,
+          ) ||
+          !applyWorkspaceGroupOffers(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: 1,
+            records: seed.offers,
+            complete: true,
+          )) {
+        throw StateError('Invalid Store review projections');
+      }
+      final gateway = StoreReviewOrderGateway(seed);
+      final operations = WorkOrderOperations(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        gateway: gateway,
+      );
+      for (final snapshot in gateway.snapshots) {
+        operations.observe(snapshot);
+      }
+      if (!bindWorkspaceOrderOperations(operations)) {
+        operations.dispose();
+        throw StateError('Review order controller could not be bound');
+      }
+      selectWorkspaceOrder(seed.orders.first.id);
+    }
+    notifyListeners();
+    return true;
+  }
+
+  bool setStoreReviewOrderResponse(StoreReviewOrderResponse response) {
+    final adapter = _scopedOrderOperations?.gateway;
+    if (!canLoadStoreReviewSeed ||
+        adapter is! StoreReviewOrderGateway ||
+        adapter.seed.storeId != activeWorkspace?.id) {
+      return false;
+    }
+    adapter.nextResponse = response;
+    return true;
+  }
+
   void seedVerifiedWorkspace() {
     selectedProfile = workProfiles.first;
     workName = 'Mahadev Fresh Mart';

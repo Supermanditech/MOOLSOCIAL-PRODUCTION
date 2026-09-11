@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
@@ -42,6 +44,310 @@ class _ReviewCaseDraftStore implements WorkPendingProofStore {
 }
 
 void main() {
+  test('Store review seed V1 is deterministic scoped and internally valid', () {
+    final now = DateTime.utc(2026, 9, 11, 12);
+    for (final count in [12, 100, 1000]) {
+      final seed = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: count,
+        now: now,
+      );
+      final same = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: count,
+        now: now,
+      );
+      expect(seed.orders.length, count);
+      expect(seed.storeId, same.storeId);
+      expect(
+        seed.storeId,
+        isNot(
+          StoreReviewSeed(
+            accountScope: 'other-account',
+            orderCount: count,
+            now: now,
+          ).storeId,
+        ),
+      );
+      expect(seed.orders.map((o) => o.id).toSet().length, count);
+      expect(
+        seed.orders.map((o) => (o.id, o.stage, o.createdAt)),
+        same.orders.map((o) => (o.id, o.stage, o.createdAt)),
+      );
+      expect(seed.orders.every((o) => o.hasCompleteItemSnapshot), isTrue);
+      expect(
+        seed.orders.every(
+          (o) => o.itemSnapshots.single.lineTotalPaise == o.amount * 100,
+        ),
+        isTrue,
+      );
+      expect(seed.finance.valid, isTrue);
+      expect(seed.finance.historyComplete, isFalse);
+      expect(
+        seed.purchases.every(
+          (p) =>
+              p.valid &&
+              p.accountScope == 'qa-account' &&
+              p.workspaceId == seed.storeId,
+        ),
+        isTrue,
+      );
+      expect(
+        seed.offers.every((o) => o.valid && o.workspaceId == seed.storeId),
+        isTrue,
+      );
+      expect(
+        seed.offers.map((o) => o.supplierType).toSet(),
+        WorkspaceStockSupplierType.values.toSet(),
+      );
+      expect(seed.orders.every((o) => o.collectionStoreId == null), isTrue);
+      expect(() => seed.orders.clear(), throwsUnsupportedError);
+    }
+    expect(
+      () => StoreReviewSeed(accountScope: '', orderCount: 12, now: now),
+      throwsArgumentError,
+    );
+    expect(
+      () => StoreReviewSeed(accountScope: 'qa', orderCount: 13, now: now),
+      throwsArgumentError,
+    );
+  });
+
+  test(
+    'Store review seed loader is gated and never overwrites another Store',
+    () {
+      final drafts = _ReviewCaseDraftStore();
+      final work = WorkSession(
+        contactDraftStore: drafts,
+        pendingProofStore: drafts,
+      )..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      const enabled =
+          bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+          bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+      final original = work.activeWorkspace!;
+      final originalProducts = List.of(work.workspaceCatalogueItems);
+      expect(work.canLoadStoreReviewSeed, enabled);
+      expect(
+        work.loadStoreReviewSeed(100, now: DateTime.utc(2026, 9, 11)),
+        enabled,
+      );
+      if (!enabled) {
+        expect(work.activeWorkspace, original);
+        expect(work.workspaceOrders, isEmpty);
+        return;
+      }
+      final seedStoreId = StoreReviewSeed(
+        accountScope: drafts.accountScope,
+        orderCount: 100,
+        now: DateTime.now(),
+      ).storeId;
+      expect(work.activeWorkspace!.id, seedStoreId);
+      expect(work.workspaceOrders.length, 100);
+      expect(work.workspaceFinance!.valid, isTrue);
+      expect(work.otherWorkspaces, contains(original));
+      expect(work.selectWorkspaceOrder('QA-ORDER-0001'), isTrue);
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
+          .copyWith(stock: 123);
+      expect(work.loadStoreReviewSeed(100), isTrue);
+      expect(work.currentWorkspaceOrderId, 'QA-ORDER-0001');
+      expect(work.workspaceCatalogueItems.first.stock, 123);
+      work.activeWorkspace = original;
+      expect(work.workspaceCatalogueItems, originalProducts);
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.loadStoreReviewSeed(100), isTrue);
+      expect(work.currentWorkspaceOrderId, 'QA-ORDER-0001');
+      expect(work.workspaceCatalogueItems.first.stock, 123);
+      expect(work.loadStoreReviewSeed(999), isFalse);
+      expect(work.activeWorkspace!.id, seedStoreId);
+    },
+  );
+
+  test(
+    'Store review seed lost reply reconciles once without blocking another order',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: 100,
+        now: DateTime.now(),
+      );
+      final gateway = StoreReviewOrderGateway(seed);
+      final operations = WorkOrderOperations(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        gateway: gateway,
+      );
+      addTearDown(operations.dispose);
+      for (final row in gateway.snapshots) {
+        expect(operations.observe(row), isTrue);
+      }
+      gateway.nextResponse = StoreReviewOrderResponse.lostReply;
+      expect(
+        await operations.act('QA-ORDER-0000', WorkOrderAction.accept),
+        isFalse,
+      );
+      expect(
+        operations.state('QA-ORDER-0000'),
+        WorkOrderOperationState.uncertain,
+      );
+      expect(operations.order('QA-ORDER-0000')!.order!.stage, 'Confirmed');
+      expect(
+        await operations.act('QA-ORDER-0004', WorkOrderAction.accept),
+        isTrue,
+      );
+      expect(operations.order('QA-ORDER-0004')!.order!.stage, 'Preparing');
+      expect(await operations.retry('QA-ORDER-0000'), isTrue);
+      expect(operations.order('QA-ORDER-0000')!.order!.stage, 'Preparing');
+      expect(operations.order('QA-ORDER-0000')!.revision, 2);
+      expect(await operations.retry('QA-ORDER-0000'), isFalse);
+    },
+  );
+
+  test(
+    'Store review seed simulator rejects changed operation identity and supports retry evidence',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: 12,
+        now: DateTime.now(),
+      );
+      final gateway = StoreReviewOrderGateway(seed);
+      WorkOrderCommand command(String order) => WorkOrderCommand(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        orderId: order,
+        operationId: 'QA-OPERATION-1',
+        expectedRevision: 1,
+        action: WorkOrderAction.accept,
+      );
+      gateway.nextResponse = StoreReviewOrderResponse.lostReply;
+      await expectLater(
+        gateway.submitOrderCommand(command('QA-ORDER-0000')),
+        throwsA(isA<TimeoutException>()),
+      );
+      final result = await gateway.reconcileOrderCommand(
+        command('QA-ORDER-0000'),
+      );
+      expect(result.revision, 2);
+      expect(
+        await gateway.submitOrderCommand(command('QA-ORDER-0000')),
+        same(result),
+      );
+      await expectLater(
+        gateway.submitOrderCommand(command('QA-ORDER-0004')),
+        throwsStateError,
+      );
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    for (final count in [100, 1000]) {
+      testWidgets('Store review seed dashboard $count orders at $scale', (
+        tester,
+      ) async {
+        const enabled =
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = scale == 1
+            ? const Size(412, 915)
+            : const Size(320, 568);
+        tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+        addTearDown(tester.view.reset);
+        final drafts = _ReviewCaseDraftStore();
+        final work = WorkSession(
+          contactDraftStore: drafts,
+          pendingProofStore: drafts,
+        )..seedVerifiedWorkspace();
+        final core = BuySession();
+        final procurement = BuyV2Session(
+          core: core,
+          customerStateStore: _ReviewCaseMemoryStore(),
+        );
+        final router = GoRouter(
+          initialLocation: '/app/work/workspace/dashboard',
+          routes: [
+            GoRoute(
+              path: '/app/work/workspace/dashboard',
+              builder: (_, _) => WorkWorkspaceDashboardScreen(
+                session: work,
+                procurementSession: procurement,
+              ),
+            ),
+          ],
+        );
+        addTearDown(() {
+          router.dispose();
+          procurement.dispose();
+          core.dispose();
+          work.dispose();
+        });
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('store-seed-capture'),
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final menu = find.byKey(const Key('store-review-seed-menu'));
+        if (!enabled) {
+          expect(menu, findsNothing);
+          expect(work.workspaceOrders, isEmpty);
+          return;
+        }
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Test Store · $count orders'));
+        await tester.pumpAndSettle();
+        expect(
+          work.activeWorkspace!.id,
+          StoreReviewSeed(
+            accountScope: drafts.accountScope,
+            orderCount: count,
+            now: DateTime.now(),
+          ).storeId,
+        );
+        expect(work.workspaceOrders.length, count);
+        expect(
+          find.byKey(const Key('work-workspace-dashboard')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          expect(folder, isNotEmpty);
+          await expectLater(
+            find.byKey(const Key('store-seed-capture')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/seed-$count-$scale.png',
+            ),
+          );
+        }
+        final accept = find.byKey(const Key('work-activity-order-accept'));
+        await tester.ensureVisible(accept);
+        await tester.pumpAndSettle();
+        expect(accept.hitTestable(), findsOneWidget);
+        expect(work.currentWorkspaceOrderId, 'QA-ORDER-0000');
+        expect(tester.takeException(), isNull);
+        if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          await expectLater(
+            find.byKey(const Key('store-seed-capture')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/seed-action-$count-$scale.png',
+            ),
+          );
+        }
+      });
+    }
+  }
+
   Future<JourneySession> readyJourney() async {
     final session = JourneySession(
       store: MemoryJourneyStore(
