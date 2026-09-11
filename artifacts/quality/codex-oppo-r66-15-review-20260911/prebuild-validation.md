@@ -1,5 +1,9 @@
 # r66.15 prebuild validation
 
+## One-build activation
+
+Founder-authorised review build activated once against clean remote-equal evidence seal752c8830610e15d5836e9f16f26c1cba1cc28e16, verified zero status bytes/records/stderr and exit0 before activation. Exact candidate UAW-CODEX-OPPO-R66.15-REVIEW-20260911, RuntimeUiReview debug1.0.0-r66.15+2026091102, unchanged391-input manifest BB9B3049875A88745007EFCEFD2E4474F051595040FEF3795D3C93481630394E. Only this activation evidence and machine state are uncommitted; product/test source is sealed. This authority is consumed by the attempt and cannot be silently reused after failure. APK integrity, installation and OPPO review remain pending.
+
 Status: prebuild passed on clean remote-equal6e10f4e932ce3f00929dc123be5369a6c8e5195d. Build remains disabled until the evidence seal is committed/pushed/clean and the exact seal HEAD is activated for one attempt. No r66.15 APK, install or device pass is claimed.
 
 Required before activation: both complete 44-file cycles, review-only isolation, exact source hashes, full analysis, copy/UI locks, approved-commit coverage and fixtures, Flutter support-byte preservation, Android resources, unchanged build-foundation controls, incremental pre_build for 1.0.0-r66.15+2026091102, current MVP execution controls and clean remote-equal evidence seal. Then activate exactly one RuntimeUiReview debug build for the sealed HEAD. Preserve all earlier candidates and never reuse a consumed build authorisation.
