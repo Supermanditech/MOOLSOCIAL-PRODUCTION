@@ -1,5 +1,15 @@
 # r66.15 build and device review
 
+## Restart recovery — native215-224, current
+
+5f1353e1981ea0df832518b21f7622620205bc1f was clean and remote-equal before this continuation. Device/coordination gates passed.215 preserves the unsubmitted application with both filenames, types and sizes. Only Runtime on OPPO was force-stopped/relaunched, without data clearing. Its in-memory review Store datasets are no longer available; this is fixture lifetime, not proof of lost production Store records.
+
+216-221: reopening Work > Workspace > Grocery setup retains contact and exact business values. Local OTP-confirmed flags reset deliberately; existing ReviewWorkGateway confirmations were repeated, without real SMS/email. That reset is not classified as loss of authoritative server verification.216's truncated text output was not used for an omitted result; the exact Mool menu node was independently recovered and217 records the normal route.
+
+New child R6615-UAT-DOCUMENT-RESTORE-12 under REG4509 / pre-dashboard document recovery / DASH-LOAD-14:222 retains two attached references but loses both filenames.223 View PDF offers only Preview unavailable. Choose the document again to view it.224 Review retains business/contact and two attachment slots, but replaces filenames/type/size with generic Document attached. Source confirms serialized application.details contains proof references, not application.files/metadata, and restored draft defaults to empty files. Existing preview has no file and truthfully shows recovery. This completed-attachment recovery issue is distinct from the older pending-camera/lost-data incident. Backend durable-reference retrieval remains a separate dependency; current review references do not prove remote storage.
+
+Historical count12: one corrected/narrowly device-retested, eleven open (eight new r66.15). Product implementation remains held for consolidated review; no new APK or source/test edit. Full27 qualification is not asserted. Evidence manifestv4 in the external native folder binds215-224,20 PNG/XML files /1,559,147 bytes, independently rehashed; SHA256 57A2BB236ECF3FF389ED514A279D177EE2C3CC1F0FD385F3519976EA0F4D88FB. OPPO is left on the unsubmitted QA application's Review page.
+
 ## OPPO reconnected — native154-214 document continuation
 
 Preceding evidence checkpoint6a18db801c9873f94dcd299c11e155821c9b81c5 was clean and exactly remote-equal. OPPO2b3e0f71 reconnected with Runtime foreground; device gate passed before interaction. APK/source unchanged; Redmi untouched.

@@ -1,5 +1,11 @@
 # r66.15 scoped OPPO qualification ledger
 
+## Native224 restart checkpoint — current
+
+Count12 historical findings: one corrected/narrowly device-retested, eleven open. New R6615-UAT-DOCUMENT-RESTORE-12 / REG4509 / pre-dashboard recovery and DASH-LOAD-14: after Runtime restart without data clearing, both completed attachment slots persist but filenames/types/sizes and preview content do not (215 before,222-224 after). Contact and business values restore correctly. Source persists references, omitting picked-file metadata/content/retrieval state. This is not the earlier interrupted-camera case and does not negate the in-session cloud/PDF pass.
+
+Actual process restart removes in-memory seeded Store datasets; do not claim backend record loss. Mock contact verification was repeated, not a real OTP send or authoritative verification test. Product fixes remain held; no27-parent full closure asserted. External manifestv4 SHA256 57A2BB236ECF3FF389ED514A279D177EE2C3CC1F0FD385F3519976EA0F4D88FB binds20 files/1,559,147 bytes for215-224. More detail and scope exclusions are in device-review.md.
+
 ## Native214 document checkpoint — current
 
 Historical findings now11: one corrected/narrowly device-retested and ten open. Add R6615-UAT-FILES-PICKER-11 under REG4556 / global Files provider completion: Choose file merely announces opened and closes the sheet; actual picker never launches (155-158), confirmed by shared_screens.dart handler. Product correction remains held for consolidated report.
