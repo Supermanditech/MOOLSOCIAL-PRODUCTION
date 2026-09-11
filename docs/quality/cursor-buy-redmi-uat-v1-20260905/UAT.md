@@ -6,6 +6,18 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## r66.9 round 1 checkpoint22 - review fitment, enlarged retention and Wholesale history
+
+Frozen scope is 33 findings + 9 requests plus the required Buy procurement dependency. Counts remain **11 original entries closed, 31 open** (16 partial, 14 failed connected replay, 1 supplier-media case not exercised); **10 UAT child defects are now registered**, all awaiting the authorized implementation batch. Device scope remains Redmi TG8HCYTGGQT885OF and the unchanged r66.9 APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. No implementation, new APK, installation or OPPO action occurred.
+
+Captures840-895 add 56 actual device observations. Address840-849 covers enlarged Add lower inputs, required-field validation, keyboard Next into landmark and cancellation; original addresses/selection are restored. Cold relaunch850-856 retains original Home/Work and Work selection after the earlier temporary-address removal. This does not qualify persistence of a newly added address across process death.
+
+New child R669-UAT-REVIEW-ELIGIBILITY-ACTION-CLIPPED-001: normal-text ineligible review Check again is hidden below Android navigation861-864 and not recovered by scrolling. The eligible enlarged Save footer is also clipped when the keyboard is closed870-875; with keyboard open it is fully visible. Both states belong to the same child. Existing REVIEW-BACK-DRAFT child reproduces at enlarged text874-879: four stars and the 24-character unsent draft disappear after Back/reopen. No review was submitted; Cancel880 returns to the same product.
+
+Wholesale enlarged Brand885 truthfully reports unavailable brand details; supplied-brand filtering remains unqualified. Recently viewed889-891 contains two Wholesale products and reproduces existing RECENT-LAST-ACTION clipping on its final Add action. Opening that product892 preserves exact tomato1/10kg crate/MOQ2/total1160; Android Back893 returns to Wholesale history with that newly viewed item first. Close894 returns catalogue. No history clearing, cart additions, saved-item edits or transactions. Font scale restored and read back as1.0; capture895 shows normal Wholesale catalogue.
+
+Immutable checkpoint: external redmi-r66-9-round-1/round-progress-checkpoint-22.json SHA256 A9AF5F3AFD7A54DB42C698F816DFD089DE78049D87EFC6102A9C62BCE023DCCF. It binds all56 PNG/XML/metadata/terminal receipts, prior checkpoint21, address extensions, new-child evidence, existing-child extensions and the finite remaining-case reconciliation. The full scoped round and final deduplicated list remain incomplete; implementation stays paused. The latest founder direction permits the resulting scoped implementation only after that round/list, followed by local qualification and safe Git parking, with no new APK.
+
 ## r66.9 round 1 checkpoint21 - address validation, Save and removal
 
 Frozen42 remains **11 closed,31 open;9 UAT children open separately**. This batch adds49 successful captures791-839, bringing retained successful captures to836; failed382/504/725 stay excluded. No new defect or closure. Full scoped device testing/listing remains incomplete and implementation remains paused. No APK build/install.
