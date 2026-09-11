@@ -1,5 +1,17 @@
 # r66.16 OPPO review
 
+## Native048 continuation — dashboard replay blocked by review-fixture recovery
+
+Current source HEAD at audit start421aa770f112bbc7baf4c75688caed4be01548be was clean; OPPO2b3e0f71 connected. No product/test/Android edits or APK build. The new support restart child was additionally recorded under existing REG4549 with only its registry hash binding refreshed before this device continuation.
+
+042 rechecks exact application A with empty draft.043 Back reaches its persisted Application received state, not the previous synthetic rejected state.044–047 exercise Mool > Work > Workspace > Grocery: the retained pending application offers View application, not a new submission or test approval.048 sends the known dashboard route through Runtime and confirms No approved Workspace yet / Choose a Workspace. This negative access-control check passes; no unauthorized dashboard access occurred. Actual048 PNG inspected. The intended Restock product/cart/Back replay was NOT reached and is not marked passed.
+
+Source evidence: ReviewWorkGateway._submittedReviewCases is an in-memory Set; canSelectDeviceReviewCase requires membership. The application state-control eligibility is lost after process recreation. WorkChooseActivityScreen.chooseWorkspace routes all choices back to proof while resumeApplication is true; it does not provide a fresh review submission here. WorkWorkspaceDashboardScreen requires an existing verified workspace before rendering Store or its seed controls. These are review-fixture reachability limitations, not proof of production approval loss. Do not count another customer defect from the lost mock approval, clear app data, mutate stored approval, bypass the guard or build a successor under the current testing-only instruction.
+
+Remaining native Store replay requires a permitted recovery of an approved QA workspace/test-control state. No such recovery is exposed on this retained application in the installed build. Founder direction or a later authorized review-fixture correction is required; no change is performed now. Historical findings remain13 total, one narrow closure and12 open. The original27 items are not all device-qualified.
+
+External native-capture-manifest-v3.json binds042–048 (14 PNG/XML files); SHA256 372D55B0D593DDC2AA10C0537280FE8924D177C49035BDFB36BEBBDDF24B1F83. Earlier manifests and evidence remain untouched.
+
 ## Native041 restart finding — latest disposition
 
 Historical native findings now13: one narrowly corrected/retested and twelve open. One new child in r66.16: **R6616-UAT-SUPPORT-DRAFT-13 / REG4549**, also relevant to DASH-LOAD-14 durability. Implementation and another APK are held under the founder's latest testing-only instruction.

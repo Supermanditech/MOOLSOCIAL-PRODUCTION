@@ -1,5 +1,9 @@
 # r66.16 bounded support review disposition
 
+## Latest continuation048 — no fixes, no APK
+
+Pending-application recovery and direct dashboard denial were tested on the unchanged installed r66.16. The dashboard guard correctly blocks access without a verified workspace. Restart removed the review gateway's in-memory test-approval eligibility; the retained pending application exposes no test-state control or fresh submission. Restock product/cart/Back replay therefore remains unexecuted in this continuation. See device-review.md/native042–048 for observed routes, source classification and hash-bound evidence. A permitted approved-QA-state recovery or later authorized fixture correction is needed; do not clear data, bypass approval or create a new APK. Counts remain13 historical native findings,1 narrowly closed,12 open; all27 remain accounted for, not fully qualified.
+
 ## Latest 27-item audit disposition — native041
 
 Testing/recording only; no more APKs or implementation. All27 original items remain accounted for below. This is not a claim that all27 are fully device-qualified. Items1–22,25 and26 have related OPPO observations;23/27 are host investigations;24 is held. Existing source/build is unchanged.
