@@ -1,5 +1,22 @@
 # r66.15 build and device review
 
+## OPPO reconnected — native154-214 document continuation
+
+Preceding evidence checkpoint6a18db801c9873f94dcd299c11e155821c9b81c5 was clean and exactly remote-equal. OPPO2b3e0f71 reconnected with Runtime foreground; device gate passed before interaction. APK/source unchanged; Redmi untouched.
+
+New genuine child R6615-UAT-FILES-PICKER-11 / REG4556: native155-158, global profile Documents > Files > Add > Choose file reports opened without opening a picker. The shared source handler only calls completeLocal and closes the sheet. Camera/Scan/Gallery share that handler by source inspection, not independent device replay. Global Files provider completion is not passed. Historical total11: one corrected/narrowly retested, ten open (seven new r66.15).
+
+Workspace document flow is separate and passed these exact default-scale native checks:
+
+- 165-179: new local QA application setup reaches Documents with corrected test contact/business values. Contact confirmations use the existing ReviewWorkGateway, not real SMS/email. No application submitted.
+- 180-188: Cloud files opens Android picker; only the founder-specified Drive account was opened. A small logo PNG was selected instead of identity documents. It returned to the exact Account owner identity slot and rendered in-app (188 visually inspected). Attachment is not proof of genuine identity approval.
+- 189-194: image zoom changes rendered bounds; Android Back closes preview. Replace > Cloud files > provider Back/root Back > source Cancel retains the same attachment. No replacement/removal occurred.
+- 197/203: Android Downloads search reports Can't load content at the moment. Direct phone-storage provider eventually lists folders and successfully searches the known QA file (204-208). Record provider-specific limitation, not an established MoolSocial product root cause.
+- 209-213: existing clearly labelled local QA PDF is attached to Shop address document.211 and213 visually prove page1 and page2 rendered with their distinct markers, proper page counts and disabled terminal direction.210/212 are earlier loading PNGs and not final render evidence.
+- 214: Review your information contains the exact QA business, both attached filenames/types/sizes and correct contact. Submit for review was not tapped. This proves in-session selection/preview/cancel/review return, not upload to production, process-death persistence, arbitrary-provider errors or full physical200%/TalkBack qualification.
+
+Evidence manifestv3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r66-15-native-20260911/native-capture-manifest-v3.json; SHA256 4265151D12B46FBFAF97987A25F5E72BEDE07F7871EA46057B5480AA9D7C59FC;120 files /8,031,963 bytes independently rehashed. Range154-214, except198/199 PNG-only after failed UI dumps. Provider chooser screenshots/XML contain account names and filenames; retain privately outside Git and do not publish. No identity document contents were opened. No product source, tests, APK, integration or real messaging/payment was changed. OPPO left on the unsubmitted QA application review.
+
 ## Continuation through native153
 
 Continuation evidence is preserved separately without altering manifestv1: native-capture-manifest-v2.json in the same external native folder, SHA256 D363833610BAFB279814E0A7A06B442FF5327454D563F203762FEC1C85EA6F9F. All48 files /4,004,009 bytes were independently rehashed. Range126-153 includes PNG/XML pairs except133-140, which are explicitly PNG-only. This is partial test evidence, not a complete accessibility or27-item qualification. OPPO remained absent on the next read-only connection check; only Redmi was listed and remained untouched.

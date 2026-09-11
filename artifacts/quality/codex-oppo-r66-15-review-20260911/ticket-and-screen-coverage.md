@@ -1,5 +1,13 @@
 # r66.15 scoped OPPO qualification ledger
 
+## Native214 document checkpoint — current
+
+Historical findings now11: one corrected/narrowly device-retested and ten open. Add R6615-UAT-FILES-PICKER-11 under REG4556 / global Files provider completion: Choose file merely announces opened and closes the sheet; actual picker never launches (155-158), confirmed by shared_screens.dart handler. Product correction remains held for consolidated report.
+
+Item26 Workspace cloud-file frontend completion now has a positive default-scale native journey: authorized Drive account > selected logo image > exact slot > rendered preview > zoom > cancelled replacement retains original (180-194). Local existing two-page QA PDF selection, both rendered pages and Back to exact review also pass (208-214); both documents appear together on the correct unsubmitted QA application. Keep global Files no-op child separate; do not close it from the working Workspace uploader. Backend upload/verification, process death, provider-error mapping and complete physical accessibility remain unqualified.
+
+Native197/203 Downloads-provider search errors are recorded as external-provider observations; alternate direct phone-storage search succeeds at208. Evidence manifestv3 SHA256 4265151D12B46FBFAF97987A25F5E72BEDE07F7871EA46057B5480AA9D7C59FC binds120 files/8,031,963 bytes. No full27-item closure claimed. Full details, provisional captures and privacy constraints are in device-review.md.
+
 ## Native continuation through153 — current
 
 Historical findings:10 total, one narrowly corrected/retested, nine open (six new r66.15 children). New R6615-UAT-STATEMENT-RETURN-10 / REG4513 / DASH-LOAD-10/14: Sales reaches order1000, but switching to Purchases and back in the same period loses its deep position (150-153). Preserve independent tab scroll/expansion; source cause remains unclassified and product implementation held.
