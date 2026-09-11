@@ -16315,6 +16315,7 @@ void main() {
         findsOneWidget,
       );
       await captureStoreView(tester, 'restock-product-search-$scale');
+      expect(tester.takeException(), isNull);
       await tester.tap(searchControl);
       await tester.pumpAndSettle();
       final search = find.byKey(const ValueKey('buy-search-field'));
@@ -16340,13 +16341,116 @@ void main() {
       final secondRestock = find.byKey(
         const Key('work-stock-restock-store-product-3'),
       );
-      await reveal(tester, secondRestock);
+      expect(
+        work.workspaceCatalogueItems.any(
+          (item) => item.id == 'store-product-3',
+        ),
+        isTrue,
+        reason: 'Back must preserve the second stock item.',
+      );
+      final stockScrollable = find.descendant(
+        of: find.byKey(const Key('work-stock-statement-screen')),
+        matching: find.byType(Scrollable),
+      );
+      expect(stockScrollable, findsOneWidget);
+      // The two-unit item ranks above oil. Back retains the oil-row offset.
+      await tester.scrollUntilVisible(
+        secondRestock,
+        -180,
+        scrollable: stockScrollable,
+        maxScrolls: 20,
+      );
+      await tester.pumpAndSettle();
+      expect(secondRestock.hitTestable(), findsOneWidget);
       await tester.tap(secondRestock);
       await tester.pumpAndSettle();
       expect(buy.query, 'Store Brand Daily grocery product 3 4 kg pack');
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
       expect(buy.selectedFilter, 'nearby');
       await captureStoreView(tester, 'restock-second-product-search-$scale');
+      expect(tester.takeException(), isNull);
+      final emptyScroll = find.byKey(
+        const ValueKey('buy-empty-products-scroll'),
+      );
+      expect(emptyScroll, findsOneWidget);
+      final clearSearch = find.descendant(
+        of: emptyScroll,
+        matching: find.widgetWithText(TextButton, 'Clear search'),
+      );
+      await tester.ensureVisible(clearSearch);
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'restock-empty-revealed-$scale');
+      expect(
+        clearSearch.hitTestable(),
+        findsOneWidget,
+        reason:
+            'Clear=${tester.getRect(clearSearch)}; '
+            'scroll=${tester.getRect(emptyScroll)}; '
+            'cart=${tester.getRect(find.byKey(const ValueKey('buy-mini-cart-drag-handle')))}',
+      );
+      expect(tester.getSize(clearSearch).height, greaterThanOrEqualTo(48));
+      expect(
+        tester.getRect(clearSearch).bottom,
+        lessThanOrEqualTo(
+          tester
+              .getRect(find.byKey(const ValueKey('buy-mini-cart-drag-handle')))
+              .top,
+        ),
+        reason: 'The retained cart must not cover the recovery action.',
+      );
+      await captureStoreView(tester, 'restock-empty-recovery-$scale');
+      await tester.tap(clearSearch);
+      await tester.pumpAndSettle();
+      expect(buy.query, isEmpty);
+      expect(buy.quantityFor(cartProduct.id), cartQuantity);
+      expect(
+        find.byKey(const ValueKey('buy-empty-products-scroll')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'restock-cleared-catalogue-$scale');
+      if (scale > 1.4) {
+        for (final (key, title, detail) in const [
+          (
+            'buy-promotion-wholesale-restock',
+            'Flexible restocking',
+            'Compare products with lower minimum packs',
+          ),
+          (
+            'buy-promotion-wholesale-shop',
+            'Shopping for home?',
+            'Browse retail packs sized for home',
+          ),
+        ]) {
+          final promotion = find.byKey(ValueKey(key));
+          await tester.scrollUntilVisible(
+            promotion,
+            180,
+            scrollable: find.descendant(
+              of: find.byKey(
+                const ValueKey('buy-enlarged-catalogue-promotions'),
+              ),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await tester.pumpAndSettle();
+          for (final copy in [title, detail]) {
+            final label = find.descendant(
+              of: promotion,
+              matching: find.text(copy),
+            );
+            expect(label, findsOneWidget);
+            expect(
+              tester.renderObject<RenderParagraph>(label).didExceedMaxLines,
+              isFalse,
+            );
+          }
+          expect(promotion.hitTestable(), findsOneWidget);
+          await captureStoreView(tester, 'restock-$key-$scale');
+        }
+        expect(buy.quantityFor(cartProduct.id), cartQuantity);
+        expect(tester.takeException(), isNull);
+      }
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(

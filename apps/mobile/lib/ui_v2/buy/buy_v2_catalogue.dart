@@ -1501,6 +1501,7 @@ class _SearchProductResults extends StatelessWidget {
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
+          textScale: textScale,
         );
         return CustomScrollView(
           key: PageStorageKey('buy-search-${session.destination.name}-$query'),
@@ -5583,9 +5584,14 @@ class _ProductGrid extends StatelessWidget {
         session.selectedCategoryId == 'all' &&
         session.activeShoppingIntent == null;
     if (products.isEmpty) {
+      final cartVisible =
+          MediaQuery.viewInsetsOf(context).bottom == 0 &&
+          session.countForDestination(session.activeDockDestination) > 0;
       return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
+        child: SingleChildScrollView(
+          key: const ValueKey('buy-empty-products-scroll'),
+          // Keep recovery above the 48px floating cart and its 8px edge.
+          padding: EdgeInsets.fromLTRB(24, 24, 24, cartVisible ? 80 : 24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -5641,6 +5647,7 @@ class _ProductGrid extends StatelessWidget {
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
+          textScale: textScale,
           savedOnly: savedOnly,
         );
         final featuredProducts = showPromotions
@@ -6131,6 +6138,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
         final layout = _resolveCompactProductGridLayout(
           constraints: constraints,
           accessibleText: accessibleText,
+          textScale: textScale,
           denseStore: storeContext,
         );
         return _HorizontalProductGrid(
@@ -6155,6 +6163,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
 _resolveCompactProductGridLayout({
   required BoxConstraints constraints,
   required bool accessibleText,
+  required double textScale,
   bool savedOnly = false,
   bool denseStore = false,
 }) {
@@ -6196,7 +6205,15 @@ _resolveCompactProductGridLayout({
       : columns == 3
       ? 240.0
       : 238.0;
-  return (columns: columns, cardWidth: cardWidth, tileHeight: tileHeight);
+  // Keep the normal catalogue rhythm, but let enlarged text and actions
+  // retain their size instead of overflowing the fixed card body.
+  final enlargedTextHeight =
+      (textScale - 1.4).clamp(0.0, double.infinity) * 160;
+  return (
+    columns: columns,
+    cardWidth: cardWidth,
+    tileHeight: tileHeight + enlargedTextHeight,
+  );
 }
 
 class _HorizontalProductGrid extends StatefulWidget {
@@ -6373,7 +6390,8 @@ class _CataloguePromotionRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
+    final accessibleText = textScale > 1.25;
     final cards = switch (session.destination) {
       BuyV2Destination.shop => [
         BuyV2PromotionCard(
@@ -6440,20 +6458,36 @@ class _CataloguePromotionRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-catalogue-promotions'),
-      height: accessibleText ? 164 : 148,
+      height:
+          (accessibleText ? 164 : 148) *
+          (textScale / 1.4).clamp(1.0, double.infinity),
       child: Padding(
         key: PageStorageKey(
           'buy-catalogue-promotions-${session.destination.name}',
         ),
         padding: const EdgeInsets.fromLTRB(6, 6, 6, 6),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            for (var index = 0; index < cards.length; index++) ...[
-              if (index > 0) const SizedBox(width: 7),
-              Expanded(child: cards[index]),
-            ],
-          ],
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            if (textScale > 1.4) {
+              return ListView.separated(
+                key: const ValueKey('buy-enlarged-catalogue-promotions'),
+                scrollDirection: Axis.horizontal,
+                itemCount: cards.length,
+                separatorBuilder: (_, _) => const SizedBox(width: 7),
+                itemBuilder: (_, index) =>
+                    SizedBox(width: constraints.maxWidth, child: cards[index]),
+              );
+            }
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (var index = 0; index < cards.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 7),
+                  Expanded(child: cards[index]),
+                ],
+              ],
+            );
+          },
         ),
       ),
     );
@@ -6602,6 +6636,7 @@ class _FeaturedProductRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textScale = MediaQuery.textScalerOf(context).scale(1);
     final title = switch (session.destination) {
       BuyV2Destination.shop => 'Fresh picks',
       BuyV2Destination.wholesale => 'Trade picks',
@@ -6610,7 +6645,9 @@ class _FeaturedProductRail extends StatelessWidget {
     };
     return SizedBox(
       key: const ValueKey('buy-featured-products'),
-      height: accessibleText ? 365 : 285,
+      height:
+          (accessibleText ? 365 : 285) *
+          (textScale / 1.4).clamp(1.0, double.infinity),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

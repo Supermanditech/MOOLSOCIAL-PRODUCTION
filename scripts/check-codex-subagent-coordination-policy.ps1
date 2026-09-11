@@ -1641,6 +1641,7 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart',
           'apps/mobile/lib/features/shared/screens/shared_screens.dart',
           'apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
           'artifacts/quality/codex-oppo-r66-5-review-20260907/candidate-contract.md',
           'artifacts/quality/codex-oppo-r66-6-review-20260908/candidate-contract.md',
