@@ -56,14 +56,15 @@
         "testing",
         "work"
       ],
-      "mistake": "The r66.13 OPPO audit stopped after successful capture084 because the orchestration expected Bring customers back to remain in the XML viewport after keyboard dismissal. The correct Promote store view remained open with retained scroll, offer fields and Store shortcuts; no app navigation defect was proven. A subsequent 71-line registry inspection was output-truncated; no missing content is qualification evidence.",
+      "mistake": "The r66.13 OPPO audit stopped after successful capture084 because the orchestration expected Bring customers back to remain in the XML viewport after keyboard dismissal. The correct Promote store view remained open with retained scroll, offer fields and Store shortcuts; no app navigation defect was proven. A subsequent 71-line registry inspection was output-truncated; no missing content is qualification evidence. During r66.14 prebuild attempt1, the unchanged copy gate rejected the phrase local review in the counterBillReviewSignature source comment; no customer-visible copy violation or APK build was observed.",
       "rootCause": "The test predicate used a scrollable heading instead of stable current destination and field identity. Diagnostic output selection also included oversized unrelated historical registry entries. A later bounded source lookup included the absent apps/mobile/lib/ui_v2/chat directory; a following Get-Date masked its rg exit2. Read the discovered existing features/chat owner directly; that failed lookup is not qualification evidence.",
-      "prevention": "Before the next tap, verify the observed destination using stable in-view controls and correct Store identity, allowing expected retained scroll. Preserve084 PNG/XML/log and do not count the guard as an app failure or run its unexecuted subsequent steps. Read only bounded relevant registry entries or parsed identity/count projections.",
+      "prevention": "Before the next tap, verify the observed destination using stable in-view controls and correct Store identity, allowing expected retained scroll. Preserve084 PNG/XML/log and do not count the guard as an app failure or run its unexecuted subsequent steps. Read only bounded relevant registry entries or parsed identity/count projections. For r66.14 retain the failed prebuild log, reword only the internal bill-comparison comment without changing its meaning or executable code, refresh the source fingerprint, and rerun the unchanged copy gate. Do not weaken the gate or classify this as a customer-visible product defect.",
       "gates": [
         "scripts/check-codex-subagent-coordination-policy.ps1"
       ],
       "evidence": [
-        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md"
+        "artifacts/quality/codex-oppo-r66-13-review-20260909/ticket-and-screen-coverage.md",
+        "artifacts/quality/codex-oppo-r66-14-review-20260911/prebuild-validation.md"
       ]
     },
     {

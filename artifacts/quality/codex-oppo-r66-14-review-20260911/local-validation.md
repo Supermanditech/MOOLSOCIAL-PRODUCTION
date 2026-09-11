@@ -9,8 +9,20 @@ Source/test HEAD: 7dbb7f87f598e0a372fdef5097d2682d35d49c5c. Runtime unchanged du
 | product-copy-contract-analysis-v1.log | Full analysis: zero issues, exit 0 | 745F8775F89DA0D6DCC7997A30EEAD07C9D51B450AB198140D2C7DB8F01F72FC |
 | store-preapk-7dbb7f87-connected16-cycle1.log | 1422 passed, 81 skipped, exit 0 | B64226673B7A976D2A49117C7CACFC9403492DD277EC5E0A423B7E5615061920 |
 | store-preapk-7dbb7f87-remaining28-cycle1.log | 402 passed, 2 skipped, exit 0 | 766938A124BBA4E7AA93E8863E242BCA9359B3D8DFB19C2A1E3565A3C84C79A7 |
+| store-preapk-7dbb7f87-connected16-cycle2.log | 1422 passed, 81 skipped, exit 0 | C0DD1D416771615BB96AFED8E68D13161B910B33BE2A07B0014E299A8D7EF71A |
+| store-preapk-7dbb7f87-remaining28-cycle2.log | 402 passed, 2 skipped, exit 0 | 0FF802228A487AB1A130C7E3743712E2A4826A106F48DDEA519C001F3ECF382C |
+| store-preapk-7dbb7f87-review-isolation.log | 5 passed, exit 0 | CCB60209614E26BBCB416972504978C27160985A241D57432F0A5B56F3D4EB1C |
+| r6614-comment-counter-regression-v1.log | 214 passed, exit 0 | 954DB0FC7BDE9686C1BA3ED5E490EF30626E74565310E4416C82F3820DCDB5DB |
+| r6614-comment-analysis-v1.log | Full analysis: zero issues, exit 0 | 745F8775F89DA0D6DCC7997A30EEAD07C9D51B450AB198140D2C7DB8F01F72FC |
+| r6614-comment-copy-check-v1.log | Unchanged customer-copy gate passed, exit 0 | B638156BB33D2E2ABB62FC5DCEF7BB7F96C8E508E7597024C70B1AE8924D717F |
 
-Cycle 1: 1824 passed / 83 existing skips / zero failures. Cycle 2 and review-only isolation pending. Counts from overlapping focused suites are not summed into cycle totals. Protected-reference exclusions remain the existing boundary, not new passing evidence.
+Each complete cycle: 1824 passed / 83 existing skips / zero failures. Review-only isolation: 5 passed. Counts from overlapping focused suites are not summed into cycle totals. Protected-reference exclusions remain the existing boundary, not new passing evidence.
+
+Isolation command: `flutter test --no-pub --concurrency=1 --reporter expanded --dart-define=MOOLSOCIAL_DEVICE_REVIEW=true --dart-define=MOOLSOCIAL_UI_REVIEW_ONLY=true test/work_production_gateway_test.dart --name "r66.8 review state isolation|S07 device review defaults"`. Both flags, unique application identity, explicit submitted-case selection, unknown-case refusal and failed-submission isolation passed; no backend approval is implied.
+
+After these cycles, the unchanged copy scanner rejected an internal comment. The only later app-file change is `work_session.dart`: `// Exact local review snapshot, not a cryptographic or backend authorization.` becomes `// Exact bill comparison snapshot, not a cryptographic or backend authorization.` Complete normalized-file comparison to 8885d98a proves exactly this one replacement; all executable code and tests remain unchanged. The two full cycles therefore remain evidence for the unchanged executable code, not a claim that they ran on the new comment bytes. Fresh atomic-operation tests (214), full analysis (zero issues) and the unchanged copy check pass. Source manifest was refreshed explicitly to 962D8984C32169F3307C79BF50BB81B41DE61332C2F69E1CFC1AB253682D00E2, with all 391 inputs verified; old failed prebuild evidence is preserved.
+
+Comment-only verification commands: from apps/mobile, `flutter test --no-pub --concurrency=1 --reporter expanded test/work_store_atomic_operations_test.dart`, then `dart analyze`; from the repository root, `./scripts/check-user-facing-copy.ps1`. All exited 0. No test, gate, customer wording or executable behavior was changed to obtain these results.
 
 Each cycle runs both partitions below, from apps/mobile, using C:/Users/jisal/develop/flutter/bin/flutter.bat:
 `flutter test --no-pub --concurrency=1 --reporter expanded --exclude-tags protected-reference <exact partition files>`

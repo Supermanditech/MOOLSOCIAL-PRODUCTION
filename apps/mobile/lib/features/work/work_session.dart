@@ -594,7 +594,7 @@ class WorkSession extends ChangeNotifier {
       counterDraftCatalogueChanged ||
       (_counterRecovery != null && !_counterRecovery!.loaded);
 
-  // Exact local review snapshot, not a cryptographic or backend authorization.
+  // Exact bill comparison snapshot, not a cryptographic or backend authorization.
   String get counterBillReviewSignature {
     final catalogue = {
       for (final product in workspaceCatalogueItems) product.id: product,
