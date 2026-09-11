@@ -1,5 +1,57 @@
 # Fresh Redmi journey inventory
 
+## Latest founder stop rule — 11 September 2026
+
+Complete Redmi testing of all previously scoped tickets and their connected journeys, register and deduplicate all genuine defects, then **STOP and report the full list before any further implementation**. This supersedes the earlier automatic implement/rebuild/retest loop. No next-batch runtime changes or new APK build until fresh founder instruction. Preserve provider-dependent and unavailable cases explicitly; do not mark them passed. The current new r66.9 defect count is one, not a final count. Authority record: external redmi-r66-9-round-1/founder-stop-after-uat-directive-1.json, SHA256 868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0.
+
+
+
+## r66.9 scoped round 1 checkpoint 2 — enlarged text and original keyboard configuration
+
+**Latest instruction remains: finish all prior scoped Redmi tests, enumerate/deduplicate defects, STOP before further implementation and report.** The current result is **one confirmed new r66.9 child defect**, R669-UAT-TRACKING-FRESHNESS-SUMMARY-001. No additional defect or whole-ticket closure is asserted by this checkpoint. Forty-eight total captures now cover partial checks in nine frozen ticket areas plus the existing completion-promise child; the full round is incomplete.
+
+APK is unchanged: SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9 on Redmi TG8HCYTGGQT885OF. Source a18aa780c0e00497ef218025bc8473a32f50a084 / build HEAD7eb5d1034f1aeb45b7987db22a5521649af22a25; prior evidence-only commit479e0bb8702db25c3cfd84a72db3bdd61b48330a was pushed and clean/remote-equal before this extension.
+
+- Invoice029 at200% system text/density320 displays the complete wholesale missing-item explanation, Back and Refresh orders. Back030 returns the Delivered list; amount and historical Original promise are readable.
+- Completed MS-240741 tracking031 and Address033 retain Delivery partner details unavailable at200% text. Scroll032/034 exposes lower actions above Android navigation. Manage addresses035 reaches the saved-address list.
+- Work options036 → Edit037 retains all four type chips and existing Work selection. Recipient focus038 is a keyboard transition; settled039 visibly shows Gboard, name and caret above the keyboard. A bounded input-method read confirms shown/requested IME. No text was entered.
+- Original failing configuration was replayed at font2.0, density360, landscape:041 retains the Work editor;042/settled043 show recipient text partly clipped at the keyboard edge. Scroll044 moves it but clips its top; a small reverse adjustment045 exposes the complete name. Record this focus/scroll limitation as **still unqualified/investigation**, not another confirmed defect or proof of an unreachable field. A valid final test must address automatic reveal and remaining phone/address/PIN, validation, Cancel/Save and retention cases; this sequence alone does not close ADDRESS-KEYBOARD-001.
+- Back046 dismisses keyboard; Back047 cancels the untouched editor. Restored portrait048 shows the original visible Home/Work values and selected Work. No address removal, typed edit, Save, purchase, payment or message occurred.
+- Address-type density has only partial enlarged-text observation; all four type selections and their complete add/edit journeys remain pending. Invoice confirmation/historical provider retrieval and named delivery-partner data remain unqualified.
+
+Display preservation: pre-check readback under redmi-r66-9-round-1/display-before-enlarged-check-1.json SHA256 D5DB7240234CE92FA1831D1E18C4E2B878FD773AC47DF68AE8D03C60B78768E1. Eight bounded display writes enlarged/restored font/density/rotation; original settings are verified restored in display-restored-after-enlarged-check-1.json SHA256 870C5505258393918A7332F14BF7B7873E6239F9590F0B258E3E370B563861CF: font1.0, physical density320 with no override, physical720x1600, auto-rotation1 and user-rotation0. The display reset command removed only the temporary density override; no app data was cleared.
+
+Current complete progress snapshot: external redmi-r66-9-round-1/round-progress-checkpoint-2.json SHA256 C5F9FA26D6C634DF81A366B9F7FFE6D6120A82BC96A9664B6E9DFEFD7A8F57BE. It inherits the immutable checkpoint1, verifies all20 new captures/terminal receipts and binds the latest founder stop directive SHA256868ED1E467216078C3828AC168790CF8A90640C6C93AD37BC1ACAC8EEE110EB0. Full round planning remains42 frozen entries,2 existing children and the separate Buy procurement dependency; historical closed tickets excluded. Keep/selection preferences noted in checkpoint1 still require round cleanup.
+
+Last observed state048: Choose delivery address over completed MS-240741 tracking, Work selected. Continue the existing round from this state. No new implementation or rebuild is authorized by completing enumeration; report and wait for fresh founder instruction.
+
+### Additional capture manifest
+
+Raw evidence remains under external redmi-r66-9/. All captures029–039,041–045 and048 were individually viewed;040/046/047 record dismissal/return actions without an independent PNG review claim. Capture038 is transitional and is superseded only for settled keyboard visibility by039. UI hierarchy equality alone did not establish text fit for042–045; those PNGs were inspected separately.
+
+| Capture label | PNG SHA256 | XML SHA256 |
+|---|---|---|
+| 029-wholesale-invoice-doubled-text | 2F57D3F45B7FBAD14EC4A236A9415BB39A31B1BD67F3EA48100FEBA5C9602DFA | 4CC45C7C19AF059C2B63EA7C2BB9A706515963EA8FC0B0714F0C645BFE945EDC |
+| 030-doubled-invoice-back-delivered | 70B7A10462A9E5755C3D139F6FF866D265C2241783A7FE308A97F9677594540A | E08B162538B534ACBD06BFD1ED60C9271E150EAA94FE6DE067414C716D0C24DE |
+| 031-delivered-tracking-doubled-text | 21C4709F6E0F7179ED00E6DC1084026753995A310CF72F9FD9D03E50B1291C33 | 873D1ED21D6518B840669C02628C1F4719899DC06BC6BD248DB59066640DEF88 |
+| 032-doubled-tracking-scroll-actions | 3F5219E759808A811F80B8E34308B84748D59C31F7701A8184B995C39C9AA5C8 | 2DC12F200CAA7CF26D43DED63E2810554C3F5665F26FEAC9745CCD5CED517A92 |
+| 033-delivered-address-doubled-text | 8117F9B98E4871E640788E12BC22B5C4186165976AAA9E879754EE8DAE578042 | 79FFCFBE5A529847E00B9008285B95D9D706898BD5D55917B14E016D7A61FBF5 |
+| 034-doubled-address-lower-actions | B5B96145DAC3BC0B15BCC10DC343EA0B1CABED9752568C1C95356CB1C994FD04 | AD2206922E9F46E00DCC71E4DE08F8B78D0FD40DD4BB3028BA24400075DD5442 |
+| 035-doubled-address-manage-destination | 7FACEF34B7764323AD2E325091C5D18990111E8AB6D3343A868FF1FED84F6BFC | 45B055DCA0C6195362E6EC6B37ECEDA435B83D00FB22FD9C3FF2E0CDC225B141 |
+| 036-work-address-options-doubled | 5B9D17634E8C8F28723C6F2A59EBA87CD9D946B6C8C4666DD676F8BC8D632BE0 | 53AA603073B83A8448F4CE636118C85F7578B8D2F81D7843128DCE93479A6633 |
+| 037-work-editor-doubled-text | 6C6065CDCED490F6ED4E138FAA9164E64ECDE1706AC5EDBF2DE4670F9FC49C0B | 81AA9353232EF1CE3DE74F3E0321A84C3FE7513BB13B7898A0DF4A0B7CCCAF22 |
+| 038-work-recipient-keyboard-doubled | A8CEB70E210FB909CACC320758B172BFFBB359B0CBF02D30D110DB0629C85C19 | CAE7D8DAF6B3B20303D7EDBE27777C45E0C0A5B8479FDCAA14E0C46DCFEE29DA |
+| 039-work-recipient-focus-settled | FD6CFA9B14B36A4FEBEF2429F2D991E26C5FEB5B75F9175ED634EBEDA429AD28 | CAE7D8DAF6B3B20303D7EDBE27777C45E0C0A5B8479FDCAA14E0C46DCFEE29DA |
+| 040-work-keyboard-dismiss-before-landscape | CD356389B7EADCC08E2BFCD87AAFD3B6B61456CE5B7748B37AC15ADB1A0EC8AA | 32FF773BC5F3174F432A5DF202FDD75D3691C2A53E9B5E36269DBF8D8A95C0A8 |
+| 041-work-editor-original-landscape | C686EA2F326CC4DE32B2576720AFC4A00F79167DA531EDF7F879C14CFF069B3C | 30DA5A94157DB20DA559BD5A03E79AA2C18A19B5026D27F4614564A741746209 |
+| 042-work-landscape-recipient-keyboard | 3417AAA7CAC28C7B1CB342F9A3B3614C82ABA817C6ADB30D5B8BB6A5AE681299 | BD9AF6C4082E134CCAD7E082AEE462F23E1A3C54548CFA327B5A4A45C19537FE |
+| 043-work-landscape-focus-settled | 235E4DD5330DD00C5FC3FD6E1F5705E3AB447EC8BEACD803DC016B34F1307AB4 | BD9AF6C4082E134CCAD7E082AEE462F23E1A3C54548CFA327B5A4A45C19537FE |
+| 044-landscape-recipient-scroll-recovery | 78382F167996F639F2A4F57EFD6A3908FE78A70F3A574666F882AA712F2DCB86 | BD9AF6C4082E134CCAD7E082AEE462F23E1A3C54548CFA327B5A4A45C19537FE |
+| 045-landscape-recipient-fine-scroll | 9338F53A0ED2EF8D2CCD118577F729DC003E76E72BC2891C3EF2FFD5DDA1D22B | BD9AF6C4082E134CCAD7E082AEE462F23E1A3C54548CFA327B5A4A45C19537FE |
+| 046-landscape-dismiss-keyboard-unchanged | 3F1473BC9CDD1D90EA1B6FE129279B83B584CBEB7C3618A0DC530D0E4D9F9864 | EC93069AEBFE82E56EF551FEF8E4159C34C77584BA3D30776CD66D26B52B751B |
+| 047-cancel-work-editor-no-save | 27CF11F028E32CFF9114EF3A1173AC990E7FFA3B05051C7060DCBEFF8DB1D365 | BB6B9697B75BF047FDEF8FD1A18DE79C04F6886C247F179B21B0C6F0AC6758E5 |
+| 048-display-restored-address-preserved | 3C19906B30385BC4377C7499AA75E57439D40EC9A93345C37706EE4189DB3133 | D223A4D420B43C631D8FAA8B02FE56F3750DCE76C64CE1A9C5540E0768F997E3 |
+
 ## r66.9 built, installed and scoped Redmi round 1 checkpoint 1 — 11 September 2026
 
 This is the latest checkpoint and supersedes older pending-build/implementation notes below for current status only. Frozen scope remains **33 findings + 9 founder requests**, the separate STORE-PROCUREMENT-ELIGIBILITY-01 Buy dependency and two existing implementation children. **One new UAT child is registered; zero tickets are closed.** Host/source qualification is complete for this APK; the planned device round and provider-dependent qualification remain incomplete.
