@@ -76,6 +76,21 @@ class _OrderCommandFixtureGateway implements WorkOrderCommandGateway {
   }
 }
 
+class _DeliveryBookingFixtureGateway extends ReviewWorkGateway {
+  final requests = <({String store, String order, String address})>[];
+  final response = Completer<WorkDeliveryAssignmentResult>();
+  @override
+  Future<WorkDeliveryAssignmentResult> requestDeliveryAssignment({
+    required String workspaceId,
+    required String orderId,
+    required String address,
+    required String idempotencyKey,
+  }) {
+    requests.add((store: workspaceId, order: orderId, address: address));
+    return response.future;
+  }
+}
+
 class _ScopedTimingFixtureGateway extends _OrderCommandFixtureGateway
     implements WorkOrderTimeCommandGateway {
   @override
@@ -18719,6 +18734,145 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+
+    for (final scoped in [true, false]) {
+      testWidgets(
+        'R6617 ready does not claim delivery requested $scoped $scale',
+        (tester) async {
+          final gateway = _DeliveryBookingFixtureGateway();
+          final work = storeViewFixture(gateway, _ContactDraftFixtureStore());
+          final ready = work.currentWorkspaceOrder!.copyWith(
+            stage: 'Ready',
+            needsDelivery: true,
+            fulfilment: 'Mool delivery',
+            address: '12 Market Road, Test Area',
+          );
+          work.workspaceOrders[0] = ready;
+          work.workspaceOrderStage = 'Ready';
+          work.workspaceOrderNeedsDelivery = true;
+          work.workspaceOrderFulfilment = ready.fulfilment;
+          work.workspaceOrderAddress = ready.address;
+          if (scoped) {
+            final operations = WorkOrderOperations(
+              accountScope: 'review-draft-account',
+              workspaceId: work.activeWorkspace!.id,
+              gateway: _OrderCommandFixtureGateway(),
+            );
+            expect(
+              operations.observe(
+                WorkOrderReply(
+                  accountScope: operations.accountScope,
+                  workspaceId: operations.workspaceId,
+                  orderId: ready.id,
+                  operationId: '',
+                  revision: 1,
+                  state: WorkOrderReplyState.applied,
+                  order: ready,
+                ),
+              ),
+              isTrue,
+            );
+            expect(work.bindWorkspaceOrderOperations(operations), isTrue);
+          }
+          final balances = (
+            work.workspaceSalesToday,
+            work.workspaceSettlementBalance,
+          );
+          await mount(
+            tester,
+            route: '/app/work/workspace/dashboard',
+            work: work,
+            viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+            textScale: scale,
+          );
+          expect(find.text('Order ready'), findsOneWidget);
+          expect(find.text('Awaiting a delivery partner'), findsNothing);
+          expect(
+            find.byKey(const Key('work-delivery-proof-pending')),
+            findsNothing,
+          );
+          final button = find.byKey(const Key('work-delivery-arrange'));
+          await reveal(tester, button);
+          expect(button.hitTestable(), findsOneWidget);
+          expect(tester.getSize(button).height, greaterThanOrEqualTo(48));
+          expect(tester.getSize(button).width, greaterThanOrEqualTo(48));
+          final paragraph = tester.renderObject<RenderParagraph>(
+            find.descendant(
+              of: button,
+              matching: find.text('Arrange delivery'),
+            ),
+          );
+          expect(paragraph.textScaler.scale(1), closeTo(scale, .01));
+          expect((paragraph.text as TextSpan).style!.fontFamily, 'Inter');
+          for (final range in const [(0, 7), (8, 16)]) {
+            expect(
+              paragraph.getBoxesForSelection(
+                TextSelection(baseOffset: range.$1, extentOffset: range.$2),
+              ),
+              hasLength(1),
+              reason: 'Action words must not fragment across lines',
+            );
+          }
+          final action = tester.widget<FilledButton>(button).onPressed;
+          expect(gateway.requests, isEmpty);
+          expect(work.workspaceDeliveryAssignment, isNull);
+          expect(work.workspaceOrderStage, 'Ready');
+          await captureStoreView(
+            tester,
+            'ready-before-delivery-$scoped-$scale',
+          );
+          if (scoped) {
+            expect(action, isNull);
+            await reveal(
+              tester,
+              find.byKey(const Key('work-delivery-booking-unavailable')),
+            );
+            expect(
+              find
+                  .byKey(const Key('work-delivery-booking-unavailable'))
+                  .hitTestable(),
+              findsOneWidget,
+            );
+            expect(work.currentWorkspaceOrder!.stage, 'Ready');
+            expect(gateway.requests, isEmpty);
+          } else {
+            expect(action, isNotNull);
+            await tester.tap(button);
+            await tester.pump(const Duration(milliseconds: 400));
+            action!(); // A delayed duplicate tap cannot book this order twice.
+            expect(gateway.requests, hasLength(1));
+            expect(gateway.requests.single, (
+              store: work.activeWorkspace!.id,
+              order: ready.id,
+              address: ready.address,
+            ));
+            expect(work.workspaceOrderStage, 'Delivery requested');
+            expect(
+              find.byKey(const Key('work-delivery-arrange')),
+              findsNothing,
+            );
+            gateway.response.complete(
+              WorkDeliveryAssignmentResult(
+                partnerName: 'Test rider',
+                vehicleLabel: 'Bike',
+                eta: DateTime.now().add(const Duration(minutes: 5)),
+                stage: 'Assigned',
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(work.workspaceDeliveryAssignment!.orderId, ready.id);
+            expect(find.text('Rider · Test rider'), findsOneWidget);
+            expect(work.workspaceInvoices, isEmpty);
+          }
+          expect((
+            work.workspaceSalesToday,
+            work.workspaceSettlementBalance,
+          ), balances);
+          expect(work.currentWorkspaceOrderId, ready.id);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
 
     for (final snapshotComplete in [true, false]) {
       testWidgets(

@@ -6401,6 +6401,11 @@ class _DeliveryActivityCard extends StatelessWidget {
       'Delivery failed' => WorkspaceDeliveryStage.failed,
       _ => assignment?.deliveryStage,
     };
+    final needsDeliveryRequest =
+        renderedStage == 'Ready' &&
+        session.workspaceOrderNeedsDelivery &&
+        assignment == null;
+    final bookingUnavailable = session.hasScopedWorkspaceOrder(orderId);
     final phone = workspaceCustomerMobile(customer);
     final canConfirmOwnDelivery =
         session.workspaceOrderFulfilment == 'Own delivery' &&
@@ -6443,16 +6448,69 @@ class _DeliveryActivityCard extends StatelessWidget {
                 Text(
                   assignment != null
                       ? 'Rider · ${assignment.partnerName}'
+                      : needsDeliveryRequest
+                      ? 'Order ready'
                       : (deliveryStage == WorkspaceDeliveryStage.cancelled ||
                                 deliveryStage == WorkspaceDeliveryStage.failed
                             ? deliveryStage!.label
                             : 'Awaiting a delivery partner'),
+                  key: const Key('work-delivery-status'),
                   style: const TextStyle(
                     color: MoolColors.ink,
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                if (needsDeliveryRequest) ...[
+                  const SizedBox(height: 8),
+                  FilledButton.icon(
+                    key: const Key('work-delivery-arrange'),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(48, 48),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 10,
+                      ),
+                      textStyle: const TextStyle(
+                        fontFamily: 'Inter',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    onPressed:
+                        bookingUnavailable ||
+                            session.busy ||
+                            session.workspaceOperationsSyncing ||
+                            session.workspaceHandoverBusy
+                        ? null
+                        : () {
+                            if (sameOrder() &&
+                                session.workspaceOrderStage == 'Ready' &&
+                                session.workspaceOrderNeedsDelivery &&
+                                session.workspaceDeliveryAssignment == null &&
+                                !session.hasScopedWorkspaceOrder(orderId) &&
+                                !session.busy &&
+                                !session.workspaceOperationsSyncing &&
+                                !session.workspaceHandoverBusy) {
+                              _advanceDeskOrder(
+                                session,
+                                expectedOrderId: orderId,
+                              );
+                            }
+                          },
+                    icon: const Icon(Icons.delivery_dining_outlined, size: 18),
+                    label: const Text(
+                      'Arrange delivery',
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                  if (bookingUnavailable)
+                    const Text(
+                      'Delivery booking is not available for this order yet.',
+                      key: Key('work-delivery-booking-unavailable'),
+                      style: TextStyle(color: MoolColors.muted, fontSize: 12),
+                    ),
+                ],
                 if (assignment != null) ...[
                   Text(
                     '${assignment.vehicleLabel} · ${deliveryStage!.label}',
@@ -6694,7 +6752,7 @@ class _DeliveryActivityCard extends StatelessWidget {
                   icon: const Icon(Icons.password_rounded, size: 18),
                   label: const Text('Confirm customer delivery'),
                 )
-              else
+              else if (!needsDeliveryRequest)
                 Text(
                   switch (deliveryStage) {
                     WorkspaceDeliveryStage.cancelled ||
