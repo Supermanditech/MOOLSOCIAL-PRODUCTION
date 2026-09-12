@@ -147,8 +147,25 @@ void main() {
     (tester) async {
       await mountRoute(tester, '/app/buy/product/missing-product');
 
-      expect(find.text('This product could not be found.'), findsOneWidget);
+      expect(find.byKey(const Key('buy-linked-product-recovery')), findsOneWidget);
+      expect(find.text('Product unavailable'), findsOneWidget);
+      expect(
+        find.text(
+          'This product could not be opened. Try again or return to shopping.',
+        ),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('buy-product-detail')), findsNothing);
+      await tester.tap(find.byKey(const Key('buy-catalogue-retry')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('buy-linked-product-recovery')), findsOneWidget);
+      expect(find.byKey(const Key('buy-product-detail')), findsNothing);
+      await tester.tap(find.byKey(const Key('buy-procurement-return')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('buy-linked-product-recovery')), findsNothing);
+      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+      expect(find.byKey(const Key('buy-product-detail')), findsNothing);
+      expect(tester.takeException(), isNull);
 
       await mountRoute(tester, '/app/buy/order/missing-order');
 

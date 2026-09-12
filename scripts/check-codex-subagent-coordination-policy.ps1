@@ -1834,6 +1834,10 @@ if ($ProductionLane -ceq 'baseline') {
           'scripts/check-buy-data-egress-boundary.ps1',
           'scripts/check-brand-integrity.ps1',
           'scripts/check-windows-powershell-compatibility.ps1',
+          'scripts/build-buy-device-review.ps1',
+          'scripts/test-public-auth-sideload-build-controls.ps1',
+          'apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart',
           'config/codex-development-regression-registry.json',
           'config/codex-subagent-coordination-policy.json',
           'scripts/check-codex-subagent-coordination-policy.ps1'

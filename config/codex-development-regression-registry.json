@@ -10,6 +10,27 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4611-INTEGRATED-BUY-TEST-CONTRACTS",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "integration", "testing", "release"],
+      "mistake": "The completed 44-file pre-APK cycle reports three failures: an obsolete missing-product notice and two Cart summaries omitting the current Subtotal label.",
+      "rootCause": "Historical router and pack-count tests predate the admitted linked-product recovery surface and explicit subtotal copy. Source inspection retains exact identity recovery and product/pack/item/amount calculations.",
+      "prevention": "Update only the two exact test owners; assert current unavailable recovery, Retry and return without substitution, and exact subtotal/product/pack/item facts. Retain original failed evidence, replay both full test files and connected regressions; do not change product source to restore obsolete copy.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
+      "id": "REG-20260912-4610-BUILD-ARCHIVED-EVIDENCE-LOOKUP",
+      "ownershipIncident": "Initial 24-owner check rejected the two build-call-chain owners absent from the recorded primary claim. Neither build script was edited or executed after rejection. Bind the exact two owners before retry; keep every other owner boundary unchanged.",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "build", "release", "integration"],
+      "mistake": "Default build-memory probe rejects REG3955 evidence moved by the founder-authorized cleanup; the same gate passes with its existing EvidenceArchiveRoot argument.",
+      "rootCause": "The device-review build wrapper and its foundation caller do not forward the existing archive lookup parameter to the memory gate.",
+      "prevention": "Forward only the optional existing archive argument through the build call chain. Preserve validation of archive location and metadata, all evidence requirements and default behavior; do not delete records, fabricate artifacts or bypass the gate. Verify default forwarding and explicit archive propagation before building.",
+      "gates": ["scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
       "id": "REG-20260912-4609-COMBINED-REVIEW-RELEASE-BOUNDARY",
       "status": "registered_correction_in_progress",
       "appliesTo": ["primary", "integration", "testing", "release"],

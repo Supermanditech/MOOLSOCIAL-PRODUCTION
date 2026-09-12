@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4580,
-    "sha256": "EF8FBCB88F6AC7728FC27C5956FF1D2C3E794CAFC59CF737A7734C835FC51F17"
+    "entryCount": 4582,
+    "sha256": "FBEAD161E23BF66DD0968FA743F035C191A33A1323CE0D8ED54137E4A5951CB5"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -35,6 +35,10 @@
       "role": "primary",
       "owners": [
         "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md",
+        "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
+        "scripts/build-buy-device-review.ps1",
+        "scripts/test-public-auth-sideload-build-controls.ps1",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_video_test.dart",

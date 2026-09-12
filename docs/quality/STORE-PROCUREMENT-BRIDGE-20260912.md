@@ -358,3 +358,42 @@ to integrated when the integrated argument is used; behavior is unchanged.
 Native and coordination destination pins now name only fresh v4. Recheck those
 final mechanical edits before sealing. No application source change, APK,
 installation, live backend action or original-branch mutation occurred.
+
+## Independent review and pre-APK contract correction — REG4610/REG4611
+
+Founder requested independent original/modified checker assessment, not implicit
+release approval. The external `store-buy-v4-checker-independent-review-20260912.md`
+under `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905` records all 18
+backend, six egress and one brand findings, exact locations, exclusion behavior
+and remaining impacts. Original a21ff6f4 checks failed 18/6/1 on the same V4
+application; 0d8cbbaa and f6cb6eda integrated-review invocations passed. Only
+PSScriptRoot was rebound in memory for the diagnostic replay, no conditions.
+Source identity proves provenance, not safety. Real persistence/sharing/clipboard
+operations remain distinct from false-positive scanner labels. Live payment,
+address-request authority, privacy retention and backend enforcement are not
+qualified by review fixtures. No release-promotion claim is made.
+
+V4 pre-APK cycle 1 completed with 2471 passed, 83 skipped, three failed; cycle 2
+and analysis were not run by that fail-fast batch. Preserve its original log.
+The three failures were obsolete assertions in two historical Buy tests:
+linked products now retain their exact unavailable recovery with Retry/return,
+and Cart explicitly labels the monetary amount Subtotal. Only those two test
+owners were added to the existing correction boundary; product code unchanged.
+The corrected router test asserts Retry and return without substituted product;
+the count tests retain exact product/pack/item quantities and monetary values.
+Both full files passed 15/15, session3793, external
+`store-buy-reg4611-focused-v1.log`. Session66615 completed exit 0: both full
+44-file cycles passed 2474 tests, skipped 83 and failed zero, followed by full
+Flutter analysis with zero issues (75.1 seconds). Logs are
+`store-buy-reg4611-preapk-44-cycle1.log`, `store-buy-reg4611-preapk-44-cycle2.log`
+and `store-buy-reg4611-analysis.log` in the same external evidence directory.
+Skips are the previously documented 79 plus two explicitly tagged protected
+reference comparisons and two opt-in Work captures. These are not passes or
+device evidence. Runtime lib/backend/contracts remain unchanged from 0d8cbbaa.
+
+REG4610 forwards the already-existing optional EvidenceArchiveRoot through the
+two build callers, preserving defaults and every validation. AST inspection
+confirmed both optional parameters and exact unmodified forwarding; both scripts
+parse, and git diff --check passes. The real regression-memory gate passes with
+the validated archive (4582 records, implementation phase). No evidence deletion,
+fabrication, new exception mechanism, APK build or device action occurred.

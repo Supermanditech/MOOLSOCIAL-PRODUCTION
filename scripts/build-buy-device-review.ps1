@@ -29,6 +29,7 @@ param(
   [string]$MachineStatePath,
 
   [string]$RuntimeStatePath,
+  [string]$EvidenceArchiveRoot,
 
   [ValidateSet(
     'EmulatorDeviceReview',
@@ -127,6 +128,7 @@ $successorBuildFoundationGate = Join-Path `
 & $successorBuildFoundationGate `
   -RepositoryRoot $repositoryRoot `
   -CandidateId $CandidateId `
+  -EvidenceArchiveRoot $EvidenceArchiveRoot `
   -PreApkStatePath $machineStateFile | Out-Null
 $successorBuildFoundationPassed = $?
 if (-not $successorBuildFoundationPassed) {

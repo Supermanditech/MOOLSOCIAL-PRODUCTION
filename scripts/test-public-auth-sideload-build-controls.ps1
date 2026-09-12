@@ -2,6 +2,7 @@
 param(
   [string]$RepositoryRoot,
   [string]$PreApkStatePath,
+  [string]$EvidenceArchiveRoot,
   [string]$CandidateId = 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'
 )
 
@@ -31,7 +32,8 @@ $coordinationGate = Join-Path `
 & $regressionMemoryGate `
   -Phase build `
   -BuildMode release `
-  -RepositoryRoot $RepositoryRoot | Out-Null
+  -RepositoryRoot $RepositoryRoot `
+  -EvidenceArchiveRoot $EvidenceArchiveRoot | Out-Null
 $regressionMemoryPassed = $?
 Assert-SideloadControl $regressionMemoryPassed `
   'mandatory successor regression-memory gate failed.'
