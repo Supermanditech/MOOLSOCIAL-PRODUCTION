@@ -6,6 +6,16 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## r66.9 round 1 checkpoint25 - Wholesale filters, Help closure and delivery return child
+
+**12 original entries closed,30 open;12 open UAT children.** Original open breakdown14 partial,15 failed connected replay,1 supplier-media case not exercised. HELP-CONTEXT-001 is closed against its original shopping-help destination and connected Settings/order return acceptance using933-957, including200% text. Closure evidence help-context-redmi-closure-1.json SHA256 1468288378882AE38078EAA972D23FB63E40893B60A29F355E14A5029F867449; no live support or authenticated-service acceptance implied.
+
+Wholesale967-976: Stationery & office selection produces relevant catalogue entries; Brand truthfully reports supplier details unavailable. Available-to-order toggle enables Clear; Clear resets it and Apply preserves the selected category. Best prices restores the original catalogue. This completes the available category/filter branch; genuine supplier-brand data remains unavailable.
+
+Bulk977-982 finds new P2 R669-UAT-DELIVERY-TRACKING-RETURN-CONTEXT-001: quiet-control selection of PO-NEW-01 opens correct tracking, but Android Back routes to Orders instead of originating Bulk shopping. Registered before further input. This differs from the existing Orders-origin scroll-loss child. Original selected MS-240782 restored986, unkept/muted, hidden987; Quick Shop/Saved1/emptycart restored988. No real order, payment, review or message submitted.
+
+Immutable external checkpoint redmi-r66-9-round-1/round-progress-checkpoint-25.json SHA256 99492F69A94AE6468DE23484491D56F02DE72AF3D2403954E92C34872F3DB0AA binds22 fresh captures, terminal receipts, closure and child evidence to the unchanged r66.9 APK. Remaining-case reconciliation is enumerated there. Round and full deduplicated list remain incomplete; no implementation or APK. Broad read-only UAT search output was recovered with bounded ticket/range reads; no device action repeated.
+
 ## r66.9 round 1 checkpoint24 - Settings Help and Recently viewed cart
 
 Counts remain **11 original entries closed, 31 open; 11 open UAT child defects** (15 partial, 15 failed connected replay, 1 supplier-media case not exercised). Frozen scope remains 33 findings + 9 requests plus the required Buy procurement dependency. No implementation or new APK.
