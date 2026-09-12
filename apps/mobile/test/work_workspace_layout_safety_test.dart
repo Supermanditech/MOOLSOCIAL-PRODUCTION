@@ -16513,7 +16513,7 @@ void main() {
       expect(emptyScroll, findsOneWidget);
       final clearSearch = find.descendant(
         of: emptyScroll,
-        matching: find.widgetWithText(TextButton, 'Clear search'),
+        matching: find.widgetWithText(TextButton, 'Clear search and filters'),
       );
       await tester.ensureVisible(clearSearch);
       await tester.pumpAndSettle();
@@ -16561,16 +16561,7 @@ void main() {
           ),
         ]) {
           final promotion = find.byKey(ValueKey(key));
-          await tester.scrollUntilVisible(
-            promotion,
-            180,
-            scrollable: find.descendant(
-              of: find.byKey(
-                const ValueKey('buy-enlarged-catalogue-promotions'),
-              ),
-              matching: find.byType(Scrollable),
-            ),
-          );
+          await tester.ensureVisible(promotion);
           await tester.pumpAndSettle();
           for (final copy in [title, detail]) {
             final label = find.descendant(

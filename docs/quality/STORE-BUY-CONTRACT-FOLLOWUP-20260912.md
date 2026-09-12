@@ -16,3 +16,24 @@ Run DASH10 normal/200%, focused video and connected recovery tests, full analysi
 Commit/push clean and verify remote equality. This child is not final integration
 admission and does not qualify backend or OPPO. Existing further Store–Buy wiring
 dependencies remain separate; no APK here.
+
+Attempt 1: corrected search-label expectation passes DASH10 at 1.0. At 2.0 the
+test proceeds to line 16564 and fails because it requests a Scrollable under the
+retired buy-enlarged-catalogue-promotions rail. The merged catalogue uses a vertical
+layout. This is a newly reached stale test topology, not proof of a runtime defect.
+Retain all promotion copy/clipping/hit-test and cart assertions when updating the
+interaction. No completed 200% qualification is claimed.
+
+Qualified rerun after complete seven-owner gate: DASH10 2 passed (normal/200%),
+video/search-recovery/promotion connected batch 30 passed, full analysis zero issues.
+Separate actual Flutter capture run also passes 2/2 and creates 14 new PNGs under
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-buy-contract-followup-20260912-visual-v1/.
+Reviewed recovery-200%, promotion-restock-200% and cleared-catalogue-normal captures:
+recovery action and promotion text fit; all original reachability/clipping/cart/Back
+assertions retained. Existing consumer promotion within Restock remains a separate
+Store procurement wiring dependency, not closed by this test-contract child.
+
+REG-20260912-4604 records the stale contracts and the excluded test run launched
+after incomplete-claim rejection. That earlier 2/2 is not counted. Wrong-ticket and
+extra-source-owner negative checks reject. No general owner or gate relaxation.
+Mechanical registry/hash/checker owners support this exact ticket only.

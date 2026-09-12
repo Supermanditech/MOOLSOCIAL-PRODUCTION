@@ -1802,7 +1802,10 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/test/work_workspace_layout_safety_test.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart',
           'apps/mobile/test/ui_v2/buy/buy_v2_product_video_test.dart',
-          'docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md'
+          'docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md',
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1'
         )
       )
       if ($hasContinuationBinding -and

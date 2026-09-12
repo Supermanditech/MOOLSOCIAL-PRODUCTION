@@ -10,6 +10,28 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4604-STORE-BUY-MERGED-RECOVERY-TEST-CONTRACT",
+      "attemptControlIncident": "A composed tool sequence continued into a test after the gate rejected a claim list missing the mechanically changed registry. That run finished 2/2 but is excluded from qualification. Correct the complete seven-owner invocation and require a successful gate result before launching the fresh run; do not chain unguarded follow-up actions after a possibly failing gate.",
+      "status": "registered_correction_in_progress",
+      "appliesTo": [
+        "primary",
+        "work",
+        "buy",
+        "testing",
+        "integration"
+      ],
+      "mistake": "DASH10 failed on the combined source because its exact Clear search finder and horizontal enlarged-promotion Scrollable no longer match the approved merged catalogue. Initial label correction passes normal text but exposes the obsolete promotion topology at 200%.",
+      "rootCause": "Independent source/test histories preserved old Store test assumptions while Buy changed recovery copy and accessible vertical promotion layout. Two video imports also became redundant through the merged models export.",
+      "prevention": "Keep combined-query recovery wording exact, reveal the actual promotion through its existing ancestor viewport, and preserve all clipping, tap-size, cart avoidance, quantity and Back assertions. Require both text scales and full analysis before qualification. No product change or weakened assertion to hide the mismatch.",
+      "gates": [
+        "apps/mobile/test/work_workspace_layout_safety_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_video_test.dart"
+      ],
+      "evidence": [
+        "docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md"
+      ]
+    },
+    {
       "id": "REG-20260909-4560-CHAT-FIRST-TAP-INLINE-SEARCH-PRESENTATION",
       "status": "registered_native_shared_first_tap_followup_pending",
       "appliesTo": [
