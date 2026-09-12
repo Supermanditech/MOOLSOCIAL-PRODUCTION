@@ -19915,7 +19915,8 @@ class _WorkspacePaidWorkSurface extends StatefulWidget {
       _WorkspacePaidWorkSurfaceState();
 }
 
-class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
+class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface>
+    with WidgetsBindingObserver {
   final _errorKey = GlobalKey();
   final _title = TextEditingController();
   final _outcome = TextEditingController();
@@ -19928,10 +19929,12 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
   DateTime? _deadline;
   bool _reviewing = false;
   String? _error;
+  bool _revealPending = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     final draft = widget.draft;
     _service = draft['service'];
     _title.text = draft['title'] ?? '';
@@ -19972,10 +19975,29 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final controller in [_title, _outcome, _terms, _budget, _location]) {
       controller.dispose();
     }
     super.dispose();
+  }
+
+  @override
+  void didChangeMetrics() {
+    if (_revealPending) _revealErrorAfterLayout();
+  }
+
+  void _revealErrorAfterLayout() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_revealPending || _reviewing || _error == null) return;
+      // A keyboard dismissal can resize the form over several native frames.
+      // Reveal against the final viewport, not the outgoing compact layout.
+      if (View.of(context).viewInsets.bottom > 0) return;
+      final target = _errorKey.currentContext;
+      if (target == null) return;
+      _revealPending = false;
+      unawaited(Scrollable.ensureVisible(target, alignment: .5));
+    });
   }
 
   Future<void> _pickDeadline() async {
@@ -20013,17 +20035,10 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
     setState(() {
       _error = error;
       _reviewing = error == null;
+      _revealPending = error != null;
     });
     FocusManager.instance.primaryFocus?.unfocus();
-    if (error != null) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted || _reviewing || _error != error) return;
-        final target = _errorKey.currentContext;
-        if (target != null) {
-          unawaited(Scrollable.ensureVisible(target, alignment: .5));
-        }
-      });
-    }
+    if (error != null) _revealErrorAfterLayout();
   }
 
   @override
@@ -20049,6 +20064,7 @@ class _WorkspacePaidWorkSurfaceState extends State<_WorkspacePaidWorkSurface> {
     setState(() {
       _service = selected;
       _error = null;
+      _revealPending = false;
     });
     _retainDraft();
   }

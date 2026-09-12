@@ -17117,6 +17117,56 @@ void main() {
       },
     );
 
+    testWidgets('R6618 requirement first tap after keyboard animation $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(360, 806),
+        textScale: scale,
+      );
+      await reveal(tester, find.byKey(const Key('work-quick-requirement')));
+      await tester.tap(find.byKey(const Key('work-quick-requirement')));
+      await tester.pumpAndSettle();
+      final service = find.byKey(const Key('work-requirement-category-0'));
+      await tester.ensureVisible(service);
+      await tester.tap(service);
+      await tester.pumpAndSettle();
+      final title = find.byKey(const Key('work-requirement-title'));
+      await tester.enterText(title, 'Source store stock');
+      await tester.showKeyboard(title);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.pumpAndSettle();
+      final review = find.byKey(const Key('work-requirement-review'));
+      await tester.ensureVisible(review);
+      await tester.pumpAndSettle();
+      await tester.tap(review, warnIfMissed: true);
+      await tester.pump();
+      expect(tester.testTextInput.isVisible, isFalse);
+      // Android keyboard metrics arrive after the first post-frame callback.
+      // Do not scroll to the error or tap Review again on the test's behalf.
+      for (final inset in [280.0, 220.0, 140.0, 60.0, 0.0]) {
+        tester.view.viewInsets = FakeViewPadding(bottom: inset);
+        await tester.pump(const Duration(milliseconds: 60));
+      }
+      await tester.pumpAndSettle();
+      final error = find.byKey(const Key('work-requirement-error'));
+      expect(find.text('Describe the result you expect.'), findsOneWidget);
+      expect(error.hitTestable(), findsOneWidget);
+      final errorRect = tester.getRect(error);
+      final formRect = tester.getRect(
+        find.byKey(const Key('work-requirement-details')),
+      );
+      expect(errorRect.top, greaterThanOrEqualTo(formRect.top));
+      expect(errorRect.bottom, lessThanOrEqualTo(formRect.bottom));
+      expect(work.workspacePaidRequirementReference, isNull);
+      expect(tester.takeException(), isNull);
+      await captureStoreView(tester, 'requirement-keyboard-transition-$scale');
+    });
+
     for (final keyboardOpen in [false, true]) {
       testWidgets(
         'R6617 requirement reveals validation $scale keyboard $keyboardOpen',

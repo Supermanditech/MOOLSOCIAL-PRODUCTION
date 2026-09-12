@@ -1,5 +1,30 @@
 # r66.17 device qualification inventory
 
+## Authorized follow-up implementation checkpoint — child04, not installed
+
+### Observation classification — no additional source fix justified
+
+- Track-button non-response: replayed on installed r66.17, OPPO2b3e0f71, using the exact visible manufacturer Track button. External r6618-observation-replay-20260912/004-track-button-result.png (SHA25628662B107C17276832035F804208C1CD4F81BA8CD6EB91480B0BDAF205CB5CF2) and matching XML (SHA2568848D24AEAFE7970E53FBFCF13BA601C8FC35A0BA6034C43537A67536D6D242F) show 'Tracking is not available for this Store purchase.' The button is not dead. The seeded QA-SHIPMENT-2/QA-PURCHASE-2 pair is not a qualifying linked Buy order. _trackingPurchaseAvailable requires exact account, Store, purchase, supplier and matching Buy order; the row opens local shipment details while Track attempts the reused Buy tracker. Keep authoritative tracking/Buy integration pending; do not fabricate navigation success or remove identity checks. No Track source change.
+- Contact restart R17-OBS-01: prior native032 already reproduced the loss of review confirmation while text survived. _readContactDraft explicitly clears local verified flags; _queueContactDraft does not persist verification tokens/flags. hydrateAccountSnapshot reconciles only exact authoritative contacts. Existing 'S03 draft reconciles only exact authoritative contact confirmations' tests deliberately tampered local flags, mismatched email and exact server-confirmed restoration. Pending-camera review recovery is a different temporary checkpoint and is not the ordinary draft security contract. Classification: review/backend-authority limitation, not permission to retain a local verification boolean. Real authoritative restart remains unqualified; no contact source change or false production closure. This test is included in the running connected Work gateway suite.
+
+Connected qualification completed: flutter test --no-pub test/work_workspace_layout_safety_test.dart test/work_store_atomic_operations_test.dart test/work_production_gateway_test.dart --exclude-tags protected-reference --reporter expanded --concurrency=1. Result1264 passed,79 existing skips,0 failures,exit0. External r6618-work-connected-v1.log SHA25617D56B94829ED1D5FC26B68BBF16E758363C3F68B238E2FE54A04F3ED4C63E76. Source was unchanged throughout; the exact authoritative-contact reconciliation test passed. Skips are unchanged and not acceptance evidence. The bounded correction is locally qualified, not yet installed or device-closed.
+
+Starting HEAD774209471185513db45aa7eb91d0eae7b105eef5 was verified clean and remote-equal. Founder authorized child04 and classification of contact restart/Track observations, then one consolidated Codex-only successor APK. No Cursor integration or policy redesign.
+
+The new R6618 keyboard-animation regression reproduces child04 at100% and200%: a populated requirement title, missing expected result, first Review tap, and native inset transitions320→280→220→140→60→0 leave the error non-hit-testable on the previous code. No test scroll or second tap assists the error. Both fail before correction. Existing immediate-inset tests were insufficient for this device timing.
+
+Bounded draft correction in work_workspace_dashboard_screen.dart observes keyboard metrics only while an error reveal is pending, waits for the native View inset to reach zero and reveals after layout. Scaffold consumes the descendant MediaQuery inset, so using that value in the first attempted correction still failed both new tests. The corrected native View check passes. Observer is removed on disposal, pending reveal is cleared on successful review/service change, and validation, live-region semantics, posting authority and approved layout are unchanged.
+
+Current local evidence under C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905:
+
+- r6618-requirement-transition-before-v1.log:0 passed,2 failed,exit1; SHA256 E59A6C5F13C3D8E7291EF8F4F883502B031D6D2DFD0B33FF51B3BA01D0732CF1.
+- r6618-requirement-transition-after-v1.log:6 passed,2 failed,exit1; SHA256 8CD129BA9938D6E31DBE0DB6A7D9F37FDFC9FC8C54E8E8CE76D36F170C08B2EB. Preserved intermediate result, not qualification.
+- r6618-requirement-transition-after-v2.log:8 passed,0 failed,exit0; SHA256 5866D24C9F9E806C4A26E081B35B8742D2FDB6375802424F2E177F444A14D4A2. Exact test selection: R6618 requirement first tap|R6617 requirement reveals validation|DASH13 requirement budget in work_workspace_layout_safety_test.dart, --no-pub --reporter expanded --concurrency=1.
+- r6618-requirement-analysis-v1.log:full flutter analyze --no-pub,zero issues,exit0; SHA256 B2B1EBD1A05FB4139659E2CD7680A55ACF3E400E5C5525700AA2CEB4AD7A569B.
+- r6618-requirement-visual-v1.log:2 rendered tests passed,exit0; SHA256 F9E982560254E8D2ACB45E8F5290C01A539D8992065753F6D9B41A20CF2B5EF2. Actual requirement-keyboard-transition-1.0.png and2.0.png in r6618-requirement-visual-v1 inspected: exact expected-result error fully visible above Review after first tap.
+
+This is local-only draft progress, not device closure or successor build authority consumption. Broader connected regressions, bounded commit, the two observation classifications and successor preparation remain pending. Existing r66.17 device evidence below remains unchanged in meaning.
+
 ## Current disposition — completed safe r66.17 round, founder review required
 
 Supersedes the historical pending-build wording below. r66.17 is installed on OPPO only, with exact checksum verification. See device-review.md and post-install.json. No further implementation or APK is performed after this round. All 27 items remain accounted for; none is silently dropped, and unavailable outcomes are not passed.
