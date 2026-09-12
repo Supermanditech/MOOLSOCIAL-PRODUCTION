@@ -116,6 +116,13 @@ class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
       throw UnsupportedError(invocation.memberName.toString());
 }
 
+class _R669PendingDeliveryCommerce extends _R669DeliveryCommerce {
+  Completer<BuyV2OrderRefreshResult>? pending;
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({required String orderId}) =>
+      pending?.future ?? super.refreshOrder(orderId: orderId);
+}
+
 class _R669DeliveryIconFacts implements BuyV2ProductFactsAdapter {
   @override
   BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
@@ -579,6 +586,77 @@ void main() {
         },
       );
     }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 arrival summaries preserve freshness $scale', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final adapter = _R669PendingDeliveryCommerce();
+      final session = BuyV2Session(core: core, commerceAdapter: adapter, reviewDataEnabled: false);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      await tester.pumpWidget(app(session, scale));
+      await tester.pumpAndSettle();
+      await tapDelivery(tester, 'toggle');
+      final panel = find.byKey(const ValueKey('buy-quick-delivery-status-expanded'));
+      Finder panelText(String text) => find.descendant(of: panel, matching: find.textContaining(text));
+      expect(panelText('Last recorded estimate'), findsOneWidget);
+      expect(panelText('Delivery in 15 min'), findsOneWidget);
+      await capture(tester, 'r669-arrival-last-recorded-$scale');
+      await tapDelivery(tester, 'open');
+      expect(session.view, BuyV2View.tracking);
+      expect(find.text('Last recorded estimate · Delivery in 15 min'), findsWidgets);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      session.openOrders();
+      await tester.pumpAndSettle();
+      final quickCard = find.byKey(const ValueKey('buy-order-card-quick-1'));
+      Finder cardText(String text) => find.descendant(of: quickCard, matching: find.textContaining(text));
+      expect(cardText('Last recorded estimate'), findsOneWidget);
+      adapter.pending = Completer<BuyV2OrderRefreshResult>();
+      final pending = session.refreshOrder('quick-1');
+      await tester.pump();
+      expect(cardText('Updating · last recorded estimate'), findsOneWidget);
+      adapter.pending!.complete(const BuyV2OrderRefreshResult(state: BuyV2CommerceLoadState.offline, customerMessage: 'Update unavailable'));
+      expect(await pending, isFalse);
+      adapter.pending = null;
+      await tester.pumpAndSettle();
+      expect(cardText('Last recorded estimate (update unavailable)'), findsOneWidget);
+      await capture(tester, 'r669-arrival-unavailable-$scale');
+      expect(await session.refreshOrder('quick-1'), isTrue);
+      await tester.pumpAndSettle();
+      expect(cardText('Updated estimate · Delivery in 15 min'), findsOneWidget);
+      final scheduledCard = find.byKey(const ValueKey('buy-order-card-scheduled-2'));
+      expect(find.descendant(of: scheduledCard, matching: find.textContaining('Last recorded estimate')), findsOneWidget);
+      await capture(tester, 'r669-arrival-updated-$scale');
+      session.openDestination(BuyV2Destination.shop);
+      await tester.pumpAndSettle();
+      await tapDelivery(tester, 'toggle');
+      expect(panelText('Updated estimate'), findsOneWidget);
+      final picker = find.byKey(const ValueKey('buy-delivery-picker-toggle'));
+      await tester.ensureVisible(picker);
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      final quickChoice = find.byKey(const ValueKey('buy-delivery-select-quick-1'));
+      final scheduledChoice = find.byKey(const ValueKey('buy-delivery-select-scheduled-2'));
+      expect(find.descendant(of: quickChoice, matching: find.textContaining('Updated estimate')), findsOneWidget);
+      expect(find.descendant(of: scheduledChoice, matching: find.textContaining('Last recorded estimate')), findsOneWidget);
+      await capture(tester, 'r669-arrival-selector-$scale');
+      await tester.ensureVisible(quickChoice);
+      await tester.tap(quickChoice);
+      await tester.pumpAndSettle();
+      await tapDelivery(tester, 'hide');
+      final quiet = tester.widget<Semantics>(find.byKey(const ValueKey('buy-quick-delivery-status-minimized')));
+      expect(quiet.properties.label, contains('Updated estimate'));
+
+      expect(session.orders, hasLength(4));
+      expect(session.orders.firstWhere((o) => o.id == 'quick-1').promise, 'Delivery in 15 min');
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
   }
 
   testWidgets('R669 delivery recovery with twelve simultaneous deliveries', (

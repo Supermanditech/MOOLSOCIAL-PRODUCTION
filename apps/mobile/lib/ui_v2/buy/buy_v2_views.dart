@@ -442,6 +442,31 @@ class BuyV2GstInvoiceController extends ChangeNotifier {
 String _orderPromiseSummary(BuyV2Order order) =>
     buyV2OrderPromiseSummary(order);
 
+String buyV2OrderArrivalSummary(
+  BuyV2Session session,
+  BuyV2Order order, {
+  bool revised = false,
+}) {
+  final summary = revised
+      ? order.updatedDeliveryEstimate ?? buyV2OrderPromiseSummary(order)
+      : buyV2OrderPromiseSummary(order);
+  if (order.status == BuyV2OrderStatus.delivered) {
+    return revised ? 'Recorded revised estimate · $summary' : summary;
+  }
+  final kind = revised ? 'revised estimate' : 'estimate';
+  if (session.orderRefreshBusy(order.id)) {
+    return 'Updating · last recorded $kind · $summary';
+  }
+  final state = session.orderRefreshState(order.id);
+  if (state == BuyV2CommerceLoadState.ready) {
+    return 'Updated $kind · $summary';
+  }
+  if (state != null && state != BuyV2CommerceLoadState.loading) {
+    return 'Last recorded $kind (update unavailable) · $summary';
+  }
+  return 'Last recorded $kind · $summary';
+}
+
 String _orderDeliveryPartnerLabel(BuyV2Order order) {
   final name = order.deliveryPartnerName?.trim();
   if (name != null && name.isNotEmpty) return name;
@@ -10078,7 +10103,7 @@ Future<void> _showBuyV2OrderDeliveryContextSheet(
                     _OrderDeliveryFact(
                       icon: Icons.schedule_outlined,
                       label: 'Delivery window',
-                      value: _orderPromiseSummary(order),
+                      value: buyV2OrderArrivalSummary(session, order),
                     ),
                     _OrderDeliveryFact(
                       icon: Icons.local_shipping_outlined,
@@ -11307,8 +11332,6 @@ class BuyV2TrackingView extends StatelessWidget {
         ? 'UPDATED'
         : 'LAST KNOWN';
     final freshnessColor = refreshed ? BuyV2Colors.green : BuyV2Colors.navy;
-    final retainedEstimate =
-        !refreshed && order.status != BuyV2OrderStatus.delivered;
     final currentStatus = Semantics(
       label:
           '${refreshing
@@ -11480,9 +11503,7 @@ class BuyV2TrackingView extends StatelessWidget {
               ),
               const SizedBox(height: 3),
               Text(
-                retainedEstimate
-                    ? 'Last recorded estimate · ${_orderPromiseSummary(order)}'
-                    : _orderPromiseSummary(order),
+                buyV2OrderArrivalSummary(session, order),
                 key: ValueKey('buy-tracking-estimate-${order.id}'),
                 style: const TextStyle(
                   color: Colors.white,
@@ -11490,12 +11511,10 @@ class BuyV2TrackingView extends StatelessWidget {
                   fontWeight: FontWeight.w900,
                 ),
               ),
-              if (order.updatedDeliveryEstimate case final estimate?) ...[
+              if (order.updatedDeliveryEstimate != null) ...[
                 const SizedBox(height: 2),
                 Text(
-                  retainedEstimate
-                      ? 'Last recorded revised estimate · $estimate'
-                      : 'Delayed · new estimate $estimate',
+                  buyV2OrderArrivalSummary(session, order, revised: true),
                   style: const TextStyle(
                     color: BuyV2Colors.orange,
                     fontSize: 9,
@@ -19074,16 +19093,16 @@ class _OrderCard extends StatelessWidget {
                     ],
                   ),
                   Text(
-                    _orderPromiseSummary(order),
+                    buyV2OrderArrivalSummary(session, order),
                     style: const TextStyle(
                       color: BuyV2Colors.ink,
                       fontSize: 10,
                       fontWeight: FontWeight.w800,
                     ),
                   ),
-                  if (order.updatedDeliveryEstimate case final estimate?)
+                  if (order.updatedDeliveryEstimate != null)
                     Text(
-                      'Delayed · new estimate $estimate',
+                      buyV2OrderArrivalSummary(session, order, revised: true),
                       style: context.buyMeta.copyWith(
                         color: BuyV2Colors.orange,
                         fontSize: 8,

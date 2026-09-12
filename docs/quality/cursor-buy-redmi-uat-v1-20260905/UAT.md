@@ -74,6 +74,17 @@ This supersedes the earlier stop-before-implementation instruction retained belo
 
 ## Completed scoped r66.9 device round - consolidated open list,12 September2026
 
+## Arrival freshness summary child checkpoint - 12 September 2026
+
+**R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 implemented and locally checked; remains OPEN for Redmi verification.** Delivery selector, expanded panel, quiet-rail accessibility, Orders cards, tracking and order delivery context now reuse the same per-order refresh state. Active estimates distinguish Last recorded, Updating, update unavailable and Updated; revised estimates receive the same qualification. Completed orders preserve historical Original promise wording. No timestamp, fresh countdown, delay or provider update is invented. Refreshing one order does not qualify the other deliveries.
+
+Final connected regression: 528 passed, 0 failed, 0 skipped across order-progress, honest-order-motion and session suites. Two expanded widget lifecycles at 360x800 and 100%/200% text cover panel to tracking, Android Back, Orders pending/failed/successful refresh, mixed-order selector state and quiet-rail semantics. Eight actual Flutter captures reviewed. Analysis and UI locks pass. Existing tracking recovery tests now assert the exact unavailable/updated wording while retaining invalid-success rejection, original order identity, disabled refresh and no-false-current checks. The first connected run's two old-copy failures remain preserved; no assertion was removed.
+
+Evidence: external redmi-r66-9-round-1/freshness-summary-implementation-20260912-0304/local-qualification-1.json SHA256 AD563C28A12C8BDC5D2C5887827F25D9EB0A0D1E66BE3ADE1EDC63C6D942753C. Final receipt singlechat-r669-freshness-connected-20260912-b.result.json; stdout SHA256 6C8134443142C9661469E30C54348A4AE774A56F8329D927766A96AB461B09E8. Required tested parent 1fa703f10eb38aecc8dfec6cc026b98529ddcd5a. Four exact source/test owners and eight capture hashes are bound in the manifest. Runtime and capture-test sources remained unchanged after visual capture; the final connected run includes the updated existing session-test assertions.
+
+No APK/build/install, integration or device closure. Provider-backed arrival accuracy and live delivery adapter qualification remain unresolved. Counts remain 13 closed/29 open originals, 12 open UAT children and 2 earlier implementation children. Remaining scoped fixes continue.
+
+
 ## Orders return-position child checkpoint - 12 September 2026
 
 **R669-UAT-ORDER-ANDROID-BACK-POSITION-001 implemented and locally checked; remains OPEN for Redmi verification.** The existing horizontal Orders continuation rail shared its ancestor's PageStorage identity and overwrote the vertical Orders position. Local diagnostics showed a visible offset of821 but stored330 before departure; Back restored330. Its own PageStorageKey now keeps horizontal and vertical positions separate. No controller retry, delayed jump or extra navigation state was retained. Failed primary-controller and save-on-deactivation attempts are preserved externally and removed from source.

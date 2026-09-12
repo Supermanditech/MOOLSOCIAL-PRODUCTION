@@ -1363,7 +1363,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       ),
       label:
           '${_deliveryOrders.length} ${_deliveryOrders.length == 1 ? 'delivery' : 'deliveries'}. ${order.id}. ${_buyOrderStatusLabel(order.status)}. '
-          '${buyV2OrderPromiseSummary(order)}',
+          '${buyV2OrderArrivalSummary(widget.session, order)}',
       expanded: expanded,
       child: SizedBox.square(
         key: const ValueKey('buy-quick-delivery-toggle'),
@@ -1542,7 +1542,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                   '${delivery.partner} · ${delivery.id}',
                                 ),
                                 subtitle: Text(
-                                  '${delivery.destinationLabel} · ${_buyOrderStatusLabel(delivery.status)}\n${buyV2OrderPromiseSummary(delivery)}',
+                                  '${delivery.destinationLabel} · ${_buyOrderStatusLabel(delivery.status)}\n${buyV2OrderArrivalSummary(widget.session, delivery)}',
                                 ),
                                 onTap: () =>
                                     _selectDelivery(delivery.id, update),
@@ -1550,6 +1550,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                         ],
                         _BuyQuickDeliveryStatusBar(
                           order: order,
+                          arrivalSummary: buyV2OrderArrivalSummary(widget.session, order),
                           artwork: _deliveryArtwork(order),
                           minimized: false,
                           kept: _quickTrackerKept,
@@ -2582,6 +2583,7 @@ String _buyOrderStatusLabel(BuyV2OrderStatus status) => switch (status) {
 class _BuyQuickDeliveryStatusBar extends StatelessWidget {
   const _BuyQuickDeliveryStatusBar({
     required this.order,
+    required this.arrivalSummary,
     required this.artwork,
     required this.minimized,
     required this.kept,
@@ -2596,6 +2598,7 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
   });
 
   final BuyV2Order order;
+  final String arrivalSummary;
   final BuyV2DeliveryArtwork artwork;
   final bool minimized;
   final bool kept;
@@ -2611,7 +2614,7 @@ class _BuyQuickDeliveryStatusBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final status = _buyOrderStatusLabel(order.status);
-    final promise = buyV2OrderPromiseSummary(order);
+    final promise = arrivalSummary;
     const statusStyle = TextStyle(
       color: BuyV2Colors.navy,
       fontSize: 9,

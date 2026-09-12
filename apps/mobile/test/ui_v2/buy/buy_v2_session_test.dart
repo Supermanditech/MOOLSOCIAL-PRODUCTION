@@ -3462,13 +3462,15 @@ void main() {
       final estimate = find.byKey(
         const ValueKey('buy-tracking-estimate-MS-SEARCH-TOMATO'),
       );
-      void expectRetained() {
+      void expectRetained({bool updateUnavailable = false}) {
         expect(find.text('LAST KNOWN'), findsOneWidget);
         expect(find.text('CURRENT'), findsNothing);
         expect(find.text('NOW'), findsNothing);
         expect(
           tester.widget<Text>(estimate).data,
-          startsWith('Last recorded estimate · '),
+          startsWith(updateUnavailable
+              ? 'Last recorded estimate (update unavailable) · '
+              : 'Last recorded estimate · '),
         );
         expect(session.selectedOrder, same(original));
       }
@@ -3487,7 +3489,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expectRetained();
+      expectRetained(updateUnavailable: true);
       await captureR66Visual(tester, 'r669-order-status-failed-$scale');
       adapter.orderRefreshGate = null;
       adapter.orderRefreshResult = const BuyV2OrderRefreshResult(
@@ -3500,7 +3502,7 @@ void main() {
         session.orderRefreshState(original.id),
         BuyV2CommerceLoadState.unavailable,
       );
-      expectRetained();
+      expectRetained(updateUnavailable: true);
       expect(
         find.text(
           'Order update could not be verified. Last known details are still shown.',
@@ -3515,7 +3517,7 @@ void main() {
       await tester.tap(refresh);
       await tester.pumpAndSettle();
       expect(find.text('UPDATED'), findsOneWidget);
-      expect(tester.widget<Text>(estimate).data, 'Delivery in 12 min');
+      expect(tester.widget<Text>(estimate).data, 'Updated estimate · Delivery in 12 min');
       expect(
         find.byKey(const ValueKey('buy-tracking-refresh-unavailable')),
         findsNothing,
@@ -3535,7 +3537,7 @@ void main() {
         session.orderRefreshState(original.id),
         BuyV2CommerceLoadState.offline,
       );
-      expectRetained();
+      expectRetained(updateUnavailable: true);
       await tester.scrollUntilVisible(
         find.text('RECORDED'),
         240,
