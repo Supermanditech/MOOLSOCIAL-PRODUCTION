@@ -15,3 +15,7 @@ Blocked descendants: supplier-result cards, price and delivery winner correctnes
 ## B-003 — eligible purchase for this product review
 
 Turmeric powder 97 has no eligible delivered purchase in the current review state. Write review and Check again show the explicit eligibility message, evidence 013–014. Positive rating/comment/submission paths for this SKU remain unverified. Existing eligible fixture products may provide independent safe coverage; that search remains pending. Real purchases and public review submission are excluded.
+
+## B-004 — Bulk checkout delivery estimate
+
+Rice 4 / five 25 kg packs reaches Confirm order with retained Work address and ₹8150 after the ₹300 coupon. Delivery is unavailable; Check delivery returns explicit unavailable feedback (088–089). The button is wired to session.refreshCheckoutDeliveryEstimates in buy_v2_views.dart near 7252. Successful authoritative estimate, recovery after provider availability and subsequent eligible order placement are not qualified. Exact runtime provider binding remains to be traced; this is not proof of a service outage or a new customer-facing implementation defect. No order/payment was submitted. Other checkout controls and Back remain independently testable.
