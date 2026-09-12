@@ -1,5 +1,10 @@
 # Fresh Redmi defect register
 
+## Current scoped round result -12 September2026
+
+Available r66.9 Redmi round and full deduplicated listing are complete; full provider/device qualification remains incomplete. Frozen42=33 findings+9 requests: **13 closed,29 open**. **12 UAT children** remain open, plus the two earlier implementation children and separate STORE-PROCUREMENT-ELIGIBILITY-01 dependency. None is dropped or counted as a separate duplicate fix. UAT.md now contains the complete open-original disposition and parent/child mapping, backed by complete-scoped-round1-defect-list-v1.json SHA256A1CAF6AC839BEB55D8666E185AEA8967C0031E9CA5860CEF983243457AB9E043. Missing media/offer/Maps/live-event/authenticated/Store contexts remain explicitly unverified. The founder-authorized next phase is scoped implementation and required local regressions/Flutter visuals, then safe atomic commits/push/remote verification and stop; **no new APK** and no device closure from host tests. No implementation has started at this list checkpoint. This current summary supersedes older counts and testing-in-progress notes below without erasing their evidence.
+
+
 ## r66.9 round 1 checkpoint20 - address keyboard and preservation
 
 **Current frozen42: 11 closed (10 findings +1 request),31 open (16 partially exercised,14 failed connected replay,1 not exercised). Nine UAT children remain open separately.** No closure in this batch.53 successful captures738-790;787 successful captures total, failed382/504/725 excluded.41/42 reached is coverage only. The complete scoped device round/list remains unfinished; **implementation remains paused**.

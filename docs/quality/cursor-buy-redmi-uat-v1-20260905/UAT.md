@@ -6,6 +6,75 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## Completed scoped r66.9 device round - consolidated open list,12 September2026
+
+List evidence: external redmi-r66-9-round-1/complete-scoped-round1-defect-list-v1.json, SHA256 A1CAF6AC839BEB55D8666E185AEA8967C0031E9CA5860CEF983243457AB9E043. Source HEAD 6f666f15109f6df8ebba1f326512613c259c4d80; Redmi TG8HCYTGGQT885OF; APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9.
+
+**Available scoped device round and deduplicated listing are complete; full device/provider qualification is not complete.** Frozen42 =33 findings+9 requests:13 closed,29 open. Twelve UAT children and two earlier implementation children remain open separately; procurement is a separate dependency. These linked records are not44 independent fixes. Unavailable data/auth/provider/Store cases remain explicitly unverified. No implementation has started. The next authorized phase fixes this resulting batch and required dependencies locally, then safely parks it; no new APK.
+
+### Open originals and required disposition
+
+| Ticket | Required work or unresolved qualification |
+|---|---|
+| R668-AUDIT-DELIVERY-HIDE-RECOVERY-001 | Fix selector auto-hide and tracking return-context children. Quiet rail, explicit reopen and per-order selection were exercised; actual provider refresh/split events remain unverified. |
+| R668-AUDIT-WRITE-REVIEW-001 | Fix review draft loss on Back/cold restart and clipped retry/save actions. Eligibility and eligible editor were exercised; do not publish reviews. |
+| R668-AUDIT-SHARE-LINK-001 | Fix cold exact-product route loss; preserve exact supplier SKU. Warm package-directed route passes. Default domain association, recipient/no-app/install/auth return remain explicit native/provider dependencies, not proved by forced package routing. |
+| R668-AUDIT-BULK-QTY-001 | Fix enlarged landscape numeric-input visibility child. Original quantity/MOQ, product/cart agreement and mixed consumer/Bulk cold retention pass; preserve these. |
+| R668-AUDIT-CATALOGUE-001 | Fix Monthly enlarged continuation child, retaining original supplier final-row/card/Back fixes and generated catalogue paging. |
+| R668-AUDIT-MEDIA-001 | Fix Cart illustration-disclosure word fit (Category/illustratio/n), repeated1022-1023. Preserve honest fallback and exact variant identity. Actual supplier image/video viewer branches remain unavailable, not passed. |
+| R668-AUDIT-MEDIA-002 | Required supplier-media publication/metadata and byte-validation dependency remains. Buy format/identity/display contracts exist; WorkspaceCatalogueItem conversion lacks assets. Keep actual photo/video decoding, poster, transcript, normalization and provider upload unverified; do not substitute illustrations as evidence. |
+| R668-AUDIT-SELLER-001 | Available catalogue/cart/offer/store routes and normal/enlarged seller identity/one visit action/Back pass680-708. Positive Compare-origin remains blocked on comparison binding. Preserve single link and replay that connected origin when available; no speculative rewrite. |
+| R668-AUDIT-RECENT-001 | Fix final Recently viewed Add action clipping. Direct first-item Add/details/Back/cart passes958-966; Wholesale/enlarged last-row failure remains. |
+| R668-AUDIT-OFFER-COPY-001 | Available retail/wholesale offer wording and selected identity/Back/expiry recovery exercised; enlarged/reduced-motion offer paths920-932 pass. Populated authoritative benefits remain unverified. Preserve explicit separation of seller price and additional benefits; relate landscape input child rather than duplicate it. |
+| R668-AUDIT-ADDRESS-KEYBOARD-001 | Fix landscape Next-field visibility child. Add/Edit, invalid phone/PIN, Save/reopen/removal, original-address cold retention and enlarged portrait recovery pass available paths. Preserve original user addresses. |
+| R668-AUDIT-CART-TOTAL-LABEL-001 | Fix coupon minimum-spend child; retain original nine-digit subtotal/discount/payable arithmetic and explicit labels. |
+| R668-AUDIT-CHECKOUT-PROMISE-001 | Available Quick and Scheduled/Wholesale mixed checkout estimates, unavailable Check delivery gating and Back retention pass231-236/282-286. Live quote refresh and provider-confirmed fulfillment remain unverified. Preserve truthful unavailable gating; no order submission. |
+| R668-AUDIT-ORDER-PRODUCT-SEARCH-001 | Fix Android Back list-position child shared with purchase search; preserve correct matching/filter/empty/clear and invoice return behavior. |
+| R668-AUDIT-ORDER-PURCHASE-SEARCH-001 | Same order tracking Back-position child; preserve purchase/split attribution and retained query. Do not duplicate implementation. |
+| R668-AUDIT-COMPARE-EQUIVALENCE-001 | Complete required source/entry wiring with authoritative same product+variant+pack+quantity offers in selected mode, charge completeness, availability/MOQ and quote revision. Installed comparisonSource is unbound; unavailable sheet does not qualify comparison. Reuse approved cards and contracts. |
+| R668-AUDIT-INVOICE-MISSING-LINES-001 | Orders/Tracking missing-line disclosure, retry/Back and complete historical invoices pass available normal/enlarged paths. Confirmation entry unavailable after restart without a new purchase; provider historical retrieval/export remain unverified. Never fabricate historical lines from catalogue. |
+| R668-AUDIT-DELIVERED-PARTNER-STATUS-001 | Original delivered missing-partner wording and pending wording pass normal/enlarged paths017-035 and later pending checks. Named-partner/provider state remains unverified; preserve status-aware disclosure, no fabricated assignment. |
+| R668-AUDIT-BRAND-CATEGORY-001 | Saved, Shop and Wholesale missing-brand disclosure/category separation and filter clearing pass available paths, including967-976. Actual supplier-provided brand filtering remains unavailable. Keep unavailable data explicit. |
+| R668-AUDIT-TRACKING-FRESHNESS-001 | Fix unqualified last-known ETA in tracker/Orders summary child. Detail unavailable/retry already truthful. Live delivery adapter absent, so fresh/delayed/arrival event branches remain unverified. |
+| R66-UAT-032-R668-PAGED-001 | Same Monthly enlarged continuation child as CATALOGUE. Preserve exact basket subset, six products per group, quantities, later-page/filter/Back retention. |
+| R668-REQ-COMPARE-SUPPLIER-001 | Same comparison dependency as COMPARE-EQUIVALENCE: existing vertical SKU cards, direct comparative price/charges, Add in sheet, correct supplier/quantity/mode and retained Back. No new screen or upselling different wholesale packs by default. |
+| R668-REQ-STORE-CATEGORY-COMPACT-001 | Current Store icon replaces All products row and category/search/Back behavior passes. Exact registered three-line icon requirement remains unresolved because current shared home/store control is four-square. Resolve within shared Buy UI consistently with Offers, preserving accessibility and touch targets. |
+| R668-REQ-LOCATION-INDIA-001 | Google Maps/Places/Geocoding, permission and place-to-service-region binding remains required. Installed shoppingAreaSource unbound; manual development Jodhpur/region fallback is not India-wide Maps discovery. Preserve explicit unavailable/retry and manual choice without pretending serviceability. |
+| R668-REQ-ADDRESS-TYPE-DENSITY-001 | Four-type normal/enlarged portrait and selection/cancel now covered1002-1015. Existing landscape Next-field child blocks complete connected qualification; retain compact type meaning and accessible selection. |
+| R668-REQ-OFFERS-HEADER-001 | Promotion CTA, category selection, exact product/Back, expiry/retry and reduced-motion paths exercised920-932. Resolve same registered three-line icon criterion consistently; actual supplier/admin campaign publication remains provider-dependent. |
+| R668-AUDIT-DELIVERY-ICON-001 | Quick rider and Wholesale driver/vehicle observed. Actual Bulk-order/fleet and full live state context remain unavailable in retained data; Bulk catalogue origin is not proof of Bulk delivery. Preserve exact-mode artwork and accessible semantics; qualify missing mode locally without calling it Redmi-verified. |
+| R668-REQ-COLLECTION-DISCOVERY-001 | Approved Order & Collect copy/CTA, exact-store browse and sign-in-required collection checkout exercised. Actual capability enable/disable, stale eligibility, authenticated checkout/QR and onboarding remain unavailable provider/Store dependencies. Keep unsupported stores unavailable and preserve unrelated cart. |
+| R668-REQ-DELIVERY-CONTROLS-001 | Fix selector auto-hide, tracking return-context and freshness summary children together; preserve quiet rail, per-order sound and Keep intent. Live arrival/audio, fresh updates and actual split/Bulk events remain unverified; never alter order or system volume. |
+
+### Complete deduplicated UAT child list
+
+| Child | Parents | Required fix | Redmi captures |
+|---|---|---|---|
+| R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 | R668-AUDIT-TRACKING-FRESHNESS-001, R668-REQ-DELIVERY-CONTROLS-001 | Label last-known/unavailable ETA consistently in delivery panel and Orders. | 012-015,714,720-721 |
+| R669-UAT-REVIEW-BACK-DRAFT-001 | R668-AUDIT-WRITE-REVIEW-001 | Retain unsent rating/text on Back and process restart, isolated by exact product and account. | 076-083,874-879,989-1001 |
+| R669-UAT-RECENT-LAST-ACTION-001 | R668-AUDIT-RECENT-001 | Make final Recently viewed Add reachable above system navigation at normal/enlarged text. | 210-213,890-891 |
+| R669-UAT-COUPON-MINIMUM-SPEND-001 | R668-AUDIT-CART-TOTAL-LABEL-001 | Enforce disclosed minimum spend against correct eligible cart scope and revalidate on changes. | 224-226 |
+| R669-UAT-BULK-QUANTITY-KEYBOARD-001 | R668-AUDIT-BULK-QTY-001, R669-IMPL-WHOLESALE-LANDSCAPE-001 | Keep complete quantity digits/caret and actions visible with enlarged landscape IME. | 333-337 |
+| R669-UAT-MONTHLY-LARGE-TEXT-CONTINUATION-001 | R668-AUDIT-CATALOGUE-001, R66-UAT-032-R668-PAGED-001 | Expose all Monthly basket products with clear reachable continuation at200 percent text. | 454-456,468-469 |
+| R669-UAT-ORDER-ANDROID-BACK-POSITION-001 | R668-AUDIT-ORDER-PRODUCT-SEARCH-001, R668-AUDIT-ORDER-PURCHASE-SEARCH-001 | Return from tracking with Android Back to exact searched Orders position, matching in-app Back. | 568-573,588-592 |
+| R669-UAT-DELIVERY-SELECTOR-AUTOHIDE-001 | R668-AUDIT-DELIVERY-HIDE-RECOVERY-001, R668-REQ-DELIVERY-CONTROLS-001 | Do not auto-dismiss/reset a customer-open delivery selector while reading or selecting. | 716-719 |
+| R669-UAT-ADDRESS-NEXT-FIELD-VISIBILITY-001 | R668-AUDIT-ADDRESS-KEYBOARD-001, R668-REQ-ADDRESS-TYPE-DENSITY-001 | Scroll the newly focused address field into the actual keyboard-visible landscape viewport. | 772-776 |
+| R669-UAT-REVIEW-ELIGIBILITY-ACTION-CLIPPED-001 | R668-AUDIT-WRITE-REVIEW-001 | Keep ineligible Check again and eligible draft action reachable at enlarged text with and without IME. | 861-865,870-875 |
+| R669-UAT-SHARE-COLD-PRODUCT-ROUTE-001 | R668-AUDIT-SHARE-LINK-001 | Preserve and resolve cold-start exact product URI; keep native association/no-app/auth return dependencies explicit. | 917-919 |
+| R669-UAT-DELIVERY-TRACKING-RETURN-CONTEXT-001 | R668-AUDIT-DELIVERY-HIDE-RECOVERY-001, R668-REQ-DELIVERY-CONTROLS-001 | Return delivery tracking to originating shopping mode/query/selection/cart, not unrelated Orders. | 977-982 |
+
+### Preserved earlier children and separate dependency
+
+- R669-IMPL-WHOLESALE-LANDSCAPE-001: Short landscape product dock exercised331-337; preserve improvement and fix related numeric input child. No duplicate implementation.
+- R669-IMPL-DELIVERY-COMPLETION-PROMISE-001: Historical delivered/missing data screens exercised. No actual supplied elapsed-time/live completion transition is available; keep original promise distinct from measured completion, carry local regression and unresolved device event.
+- STORE-PROCUREMENT-ELIGIBILITY-01: Retain qualified pinned Buy stack5ae5059a2c1536e0dbd12373d3b6fb4b7c04f448 on cb46b588f25365e8d180e7c441c26ff5143625a8, eligibility/relaunch/offer revision and exact account/Store/purpose/return contracts. Desktop owns embedded DASH10/Store wrapper/OPPO replay. No dirty copying or integration.
+
+### Closed original items - reference only, excluded from new fixes
+
+R668-AUDIT-QTY-001, R668-AUDIT-HELP-CONTEXT-001, R668-AUDIT-MIXED-GST-001, R668-AUDIT-AREA-BOTTOM-001, R668-AUDIT-STORE-KEYBOARD-RETURN-001, R668-AUDIT-STORE-CATEGORY-BOTTOM-001, R668-AUDIT-VARIANT-DELIVERY-BADGE-001, R668-AUDIT-ADDRESS-REQUEST-NAME-001, R668-AUDIT-REPORT-LARGE-TEXT-001, R668-AUDIT-SAVED-EMPTY-FILTER-001, R668-AUDIT-SAVED-FILTER-COUNT-001, R66-UAT-028-R668-NINE-DIGIT-001, R668-REQ-SHOP-COUNT-ROW-001.
+
+The original/connected available checks include normal and enlarged text, original reproduction, navigation/Back, retained cart and relevant cold restart. Source reconciliation proves missing bindings only; it does not prove provider behavior. Fresh live events, supplier media, equivalent actual offers, Maps serviceability, authenticated collection, confirmation without an existing retained purchase and Desktop embedded Store remain explicitly unresolved. All source, local test, Git and post-fix device states must remain distinct.
+
 ## r66.9 round 1 checkpoint27 - enlarged address completion and mixed GST closure
 
 Current counts: **13 originals closed,29 open;12 open UAT children**. MIXED-GST-001 now closes the original frontend ambiguity: normal and200 percent mixed checkout names Shop/Wholesale separately and preserves independent switches. Captures1016-1040 show temporary Shop tomato37 plus Wholesale notebook3480, exact3517 combined cart, Work address and PhonePe. Enlarged1028-1035 shows readable labels, independent on/off, required-details gating, scrollable form lower controls and exact Back recovery. No tax data entered or saved and no order/payment placed. Both toggles restored off, font1.0 restored, Android Back retains cart/address/payment, and only the two temporary items are removed1040. GST closure evidence SHA2564221181D221405BA7237C5FC78083B2E45D220EB11DB0C7A7034D5F826A6ADEF; provider taxation/invoice issuance is not qualified.
