@@ -6,6 +6,16 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## r66.9 round 1 checkpoint27 - enlarged address completion and mixed GST closure
+
+Current counts: **13 originals closed,29 open;12 open UAT children**. MIXED-GST-001 now closes the original frontend ambiguity: normal and200 percent mixed checkout names Shop/Wholesale separately and preserves independent switches. Captures1016-1040 show temporary Shop tomato37 plus Wholesale notebook3480, exact3517 combined cart, Work address and PhonePe. Enlarged1028-1035 shows readable labels, independent on/off, required-details gating, scrollable form lower controls and exact Back recovery. No tax data entered or saved and no order/payment placed. Both toggles restored off, font1.0 restored, Android Back retains cart/address/payment, and only the two temporary items are removed1040. GST closure evidence SHA2564221181D221405BA7237C5FC78083B2E45D220EB11DB0C7A7034D5F826A6ADEF; provider taxation/invoice issuance is not qualified.
+
+Captures1002-1015 complete the four-type enlarged address case: Home, Work, Third party and Other place are readable/selectable. Blank unsaved form cancelled; original Home/Work and Work selection retained, original font restored. Existing landscape next-field child stays open. Address extension SHA256E44EE8AC4B1F28AFB685ED3E04E4DFAB59CA49C8A4069E1D127ABDA4123F1DD0.
+
+Checkpoint27 external redmi-r66-9-round-1/round-progress-checkpoint-27.json SHA2567C5C3B0D6D9B68CD20BE1D364D4B57C4847C54CBE97F495F66E3F8BC7AB372F0 binds these39 captures through the two manifests to exact r66.9 APK AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9 / Redmi TG8HCYTGGQT885OF. Remaining reconciliation evidence after1015 SHA25607097C5EC8A1CB69C111AA036CF1F3AD5843D438212D4DD36783F9B2543EFA19 preserves unavailable confirmation/provider events and source hashes. Capture1015 truncated output was recovered from its terminal-zero receipt and existing image without repeating input. Missing guessed source path/wildcard reads were corrected using exact discovery; no product defect inferred.
+
+Full round and deduplicated final list remain incomplete; no implementation or APK work. Remaining original acceptance/provider availability reconciliation precedes that list. No source, ownership, integration or governance edits.
+
 ## r66.9 round 1 checkpoint26 - review cold-draft loss and provider bindings
 
 Counts unchanged: **12 originals closed,30 open;12 open UAT children**. Captures989-1001 finish the remaining review restart case. Eligible s-tomato starts empty; a four-star25-character unsent draft is visible995. Force-stop/ordinary launch reports Status ok/COLD. Reopen exact product using explicit warm intent, then Write review1000 loses both rating and text. This extends REVIEW-BACK-DRAFT-001, not another child. No Save/Cancel/dismissal before restart; no publication. Empty editor cancelled1001. Normal display, empty cart and Saved membership remain unchanged.
