@@ -143,7 +143,7 @@ void main() {
     (
       id: 'work',
       route: '/app/work/my-work',
-      owner: Key('my-work-screen'),
+      owner: Key('work-choose-screen'),
       currentAction: Key('mool-navigator-family-work'),
       localAction: Key('work-local-workspace'),
     ),

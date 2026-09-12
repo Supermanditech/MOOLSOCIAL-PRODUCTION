@@ -168,6 +168,10 @@ void main() {
       await tester.tap(find.byKey(const Key('screen04-rail-create')));
       await tester.pumpAndSettle();
       expect(find.byType(Screen04Header), findsNothing);
+      expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+      expect(find.byKey(const Key('screen04-context-tabs')), findsOneWidget);
+      await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+      await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('screen04-create-ownership-gateway')),
         findsNothing,

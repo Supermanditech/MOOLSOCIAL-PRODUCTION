@@ -38,10 +38,20 @@ void main() {
         {'eat': 2, 'ride': 3, 'book': 2, 'work': 2},
       );
       expect(_families.expand((family) => family.actions), hasLength(9));
-      expect(MoolLocalNavigationTokens.clusterWidth(320, 2), 152);
-      expect(MoolLocalNavigationTokens.clusterWidth(320, 3), 232);
-      expect(MoolLocalNavigationTokens.clusterWidth(412, 2), 152);
-      expect(MoolLocalNavigationTokens.clusterWidth(412, 3), 232);
+      for (final width in _widths) {
+        for (final family in _families) {
+          expect(
+            width,
+            greaterThanOrEqualTo(
+              MoolMetrics.minimumTapTarget * family.actions.length,
+            ),
+          );
+        }
+      }
+      expect({
+        for (final family in _families)
+          MoolLocalNavigationTokens.navigationAccentForFamily(family.id),
+      }, hasLength(_families.length));
       expect(MoolLocalNavigationTokens.destinationRailHeight, 58);
       expect(MoolLocalNavigationTokens.destinationMinimumFixedCellWidth, 44);
     },
@@ -49,7 +59,7 @@ void main() {
 
   for (final family in _families) {
     testWidgets(
-      '${family.id} keeps ${family.actions.length} compact leading destination actions across widths and scales',
+      '${family.id} keeps ${family.actions.length} full-width destination actions across widths and scales',
       (tester) async {
         addTearDown(() => tester.binding.setSurfaceSize(null));
         for (final width in _widths) {
@@ -125,10 +135,12 @@ void main() {
           Duration.zero,
         );
         expect(
-          tester.widget<SizedBox>(
-            find.byKey(Key('moolsocial-local-${selected.id}-selection')),
-          ),
-          isA<SizedBox>(),
+          tester
+              .widget<AnimatedContainer>(
+                find.byKey(Key('moolsocial-local-${selected.id}-selection')),
+              )
+              .duration,
+          Duration.zero,
         );
         expect(
           tester
@@ -222,12 +234,9 @@ void _expectAdaptiveFamily(
     ),
   );
   expect(tester.getSize(rail).height, MoolLocalNavigationTokens.railHeight);
-  expect(
-    tester.getSize(cluster).width,
-    MoolLocalNavigationTokens.clusterWidth(width, family.actions.length),
-  );
+  expect(tester.getSize(cluster).width, width);
+  expect(tester.getSize(cluster).width, tester.getSize(rail).width);
   expect(tester.getTopLeft(cluster).dx, tester.getTopLeft(rail).dx);
-  expect(tester.getSize(cluster).width, lessThan(tester.getSize(rail).width));
   expect(
     find.descendant(of: rail, matching: find.byType(Scrollable)),
     findsNothing,
@@ -242,7 +251,7 @@ void _expectAdaptiveFamily(
   );
   expect(
     find.descendant(of: rail, matching: find.byType(FittedBox)),
-    findsNothing,
+    findsNWidgets(family.actions.length),
   );
 
   for (var index = 0; index < family.actions.length; index += 1) {
@@ -255,7 +264,12 @@ void _expectAdaptiveFamily(
     );
     final label = find.descendant(of: rail, matching: find.text(action.label));
     final text = tester.widget<Text>(label);
-    expect(text.maxLines, 2);
+    expect(text.maxLines, 1);
+    expect(text.softWrap, isFalse);
+    expect(text.overflow, TextOverflow.clip);
+    final labelFit = find.ancestor(of: label, matching: find.byType(FittedBox));
+    expect(labelFit, findsOneWidget);
+    expect(tester.widget<FittedBox>(labelFit).fit, BoxFit.scaleDown);
     expect(
       text.style?.fontSize,
       MoolLocalNavigationTokens.destinationLabelSize,
@@ -266,15 +280,25 @@ void _expectAdaptiveFamily(
     );
 
     final selected = index == selectedIndex;
-    final foreground = selected ? MoolColors.navy : MoolColors.muted;
-    expect(text.style?.fontWeight, selected ? FontWeight.w800 : FontWeight.w700);
-    expect(text.style?.color, foreground);
+    final foreground = selected
+        ? MoolLocalNavigationTokens.navigationAccentForFamily(family.id)
+        : MoolColors.muted;
     expect(
-      _contrastRatio(
-        foreground,
-        MoolLocalNavigationTokens.destinationCanvas,
-      ),
-      greaterThanOrEqualTo(4.5),
+      text.style?.fontWeight,
+      selected ? FontWeight.w800 : FontWeight.w700,
+    );
+    expect(text.style?.color, foreground);
+    final selection = tester.widget<AnimatedContainer>(
+      find.byKey(Key('moolsocial-local-${action.id}-selection')),
+    );
+    final selectionDecoration = selection.decoration! as BoxDecoration;
+    final selectedSurface = Color.alphaBlend(
+      selectionDecoration.color ?? Colors.transparent,
+      const Color(0xFFF4F6FB),
+    );
+    expect(
+      _contrastRatio(foreground, selectedSurface),
+      greaterThanOrEqualTo(selected ? 4.6 : 4.5),
     );
     final node = tester.getSemantics(actionFinder);
     expect(
