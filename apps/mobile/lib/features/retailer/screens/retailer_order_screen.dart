@@ -181,7 +181,8 @@ class _RetailerOrderScreenState extends State<RetailerOrderScreen> {
                     widget.session.contactCustomer('message');
                     context.go(
                       Uri(
-                        path: '/app/chat/thread/mahadev-business',
+                        path:
+                            '/app/chat/thread/retailer-order-${order.id.toLowerCase()}',
                         queryParameters: {
                           'return': '/app/retailer/orders/${order.id}',
                         },
@@ -340,6 +341,8 @@ class _RetailerOrderScreenState extends State<RetailerOrderScreen> {
             context.go('/app/retailer/orders/${order.id}/tracking'),
         icon: Icons.receipt_long_rounded,
       ),
+      RetailerOrderStage.cancelled ||
+      RetailerOrderStage.returned ||
       RetailerOrderStage.cannotFulfil => RetailerPrimaryButton(
         keyName: 'retailer-return-orders',
         label: 'Return to orders',

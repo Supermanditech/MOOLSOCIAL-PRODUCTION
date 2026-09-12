@@ -1,61 +1,375 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../core/design/mool_design_system.dart';
 import '../../core/design/mool_motion_primitives.dart';
+import '../../features/buy/buy_v2_content_contracts.dart';
 import '../../features/buy/buy_v2_models.dart';
 import '../../features/buy/buy_v2_session.dart';
+import '../../features/journey01/journey_services.dart';
+import '../profile/global_profile_panel_v2.dart';
 import '../universal/mool_global_navigation_v2.dart';
+import 'buy_v2_chat_route_adapter.dart';
 import 'buy_v2_catalogue.dart';
 import 'buy_v2_design.dart';
+import 'buy_v2_invoice.dart';
+import 'buy_v2_invoice_downloader.dart';
 import 'buy_v2_scanner.dart';
 import 'buy_v2_views.dart';
+
+String buyV2CustomerPaymentProviderLabel(
+  String providerSlug, {
+  required String fallback,
+}) {
+  final normalized = providerSlug.trim().toLowerCase();
+  return switch (normalized) {
+    'phonepe' => 'PhonePe',
+    'paytm' => 'Paytm',
+    'pine-labs' || 'pinelabs' => 'Pine Labs',
+    _ when normalized.isNotEmpty =>
+      normalized
+          .split('-')
+          .map(
+            (part) => part.isEmpty
+                ? part
+                : '${part[0].toUpperCase()}${part.substring(1)}',
+          )
+          .join(' '),
+    _ => fallback,
+  };
+}
+
+class _BuySystemBars extends StatelessWidget {
+  const _BuySystemBars({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final topInset = MediaQuery.paddingOf(context).top;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        statusBarBrightness: Brightness.dark,
+        systemNavigationBarColor: Colors.white,
+        systemNavigationBarIconBrightness: Brightness.dark,
+        systemNavigationBarDividerColor: Colors.transparent,
+        systemStatusBarContrastEnforced: false,
+      ),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          child,
+          // Paint the existing inset even when Android ignores bar colours.
+          if (topInset > 0)
+            Positioned(
+              top: 0,
+              left: 0,
+              right: 0,
+              height: topInset,
+              child: const IgnorePointer(
+                child: ColoredBox(color: BuyV2Colors.navy),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+abstract interface class BuyV2DeliveryArrivalSound {
+  Future<bool> prepare();
+  Future<bool> play();
+  Future<void> stop();
+  Future<void> dispose();
+}
+
+/// A short foreground cue. It uses the existing mobile audio dependency and
+/// never changes the shared audio-session configuration or device volume.
+class BuyV2LocalDeliveryArrivalSound implements BuyV2DeliveryArrivalSound {
+  BuyV2LocalDeliveryArrivalSound({
+    Future<Directory> Function()? temporaryDirectory,
+    AudioPlayer Function()? playerFactory,
+    bool? supportedPlatform,
+  }) : _temporaryDirectory = temporaryDirectory ?? getTemporaryDirectory,
+       _playerFactory =
+           playerFactory ??
+           (() => AudioPlayer(useProxyForRequestHeaders: false)),
+       _supported =
+           supportedPlatform ??
+           (!kIsWeb &&
+               (defaultTargetPlatform == TargetPlatform.android ||
+                   defaultTargetPlatform == TargetPlatform.iOS));
+
+  final Future<Directory> Function() _temporaryDirectory;
+  final AudioPlayer Function() _playerFactory;
+  final bool _supported;
+  AudioPlayer? _player;
+  Directory? _directory;
+  Future<bool>? _preparing;
+  bool _ready = false;
+  bool _disposed = false;
+  int _generation = 0;
+
+  @override
+  Future<bool> prepare() {
+    if (_disposed || !_supported) return Future.value(false);
+    if (_ready) return Future.value(true);
+    final pending = _preparing;
+    if (pending != null) return pending;
+    final operation = _prepare(_generation);
+    _preparing = operation;
+    return operation.whenComplete(() {
+      if (identical(_preparing, operation)) _preparing = null;
+    });
+  }
+
+  Future<bool> _prepare(int generation) async {
+    Directory? directory;
+    AudioPlayer? player;
+    var ready = false;
+    bool current() => !_disposed && generation == _generation;
+    try {
+      final root = await _temporaryDirectory().timeout(
+        const Duration(seconds: 3),
+      );
+      if (!current()) return false;
+      directory = await root.createTemp('buy-arrival-');
+      if (!current()) return false;
+      final file = File('${directory.path}/arrival.wav');
+      await file.writeAsBytes(_arrivalWave(), flush: true);
+      if (!current()) return false;
+      player = _playerFactory();
+      _player = player;
+      _directory = directory;
+      await player.setFilePath(file.path).timeout(const Duration(seconds: 3));
+      if (!current()) return false;
+      _ready = true;
+      ready = true;
+      return true;
+    } on Object {
+      return false;
+    } finally {
+      if (!ready) {
+        if (player == null) {
+          await _release(null, directory);
+        } else if (identical(_player, player)) {
+          _player = null;
+          _directory = null;
+          _ready = false;
+          await _release(player, directory);
+        }
+      }
+    }
+  }
+
+  @override
+  Future<bool> play() async {
+    if (!await prepare()) return false;
+    final generation = _generation;
+    final player = _player;
+    if (player == null || _disposed) return false;
+    try {
+      await player.seek(Duration.zero).timeout(const Duration(seconds: 2));
+      if (_disposed || generation != _generation) return false;
+      await player.play().timeout(const Duration(seconds: 2));
+      return !_disposed &&
+          generation == _generation &&
+          player.processingState == ProcessingState.completed;
+    } on Object {
+      return false;
+    } finally {
+      if (generation == _generation) await stop();
+    }
+  }
+
+  @override
+  Future<void> stop() async {
+    _generation++;
+    _preparing = null;
+    _ready = false;
+    final player = _player;
+    final directory = _directory;
+    _player = null;
+    _directory = null;
+    await _release(player, directory);
+  }
+
+  @override
+  Future<void> dispose() async {
+    _disposed = true;
+    await stop();
+  }
+
+  static Future<void> _release(
+    AudioPlayer? player,
+    Directory? directory,
+  ) async {
+    try {
+      await player?.dispose().timeout(const Duration(seconds: 3));
+    } on Object {
+      // Cancellation must not reopen playback or escape into the order journey.
+    }
+    try {
+      if (directory != null && await directory.exists()) {
+        await directory.delete(recursive: true);
+      }
+    } on Object {
+      // Only this cue's unique application-temporary directory is touched.
+    }
+  }
+
+  static Uint8List _arrivalWave() {
+    const rate = 16000;
+    const samples = 6400;
+    final bytes = Uint8List(44 + samples * 2);
+    final data = ByteData.sublistView(bytes);
+    void word(int offset, String value) =>
+        bytes.setRange(offset, offset + value.length, value.codeUnits);
+    word(0, 'RIFF');
+    data.setUint32(4, bytes.length - 8, Endian.little);
+    word(8, 'WAVE');
+    word(12, 'fmt ');
+    data.setUint32(16, 16, Endian.little);
+    data.setUint16(20, 1, Endian.little);
+    data.setUint16(22, 1, Endian.little);
+    data.setUint32(24, rate, Endian.little);
+    data.setUint32(28, rate * 2, Endian.little);
+    data.setUint16(32, 2, Endian.little);
+    data.setUint16(34, 16, Endian.little);
+    word(36, 'data');
+    data.setUint32(40, samples * 2, Endian.little);
+    for (var i = 0; i < samples; i++) {
+      final time = i / rate;
+      final toneTime = time < .2 ? time : time - .2;
+      final envelope = toneTime >= .16
+          ? 0.0
+          : math.min(1.0, math.min(toneTime / .015, (.16 - toneTime) / .025));
+      final frequency = time < .2 ? 660.0 : 880.0;
+      final sample =
+          (math.sin(2 * math.pi * frequency * toneTime) *
+                  envelope *
+                  .12 *
+                  32767)
+              .round();
+      data.setInt16(44 + i * 2, sample, Endian.little);
+    }
+    return bytes;
+  }
+}
 
 class BuyV2Screen extends StatefulWidget {
   const BuyV2Screen({
     super.key,
     required this.session,
+    this.accountIdentity,
+    this.accountAuthenticated = false,
     this.initialDestination = BuyV2Destination.shop,
+    this.initialOffersActive = false,
     this.initialView = BuyV2View.catalogue,
     this.initialCartScope = BuyV2CartScope.all,
     this.productId,
     this.orderId,
     this.recoveryKind,
     this.scannerLauncher = showBuyV2ProductScanner,
+    this.collectionCameraBuilder,
+    this.deliveryArrivalSound,
     this.onExit,
     this.onOpenMool,
     this.onOpenMainAction,
     this.onOpenChat,
     this.onDestinationChanged,
+    this.invoiceDownloader = saveBuyV2InvoiceToDevice,
+    this.paymentHandoff,
+    this.liveDeliveryMapBuilder,
+    this.offersSource = const BuyV2CataloguePublishedOffersSource(),
+    this.wholesaleTradeDecisionAdapter =
+        const BuyV2UnavailableWholesaleTradeDecisionAdapter(),
   });
 
   final BuyV2Session session;
+  final AuthenticatedAccountIdentity? accountIdentity;
+  final bool accountAuthenticated;
   final BuyV2Destination initialDestination;
+  final bool initialOffersActive;
   final BuyV2View initialView;
   final BuyV2CartScope initialCartScope;
   final String? productId;
   final String? orderId;
   final BuyV2RecoveryKind? recoveryKind;
+  // Retained for older capture callers. Catalogue search never launches it;
+  // customer collection uses the camera on its authenticated paid order.
   final BuyV2ScannerLauncher scannerLauncher;
+  final BuyV2CollectionCameraBuilder? collectionCameraBuilder;
+  // An injected cue belongs to this screen and is disposed when it leaves.
+  final BuyV2DeliveryArrivalSound? deliveryArrivalSound;
   final VoidCallback? onExit;
   final VoidCallback? onOpenMool;
   final ValueChanged<PersonalMoolActionSpec>? onOpenMainAction;
   final VoidCallback? onOpenChat;
   final ValueChanged<BuyV2Destination>? onDestinationChanged;
+  final BuyV2InvoiceDownloader? invoiceDownloader;
+  final BuyV2PaymentHandoff? paymentHandoff;
+  final BuyV2LiveDeliveryMapBuilder? liveDeliveryMapBuilder;
+  final BuyV2PublishedOffersSource offersSource;
+  final BuyV2WholesaleTradeDecisionAdapter wholesaleTradeDecisionAdapter;
 
   @override
   State<BuyV2Screen> createState() => _BuyV2ScreenState();
 }
 
-class _BuyV2ScreenState extends State<BuyV2Screen> {
+class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
+  final MoolGlobalNavigationController _moolNavigationController =
+      MoolGlobalNavigationController();
   Timer? _noticeTimer;
   Timer? _cartAcknowledgementTimer;
-  bool _scannerBusy = false;
+  Timer? _quickTrackerCollapseTimer;
+  final _quickTrackerPointers = <int>{};
+  int _quickTrackerNavigationSequence = 0;
   bool _searchOpen = false;
+  bool _offersActive = false;
+  bool _quickTrackerMinimized = true;
+  bool _quickTrackerHidden = false;
+  bool _deliveryPickerOpen = false;
+  final _deliveryPreferences = <String, ({bool hidden, bool kept})>{};
+  final _deliveryStatuses = <String, BuyV2OrderStatus>{};
+  final _deliverySoundOrders = <String>{};
+  bool _quickTrackerKept = false;
+  bool _quickTrackerSoundOnArrival = false;
+  bool _quickTrackerSoundPreparing = false;
+  String? _quickTrackerSoundError;
+  BuyV2DeliveryArrivalSound? _arrivalSound;
+  int _arrivalSoundOperation = 0;
+  Object? _arrivalAccount;
+  bool _arrivalSoundPlaying = false;
+  bool _foreground = true;
+  final _arrivalNotifiedOrders = <String>{};
+  Offset? _miniCartPosition;
+  bool _miniCartParked = false;
+  final _parkedCartNavigationScrollController = ScrollController();
+  final _rootProductScrollController = ScrollController();
+  final _landscapeCatalogueKey = GlobalKey<NestedScrollViewState>();
+  final _landscapeCatalogueOffsets = <String, (double, double)>{};
+  String? _landscapeCatalogueIdentity;
+  String? _presentedQuickOrderId;
+  final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
+  int _storeProductRouteDepth = 0;
+  int _storeNavigationGeneration = 0;
+  BuyV2Product? get _storeBrowseAnchor =>
+      _storeBrowseAnchors.isEmpty ? null : _storeBrowseAnchors.values.last;
+  BuyV2NavigationMotionDirection _surfaceMotionDirection =
+      BuyV2NavigationMotionDirection.replace;
+  late BuyV2GstInvoiceController _gstInvoiceController;
   late BuyV2Destination _lastSearchDestination;
   late final TextEditingController _searchController = TextEditingController(
     text: widget.session.query,
@@ -64,21 +378,77 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   @override
   void initState() {
     super.initState();
-    _applyInitialState();
-    unawaited(widget.session.restoreSavedProducts());
+    WidgetsBinding.instance.addObserver(this);
+    _foreground =
+        WidgetsBinding.instance.lifecycleState == null ||
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    _arrivalAccount = _arrivalIdentity;
+    _arrivalSound = widget.deliveryArrivalSound;
+    _gstInvoiceController = BuyV2GstInvoiceController(
+      store: widget.session.gstInvoiceProfileStore,
+    );
+    if (widget.session.hasShoppingAlertReturnOrigin ||
+        widget.session.hasShoppingHelpReturnOrigin) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _applyInitialState();
+        unawaited(_restoreSessionState());
+      });
+    } else {
+      // Both explicit tracking entry and commerce restoration notify listeners,
+      // including an embedding Store parent. Defer them until mounting ends.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _applyInitialState();
+        unawaited(_restoreSessionState());
+      });
+    }
     _lastSearchDestination = widget.session.destination;
+    _presentedQuickOrderId = _deliveryOrder?.id;
+    _deliveryStatuses.addEntries(
+      widget.session.orders.map((order) => MapEntry(order.id, order.status)),
+    );
+    _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
     widget.session.addListener(_sessionChanged);
   }
 
   @override
   void didUpdateWidget(covariant BuyV2Screen oldWidget) {
     super.didUpdateWidget(oldWidget);
+    var restoreState = false;
+    if (oldWidget.session != widget.session ||
+        oldWidget.deliveryArrivalSound != widget.deliveryArrivalSound ||
+        _arrivalAccount != _arrivalIdentity) {
+      _resetArrivalSound(
+        dispose: oldWidget.deliveryArrivalSound != widget.deliveryArrivalSound,
+      );
+      _arrivalSound = widget.deliveryArrivalSound;
+      _arrivalAccount = _arrivalIdentity;
+      _presentedQuickOrderId = _deliveryOrder?.id;
+      _deliveryStatuses.addEntries(
+        widget.session.orders.map((order) => MapEntry(order.id, order.status)),
+      );
+      _quickTrackerKept = false;
+      _quickTrackerHidden = false;
+      _quickTrackerMinimized = true;
+    }
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_sessionChanged);
       widget.session.addListener(_sessionChanged);
-      unawaited(widget.session.restoreSavedProducts());
+      restoreState = true;
     }
-    if (oldWidget.initialDestination != widget.initialDestination ||
+    if (oldWidget.session.gstInvoiceProfileStore !=
+        widget.session.gstInvoiceProfileStore) {
+      _gstInvoiceController.dispose();
+      _gstInvoiceController = BuyV2GstInvoiceController(
+        store: widget.session.gstInvoiceProfileStore,
+      );
+      restoreState = true;
+    }
+    if (restoreState) unawaited(_restoreSessionState());
+    if ((oldWidget.session != widget.session && _hasExplicitBuyRoute) ||
+        oldWidget.initialDestination != widget.initialDestination ||
+        oldWidget.initialOffersActive != widget.initialOffersActive ||
         oldWidget.initialView != widget.initialView ||
         oldWidget.initialCartScope != widget.initialCartScope ||
         oldWidget.productId != widget.productId ||
@@ -88,15 +458,82 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     }
   }
 
-  void _applyInitialState() {
+  bool get _hasExplicitBuyRoute =>
+      widget.productId != null ||
+      widget.orderId != null ||
+      widget.recoveryKind != null ||
+      widget.initialView != BuyV2View.catalogue;
+
+  Future<void> _restoreSessionState() async {
+    final session = widget.session;
+    final gstController = _gstInvoiceController;
+    bool current() =>
+        mounted &&
+        identical(widget.session, session) &&
+        session.procurementScopeCurrent &&
+        identical(_gstInvoiceController, gstController);
+    await session.restoreCommerce();
+    if (!current()) return;
+    await session.restoreCustomerState(restoreBrowsing: !_hasExplicitBuyRoute);
+    if (!current()) return;
+    // Explicit current links take precedence over a retained browsing position.
+    if (_hasExplicitBuyRoute && session.isStoreProcurement) {
+      _applyInitialState(afterRestore: true);
+    }
+    for (final restore in <Future<void> Function()>[
+      session.restoreSavedProducts,
+      session.restoreOrderAlerts,
+      session.restoreShoppingAlerts,
+      session.refreshCartBenefits,
+      session.refreshCheckoutQuote,
+      session.refreshCommercialPaymentTerms,
+      gstController.restore,
+    ]) {
+      if (!current()) return;
+      await restore();
+    }
+    if (!current()) return;
+    if (session.businessVerified) {
+      gstController.applySavedBusinessProfile();
+    }
+  }
+
+  void _applyInitialState({bool afterRestore = false}) {
+    if (widget.session.isStoreProcurement &&
+        _hasExplicitBuyRoute &&
+        !afterRestore) {
+      // Opening a product records recent history; restore the retained draft
+      // before allowing that write to persist this session.
+      widget.session.destination = widget.initialDestination;
+      widget.session.view = BuyV2View.catalogue;
+      return;
+    }
+    _offersActive = widget.initialOffersActive;
     final productId = widget.productId;
     final orderId = widget.orderId;
     final recoveryKind = widget.recoveryKind;
-    if (recoveryKind != null) {
+    final storeReturnId = widget.session.takeStoreReturnAnchor(
+      routeProductId: productId,
+    );
+    if (storeReturnId != null) {
+      widget.session.destination = widget.initialDestination;
+      widget.session.view = BuyV2View.catalogue;
+      widget.session.selectedProductId = null;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final anchor = widget.session.findProduct(storeReturnId);
+        if (anchor != null) _openPartnerCatalogue(anchor);
+      });
+    } else if (recoveryKind != null) {
+      widget.session.destination = widget.initialDestination;
       widget.session.openRecovery(recoveryKind);
     } else if (productId != null) {
-      widget.session.openProduct(productId);
-    } else if (orderId != null && widget.initialView == BuyV2View.tracking) {
+      unawaited(widget.session.openLinkedProduct(productId));
+    } else if (orderId != null && widget.initialView == BuyV2View.orderItems) {
+      widget.session.openOrderItems(orderId);
+    } else if (orderId != null &&
+        (widget.initialView == BuyV2View.tracking ||
+            widget.initialView == BuyV2View.assist)) {
       widget.session.openTracking(orderId);
     } else if (widget.initialView == BuyV2View.cart) {
       widget.session.destination = widget.initialDestination;
@@ -112,6 +549,103 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
 
   void _sessionChanged() {
     if (!mounted) return;
+    if (!widget.session.procurementScopeCurrent) {
+      _resetArrivalSound();
+      _noticeTimer?.cancel();
+      _cartAcknowledgementTimer?.cancel();
+      _quickTrackerCollapseTimer?.cancel();
+      _searchOpen = false;
+      final session = widget.session;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            widget.session != session ||
+            session.procurementScopeCurrent) {
+          return;
+        }
+        final root = ModalRoute.of(context);
+        if (root != null && !root.isCurrent) {
+          // Close only overlays above this Buy owner. Do not expose the old
+          // account's supplier, address or payment sheet after a scope change.
+          _storeNavigationGeneration++;
+          Navigator.of(context).popUntil((route) => route == root);
+        }
+      });
+      setState(() {});
+      return;
+    }
+    if (_arrivalAccount != _arrivalIdentity) {
+      _resetArrivalSound();
+      _arrivalAccount = _arrivalIdentity;
+      _presentedQuickOrderId = null;
+    }
+    if (_quickTrackerNavigationSequence !=
+        widget.session.navigationMotionSequence) {
+      final session = widget.session;
+      if (_storeProductRouteDepth == 0 &&
+          session.view == BuyV2View.product &&
+          session.navigationMotionDirection ==
+              BuyV2NavigationMotionDirection.forward) {
+        final sequence = session.navigationMotionSequence;
+        // Fresh product entry starts with the buying decision. Back from Cart
+        // or a nested Store visit retains its own existing scroll restoration.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              identical(widget.session, session) &&
+              session.navigationMotionSequence == sequence &&
+              session.view == BuyV2View.product &&
+              _storeProductRouteDepth == 0 &&
+              _rootProductScrollController.positions.length == 1) {
+            _rootProductScrollController.jumpTo(0);
+          }
+        });
+      }
+      _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
+      _quickTrackerCollapseTimer?.cancel();
+      _quickTrackerPointers.clear();
+      if (!_quickTrackerKept) _quickTrackerMinimized = true;
+    }
+    if (_storeProductRouteDepth > 0 &&
+        widget.session.view == BuyV2View.catalogue) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && widget.session.view == BuyV2View.catalogue) {
+          _dismissStoreProductRoutes();
+        }
+      });
+    }
+    _surfaceMotionDirection = widget.session.navigationMotionDirection;
+    final newlyConfirmed = widget.session.view == BuyV2View.confirmation
+        ? widget.session.confirmedOrders
+              .where(
+                (order) =>
+                    order.collection == null &&
+                    order.destination != BuyV2Destination.medicine &&
+                    !_deliveryStatuses.containsKey(order.id),
+              )
+              .firstOrNull
+        : null;
+    for (final order in widget.session.orders) {
+      _observeArrival(order, _deliveryStatuses[order.id]);
+      _deliveryStatuses[order.id] = order.status;
+    }
+    final quickOrder = newlyConfirmed ?? _deliveryOrder;
+    final quickOrderId = quickOrder?.id;
+    if (quickOrderId != _presentedQuickOrderId) {
+      _rememberDeliveryPreferences();
+      _presentedQuickOrderId = quickOrderId;
+      _quickTrackerMinimized = true;
+      _quickTrackerHidden = _deliveryPreferences[quickOrderId]?.hidden ?? false;
+      _quickTrackerKept = _deliveryPreferences[quickOrderId]?.kept ?? false;
+      _quickTrackerSoundOnArrival = _deliverySoundOrders.contains(quickOrderId);
+      _deliveryPickerOpen = false;
+      _quickTrackerCollapseTimer?.cancel();
+    }
+
+    if (_offersActive &&
+        !widget.session.hasShoppingHelpReturnOrigin &&
+        widget.session.view == BuyV2View.catalogue &&
+        widget.session.destination != BuyV2Destination.shop) {
+      _offersActive = false;
+    }
     final destinationChanged =
         _lastSearchDestination != widget.session.destination;
     if (destinationChanged) {
@@ -142,44 +676,329 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     setState(() {});
   }
 
-  Future<void> _scanProduct() async {
-    if (_scannerBusy) return;
-    setState(() => _scannerBusy = true);
-    try {
-      final scanned = await widget.scannerLauncher(context);
-      if (!mounted || scanned == null || scanned.trim().isEmpty) return;
+  Object get _arrivalIdentity => (
+    widget.session.collectionIdentity?.value,
+    widget.accountIdentity,
+    widget.accountAuthenticated,
+  );
 
-      final code = scanned.trim();
-      widget.session.updateQuery(code);
-      final matches = widget.session.visibleProducts;
-      if (matches.length == 1) {
-        widget.session.openProduct(matches.single.id);
-      } else if (matches.isEmpty) {
-        widget.session.showNotice(
-          'No product matched that code. Check the code or search by name.',
-        );
-      } else {
-        widget.session.showNotice('${matches.length} matching products found.');
-      }
-    } finally {
-      if (mounted) setState(() => _scannerBusy = false);
+  bool get _canSound =>
+      mounted && _foreground && (ModalRoute.of(context)?.isCurrent ?? true);
+
+  Future<void> _closeArrivalSound(
+    BuyV2DeliveryArrivalSound? sound, {
+    bool dispose = false,
+  }) async {
+    if (sound == null) return;
+    try {
+      await (dispose ? sound.dispose() : sound.stop()).timeout(
+        const Duration(seconds: 3),
+      );
+    } on Object {
+      // A platform cancellation cannot interrupt shopping or start a retry.
     }
+  }
+
+  void _resetArrivalSound({bool dispose = false}) {
+    _arrivalSoundOperation++;
+    _quickTrackerSoundOnArrival = false;
+    _quickTrackerSoundPreparing = false;
+    _quickTrackerSoundError = null;
+    _arrivalSoundPlaying = false;
+    _arrivalNotifiedOrders.clear();
+    _deliverySoundOrders.clear();
+    _deliveryStatuses.clear();
+    _deliveryPreferences.clear();
+    _deliveryPickerOpen = false;
+    final sound = _arrivalSound;
+    _arrivalSound = dispose ? null : widget.deliveryArrivalSound;
+    unawaited(_closeArrivalSound(sound, dispose: dispose));
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.paused ||
+        state == AppLifecycleState.detached) {
+      widget.session.retainProcurementNavigation();
+    }
+    _foreground = state == AppLifecycleState.resumed;
+    if (!_foreground) {
+      _arrivalSoundOperation++;
+      _quickTrackerSoundPreparing = false;
+      _arrivalSoundPlaying = false;
+      unawaited(_closeArrivalSound(_arrivalSound));
+    }
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _setArrivalSound(bool enabled, StateSetter update) async {
+    final orderId = _deliveryOrder?.id;
+    if (orderId == null) return;
+    final operation = ++_arrivalSoundOperation;
+    if (!enabled) {
+      update(() {
+        _deliverySoundOrders.remove(orderId);
+        _quickTrackerSoundOnArrival = false;
+        _quickTrackerSoundPreparing = false;
+        _quickTrackerSoundError = null;
+      });
+      await _closeArrivalSound(_arrivalSound);
+      return;
+    }
+    if (!_canSound) return;
+    final sound = _arrivalSound ??=
+        widget.deliveryArrivalSound ?? BuyV2LocalDeliveryArrivalSound();
+    update(() {
+      _quickTrackerSoundPreparing = true;
+      _quickTrackerSoundError = null;
+    });
+    var ready = false;
+    try {
+      ready = await sound.prepare().timeout(const Duration(seconds: 8));
+    } on Object {
+      ready = false;
+    }
+    if (!mounted || operation != _arrivalSoundOperation) return;
+    if (!_canSound) {
+      update(() => _quickTrackerSoundPreparing = false);
+      await _closeArrivalSound(sound);
+      return;
+    }
+    update(() {
+      _quickTrackerSoundPreparing = false;
+      if (ready) _deliverySoundOrders.add(orderId);
+      _quickTrackerSoundOnArrival = _deliverySoundOrders.contains(
+        _deliveryOrder?.id,
+      );
+      _quickTrackerSoundError = ready ? null : 'Sound unavailable. Try again.';
+    });
+    if (!ready) await _closeArrivalSound(sound);
+    _scheduleQuickTrackerCollapse(update);
+  }
+
+  void _observeArrival(BuyV2Order? order, BuyV2OrderStatus? previousStatus) {
+    if (!_canSound ||
+        order == null ||
+        !_deliverySoundOrders.contains(order.id) ||
+        order.collection != null ||
+        previousStatus == null ||
+        previousStatus == order.status ||
+        previousStatus == BuyV2OrderStatus.delivered ||
+        (order.status != BuyV2OrderStatus.arriving &&
+            order.status != BuyV2OrderStatus.delivered) ||
+        !_arrivalNotifiedOrders.add(order.id)) {
+      return;
+    }
+    // Simultaneous arrivals share one chime; each delivery remains listed.
+    if (!_arrivalSoundPlaying) unawaited(_playArrivalSound());
+  }
+
+  Future<void> _playArrivalSound() async {
+    final sound = _arrivalSound;
+    if (sound == null) return;
+    final operation = _arrivalSoundOperation;
+    _arrivalSoundPlaying = true;
+    var played = false;
+    try {
+      played = await sound.play().timeout(const Duration(seconds: 10));
+    } on Object {
+      played = false;
+    }
+    if (!mounted || operation != _arrivalSoundOperation) return;
+    _arrivalSoundPlaying = false;
+    if (!played) {
+      await _closeArrivalSound(sound);
+      if (!mounted || operation != _arrivalSoundOperation) return;
+      setState(() {
+        _quickTrackerSoundOnArrival = false;
+        _deliverySoundOrders.clear();
+        _quickTrackerSoundError = 'Sound unavailable. Try again.';
+      });
+    }
+  }
+
+  GlobalProfileContextAction _buyProfileContext(BuyV2Session session) {
+    void prepareDestinationChange() {
+      setState(() {
+        _offersActive = false;
+        _searchOpen = false;
+      });
+    }
+
+    void openOrders() {
+      prepareDestinationChange();
+      session.openOrders();
+    }
+
+    void openCart(BuyV2Destination destination) {
+      prepareDestinationChange();
+      session.openDestination(destination);
+      session.openCart(
+        scope: switch (destination) {
+          BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+          BuyV2Destination.medicine => BuyV2CartScope.medicine,
+          BuyV2Destination.shop ||
+          BuyV2Destination.orders => BuyV2CartScope.shop,
+        },
+      );
+    }
+
+    void openCatalogue(BuyV2Destination destination) {
+      prepareDestinationChange();
+      session.openDestination(destination);
+    }
+
+    if (_offersActive) {
+      return GlobalProfileContextAction(
+        id: 'shop-offers',
+        title: 'Shop offers',
+        detail: 'Review current offers and continue with eligible products.',
+        actionLabel: 'Open offers',
+        icon: Icons.local_offer_outlined,
+        accentColor: BuyV2Colors.orange,
+        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+        onPressed: _openOffers,
+      );
+    }
+
+    final destination = session.activeDockDestination;
+    if (destination == BuyV2Destination.orders) {
+      final activeOrders = session.activeOrderCount;
+      final deliveredOrders = session.deliveredOrderCount;
+      return GlobalProfileContextAction(
+        id: 'shop-orders',
+        title: 'Your Shop orders',
+        detail:
+            '$activeOrders active · $deliveredOrders delivered orders are ready to review.',
+        actionLabel: 'Open orders',
+        icon: Icons.receipt_long_outlined,
+        accentColor: BuyV2Colors.orange,
+        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+        onPressed: openOrders,
+      );
+    }
+
+    final activeOrders = session.activeOrderCount;
+    if (destination == BuyV2Destination.shop && activeOrders > 0) {
+      return GlobalProfileContextAction(
+        id: 'shop-active-orders',
+        title: activeOrders == 1
+            ? 'Your active Shop order'
+            : 'Your Shop orders',
+        detail: activeOrders == 1
+            ? 'One order is ready to track from purchase to delivery.'
+            : '$activeOrders active orders are ready to track.',
+        actionLabel: 'Open orders',
+        icon: Icons.local_shipping_outlined,
+        accentColor: BuyV2Colors.orange,
+        gradientColors: const [BuyV2Colors.navy, BuyV2Colors.orange],
+        onPressed: openOrders,
+      );
+    }
+
+    final itemCount = session.countForDestination(destination);
+    final accent = switch (destination) {
+      BuyV2Destination.wholesale => BuyV2Colors.royal,
+      BuyV2Destination.medicine => BuyV2Colors.green,
+      BuyV2Destination.shop || BuyV2Destination.orders => BuyV2Colors.orange,
+    };
+    final icon = switch (destination) {
+      BuyV2Destination.wholesale => Icons.inventory_2_outlined,
+      BuyV2Destination.medicine => Icons.medication_outlined,
+      BuyV2Destination.shop ||
+      BuyV2Destination.orders => Icons.shopping_bag_outlined,
+    };
+    if (itemCount > 0) {
+      return GlobalProfileContextAction(
+        id: '${destination.name}-cart',
+        title: 'Your ${destination.label} cart',
+        detail:
+            '$itemCount ${itemCount == 1 ? 'item' : 'items'} · '
+            '${buyV2Money(session.totalForDestination(destination))}',
+        actionLabel: 'Open cart',
+        icon: icon,
+        accentColor: accent,
+        gradientColors: [BuyV2Colors.navy, accent],
+        onPressed: () => openCart(destination),
+      );
+    }
+
+    final savedCount = session.savedCountFor(destination);
+    return GlobalProfileContextAction(
+      id: '${destination.name}-discovery',
+      title: savedCount > 0
+          ? 'Continue ${destination.label}'
+          : switch (destination) {
+              BuyV2Destination.wholesale => 'Source wholesale products',
+              BuyV2Destination.medicine => 'Browse medicine and care',
+              BuyV2Destination.shop ||
+              BuyV2Destination.orders => 'Shop everyday needs',
+            },
+      detail: savedCount > 0
+          ? '$savedCount saved ${savedCount == 1 ? 'product is' : 'products are'} ready when you return.'
+          : switch (destination) {
+              BuyV2Destination.wholesale =>
+                'Compare bulk packs, minimum orders and delivery promises.',
+              BuyV2Destination.medicine =>
+                'Review medicine information and prescription requirements.',
+              BuyV2Destination.shop || BuyV2Destination.orders =>
+                'Browse retail packs, trusted sellers and delivery promises.',
+            },
+      actionLabel: 'Browse ${destination.label}',
+      icon: destination == BuyV2Destination.shop
+          ? Icons.storefront_outlined
+          : icon,
+      accentColor: accent,
+      gradientColors: [BuyV2Colors.navy, accent],
+      onPressed: () => openCatalogue(destination),
+    );
+  }
+
+  void _openBuyProfile() {
+    HapticFeedback.selectionClick();
+    setState(() => _searchOpen = false);
+    unawaited(
+      showGlobalProfilePanelV2(
+        context,
+        accountAuthenticated: widget.accountAuthenticated,
+        contextAction: _buyProfileContext(widget.session),
+        onOpenRoute: (route) {
+          context.push(route);
+        },
+      ),
+    );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _resetArrivalSound(dispose: true);
     _noticeTimer?.cancel();
     _cartAcknowledgementTimer?.cancel();
+    _quickTrackerCollapseTimer?.cancel();
     widget.session.removeListener(_sessionChanged);
     _searchController.dispose();
+    _rootProductScrollController.dispose();
+    _parkedCartNavigationScrollController.dispose();
+    _gstInvoiceController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final session = widget.session;
-    final careNavigation =
-        session.activeDockDestination == BuyV2Destination.medicine;
+    if (!session.procurementScopeCurrent) {
+      return _procurementScopeRecovery(session, onReturn: _exitBuy);
+    }
+    final keyboardVisible = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final viewport = MediaQuery.sizeOf(context);
+    final shortLandscapeCatalogue =
+        viewport.width > viewport.height &&
+        viewport.height <= 480 &&
+        session.view == BuyV2View.catalogue &&
+        session.destination != BuyV2Destination.orders &&
+        !_offersActive;
     final surfaceTheme = BuyV2ThemeSpec.resolve(
       session.destination,
       session.view,
@@ -191,11 +1010,20 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
         onPopInvokedWithResult: (didPop, _) {
           if (!didPop) {
             HapticFeedback.selectionClick();
-            if (_searchOpen) {
+            if (_moolNavigationController.isOpen) {
+              unawaited(_moolNavigationController.close());
+            } else if (_searchOpen) {
               FocusScope.of(context).unfocus();
               setState(() => _searchOpen = false);
             } else if (session.canHandleBack) {
-              session.goBack();
+              if (_offersActive &&
+                  session.view == BuyV2View.product &&
+                  !session.canReturnToComparedProduct &&
+                  !session.canReturnToShoppingAlerts) {
+                _openOffers();
+              } else {
+                session.goBack();
+              }
             } else if (widget.onExit case final onExit?) {
               onExit();
             } else {
@@ -203,83 +1031,138 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
             }
           }
         },
-        child: Scaffold(
-          key: const ValueKey('buy-v2-screen'),
-          extendBody: true,
-          backgroundColor: Colors.white,
-          body: DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: surfaceTheme.canvasGradient.colors,
+        child: _BuySystemBars(
+          child: Scaffold(
+            key: const ValueKey('buy-v2-screen'),
+            extendBody: true,
+            backgroundColor: Colors.white,
+            body: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: surfaceTheme.canvasGradient.colors,
+                ),
               ),
-            ),
-            child: SafeArea(
-              bottom: true,
-              child: Center(
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(
-                    maxWidth: BuyV2Metrics.maxWidth,
-                  ),
-                  child: MoolFiniteGradientTransition(
-                    key: const ValueKey('buy-theme-canvas'),
-                    gradient: surfaceTheme.canvasGradient,
-                    duration: BuyV2Motion.contentChange,
-                    child: ColoredBox(
-                      color: Colors.white.withValues(alpha: .94),
-                      child: Column(
-                        children: [
-                          RepaintBoundary(
-                            key: ValueKey(
-                              'buy-header-boundary-${session.destination.name}-'
-                              '${session.view.name}',
+              child: SafeArea(
+                bottom: true,
+                child: Center(
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: shortLandscapeCatalogue
+                          ? double.infinity
+                          : BuyV2Metrics.maxWidth,
+                    ),
+                    child: MoolFiniteGradientTransition(
+                      key: const ValueKey('buy-theme-canvas'),
+                      gradient: surfaceTheme.canvasGradient,
+                      duration: BuyV2Motion.contentChange,
+                      child: ColoredBox(
+                        color: Colors.white.withValues(alpha: .94),
+                        child: _buildScreenLayout(
+                          scrollHeader: shortLandscapeCatalogue,
+                          header: [
+                            if (session.view == BuyV2View.catalogue)
+                              _BuySearchBand(
+                                session: session,
+                                offersActive: _offersActive,
+                                controller: _searchController,
+                                open: _searchOpen,
+                                onOpenChanged: (value) =>
+                                    setState(() => _searchOpen = value),
+                                onLocation: () => session.pagedCatalogueEnabled
+                                    ? showBuyV2CatalogueArea(context, session)
+                                    : showBuyV2AddressSheet(context, session),
+                                onAccount: _openBuyProfile,
+                                trailingAction: keyboardVisible
+                                    ? _buildDeliveryControl(session, setState)
+                                    : null,
+                              ),
+                            if (session.activeShoppingIntent != null &&
+                                session.destination !=
+                                    BuyV2Destination.orders &&
+                                session.destination !=
+                                    BuyV2Destination.medicine)
+                              BuyV2ShoppingIntentBar(session: session),
+                            _buildDeliveryStatus(session, setState),
+                          ],
+                          body: BuyV2CartAvoidanceScope(
+                            cartVisible:
+                                !keyboardVisible && _showsMiniCart(session),
+                            navigationIdentity: (
+                              session.view,
+                              session.destination,
+                              _offersActive,
+                              session.showingSavedProducts,
+                              session.view == BuyV2View.product
+                                  ? session.selectedProduct?.id
+                                  : null,
+                              !_quickTrackerMinimized && !_quickTrackerHidden,
                             ),
-                            child: _BuyHeader(
-                              session: session,
-                              onOpenChat: _openGlobalChat,
-                            ),
-                          ),
-                          if (session.view == BuyV2View.catalogue)
-                            _BuySearchBand(
-                              session: session,
-                              controller: _searchController,
-                              open: _searchOpen,
-                              onOpenChanged: (value) =>
-                                  setState(() => _searchOpen = value),
-                              onScan: _scanProduct,
-                              onLocation: () =>
-                                  showBuyV2AddressSheet(context, session),
-                              scannerBusy: _scannerBusy,
-                            ),
-                          Expanded(
                             child: Stack(
+                              key: const ValueKey(
+                                'buy-navigation-overlay-stack',
+                              ),
                               children: [
                                 Positioned.fill(
-                                  child: _BuyNavigationSurfaceOwner(
-                                    key: ObjectKey(session),
-                                    stateKey: session.navigationMotionSequence,
-                                    direction:
-                                        session.navigationMotionDirection,
-                                    child: _BuyExpandCollapseOwner(
-                                      key: ValueKey(
-                                        _searchOpen &&
-                                                session.destination !=
-                                                    BuyV2Destination.orders
-                                            ? 'buy-search-owner-motion-search'
-                                            : 'buy-search-owner-motion-primary',
-                                      ),
-                                      child:
+                                  child: BuyV2CartAvoidanceViewport(
+                                    reserveBottomSpace: false,
+                                    child: _BuyNavigationSurfaceOwner(
+                                      key: ObjectKey(session),
+                                      stateKey:
+                                          session.navigationMotionSequence,
+                                      direction: _surfaceMotionDirection,
+                                      child: _BuyExpandCollapseOwner(
+                                        key: ValueKey(
                                           _searchOpen &&
-                                              session.destination !=
-                                                  BuyV2Destination.orders
-                                          ? BuyV2SearchResultsView(
-                                              session: session,
-                                            )
-                                          : _currentView(session),
+                                                  session.destination !=
+                                                      BuyV2Destination.orders
+                                              ? 'buy-search-owner-motion-search'
+                                              : 'buy-search-owner-motion-primary',
+                                        ),
+                                        child:
+                                            _procurementPurchaseRecovery(
+                                              session,
+                                            ) ??
+                                            (_storeProductRouteDepth > 0 &&
+                                                    session.view !=
+                                                        BuyV2View.product
+                                                ? const SizedBox.expand()
+                                                : _searchOpen &&
+                                                      !_offersActive &&
+                                                      session.destination !=
+                                                          BuyV2Destination
+                                                              .orders
+                                                ? BuyV2SearchResultsView(
+                                                    session: session,
+                                                    onOpenStore:
+                                                        _openPartnerCatalogue,
+                                                  )
+                                                : _currentView(session)),
+                                      ),
                                     ),
                                   ),
                                 ),
+                                ?_buildDeliveryRestore(session, setState),
+                                if (!keyboardVisible && _showsMiniCart(session))
+                                  Positioned.fill(
+                                    child: _BuyMiniCartBar(
+                                      session: session,
+                                      aggregate: _offersActive,
+                                      initialPosition: _miniCartPosition,
+                                      onParkingChanged: (parked) {
+                                        if (mounted &&
+                                            _miniCartParked != parked) {
+                                          setState(
+                                            () => _miniCartParked = parked,
+                                          );
+                                        }
+                                      },
+                                      onPositionChanged: (position) {
+                                        _miniCartPosition = position;
+                                      },
+                                    ),
+                                  ),
                                 if (session.notice case final message?)
                                   Positioned(
                                     right: 8,
@@ -289,37 +1172,591 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
                               ],
                             ),
                           ),
-                          if (_showsMiniCart(session))
-                            _BuyMiniCartBar(session: session),
-                        ],
+                        ),
                       ),
                     ),
                   ),
                 ),
               ),
             ),
-          ),
-          bottomNavigationBar: MoolDestinationNavigationV2(
-            activeId: careNavigation ? 'book' : 'buy',
-            destinationLabel: careNavigation ? 'Care' : 'Shop',
-            selectedLocalIndex: careNavigation
-                ? 1
-                : switch (session.activeDockDestination) {
-                    BuyV2Destination.orders => 1,
-                    _ => 0,
-                  },
-            localActionCount: careNavigation ? 3 : 2,
-            localNavigation: careNavigation
-                ? _buildCareLocalNavigation()
-                : _buildBuyLocalNavigation(session),
-            onOpenMool: _openGlobalMool,
-            onOpenAction: _openGlobalAction,
-            onOpenChat: _openGlobalChat,
-            onPreviousLocalAction: () => _moveBuyLocal(session, -1),
-            onNextLocalAction: () => _moveBuyLocal(session, 1),
+            bottomNavigationBar: keyboardVisible
+                ? null
+                : _buildDestinationNavigation(
+                    session,
+                    _moolNavigationController,
+                  ),
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildScreenLayout({
+    required bool scrollHeader,
+    required List<Widget> header,
+    required Widget body,
+  }) {
+    final previous = _landscapeCatalogueKey.currentState;
+    final previousIdentity = _landscapeCatalogueIdentity;
+    if (previous != null &&
+        previousIdentity != null &&
+        previous.outerController.positions.length == 1 &&
+        previous.innerController.positions.length == 1) {
+      _landscapeCatalogueOffsets[previousIdentity] = (
+        previous.outerController.offset,
+        previous.innerController.offset,
+      );
+    }
+    if (scrollHeader) {
+      final session = widget.session;
+      final identity =
+          '${session.destination.name}-'
+          '${session.selectedCategoryId}-${session.saleTypeSignature}-'
+          '${session.showingSavedProducts}';
+      final restore = _landscapeCatalogueIdentity != identity;
+      _landscapeCatalogueIdentity = identity;
+      final offsets = _landscapeCatalogueOffsets[identity];
+      if (restore && offsets != null) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          final state = _landscapeCatalogueKey.currentState;
+          if (!mounted ||
+              _landscapeCatalogueIdentity != identity ||
+              state == null ||
+              state.outerController.positions.length != 1 ||
+              state.innerController.positions.length != 1) {
+            return;
+          }
+          // Each NestedScrollView jump coordinates both scroll positions.
+          // A scrolled body restores through the inner controller; at the
+          // body's start, restore the fully or partly visible header instead.
+          final inner = state.innerController.position;
+          final innerOffset = offsets.$2.clamp(
+            inner.minScrollExtent,
+            inner.maxScrollExtent,
+          );
+          if (innerOffset > inner.minScrollExtent) {
+            state.innerController.jumpTo(innerOffset);
+          } else {
+            final outer = state.outerController.position;
+            state.outerController.jumpTo(
+              offsets.$1.clamp(outer.minScrollExtent, outer.maxScrollExtent),
+            );
+          }
+        });
+      }
+      return NestedScrollView(
+        key: _landscapeCatalogueKey,
+        headerSliverBuilder: (context, innerBoxIsScrolled) => [
+          SliverToBoxAdapter(child: Column(children: header)),
+        ],
+        body: body,
+      );
+    }
+    _landscapeCatalogueIdentity = null;
+    return Column(
+      children: [
+        ...header,
+        Expanded(child: body),
+      ],
+    );
+  }
+
+  List<BuyV2Order> get _deliveryOrders {
+    final active = widget.session.activeDeliveryOrders;
+    final selected = widget.session.orders
+        .where(
+          (order) =>
+              order.id == _presentedQuickOrderId &&
+              order.collection == null &&
+              order.destination != BuyV2Destination.medicine,
+        )
+        .firstOrNull;
+    return [
+      ...active,
+      if (selected != null && !active.any((order) => order.id == selected.id))
+        selected,
+    ];
+  }
+
+  BuyV2Order? get _deliveryOrder {
+    final deliveries = _deliveryOrders;
+    return deliveries
+            .where((order) => order.id == _presentedQuickOrderId)
+            .firstOrNull ??
+        deliveries
+            .where(
+              (order) =>
+                  order.id == widget.session.activeQuickDeliveryOrder?.id,
+            )
+            .firstOrNull ??
+        deliveries.firstOrNull;
+  }
+
+  BuyV2DeliveryArtwork _deliveryArtwork(BuyV2Order order) => order.lines.isEmpty
+      ? (order.destination == BuyV2Destination.wholesale
+            ? BuyV2DeliveryArtwork.wholesale
+            : order.id == widget.session.activeQuickDeliveryOrder?.id
+            ? BuyV2DeliveryArtwork.quick
+            : BuyV2DeliveryArtwork.courier)
+      : buyV2DeliveryArtworkForLines(
+          order.lines,
+          fulfilmentModeFor: widget.session.fulfilmentModeFor,
+        );
+
+  void _rememberDeliveryPreferences() {
+    final id = _presentedQuickOrderId;
+    if (id != null) {
+      _deliveryPreferences[id] = (
+        hidden: _quickTrackerHidden,
+        kept: _quickTrackerKept,
+      );
+    }
+  }
+
+  void _selectDelivery(String id, StateSetter update) {
+    if (!_deliveryOrders.any((order) => order.id == id)) return;
+    _rememberDeliveryPreferences();
+    _quickTrackerCollapseTimer?.cancel();
+    if (_quickTrackerSoundPreparing) {
+      _arrivalSoundOperation++;
+      _quickTrackerSoundPreparing = false;
+      unawaited(_closeArrivalSound(_arrivalSound));
+    }
+    update(() {
+      _quickTrackerSoundError = null;
+      _presentedQuickOrderId = id;
+      _quickTrackerHidden = false;
+      _quickTrackerMinimized = false;
+      _quickTrackerKept = _deliveryPreferences[id]?.kept ?? false;
+      _quickTrackerSoundOnArrival = _deliverySoundOrders.contains(id);
+      _deliveryPickerOpen = false;
+    });
+    _rememberDeliveryPreferences();
+    _scheduleQuickTrackerCollapse(update);
+  }
+
+  Widget _buildDeliveryStatus(BuyV2Session session, StateSetter update) =>
+      const SizedBox.shrink();
+
+  void _scheduleQuickTrackerCollapse(StateSetter update) {
+    _quickTrackerCollapseTimer?.cancel();
+    if (_quickTrackerMinimized ||
+        _quickTrackerHidden ||
+        _quickTrackerKept ||
+        _deliveryPickerOpen ||
+        _quickTrackerPointers.isNotEmpty) {
+      return;
+    }
+    _quickTrackerCollapseTimer = Timer(const Duration(seconds: 45), () {
+      if (!mounted ||
+          _quickTrackerMinimized ||
+          _quickTrackerHidden ||
+          _quickTrackerKept ||
+        _deliveryPickerOpen ||
+          _quickTrackerPointers.isNotEmpty) {
+        return;
+      }
+      update(() => _quickTrackerMinimized = true);
+    });
+  }
+
+  void _setQuickTrackerExpanded(bool expanded, StateSetter update) {
+    _quickTrackerCollapseTimer?.cancel();
+    update(() {
+      _quickTrackerMinimized = !expanded;
+      _quickTrackerHidden = false;
+      if (!expanded) _quickTrackerKept = false;
+    });
+    _rememberDeliveryPreferences();
+    if (expanded) _scheduleQuickTrackerCollapse(update);
+  }
+
+  Widget? _buildDeliveryControl(BuyV2Session session, StateSetter update) {
+    final order = _deliveryOrder;
+    if (order == null ||
+        session.view == BuyV2View.tracking ||
+        session.view == BuyV2View.assist) {
+      return null;
+    }
+    final expanded = !_quickTrackerMinimized && !_quickTrackerHidden;
+    return Semantics(
+      key: ValueKey(
+        _quickTrackerMinimized || _quickTrackerHidden
+            ? 'buy-quick-delivery-status-minimized'
+            : 'buy-quick-delivery-status-control',
+      ),
+      label:
+          '${_deliveryOrders.length} ${_deliveryOrders.length == 1 ? 'delivery' : 'deliveries'}. ${order.id}. ${_buyOrderStatusLabel(order.status)}. '
+          '${buyV2OrderArrivalSummary(widget.session, order)}',
+      expanded: expanded,
+      child: SizedBox.square(
+        key: const ValueKey('buy-quick-delivery-toggle'),
+        dimension: 44,
+        child: IconButton(
+          key: const ValueKey('buy-quick-delivery-expand'),
+          tooltip: expanded
+              ? 'Collapse delivery status'
+              : _deliveryOrders.length > 1
+              ? 'Show ${_deliveryOrders.length} deliveries'
+              : 'Show delivery choices',
+          onPressed: () => _setQuickTrackerExpanded(!expanded, update),
+          padding: EdgeInsets.zero,
+          color: BuyV2Colors.royal,
+          icon: SizedBox(
+            width: 44,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (expanded)
+                  const Icon(Icons.expand_more_rounded, size: 20)
+                else
+                  ExcludeSemantics(
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        BuyV2DeliveryModeIcon(
+                          key: const ValueKey('buy-delivery-compact-artwork'),
+                          artwork: _deliveryArtwork(order),
+                          size: 18,
+                          color: BuyV2Colors.royal,
+                        ),
+                        if (_deliveryOrders.length > 1) ...[
+                          const SizedBox(width: 2),
+                          Flexible(
+                            child: Text(
+                              _deliveryOrders.length > 9
+                                  ? '9+'
+                                  : '${_deliveryOrders.length}',
+                              key: const ValueKey('buy-delivery-count'),
+                              maxLines: 1,
+                              style: TextStyle(
+                                fontSize: _deliveryOrders.length > 9 ? 9 : 10,
+                                letterSpacing: 0,
+                                height: 1,
+                                fontWeight: FontWeight.w700,
+                                color: BuyV2Colors.royal,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                const SizedBox(height: 3),
+                ExcludeSemantics(
+                  child: BuyV2HonestProgressIndicator(
+                    key: const ValueKey('buy-quick-delivery-compact-progress'),
+                    ownerId: order.id,
+                    progress: order.progress,
+                    statusLabel: _buyOrderStatusLabel(order.status),
+                    backgroundColor: BuyV2Colors.softBlue,
+                    valueColor: BuyV2Colors.royal,
+                    minHeight: 3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget? _buildDeliveryRestore(BuyV2Session session, StateSetter update) {
+    final order = _deliveryOrder;
+    if (order == null ||
+        session.view == BuyV2View.tracking ||
+        session.view == BuyV2View.assist ||
+        _quickTrackerMinimized ||
+        _quickTrackerHidden) {
+      return null;
+    }
+    final refreshState =
+        session.orderRefreshState(order.id) ?? session.commerceLoadState;
+    final refreshing =
+        session.orderRefreshBusy(order.id) ||
+        refreshState == BuyV2CommerceLoadState.loading;
+    final refreshFailed =
+        refreshState == BuyV2CommerceLoadState.offline ||
+        refreshState == BuyV2CommerceLoadState.unavailable;
+    void releasePointer(PointerEvent event) {
+      _quickTrackerPointers.remove(event.pointer);
+      _scheduleQuickTrackerCollapse(update);
+    }
+
+    return Positioned.fill(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final avoidance = BuyV2CartAvoidanceScope.of(context);
+          return ListenableBuilder(
+            listenable: avoidance ?? const AlwaysStoppedAnimation<int>(0),
+            child: BuyV2CartAvoidanceRegion(
+              child: Listener(
+                onPointerDown: (event) {
+                  _quickTrackerPointers.add(event.pointer);
+                  _quickTrackerCollapseTimer?.cancel();
+                },
+                onPointerUp: releasePointer,
+                onPointerCancel: releasePointer,
+                child: Material(
+                  color: Colors.white,
+                  elevation: 6,
+                  borderRadius: BorderRadius.circular(14),
+                  clipBehavior: Clip.antiAlias,
+                  child: SingleChildScrollView(
+                    key: const ValueKey('buy-quick-delivery-choices-scroll'),
+                    primary: false,
+                    physics: const AlwaysScrollableScrollPhysics(
+                      parent: ClampingScrollPhysics(),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (refreshing || refreshFailed)
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
+                            child: Column(
+                              children: [
+                                Text(
+                                  refreshing
+                                      ? 'Refreshing delivery status'
+                                      : 'Status could not refresh. Last known details are shown.',
+                                  key: const ValueKey(
+                                    'buy-delivery-refresh-message',
+                                  ),
+                                  style: context.buyMeta,
+                                ),
+                                if (refreshFailed)
+                                  TextButton.icon(
+                                    key: const ValueKey('buy-delivery-retry'),
+                                    onPressed: refreshing
+                                        ? null
+                                        : () => unawaited(
+                                            session.refreshOrder(order.id),
+                                          ),
+                                    icon: const Icon(Icons.refresh),
+                                    label: const Text('Refresh delivery'),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        if (_deliveryOrders.length > 1) ...[
+                          TextButton.icon(
+                            key: const ValueKey('buy-delivery-picker-toggle'),
+                            onPressed: () {
+                              update(() => _deliveryPickerOpen = !_deliveryPickerOpen);
+                              _scheduleQuickTrackerCollapse(update);
+                            },
+                            icon: const Icon(Icons.list_alt_outlined),
+                            label: Text(
+                              'Deliveries (${_deliveryOrders.length})',
+                            ),
+                          ),
+                          if (_deliveryPickerOpen)
+                            for (final delivery in _deliveryOrders)
+                              ListTile(
+                                key: ValueKey(
+                                  'buy-delivery-select-${delivery.id}',
+                                ),
+                                selected: delivery.id == order.id,
+                                leading: BuyV2DeliveryModeIcon(
+                                  artwork: _deliveryArtwork(delivery),
+                                ),
+                                title: Text(
+                                  '${delivery.partner} · ${delivery.id}',
+                                ),
+                                subtitle: Text(
+                                  '${delivery.destinationLabel} · ${_buyOrderStatusLabel(delivery.status)}\n${buyV2OrderArrivalSummary(widget.session, delivery)}',
+                                ),
+                                onTap: () =>
+                                    _selectDelivery(delivery.id, update),
+                              ),
+                        ],
+                        _BuyQuickDeliveryStatusBar(
+                          order: order,
+                          arrivalSummary: buyV2OrderArrivalSummary(widget.session, order),
+                          artwork: _deliveryArtwork(order),
+                          minimized: false,
+                          kept: _quickTrackerKept,
+                          soundOnArrival: _quickTrackerSoundOnArrival,
+                          soundPreparing: _quickTrackerSoundPreparing,
+                          soundError: _quickTrackerSoundError,
+                          onMinimizedChanged: (value) =>
+                              _setQuickTrackerExpanded(!value, update),
+                          onHiddenChanged: (value) {
+                            _quickTrackerCollapseTimer?.cancel();
+                            update(() {
+                              _quickTrackerHidden = value;
+                              _quickTrackerMinimized = true;
+                              _quickTrackerKept = false;
+                              _deliveryPickerOpen = false;
+                            });
+                            _rememberDeliveryPreferences();
+                          },
+                          onSoundChanged: (value) =>
+                              unawaited(_setArrivalSound(value, update)),
+                          onKeepOnScreen: () {
+                            _quickTrackerCollapseTimer?.cancel();
+                            update(
+                              () => _quickTrackerKept = !_quickTrackerKept,
+                            );
+                            _rememberDeliveryPreferences();
+                            _scheduleQuickTrackerCollapse(update);
+                          },
+                          onOpen: () => session.openDeliveryTracking(order.id),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            builder: (context, child) {
+              return Align(
+                alignment: Alignment.bottomRight,
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: (constraints.maxWidth - 16).clamp(0.0, 440.0),
+                      maxHeight: (constraints.maxHeight - 16).clamp(
+                        0.0,
+                        double.infinity,
+                      ),
+                    ),
+                    child: child,
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
+    );
+  }
+
+  VoidCallback? _deliveryStatusRestore(BuyV2Session session) {
+    final order = _deliveryOrder;
+    if (!_quickTrackerHidden ||
+        order == null ||
+        order.id != session.selectedOrderOrNull?.id) {
+      return null;
+    }
+    return () {
+      if (_deliveryOrder?.id != order.id) return;
+      _setQuickTrackerExpanded(false, setState);
+    };
+  }
+
+  Widget _buildDestinationNavigation(
+    BuyV2Session session,
+    MoolGlobalNavigationController controller, {
+    StateSetter? update,
+  }) {
+    final careNavigation =
+        session.activeDockDestination == BuyV2Destination.medicine;
+    final delivery = _buildDeliveryControl(session, update ?? setState);
+    final localNavigation = careNavigation
+        ? _buildCareLocalNavigation()
+        : _buildBuyLocalNavigation(session);
+    final parkedCart =
+        update == null && _miniCartParked && _showsMiniCart(session)
+        ? _BuyMiniCartBar(
+            session: session,
+            aggregate: _offersActive,
+            compact: true,
+            initialPosition: _miniCartPosition,
+            onPositionChanged: (_) {},
+          )
+        : null;
+    final localCount =
+        3 + (delivery == null ? 0 : 1) + (parkedCart == null ? 0 : 1);
+    final navigationCount =
+        parkedCart != null &&
+            delivery != null &&
+            MediaQuery.sizeOf(context).width < 352
+        ? 4
+        : localCount;
+    if (parkedCart != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted ||
+            !_miniCartParked ||
+            _parkedCartNavigationScrollController.positions.length != 1) {
+          return;
+        }
+        final position = _parkedCartNavigationScrollController.position;
+        final target = !_quickTrackerMinimized && !_quickTrackerHidden
+            ? position.maxScrollExtent
+            : position.minScrollExtent;
+        if ((position.pixels - target).abs() > .1) {
+          position.jumpTo(target);
+        }
+      });
+    }
+    return MoolDestinationNavigationV2(
+      activeId: careNavigation ? 'book' : 'buy',
+      destinationLabel: careNavigation ? 'Care' : 'Shop',
+      familyRootSelected:
+          !careNavigation &&
+          !_offersActive &&
+          session.activeDockDestination == BuyV2Destination.shop,
+      selectedLocalIndex: careNavigation
+          ? 1
+          : _offersActive
+          ? 2
+          : switch (session.activeDockDestination) {
+              BuyV2Destination.orders => 1,
+              _ => 0,
+            },
+      localActionCount: navigationCount,
+      localNavigation: parkedCart != null
+          ? Row(
+              children: [
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      key: const PageStorageKey(
+                        'buy-compact-cart-local-navigation-scroll',
+                      ),
+                      controller: _parkedCartNavigationScrollController,
+                      scrollDirection: Axis.horizontal,
+                      primary: false,
+                      child: SizedBox(
+                        width: constraints.maxWidth.clamp(
+                          delivery == null ? 132.0 : 176.0,
+                          double.infinity,
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(flex: 3, child: localNavigation),
+                            if (delivery != null)
+                              SizedBox(
+                                width: 44,
+                                child: Center(child: delivery),
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 44, child: Center(child: parkedCart)),
+              ],
+            )
+          : delivery == null
+          ? localNavigation
+          : Row(
+              children: [
+                Expanded(flex: 3, child: localNavigation),
+                Expanded(child: Center(child: delivery)),
+              ],
+            ),
+      onOpenMool: _openGlobalMool,
+      onOpenAction: _openGlobalAction,
+      onOpenChat: _openShopChat,
+      moolNavigationController: controller,
+      onPreviousLocalAction: () => _moveBuyLocal(session, -1),
+      onNextLocalAction: () => _moveBuyLocal(session, 1),
     );
   }
 
@@ -329,35 +1766,62 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       key: const ValueKey('buy-local-destination-tabs'),
       familyId: 'buy',
       surfaceTone: MoolLocalNavigationSurfaceTone.light,
-      semanticLabel: 'Shop choices: Wholesale and Orders.',
-      activeId: active.name,
+      semanticLabel: 'Shop choices: Wholesale, Orders and Offers.',
+      activeId: _offersActive ? 'offers' : active.name,
       actions: [
         MoolLocalNavigationAction(
           keyName: 'buy-local-tab-wholesale',
           id: BuyV2Destination.wholesale.name,
           label: 'Wholesale',
           icon: Icons.inventory_2_outlined,
-          onPressed: active == BuyV2Destination.wholesale
-              ? null
-              : () {
-                  HapticFeedback.selectionClick();
-                  session.openDestination(BuyV2Destination.wholesale);
-                },
+          onPressed: () => _openBuyDestination(BuyV2Destination.wholesale),
         ),
         MoolLocalNavigationAction(
           keyName: 'buy-local-tab-orders',
           id: BuyV2Destination.orders.name,
           label: 'Orders',
           icon: Icons.receipt_long_outlined,
-          onPressed: active == BuyV2Destination.orders
-              ? null
-              : () {
-                  HapticFeedback.selectionClick();
-                  session.openOrders();
-                },
+          onPressed: () => _openBuyDestination(BuyV2Destination.orders),
+        ),
+        MoolLocalNavigationAction(
+          keyName: 'buy-local-tab-offers',
+          id: 'offers',
+          label: 'Offers',
+          icon: Icons.local_offer_outlined,
+          onPressed: _openOffers,
         ),
       ],
     );
+  }
+
+  void _openBuyDestination(BuyV2Destination destination) {
+    _dismissStoreProductRoutes();
+    HapticFeedback.selectionClick();
+    setState(() {
+      _offersActive = false;
+      _searchOpen = false;
+    });
+    if (destination == BuyV2Destination.orders) {
+      widget.session.openOrders();
+    } else {
+      widget.session.openDestination(destination);
+    }
+  }
+
+  void _openOffers() {
+    _dismissStoreProductRoutes();
+    HapticFeedback.selectionClick();
+    setState(() {
+      _offersActive = true;
+      _searchOpen = false;
+    });
+    widget.session.openDestination(BuyV2Destination.shop);
+    final router = GoRouter.maybeOf(context);
+    if (router != null &&
+        router.routeInformationProvider.value.uri.toString() !=
+            '/app/buy?sub=offers') {
+      router.replace('/app/buy?sub=offers');
+    }
   }
 
   Widget _buildCareLocalNavigation() {
@@ -420,20 +1884,24 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
       BuyV2Destination.wholesale,
       BuyV2Destination.orders,
     ];
-    final current = destinations.indexOf(session.activeDockDestination);
-    final next =
-        destinations[(current + delta + destinations.length) %
-            destinations.length];
-    HapticFeedback.selectionClick();
-    if (next == BuyV2Destination.orders) {
-      session.openOrders();
+    final current = _offersActive
+        ? destinations.length
+        : destinations.indexOf(session.activeDockDestination);
+    final nextIndex =
+        (current + delta + destinations.length + 1) % (destinations.length + 1);
+    if (nextIndex == destinations.length) {
+      _openOffers();
     } else {
-      session.openDestination(next);
+      _openBuyDestination(destinations[nextIndex]);
     }
   }
 
   bool _showsMiniCart(BuyV2Session session) =>
-      session.itemCount > 0 &&
+      (session.activeDockDestination == BuyV2Destination.medicine &&
+                  !_offersActive
+              ? session.countForDestination(BuyV2Destination.medicine)
+              : session.itemCount) >
+          0 &&
       (session.view == BuyV2View.product ||
           session.view == BuyV2View.catalogue);
 
@@ -447,6 +1915,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
   }
 
   void _openGlobalAction(PersonalMoolActionSpec action) {
+    if (action.id == 'buy') {
+      _openBuyDestination(BuyV2Destination.shop);
+      return;
+    }
     final onOpenMainAction = widget.onOpenMainAction;
     if (onOpenMainAction != null) {
       onOpenMainAction(action);
@@ -462,39 +1934,941 @@ class _BuyV2ScreenState extends State<BuyV2Screen> {
     );
   }
 
-  void _openGlobalChat() {
-    final onOpenChat = widget.onOpenChat;
-    if (onOpenChat != null) {
-      onOpenChat();
+  void _openOrderHelpChat(BuyV2Order order) {
+    if (order.collection != null &&
+        !widget.session.collectionOrderBelongsToCurrentAccount(order)) {
+      widget.session.showNotice(
+        'Sign in with the account that placed this order.',
+      );
       return;
     }
+    final onOpenChat = widget.onOpenChat;
+    final chatLabel = order.destination == BuyV2Destination.medicine
+        ? 'Care Chat'
+        : 'Shop Chat';
     final router = GoRouter.maybeOf(context);
-    final returnRoute = router?.routeInformationProvider.value.uri.toString();
+    if (router == null) {
+      if (onOpenChat != null) {
+        onOpenChat();
+      } else {
+        widget.session.showNotice(
+          '$chatLabel is unavailable right now. Your order is unchanged.',
+        );
+      }
+      return;
+    }
+    try {
+      context.push(
+        order.collection == null
+            ? const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order)
+            : const BuyV2ChatRouteAdapter().orderHelpLocationFor(
+                orderId: order.id,
+              ),
+      );
+    } on ArgumentError {
+      widget.session.showNotice(
+        '$chatLabel is unavailable right now. Your order is unchanged.',
+      );
+    }
+  }
+
+  void _openProductQuestion(BuyV2Product product) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      final onOpenChat = widget.onOpenChat;
+      if (onOpenChat != null) {
+        onOpenChat();
+      } else {
+        widget.session.showNotice(
+          'Supplier Chat is unavailable right now. Your product is unchanged.',
+        );
+      }
+      return;
+    }
+    try {
+      context.push(
+        const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+          product: product,
+          quantity: widget.session.quantityFor(product.id),
+        ),
+      );
+    } on ArgumentError {
+      widget.session.showNotice(
+        'Supplier Chat is unavailable right now. Your product is unchanged.',
+      );
+    }
+  }
+
+  void _openStoreQuestion(BuyV2Product product) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      final onOpenChat = widget.onOpenChat;
+      if (onOpenChat != null) {
+        onOpenChat();
+      } else {
+        widget.session.showNotice(
+          'Store Chat is unavailable right now. Your products are unchanged.',
+        );
+      }
+      return;
+    }
+    if (!widget.session.rememberStoreReturnAnchor(product.id)) {
+      widget.session.showNotice(
+        'This store is unavailable right now. Your products are unchanged.',
+      );
+      return;
+    }
+    unawaited(_openStoreQuestionRoute(product));
+  }
+
+  Future<void> _openStoreQuestionRoute(BuyV2Product product) async {
+    try {
+      await context.push(
+        const BuyV2ChatRouteAdapter().storeQuestionLocationFor(anchor: product),
+      );
+    } on ArgumentError {
+      widget.session.clearStoreReturnAnchor();
+      widget.session.showNotice(
+        'Store Chat is unavailable right now. Your products are unchanged.',
+      );
+      return;
+    }
+    if (!mounted) return;
+    final anchorId = widget.session.takeStoreReturnAnchor(
+      routeProductId: product.id,
+    );
+    if (anchorId == null) return;
+    final anchor = widget.session.findProduct(anchorId);
+    if (anchor != null) _openPartnerCatalogue(anchor);
+  }
+
+  void _rememberStoreBrowse(BuyV2Product product) {
+    widget.session.retainCatalogueStoreBrowse(product);
+    setState(() {
+      _storeBrowseAnchors.remove(product.destination);
+      _storeBrowseAnchors[product.destination] = product;
+    });
+  }
+
+  void _openPartnerCatalogue(BuyV2Product product, {bool brandOnly = false}) {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    final session = widget.session;
+    final originProductId =
+        session.view == BuyV2View.product && _storeProductRouteDepth == 0
+        ? session.selectedProductId
+        : null;
+    final originOffset =
+        originProductId != null &&
+            _rootProductScrollController.positions.length == 1
+        ? _rootProductScrollController.position.pixels
+        : null;
+    final generation = _storeNavigationGeneration;
+    if (!brandOnly) {
+      _rememberStoreBrowse(product);
+    }
+    unawaited(
+      showBuyV2PartnerCatalogue(
+        context,
+        widget.session,
+        product,
+        brandOnly: brandOnly,
+        onAskStore: _openStoreQuestion,
+        onStoreChanged: _rememberStoreBrowse,
+        onOpenProduct: _openStoreProduct,
+        onOpenStoreCart: (store) {
+          unawaited(_openStoreProduct(store, cartEntry: true));
+        },
+        onOpenCart: () => widget.session.openCart(
+          scope: switch (product.destination) {
+            BuyV2Destination.shop ||
+            BuyV2Destination.orders => BuyV2CartScope.shop,
+            BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+            BuyV2Destination.medicine => BuyV2CartScope.medicine,
+          },
+        ),
+      ).whenComplete(() {
+        if (originOffset == null) return;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted ||
+              widget.session != session ||
+              generation != _storeNavigationGeneration ||
+              _storeProductRouteDepth != 0 ||
+              session.view != BuyV2View.product ||
+              session.selectedProductId != originProductId ||
+              _rootProductScrollController.positions.length != 1) {
+            return;
+          }
+          final position = _rootProductScrollController.position;
+          position.jumpTo(
+            originOffset.clamp(
+              position.minScrollExtent,
+              position.maxScrollExtent,
+            ),
+          );
+        });
+      }),
+    );
+  }
+
+  Future<bool> _openStoreProduct(
+    BuyV2Product product, {
+    bool cartEntry = false,
+    String? returnLabel,
+  }) async {
+    final session = widget.session;
+    if (returnLabel == null &&
+        _storeBrowseAnchor?.isFromSameStoreAs(product) != true) {
+      _rememberStoreBrowse(product);
+    }
+    final restoreOrigin = session.beginStoreNavigationVisit();
+    if (!mounted || (!cartEntry && !session.openProduct(product.id))) {
+      restoreOrigin();
+      return false;
+    }
+    if (cartEntry) {
+      session.openCart(
+        scope: switch (product.destination) {
+          BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+          BuyV2Destination.medicine => BuyV2CartScope.medicine,
+          _ => BuyV2CartScope.shop,
+        },
+      );
+    }
+    final generation = _storeNavigationGeneration;
+    final navigation = MoolGlobalNavigationController();
+    final routeDepth = ++_storeProductRouteDepth;
+    final openCart = await Navigator.of(context).push<bool>(
+      PageRouteBuilder<bool>(
+        settings: const RouteSettings(name: 'buy-store-product'),
+        transitionDuration: BuyV2Motion.contentChange,
+        reverseTransitionDuration: BuyV2Motion.contentChange,
+        pageBuilder: (routeContext, _, _) => StatefulBuilder(
+          builder: (context, setRouteState) => AnimatedBuilder(
+            animation: session,
+            builder: (context, _) {
+              if (!session.procurementScopeCurrent) {
+                return _procurementScopeRecovery(
+                  session,
+                  onReturn: () => Navigator.of(routeContext).pop(false),
+                );
+              }
+              final showingProduct =
+                  !cartEntry && session.view == BuyV2View.product;
+              void update(VoidCallback change) {
+                if (!mounted || !context.mounted) return;
+                setState(change);
+                setRouteState(() {});
+              }
+
+              return _BuySystemBars(
+                child: BuyV2ThemeScope(
+                  spec: BuyV2ThemeSpec.resolve(
+                    session.destination,
+                    session.view,
+                  ),
+                  child: PopScope<bool>(
+                    canPop: cartEntry
+                        ? session.view == BuyV2View.cart
+                        : showingProduct && !session.canReturnToComparedProduct,
+                    onPopInvokedWithResult: (didPop, _) {
+                      if (didPop) return;
+                      if (navigation.isOpen) {
+                        unawaited(navigation.close());
+                      } else {
+                        session.goBack();
+                      }
+                    },
+                    child: Scaffold(
+                      backgroundColor: Colors.white,
+                      body: SafeArea(
+                        child: Center(
+                          child: ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxWidth: showingProduct
+                                  ? double.infinity
+                                  : BuyV2Metrics.maxWidth,
+                            ),
+                            child: Column(
+                              children: [
+                                if (!showingProduct) ...[
+                                  if (session.activeShoppingIntent != null &&
+                                      session.destination !=
+                                          BuyV2Destination.orders &&
+                                      session.destination !=
+                                          BuyV2Destination.medicine)
+                                    BuyV2ShoppingIntentBar(session: session),
+                                  _buildDeliveryStatus(session, update),
+                                ],
+                                Expanded(
+                                  child: Stack(
+                                    children: [
+                                      Positioned.fill(
+                                        child: _BuyNavigationSurfaceOwner(
+                                          key: const ValueKey(
+                                            'buy-store-product-surface-owner',
+                                          ),
+                                          stateKey:
+                                              session.navigationMotionSequence,
+                                          direction:
+                                              session.navigationMotionDirection,
+                                          child:
+                                              _procurementPurchaseRecovery(
+                                                session,
+                                                onProductReturn: () =>
+                                                    Navigator.of(
+                                                      routeContext,
+                                                    ).pop(false),
+                                              ) ??
+                                              (showingProduct
+                                                  ? Column(
+                                                      children: [
+                                                        Expanded(
+                                                          child: BuyV2ProductView(
+                                                            session: session,
+                                                            trailingAction:
+                                                                _buildDeliveryControl(
+                                                                  session,
+                                                                  update,
+                                                                ),
+                                                            returnLabel:
+                                                                returnLabel ==
+                                                                    null
+                                                                ? 'Back to ${_storeBrowseAnchor?.seller ?? product.seller}'
+                                                                : 'Back to $returnLabel',
+                                                            onReturn: () =>
+                                                                Navigator.of(
+                                                                  routeContext,
+                                                                ).pop(false),
+                                                            onAskSeller:
+                                                                _openProductQuestion,
+                                                            onVisitComparisonProduct:
+                                                                (
+                                                                  product,
+                                                                ) async {
+                                                                  await _openStoreProduct(
+                                                                    product,
+                                                                    returnLabel:
+                                                                        'Compare suppliers',
+                                                                  );
+                                                                },
+                                                            onOpenPartnerCatalogue:
+                                                                _openPartnerCatalogue,
+                                                            wholesaleTradeDecisionAdapter:
+                                                                widget
+                                                                    .wholesaleTradeDecisionAdapter,
+                                                          ),
+                                                        ),
+                                                        if (session.countForDestination(
+                                                              product
+                                                                  .destination,
+                                                            ) >
+                                                            0)
+                                                          BuyV2StoreCartBar(
+                                                            session: session,
+                                                            destination: product
+                                                                .destination,
+                                                            onOpenCart: () => session.openCart(
+                                                              scope: switch (product
+                                                                  .destination) {
+                                                                BuyV2Destination
+                                                                    .wholesale =>
+                                                                  BuyV2CartScope
+                                                                      .wholesale,
+                                                                BuyV2Destination
+                                                                    .medicine =>
+                                                                  BuyV2CartScope
+                                                                      .medicine,
+                                                                _ =>
+                                                                  BuyV2CartScope
+                                                                      .shop,
+                                                              },
+                                                            ),
+                                                          ),
+                                                      ],
+                                                    )
+                                                  : routeDepth ==
+                                                        _storeProductRouteDepth
+                                                  ? _currentView(session)
+                                                  : const SizedBox.expand()),
+                                        ),
+                                      ),
+                                      ?_buildDeliveryRestore(session, update),
+                                      if (session.notice case final message?)
+                                        Positioned(
+                                          right: 8,
+                                          top: 8,
+                                          child: _BuyNotice(message: message),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      bottomNavigationBar:
+                          showingProduct ||
+                              MediaQuery.viewInsetsOf(context).bottom > 0
+                          ? null
+                          : _buildDestinationNavigation(
+                              session,
+                              navigation,
+                              update: update,
+                            ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        transitionsBuilder: (context, animation, _, child) {
+          if (MediaQuery.disableAnimationsOf(context)) return child;
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+            reverseCurve: Curves.easeInCubic,
+          );
+          return FadeTransition(
+            key: const ValueKey('buy-store-product-route-motion'),
+            opacity: Tween<double>(begin: .86, end: 1).animate(curved),
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(.035, 0),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
+            ),
+          );
+        },
+      ),
+    );
+    _storeProductRouteDepth--;
+    if (!mounted) return openCart ?? false;
+    setState(() {});
+    if (generation != _storeNavigationGeneration || widget.session != session) {
+      return false;
+    }
+    restoreOrigin();
+    return openCart ?? false;
+  }
+
+  void _dismissStoreProductRoutes() {
+    if (_storeProductRouteDepth == 0) return;
+    final root = ModalRoute.of(context);
+    if (root == null) return;
+    _storeNavigationGeneration++;
+    Navigator.of(context).popUntil((route) => route == root);
+  }
+
+  void _openShopChat() {
+    HapticFeedback.selectionClick();
+    FocusScope.of(context).unfocus();
+    final router = GoRouter.maybeOf(context);
+    if (router == null) {
+      widget.onOpenChat?.call();
+      return;
+    }
+    final session = widget.session;
     context.push(
-      Uri(
-        path: '/app/chat/inbox',
-        queryParameters: {'return': returnRoute ?? '/app/buy'},
-      ).toString(),
+      const BuyV2ChatRouteAdapter().locationFor(
+        destination: session.activeDockDestination,
+        view: session.view,
+        offersActive: _offersActive,
+        cartScope: session.cartScope,
+        checkoutScope: session.checkoutScope,
+        productId: session.selectedProductId,
+        orderId: session.selectedOrderId,
+        recoveryKind: session.recoveryKind,
+      ),
+    );
+  }
+
+  void _exitBuy() {
+    if (widget.onExit case final onExit?) {
+      onExit();
+    } else {
+      context.go('/app/mool?from=buy');
+    }
+  }
+
+  Widget _procurementScopeRecovery(
+    BuyV2Session session, {
+    required VoidCallback onReturn,
+  }) => BuyV2ThemeScope(
+    spec: BuyV2ThemeSpec.resolve(session.destination, session.view),
+    child: PopScope<Object?>(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) onReturn();
+      },
+      child: _BuySystemBars(
+        child: Scaffold(
+          key: const ValueKey('buy-procurement-scope-recovery'),
+          backgroundColor: Colors.white,
+          body: SafeArea(
+            child: BuyV2CatalogueAvailabilityView(
+              session: session,
+              title: 'Reopen your Store purchase',
+              detail: session.procurementUnavailableMessage,
+              loading: false,
+              retryAvailable: false,
+              onReturn: onReturn,
+              returnLabel: 'Back to Store',
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+
+  Widget? _procurementPurchaseRecovery(
+    BuyV2Session session, {
+    VoidCallback? onProductReturn,
+  }) {
+    if (!session.isStoreProcurement ||
+        session.linkedProductRecoveryId != null) {
+      return null;
+    }
+    final message = switch (session.view) {
+      BuyV2View.catalogue when session.destination != BuyV2Destination.orders =>
+        session.procurementUnavailableMessage,
+      BuyV2View.product =>
+        session.selectedProduct == null
+            ? session.procurementUnavailableMessage
+            : session.procurementProductUnavailableMessage(
+                session.selectedProduct!,
+              ),
+      BuyV2View.checkout => session.procurementCheckoutUnavailableMessage,
+      _ => null,
+    };
+    if (message == null) return null;
+    final loading = session.commerceLoadState == BuyV2CommerceLoadState.loading;
+    final checkout = session.view == BuyV2View.checkout;
+    return BuyV2CatalogueAvailabilityView(
+      session: session,
+      title: loading
+          ? 'Checking Store purchasing'
+          : 'Store purchase unavailable',
+      detail: loading
+          ? 'Checking approval and current supplier offers.'
+          : message,
+      loading: loading,
+      onReturn: checkout
+          ? () => session.openCart(scope: session.checkoutScope)
+          : session.view == BuyV2View.product
+          ? onProductReturn ?? session.goBack
+          : _exitBuy,
+      returnLabel: checkout
+          ? 'Back to Cart'
+          : session.view == BuyV2View.product
+          ? 'Back to products'
+          : 'Back to Store',
     );
   }
 
   Widget _currentView(BuyV2Session session) {
+    final linkedProductId = session.linkedProductRecoveryId;
+    if (linkedProductId != null) {
+      return BuyV2CatalogueAvailabilityView(
+        key: const ValueKey('buy-linked-product-recovery'),
+        session: session,
+        title: session.linkedProductLoading
+            ? 'Opening product'
+            : 'Product unavailable',
+        detail: session.linkedProductLoading
+            ? 'Checking this product and its current availability.'
+            : session.linkedProductMessage,
+        loading: session.linkedProductLoading,
+        onRetry: () => unawaited(session.openLinkedProduct(linkedProductId)),
+        onReturn: session.goBack,
+      );
+    }
+    final cartStoreAnchor = switch (session.cartScope) {
+      BuyV2CartScope.all => _storeBrowseAnchor,
+      BuyV2CartScope.shop => _storeBrowseAnchors[BuyV2Destination.shop],
+      BuyV2CartScope.wholesale =>
+        _storeBrowseAnchors[BuyV2Destination.wholesale],
+      BuyV2CartScope.medicine => _storeBrowseAnchors[BuyV2Destination.medicine],
+    };
+    if (_offersActive && session.view == BuyV2View.catalogue) {
+      return BuyV2OffersView(session: session, source: widget.offersSource);
+    }
     if (session.destination == BuyV2Destination.orders &&
         session.view == BuyV2View.catalogue) {
-      return BuyV2OrdersView(session: session);
+      return BuyV2OrdersView(
+        session: session,
+        onOpenOrderHelp: _openOrderHelpChat,
+        invoiceDownloader: widget.invoiceDownloader,
+        browseProducts: session.visibleProducts.isEmpty
+            ? null
+            : BuyV2ProgressiveProductGrid(
+                session: session,
+                products: session.visibleProducts,
+                storageKey: 'buy-orders-products',
+                semanticLabel: 'Products to buy from Orders',
+              ),
+      );
     }
     return switch (session.view) {
-      BuyV2View.catalogue => BuyV2CatalogueView(session: session),
-      BuyV2View.product => BuyV2ProductView(session: session),
-      BuyV2View.cart => BuyV2CartView(session: session),
-      BuyV2View.checkout => BuyV2CheckoutView(session: session),
-      BuyV2View.confirmation => BuyV2ConfirmationView(session: session),
-      BuyV2View.tracking => BuyV2TrackingView(session: session),
+      BuyV2View.catalogue => BuyV2CatalogueView(
+        session: session,
+        onVisitProduct: (product, label) async {
+          await _openStoreProduct(product, returnLabel: label);
+        },
+        onOpenStore: _openPartnerCatalogue,
+      ),
+      BuyV2View.product => BuyV2ProductView(
+        session: session,
+        scrollController: _rootProductScrollController,
+        returnLabel: _offersActive ? 'Offers' : null,
+        onAskSeller: _openProductQuestion,
+        onVisitComparisonProduct: (product) async {
+          await _openStoreProduct(product, returnLabel: 'Compare suppliers');
+        },
+        onOpenPartnerCatalogue: _openPartnerCatalogue,
+        wholesaleTradeDecisionAdapter: widget.wholesaleTradeDecisionAdapter,
+      ),
+      BuyV2View.cart => BuyV2CartView(
+        session: session,
+        storeLabel: cartStoreAnchor?.seller,
+        onBrowseStore: cartStoreAnchor == null
+            ? null
+            : () => _openPartnerCatalogue(cartStoreAnchor),
+        onBrowseMore: () {
+          if (_offersActive) {
+            _openOffers();
+            return;
+          }
+          final destination = switch (session.cartScope) {
+            BuyV2CartScope.wholesale => BuyV2Destination.wholesale,
+            BuyV2CartScope.medicine => BuyV2Destination.medicine,
+            BuyV2CartScope.all || BuyV2CartScope.shop => BuyV2Destination.shop,
+          };
+          _openBuyDestination(destination);
+        },
+      ),
+      BuyV2View.checkout => BuyV2CheckoutView(
+        session: session,
+        gstInvoiceController: _gstInvoiceController,
+        keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
+        paymentHandoff: widget.paymentHandoff,
+      ),
+      BuyV2View.confirmation => BuyV2ConfirmationView(
+        session: session,
+        invoiceDownloader: widget.invoiceDownloader,
+      ),
+      BuyV2View.tracking => BuyV2TrackingView(
+        session: session,
+        onRestoreDeliveryStatus: _deliveryStatusRestore(session),
+        collectionCameraBuilder: widget.collectionCameraBuilder,
+        onOpenOrderHelp: _openOrderHelpChat,
+        invoiceDownloader: widget.invoiceDownloader,
+        paymentHandoff: widget.paymentHandoff,
+        liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
+      ),
       BuyV2View.orderItems => BuyV2OrderItemsView(session: session),
-      BuyV2View.assist => BuyV2AssistView(session: session),
-      BuyV2View.account => BuyV2AccountView(session: session),
-      BuyV2View.recovery => BuyV2RecoveryView(session: session),
+      BuyV2View.assist => BuyV2TrackingView(
+        session: session,
+        onRestoreDeliveryStatus: _deliveryStatusRestore(session),
+        collectionCameraBuilder: widget.collectionCameraBuilder,
+        onOpenOrderHelp: _openOrderHelpChat,
+        invoiceDownloader: widget.invoiceDownloader,
+        paymentHandoff: widget.paymentHandoff,
+        liveDeliveryMapBuilder: widget.liveDeliveryMapBuilder,
+      ),
+      BuyV2View.account => BuyV2AccountView(
+        session: session,
+        accountIdentity: widget.accountIdentity,
+        accountAuthenticated: widget.accountAuthenticated,
+      ),
+      BuyV2View.recovery => BuyV2RecoveryView(
+        session: session,
+        onOpenOrderHelp: _openOrderHelpChat,
+      ),
     };
+  }
+}
+
+String _buyOrderStatusLabel(BuyV2OrderStatus status) => switch (status) {
+  BuyV2OrderStatus.preparing => 'Preparing your order',
+  BuyV2OrderStatus.confirmed => 'Order confirmed',
+  BuyV2OrderStatus.dispatched => 'On the way',
+  BuyV2OrderStatus.arriving => 'Arriving soon',
+  BuyV2OrderStatus.delivered => 'Delivered',
+};
+
+class _BuyQuickDeliveryStatusBar extends StatelessWidget {
+  const _BuyQuickDeliveryStatusBar({
+    required this.order,
+    required this.arrivalSummary,
+    required this.artwork,
+    required this.minimized,
+    required this.kept,
+    required this.soundOnArrival,
+    required this.soundPreparing,
+    required this.soundError,
+    required this.onMinimizedChanged,
+    required this.onHiddenChanged,
+    required this.onSoundChanged,
+    required this.onKeepOnScreen,
+    required this.onOpen,
+  });
+
+  final BuyV2Order order;
+  final String arrivalSummary;
+  final BuyV2DeliveryArtwork artwork;
+  final bool minimized;
+  final bool kept;
+  final bool soundOnArrival;
+  final bool soundPreparing;
+  final String? soundError;
+  final ValueChanged<bool> onMinimizedChanged;
+  final ValueChanged<bool> onHiddenChanged;
+  final ValueChanged<bool> onSoundChanged;
+  final VoidCallback onKeepOnScreen;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final status = _buyOrderStatusLabel(order.status);
+    final promise = arrivalSummary;
+    const statusStyle = TextStyle(
+      color: BuyV2Colors.navy,
+      fontSize: 9,
+      fontWeight: FontWeight.w800,
+    );
+    final measuredWidth =
+        buyV2ValueTextSize(context, status, statusStyle).width + 74;
+    final collapsedWidth = (measuredWidth < 236 ? 236.0 : measuredWidth)
+        .clamp(0.0, MediaQuery.sizeOf(context).width - 16)
+        .toDouble();
+    final statusBar = minimized
+        ? Align(
+            alignment: Alignment.centerRight,
+            child: SizedBox(
+              key: const ValueKey('buy-quick-delivery-status-minimized'),
+              width: collapsedWidth,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    height: 44,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Expanded(
+                          child: InkWell(
+                            key: const ValueKey(
+                              'buy-quick-delivery-open-minimized',
+                            ),
+                            onTap: onOpen,
+                            child: Padding(
+                              padding: const EdgeInsets.only(left: 4),
+                              child: Row(
+                                children: [
+                                  BuyV2DeliveryModeIcon(
+                                    artwork: artwork,
+                                    color: BuyV2Colors.royal,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Expanded(
+                                    child: Semantics(
+                                      label: '$status · $promise',
+                                      excludeSemantics: true,
+                                      child: Text(
+                                        status,
+                                        maxLines: 1,
+                                        style: statusStyle,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          key: const ValueKey('buy-quick-delivery-expand'),
+                          tooltip: 'Show delivery choices',
+                          onPressed: () => onMinimizedChanged(false),
+                          icon: const Icon(Icons.expand_more_rounded, size: 18),
+                          color: BuyV2Colors.royal,
+                          style: IconButton.styleFrom(
+                            minimumSize: const Size(48, 44),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  BuyV2HonestProgressIndicator(
+                    ownerId: order.id,
+                    progress: order.progress,
+                    statusLabel: _buyOrderStatusLabel(order.status),
+                    backgroundColor: BuyV2Colors.softBlue,
+                    valueColor: BuyV2Colors.royal,
+                    minHeight: 2,
+                  ),
+                ],
+              ),
+            ),
+          )
+        : Padding(
+            key: const ValueKey('buy-quick-delivery-status-expanded'),
+            padding: const EdgeInsets.fromLTRB(10, 5, 6, 4),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    BuyV2DeliveryModeIcon(
+                      artwork: artwork,
+                      color: BuyV2Colors.navy,
+                      size: 19,
+                    ),
+                    const SizedBox(width: 7),
+                    Expanded(
+                      child: InkWell(
+                        key: const ValueKey('buy-quick-delivery-open'),
+                        onTap: onOpen,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(switch (artwork) {
+                              BuyV2DeliveryArtwork.quick => 'Quick delivery',
+                              BuyV2DeliveryArtwork.wholesale =>
+                                'Wholesale delivery',
+                              BuyV2DeliveryArtwork.bulk => 'Bulk delivery',
+                              BuyV2DeliveryArtwork.courier => 'Delivery',
+                            }, style: context.buyBody.copyWith(fontSize: 12)),
+                            Text(
+                              '$status · $promise',
+                              style: context.buyMeta.copyWith(fontSize: 11),
+                            ),
+                            Text(
+                              order.id,
+                              style: context.buyMeta.copyWith(fontSize: 9),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      key: const ValueKey('buy-quick-delivery-minimize'),
+                      tooltip: 'Minimize delivery status',
+                      onPressed: () => onMinimizedChanged(true),
+                      icon: const Icon(Icons.expand_less_rounded, size: 18),
+                      color: BuyV2Colors.navy,
+                      style: IconButton.styleFrom(
+                        minimumSize: const Size(44, 44),
+                      ),
+                    ),
+                  ],
+                ),
+                BuyV2HonestProgressIndicator(
+                  ownerId: order.id,
+                  progress: order.progress,
+                  statusLabel: _buyOrderStatusLabel(order.status),
+                  backgroundColor: BuyV2Colors.softBlue,
+                  valueColor: BuyV2Colors.navy,
+                  minHeight: 4,
+                ),
+                const SizedBox(height: 4),
+                Wrap(
+                  spacing: 4,
+                  runSpacing: 2,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    if (order.status != BuyV2OrderStatus.delivered) ...[
+                      TextButton.icon(
+                        key: const ValueKey('buy-quick-delivery-keep'),
+                        onPressed: onKeepOnScreen,
+                        style: TextButton.styleFrom(
+                          minimumSize: const Size(0, 44),
+                          padding: const EdgeInsets.symmetric(horizontal: 6),
+                        ),
+                        icon: Icon(
+                          kept
+                              ? Icons.push_pin_rounded
+                              : Icons.push_pin_outlined,
+                          size: 15,
+                        ),
+                        label: Text(
+                          kept ? 'Kept' : 'Keep',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        key: const ValueKey('buy-quick-delivery-sound'),
+                        tooltip: soundPreparing
+                            ? 'Setting arrival sound'
+                            : soundOnArrival
+                            ? 'Mute arrival sound for this delivery'
+                            : 'Enable arrival sound for this delivery',
+                        isSelected: soundOnArrival,
+                        onPressed: soundPreparing
+                            ? null
+                            : () => onSoundChanged(!soundOnArrival),
+                        icon: Icon(
+                          soundPreparing
+                              ? Icons.hourglass_top
+                              : Icons.volume_off_outlined,
+                        ),
+                        selectedIcon: const Icon(Icons.volume_up_rounded),
+                        style: IconButton.styleFrom(
+                          minimumSize: const Size(44, 44),
+                        ),
+                      ),
+                    ],
+                    TextButton.icon(
+                      key: const ValueKey('buy-quick-delivery-hide'),
+                      onPressed: () => onHiddenChanged(true),
+                      style: TextButton.styleFrom(
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                      ),
+                      icon: const Icon(Icons.visibility_off_outlined, size: 15),
+                      label: const Text(
+                        'Hide',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                if (order.status != BuyV2OrderStatus.delivered &&
+                    (soundOnArrival || soundError != null))
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      soundError ?? 'Sounds while you use the app.',
+                      key: const ValueKey('buy-quick-delivery-sound-message'),
+                      style: context.buyMeta.copyWith(fontSize: 10),
+                    ),
+                  ),
+              ],
+            ),
+          );
+    if (MediaQuery.disableAnimationsOf(context)) return statusBar;
+    return AnimatedSize(
+      duration: BuyV2Motion.expandCollapse,
+      curve: Curves.easeOutCubic,
+      alignment: Alignment.topCenter,
+      child: statusBar,
+    );
   }
 }
 
@@ -509,6 +2883,7 @@ class _BuyExpandCollapseOwner extends StatelessWidget {
     return TweenAnimationBuilder<double>(
       key: const ValueKey('buy-expand-collapse-owner-tween'),
       duration: duration,
+      onEnd: BuyV2CartAvoidanceScope.of(context)?.schedule,
       curve: Curves.easeOutCubic,
       tween: Tween<double>(begin: duration == Duration.zero ? 1 : 0, end: 1),
       builder: (context, value, child) => Opacity(
@@ -565,6 +2940,7 @@ class _BuyNavigationSurfaceOwnerState
         key: ValueKey<int>(widget.stateKey),
         tween: Tween<double>(begin: firstBuild ? 1 : 0, end: 1),
         duration: BuyV2Motion.routeChange,
+        onEnd: BuyV2CartAvoidanceScope.of(context)?.schedule,
         child: KeyedSubtree(
           key: const ValueKey('buy-navigation-surface-current'),
           child: widget.child,
@@ -605,3261 +2981,54 @@ class _BuyNavigationSurfaceOwnerState
   }
 }
 
-class _BuyHeader extends StatelessWidget {
-  const _BuyHeader({required this.session, required this.onOpenChat});
-
-  final BuyV2Session session;
-  final VoidCallback onOpenChat;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = BuyV2ThemeScope.of(context);
-    return MoolFiniteGradientTransition(
-      key: const ValueKey('buy-shared-header'),
-      gradient: theme.headerGradient,
-      duration: BuyV2Motion.routeChange,
-      child: _ContextualGlassHeader(
-        session: session,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 5, 8, 5),
-          child: Row(
-            children: [
-              SizedBox(
-                key: const ValueKey('buy-header-context-slot'),
-                width: 44,
-                height: 56,
-                child: Center(
-                  child: SizedBox(
-                    width: 38,
-                    height: 38,
-                    child: _HeaderContextButton(session: session),
-                  ),
-                ),
-              ),
-              const Spacer(),
-              MoolGlobalChatShortcut(
-                keyName: 'buy-global-chat',
-                onPressed: onOpenChat,
-                onDarkSurface: true,
-              ),
-              const SizedBox(width: 4),
-              Semantics(
-                label: session.view == BuyV2View.account
-                    ? 'Close profile and return to purchases'
-                    : 'Open profile and account',
-                button: true,
-                child: InkWell(
-                  key: const ValueKey('buy-open-account'),
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    if (session.view == BuyV2View.account) {
-                      session.closeAccount();
-                    } else {
-                      session.openAccount();
-                    }
-                  },
-                  customBorder: const CircleBorder(),
-                  child: SizedBox(
-                    width: 44,
-                    height: 56,
-                    child: Center(
-                      child: Stack(
-                        clipBehavior: Clip.none,
-                        children: [
-                          Container(
-                            key: const ValueKey('buy-profile-glass-core'),
-                            width: 34,
-                            height: 34,
-                            alignment: Alignment.center,
-                            decoration: BoxDecoration(
-                              color: BuyV2Colors.navy.withValues(alpha: .76),
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: .90),
-                                width: 1.4,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: BuyV2Colors.navy.withValues(
-                                    alpha: .24,
-                                  ),
-                                  blurRadius: 7,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              'DC',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                          Positioned(
-                            right: -1,
-                            bottom: 1,
-                            child: Container(
-                              width: 9,
-                              height: 9,
-                              decoration: BoxDecoration(
-                                color: BuyV2Colors.green,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 1.5,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ContextualGlassHeader extends StatelessWidget {
-  const _ContextualGlassHeader({required this.session, required this.child});
-
-  final BuyV2Session session;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final destination = session.destination;
-    final view = session.view;
-    final reduced = MediaQuery.disableAnimationsOf(context);
-    final promoAction = _resolveHeaderPromoAction(context, session);
-    return TweenAnimationBuilder<double>(
-      key: ValueKey<String>(
-        'buy-contextual-glass-motion-${destination.name}-${view.name}',
-      ),
-      tween: Tween<double>(begin: reduced ? 1 : 0, end: 1),
-      duration: BuyV2Motion.resolved(
-        context,
-        const Duration(milliseconds: 3600),
-      ),
-      curve: Curves.linear,
-      builder: (context, progress, _) => ClipRect(
-        key: const ValueKey('buy-contextual-glass-header'),
-        child: Stack(
-          fit: StackFit.passthrough,
-          children: [
-            Positioned.fill(
-              child: IgnorePointer(
-                child: ColoredBox(
-                  key: const ValueKey('buy-header-navy-depth-stage'),
-                  color: BuyV2Colors.navy,
-                  child: _HeaderSignatureMotion(
-                    destination: destination,
-                    view: view,
-                    progress: progress,
-                  ),
-                ),
-              ),
-            ),
-            Positioned.fill(
-              child: IgnorePointer(
-                child: DecoratedBox(
-                  key: const ValueKey('buy-header-contrast-veil'),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      stops: const [0, .38, .76, 1],
-                      colors: [
-                        BuyV2Colors.navy.withValues(alpha: .18),
-                        BuyV2Colors.navy.withValues(alpha: .03),
-                        BuyV2Colors.navy.withValues(alpha: .22),
-                        BuyV2Colors.navy.withValues(alpha: .10),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            if (promoAction != null)
-              Positioned(
-                left: 8,
-                width: 96,
-                top: 0,
-                bottom: 0,
-                child: _HeaderPromoTapTarget(
-                  destination: destination,
-                  slot: _HeaderScenePainter.creativeSlotForProgress(progress),
-                  action: promoAction,
-                ),
-              ),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderPromoTapTarget extends StatelessWidget {
-  const _HeaderPromoTapTarget({
-    required this.destination,
-    required this.slot,
-    required this.action,
-  });
-
-  final BuyV2Destination destination;
-  final int slot;
-  final _HeaderPromoAction action;
-
-  @override
-  Widget build(BuildContext context) {
-    void dispatchAction() {
-      HapticFeedback.selectionClick();
-      action.onTap();
-    }
-
-    return Semantics(
-      key: ValueKey<String>(
-        'buy-header-promo-stage-action-${destination.name}-$slot',
-      ),
-      label:
-          '${destination.label} visual promotion ${slot + 1} of 5. '
-          '${action.semantics}',
-      button: true,
-      onTap: dispatchAction,
-      excludeSemantics: true,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          key: ValueKey<String>(
-            'buy-header-promo-stage-tap-${destination.name}-$slot',
-          ),
-          onTap: dispatchAction,
-          splashColor: Colors.white.withValues(alpha: .10),
-          highlightColor: Colors.white.withValues(alpha: .055),
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderSignatureMotion extends StatelessWidget {
-  const _HeaderSignatureMotion({
-    required this.destination,
-    required this.view,
-    required this.progress,
-  });
-
-  final BuyV2Destination destination;
-  final BuyV2View view;
-  final double progress;
-
-  @override
-  Widget build(BuildContext context) {
-    final signatureKey = switch (destination) {
-      BuyV2Destination.shop => 'buy-header-signature-shop',
-      BuyV2Destination.wholesale => 'buy-header-signature-wholesale',
-      BuyV2Destination.medicine => 'buy-header-signature-medicine',
-      BuyV2Destination.orders => 'buy-header-signature-orders',
-    };
-    return RepaintBoundary(
-      key: const ValueKey('buy-header-visual-creative-reel'),
-      child: CustomPaint(
-        key: ValueKey<String>(signatureKey),
-        painter: _HeaderScenePainter(
-          destination: destination,
-          view: view,
-          progress: progress,
-        ),
-        child: const SizedBox.expand(),
-      ),
-    );
-  }
-}
-
-class _HeaderScenePainter extends CustomPainter {
-  const _HeaderScenePainter({
-    required this.destination,
-    required this.view,
-    required this.progress,
-  });
-
-  final BuyV2Destination destination;
-  final BuyV2View view;
-  final double progress;
-
-  static const int _creativeSlotsPerContext = 5;
-  static const int _totalVisualCreativeSlots = 20;
-  static const Color _shopLight = Color(0xFF00D4FF);
-  static const Color _shopRim = Color(0xFF7C4DFF);
-  static const Color _wholesaleLight = Color(0xFF00BFA5);
-  static const Color _wholesaleRim = Color(0xFFFFCA28);
-  static const Color _medicineLight = Color(0xFF47D7FF);
-  static const Color _medicineRim = Color(0xFF9D7CFF);
-  static const Color _ordersLight = Color(0xFF42A5F5);
-  static const Color _ordersRim = Color(0xFFE040FB);
-
-  ({Color primary, Color secondary, Color tertiary}) get _promoPalette =>
-      switch (destination) {
-        BuyV2Destination.shop => (
-          primary: _shopLight,
-          secondary: _shopRim,
-          tertiary: _ordersRim,
-        ),
-        BuyV2Destination.wholesale => (
-          primary: _wholesaleLight,
-          secondary: _wholesaleRim,
-          tertiary: _shopLight,
-        ),
-        BuyV2Destination.medicine => (
-          primary: _medicineLight,
-          secondary: _medicineRim,
-          tertiary: _wholesaleLight,
-        ),
-        BuyV2Destination.orders => (
-          primary: _ordersLight,
-          secondary: _ordersRim,
-          tertiary: _medicineLight,
-        ),
-      };
-
-  Offset _cameraVanishingPoint(Size size) {
-    final horizontalDolly = math.sin(progress * math.pi) * .026;
-    final verticalDolly = math.cos(progress * math.pi * .82) * .026;
-    return Offset(
-      size.width * (.70 + horizontalDolly),
-      size.height * (.47 + verticalDolly),
-    );
-  }
-
-  static int creativeSlotForProgress(double progress) {
-    final reelArrival = progress <= .08
-        ? 0.0
-        : progress >= .88
-        ? 1.0
-        : Curves.easeOutCubic.transform((progress - .08) / .80);
-    final reelPosition =
-        Curves.easeInOutCubic.transform(reelArrival) *
-        (_creativeSlotsPerContext - 1);
-    return reelPosition.round().clamp(0, _creativeSlotsPerContext - 1);
-  }
-
-  double _phase(double begin, double end) {
-    if (progress <= begin) return 0;
-    if (progress >= end) return 1;
-    return Curves.easeOutCubic.transform((progress - begin) / (end - begin));
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final bounds = Offset.zero & size;
-    final far = .58 + (.42 * _phase(0, .42));
-    final middle = .34 + (.66 * _phase(.16, .70));
-    final near = .16 + (.84 * _phase(.34, .96));
-    canvas.drawRect(bounds, Paint()..color = BuyV2Colors.navy);
-    _paintCinematicVolume(canvas, size, far, middle);
-    _paintContextCreativeReel(canvas, size, far, middle, near);
-    _paintForegroundOcclusion(canvas, size, near);
-  }
-
-  void _paintCinematicVolume(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-  ) {
-    final bounds = Offset.zero & size;
-    final vanishing = _cameraVanishingPoint(size);
-    final palette = _promoPalette;
-    canvas.drawRect(
-      bounds,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(.46, -.08),
-          radius: 1.32,
-          stops: const [0, .18, .50, .78, 1],
-          colors: [
-            Color.lerp(
-              Colors.white,
-              palette.primary,
-              .44,
-            )!.withValues(alpha: .27 * far),
-            palette.tertiary.withValues(alpha: .15 * middle),
-            palette.secondary.withValues(alpha: .18 * far),
-            BuyV2Colors.navy.withValues(alpha: .12),
-            BuyV2Colors.navy,
-          ],
-        ).createShader(bounds),
-    );
-    canvas.drawRect(
-      bounds,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          stops: const [0, .25, .52, .76, 1],
-          colors: [
-            palette.primary.withValues(alpha: .40 * far),
-            Colors.white.withValues(alpha: .085 * far),
-            BuyV2Colors.navy.withValues(alpha: 0),
-            palette.secondary.withValues(alpha: .34 * middle),
-            palette.tertiary.withValues(alpha: .28 * middle),
-          ],
-        ).createShader(bounds),
-    );
-    for (final glow in <({Offset centre, Color colour, double radius})>[
-      (
-        centre: Offset(size.width * .08, size.height * .08),
-        colour: palette.primary,
-        radius: size.width * .28,
-      ),
-      (
-        centre: Offset(size.width * .92, size.height * .14),
-        colour: palette.secondary,
-        radius: size.width * .24,
-      ),
-      (
-        centre: Offset(size.width * .66, size.height * .98),
-        colour: palette.tertiary,
-        radius: size.width * .32,
-      ),
-    ]) {
-      canvas.drawCircle(
-        glow.centre,
-        glow.radius,
-        Paint()
-          ..shader =
-              RadialGradient(
-                colors: [
-                  glow.colour.withValues(alpha: .12 * middle),
-                  glow.colour.withValues(alpha: .035 * far),
-                  glow.colour.withValues(alpha: 0),
-                ],
-              ).createShader(
-                Rect.fromCircle(center: glow.centre, radius: glow.radius),
-              ),
-      );
-    }
-
-    final portal = RRect.fromRectAndRadius(
-      Rect.fromCenter(
-        center: vanishing,
-        width: 22 + (12 * far),
-        height: 13 + (8 * far),
-      ),
-      const Radius.circular(4),
-    );
-    final ceiling = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(portal.right, portal.top)
-      ..lineTo(portal.left, portal.top)
-      ..close();
-    final floor = Path()
-      ..moveTo(0, size.height)
-      ..lineTo(portal.left, portal.bottom)
-      ..lineTo(portal.right, portal.bottom)
-      ..lineTo(size.width, size.height)
-      ..close();
-    final leftWall = Path()
-      ..moveTo(0, 0)
-      ..lineTo(portal.left, portal.top)
-      ..lineTo(portal.left, portal.bottom)
-      ..lineTo(0, size.height)
-      ..close();
-    final rightWall = Path()
-      ..moveTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(portal.right, portal.bottom)
-      ..lineTo(portal.right, portal.top)
-      ..close();
-    canvas.drawPath(
-      ceiling,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            palette.tertiary.withValues(alpha: .24 * far),
-            Color.lerp(
-              BuyV2Colors.navy,
-              palette.primary,
-              .18,
-            )!.withValues(alpha: .82),
-            Colors.white.withValues(alpha: .045 * middle),
-          ],
-        ).createShader(bounds),
-    );
-    canvas.drawPath(
-      leftWall,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            Color.lerp(
-              BuyV2Colors.navy,
-              palette.primary,
-              .42,
-            )!.withValues(alpha: .94),
-            palette.primary.withValues(alpha: .19 * far),
-            palette.tertiary.withValues(alpha: .10 * middle),
-          ],
-        ).createShader(bounds),
-    );
-    canvas.drawPath(
-      rightWall,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerRight,
-          end: Alignment.centerLeft,
-          colors: [
-            Color.lerp(
-              BuyV2Colors.navy,
-              palette.secondary,
-              .38,
-            )!.withValues(alpha: .92),
-            palette.secondary.withValues(alpha: .21 * middle),
-            palette.tertiary.withValues(alpha: .095 * far),
-          ],
-        ).createShader(bounds),
-    );
-    canvas.drawPath(
-      floor,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          stops: const [0, .34, .72, 1],
-          colors: [
-            palette.primary.withValues(alpha: .20 * middle),
-            Color.lerp(
-              BuyV2Colors.navy,
-              palette.tertiary,
-              .26,
-            )!.withValues(alpha: .56),
-            palette.secondary.withValues(alpha: .22 * middle),
-            BuyV2Colors.navy.withValues(alpha: .48),
-          ],
-        ).createShader(bounds),
-    );
-    _paintPoolRoomSurfaces(canvas, size, portal, far, middle);
-    _paintBroadcastLighting(canvas, size, portal, far, middle);
-
-    for (var frame = 0; frame < 9; frame += 1) {
-      final frameArrival = (far - (frame * .025)).clamp(0.0, 1.0);
-      if (frameArrival <= 0) continue;
-      final depth = frame / 8;
-      final expansion = Curves.easeInCubic.transform(depth);
-      final rect = Rect.fromCenter(
-        center: Offset(
-          vanishing.dx - (size.width * .07 * expansion),
-          vanishing.dy + (size.height * .018 * expansion),
-        ),
-        width: 24 + (size.width * 1.16 * expansion),
-        height: 14 + (size.height * 1.52 * expansion),
-      );
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(rect, Radius.circular(4 + (8 * expansion))),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = frame < 2 ? .95 : .55
-          ..color = Colors.white.withValues(
-            alpha: (.18 - (frame * .014)) * frameArrival,
-          ),
-      );
-    }
-
-    final edge = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = .75
-      ..color = Colors.white.withValues(alpha: .17 * far);
-    for (final corner in <Offset>[
-      Offset.zero,
-      Offset(size.width, 0),
-      Offset(0, size.height),
-      Offset(size.width, size.height),
-    ]) {
-      canvas.drawLine(corner, vanishing, edge);
-    }
-
-    for (var panel = 0; panel < 5; panel += 1) {
-      final t = (panel + 1) / 6;
-      final centre = Offset.lerp(
-        Offset(size.width * (.12 + (panel * .18)), -4),
-        vanishing,
-        .28 + (.08 * panel),
-      )!;
-      final panelRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: centre,
-          width: 18 - (7 * t),
-          height: 7 - (2.5 * t),
-        ),
-        const Radius.circular(2),
-      );
-      canvas.drawRRect(
-        panelRect,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [
-              Colors.white.withValues(alpha: .28 * far),
-              Colors.white.withValues(alpha: .065 * far),
-              BuyV2Colors.navy.withValues(alpha: .18),
-            ],
-          ).createShader(panelRect.outerRect),
-      );
-    }
-
-    for (var reflection = 0; reflection < 5; reflection += 1) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(
-            size.width * (.66 + (.025 * reflection)),
-            size.height * (.64 + (.075 * reflection)),
-          ),
-          width: size.width * (.13 + (.15 * reflection)),
-          height: 2.2 + (reflection * 1.3),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .65
-          ..color = Colors.white.withValues(
-            alpha: (.13 - (reflection * .019)) * middle,
-          ),
-      );
-    }
-
-    canvas.drawRRect(
-      portal,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: .26 * far),
-            Colors.white.withValues(alpha: .055 * far),
-            BuyV2Colors.navy.withValues(alpha: .64),
-          ],
-        ).createShader(portal.outerRect),
-    );
-    canvas.drawRRect(
-      portal,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: .42 * far),
-    );
-    canvas.drawCircle(portal.center, 2.1, Paint()..color = BuyV2Colors.green);
-    _paintVolumetricGlints(
-      canvas,
-      size,
-      far,
-      middle,
-      palette.primary,
-      palette.secondary,
-    );
-  }
-
-  void _paintPoolRoomSurfaces(
-    Canvas canvas,
-    Size size,
-    RRect portal,
-    double far,
-    double middle,
-  ) {
-    final bounds = Offset.zero & size;
-    final vanishing = portal.center;
-    final palette = _promoPalette;
-    for (var bay = 0; bay < 4; bay += 1) {
-      final depth = bay / 4;
-      final leftNearX = size.width * (.02 + (bay * .105));
-      final leftFarX = portal.left - (7 + (bay * 9));
-      final leftBay = Path()
-        ..moveTo(leftNearX, 5 + (bay * 2.2))
-        ..quadraticBezierTo(
-          size.width * (.38 + (.035 * bay)),
-          9 + (bay * 2),
-          leftFarX,
-          portal.top + (2 * depth),
-        )
-        ..lineTo(leftFarX, portal.bottom - (2 * depth))
-        ..quadraticBezierTo(
-          size.width * (.36 + (.04 * bay)),
-          size.height - (8 + (bay * 1.5)),
-          leftNearX,
-          size.height - (5 + (bay * 2)),
-        )
-        ..close();
-      canvas.drawPath(
-        leftBay,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.centerLeft,
-            end: Alignment.centerRight,
-            colors: [
-              Colors.white.withValues(alpha: (.085 - (.012 * bay)) * far),
-              BuyV2Colors.navy.withValues(alpha: .20 + (.08 * bay)),
-              Colors.white.withValues(alpha: .018 * middle),
-            ],
-          ).createShader(bounds),
-      );
-      canvas.drawPath(
-        leftBay,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = bay == 0 ? 1.15 : .65
-          ..color = Colors.white.withValues(alpha: (.24 - (.035 * bay)) * far),
-      );
-
-      final rightNearX = size.width * (.98 - (bay * .075));
-      final rightFarX = portal.right + (7 + (bay * 8));
-      final rightBay = Path()
-        ..moveTo(rightNearX, 5 + (bay * 2.4))
-        ..quadraticBezierTo(
-          size.width * (.88 - (.02 * bay)),
-          9 + (bay * 2),
-          rightFarX,
-          portal.top + (2 * depth),
-        )
-        ..lineTo(rightFarX, portal.bottom - (2 * depth))
-        ..quadraticBezierTo(
-          size.width * (.88 - (.02 * bay)),
-          size.height - (8 + (bay * 1.5)),
-          rightNearX,
-          size.height - (5 + (bay * 2)),
-        )
-        ..close();
-      canvas.drawPath(
-        rightBay,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.centerRight,
-            end: Alignment.centerLeft,
-            colors: [
-              Colors.white.withValues(alpha: (.10 - (.014 * bay)) * far),
-              BuyV2Colors.navy.withValues(alpha: .22 + (.07 * bay)),
-              Colors.white.withValues(alpha: .022 * middle),
-            ],
-          ).createShader(bounds),
-      );
-      canvas.drawPath(
-        rightBay,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = bay == 0 ? 1.15 : .65
-          ..color = Colors.white.withValues(alpha: (.26 - (.038 * bay)) * far),
-      );
-    }
-
-    for (var rim = 0; rim < 6; rim += 1) {
-      final expansion = rim * 15.0;
-      final pool = Rect.fromCenter(
-        center: Offset(
-          vanishing.dx - (expansion * .20),
-          size.height * (.67 + (.035 * rim)),
-        ),
-        width: 42 + (expansion * 2.1),
-        height: 5 + (rim * 2.4),
-      );
-      canvas.drawOval(
-        pool,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = rim == 0 ? 1.1 : .65
-          ..color = Colors.white.withValues(
-            alpha: (.28 - (.038 * rim)) * middle,
-          ),
-      );
-    }
-
-    final mirror = Path()
-      ..moveTo(portal.left + 3, portal.bottom)
-      ..lineTo(portal.right - 3, portal.bottom)
-      ..lineTo(size.width * .83, size.height)
-      ..lineTo(size.width * .42, size.height)
-      ..close();
-    canvas.drawPath(
-      mirror,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white.withValues(alpha: .15 * middle),
-            Colors.white.withValues(alpha: .025 * middle),
-            BuyV2Colors.navy.withValues(alpha: 0),
-          ],
-        ).createShader(bounds),
-    );
-
-    final cornerCore = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.05
-      ..strokeCap = StrokeCap.round
-      ..color = Color.lerp(
-        Colors.white,
-        palette.primary,
-        .42,
-      )!.withValues(alpha: .56 * far);
-    final cornerGlow = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.2
-      ..strokeCap = StrokeCap.round
-      ..color = palette.secondary.withValues(alpha: .16 * far);
-    final corners = <Path>[
-      Path()
-        ..moveTo(0, 0)
-        ..quadraticBezierTo(size.width * .38, 3, portal.left, portal.top),
-      Path()
-        ..moveTo(size.width, 0)
-        ..quadraticBezierTo(size.width * .88, 4, portal.right, portal.top),
-      Path()
-        ..moveTo(0, size.height)
-        ..quadraticBezierTo(
-          size.width * .36,
-          size.height - 4,
-          portal.left,
-          portal.bottom,
-        ),
-      Path()
-        ..moveTo(size.width, size.height)
-        ..quadraticBezierTo(
-          size.width * .89,
-          size.height - 4,
-          portal.right,
-          portal.bottom,
-        ),
-    ];
-    for (final corner in corners) {
-      canvas.drawPath(corner, cornerGlow);
-      canvas.drawPath(corner, cornerCore);
-    }
-
-    final deepLight = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          Colors.white.withValues(alpha: .28 * far),
-          palette.primary.withValues(alpha: .24 * far),
-          palette.secondary.withValues(alpha: .13 * middle),
-          palette.tertiary.withValues(alpha: .07 * middle),
-          BuyV2Colors.navy.withValues(alpha: 0),
-        ],
-      ).createShader(Rect.fromCircle(center: vanishing, radius: 35));
-    canvas.drawCircle(vanishing, 35, deepLight);
-  }
-
-  void _paintBroadcastLighting(
-    Canvas canvas,
-    Size size,
-    RRect portal,
-    double far,
-    double middle,
-  ) {
-    final palette = _promoPalette;
-    final vanishing = portal.center;
-    final bounds = Offset.zero & size;
-    final beamOrigins = <Offset>[
-      Offset(size.width * .06, 0),
-      Offset(size.width * .34, 0),
-      Offset(size.width * .78, 0),
-      Offset(size.width * .97, size.height),
-    ];
-    for (var beam = 0; beam < beamOrigins.length; beam += 1) {
-      final origin = beamOrigins[beam];
-      final colour = switch (beam % 3) {
-        0 => palette.primary,
-        1 => palette.secondary,
-        _ => palette.tertiary,
-      };
-      final width = 18.0 + (beam * 7);
-      final beamPath = Path()
-        ..moveTo(origin.dx - width, origin.dy)
-        ..lineTo(origin.dx + width, origin.dy)
-        ..lineTo(vanishing.dx + (beam.isEven ? 5 : -5), vanishing.dy + 2)
-        ..lineTo(vanishing.dx - (beam.isEven ? 5 : -5), vanishing.dy - 2)
-        ..close();
-      canvas.drawPath(
-        beamPath,
-        Paint()
-          ..shader = LinearGradient(
-            begin: beam < 3 ? Alignment.topCenter : Alignment.bottomRight,
-            end: Alignment.center,
-            colors: [
-              colour.withValues(alpha: .27 * far),
-              colour.withValues(alpha: .11 * middle),
-              colour.withValues(alpha: 0),
-            ],
-          ).createShader(bounds),
-      );
-    }
-
-    for (var curtain = 0; curtain < 6; curtain += 1) {
-      final t = curtain / 5;
-      final origin = Offset(size.width * (.08 + (.17 * curtain)), -2);
-      final colour = switch (curtain % 3) {
-        0 => palette.primary,
-        1 => palette.secondary,
-        _ => palette.tertiary,
-      };
-      final lightPath = Path()
-        ..moveTo(origin.dx, origin.dy)
-        ..quadraticBezierTo(
-          size.width * (.42 + (.09 * t)),
-          size.height * (.18 + (.12 * math.sin(t * math.pi))),
-          vanishing.dx,
-          vanishing.dy,
-        )
-        ..quadraticBezierTo(
-          size.width * (.54 + (.13 * t)),
-          size.height * .80,
-          size.width * (.22 + (.14 * curtain)),
-          size.height + 2,
-        );
-      canvas.drawPath(
-        lightPath,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 5.5 - (2.2 * t)
-          ..strokeCap = StrokeCap.round
-          ..color = colour.withValues(alpha: (.075 - (.025 * t)) * far)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5),
-      );
-      canvas.drawPath(
-        lightPath,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .55
-          ..strokeCap = StrokeCap.round
-          ..color = Color.lerp(
-            Colors.white,
-            colour,
-            .62,
-          )!.withValues(alpha: (.52 - (.15 * t)) * far),
-      );
-    }
-
-    for (var flare = 0; flare < 5; flare += 1) {
-      final t = flare / 4;
-      final centre = Offset.lerp(
-        vanishing,
-        Offset(size.width * .18, size.height * .70),
-        t,
-      )!;
-      final radius = 1.4 + (t * 5.5);
-      final colour = switch (flare % 3) {
-        0 => palette.primary,
-        1 => palette.secondary,
-        _ => palette.tertiary,
-      };
-      canvas.drawCircle(
-        centre,
-        radius,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .55
-          ..color = colour.withValues(alpha: (.46 - (.07 * flare)) * middle),
-      );
-    }
-
-    final lensBloom = Rect.fromCircle(
-      center: vanishing,
-      radius: 28 + (18 * middle),
-    );
-    canvas.drawCircle(
-      vanishing,
-      lensBloom.width / 2,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Colors.white.withValues(alpha: .18 * far),
-            palette.primary.withValues(alpha: .21 * middle),
-            palette.secondary.withValues(alpha: .11 * middle),
-            palette.tertiary.withValues(alpha: .055 * middle),
-            BuyV2Colors.navy.withValues(alpha: 0),
-          ],
-        ).createShader(lensBloom),
-    );
-  }
-
-  void _paintContextCreativeReel(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    assert(_creativeSlotsPerContext * 4 == _totalVisualCreativeSlots);
-    final reelArrival = _phase(.08, .88);
-    final reelPosition =
-        Curves.easeInOutCubic.transform(reelArrival) *
-        (_creativeSlotsPerContext - 1);
-    final vanishing = _cameraVanishingPoint(size);
-    final palette = _promoPalette;
-    final handoffFraction = reelPosition - reelPosition.floorToDouble();
-    final handoffFlash = math.sin(math.pi * handoffFraction).abs();
-    if (handoffFlash > .01) {
-      final flashRadius = 8 + (34 * handoffFlash);
-      canvas.drawCircle(
-        vanishing,
-        flashRadius,
-        Paint()
-          ..shader =
-              RadialGradient(
-                colors: [
-                  Colors.white.withValues(alpha: .34 * handoffFlash),
-                  palette.primary.withValues(alpha: .15 * handoffFlash),
-                  palette.secondary.withValues(alpha: .06 * handoffFlash),
-                  BuyV2Colors.navy.withValues(alpha: 0),
-                ],
-              ).createShader(
-                Rect.fromCircle(center: vanishing, radius: flashRadius),
-              ),
-      );
-    }
-    for (var slot = 0; slot < _creativeSlotsPerContext; slot += 1) {
-      final delta = slot - reelPosition;
-      final distance = delta.abs();
-      var visibility = distance <= 1
-          ? (1 - (distance * .76)).clamp(0.0, 1.0)
-          : delta > 0
-          ? (.18 / distance).clamp(0.0, .18)
-          : (.09 / distance).clamp(0.0, .09);
-      final settledBackground =
-          reelArrival >= .999 && slot != _creativeSlotsPerContext - 1;
-      if (reelArrival >= .999 && slot != _creativeSlotsPerContext - 1) {
-        visibility = .10 + (slot * .025);
-      }
-      if (visibility <= .01) continue;
-      final isActive = !settledBackground && distance < .74;
-      final settledTargets = <Offset>[
-        Offset(size.width * .38, size.height * .24),
-        Offset(size.width * .47, size.height * .68),
-        Offset(size.width * .76, size.height * .22),
-        Offset(size.width * .84, size.height * .66),
-      ];
-      final target = settledBackground
-          ? settledTargets[slot]
-          : isActive
-          ? Offset(
-              size.width * (.62 - (.13 * delta)),
-              size.height * (.39 + ((slot.isOdd ? 1 : -1) * .045)),
-            )
-          : delta > 0
-          ? Offset(
-              size.width * (.78 + (.045 * (slot % 3))),
-              size.height * (slot.isOdd ? .24 : .63),
-            )
-          : Offset(
-              size.width * (.39 - (.05 * (slot % 2))),
-              size.height * (slot.isOdd ? .67 : .22),
-            );
-      final forwardTravel = settledBackground
-          ? .24 + (.045 * slot)
-          : isActive
-          ? .40 + (.60 * visibility)
-          : delta > 0
-          ? (.34 - (.035 * distance)).clamp(.22, .34)
-          : .88;
-      final centre = Offset.lerp(vanishing, target, forwardTravel)!;
-      final scale = settledBackground
-          ? .25 + (.035 * slot)
-          : isActive
-          ? .42 + (.78 * visibility)
-          : delta > 0
-          ? .31 + (.16 * visibility)
-          : 1.12 + (.10 * (1 - visibility));
-      canvas.save();
-      canvas.translate(centre.dx, centre.dy);
-      canvas.scale(scale);
-      _paintPromoLightField(
-        canvas,
-        slot,
-        visibility,
-        isActive: isActive,
-        flash: handoffFlash,
-      );
-      _paintVisualCreative(canvas, slot, visibility);
-      canvas.restore();
-      if (isActive) {
-        canvas.save();
-        canvas.translate(centre.dx, size.height * .74);
-        canvas.scale(scale, -.22 * scale);
-        _paintVisualCreative(canvas, slot, visibility * .18 * middle);
-        canvas.restore();
-      }
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(centre.dx, size.height * .78),
-          width: (30 + (slot * 5)) * visibility,
-          height: 3.8 * visibility,
-        ),
-        Paint()
-          ..shader =
-              LinearGradient(
-                colors: [
-                  palette.primary.withValues(alpha: 0),
-                  palette.primary.withValues(alpha: .25 * visibility),
-                  Colors.white.withValues(alpha: .18 * visibility),
-                  palette.secondary.withValues(alpha: .18 * visibility),
-                  palette.secondary.withValues(alpha: 0),
-                ],
-              ).createShader(
-                Rect.fromCenter(
-                  center: Offset(centre.dx, size.height * .78),
-                  width: (30 + (slot * 5)) * visibility,
-                  height: 3.8 * visibility,
-                ),
-              ),
-      );
-    }
-  }
-
-  void _paintPromoLightField(
-    Canvas canvas,
-    int slot,
-    double opacity, {
-    required bool isActive,
-    required double flash,
-  }) {
-    final palette = _promoPalette;
-    final primary = slot.isEven ? palette.primary : palette.secondary;
-    final secondary = slot.isEven ? palette.secondary : palette.primary;
-    final tertiary = palette.tertiary;
-    const field = Rect.fromLTWH(-43, -30, 86, 60);
-    canvas.drawOval(
-      field,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-.20, -.24),
-          radius: 1,
-          stops: const [0, .24, .52, .78, 1],
-          colors: [
-            Colors.white.withValues(alpha: .24 * opacity),
-            primary.withValues(alpha: .25 * opacity),
-            secondary.withValues(alpha: .16 * opacity),
-            tertiary.withValues(alpha: .09 * opacity),
-            BuyV2Colors.navy.withValues(alpha: 0),
-          ],
-        ).createShader(field)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
-    );
-    final arcRect = field.deflate(3);
-    for (var arc = 0; arc < 3; arc += 1) {
-      final colour = switch (arc) {
-        0 => primary,
-        1 => secondary,
-        _ => tertiary,
-      };
-      canvas.drawArc(
-        arcRect.deflate(arc * 4),
-        (-.85 + (arc * 1.95)) + (flash * .22),
-        .70 + (arc * .11),
-        false,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = isActive ? 1.45 : .75
-          ..strokeCap = StrokeCap.round
-          ..color = colour.withValues(alpha: (isActive ? .82 : .48) * opacity),
-      );
-    }
-    for (var particle = 0; particle < 4; particle += 1) {
-      final colour = particle.isEven ? primary : tertiary;
-      canvas.drawCircle(
-        Offset(-27 + (particle * 18), particle.isEven ? -18 : 19),
-        1.2 + ((particle % 3) * .45),
-        Paint()..color = colour.withValues(alpha: .74 * opacity),
-      );
-    }
-  }
-
-  void _paintVisualCreative(Canvas canvas, int slot, double opacity) {
-    final objectBounds = const Rect.fromLTWH(-34, -26, 68, 52);
-    final palette = _promoPalette;
-    final primary = slot.isEven ? palette.primary : palette.secondary;
-    final secondary = slot.isEven ? palette.secondary : palette.primary;
-    final tertiary = palette.tertiary;
-    final glass = Paint()
-      ..shader = RadialGradient(
-        center: const Alignment(-.38, -.46),
-        radius: 1.18,
-        colors: [
-          Color.lerp(
-            Colors.white,
-            primary,
-            .24,
-          )!.withValues(alpha: .30 * opacity),
-          primary.withValues(alpha: .13 * opacity),
-          secondary.withValues(alpha: .15 * opacity),
-          tertiary.withValues(alpha: .08 * opacity),
-          BuyV2Colors.navy.withValues(alpha: .62 * opacity),
-        ],
-      ).createShader(objectBounds);
-    final edge = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = .9
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..color = Color.lerp(
-        Colors.white,
-        primary,
-        .35,
-      )!.withValues(alpha: .62 * opacity);
-    final soft = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = .7
-      ..strokeCap = StrokeCap.round
-      ..color = Color.lerp(
-        secondary,
-        tertiary,
-        .34,
-      )!.withValues(alpha: .48 * opacity);
-    final green = Paint()
-      ..color = opacity >= .52
-          ? BuyV2Colors.green
-          : Colors.white.withValues(alpha: .18 * opacity);
-
-    switch ((destination, slot)) {
-      case (BuyV2Destination.shop, 0):
-        final basket = Path()
-          ..moveTo(-22, -7)
-          ..lineTo(-16, 13)
-          ..lineTo(16, 13)
-          ..lineTo(22, -7)
-          ..close();
-        canvas.drawPath(basket, glass);
-        canvas.drawPath(basket, edge);
-        canvas.drawArc(
-          const Rect.fromLTWH(-13, -18, 26, 24),
-          math.pi,
-          math.pi,
-          false,
-          edge,
-        );
-        canvas.drawCircle(const Offset(0, 2), 3.2, green);
-      case (BuyV2Destination.shop, 1):
-        final store = RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-24, -18, 48, 36),
-          const Radius.circular(5),
-        );
-        canvas.drawRRect(store, glass);
-        canvas.drawRRect(store, edge);
-        canvas.drawLine(const Offset(-15, -7), const Offset(15, -7), soft);
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(-7, -4, 14, 22),
-            const Radius.circular(3),
-          ),
-          edge,
-        );
-        canvas.drawCircle(const Offset(13, 4), 3, green);
-      case (BuyV2Destination.shop, 2):
-        for (var item = 0; item < 3; item += 1) {
-          final card = RRect.fromRectAndRadius(
-            Rect.fromCenter(
-              center: Offset(-20 + (item * 20), -2 + (item.isOdd ? -5 : 4)),
-              width: 16,
-              height: 24,
-            ),
-            const Radius.circular(4),
-          );
-          canvas.drawRRect(card, glass);
-          canvas.drawRRect(card, edge);
-        }
-        canvas.drawOval(const Rect.fromLTWH(-30, 15, 60, 7), soft);
-        canvas.drawCircle(const Offset(0, -7), 2.8, green);
-      case (BuyV2Destination.shop, 3):
-        final cart = Path()
-          ..moveTo(-23, -15)
-          ..lineTo(-17, -15)
-          ..lineTo(-10, 7)
-          ..lineTo(17, 7)
-          ..lineTo(22, -8)
-          ..lineTo(-14, -8);
-        canvas.drawPath(cart, edge);
-        canvas.drawCircle(const Offset(-5, 15), 4, soft);
-        canvas.drawCircle(const Offset(14, 15), 4, soft);
-        canvas.drawCircle(const Offset(7, -1), 3, green);
-        canvas.drawOval(const Rect.fromLTWH(-28, -22, 56, 44), soft);
-      case (BuyV2Destination.shop, 4):
-        for (var aisle = 0; aisle < 5; aisle += 1) {
-          final x = -30 + (aisle * 15.0);
-          final aislePath = Path()
-            ..moveTo(x, 22)
-            ..quadraticBezierTo(x * .48, -5, x * .18, -23);
-          canvas.drawPath(aislePath, aisle.isEven ? edge : soft);
-          canvas.drawCircle(
-            Offset(x * .58, -2 + ((aisle % 2) * 8)),
-            2.6 + ((aisle % 3) * .45),
-            aisle.isEven ? glass : soft,
-          );
-        }
-        canvas.drawArc(
-          const Rect.fromLTWH(-32, -24, 64, 48),
-          math.pi * .10,
-          math.pi * .80,
-          false,
-          edge,
-        );
-        canvas.drawCircle(Offset.zero, 3.4, green);
-      case (BuyV2Destination.wholesale, 0):
-        for (var box = 0; box < 4; box += 1) {
-          final rect = RRect.fromRectAndRadius(
-            Rect.fromLTWH(
-              -27 + ((box % 2) * 28),
-              -18 + ((box ~/ 2) * 20),
-              24,
-              17,
-            ),
-            const Radius.circular(3),
-          );
-          canvas.drawRRect(rect, glass);
-          canvas.drawRRect(rect, edge);
-        }
-        canvas.drawCircle(Offset.zero, 3, green);
-      case (BuyV2Destination.wholesale, 1):
-        final pallet = RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-25, -18, 50, 32),
-          const Radius.circular(4),
-        );
-        canvas.drawRRect(pallet, glass);
-        canvas.drawRRect(pallet, edge);
-        canvas.drawLine(const Offset(-29, 18), const Offset(29, 18), edge);
-        canvas.drawLine(const Offset(-29, 22), const Offset(29, 22), edge);
-        canvas.drawCircle(const Offset(17, -7), 3, green);
-      case (BuyV2Destination.wholesale, 2):
-        for (var frame = 0; frame < 4; frame += 1) {
-          final inset = frame * 5.0;
-          canvas.drawRRect(
-            RRect.fromRectAndRadius(
-              Rect.fromLTWH(
-                -30 + inset,
-                -22 + (inset * .4),
-                60 - (inset * 2),
-                44 - (inset * .8),
-              ),
-              const Radius.circular(4),
-            ),
-            frame == 3 ? edge : soft,
-          );
-        }
-        canvas.drawCircle(Offset.zero, 3.2, green);
-      case (BuyV2Destination.wholesale, 3):
-        for (var orbit = 0; orbit < 3; orbit += 1) {
-          canvas.drawOval(
-            Rect.fromCenter(
-              center: Offset.zero,
-              width: 24 + (orbit * 18),
-              height: 14 + (orbit * 12),
-            ),
-            soft,
-          );
-        }
-        for (final x in const [-17.0, 0.0, 17.0]) {
-          final centre = Offset(x, x == 0 ? -4 : 5);
-          canvas.drawCircle(centre, 6, glass);
-          canvas.drawCircle(centre, 6, edge);
-        }
-        canvas.drawCircle(Offset.zero, 3, green);
-      case (BuyV2Destination.wholesale, 4):
-        final dock = Path()
-          ..moveTo(-31, 20)
-          ..lineTo(-22, -19)
-          ..lineTo(22, -19)
-          ..lineTo(31, 20)
-          ..close();
-        canvas.drawPath(dock, glass);
-        canvas.drawPath(dock, edge);
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(-10, -8, 20, 28),
-            const Radius.circular(3),
-          ),
-          edge,
-        );
-        canvas.drawCircle(const Offset(17, 7), 3.2, green);
-      case (BuyV2Destination.medicine, 0):
-        for (var halo = 0; halo < 4; halo += 1) {
-          canvas.drawCircle(Offset.zero, 7 + (halo * 6), soft);
-        }
-        canvas.drawCircle(Offset.zero, 9, glass);
-        canvas.drawCircle(Offset.zero, 3.4, green);
-      case (BuyV2Destination.medicine, 1):
-        canvas.save();
-        canvas.rotate(-.35);
-        final capsule = RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-28, -8, 56, 16),
-          const Radius.circular(9),
-        );
-        canvas.drawRRect(capsule, glass);
-        canvas.drawRRect(capsule, edge);
-        canvas.drawLine(const Offset(0, -8), const Offset(0, 8), edge);
-        canvas.drawCircle(const Offset(-12, 0), 3.2, green);
-        canvas.restore();
-      case (BuyV2Destination.medicine, 2):
-        final shield = Path()
-          ..moveTo(0, -24)
-          ..quadraticBezierTo(18, -18, 24, -10)
-          ..quadraticBezierTo(21, 14, 0, 24)
-          ..quadraticBezierTo(-21, 14, -24, -10)
-          ..quadraticBezierTo(-18, -18, 0, -24)
-          ..close();
-        canvas.drawPath(shield, glass);
-        canvas.drawPath(shield, edge);
-        canvas.drawLine(const Offset(-8, 0), const Offset(8, 0), edge);
-        canvas.drawLine(const Offset(0, -8), const Offset(0, 8), edge);
-        canvas.drawCircle(const Offset(12, 11), 3, green);
-      case (BuyV2Destination.medicine, 3):
-        for (var orbit = 0; orbit < 3; orbit += 1) {
-          canvas.drawOval(
-            Rect.fromCenter(
-              center: Offset.zero,
-              width: 30 + (orbit * 17),
-              height: 18 + (orbit * 11),
-            ),
-            soft,
-          );
-        }
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            const Rect.fromLTWH(-12, -12, 24, 24),
-            const Radius.circular(6),
-          ),
-          glass,
-        );
-        canvas.drawLine(const Offset(-7, 0), const Offset(7, 0), edge);
-        canvas.drawLine(const Offset(0, -7), const Offset(0, 7), edge);
-        canvas.drawCircle(const Offset(18, -8), 3, green);
-      case (BuyV2Destination.medicine, 4):
-        for (var frame = 0; frame < 4; frame += 1) {
-          canvas.drawOval(
-            Rect.fromCenter(
-              center: Offset.zero,
-              width: 28 + (frame * 13),
-              height: 18 + (frame * 9),
-            ),
-            frame == 3 ? edge : soft,
-          );
-        }
-        canvas.drawCircle(Offset.zero, 10, glass);
-        canvas.drawLine(const Offset(-6, 0), const Offset(6, 0), edge);
-        canvas.drawLine(const Offset(0, -6), const Offset(0, 6), edge);
-        canvas.drawCircle(const Offset(16, 10), 3.2, green);
-      case (BuyV2Destination.orders, 0):
-        final parcel = RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-23, -18, 46, 36),
-          const Radius.circular(5),
-        );
-        canvas.drawRRect(parcel, glass);
-        canvas.drawRRect(parcel, edge);
-        canvas.drawLine(const Offset(0, -18), const Offset(0, 18), edge);
-        canvas.drawCircle(const Offset(13, 8), 3.2, green);
-      case (BuyV2Destination.orders, 1):
-        final route = Path()
-          ..moveTo(-30, 15)
-          ..cubicTo(-15, -24, 8, 24, 30, -16);
-        canvas.drawPath(route, edge);
-        for (final point in const [
-          Offset(-24, 3),
-          Offset(-2, 0),
-          Offset(23, -7),
-        ]) {
-          canvas.drawCircle(point, 4, glass);
-          canvas.drawCircle(point, 4, edge);
-        }
-        canvas.drawCircle(const Offset(23, -7), 2.4, green);
-      case (BuyV2Destination.orders, 2):
-        for (var orbit = 0; orbit < 4; orbit += 1) {
-          canvas.drawOval(
-            Rect.fromCenter(
-              center: Offset.zero,
-              width: 22 + (orbit * 14),
-              height: 13 + (orbit * 9),
-            ),
-            soft,
-          );
-        }
-        for (final point in const [
-          Offset(-18, 4),
-          Offset(0, -6),
-          Offset(18, 4),
-        ]) {
-          canvas.drawCircle(point, 4.5, glass);
-          canvas.drawCircle(point, 4.5, edge);
-        }
-        canvas.drawCircle(const Offset(18, 4), 2.5, green);
-      case (BuyV2Destination.orders, 3):
-        final arc = Path()
-          ..moveTo(-30, 15)
-          ..quadraticBezierTo(0, -28, 30, 15);
-        canvas.drawPath(arc, edge);
-        final vehicle = RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-18, -5, 36, 20),
-          const Radius.circular(5),
-        );
-        canvas.drawRRect(vehicle, glass);
-        canvas.drawRRect(vehicle, edge);
-        canvas.drawCircle(const Offset(-10, 16), 3.2, edge);
-        canvas.drawCircle(const Offset(11, 16), 3.2, edge);
-        canvas.drawCircle(const Offset(10, 2), 2.6, green);
-      case (BuyV2Destination.orders, 4):
-        final vault = RRect.fromRectAndRadius(
-          const Rect.fromLTWH(-24, -22, 48, 44),
-          const Radius.circular(6),
-        );
-        canvas.drawRRect(vault, glass);
-        canvas.drawRRect(vault, edge);
-        for (final x in const [-11.0, 0.0, 11.0]) {
-          canvas.drawLine(Offset(x, -13), Offset(x, 13), soft);
-        }
-        canvas.drawOval(const Rect.fromLTWH(-31, -27, 62, 54), soft);
-        canvas.drawCircle(const Offset(15, 10), 3.2, green);
-      default:
-        assert(false, 'Unsupported header visual creative slot');
-    }
-  }
-
-  // Kept only while prior qualified candidates remain source-reconstructable.
-  // ignore: unused_element
-  void _paintAllCornerDepth(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-  ) {
-    final bounds = Offset.zero & size;
-    final portalCentre = Offset(
-      size.width * (.73 + (.035 * (1 - far))),
-      size.height * (.44 - (.025 * (1 - far))),
-    );
-    final portal = Rect.fromCenter(
-      center: portalCentre,
-      width: size.width * (.10 + (.055 * far)),
-      height: size.height * (.13 + (.10 * far)),
-    );
-
-    final topVault = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(portal.right, portal.top)
-      ..lineTo(portal.left, portal.top)
-      ..close();
-    canvas.drawPath(
-      topVault,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: .42),
-            Colors.white.withValues(alpha: .035 * far),
-            BuyV2Colors.navy.withValues(alpha: .10 * middle),
-          ],
-        ).createShader(bounds),
-    );
-
-    final bottomVault = Path()
-      ..moveTo(0, size.height)
-      ..lineTo(portal.left, portal.bottom)
-      ..lineTo(portal.right, portal.bottom)
-      ..lineTo(size.width, size.height)
-      ..close();
-    canvas.drawPath(
-      bottomVault,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: .58),
-            Colors.white.withValues(alpha: .045 * middle),
-            BuyV2Colors.navy.withValues(alpha: .08 * far),
-          ],
-        ).createShader(bounds),
-    );
-
-    final leftVault = Path()
-      ..moveTo(0, 0)
-      ..lineTo(portal.left, portal.top)
-      ..lineTo(portal.left, portal.bottom)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(
-      leftVault,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: .34),
-            Colors.white.withValues(alpha: .022 * far),
-            BuyV2Colors.navy.withValues(alpha: .055 * middle),
-          ],
-        ).createShader(bounds),
-    );
-
-    final rightVault = Path()
-      ..moveTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(portal.right, portal.bottom)
-      ..lineTo(portal.right, portal.top)
-      ..close();
-    canvas.drawPath(
-      rightVault,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerRight,
-          end: Alignment.centerLeft,
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: .46),
-            Colors.white.withValues(alpha: .04 * middle),
-            BuyV2Colors.navy.withValues(alpha: .07 * far),
-          ],
-        ).createShader(bounds),
-    );
-
-    final cornerEdge = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = .85
-      ..color = Colors.white.withValues(alpha: .12 * far);
-    final upperLeft = Path()
-      ..moveTo(0, 0)
-      ..cubicTo(
-        size.width * .28,
-        size.height * .02,
-        portal.left - 24,
-        portal.top - 7,
-        portal.left,
-        portal.top,
-      );
-    final upperRight = Path()
-      ..moveTo(size.width, 0)
-      ..cubicTo(
-        size.width * .92,
-        size.height * .06,
-        portal.right + 20,
-        portal.top - 6,
-        portal.right,
-        portal.top,
-      );
-    final lowerLeft = Path()
-      ..moveTo(0, size.height)
-      ..cubicTo(
-        size.width * .34,
-        size.height * .93,
-        portal.left - 20,
-        portal.bottom + 8,
-        portal.left,
-        portal.bottom,
-      );
-    final lowerRight = Path()
-      ..moveTo(size.width, size.height)
-      ..cubicTo(
-        size.width * .91,
-        size.height * .91,
-        portal.right + 18,
-        portal.bottom + 7,
-        portal.right,
-        portal.bottom,
-      );
-    canvas.drawPath(upperLeft, cornerEdge);
-    canvas.drawPath(upperRight, cornerEdge);
-    canvas.drawPath(lowerLeft, cornerEdge);
-    canvas.drawPath(lowerRight, cornerEdge);
-
-    for (var plane = 0; plane < 7; plane += 1) {
-      final planeArrival = (far - (plane * .035)).clamp(0.0, 1.0);
-      if (planeArrival <= 0) continue;
-      final expansion = 3.0 + (plane * 27.0);
-      final planeRect = RRect.fromRectAndRadius(
-        portal.inflate(expansion),
-        Radius.circular(4 + (plane * 2.0)),
-      );
-      canvas.drawRRect(
-        planeRect,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = plane == 0 ? 1.05 : .55
-          ..color = Colors.white.withValues(
-            alpha: (.14 - (plane * .014)) * planeArrival,
-          ),
-      );
-    }
-
-    for (var halo = 0; halo < 4; halo += 1) {
-      final expansion = 8.0 + (halo * 22.0);
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: portalCentre,
-          width: portal.width + (expansion * 2.4),
-          height: portal.height + expansion,
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .65
-          ..color = Colors.white.withValues(
-            alpha: (.105 - (halo * .018)) * middle,
-          ),
-      );
-    }
-  }
-
-  // Kept only while prior qualified candidates remain source-reconstructable.
-  // ignore: unused_element
-  void _paintPerspectiveChamber(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-  ) {
-    final vanishing = Offset(size.width * .73, size.height * .44);
-    for (var depth = 0; depth < 6; depth += 1) {
-      final arrival = (far - (depth * .038)).clamp(0.0, 1.0);
-      if (arrival <= 0) continue;
-      final depthFactor = depth / 5;
-      final frameWidth = size.width * (.17 + (.84 * depthFactor));
-      final frameHeight = size.height * (.21 + (1.34 * depthFactor));
-      final chamber = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: Offset(
-            vanishing.dx - (14 * depthFactor) + (24 * (1 - arrival)),
-            vanishing.dy + (2 * depthFactor),
-          ),
-          width: frameWidth,
-          height: frameHeight,
-        ),
-        Radius.circular(5 + (depth * 2.0)),
-      );
-      canvas.drawRRect(
-        chamber,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = depth == 0 ? 1.05 : .65
-          ..color = Colors.white.withValues(
-            alpha: (.13 - (depth * .012)) * arrival,
-          ),
-      );
-    }
-
-    for (var pane = 0; pane < 4; pane += 1) {
-      final arrival = (middle - (pane * .055)).clamp(0.0, 1.0);
-      if (arrival <= 0) continue;
-      final target = Offset(
-        size.width * (.52 + (pane * .14)),
-        size.height * (.16 + ((pane % 2) * .40)),
-      );
-      final centre = Offset.lerp(vanishing, target, arrival)!;
-      final paneRect = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: centre,
-          width: 12 + (pane * 3.0),
-          height: 9 + (pane * 2.0),
-        ),
-        const Radius.circular(7),
-      );
-      canvas.drawRRect(
-        paneRect,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-.35, -.35),
-            radius: 1.15,
-            colors: [
-              Colors.white.withValues(alpha: .20 * arrival),
-              Colors.white.withValues(alpha: .035 * arrival),
-              BuyV2Colors.navy.withValues(alpha: .28 * arrival),
-            ],
-          ).createShader(paneRect.outerRect),
-      );
-      canvas.drawRRect(
-        paneRect,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .6
-          ..color = Colors.white.withValues(alpha: .16 * arrival),
-      );
-    }
-
-    for (var reflection = 0; reflection < 4; reflection += 1) {
-      final centre = Offset(
-        size.width * (.68 + (reflection * .06)),
-        size.height * (.70 + (reflection * .08)),
-      );
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: centre,
-          width: size.width * (.38 - (reflection * .045)),
-          height: 5 + (reflection * 1.4),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .7
-          ..color = Colors.white.withValues(
-            alpha: (.08 - (reflection * .012)) * middle,
-          ),
-      );
-    }
-  }
-
-  void _paintVolumetricGlints(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    Color primary,
-    Color secondary,
-  ) {
-    final points = <(Offset, double)>[
-      (Offset(size.width * .58, size.height * .24), 5.5),
-      (Offset(size.width * .81, size.height * .18), 4.0),
-      (Offset(size.width * .90, size.height * .61), 5.0),
-      (Offset(size.width * .65, size.height * .76), 3.5),
-    ];
-    for (var index = 0; index < points.length; index += 1) {
-      final arrival = (middle - (index * .035)).clamp(0.0, 1.0);
-      if (arrival <= 0) continue;
-      final point = points[index];
-      canvas.drawCircle(
-        point.$1,
-        point.$2 + (4 * far),
-        Paint()
-          ..shader =
-              RadialGradient(
-                colors: [
-                  Colors.white.withValues(alpha: .24 * arrival),
-                  Colors.white.withValues(alpha: .055 * arrival),
-                  BuyV2Colors.navy.withValues(alpha: 0),
-                ],
-              ).createShader(
-                Rect.fromCircle(center: point.$1, radius: point.$2 + (4 * far)),
-              ),
-      );
-    }
-
-    if (middle > 0) {
-      canvas.drawCircle(
-        Offset(size.width * .76, size.height * .39),
-        2.2,
-        Paint()..color = primary,
-      );
-      canvas.drawCircle(
-        Offset(size.width * .84, size.height * .55),
-        1.8,
-        Paint()..color = secondary,
-      );
-    }
-  }
-
-  // Kept only while prior qualified candidates remain source-reconstructable.
-  // ignore: unused_element
-  void _paintCinematicWorld(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    switch (destination) {
-      case BuyV2Destination.shop:
-        _paintCinematicShop(canvas, size, far, middle, near);
-      case BuyV2Destination.wholesale:
-        _paintCinematicWholesale(canvas, size, far, middle, near);
-      case BuyV2Destination.medicine:
-        _paintCinematicMedicine(canvas, size, far, middle, near);
-      case BuyV2Destination.orders:
-        _paintCinematicOrders(canvas, size, far, middle, near);
-    }
-  }
-
-  void _paintCinematicShop(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final vanishing = Offset(size.width * .74, size.height * .43);
-    for (var index = 0; index < 5; index += 1) {
-      final arrival = index.isEven ? middle : near;
-      if (arrival <= 0) continue;
-      final target = Offset(
-        size.width * (.54 + (index * .095)),
-        size.height * (.16 + ((index % 2) * .35)),
-      );
-      final centre = Offset.lerp(vanishing, target, arrival)!;
-      final scale = .55 + (.09 * index) + (.35 * arrival);
-      final card = RRect.fromRectAndRadius(
-        Rect.fromCenter(center: centre, width: 21 * scale, height: 28 * scale),
-        Radius.circular(5 * scale),
-      );
-      canvas.drawRRect(
-        card,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-.45, -.50),
-            radius: 1.28,
-            colors: [
-              Colors.white.withValues(alpha: .22 * arrival),
-              Colors.white.withValues(alpha: .05 * arrival),
-              BuyV2Colors.navy.withValues(alpha: .58 * arrival),
-            ],
-          ).createShader(card.outerRect),
-      );
-      canvas.drawRRect(
-        card,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .7
-          ..color = Colors.white.withValues(alpha: .25 * arrival),
-      );
-      canvas.drawCircle(
-        centre + Offset(0, -4 * scale),
-        3.2 * scale,
-        Paint()..color = index.isEven ? BuyV2Colors.orange : BuyV2Colors.green,
-      );
-    }
-
-    for (var contour = 0; contour < 3; contour += 1) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(size.width * .79, size.height * .47),
-          width: size.width * (.18 + (contour * .18)),
-          height: size.height * (.22 + (contour * .20)),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .7
-          ..color = Colors.white.withValues(
-            alpha: (.09 - (contour * .02)) * far,
-          ),
-      );
-    }
-  }
-
-  void _paintCinematicWholesale(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final vanishing = Offset(size.width * .74, size.height * .43);
-    for (var parcel = 0; parcel < 5; parcel += 1) {
-      final arrival = parcel > 1 ? near : middle;
-      if (arrival <= 0) continue;
-      final target = Offset(
-        size.width * (.53 + (parcel * .105)),
-        size.height * (.58 - ((parcel % 2) * .30)),
-      );
-      final centre = Offset.lerp(vanishing, target, arrival)!;
-      final boxScale = .50 + (.10 * parcel) + (.28 * arrival);
-      final box = RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: centre,
-          width: (25.0 + parcel) * boxScale,
-          height: (21.0 + parcel) * boxScale,
-        ),
-        Radius.circular(4 * boxScale),
-      );
-      canvas.drawRRect(
-        box,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-.42, -.48),
-            radius: 1.25,
-            colors: [
-              Colors.white.withValues(alpha: .21 * arrival),
-              BuyV2Colors.navy.withValues(alpha: .34 * arrival),
-              BuyV2Colors.navy.withValues(alpha: .72 * arrival),
-            ],
-          ).createShader(box.outerRect),
-      );
-      canvas.drawRRect(
-        box,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .7
-          ..color = Colors.white.withValues(alpha: .22 * arrival),
-      );
-      canvas.drawCircle(
-        centre,
-        3.2 * boxScale,
-        Paint()..color = parcel.isOdd ? BuyV2Colors.orange : BuyV2Colors.green,
-      );
-    }
-
-    for (var orbit = 0; orbit < 3; orbit += 1) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(size.width * .78, size.height * .45),
-          width: size.width * (.20 + (orbit * .17)),
-          height: size.height * (.28 + (orbit * .18)),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .75
-          ..color = Colors.white.withValues(
-            alpha: (.095 - (orbit * .021)) * far,
-          ),
-      );
-    }
-  }
-
-  void _paintCinematicMedicine(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final centre = Offset(
-      size.width * (.76 + (.08 * (1 - far))),
-      size.height * .43,
-    );
-    for (final radius in [
-      size.height * .67,
-      size.height * .46,
-      size.height * .27,
-    ]) {
-      canvas.drawCircle(
-        centre,
-        radius,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.1
-          ..color = Colors.white.withValues(alpha: .19 * far),
-      );
-    }
-    final careTarget = Offset(size.width * .67, size.height * .39);
-    final careCentre = Offset.lerp(centre, careTarget, middle)!;
-    canvas.drawCircle(
-      careCentre,
-      12 + (7 * middle),
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-.35, -.40),
-          radius: 1.12,
-          colors: [
-            Colors.white.withValues(alpha: .24 * middle),
-            Colors.white.withValues(alpha: .055 * middle),
-            BuyV2Colors.navy.withValues(alpha: .42 * middle),
-          ],
-        ).createShader(Rect.fromCircle(center: careCentre, radius: 19)),
-    );
-    canvas.drawCircle(careCentre, 5.2, Paint()..color = BuyV2Colors.green);
-    canvas.drawCircle(
-      careCentre + const Offset(-2, -2),
-      1.7,
-      Paint()..color = Colors.white.withValues(alpha: .88 * middle),
-    );
-    for (var orbit = 0; orbit < 3; orbit += 1) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: centre,
-          width: size.width * (.18 + (orbit * .17)),
-          height: size.height * (.24 + (orbit * .18)),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .7
-          ..color = Colors.white.withValues(
-            alpha: (.10 - (orbit * .023)) * middle,
-          ),
-      );
-    }
-    canvas.save();
-    final capsuleCentre = Offset.lerp(
-      centre,
-      Offset(size.width * .84, size.height * .68),
-      near,
-    )!;
-    canvas.translate(capsuleCentre.dx, capsuleCentre.dy);
-    canvas.rotate(-.34);
-    final capsule = RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset.zero, width: 42, height: 15),
-      const Radius.circular(9),
-    );
-    if (near > 0) {
-      canvas.drawRRect(
-        capsule,
-        Paint()
-          ..shader = LinearGradient(
-            colors: [
-              Colors.white.withValues(alpha: .92 * near),
-              Colors.white.withValues(alpha: .11 * near),
-              BuyV2Colors.navy.withValues(alpha: .78 * near),
-            ],
-          ).createShader(capsule.outerRect),
-      );
-      canvas.drawCircle(
-        const Offset(-9, 0),
-        4.1,
-        Paint()..color = BuyV2Colors.orange,
-      );
-    }
-    canvas.restore();
-  }
-
-  void _paintCinematicOrders(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final route = Path()
-      ..moveTo(size.width * .48, size.height * .81)
-      ..cubicTo(
-        size.width * (.61 + (.10 * (1 - far))),
-        size.height * .08,
-        size.width * .82,
-        size.height * .88,
-        size.width,
-        size.height * .18,
-      );
-    canvas.drawPath(
-      route,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 7
-        ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: .11 * far),
-    );
-    canvas.drawPath(
-      route,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4
-        ..strokeCap = StrokeCap.round
-        ..color = Colors.white.withValues(alpha: .42 * far),
-    );
-    final parcelLeft = size.width * (.67 + (.16 * (1 - middle)));
-    final parcel = RRect.fromRectAndRadius(
-      Rect.fromLTWH(parcelLeft, size.height * .18, 29, 27),
-      const Radius.circular(4),
-    );
-    if (middle > 0) {
-      canvas.drawRRect(
-        parcel,
-        Paint()
-          ..shader = RadialGradient(
-            center: const Alignment(-.42, -.46),
-            radius: 1.24,
-            colors: [
-              Colors.white.withValues(alpha: .22 * middle),
-              BuyV2Colors.navy.withValues(alpha: .36 * middle),
-              BuyV2Colors.navy.withValues(alpha: .78 * middle),
-            ],
-          ).createShader(parcel.outerRect),
-      );
-      canvas.drawRRect(
-        parcel,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = .7
-          ..color = Colors.white.withValues(alpha: .24 * middle),
-      );
-      canvas.drawCircle(
-        parcel.center,
-        3.3,
-        Paint()..color = BuyV2Colors.orange,
-      );
-    }
-    final node = Offset(
-      size.width * (.88 + (.07 * (1 - near))),
-      size.height * .67,
-    );
-    if (near > 0) {
-      canvas.drawCircle(node, 7, Paint()..color = BuyV2Colors.green);
-    }
-    canvas.drawCircle(
-      node,
-      2.5,
-      Paint()..color = Colors.white.withValues(alpha: near),
-    );
-    for (final stop in [.58, .77, .94]) {
-      canvas.drawCircle(
-        Offset(size.width * stop, size.height * (.59 - (.13 * stop))),
-        2.5 + (3 * near),
-        Paint()..color = Colors.white.withValues(alpha: .17 * near),
-      );
-    }
-  }
-
-  // Kept only while FIX13 remains source-reconstructable. FIX14 never calls it.
-  // ignore: unused_element
-  void _paintSceneNarrative(Canvas canvas, Size size) {
-    final feature = view == BuyV2View.account
-        ? ('Your account', 'Purchases & profile')
-        : switch (destination) {
-            BuyV2Destination.shop => (
-              'Everyday shop',
-              'Plan the monthly basket',
-            ),
-            BuyV2Destination.wholesale => (
-              'Wholesale supply',
-              'Flexible restocking',
-            ),
-            BuyV2Destination.medicine => (
-              'Everyday care',
-              'Prescription centre',
-            ),
-            BuyV2Destination.orders => ('Orders & delivery', 'Purchases'),
-          };
-    final accent = switch (destination) {
-      BuyV2Destination.shop => BuyV2Colors.orange,
-      BuyV2Destination.wholesale => BuyV2Colors.green,
-      BuyV2Destination.medicine => BuyV2Colors.green,
-      BuyV2Destination.orders => BuyV2Colors.orange,
-    };
-    final eyebrowArrival = _phase(.60, .76);
-    final titleArrival = _phase(.70, .92);
-    final x = math.max(114.0, size.width * .30);
-    final maxWidth = math.max(106.0, size.width * .48);
-    final vanishing = Offset(size.width * .72, size.height * .43);
-    final clip = Path()
-      ..moveTo(x - 8, 5)
-      ..lineTo(x + maxWidth + 12, 1)
-      ..lineTo(x + maxWidth - 2, size.height - 4)
-      ..lineTo(x - 15, size.height)
-      ..close();
-    canvas.save();
-    canvas.clipPath(clip);
-
-    final contextWord = switch (destination) {
-      BuyV2Destination.shop => 'SHOP',
-      BuyV2Destination.wholesale => 'SUPPLY',
-      BuyV2Destination.medicine => 'CARE',
-      BuyV2Destination.orders => 'ORDERS',
-    };
-    final contextPainter = TextPainter(
-      text: TextSpan(
-        text: contextWord,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: .055 * titleArrival),
-          fontSize: math.min(32.0, size.height * .40),
-          fontFamily: 'Inter',
-          height: 1,
-          fontStyle: FontStyle.italic,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 1.5,
-        ),
-      ),
-      maxLines: 1,
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: maxWidth + 20);
-    final contextPosition = Offset.lerp(
-      vanishing,
-      Offset(x, size.height * .48),
-      titleArrival,
-    )!;
-    canvas.save();
-    canvas.translate(contextPosition.dx, contextPosition.dy);
-    final contextScale = .20 + (.80 * titleArrival);
-    canvas.scale(contextScale, contextScale);
-    contextPainter.paint(canvas, Offset.zero);
-    canvas.restore();
-
-    final eyebrowPosition = Offset.lerp(
-      vanishing,
-      Offset(x, 7),
-      eyebrowArrival,
-    )!;
-    canvas.save();
-    canvas.translate(eyebrowPosition.dx, eyebrowPosition.dy);
-    canvas.skew(-.045 - (.08 * (1 - eyebrowArrival)), 0);
-    final eyebrowScale = .30 + (.70 * eyebrowArrival);
-    canvas.scale(eyebrowScale, eyebrowScale);
-    _paintNarrativeText(
-      canvas,
-      feature.$1,
-      Offset.zero,
-      fontSize: 9,
-      opacity: eyebrowArrival,
-      color: accent,
-      maxWidth: maxWidth,
-      fontWeight: FontWeight.w800,
-    );
-    canvas.restore();
-
-    final titlePosition = Offset.lerp(vanishing, Offset(x, 20), titleArrival)!;
-    canvas.save();
-    canvas.translate(titlePosition.dx, titlePosition.dy);
-    canvas.skew(-.06 - (.09 * (1 - titleArrival)), 0);
-    final titleScale = .26 + (.74 * titleArrival);
-    canvas.scale(titleScale, titleScale);
-    _paintNarrativeText(
-      canvas,
-      feature.$2,
-      Offset.zero,
-      fontSize: 10.8,
-      opacity: titleArrival,
-      color: Colors.white,
-      maxWidth: maxWidth,
-      fontWeight: FontWeight.w900,
-    );
-    canvas.restore();
-    canvas.restore();
-  }
-
-  void _paintNarrativeText(
-    Canvas canvas,
-    String text,
-    Offset offset, {
-    required double fontSize,
-    required double opacity,
-    required Color color,
-    required double maxWidth,
-    required FontWeight fontWeight,
-  }) {
-    if (opacity <= 0) return;
-    final shadow = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: BuyV2Colors.navy.withValues(alpha: .86 * opacity),
-          fontSize: fontSize,
-          fontFamily: 'Inter',
-          height: 1,
-          fontWeight: fontWeight,
-        ),
-      ),
-      maxLines: 1,
-      ellipsis: '…',
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: maxWidth);
-    shadow.paint(canvas, offset + const Offset(1.5, 2.5));
-    final face = TextPainter(
-      text: TextSpan(
-        text: text,
-        style: TextStyle(
-          color: color.withValues(alpha: opacity),
-          fontSize: fontSize,
-          fontFamily: 'Inter',
-          height: 1,
-          fontWeight: fontWeight,
-          letterSpacing: .05,
-        ),
-      ),
-      maxLines: 1,
-      ellipsis: '…',
-      textDirection: TextDirection.ltr,
-    )..layout(maxWidth: maxWidth);
-    face.paint(canvas, offset);
-  }
-
-  void _paintForegroundOcclusion(Canvas canvas, Size size, double near) {
-    final bounds = Offset.zero & size;
-    final topLens = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width * .91, size.height * .16)
-      ..lineTo(size.width * .10, size.height * .19)
-      ..close();
-    canvas.drawPath(
-      topLens,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: .46 * near),
-            Colors.white.withValues(alpha: .055 * near),
-            BuyV2Colors.navy.withValues(alpha: 0),
-          ],
-        ).createShader(bounds),
-    );
-
-    final leftLens = Path()
-      ..moveTo(0, 0)
-      ..lineTo(size.width * .060, size.height * .16)
-      ..lineTo(size.width * .045, size.height * .84)
-      ..lineTo(0, size.height)
-      ..close();
-    canvas.drawPath(
-      leftLens,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: .54 * near),
-            Colors.white.withValues(alpha: .075 * near),
-            BuyV2Colors.navy.withValues(alpha: 0),
-          ],
-        ).createShader(bounds),
-    );
-
-    final rightLens = Path()
-      ..moveTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(size.width * .948, size.height * .84)
-      ..lineTo(size.width * .958, size.height * .16)
-      ..close();
-    canvas.drawPath(
-      rightLens,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.centerRight,
-          end: Alignment.centerLeft,
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: .56 * near),
-            Colors.white.withValues(alpha: .070 * near),
-            BuyV2Colors.navy.withValues(alpha: 0),
-          ],
-        ).createShader(bounds),
-    );
-
-    for (var lens = 0; lens < 3; lens += 1) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(
-            size.width * (.78 + (.025 * lens)),
-            size.height * (.44 + (.03 * lens)),
-          ),
-          width: size.width * (.42 + (lens * .24)),
-          height: size.height * (.64 + (lens * .34)),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = lens == 0 ? 1.15 : .75
-          ..color = Colors.white.withValues(
-            alpha: (.16 - (lens * .031)) * near,
-          ),
-      );
-    }
-
-    final cameraLip = Path()
-      ..moveTo(size.width * .18, size.height)
-      ..lineTo(size.width * .66, size.height * (.72 + (.08 * (1 - near))))
-      ..lineTo(size.width, size.height * .76)
-      ..lineTo(size.width, size.height)
-      ..close();
-    canvas.drawPath(
-      cameraLip,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white.withValues(alpha: .055 * near),
-            BuyV2Colors.navy.withValues(alpha: .20 * near),
-            BuyV2Colors.navy.withValues(alpha: .52 * near),
-          ],
-        ).createShader(bounds),
-    );
-
-    canvas.drawRect(
-      Offset.zero & size,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(.18, -.12),
-          radius: 1.22,
-          stops: const [.42, .78, 1],
-          colors: [
-            BuyV2Colors.navy.withValues(alpha: 0),
-            BuyV2Colors.navy.withValues(alpha: .10 * near),
-            BuyV2Colors.navy.withValues(alpha: .38 * near),
-          ],
-        ).createShader(Offset.zero & size),
-    );
-  }
-
-  // Kept only while prior rejected evidence remains source-reconstructable.
-  // ignore: unused_element
-  void _paintPerspectiveStage(Canvas canvas, Size size, double settled) {
-    final horizon = Offset(
-      size.width * (.82 - (.05 * (1 - settled))),
-      size.height * .42,
-    );
-    final floor = Path()
-      ..moveTo(size.width * .28, size.height)
-      ..lineTo(horizon.dx - 22, horizon.dy)
-      ..lineTo(horizon.dx + 22, horizon.dy)
-      ..lineTo(size.width, size.height)
-      ..close();
-    canvas.drawPath(
-      floor,
-      Paint()..color = Colors.white.withValues(alpha: .075),
-    );
-    final rayPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = Colors.white.withValues(alpha: .15);
-    for (final foot in const [.34, .50, .66, .82, .98]) {
-      canvas.drawLine(
-        horizon,
-        Offset(size.width * foot, size.height),
-        rayPaint,
-      );
-    }
-    canvas.drawCircle(
-      horizon,
-      3.5 + (3.5 * settled),
-      Paint()..color = Colors.white.withValues(alpha: .24),
-    );
-    canvas.drawLine(
-      Offset(size.width * .18, horizon.dy),
-      Offset(size.width, horizon.dy),
-      Paint()
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: .18),
-    );
-  }
-
-  // ignore: unused_element
-  void _paintFarAtmosphere(Canvas canvas, Size size, double settled) {
-    canvas.save();
-    canvas.translate(size.width * .075 * (1 - settled), 0);
-    canvas.scale(.92 + (.08 * settled), .92 + (.08 * settled));
-    final farPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = Colors.white.withValues(alpha: .13);
-    for (final centre in const [.18, .46, .78, 1.04]) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(size.width * centre, size.height * .52),
-          width: size.height * 1.82,
-          height: size.height * 1.04,
-        ),
-        farPaint,
-      );
-    }
-    final horizonPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = .7
-      ..color = Colors.white.withValues(alpha: .11);
-    for (var line = 0; line < 3; line += 1) {
-      final y = size.height * (.16 + (line * .18));
-      canvas.drawLine(
-        Offset(size.width * .46, y),
-        Offset(size.width, y - (line * 2)),
-        horizonPaint,
-      );
-    }
-    canvas.restore();
-  }
-
-  // ignore: unused_element
-  void _paintContextWorld(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    switch (destination) {
-      case BuyV2Destination.shop:
-        _paintRetailWorld(canvas, size, far, middle, near);
-      case BuyV2Destination.wholesale:
-        _paintWarehouseWorld(canvas, size, far, middle, near);
-      case BuyV2Destination.medicine:
-        _paintPharmacyWorld(canvas, size, far, middle, near);
-      case BuyV2Destination.orders:
-        _paintDeliveryWorld(canvas, size, far, middle, near);
-    }
-  }
-
-  void _paintRetailWorld(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final shelfPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = Colors.white.withValues(alpha: .16 * far);
-    final shelfLeft = size.width * (.18 - (.04 * (1 - far)));
-    final shelfRight = size.width * .96;
-    for (final yFactor in const [.18, .43, .68]) {
-      final y = size.height * yFactor;
-      canvas.drawLine(Offset(shelfLeft, y), Offset(shelfRight, y), shelfPaint);
-    }
-    for (final xFactor in const [.28, .43, .58, .73, .88]) {
-      final x = size.width * xFactor;
-      canvas.drawLine(
-        Offset(x, size.height * .12),
-        Offset(x, size.height * .76),
-        shelfPaint,
-      );
-    }
-    final beltY = size.height * (.72 + (.08 * (1 - middle)));
-    canvas.drawLine(
-      Offset(size.width * .34, beltY),
-      Offset(size.width, beltY),
-      Paint()
-        ..strokeWidth = 4
-        ..color = Colors.white.withValues(alpha: .10 * middle),
-    );
-    _paintContextParcel(
-      canvas,
-      Offset(size.width * (.58 - (.13 * (1 - middle))), beltY - 13),
-      18,
-      BuyV2Colors.orange,
-      middle,
-    );
-    _paintContextParcel(
-      canvas,
-      Offset(size.width * (.68 - (.20 * (1 - near))), beltY - 10),
-      14,
-      BuyV2Colors.green,
-      near,
-    );
-  }
-
-  void _paintWarehouseWorld(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final rackPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = Colors.white.withValues(alpha: .20 * far);
-    final aisleTop = size.height * .10;
-    final aisleBottom = size.height * .82;
-    for (final xFactor in const [.24, .40, .56, .72, .88]) {
-      final x = size.width * (xFactor + (.04 * (1 - far)));
-      canvas.drawLine(Offset(x, aisleTop), Offset(x, aisleBottom), rackPaint);
-    }
-    for (final yFactor in const [.24, .48, .72]) {
-      final y = size.height * yFactor;
-      canvas.drawLine(
-        Offset(size.width * .20, y),
-        Offset(size.width * .94, y),
-        rackPaint,
-      );
-    }
-    final palletY = size.height * .59;
-    for (var index = 0; index < 3; index += 1) {
-      _paintContextParcel(
-        canvas,
-        Offset(
-          size.width * (.58 + (index * .07) + (.16 * (1 - middle))),
-          palletY - (index.isOdd ? 8 : 0),
-        ),
-        18 + (index * 2),
-        index == 1 ? BuyV2Colors.orange : BuyV2Colors.green,
-        middle,
-      );
-    }
-    canvas.drawLine(
-      Offset(size.width * (.50 + (.22 * (1 - near))), size.height * .82),
-      Offset(size.width * .92, size.height * .82),
-      Paint()
-        ..strokeWidth = 3
-        ..color = Colors.white.withValues(alpha: .24 * near),
-    );
-  }
-
-  void _paintPharmacyWorld(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final aperturePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..color = Colors.white.withValues(alpha: .20 * far);
-    final centre = Offset(size.width * .62, size.height * .47);
-    for (final scale in const [1.0, .72, .46]) {
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(centre.dx + (20 * (1 - far)), centre.dy),
-          width: size.height * 2.2 * scale,
-          height: size.height * 1.05 * scale,
-        ),
-        aperturePaint,
-      );
-    }
-    final shelfPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1
-      ..color = Colors.white.withValues(alpha: .16 * middle);
-    for (final yFactor in const [.22, .48, .74]) {
-      canvas.drawLine(
-        Offset(size.width * .36, size.height * yFactor),
-        Offset(size.width * .94, size.height * yFactor),
-        shelfPaint,
-      );
-    }
-    for (var index = 0; index < 4; index += 1) {
-      canvas.drawCircle(
-        Offset(
-          size.width * (.54 + (index * .07) - (.12 * (1 - near))),
-          size.height * .68,
-        ),
-        4 + (index * .5),
-        Paint()..color = index.isEven ? BuyV2Colors.green : BuyV2Colors.orange,
-      );
-    }
-  }
-
-  void _paintDeliveryWorld(
-    Canvas canvas,
-    Size size,
-    double far,
-    double middle,
-    double near,
-  ) {
-    final routePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: .22 * far);
-    final route = Path()
-      ..moveTo(size.width * .18, size.height * .72)
-      ..cubicTo(
-        size.width * .40,
-        size.height * .08,
-        size.width * .62,
-        size.height * .90,
-        size.width * .90,
-        size.height * .24,
-      );
-    canvas.drawPath(route, routePaint);
-    for (final point in const [.30, .50, .70, .88]) {
-      canvas.drawCircle(
-        Offset(size.width * point, size.height * (.62 - (.18 * point))),
-        3 + (2 * middle),
-        Paint()
-          ..color = point == .70
-              ? BuyV2Colors.orange
-              : Colors.white.withValues(alpha: .62 * middle),
-      );
-    }
-    _paintContextParcel(
-      canvas,
-      Offset(size.width * (.63 - (.18 * (1 - near))), size.height * .50),
-      23,
-      BuyV2Colors.orange,
-      near,
-    );
-  }
-
-  void _paintContextParcel(
-    Canvas canvas,
-    Offset origin,
-    double extent,
-    Color colour,
-    double arrival,
-  ) {
-    if (arrival <= 0) return;
-    final scale = .58 + (.42 * arrival);
-    final rect = Rect.fromCenter(
-      center: origin,
-      width: extent * scale,
-      height: extent * .74 * scale,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(rect, const Radius.circular(4)),
-      Paint()..color = colour,
-    );
-    canvas.drawLine(
-      Offset(rect.left + (rect.width * .50), rect.top),
-      Offset(rect.left + (rect.width * .50), rect.bottom),
-      Paint()
-        ..strokeWidth = 1
-        ..color = Colors.white.withValues(alpha: .52),
-    );
-  }
-
-  // ignore: unused_element
-  void _paintNearLens(Canvas canvas, Size size, double arrival) {
-    final nearX = size.width * (.86 + (.20 * (1 - arrival)));
-    final occlusion = Path()
-      ..moveTo(nearX, 0)
-      ..lineTo(size.width, 0)
-      ..lineTo(size.width, size.height)
-      ..lineTo(nearX - 38, size.height)
-      ..close();
-    canvas.drawPath(
-      occlusion,
-      Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Colors.white.withValues(alpha: .02 * arrival),
-            Colors.white.withValues(alpha: .16 * arrival),
-            Colors.white.withValues(alpha: .04 * arrival),
-          ],
-        ).createShader(Offset.zero & size),
-    );
-    canvas.drawLine(
-      Offset(nearX - 38, size.height),
-      Offset(nearX, 0),
-      Paint()
-        ..strokeWidth = 1.2
-        ..color = Colors.white.withValues(alpha: .28 * arrival),
-    );
-  }
-
-  // ignore: unused_element
-  void _paintShop(Canvas canvas, Size size, double settled) {
-    final compact = size.width < 360;
-    final farTravel = size.width * .12 * (1 - settled);
-    canvas.save();
-    canvas.translate(-farTravel, 0);
-    for (final x in const [.22, .38, .54]) {
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(size.width * x, 8, 22, 29),
-          const Radius.circular(5),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
-          ..color = Colors.white.withValues(alpha: .22),
-      );
-    }
-    canvas.restore();
-
-    final middleTravel = size.width * .20 * (1 - settled);
-    final orangeSize = compact ? 12.0 : 18.0;
-    final greenSize = compact ? 9.0 : 14.0;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * (compact ? .71 : .62) - middleTravel,
-          9,
-          orangeSize,
-          orangeSize,
-        ),
-        const Radius.circular(5),
-      ),
-      Paint()..color = BuyV2Colors.orange,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * (compact ? .76 : .69) - middleTravel,
-          25,
-          greenSize,
-          greenSize,
-        ),
-        const Radius.circular(4),
-      ),
-      Paint()..color = BuyV2Colors.green,
-    );
-
-    final nearTravel = size.width * .31 * (1 - settled);
-    final basketWidth = compact ? 17.0 : 36.0;
-    final basketLeft = size.width * (compact ? .80 : .78) - nearTravel;
-    final basketPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: .92);
-    final basketGlow = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: .11);
-    final basket = Path()
-      ..moveTo(basketLeft, 18)
-      ..lineTo(basketLeft + basketWidth * .17, 35)
-      ..lineTo(basketLeft + basketWidth * .83, 35)
-      ..lineTo(basketLeft + basketWidth, 18)
-      ..close();
-    canvas.drawPath(basket, basketGlow);
-    canvas.drawPath(basket, basketPaint);
-    if (compact) {
-      canvas.drawArc(
-        Rect.fromLTWH(basketLeft + 5, 10, 8, 11),
-        math.pi,
-        math.pi,
-        false,
-        basketPaint,
-      );
-    } else {
-      canvas.drawArc(
-        Rect.fromLTWH(basketLeft + 10, 8, 18, 18),
-        math.pi,
-        math.pi,
-        false,
-        basketPaint,
-      );
-    }
-  }
-
-  // ignore: unused_element
-  void _paintWholesale(Canvas canvas, Size size, double settled) {
-    final compact = size.width < 360;
-    final farRise = 13 * (1 - settled);
-    for (var index = 0; index < 3; index += 1) {
-      final top = 7 + (index * 11) + farRise;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromLTWH(size.width * (.24 + index * .05), top, 44, 8),
-          const Radius.circular(4),
-        ),
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.1
-          ..color = Colors.white.withValues(alpha: .20),
-      );
-    }
-
-    final middleRise = 20 * (1 - settled);
-    final greenWidth = compact ? 18.0 : 30.0;
-    final saffronWidth = compact ? 12.0 : 24.0;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * (compact ? .71 : .63),
-          20 + middleRise,
-          greenWidth,
-          compact ? 14 : 20,
-        ),
-        const Radius.circular(4),
-      ),
-      Paint()..color = BuyV2Colors.green,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * (compact ? .78 : .73),
-          8 + middleRise,
-          saffronWidth,
-          compact ? 11 : 16,
-        ),
-        const Radius.circular(4),
-      ),
-      Paint()..color = BuyV2Colors.orange,
-    );
-
-    final nearShift = size.width * .27 * (1 - settled);
-    final palletLeft = size.width * (compact ? .82 : .78) + nearShift;
-    final palletWidth = compact ? 12.0 : 34.0;
-    final palletHeight = compact ? 22.0 : 28.0;
-    final nearPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.7
-      ..color = Colors.white.withValues(alpha: .90);
-    final palletGlow = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 4.8
-      ..color = Colors.white.withValues(alpha: .11);
-    canvas.drawRect(
-      Rect.fromLTWH(palletLeft, 8, palletWidth, palletHeight),
-      Paint()..color = Colors.white.withValues(alpha: .055),
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(palletLeft, 8, palletWidth, palletHeight),
-      palletGlow,
-    );
-    canvas.drawRect(
-      Rect.fromLTWH(palletLeft, 8, palletWidth, palletHeight),
-      nearPaint,
-    );
-    canvas.drawLine(
-      Offset(palletLeft, 8 + palletHeight * .48),
-      Offset(palletLeft + palletWidth, 8 + palletHeight * .48),
-      nearPaint,
-    );
-    canvas.drawLine(
-      Offset(palletLeft + palletWidth * .5, 8),
-      Offset(palletLeft + palletWidth * .5, 8 + palletHeight),
-      nearPaint,
-    );
-  }
-
-  // ignore: unused_element
-  void _paintMedicine(Canvas canvas, Size size, double settled) {
-    final compact = size.width < 360;
-    final farScale = .72 + (.28 * settled);
-    final farCentre = Offset(size.width * .35, size.height * .5);
-    canvas.drawCircle(
-      farCentre,
-      27 * farScale,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.2
-        ..color = Colors.white.withValues(alpha: .22),
-    );
-
-    final middleShift = 28 * (1 - settled);
-    final crossCentre = Offset(
-      size.width * (compact ? .72 : .67) + middleShift,
-      23,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: crossCentre,
-          width: compact ? 18 : 28,
-          height: compact ? 7 : 10,
-        ),
-        const Radius.circular(3),
-      ),
-      Paint()..color = BuyV2Colors.green,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-          center: crossCentre,
-          width: compact ? 7 : 10,
-          height: compact ? 18 : 28,
-        ),
-        const Radius.circular(3),
-      ),
-      Paint()..color = BuyV2Colors.green,
-    );
-
-    final capsuleLeft = size.width * (compact ? .78 : .76) - 34 * (1 - settled);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(capsuleLeft, 8, compact ? 14 : 30, compact ? 8 : 12),
-        const Radius.circular(8),
-      ),
-      Paint()..color = BuyV2Colors.orange,
-    );
-
-    final nearShift = size.width * .25 * (1 - settled);
-    final sheetLeft = size.width * (compact ? .82 : .78) + nearShift;
-    final sheetWidth = compact ? 12.0 : 31.0;
-    final sheetHeight = compact ? 24.0 : 31.0;
-    final nearPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.6
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: .92);
-    final sheetBounds = RRect.fromRectAndRadius(
-      Rect.fromLTWH(sheetLeft, 6, sheetWidth, sheetHeight),
-      const Radius.circular(5),
-    );
-    canvas.drawRRect(
-      sheetBounds,
-      Paint()..color = Colors.white.withValues(alpha: .06),
-    );
-    canvas.drawRRect(
-      sheetBounds,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 4.8
-        ..color = Colors.white.withValues(alpha: .11),
-    );
-    canvas.drawRRect(sheetBounds, nearPaint);
-    for (final fraction in const [.32, .54, .76]) {
-      canvas.drawLine(
-        Offset(sheetLeft + sheetWidth * .22, 6 + sheetHeight * fraction),
-        Offset(sheetLeft + sheetWidth * .78, 6 + sheetHeight * fraction),
-        nearPaint,
-      );
-    }
-  }
-
-  // ignore: unused_element
-  void _paintOrders(Canvas canvas, Size size, double settled) {
-    final compact = size.width < 360;
-    final farShift = -size.width * .10 * (1 - settled);
-    final routePaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2
-      ..strokeCap = StrokeCap.round
-      ..color = Colors.white.withValues(alpha: .24);
-    final route = Path()
-      ..moveTo(size.width * .20 + farShift, 35)
-      ..cubicTo(
-        size.width * .38 + farShift,
-        4,
-        size.width * .58 + farShift,
-        45,
-        size.width * .76 + farShift,
-        15,
-      );
-    canvas.drawPath(route, routePaint);
-
-    final middleShift = size.width * .20 * (1 - settled);
-    final parcelWidth = compact ? 16.0 : 26.0;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(
-          size.width * (compact ? .71 : .62) - middleShift,
-          12,
-          parcelWidth,
-          compact ? 18 : 25,
-        ),
-        const Radius.circular(4),
-      ),
-      Paint()..color = BuyV2Colors.orange,
-    );
-    canvas.drawCircle(
-      Offset(size.width * (compact ? .78 : .75) - middleShift, 34),
-      compact ? 4 : 6,
-      Paint()..color = BuyV2Colors.green,
-    );
-
-    final nearShift = size.width * .30 * (1 - settled);
-    final vehicleLeft = size.width * (compact ? .82 : .78) + nearShift;
-    final vehicleWidth = compact ? 13.0 : 34.0;
-    final nearPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.8
-      ..strokeCap = StrokeCap.round
-      ..strokeJoin = StrokeJoin.round
-      ..color = Colors.white.withValues(alpha: .92);
-    final vehicle = Path()
-      ..moveTo(vehicleLeft, 13)
-      ..lineTo(vehicleLeft + vehicleWidth * .70, 13)
-      ..lineTo(vehicleLeft + vehicleWidth, compact ? 19 : 23)
-      ..lineTo(vehicleLeft + vehicleWidth, compact ? 29 : 34)
-      ..lineTo(vehicleLeft, compact ? 29 : 34)
-      ..close();
-    canvas.drawPath(
-      vehicle,
-      Paint()..color = Colors.white.withValues(alpha: .055),
-    );
-    canvas.drawPath(
-      vehicle,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 5
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round
-        ..color = Colors.white.withValues(alpha: .11),
-    );
-    canvas.drawPath(vehicle, nearPaint);
-    canvas.drawCircle(
-      Offset(vehicleLeft + vehicleWidth * .24, compact ? 31 : 36),
-      compact ? 2.2 : 3.5,
-      nearPaint,
-    );
-    canvas.drawCircle(
-      Offset(vehicleLeft + vehicleWidth * .82, compact ? 31 : 36),
-      compact ? 2.2 : 3.5,
-      nearPaint,
-    );
-
-    final sheenShift = size.width * (-.18 + (1.20 * settled));
-    final sheen = Path()
-      ..moveTo(sheenShift - 22, size.height)
-      ..lineTo(sheenShift - 5, 0)
-      ..lineTo(sheenShift + 9, 0)
-      ..lineTo(sheenShift - 8, size.height)
-      ..close();
-    canvas.drawPath(
-      sheen,
-      Paint()..color = Colors.white.withValues(alpha: .10),
-    );
-  }
-
-  @override
-  bool shouldRepaint(_HeaderScenePainter oldDelegate) =>
-      oldDelegate.destination != destination ||
-      oldDelegate.view != view ||
-      oldDelegate.progress != progress;
-}
-
-typedef _HeaderPromoAction = ({
-  IconData icon,
-  String label,
-  String semantics,
-  Color accent,
-  VoidCallback onTap,
-});
-
-_HeaderPromoAction? _resolveHeaderPromoAction(
-  BuildContext context,
-  BuyV2Session session,
-) {
-  final activeOrders = session.orders
-      .where((order) => order.status != BuyV2OrderStatus.delivered)
-      .toList(growable: false);
-  final activeOrder = activeOrders.isEmpty ? null : activeOrders.first;
-  late final _HeaderPromoAction? action;
-  if (session.view == BuyV2View.account) {
-    action = (
-      icon: Icons.receipt_long_outlined,
-      label: 'View purchases',
-      semantics: 'View purchases from your account',
-      accent: BuyV2Colors.green,
-      onTap: session.openOrdersFromAccount,
-    );
-  } else if (session.view != BuyV2View.catalogue) {
-    action = null;
-  } else {
-    action = switch (session.destination) {
-      BuyV2Destination.shop => (
-        icon: Icons.shopping_basket_outlined,
-        label: 'Plan basket',
-        semantics: 'Plan a household basket',
-        accent: BuyV2Colors.green,
-        onTap: () => unawaited(showBuyV2HouseholdBasket(context, session)),
-      ),
-      BuyV2Destination.wholesale => (
-        icon: Icons.inventory_2_outlined,
-        label: 'Flexible packs',
-        semantics: 'Show flexible minimum-order packs',
-        accent: BuyV2Colors.green,
-        onTap: () => session.chooseFilter('moq'),
-      ),
-      BuyV2Destination.medicine => (
-        icon: Icons.medical_services_outlined,
-        label: 'Prescription centre',
-        semantics: 'Open the prescription centre',
-        accent: BuyV2Colors.green,
-        onTap: () => unawaited(showBuyV2PrescriptionSheet(context, session)),
-      ),
-      BuyV2Destination.orders when activeOrder != null => (
-        icon: Icons.route_outlined,
-        label: 'Track active order',
-        semantics: 'Track active order ${activeOrder.id}',
-        accent: BuyV2Colors.green,
-        onTap: () => session.openTracking(activeOrder.id),
-      ),
-      BuyV2Destination.orders => (
-        icon: Icons.receipt_long_outlined,
-        label: 'View purchases',
-        semantics: 'View your purchases',
-        accent: BuyV2Colors.green,
-        onTap: session.openOrders,
-      ),
-    };
-  }
-  return action;
-}
-
 class _BuySearchBand extends StatelessWidget {
   const _BuySearchBand({
     required this.session,
+    required this.offersActive,
     required this.controller,
     required this.open,
     required this.onOpenChanged,
-    required this.onScan,
     required this.onLocation,
-    required this.scannerBusy,
+    required this.onAccount,
+    this.trailingAction,
   });
 
   final BuyV2Session session;
+  final bool offersActive;
   final TextEditingController controller;
   final bool open;
   final ValueChanged<bool> onOpenChanged;
-  final VoidCallback onScan;
   final VoidCallback onLocation;
-  final bool scannerBusy;
+  final VoidCallback onAccount;
+  final Widget? trailingAction;
 
   @override
   Widget build(BuildContext context) {
-    final hint = switch (session.destination) {
-      BuyV2Destination.wholesale => 'Search bulk products and suppliers',
-      BuyV2Destination.medicine => 'Search medicines and wellness',
-      BuyV2Destination.orders => 'Search orders, sellers or ID',
-      _ => 'Search products, brands and codes',
-    };
-    final showScanner = session.destination != BuyV2Destination.orders;
+    final storeSearch =
+        session.pagedCatalogueEnabled &&
+        !offersActive &&
+        (session.destination == BuyV2Destination.shop ||
+            session.destination == BuyV2Destination.wholesale);
+    final hint = storeSearch
+        ? 'Search stores or products'
+        : offersActive
+        ? 'Search offers, products and sellers'
+        : switch (session.destination) {
+            BuyV2Destination.wholesale => 'Search bulk products and suppliers',
+            BuyV2Destination.medicine => 'Search medicines and wellness',
+            BuyV2Destination.orders => 'Search orders, sellers or ID',
+            _ => 'Search products, brands and codes',
+          };
+    final compactHint = storeSearch
+        ? 'Stores or products'
+        : offersActive
+        ? 'Search current offers'
+        : switch (session.destination) {
+            BuyV2Destination.wholesale => 'Search bulk products',
+            BuyV2Destination.medicine => 'Search medicines',
+            BuyV2Destination.orders => 'Search orders or ID',
+            _ => 'Search products',
+          };
     final longQuery = open && controller.text.trim().length > 38;
     final accessibilityText = MediaQuery.textScalerOf(context).scale(1) >= 1.3;
     final longQueryBandHeight = accessibilityText ? 174.0 : 132.0;
@@ -3869,480 +3038,626 @@ class _BuySearchBand extends StatelessWidget {
       BuyV2Motion.expandCollapse,
     );
     final theme = BuyV2ThemeScope.of(context);
-    return AnimatedContainer(
-      key: const ValueKey('buy-search-band'),
-      duration: expandCollapseDuration,
-      curve: Curves.easeOutCubic,
-      height: open ? (longQuery ? longQueryBandHeight : 82) : 56,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-      decoration: BoxDecoration(
-        color: theme.canvas,
-        border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: AnimatedContainer(
-              key: const ValueKey('buy-search-control'),
-              duration: expandCollapseDuration,
-              curve: Curves.easeOutCubic,
-              height: open ? (longQuery ? longQueryControlHeight : 70) : 44,
-              decoration: const BoxDecoration(color: Colors.transparent),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: open
-                        ? TextField(
-                            key: const ValueKey('buy-search-field'),
-                            controller: controller,
-                            autofocus: true,
-                            onChanged: session.updateQuery,
-                            textInputAction: TextInputAction.search,
-                            minLines: 1,
-                            maxLines: 6,
-                            textAlignVertical: longQuery
-                                ? TextAlignVertical.top
-                                : TextAlignVertical.center,
-                            style: const TextStyle(
-                              color: BuyV2Colors.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                            ),
-                            decoration: InputDecoration(
-                              hintText: hint,
-                              hintStyle: const TextStyle(
-                                color: BuyV2Colors.muted,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
+    return LayoutBuilder(
+      builder: (context, bandConstraints) {
+        var queryControlHeight = longQuery ? longQueryControlHeight : 70.0;
+        if (open && !longQuery && controller.text.isNotEmpty) {
+          final queryWidth =
+              (bandConstraints.maxWidth -
+                      16 -
+                      46 -
+                      51 -
+                      48 -
+                      (trailingAction == null ? 0 : 44) -
+                      2)
+                  .clamp(1.0, double.infinity);
+          final queryPainter = TextPainter(
+            text: TextSpan(
+              text: controller.text,
+              style: Theme.of(context).textTheme.bodyLarge!.merge(
+                const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+              ),
+            ),
+            maxLines: 6,
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            locale: Localizations.maybeLocaleOf(context),
+          )..layout(maxWidth: queryWidth);
+          queryControlHeight = (queryPainter.height + 24).ceilToDouble().clamp(
+            70.0,
+            longQueryControlHeight,
+          );
+          queryPainter.dispose();
+        }
+        return AnimatedContainer(
+          key: const ValueKey('buy-search-band'),
+          duration: expandCollapseDuration,
+          curve: Curves.easeOutCubic,
+          height: open
+              ? (longQuery ? longQueryBandHeight : queryControlHeight + 12)
+              : 56,
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+          decoration: BoxDecoration(
+            color: theme.canvas,
+            border: const Border(bottom: BorderSide(color: BuyV2Colors.line)),
+          ),
+          child: Row(
+            children: [
+              Expanded(
+                child: AnimatedContainer(
+                  key: const ValueKey('buy-search-control'),
+                  duration: expandCollapseDuration,
+                  curve: Curves.easeOutCubic,
+                  height: open ? queryControlHeight : 44,
+                  // A short store name can wrap at large text sizes. Let the
+                  // measured field determine its finite animated height.
+                  decoration: const BoxDecoration(color: Colors.transparent),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: LayoutBuilder(
+                          builder: (context, constraints) {
+                            final hintStyle =
+                                (open
+                                        ? Theme.of(context).textTheme.bodyLarge!
+                                        : DefaultTextStyle.of(context).style)
+                                    .copyWith(
+                                      fontSize: open ? 12 : 11,
+                                      fontWeight: open
+                                          ? FontWeight.w600
+                                          : FontWeight.w700,
+                                    );
+                            final painter = TextPainter(
+                              text: TextSpan(
+                                text: compactHint,
+                                style: hintStyle,
                               ),
-                              border: InputBorder.none,
-                              enabledBorder: InputBorder.none,
-                              focusedBorder: InputBorder.none,
-                              disabledBorder: InputBorder.none,
-                              errorBorder: InputBorder.none,
-                              focusedErrorBorder: InputBorder.none,
-                              filled: false,
-                              isDense: true,
-                              prefixIcon: const Icon(
-                                Icons.search_rounded,
-                                color: BuyV2Colors.navy,
-                                size: 21,
-                              ),
-                              prefixIconConstraints: const BoxConstraints(
-                                minWidth: 42,
-                                minHeight: 46,
-                              ),
-                              contentPadding: const EdgeInsets.symmetric(
-                                vertical: 10,
-                              ),
-                            ),
-                            onSubmitted: (_) {
-                              FocusScope.of(context).unfocus();
-                            },
-                          )
-                        : Semantics(
-                            label: hint,
-                            button: true,
-                            child: InkWell(
-                              onTap: () {
-                                HapticFeedback.selectionClick();
-                                onOpenChanged(true);
-                              },
-                              borderRadius: BorderRadius.circular(13),
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                child: Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.search_rounded,
-                                      color: BuyV2Colors.navy,
-                                      size: 21,
+                              textDirection: Directionality.of(context),
+                              textScaler: MediaQuery.textScalerOf(context),
+                              locale: Localizations.maybeLocaleOf(context),
+                            )..layout();
+                            final visibleHint =
+                                painter.width <=
+                                    constraints.maxWidth - (open ? 42 : 54)
+                                ? compactHint
+                                : 'Search';
+                            painter.dispose();
+                            return open
+                                ? TextField(
+                                    key: const ValueKey('buy-search-field'),
+                                    controller: controller,
+                                    autofocus: true,
+                                    onChanged: session.updateQuery,
+                                    textInputAction: TextInputAction.search,
+                                    minLines: 1,
+                                    maxLines: 6,
+                                    textAlignVertical: longQuery
+                                        ? TextAlignVertical.top
+                                        : TextAlignVertical.center,
+                                    style: const TextStyle(
+                                      color: BuyV2Colors.ink,
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w700,
                                     ),
-                                    const SizedBox(width: 9),
-                                    Expanded(
-                                      child: Text(
-                                        session.query.isEmpty
-                                            ? hint
-                                            : session.query,
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: TextStyle(
-                                          color: session.query.isEmpty
-                                              ? BuyV2Colors.muted
-                                              : BuyV2Colors.ink,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w700,
+                                    decoration: InputDecoration(
+                                      hintText: visibleHint,
+                                      hintMaxLines: 1,
+                                      hintStyle: const TextStyle(
+                                        color: BuyV2Colors.muted,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                      border: InputBorder.none,
+                                      enabledBorder: InputBorder.none,
+                                      focusedBorder: InputBorder.none,
+                                      disabledBorder: InputBorder.none,
+                                      errorBorder: InputBorder.none,
+                                      focusedErrorBorder: InputBorder.none,
+                                      filled: false,
+                                      isDense: true,
+                                      prefixIcon: const Icon(
+                                        Icons.search_rounded,
+                                        color: BuyV2Colors.navy,
+                                        size: 21,
+                                      ),
+                                      prefixIconConstraints:
+                                          const BoxConstraints(
+                                            minWidth: 42,
+                                            minHeight: 46,
+                                          ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            vertical: 10,
+                                          ),
+                                    ),
+                                    onSubmitted: (value) {
+                                      session.submitSearch(value);
+                                      FocusScope.of(context).unfocus();
+                                    },
+                                  )
+                                : Semantics(
+                                    label: hint,
+                                    button: true,
+                                    child: InkWell(
+                                      onTap: () {
+                                        HapticFeedback.selectionClick();
+                                        onOpenChanged(true);
+                                      },
+                                      borderRadius: BorderRadius.circular(13),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 12,
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            const Icon(
+                                              Icons.search_rounded,
+                                              color: BuyV2Colors.navy,
+                                              size: 21,
+                                            ),
+                                            const SizedBox(width: 9),
+                                            Expanded(
+                                              child: Text(
+                                                session.query.isEmpty
+                                                    ? visibleHint
+                                                    : session.query,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  color: session.query.isEmpty
+                                                      ? BuyV2Colors.muted
+                                                      : BuyV2Colors.ink,
+                                                  fontSize: 11,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
                                     ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                  ),
-                  if (open && controller.text.isNotEmpty)
-                    IconButton(
-                      key: const ValueKey('buy-search-clear'),
-                      tooltip: 'Clear search',
-                      onPressed: () {
-                        controller.clear();
-                        session.updateQuery('');
-                      },
-                      icon: const Icon(Icons.close_rounded, size: 20),
-                      color: BuyV2Colors.muted,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 44,
-                        height: 44,
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                  if (showScanner && !open && controller.text.isEmpty)
-                    IconButton(
-                      key: const ValueKey('buy-open-scanner'),
-                      tooltip: scannerBusy
-                          ? 'Opening camera scanner'
-                          : 'Open camera barcode scanner',
-                      onPressed: scannerBusy ? null : onScan,
-                      icon: scannerBusy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.qr_code_scanner_rounded, size: 20),
-                      color: BuyV2Colors.navy,
-                      constraints: const BoxConstraints.tightFor(
-                        width: 40,
-                        height: 44,
-                      ),
-                      padding: EdgeInsets.zero,
-                    ),
-                  if (open)
-                    Padding(
-                      padding: const EdgeInsets.only(right: 3),
-                      child: IconButton(
-                        key: const ValueKey('buy-search-close'),
-                        tooltip: 'Finish search',
-                        onPressed: () {
-                          FocusScope.of(context).unfocus();
-                          onOpenChanged(false);
-                        },
-                        icon: const Icon(Icons.check_rounded, size: 21),
-                        color: BuyV2Colors.navy,
-                        constraints: const BoxConstraints.tightFor(
-                          width: 44,
-                          height: 44,
+                                  );
+                          },
                         ),
-                        padding: EdgeInsets.zero,
                       ),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          if (!open) ...[
-            const SizedBox(width: 6),
-            Material(
-              color: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-                side: const BorderSide(color: BuyV2Colors.line),
-              ),
-              child: IconButton(
-                key: const ValueKey('buy-change-location'),
-                tooltip: 'Change delivery location',
-                onPressed: onLocation,
-                icon: const Icon(Icons.location_on_outlined, size: 22),
-                color: BuyV2Colors.navy,
-                constraints: const BoxConstraints.tightFor(
-                  width: 44,
-                  height: 44,
+                      if (open && controller.text.isNotEmpty)
+                        IconButton(
+                          key: const ValueKey('buy-search-clear'),
+                          tooltip: 'Clear search',
+                          onPressed: () {
+                            controller.clear();
+                            session.updateQuery('');
+                          },
+                          icon: const Icon(Icons.close_rounded, size: 20),
+                          color: BuyV2Colors.muted,
+                          constraints: const BoxConstraints.tightFor(
+                            width: 44,
+                            height: 44,
+                          ),
+                          padding: EdgeInsets.zero,
+                        ),
+                      if (open)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 3),
+                          child: IconButton(
+                            key: const ValueKey('buy-search-close'),
+                            tooltip: 'Finish search',
+                            onPressed: () {
+                              if (controller.text.trim().isNotEmpty) {
+                                session.submitSearch(controller.text);
+                              }
+                              FocusScope.of(context).unfocus();
+                              onOpenChanged(false);
+                            },
+                            icon: const Icon(Icons.check_rounded, size: 21),
+                            color: BuyV2Colors.navy,
+                            constraints: const BoxConstraints.tightFor(
+                              width: 44,
+                              height: 44,
+                            ),
+                            padding: EdgeInsets.zero,
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-                padding: EdgeInsets.zero,
               ),
-            ),
-          ],
-        ],
-      ),
+              if (!open) ...[
+                const SizedBox(width: 6),
+                Material(
+                  color: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    side: const BorderSide(color: BuyV2Colors.line),
+                  ),
+                  child: IconButton(
+                    key: const ValueKey('buy-change-location'),
+                    tooltip: session.pagedCatalogueEnabled
+                        ? 'Choose shopping area'
+                        : 'Change delivery location',
+                    onPressed: onLocation,
+                    icon: const Icon(Icons.location_on_outlined, size: 22),
+                    color: BuyV2Colors.navy,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 44,
+                      height: 44,
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                MoolGlobalProfileShortcutV2(
+                  keyName: 'buy-open-account',
+                  onPressed: onAccount,
+                ),
+              ],
+              ?trailingAction,
+            ],
+          ),
+        );
+      },
     );
   }
 }
 
-class _BuyMiniCartBar extends StatelessWidget {
-  const _BuyMiniCartBar({required this.session});
+class _BuyCartPanGestureRecognizer extends PanGestureRecognizer {
+  @override
+  bool hasSufficientGlobalDistanceToAccept(
+    PointerDeviceKind pointerDeviceKind,
+    double? deviceTouchSlop,
+  ) {
+    // Compete at the enclosing scrollable's threshold while retaining both
+    // movement axes. A vertical Cart drag must not scroll the page beneath it.
+    return globalDistanceMoved.abs() >
+        computeHitSlop(pointerDeviceKind, gestureSettings);
+  }
+}
+
+class _BuyMiniCartBar extends StatefulWidget {
+  const _BuyMiniCartBar({
+    required this.session,
+    required this.initialPosition,
+    required this.onPositionChanged,
+    this.aggregate = false,
+    this.compact = false,
+    this.onParkingChanged,
+  });
 
   final BuyV2Session session;
+  final bool aggregate;
+  final bool compact;
+  final ValueChanged<bool>? onParkingChanged;
+  final Offset? initialPosition;
+  final ValueChanged<Offset> onPositionChanged;
+
+  @override
+  State<_BuyMiniCartBar> createState() => _BuyMiniCartBarState();
+}
+
+class _BuyMiniCartBarState extends State<_BuyMiniCartBar> {
+  static const _edgeInset = 8.0;
+  Offset? _position;
+  bool _dragging = false;
+  bool? _reportedParking;
+
+  @override
+  void initState() {
+    super.initState();
+    _position = widget.initialPosition;
+  }
+
+  Offset _defaultPosition(Size available, Size cart) => Offset(
+    (available.width - cart.width - _edgeInset).clamp(
+      _edgeInset,
+      available.width,
+    ),
+    (available.height - cart.height - _edgeInset).clamp(
+      _edgeInset,
+      available.height,
+    ),
+  );
+
+  Offset _clampPosition(Offset position, Size available, Size cart) => Offset(
+    position.dx.clamp(
+      _edgeInset,
+      (available.width - cart.width - _edgeInset).clamp(
+        _edgeInset,
+        available.width,
+      ),
+    ),
+    position.dy.clamp(
+      _edgeInset,
+      (available.height - cart.height - _edgeInset).clamp(
+        _edgeInset,
+        available.height,
+      ),
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
-    final itemCount = session.itemCount;
-    final total = session.cartTotal;
+    final session = widget.session;
+    final destination = session.activeDockDestination;
+    final otherBaskets =
+        !widget.aggregate &&
+        (destination == BuyV2Destination.shop ||
+            destination == BuyV2Destination.wholesale) &&
+        session.countForDestination(destination) == 0;
+    final aggregate = widget.aggregate || otherBaskets;
+    final scope = aggregate
+        ? BuyV2CartScope.all
+        : switch (destination) {
+            BuyV2Destination.shop => BuyV2CartScope.shop,
+            BuyV2Destination.wholesale => BuyV2CartScope.wholesale,
+            BuyV2Destination.medicine => BuyV2CartScope.medicine,
+            BuyV2Destination.orders => BuyV2CartScope.all,
+          };
+    final itemCount = aggregate || destination == BuyV2Destination.orders
+        ? session.itemCount
+        : session.countForDestination(destination);
+    final total = aggregate || destination == BuyV2Destination.orders
+        ? session.cartTotal
+        : session.totalForDestination(destination);
     final itemLabel = itemCount == 1 ? 'item' : 'items';
-    final cartMessage =
-        session.cartAcknowledgement ?? '$itemCount $itemLabel ready';
-    const title = 'Cart';
+    final itemText = '$itemCount $itemLabel';
+    final summaryText = otherBaskets ? 'All carts' : itemText;
+    final priceUnavailable = session.procurementPricesUnavailableFor(
+      aggregate || destination == BuyV2Destination.orders ? null : destination,
+    );
+    final totalText = priceUnavailable ? 'Price pending' : buyV2Money(total);
+    final acknowledgement = aggregate || destination == BuyV2Destination.orders
+        ? session.cartAcknowledgement
+        : session.cartAcknowledgementForDestination(destination);
+    final cartMessage = acknowledgement == null
+        ? '$itemText ready'
+        : '$acknowledgement · $itemText';
+    const itemStyle = TextStyle(
+      color: Colors.white70,
+      fontSize: 8.5,
+      height: 1,
+      fontWeight: FontWeight.w800,
+    );
+    const totalStyle = TextStyle(
+      color: Colors.white,
+      fontSize: 12.5,
+      height: 1,
+      fontWeight: FontWeight.w900,
+    );
+    final itemSize = buyV2ValueTextSize(context, summaryText, itemStyle);
+    final totalSize = buyV2ValueTextSize(context, totalText, totalStyle);
+
     void activate() {
       HapticFeedback.selectionClick();
-      session.openCart();
+      session.openCart(scope: scope);
     }
 
-    return Semantics(
-      key: const ValueKey('buy-compact-cart-indicator'),
-      label: '$title, $cartMessage, ${buyV2Money(total)}. View cart',
-      button: true,
-      liveRegion: true,
-      excludeSemantics: true,
-      onTap: activate,
-      child: Material(
-        color: Colors.white,
-        child: InkWell(
-          onTap: activate,
-          child: Container(
-            height: 64,
-            margin: const EdgeInsets.fromLTRB(10, 5, 10, 5),
-            padding: const EdgeInsets.symmetric(horizontal: 10),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF111A36), BuyV2Colors.navy],
-                begin: Alignment.centerLeft,
-                end: Alignment.centerRight,
+    final semanticsLabel =
+        '${otherBaskets ? 'All carts' : 'Cart'}, $cartMessage, $totalText. View cart';
+    if (widget.compact) {
+      return Semantics(
+        key: const ValueKey('buy-compact-cart-indicator'),
+        container: true,
+        label: semanticsLabel,
+        button: true,
+        liveRegion: true,
+        onTap: activate,
+        excludeSemantics: true,
+        child: Tooltip(
+          message: semanticsLabel,
+          child: SizedBox(
+            key: const ValueKey('buy-cart-navigation-button'),
+            width: 44,
+            height: 44,
+            child: Material(
+              color: BuyV2Colors.navy,
+              borderRadius: BorderRadius.circular(14),
+              child: InkWell(
+                key: const ValueKey('buy-mini-cart-drag-handle'),
+                borderRadius: BorderRadius.circular(14),
+                onTap: activate,
+                child: Center(
+                  child: Badge(
+                    label: Text(itemCount > 9 ? '9+' : '$itemCount'),
+                    child: const Icon(
+                      Icons.shopping_cart_outlined,
+                      color: Colors.white,
+                      size: 21,
+                    ),
+                  ),
+                ),
               ),
-              borderRadius: BorderRadius.circular(19),
-              border: Border.all(color: Colors.white24),
-              boxShadow: const [
-                BoxShadow(
-                  color: Color(0x2B000050),
-                  blurRadius: 14,
-                  offset: Offset(0, 5),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 42,
-                  height: 42,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: .13),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white24),
-                  ),
-                  child: const Icon(
-                    Icons.shopping_cart_outlined,
-                    color: BuyV2Colors.orange,
-                    size: 22,
-                  ),
-                ),
-                const SizedBox(width: 9),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const SizedBox(height: 3),
-                      LayoutBuilder(
-                        builder: (context, constraints) {
-                          return BuyV2FiniteValueTransition(
-                            key: ValueKey(
-                              session.cartAcknowledgement == null
-                                  ? 'buy-cart-summary'
-                                  : 'buy-cart-acknowledgement',
-                            ),
-                            stateKey: '$cartMessage|$itemCount|$total',
-                            text: cartMessage,
-                            ownerSize: Size(constraints.maxWidth, 14),
-                            textAlign: TextAlign.start,
-                            duration: BuyV2Motion.contentChange,
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 8.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                BuyV2FiniteValueTransition(
-                  key: const ValueKey('buy-mini-cart-total-motion'),
-                  stateKey: total,
-                  text: buyV2Money(total),
-                  ownerSize: const Size(74, 24),
-                  textAlign: TextAlign.end,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(width: 9),
-                Container(
-                  height: 38,
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: BuyV2Colors.orange,
-                    borderRadius: BorderRadius.circular(13),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'View cart',
-                        style: TextStyle(
-                          color: BuyV2Colors.navy,
-                          fontSize: 9,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      SizedBox(width: 1),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: BuyV2Colors.navy,
-                        size: 18,
-                      ),
-                    ],
-                  ),
-                ),
-              ],
             ),
           ),
         ),
-      ),
-    );
-  }
-}
+      );
+    }
 
-class _HeaderContextButton extends StatelessWidget {
-  const _HeaderContextButton({required this.session});
+    final avoidance = BuyV2CartAvoidanceScope.of(context);
+    return ListenableBuilder(
+      listenable: avoidance ?? const AlwaysStoppedAnimation<int>(0),
+      builder: (context, _) => LayoutBuilder(
+        builder: (context, constraints) {
+          final available = constraints.biggest;
+          final maximumWidth = (available.width - (_edgeInset * 2)).clamp(
+            88.0,
+            double.infinity,
+          );
+          final textWidth = itemSize.width > totalSize.width
+              ? itemSize.width
+              : totalSize.width;
+          final cartWidth = (textWidth + 40)
+              .clamp(88.0, maximumWidth)
+              .toDouble();
+          final cartHeight = (itemSize.height + totalSize.height + 18)
+              .clamp(48.0, double.infinity)
+              .toDouble();
+          final cartSize = Size(cartWidth, cartHeight);
+          var currentPosition = _clampPosition(
+            _position ?? _defaultPosition(available, cartSize),
+            available,
+            cartSize,
+          );
+          final owner = context.findAncestorRenderObjectOfType<RenderBox>();
+          if (!_dragging &&
+              avoidance != null &&
+              owner is RenderBox &&
+              owner.hasSize) {
+            currentPosition = avoidance.place(
+              currentPosition,
+              cartSize,
+              available,
+              owner,
+            );
+          }
+          final parked = (avoidance?.dockHeight ?? 0) > 0;
+          if (widget.onParkingChanged != null) {
+            if (_reportedParking != parked) {
+              _reportedParking = parked;
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (mounted) widget.onParkingChanged?.call(parked);
+              });
+            }
+            if (parked) return const SizedBox.shrink();
+          }
+          final valueWidth = cartWidth - 40;
 
-  final BuyV2Session session;
+          void startMove(DragStartDetails _) {
+            setState(() {
+              _position = currentPosition;
+              _dragging = true;
+            });
+          }
 
-  @override
-  Widget build(BuildContext context) {
-    final resolvedAction = _resolveHeaderPromoAction(context, session);
-    if (resolvedAction == null) return const SizedBox(height: 56);
-    final reduced = MediaQuery.disableAnimationsOf(context);
-    final motionKey =
-        '${session.destination.name}-${session.view.name}-${resolvedAction.label}';
-    return Semantics(
-      label: resolvedAction.semantics,
-      button: true,
-      excludeSemantics: true,
-      child: SizedBox(
-        height: 56,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            const Opacity(
-              key: ValueKey('buy-header-surface-copy-suppressed'),
-              opacity: 0,
-              child: SizedBox.shrink(),
-            ),
-            Align(
-              alignment: Alignment.bottomRight,
-              child: TweenAnimationBuilder<double>(
-                key: ValueKey<String>('buy-header-action-motion-$motionKey'),
-                tween: Tween<double>(begin: reduced ? 1 : 0, end: 1),
-                duration: BuyV2Motion.resolved(
-                  context,
-                  const Duration(milliseconds: 3600),
-                ),
-                curve: const Interval(.62, .88, curve: Curves.easeOutCubic),
-                builder: (context, progress, child) => Opacity(
-                  opacity: progress,
-                  child: Transform.translate(
-                    offset: Offset(10 * (1 - progress), 5 * (1 - progress)),
-                    child: child,
-                  ),
-                ),
-                child: Tooltip(
-                  message: resolvedAction.semantics,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      key: ValueKey<String>(
-                        'buy-header-context-cta-${session.destination.name}',
-                      ),
-                      onTap: () {
-                        HapticFeedback.selectionClick();
-                        resolvedAction.onTap();
-                      },
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        width: 30,
-                        height: 30,
-                        alignment: Alignment.center,
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [
-                              BuyV2Colors.navy.withValues(alpha: .86),
-                              Colors.white.withValues(alpha: .18),
-                              BuyV2Colors.navy.withValues(alpha: .66),
-                            ],
-                          ),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: .58),
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.white.withValues(alpha: .10),
-                              blurRadius: 9,
-                            ),
-                          ],
+          void move(DragUpdateDetails details) {
+            setState(() {
+              _dragging = true;
+              _position = _clampPosition(
+                (_position ?? currentPosition) + details.delta,
+                available,
+                cartSize,
+              );
+            });
+          }
+
+          void finishMove() {
+            final position = _position ?? currentPosition;
+            setState(() => _dragging = false);
+            widget.onPositionChanged(position);
+            HapticFeedback.selectionClick();
+          }
+
+          return Stack(
+            key: const ValueKey('buy-mini-cart-transparent-overlay'),
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                left: currentPosition.dx,
+                top: currentPosition.dy,
+                child: Semantics(
+                  key: const ValueKey('buy-compact-cart-indicator'),
+                  container: true,
+                  label: semanticsLabel,
+                  hint: 'Drag to move. Double tap to view cart.',
+                  button: true,
+                  liveRegion: true,
+                  onTap: activate,
+                  child: RawGestureDetector(
+                    key: const ValueKey('buy-mini-cart-drag-handle'),
+                    behavior: HitTestBehavior.opaque,
+                    gestures: {
+                      _BuyCartPanGestureRecognizer:
+                          GestureRecognizerFactoryWithHandlers<
+                            _BuyCartPanGestureRecognizer
+                          >(_BuyCartPanGestureRecognizer.new, (recognizer) {
+                            recognizer.onStart = startMove;
+                            recognizer.onUpdate = move;
+                            recognizer.onEnd = (_) => finishMove();
+                            recognizer.onCancel = finishMove;
+                          }),
+                    },
+                    child: SizedBox(
+                      width: cartWidth,
+                      height: cartHeight,
+                      child: Material(
+                        color: BuyV2Colors.navy,
+                        elevation: 3,
+                        shadowColor: BuyV2Colors.navy.withValues(alpha: .2),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                          side: const BorderSide(color: BuyV2Colors.royal),
                         ),
-                        child: Stack(
-                          alignment: Alignment.center,
-                          children: [
-                            Icon(
-                              resolvedAction.icon,
-                              color: Colors.white,
-                              size: 17,
-                            ),
-                            Positioned(
-                              right: 3,
-                              bottom: 3,
-                              child: Container(
-                                width: 5,
-                                height: 5,
-                                decoration: BoxDecoration(
-                                  color: resolvedAction.accent,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: activate,
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
+                            child: Row(
+                              children: [
+                                AnimatedSwitcher(
+                                  duration: BuyV2Motion.resolved(
+                                    context,
+                                    BuyV2Motion.stateChange,
+                                  ),
+                                  child: Icon(
+                                    acknowledgement == null
+                                        ? Icons.shopping_cart_outlined
+                                        : Icons.check_circle_rounded,
+                                    key: ValueKey(
+                                      acknowledgement == null
+                                          ? 'buy-mini-cart-icon'
+                                          : 'buy-mini-cart-added-icon',
+                                    ),
                                     color: Colors.white,
-                                    width: .7,
+                                    size: 18,
                                   ),
                                 ),
-                              ),
+                                const SizedBox(width: 6),
+                                Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    BuyV2FiniteValueTransition(
+                                      key: ValueKey(
+                                        acknowledgement == null
+                                            ? 'buy-cart-summary'
+                                            : 'buy-cart-acknowledgement',
+                                      ),
+                                      stateKey:
+                                          '$summaryText|$cartMessage|$itemCount|$total',
+                                      text: summaryText,
+                                      ownerSize: Size(
+                                        valueWidth,
+                                        itemSize.height,
+                                      ),
+                                      textAlign: TextAlign.start,
+                                      style: itemStyle,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    BuyV2FiniteValueTransition(
+                                      key: const ValueKey('buy-cart-total'),
+                                      stateKey: '$total|$totalText',
+                                      text: totalText,
+                                      ownerSize: Size(
+                                        valueWidth,
+                                        totalSize.height,
+                                      ),
+                                      textAlign: TextAlign.start,
+                                      style: totalStyle,
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
                   ),
                 ),
               ),
-            ),
-          ],
-        ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -4383,16 +3698,14 @@ class _BuyNotice extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
-                  Icons.check_circle_rounded,
-                  color: BuyV2Colors.green,
+                  Icons.info_outline_rounded,
+                  color: Colors.white,
                   size: 16,
                 ),
                 const SizedBox(width: 7),
                 Flexible(
                   child: Text(
                     message,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 10,
