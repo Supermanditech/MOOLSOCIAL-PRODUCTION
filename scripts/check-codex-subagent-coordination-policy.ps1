@@ -332,7 +332,7 @@ function Assert-IntegrationRepairMerge(
   $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
     ForEach-Object { $_.ToLowerInvariant() })
   $repairOwnerClaim = @($claims | Where-Object {
-    [string]$_.task -ceq '/root/repair_store_buy_conflict_v3_20260904'
+    [string]$_.task -ceq $(if ($storeBuySeptember12) { '/root' } else { '/root/repair_store_buy_conflict_v3_20260904' })
   })
   Assert-Coordination ($repairOwnerClaim.Count -eq 1) `
     'integration repair exact owner claim is missing or ambiguous.'
@@ -669,7 +669,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 69) `
+Assert-Coordination ($continuationBindings.Count -eq 70) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -695,7 +695,8 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_09_02',
       'founder_authorized_2026_09_03',
       'founder_authorized_2026_09_04',
-      'founder_authorized_2026_09_05'
+      'founder_authorized_2026_09_05',
+      'founder_authorized_2026_09_12'
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
@@ -1039,6 +1040,48 @@ Assert-Coordination (
   [string]$integrationRepair.freshIntegrationMergeSubject -ceq
     'merge(work-store-buy-v4-20260904): integrate corrected Store Chat and Buy'
 ) 'integration repair discipline weakened or changed.'
+
+# Single ticket continuation. Historical repair policy above remains validated.
+# This changes no other lane and cannot select arbitrary inputs or conflict owners.
+$storeBuySeptember12 = $ProductionLane -ceq 'integration_repair' -and
+  $ProductionWorkId -ceq 'store-buy-20260912'
+if ($storeBuySeptember12) {
+  Assert-Coordination (
+    $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+    $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-20260912' -and
+    (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-20260912'
+  ) 'September12 repair identity changed.'
+  $literalBinding = @($continuationBindings | Where-Object {
+    $_.id -ceq 'integration_repair_store_buy_20260912'
+  })
+  Assert-Coordination (
+    $literalBinding.Count -eq 1 -and
+    $literalBinding[0].baselineHead -ceq '2a860f9f9fd793d4f366c5952f4f8eb05326f58b' -and
+    $literalBinding[0].branch -ceq 'work/integration-repair/store-buy-20260912' -and
+    $literalBinding[0].task -ceq '/root' -and
+    $literalBinding[0].workId -ceq 'store-buy-20260912' -and
+    $literalBinding[0].ticketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-20260912' -and
+    $literalBinding[0].bootstrapCommitSubject -ceq 'coordination(store-buy-20260912): bind exact Store Buy catalogue repair' -and
+    (@($literalBinding[0].bootstrapOwners | Sort-Object) -join '|') -ceq
+      'config/codex-subagent-coordination-policy.json|docs/quality/STORE-BUY-REPAIR-20260912.md|scripts/check-codex-subagent-coordination-policy.ps1'
+  ) 'September12 repair baseline or binding changed.'
+  $integrationRepair = $integrationRepair.PSObject.Copy()
+  $integrationRepair.requiredCodexCommit = '2a860f9f9fd793d4f366c5952f4f8eb05326f58b'
+  $integrationRepair.requiredCodexBranch = 'work/codex-ui/codex-oppo-review-v1-20260905'
+  $integrationRepair.requiredCursorCommit = '4d5ae49543cc5e88eecda2a48e948cbd18500a4d'
+  $integrationRepair.requiredCursorBranch = 'work/cursor-ui/buy-redmi-fixes-v1-20260905'
+  $expectedRepairConflictOwners = @(
+    'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+    'config/codex-development-regression-registry.json',
+    'config/codex-subagent-coordination-policy.json',
+    'scripts/check-codex-subagent-coordination-policy.ps1'
+  )
+  $expectedRepairUnmergedOwners = @($expectedRepairConflictOwners)
+  $integrationRepair.exactConflictOwners = @($expectedRepairConflictOwners)
+  $integrationRepair.preMergeCoordinationOwners = @('docs/quality/STORE-BUY-REPAIR-20260912.md')
+  $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-REPAIR-20260912.md')
+  $integrationRepair.maximumPostMergeClosureCommits = 1
+}
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
   'newAnnotatedAcceptanceTagRequired','productionCheckoutCleanRequired',
@@ -1475,10 +1518,10 @@ if ($ProductionLane -ceq 'baseline') {
   } else {
     Assert-Coordination (
       [string]$selectedLane.agentRole -ceq $AgentRole -and
-      $AgentTask.StartsWith(
+      ($storeBuySeptember12 -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
-      )
+      ))
     ) 'agent role or task does not match the selected production lane.'
     if ($hasContinuationBinding) {
       Assert-Coordination (
@@ -2626,6 +2669,12 @@ if ($ProductionLane -ceq 'baseline') {
           Get-CanonicalOwner ([string]$_)
         }
       )
+      if ($storeBuySeptember12) {
+        Assert-Coordination (
+          (@($effectiveOwners | Sort-Object) -join '|') -ceq
+          (@($expectedBootstrapOwners | Sort-Object) -join '|')
+        ) 'September12 bootstrap must claim only its three exact binding owners.'
+      }
       if ($ProductionLane -cne 'codex_ui') {
         foreach ($bootstrapOwner in $expectedBootstrapOwners) {
           Assert-Coordination (

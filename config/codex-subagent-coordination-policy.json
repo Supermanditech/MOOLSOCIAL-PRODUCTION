@@ -34,6 +34,7 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "docs/quality/STORE-BUY-REPAIR-20260912.md",
         "scripts/check-approved-ui-locks.ps1",
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/WorkDocumentPreviewBridge.kt",
@@ -1114,6 +1115,26 @@
       "featureBranchesMustStartAtTag": true
     },
     "continuationBindings": [
+      {
+        "id": "integration_repair_store_buy_20260912",
+        "state": "founder_authorized_2026_09_12",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root",
+        "workId": "store-buy-20260912",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-20260912",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-20260912",
+        "branch": "work/integration-repair/store-buy-20260912",
+        "baselineHead": "2a860f9f9fd793d4f366c5952f4f8eb05326f58b",
+        "bootstrapCommitSubject": "coordination(store-buy-20260912): bind exact Store Buy catalogue repair",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/STORE-BUY-REPAIR-20260912.md"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
       {
         "id": "codex_oppo_review_v1_20260905",
         "state": "founder_authorized_2026_09_05",
