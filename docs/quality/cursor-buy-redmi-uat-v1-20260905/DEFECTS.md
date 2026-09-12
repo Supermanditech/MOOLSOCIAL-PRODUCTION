@@ -1,5 +1,16 @@
 # Fresh Redmi defect register
 
+## Fresh picks image/action clearance checkpoint - 12 September 2026
+
+**R668-AUDIT-MEDIA-001 Fresh picks follow-up implemented and locally qualified; remains OPEN.** The photo and complete illustration disclosure now have space clear of Add and quantity controls. The existing quantity control uses its horizontal layout when the value fits and its stacked layout for long values. Existing card dimensions, product facts, saved action, Add/offer eligibility and session navigation remain. The first always-stacked spacing attempt was rejected on visual review because it made normal product images too small.
+
+Final connected product-actions/responsive-grid/partner-catalogue checks: **255 passed, 0 failed, 0 skipped**. Two focused visual journeys at 360x800 and 800x600 pass, including Add, product tap, Android Back, retained quantity, real increase/decrease taps and a nine-digit quantity. These overlap the connected count. Six actual Flutter captures reviewed. Static analysis and approved UI locks pass. Final source differs from visual source only by formatting the changed visual/action classes; connected checks and analysis used the final source.
+
+Evidence: external redmi-r66-9-round-1/fresh-picks-disclosure-implementation-20260912-0450/local-qualification-1.json SHA256 **CA1D478B4C2672F16E3E00B95C6EE351C1911E75D68313B711F64D374BAB0154**. Connected receipt singlechat-r669-fresh-disclosure-connected-20260912-a.result.json; stdout SHA256 F7EF0C8840CBF78B85241CD5D4A5936263874778033C55B18A6BF5D42524546F. Required parent 51e06594d02314182a408040ef93065bbd4093b7; exact two source/test hashes, all failed attempts and preimages are preserved.
+
+This corrects the overlap recorded in the prior category-icon checkpoint, not a new unrelated feature or a device closure. No new APK/build/install, OPPO action or integration. Counts remain 13 closed / 29 open originals, 12 open UAT children and 2 earlier implementation children. Cold shared-link startup ownership and provider-dependent comparison, media, location and live fulfillment remain unresolved.
+
+
 ## Three-line category controls checkpoint - 12 September 2026
 
 **R668-REQ-STORE-CATEGORY-COMPACT-001 and R668-REQ-OFFERS-HEADER-001 icon criterion implemented and locally qualified; tickets remain OPEN.** Shop/Wholesale home, Store and Offers now use the same three-line menu icon for category selection. Only three runtime icon values changed; existing48px targets, accessible labels, tooltips, categories and navigation remain. Unrelated product-grid actions retain their own icon.

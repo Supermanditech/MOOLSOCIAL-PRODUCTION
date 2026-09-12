@@ -171,6 +171,64 @@ Future<void> _openR669Review(WidgetTester tester) async {
 }
 
 void main() {
+  for (final size in [const Size(360, 800), const Size(800, 600)]) {
+    testWidgets('R669 Fresh picks disclosure clears Add and retained quantity $size', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = size;
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await tester.pumpWidget(MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) => r66VisualCaptureRoot(child!),
+        home: BuyV2Screen(session: session),
+      ));
+      await tester.pumpAndSettle();
+      final card = find.byKey(const ValueKey('buy-product-s-tomato')).first;
+      final photo = find.descendant(of: card,
+        matching: find.byKey(const ValueKey('buy-featured-packshot-s-tomato')));
+      final add = find.descendant(of: card,
+        matching: find.byKey(const ValueKey('buy-add-s-tomato')));
+      await tester.ensureVisible(card);
+      await tester.pumpAndSettle();
+      expect(photo, findsOneWidget);
+      expect(tester.getRect(photo).overlaps(tester.getRect(add)), isFalse,
+        reason: 'The photo and its disclosure must remain clear of Add');
+      _expectIntactDisclosure(tester, photo, 's-tomato');
+      await captureR66Visual(tester, 'r669-fresh-picks-add-${size.width.toInt()}');
+      await tester.tap(add);
+      await tester.pumpAndSettle();
+      expect(session.quantityFor('s-tomato'), 1);
+      final quantity = find.descendant(of: card,
+        matching: find.byKey(const ValueKey('buy-quantity-s-tomato')));
+      expect(tester.getRect(photo).overlaps(tester.getRect(quantity)), isFalse);
+      await tester.tap(photo);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.product);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(tester.getRect(photo).overlaps(tester.getRect(quantity)), isFalse);
+      await captureR66Visual(tester, 'r669-fresh-picks-return-${size.width.toInt()}');
+      await tester.tap(find.descendant(of: card, matching: find.byTooltip('Add one')));
+      await tester.pumpAndSettle();
+      expect(session.quantityFor('s-tomato'), 2);
+      await tester.tap(find.descendant(of: card, matching: find.byTooltip('Remove one')));
+      await tester.pumpAndSettle();
+      expect(session.quantityFor('s-tomato'), 1);
+      session.setCartQuantity('s-tomato', '123456789');
+      await tester.pumpAndSettle();
+      expect(session.quantityFor('s-tomato'), 123456789);
+      expect(tester.getRect(photo).overlaps(tester.getRect(quantity)), isFalse);
+      _expectIntactDisclosure(tester, photo, 's-tomato');
+      await captureR66Visual(tester, 'r669-fresh-picks-large-quantity-${size.width.toInt()}');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   for (final eligible in [false, true]) {
     for (final scale in [1.0, 2.0]) {
       testWidgets('R669 review complete action clears bottom navigation $eligible $scale', (tester) async {
