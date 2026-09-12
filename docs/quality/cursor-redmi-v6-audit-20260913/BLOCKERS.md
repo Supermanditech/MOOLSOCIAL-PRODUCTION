@@ -27,3 +27,6 @@ MS-NEW-09 opens with last-known preparation status and no live delivery updates.
 ## B-006 — delivered-item resolution eligibility
 
 For delivered Shop MS-240741, Return/Replacement/Refund each shows no confirmed eligible items. All eight purchased product rows remain visible with eligibility unavailable and disabled checkboxes; Check eligibility again in Refund preserves unavailable state (156–160). No request submitted. Positive selection quantities reasons evidence attachments and accepted/rejected resolution execution cannot be qualified from this state. Other eligible fixtures must be sought before final disposition; no live return/refund or artificial source mutation is authorized. This is a provider/test-data prerequisite, not automatically a product defect.
+
+### B-004 additional Shop reproduction (round 11)
+Captures 177-180: the eight-item reordered Shop basket shows seven shipments. Wheat, sunflower oil and notebooks have unavailable delivery estimates; the action remains Check delivery. This extends the existing quote-provider coverage blocker beyond Bulk. No order/payment was submitted and no positive quote/provider recovery is claimed.
