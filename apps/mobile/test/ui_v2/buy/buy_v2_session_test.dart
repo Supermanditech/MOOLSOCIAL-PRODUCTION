@@ -1193,6 +1193,98 @@ void r669ShoppingAreaTests() {
         expect(session.catalogueAreaLabel, 'Any area');
       },
     );
+    for (final size in [const Size(320, 568), const Size(568, 320)]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets('area failure visible without scrolling $size $scale', (
+          tester,
+        ) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = size;
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final session = makeSession(null);
+          final originalRegion = session.catalogueRegionId;
+          await tester.pumpWidget(
+            MaterialApp(
+              theme: MoolTheme.light(),
+              builder: (_, child) => r66VisualCaptureRoot(child!),
+              home: Scaffold(
+                body: Builder(
+                  builder: (context) => TextButton(
+                    onPressed: () => showBuyV2CatalogueArea(context, session),
+                    child: const Text('Choose shopping area'),
+                  ),
+                ),
+              ),
+            ),
+          );
+          await tester.tap(find.text('Choose shopping area'));
+          await tester.pumpAndSettle();
+          final locate = find.byKey(
+            const ValueKey('buy-catalogue-current-area'),
+          );
+          await tester.ensureVisible(locate);
+          await tester.tap(locate);
+          await tester.pumpAndSettle();
+          final failure = find.byKey(const ValueKey('buy-area-lookup-failure'));
+          final list = find.byKey(const ValueKey('buy-catalogue-area-list'));
+          final visible = tester.getRect(list);
+          final message = tester.getRect(failure);
+          expect(message.top, greaterThanOrEqualTo(visible.top));
+          expect(message.bottom, lessThanOrEqualTo(visible.bottom));
+          final retry = find.byKey(const ValueKey('buy-area-lookup-retry'));
+          expect(retry.hitTestable(), findsOneWidget);
+          await captureR66Visual(
+            tester,
+            'r669-area-failure-${size.width.toInt()}-$scale',
+          );
+          await tester.tap(retry);
+          await tester.pumpAndSettle();
+          expect(failure.hitTestable(), findsOneWidget);
+          expect(session.catalogueRegionId, originalRegion);
+          final search = find.byKey(
+            const ValueKey('buy-catalogue-area-search'),
+          );
+          await tester.ensureVisible(search);
+          await tester.enterText(search, '221005');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 120);
+          await tester.pump(const Duration(milliseconds: 400));
+          await tester.pumpAndSettle();
+          final keyboardViewport = tester.getRect(list);
+          final keyboardMessage = tester.getRect(failure);
+          expect(
+            keyboardMessage.top,
+            greaterThanOrEqualTo(keyboardViewport.top),
+          );
+          expect(
+            keyboardMessage.bottom,
+            lessThanOrEqualTo(keyboardViewport.bottom),
+          );
+          expect(retry.hitTestable(), findsOneWidget);
+          await captureR66Visual(
+            tester,
+            'r669-area-failure-keyboard-${size.width.toInt()}-$scale',
+          );
+          await tester.scrollUntilVisible(
+            search,
+            100,
+            scrollable: find
+                .descendant(of: list, matching: find.byType(Scrollable))
+                .first,
+          );
+          await tester.pumpAndSettle();
+          expect(find.text('221005'), findsOneWidget);
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.text('Shopping area'), findsNothing);
+          expect(session.catalogueRegionId, originalRegion);
+          expect(tester.takeException(), isNull);
+        });
+      }
+    }
     for (final scale in [1.0, 2.0]) {
       testWidgets('sheet search keyboard retry selection and Back $scale', (
         tester,

@@ -1472,6 +1472,9 @@ Future<void> showBuyV2CatalogueArea(
   var results = <BuyV2ShoppingArea>[];
   String? failure;
   Timer? debounce;
+  final areaScroll = ScrollController();
+  final searchController = TextEditingController();
+  ModalRoute<void>? areaRoute;
   try {
     await showModalBottomSheet<void>(
       context: context,
@@ -1480,6 +1483,19 @@ Future<void> showBuyV2CatalogueArea(
       backgroundColor: Colors.white,
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setState) {
+          areaRoute ??= ModalRoute.of<void>(context);
+          void revealFailure(int generation) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!context.mounted ||
+                  generation != request ||
+                  failure == null ||
+                  !areaScroll.hasClients) {
+                return;
+              }
+              areaScroll.jumpTo(0);
+            });
+          }
+
           Future<void> lookup({bool currentLocation = false}) async {
             debounce?.cancel();
             final generation = ++request;
@@ -1511,6 +1527,7 @@ Future<void> showBuyV2CatalogueArea(
                     'Area search is unavailable right now. Try again shortly.',
                 };
               });
+              revealFailure(generation);
             }
           }
 
@@ -1529,6 +1546,7 @@ Future<void> showBuyV2CatalogueArea(
               child: BuyV2VerticalScrollIndicator(
                 child: ListView(
                   key: const ValueKey('buy-catalogue-area-list'),
+                  controller: areaScroll,
                   padding: EdgeInsets.fromLTRB(
                     12,
                     8,
@@ -1539,6 +1557,28 @@ Future<void> showBuyV2CatalogueArea(
                   keyboardDismissBehavior:
                       ScrollViewKeyboardDismissBehavior.onDrag,
                   children: [
+                    if (failure != null)
+                      Semantics(
+                        liveRegion: true,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                failure!,
+                                key: const ValueKey('buy-area-lookup-failure'),
+                              ),
+                              TextButton(
+                                key: const ValueKey('buy-area-lookup-retry'),
+                                onPressed: () =>
+                                    lookup(currentLocation: locating),
+                                child: const Text('Try again'),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     Row(
                       children: [
                         Expanded(
@@ -1553,6 +1593,7 @@ Future<void> showBuyV2CatalogueArea(
                     ),
                     TextField(
                       key: const ValueKey('buy-catalogue-area-search'),
+                      controller: searchController,
                       maxLength: 80,
                       decoration: const InputDecoration(
                         hintText: 'Locality, city or PIN code',
@@ -1618,25 +1659,6 @@ Future<void> showBuyV2CatalogueArea(
                         padding: EdgeInsets.all(12),
                         child: Center(child: CircularProgressIndicator()),
                       ),
-                    if (failure != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              failure!,
-                              key: const ValueKey('buy-area-lookup-failure'),
-                            ),
-                            TextButton(
-                              key: const ValueKey('buy-area-lookup-retry'),
-                              onPressed: () =>
-                                  lookup(currentLocation: locating),
-                              child: const Text('Try again'),
-                            ),
-                          ],
-                        ),
-                      ),
                     if (results.isNotEmpty)
                       DecoratedBox(
                         decoration: BoxDecoration(
@@ -1687,6 +1709,7 @@ Future<void> showBuyV2CatalogueArea(
                                       () => failure =
                                           'This area could not be selected. Search again.',
                                     );
+                                    revealFailure(request);
                                   }
                                 },
                               ),
@@ -1740,6 +1763,10 @@ Future<void> showBuyV2CatalogueArea(
   } finally {
     request++;
     debounce?.cancel();
+    // The modal result completes before its closing animation removes fields.
+    await areaRoute?.completed;
+    areaScroll.dispose();
+    searchController.dispose();
   }
 }
 

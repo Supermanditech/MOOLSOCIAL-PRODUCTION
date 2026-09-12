@@ -2027,7 +2027,12 @@ void main() {
         ValueKey('buy-featured-packshot-${products.first.id}'),
       );
       expect(tester.getSize(featuredPhoto).width, greaterThanOrEqualTo(145));
-      expect(tester.getSize(featuredPhoto).height, greaterThanOrEqualTo(110));
+      final addRect = tester.getRect(
+        find.byKey(ValueKey('buy-add-${products.first.id}')),
+      );
+      final photoRect = tester.getRect(featuredPhoto);
+      expect(photoRect.height, greaterThan(addRect.height));
+      expect(photoRect.bottom, lessThanOrEqualTo(addRect.top));
       expect(
         find.byKey(const ValueKey('buy-more-products-heading')),
         findsOneWidget,
@@ -4200,8 +4205,8 @@ void main() {
           children: [
             for (final product in [tomato, rice, medicine, milk])
               SizedBox(
-                width: 64,
-                height: 96,
+                width: 128,
+                height: 192,
                 child: BuyV2ProductPackshot(product: product),
               ),
           ],
@@ -4313,7 +4318,12 @@ void main() {
       final photo = find.byKey(ValueKey('buy-featured-packshot-${product.id}'));
       expect(photo, findsOneWidget);
       expect(tester.getSize(photo).width, greaterThanOrEqualTo(145));
-      expect(tester.getSize(photo).height, greaterThanOrEqualTo(110));
+      final addRect = tester.getRect(
+        find.byKey(ValueKey('buy-add-${product.id}')),
+      );
+      final photoRect = tester.getRect(photo);
+      expect(photoRect.height, greaterThan(addRect.height));
+      expect(photoRect.bottom, lessThanOrEqualTo(addRect.top));
 
       await tester.tap(find.byKey(ValueKey('buy-add-${product.id}')));
       await tester.pumpAndSettle();
