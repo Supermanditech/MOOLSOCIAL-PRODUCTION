@@ -1146,6 +1146,14 @@ $storeBuyFinalSeptember12 = (
   (ConvertTo-ProductionForwardPath $root) -ceq
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-20260912'
 )
+$storeBuyFinalAdmission = (
+  $ProductionLane -ceq 'codex_ui' -and
+  $ProductionWorkId -ceq 'store-procurement-bridge-20260912' -and
+  $ProductionTicketId -ceq 'UAW-STORE-PROCUREMENT-BRIDGE-20260912' -and
+  $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+  (ConvertTo-ProductionForwardPath $root) -ceq
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912'
+)
 $storeBuySeptember12 = $ProductionLane -ceq 'integration_repair' -and
   $ProductionWorkId -ceq 'store-buy-20260912'
 if ($storeBuySeptember12) {
@@ -2190,6 +2198,7 @@ if ($ProductionLane -ceq 'baseline') {
         'coordination_bootstrap','task_start','implementation','pre_commit','handoff',
         'founder_acceptance','ticket_acceptance','ticket_close'
       )
+      if ($storeBuyFinalAdmission) { 'integration_admission_authorize' }
     }
     'codex_auth' {
       @('coordination_bootstrap','task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
@@ -4989,9 +4998,10 @@ if ($ProductionLane -ceq 'baseline') {
     ) 'production task start must be clean at its exact required base.'
   }
 
-  if ($ProductionPhase -cin @(
+  if (($ProductionPhase -cin @(
       'handoff','founder_acceptance','ticket_acceptance','ticket_close'
-    )) {
+    )) -or ($storeBuyFinalAdmission -and
+      $ProductionPhase -ceq 'integration_admission_authorize')) {
     Assert-Coordination ($head -cne $baseCommit) `
       'production handoff contains no feature commit.'
     Assert-Coordination (Test-ProductionWorktreeClean) `
@@ -5137,6 +5147,34 @@ if ($ProductionLane -ceq 'baseline') {
   }
 
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
+    if ($storeBuyFinalAdmission) {
+      $qualifiedSource = '2de2f09fef0791b72a826ca75c54a09f544ba425'
+      & git -C $root merge-base --is-ancestor $qualifiedSource $head
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Final admission lost the qualified Store correction.'
+      $appTrees = @(& git -C $root rev-parse "${qualifiedSource}:apps" "${head}:apps")
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $appTrees.Count -eq 2 -and
+        $appTrees[0] -ceq $appTrees[1]) 'Final admission source changed after qualification.'
+      Assert-Coordination ((Test-ProductionWorktreeClean) -and
+        (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Final admission source is not clean and remote-equal.'
+      Assert-Coordination (
+        $IntegrationTargetWorkId -ceq 'store-buy-final-20260912' -and
+        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-FINAL-20260912' -and
+        (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq
+          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-20260912' -and
+        (Test-Path -LiteralPath $IntegrationTargetRoot -PathType Container)
+      ) 'Final integration target identity changed.'
+      $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
+        $targetBranch[0] -ceq 'integration/moolsocial/store-buy-final-20260912') 'Final integration branch changed.'
+      $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and
+        $targetHead[0] -ceq $workStartCommit) 'Final integration must start at the unchanged governance tag.'
+      Assert-ProductionManagedWorktreesClean
+      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin `
+        'refs/heads/integration/moolsocial/store-buy-final-20260912')
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Final integration remote already exists.'
+      Write-Output 'merge(store-buy-final-20260912): integrate qualified Store and Buy'
+    } else {
     Assert-Coordination ($ProductionLane -ceq 'integration_repair') `
       'fresh integration admission is valid only from the repair lane.'
     Assert-Coordination (
@@ -5173,6 +5211,7 @@ if ($ProductionLane -ceq 'baseline') {
       $LASTEXITCODE -eq 0 -and $existingTargetRemote.Count -eq 0
     ) 'fresh integration target remote branch already exists.'
     Write-Output ([string]$integrationRepair.freshIntegrationMergeSubject)
+    }
   }
 
   if ($ProductionPhase -ceq 'founder_acceptance') {

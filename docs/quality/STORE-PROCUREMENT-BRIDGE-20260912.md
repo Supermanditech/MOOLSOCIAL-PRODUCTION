@@ -143,3 +143,14 @@ start, automatic two-parent merge, complete ancestry, clean managed worktrees,
 approved-tip remote equality and integration-close checks remain unchanged.
 The sealed functional correction remains 2de2f09fef0791b72a826ca75c54a09f544ba425;
 this mechanical admission commit changes no app/test source.
+
+The fresh target at c2a65ac51ed58174754b9b07f2223583c48500b3 retains its historical
+policy unchanged; today's integration_start validation rejected that older schema.
+Use the already-existing integration_admission_authorize phase from this sealed
+source lane, bounded to this ticket/root and exact final target. It verifies the
+qualified 2de2f09f apps tree is unchanged, atomic source history, fresh source remote,
+all clean managed worktrees, the target's exact governance-tag HEAD/branch and no
+existing target remote. It authorizes only one automatic no-FF admission. Subsequent
+integration_verify/close run the merged current checks with no exemptions from
+ancestry, tree equality, merge count or source preservation. No historical baseline
+policy was migrated, copied into the target or bypassed by source edits there.
