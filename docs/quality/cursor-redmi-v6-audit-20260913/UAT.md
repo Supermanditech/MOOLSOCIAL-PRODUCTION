@@ -96,3 +96,24 @@ Totals106 captures;93 action rows:86 narrow passes;2 failures;3 provider-blocked
 Order Address displays snapshot and explains that future saved-address changes do not change this order. Manage future addresses opens Home/Work picker. Work menu exposes Edit/Remove; Edit prefills unchanged fields and Close returns without save. Request an address opens optional recipient/share/copy/manual controls. Add it myself opens blank form; blank submission rejects missing recipient street locality. No link created/shared/copied; no address saved or removed; no order or message action.
 
 Totals121 captures;107 action rows (99 narrow passes;2 failures;4 provider-blocked;2 observations);27 public-data rows. No new confirmed defect. Current physical state: blank Add delivery address form with validation at121. Next: remaining manual-address validation and safe dismissal; then Items/Help/Manage/Invoice order descendants. Restore tracker original MS-240782 and confirm muted/unkept preferences after tracker coverage. Full audit incomplete; all unresolved descendants retained in ledgers.
+
+## Device round 8 — address validation and order item/invoice returns
+
+122–135 inspected;133 is native-picker transition only and134 the settled result. Unsaved manual form accepts Audit/Test/Test entries then rejects absent phone; fixture phone9000000000 advances to missing PIN rejection. No address saved. Close returns Request sheet; two Android Backs dismiss Request and picker to tracking. Order Items retains MS-NEW-09 two-item74 snapshot; product opens matching500g37 Fresh tomatoes and returns to same Items then tracking. Invoice matches order and arithmetic. Download opens Android save picker; Back cancels with explicit feedback. No file saved and no existing Downloads item opened or changed. Positive export and reopen remain pending.
+
+Totals135 captures;118 exercised action rows (110 narrow passes;2 failures;4 provider-blocked;2 observations);28 public-data mappings. No new confirmed defect. Current device: MS-NEW-09 invoice after save cancellation135. Existing addresses and basket unchanged. Continue invoice positive export with unique filename and order Help/Manage paths, then remaining families. Do not treat picker cancellation as download qualification.
+
+## Source inventory reconciliation — still incomplete
+
+Read-only class inventory of buy_v2_views.dart identified these remaining families requiring action-level reconciliation and device results or explicit blocked descendants. This is a coverage worklist, not defect enumeration or new implementation scope:
+
+- Product variant selector (2047), trade decision controls (2261), continuation (3171), zoom/gallery (3436/3574), content/trust/review positive cases (3825/4245/4733).
+- Cart discovery (17681), delivery instructions (17956), tips (18101), mixed destination/scope (16264), empty and restored carts, campaign replacement/threshold/expiry.
+- Checkout collection (7420), commercial terms (6799), quote/price/promise changes (6649/8608/8680), confirmation (8739), recovery (9156); positive provider transitions require safe existing fixtures or explicit blockers.
+- Orders tabs and empty/unavailable states (9403/9801/9857), delivery exceptions (10202), balance payment (10373), live panel (10504), collection order (10776), resolution (11937).
+- Assistance and nested intents/channels/prescription/share (12469/19672/19751/19824/19908/19986); no real messages or purchases.
+- Account (12919), saved lists and shopping tools, Scheduled selection, remaining category/filter paths, Store collection availability and full supplier content.
+- Address-request provider completion and ordinary address type/save/removal validation, GST positive form/reuse lifecycle, invoice export bytes/reopen/cancel/failure.
+- Cross-cutting Back variants, keyboard,200% text and compact fit, app background/relaunch and retained selection, account/provider-dependent isolation and stale-response cases.
+
+Each family still needs exact action enumeration; this inventory alone proves no pass. Other Buy source owners and public fields must also be reconciled before final handoff. Earlier row-level remaining columns remain authoritative gaps; none is silently closed by this worklist.
