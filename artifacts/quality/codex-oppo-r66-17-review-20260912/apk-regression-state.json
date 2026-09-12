@@ -18,7 +18,7 @@
   },
   "source": {
     "manifestPath": "artifacts/quality/codex-oppo-r66-17-review-20260912/source-manifest.txt",
-    "manifestSha256": "F1AFB5F0EF2E31661FF501108C63CC40243503B401C377A559068E80004EDB6E",
+    "manifestSha256": "18F4FD72354A258E5B87FBEB6BA9CC529B2909693452D720A95B96B6F87FAAB5",
     "fileCount": 391
   },
   "requiredRuntimeDefines": {

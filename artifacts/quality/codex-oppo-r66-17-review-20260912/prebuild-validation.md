@@ -1,5 +1,9 @@
 # r66.17 prebuild controls
 
+## Current continuation after founder blocker authorization
+
+The enabled-review host fixture blocker below is now corrected and locally requalified; see local-validation.md for exact commands/results/hashes. Runtime source remains unchanged. Source manifest has one updated test hash; all391 inputs must match before activation. Prior disabled/pending notes are historical, not a waiver of the final clean seal and remote readback. No APK has yet been built or installed; machine state remains disabled until that seal is verified. Existing two full cycles and boundary/build-control results remain retained and no general policy change is needed.
+
 Build remains blocked/disabled by the enabled-review Chat host fixture failure described in local-validation.md. No APK attempted; one-build authority not consumed. Both full default-mode cycles pass but cannot substitute for the failed enabled-mode check. No product/test fixes are authorized by the current candidate-only binding permission. Preserve this candidate reservation and evidence cleanly; do not activate or reuse old authority.
 
 Existing candidate-specific build-control self-tests, incremental pre_build r66.17/2026091201/runtime lane and MVP execution checks passed,exit0. External r6617-build-controls-v1.log SHA25651AB7AE79222061E34A5C9BE6F7D4766A37613249323539A22F9D8DB87411D7C. PlayQualification remains false. Dependency resolution retained every391 manifest input and no tracked source/test/Android/lockfile drift. No APK build occurred. Full cycle2 and clean evidence seal remain required before activation.

@@ -17,6 +17,22 @@ import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
 import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
+// Host widget tests exercise draft behavior without invoking Android storage.
+class _ReviewSupportDraftMemory implements ChatSupportDraftStore {
+  @override
+  String get accountScope => 'isolated-workspace-ui-review';
+  final _drafts = <(String, String), String>{};
+
+  @override
+  Future<String?> read(String scope, String applicationId) async =>
+      scope == accountScope ? _drafts[(scope, applicationId)] : null;
+
+  @override
+  Future<void> write(String scope, String applicationId, String text) async {
+    if (scope == accountScope) _drafts[(scope, applicationId)] = text;
+  }
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -165,6 +181,7 @@ void main() {
       addTearDown(tester.view.reset);
       addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
       final chat = ChatSession(
+        supportDraftStore: _ReviewSupportDraftMemory(),
         sendGateway: ReviewChatSendGateway(latency: Duration.zero),
       );
       addTearDown(chat.dispose);
