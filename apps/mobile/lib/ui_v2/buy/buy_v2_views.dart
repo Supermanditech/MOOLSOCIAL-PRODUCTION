@@ -17305,7 +17305,6 @@ class _CartBenefitEmptyState extends StatelessWidget {
     final spec = BuyV2ThemeScope.of(context);
     return Container(
       key: ValueKey('buy-cart-${kind.name}-empty-${destination.name}'),
-      constraints: const BoxConstraints(maxHeight: 100),
       padding: const EdgeInsets.all(11),
       decoration: buyV2CardDecoration(radius: 14),
       child: Row(
@@ -17338,8 +17337,6 @@ class _CartBenefitEmptyState extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   _cartBenefitEmptyDetail(destination, kind),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
                   style: context.buyMeta.copyWith(fontSize: 9),
                 ),
               ],

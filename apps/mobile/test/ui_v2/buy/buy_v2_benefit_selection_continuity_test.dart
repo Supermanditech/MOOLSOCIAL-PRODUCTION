@@ -13,6 +13,72 @@ import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('R669 coupon minimum uses its own destination subtotal', () {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    session.addProduct('s-tomato');
+    expect(session.setCartQuantity('s-tomato', '12'), isTrue);
+    expect(session.totalForDestination(BuyV2Destination.shop), 444);
+    session.addProduct('w-notebook');
+    expect(
+      session.cartBenefits(
+        kind: BuyV2CartBenefitKind.coupon,
+        destination: BuyV2Destination.shop,
+      ),
+      isEmpty,
+    );
+    expect(
+      session
+          .cartBenefits(kind: BuyV2CartBenefitKind.coupon)
+          .every(
+            (benefit) => benefit.destination == BuyV2Destination.wholesale,
+          ),
+      isTrue,
+    );
+  });
+
+  test('R669 coupon revoked below minimum cannot silently return', () {
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    session.addProduct('s-tomato');
+    expect(session.setCartQuantity('s-tomato', '14'), isTrue);
+    final coupon = session
+        .cartBenefits(
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+        )
+        .first;
+    expect(session.chooseCartBenefit(coupon), isTrue);
+    expect(session.setCartQuantity('s-tomato', '12'), isTrue);
+    expect(
+      session.selectedCartBenefit(
+        kind: BuyV2CartBenefitKind.coupon,
+        destination: BuyV2Destination.shop,
+      ),
+      isNull,
+    );
+    expect(session.chooseCartBenefit(coupon), isFalse);
+    expect(session.setCartQuantity('s-tomato', '14'), isTrue);
+    expect(
+      session.selectedCartBenefit(
+        kind: BuyV2CartBenefitKind.coupon,
+        destination: BuyV2Destination.shop,
+      ),
+      isNull,
+    );
+    expect(session.chooseCartBenefit(coupon), isTrue);
+  });
+
   Widget app(
     BuyV2Session session, {
     double textScale = 1,
@@ -46,6 +112,46 @@ void main() {
       );
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 coupon below minimum is unavailable at $scale', (
+      tester,
+    ) async {
+      await tester.binding.setSurfaceSize(const Size(320, 568));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(
+        core: core,
+        cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+      );
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      session.addProduct('s-tomato');
+      expect(session.setCartQuantity('s-tomato', '12'), isTrue);
+      session.openCart(scope: BuyV2CartScope.shop);
+      await tester.pumpWidget(app(session, textScale: scale, reducedMotion: true));
+      await tester.pumpAndSettle();
+      final coupons = find.byKey(const ValueKey('buy-cart-coupons'));
+      await tester.scrollUntilVisible(coupons, 300,
+          scrollable: find.byType(Scrollable).first, maxScrolls: 30);
+      await tester.pumpAndSettle();
+      await tester.tap(coupons);
+      await tester.pumpAndSettle();
+      expect(session.scopedPayableTotal, 444);
+      expect(session.scopedCouponSaving, 0);
+      expect(
+        find.byKey(const ValueKey('buy-cart-benefit-select-shop-coupon')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+      await captureR66Visual(tester, 'r669-coupon-below-minimum-$scale');
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(session.scopedPayableTotal, 444);
+      expect(tester.takeException(), isNull);
+      await captureR66Visual(tester, 'r669-coupon-cart-return-$scale');
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+
     testWidgets('R66 027 payment offer explains unchanged payable at $scale', (
       tester,
     ) async {
@@ -337,6 +443,12 @@ void main() {
       ]) {
         session.addProduct(productFor(destination).id);
       }
+      // This selection journey requires a Shop basket meeting the coupon's
+      // published minimum; an unrelated Wholesale basket cannot qualify it.
+      expect(
+        session.setCartQuantity(productFor(BuyV2Destination.shop).id, '20'),
+        isTrue,
+      );
       session.openCart(scope: BuyV2CartScope.all);
 
       await tester.pumpWidget(app(session));

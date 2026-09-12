@@ -715,6 +715,26 @@ void main() {
       ]) {
         session.addProduct(productFor(destination).id);
       }
+      // Each coupon is scoped to its own destination. Populate qualifying
+      // baskets for this selection/removal test rather than relying on the
+      // combined total of unrelated destinations.
+      for (final destination in const [
+        BuyV2Destination.shop,
+        BuyV2Destination.wholesale,
+        BuyV2Destination.medicine,
+      ]) {
+        final product = productFor(destination);
+        final minimum = destination == BuyV2Destination.wholesale ? 2500 : 499;
+        if (session.totalForDestination(destination) < minimum) {
+          expect(
+            session.setCartQuantity(
+              product.id,
+              ((minimum + product.price - 1) ~/ product.price).toString(),
+            ),
+            isTrue,
+          );
+        }
+      }
       final originalTotal = session.cartTotal;
       session.openCart();
       await tester.pumpWidget(app(session, textScale: 1.4));

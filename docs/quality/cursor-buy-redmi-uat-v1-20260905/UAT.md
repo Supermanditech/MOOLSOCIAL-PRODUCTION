@@ -1,5 +1,18 @@
 # Fresh Redmi journey inventory
 
+## Coupon child implementation checkpoint - 12 September 2026
+
+**R669-UAT-COUPON-MINIMUM-SPEND-001 remains OPEN for Redmi verification; its frontend fix is implemented and locally checked.** Parent R668-AUDIT-CART-TOTAL-LABEL-001 remains open. The completed scoped round/list at commit 69dfd21a3950902109d72412618fdce644ea7bf8 authorized this implementation phase; older progress statements below are historical.
+
+Coupons now enforce their own destination subtotal and quantity requirements. A Shop basket of 12 tomatoes at INR37 (INR444) cannot use the INR499-minimum coupon, even with unrelated Wholesale items. Dropping below eligibility removes the selected discount; raising quantity again requires explicit reselection. Payment offers retain their eligibility explanations and do not silently discount the payable amount. The coupon empty-state card grows for enlarged text instead of overflowing its previous fixed maximum height. Existing qualifying selection fixtures now meet each destination's published minimum.
+
+Local evidence: coupon-focused-visual-2 passed all 5 cases, including native Flutter 320x568 at 100%/200% text, coupon unavailability, unchanged INR444 payable and Back with retained cart; all four captures were reviewed. Earlier coupon-focused-2 passed 11 checks. Analysis and approved UI locks passed. Final six-suite coupon-connected-2: **697 passed, 10 failed**. All ten failures are existing R58.8.6/7 golden-reference differences: a baseline run without the coupon fix reproduced them, and all ten candidate rendered images are byte-identical to that baseline. This is not an all-green combined regression; references were not updated and assertions were not skipped. Generated failure evidence was preserved externally before restoring the tracked historical PNG bytes.
+
+Exact four source/test owner hashes, visual captures and qualification are bound in external redmi-r66-9-round-1/coupon-child-implementation-v1/local-qualification-3.json, SHA256 A131E33732EED18BD769117FF1B02E0DD22F7600B1183F644D00CDDBC6D510EE; final comparison in golden-baseline-comparison-2.json. Final connected receipt: singlechat-r669-coupon-connected-2.result.json, stdout SHA256 FBC7F3CFC085FA6763921EBE2C270F76EAC280A002966D7C9C180EBA16B87D8C. Source dependency is this Cursor branch's complete parent 69dfd21a3950902109d72412618fdce644ea7bf8; no standalone older-branch compatibility is claimed. No backend, Store wrapper or native owner changed.
+
+No new APK or installation. Installed r66.9 checksum remains AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. No device closure is inferred from local tests. Remaining child fixes, provider/device qualifications and safe Git handoff remain required.
+
+
 ## Current founder goal - scoped Redmi UAT, then child fixes, no new APK
 
 Latest explicit founder instruction,12 September2026 IST: complete real-user device testing of the existing pre-current-APK scope on Redmi TG8HCYTGGQT885OF only. Close only fully device-qualified tickets, register genuine children and complete the whole deduplicated scoped list before starting that child implementation batch. Then implement those child fixes in existing Cursor Buy ownership, run local regressions and actual Flutter visual checks, preserve per-ticket/dependency evidence, safely commit/push and verify clean exact remote equality. **Stop after implementation and local qualification. No new APK build/install; post-fix Redmi verification must remain pending.** No OPPO, policy/governance changes, integration/merges/dirty-file copying, unrelated scope or real transactions/messages. Provider-dependent cases stay explicitly unresolved.

@@ -7247,6 +7247,16 @@ class BuyV2Session extends ChangeNotifier {
           benefit.sourceId.trim().isEmpty ||
           benefit.sponsorName.trim().isEmpty ||
           benefit.savingAmount < 0 ||
+          (benefit.kind == BuyV2CartBenefitKind.coupon &&
+              benefit.minimumSpend != null &&
+              (benefit.minimumSpend! <= 0 ||
+                  totalForDestination(benefit.destination) <
+                      benefit.minimumSpend!)) ||
+          (benefit.kind == BuyV2CartBenefitKind.coupon &&
+              benefit.minimumQuantity != null &&
+              (benefit.minimumQuantity! <= 0 ||
+                  countForDestination(benefit.destination) <
+                      benefit.minimumQuantity!)) ||
           !ids.add('${benefit.destination.name}|${benefit.id}')) {
         continue;
       }
@@ -11302,6 +11312,22 @@ class BuyV2Session extends ChangeNotifier {
         (destination) => destination.name == destinationName,
       );
     });
+    if (!liveCartBenefitsEnabled) {
+      final eligible = [
+        for (final destination in destinations)
+          for (final kind in BuyV2CartBenefitKind.values)
+            ...cartBenefits(kind: kind, destination: destination),
+      ];
+      _selectedCartBenefitRefs.removeWhere(
+        (key, selection) => !eligible.any(
+          (benefit) =>
+              key ==
+                  _cartBenefitSelectionKey(benefit.destination, benefit.kind) &&
+              selection.benefitId == benefit.id &&
+              selection.sourceId == benefit.sourceId,
+        ),
+      );
+    }
     final groupKeys = _fulfilmentGroupsFor(
       _cart.values.toList(growable: false),
     ).map((group) => group.key).toSet();
