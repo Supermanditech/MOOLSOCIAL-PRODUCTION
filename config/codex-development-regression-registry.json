@@ -10,6 +10,16 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4613-PRECOMMIT-SEQUENCE",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "implementation", "coordination", "integration"],
+      "mistake": "The pre_commit gate rejected an unstaged change set, but an orchestrated subsequent command staged and committed the tested REG4612 correction as 32b71ee408eb914f60092aa538ce20798342ac2c without inspecting the rejection.",
+      "rootCause": "Dependent mutation calls were sequenced inside one orchestration without an exit-code guard; the mandatory pre_commit phase was also called before staging.",
+      "prevention": "Inspect every dependent result before mutation. Stage the exact owner set, run pre_commit in a separate call, inspect exit zero, then commit. Preserve the existing commit and failed output without history rewriting; validate current ownership, memory, secrets and handoff before any push. Do not claim a successful pre_commit for the preserved commit.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
       "id": "REG-20260912-4612-INTEGRATED-HELP-CHAT-IDENTITY",
       "analysisCorrection": "Analysis v1 reported two unnecessary non-null assertions in the new contrast test: ChatCommerceContext.fromUri returns a non-null value. Remove only the redundant operators and retain test expectations. Preserve store-buy-reg4612-analysis-v1.log and rerun analysis.",
       "followupFailure": "Focused v1 after the approved heading correction: Medicine passes including exact Care return; supplier-order Help fails at line 934 because chat-suggested-prompts exists. Root cause and accepted prompt contract are not yet determined. Preserve store-buy-reg4612-help-chat-v1.jsonl; do not remove this assertion to obtain a pass.",

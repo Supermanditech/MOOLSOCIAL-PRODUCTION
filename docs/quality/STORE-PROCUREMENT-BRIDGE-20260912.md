@@ -481,3 +481,15 @@ The earlier connected 101-test pass remains runtime evidence: the only later
 test changes removed two redundant non-null operators. The final 27-test file
 replay covers their exact resulting bytes. No candidate qualification is
 inferred; a fresh admitted successor still needs candidate checks and visuals.
+
+## REG4613 preserved commit-sequencing incident
+
+Tested REG4612 correction was committed as
+32b71ee408eb914f60092aa538ce20798342ac2c after the pre_commit check
+rejected an unstaged set. The orchestrated next command still staged and
+committed it. This was a sequencing error, not a successful pre_commit.
+Preserve the commit and rejected result; no history rewrite. It was not pushed
+at discovery. Stage exact future changes first, inspect the standalone
+pre_commit result before commit, and validate ownership/memory/handoff before
+any push. Connected tests and analysis above remain evidence for source
+behavior but cannot retroactively establish that missing gate timing.
