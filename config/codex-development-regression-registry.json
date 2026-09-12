@@ -10,6 +10,18 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4612-INTEGRATED-HELP-CHAT-IDENTITY",
+      "analysisCorrection": "Analysis v1 reported two unnecessary non-null assertions in the new contrast test: ChatCommerceContext.fromUri returns a non-null value. Remove only the redundant operators and retain test expectations. Preserve store-buy-reg4612-analysis-v1.log and rerun analysis.",
+      "followupFailure": "Focused v1 after the approved heading correction: Medicine passes including exact Care return; supplier-order Help fails at line 934 because chat-suggested-prompts exists. Root cause and accepted prompt contract are not yet determined. Preserve store-buy-reg4612-help-chat-v1.jsonl; do not remove this assertion to obtain a pass.",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "integration", "testing", "coordination"],
+      "mistake": "Exact V5 Help-to-Chat tests fail at lines 924 and 990 expecting the generic Conversation label; later composer and Back assertions do not execute.",
+      "rootCause": "These expectations contradict the existing shared Chat test contract requiring supplier identity as the heading and absence of Conversation. The file was outside the primary claim; the unchanged gate rejected mutation before the user explicitly authorized the one-file ownership transfer.",
+      "prevention": "Transfer only this test owner to primary in the correction lane. Assert each exact fixture supplier heading and absence of generic Conversation; preserve all other assertions and the original failed log. Run both full tests without exclusions, then the full file and connected candidate qualification. Do not change runtime UI or security exceptions.",
+      "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-codex-development-regression-memory.ps1"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
       "id": "REG-20260912-4611-INTEGRATED-BUY-TEST-CONTRACTS",
       "status": "registered_correction_in_progress",
       "appliesTo": ["primary", "integration", "testing", "release"],

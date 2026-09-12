@@ -381,9 +381,11 @@ class ChatCommerceContext {
   }
 
   List<String> get suggestedPrompts => [
-    if (productTitle != null) 'Is this product available?',
-    if (price != null || orderTotal != null) 'Please confirm the price.',
-    if (delivery != null) 'When can this be delivered?',
+    if (!isOrderConversation) ...[
+      if (productTitle != null) 'Is this product available?',
+      if (price != null || orderTotal != null) 'Please confirm the price.',
+      if (delivery != null) 'When can this be delivered?',
+    ],
   ];
 
   List<ChatCommerceFact> get decisionFacts {

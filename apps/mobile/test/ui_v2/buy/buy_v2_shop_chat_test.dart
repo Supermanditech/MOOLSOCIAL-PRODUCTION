@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/chat/chat_entry_context.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -28,6 +29,32 @@ void main() {
     await session.start();
     return session;
   }
+
+  test('Order Help omits shopping prompts while product enquiries retain them', () {
+    for (final kind in ['supplier-order', 'care-pharmacy-order']) {
+      final order = ChatCommerceContext.fromUri(
+        Uri.parse(
+          '/app/chat/thread/supplier?context=$kind&orderId=order-1'
+          '&supplier=Supplier&productTitle=Product&price=10&orderTotal=20'
+          '&delivery=Tomorrow',
+        ),
+      );
+      expect(order, isNotNull);
+      expect(order.suggestedPrompts, isEmpty);
+    }
+    final product = ChatCommerceContext.fromUri(
+      Uri.parse(
+        '/app/chat/thread/supplier?context=product&supplier=Supplier'
+        '&productTitle=Product&price=10&delivery=Tomorrow',
+      ),
+    );
+    expect(product, isNotNull);
+    expect(product.suggestedPrompts, [
+      'Is this product available?',
+      'Please confirm the price.',
+      'When can this be delivered?',
+    ]);
+  });
 
   test('Buy Chat adapter preserves context without a second Chat shell', () {
     const adapter = BuyV2ChatRouteAdapter();
@@ -921,7 +948,11 @@ void main() {
 
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
       expect(find.text('MoolSocial Assist'), findsNothing);
-      expect(find.text('Conversation'), findsOneWidget);
+      expect(
+        tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+        'Marwar Foods Distribution',
+      );
+      expect(find.text('Conversation'), findsNothing);
       expect(find.text('Metro Wholesale Partner'), findsNothing);
       expect(find.text('Your bulk quote is ready to review.'), findsNothing);
       expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
@@ -987,7 +1018,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-    expect(find.text('Conversation'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+      'Sardarpura Health Pharmacy',
+    );
+    expect(find.text('Conversation'), findsNothing);
     expect(find.text('Care Chat'), findsNothing);
 
     await tester.binding.handlePopRoute();

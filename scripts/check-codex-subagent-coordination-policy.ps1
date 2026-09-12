@@ -1837,6 +1837,7 @@ if ($ProductionLane -ceq 'baseline') {
           'scripts/build-buy-device-review.ps1',
           'scripts/test-public-auth-sideload-build-controls.ps1',
           'apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart',
           'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart',
           'config/codex-development-regression-registry.json',
           'config/codex-subagent-coordination-policy.json',

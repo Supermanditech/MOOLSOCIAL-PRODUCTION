@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4582,
-    "sha256": "FBEAD161E23BF66DD0968FA743F035C191A33A1323CE0D8ED54137E4A5951CB5"
+    "entryCount": 4583,
+    "sha256": "2DDDAD70E3FCBB4438A32C88B9E1125C85CA3310991EDD5C6B995F8F3C9AC2FA"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -36,6 +36,7 @@
       "owners": [
         "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md",
         "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
         "scripts/build-buy-device-review.ps1",
         "scripts/test-public-auth-sideload-build-controls.ps1",
@@ -394,7 +395,6 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_offer_decision_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_promotion_rail_state_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shopping_intent_journey_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_payment_attribution_test.dart",

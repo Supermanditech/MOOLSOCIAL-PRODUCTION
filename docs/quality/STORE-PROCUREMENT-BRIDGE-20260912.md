@@ -409,3 +409,75 @@ backend/data-egress review, App brand, UI locks and diff checks passed. Explicit
 negative probes reject the old 0a1c0e5 source and unqualified f6cb6eda candidate.
 This is candidate admission provenance only; the independent review limitations
 above still apply. V4 is retained without rewriting or promotion.
+
+## REG4612 Help Chat identity correction and explicit ownership authorization
+
+V5 is preserved locally and unqualified at
+1a33cbc36beed5d6615acb7d7b10a24d4c7789bf, parents
+c2a65ac51ed58174754b9b07f2223583c48500b3 and
+0c4f89ddb7385bab98eb5923e30a53467f06aa98. Its tree exactly equals
+the sealed correction. The exact candidate 44-file cycle passed 2474,
+skipped 83 and failed zero, exit 0; external evidence
+store-buy-final-v5-cycle1-20260912.jsonl SHA256
+18AB183B27E2030B7F5AA7953C5991BAF8C8D285917917292A83CDFF195E07B8.
+
+The two previously unqualified Help tests were run separately on V5.
+Both reached Chat but failed the generic Conversation text expectation,
+at buy_v2_shop_chat_test.dart lines 924 and 990. Their later assertions did
+not complete. Original failed evidence is preserved externally as
+store-buy-final-v5-help-chat-20260912.jsonl SHA256
+A396B0FAD031E8C506D70790B14325977455F6C7E7A668D413383D0F6C0ABD9E.
+Existing global_contextual_chat_shell_test.dart requires the supplier heading
+and explicitly rejects Conversation. Exact fixture partners are Marwar Foods
+Distribution and Sardarpura Health Pharmacy. No runtime defect is inferred
+solely from this contradictory text contract.
+
+After the unchanged ownership gate rejected this test outside the primary
+claim, the user explicitly approved the two assertion corrections and then
+directed Desktop to take ownership of this one file. Transfer its exact claim
+from the Cursor task to /root in this correction lane only, with the matching
+literal continuation owner entry. Cursor's worktree remains untouched.
+No security exception, exclusion, unrelated owner or validation predicate is
+changed. Preserve every composer, draft, routing and Back assertion.
+
+Correction to the earlier skip summary: emitted 83 skips comprise 79 Work
+layout cases, two optional C24G Work captures, and two optional Buy address/
+payment sheet captures. Protected-reference tag exclusions are additional
+excluded coverage, not the latter two skips. Individual replacement mapping
+and current rendered review remain incomplete; none counts as a pass.
+
+Resume invocation mistakes remain disclosed: task_start probes rejected
+owner/base mismatches; the correct resumed handoff phase passed. Read-only
+Chat searches initially used nonexistent paths, then located actual owners.
+No rejected probe was converted to a pass through assertion or gate weakening.
+
+REG4612 focused v1 exited 1: Medicine Help passed including exact Care return;
+supplier-order Help passed the new heading check but failed at line 934 because
+chat-suggested-prompts exists. Original further assertion is unchanged. Evidence:
+store-buy-reg4612-help-chat-v1.jsonl in the external audit directory. Register
+the finding before diagnosis; accepted prompt behavior remains to be established.
+
+Diagnosis: ChatCommerceContext generated product-enquiry prompts from placed
+order price/delivery fields. Preserve the existing order Help no-prompts
+assertion by limiting these generated suggestions to non-order contexts.
+Product-enquiry prompts and loaded Assist prompts remain unchanged. Add a
+focused contrast case for supplier/pharmacy orders versus product enquiries,
+then replay the original journeys without further assertion changes.
+
+Focused v2 passed all 3 selected tests; connected v1 passed both complete files,
+101 tests with zero skips/failures, exit 0. Connected JSON log SHA256
+16EDD59782C107ED66F771AEC6032C4B2E36B72BCEC5F869B46ACAE7567404B2.
+Full analysis v1 found two unnecessary non-null operators in the new contrast
+test; remove only those operators, retaining the test expectations. Preserve
+store-buy-reg4612-analysis-v1.log, then rerun analysis and the affected tests.
+
+Final exact test file replay passed 27/27 with zero skips/failures, exit 0:
+store-buy-reg4612-final-file-v1.jsonl SHA256
+AA77F6E5F93E02B0D740086D076B3E9A9EDF7CAD01C5B656496BA48DC787FF83.
+Full analysis v2 exited 0, zero issues (6.8 seconds):
+store-buy-reg4612-analysis-v2.log SHA256
+2CF9014B01BA03508317D95AF70FB50ACA462B53FB97C111D762A9FF2C50813F.
+The earlier connected 101-test pass remains runtime evidence: the only later
+test changes removed two redundant non-null operators. The final 27-test file
+replay covers their exact resulting bytes. No candidate qualification is
+inferred; a fresh admitted successor still needs candidate checks and visuals.
