@@ -30,3 +30,6 @@ For delivered Shop MS-240741, Return/Replacement/Refund each shows no confirmed 
 
 ### B-004 additional Shop reproduction (round 11)
 Captures 177-180: the eight-item reordered Shop basket shows seven shipments. Wheat, sunflower oil and notebooks have unavailable delivery estimates; the action remains Check delivery. This extends the existing quote-provider coverage blocker beyond Bulk. No order/payment was submitted and no positive quote/provider recovery is claimed.
+
+## B-007 - Online privacy content unavailable with device connectivity off
+Capture218: Privacy policy opens Chrome and shows ERR_INTERNET_DISCONNECTED. Read-only device settings on this round: airplane_mode_on=0, wifi_on=0, mobile_data=0. Source points to https://moolsocial.com/privacy/. Link launch and Back are observed; policy content and online recovery are not qualified. Connectivity was not changed. Earlier provider failures must not automatically be attributed to this condition: their query bindings, review-mode sources and connectivity at those earlier moments still require separate assessment. Independent offline UI audit remains possible.
