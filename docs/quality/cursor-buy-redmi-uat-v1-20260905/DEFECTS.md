@@ -148,6 +148,17 @@ Expected: carry and restore the originating shopping mode, category/query/select
 
 ### R669-UAT-SHARE-COLD-PRODUCT-ROUTE-001 - Cold product-link launch loses the requested product
 
+## Bulk quantity keyboard implementation checkpoint - 12 September 2026
+
+**R669-UAT-BULK-QUANTITY-KEYBOARD-001 remains OPEN for future Redmi verification; frontend correction locally qualified.** Quantity-sheet clearance now uses max(keyboard inset, normal modal clearance), avoiding double reservation above the keyboard. The full entered digit line stays visible in compact landscape at normal/200% text. Existing text scale, MOQ validation, exact product, atomic save and keyboard-closed clearance are preserved.
+
+The equivalent host baseline reproduces clipping after matching Android status and side padding; earlier non-equivalent fixture attempts are preserved and excluded. Two focused geometry/edit/save checks pass. Final product-actions/session regression passes 468 checks; analysis and UI locks pass. Two actual Flutter captures reviewed. Host images reserve the keyboard viewport and are not native Redmi keyboard qualification; remaining form content is scrollable.
+
+Evidence manifest: external redmi-r66-9-round-1/quantity-keyboard-implementation-20260912-0321/local-qualification-1.json SHA256 09604E2BAADD66D1B7A1B91A7C1A194270B6CD1CBE13731289B93EA8AB78FA6C. Required tested parent 1b4db22eb941840564de662afc64ec466023b076. Two exact source/test owners, terminal receipts, captures and fixture corrections are bound in that manifest and summarized in UAT.md.
+
+No APK/build/install, integration or device closure. Counts remain 13 closed/29 open originals, 12 open UAT children and 2 earlier implementation children. Parent Bulk quantity/landscape and all other required device/provider qualifications remain open.
+
+
 ## Arrival freshness summary implementation checkpoint - 12 September 2026
 
 **R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 remains OPEN for future Redmi verification; frontend correction locally qualified.** The delivery selector, expanded summary, quiet-rail semantics, Orders card, tracking and delivery context use existing per-order refresh state. Retained, updating, unavailable and verified estimates are distinguished consistently, including revised estimates. Completed historical promises remain historical; no relative estimate is restarted and no freshness timestamp is invented.

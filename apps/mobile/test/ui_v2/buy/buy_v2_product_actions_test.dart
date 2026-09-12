@@ -720,6 +720,59 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 landscape quantity digits remain visible with keyboard $scale', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(640, 360);
+      tester.view.viewPadding = const FakeViewPadding(top: 34, right: 47);
+      tester.view.padding = const FakeViewPadding(top: 34, right: 47);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      expect(session.addProduct('w-rice'), isTrue);
+      expect(session.setCartQuantity('w-rice', '13'), isTrue);
+      await tester.pumpWidget(MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) => r66VisualCaptureRoot(child!),
+        home: BuyV2Screen(session: session, initialDestination: BuyV2Destination.wholesale,
+            initialView: BuyV2View.product, productId: 'w-rice'),
+      ));
+      await tester.pumpAndSettle();
+      final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
+      await tester.ensureVisible(edit);
+      await tester.tap(edit);
+      await tester.pumpAndSettle();
+      final input = find.byKey(const ValueKey('buy-quantity-input'));
+      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+      await tester.pumpAndSettle();
+      await tester.enterText(input, '14');
+      await tester.pumpAndSettle();
+      final editable = find.descendant(of: input, matching: find.byType(EditableText));
+      final render = tester.state<EditableTextState>(editable).renderEditable;
+      final caret = render.getLocalRectForCaret(const TextPosition(offset: 1)).shift(render.localToGlobal(Offset.zero));
+      final viewport = tester.getRect(find.ancestor(of: input, matching: find.byType(SingleChildScrollView)).first);
+      await captureR66Visual(tester, 'r669-quantity-keyboard-digits-$scale');
+      expect(caret.top, greaterThanOrEqualTo(viewport.top));
+      expect(caret.bottom, lessThanOrEqualTo(viewport.bottom), reason: 'The complete enlarged digit line must fit inside the editor viewport while typing.');
+      expect(caret.bottom, lessThanOrEqualTo(160));
+      expect(session.quantityFor('w-rice'), 13);
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      final save = find.byKey(const ValueKey('buy-quantity-save'));
+      await tester.ensureVisible(save);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(session.quantityFor('w-rice'), 14);
+      expect(input, findsNothing);
+      expect(session.view, BuyV2View.product);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  for (final scale in [1.0, 2.0]) {
     for (final id in ['s-milk', 'w-notebook']) {
       testWidgets('R669 direct quantity product and Cart $id scale $scale', (
         tester,

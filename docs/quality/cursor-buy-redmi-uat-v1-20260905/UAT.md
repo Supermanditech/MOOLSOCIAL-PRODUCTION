@@ -74,6 +74,17 @@ This supersedes the earlier stop-before-implementation instruction retained belo
 
 ## Completed scoped r66.9 device round - consolidated open list,12 September2026
 
+## Bulk quantity keyboard child checkpoint - 12 September 2026
+
+**R669-UAT-BULK-QUANTITY-KEYBOARD-001 implemented and locally checked; remains OPEN for Redmi verification.** The quantity editor added its normal modal bottom clearance to the keyboard inset. At the recorded compact landscape profile this left a 34-logical-pixel editor viewport; the enlarged text line extended to y145 below viewport bottom y116. The sheet now uses the larger of the keyboard inset and closed-keyboard clearance. It preserves the full entered digit line without lowering text scale; keyboard-closed action clearance is unchanged.
+
+Final connected regression: 468 passed, 0 failed, 0 skipped across product-actions and session suites. Two focused tests use 640x360 logical size, top padding34, side padding47, keyboard inset200 and text100%/200%. They enter14 from13, prove the complete editable line lies inside the visible viewport, preserve13 before submission and update14 in the same product. Both actual Flutter captures reviewed. Analysis and UI locks pass. These host captures reserve the keyboard area; they do not render the native Redmi keyboard. Form context and actions remain scrollable rather than all fitting at once.
+
+Evidence: external redmi-r66-9-round-1/quantity-keyboard-implementation-20260912-0321/local-qualification-1.json SHA256 09604E2BAADD66D1B7A1B91A7C1A194270B6CD1CBE13731289B93EA8AB78FA6C. Connected receipt singlechat-r669-quantity-connected-20260912-a.result.json; stdout SHA256 2C5C2C71D6501D4457FF74BE9BB6C0EDE716AF5B8AAA74605EA146C03D68D743. Required tested parent 1b4db22eb941840564de662afc64ec466023b076. Exact two source/test owners and capture hashes are bound there. The equivalent failing baseline is red-d; earlier fixture attempts lacked cart setup, used the wrong render accessor or omitted actual safe padding and are explicitly not clipping qualification evidence. All attempts and corrections remain preserved.
+
+No APK/build/install, integration or device closure. Counts remain 13 closed/29 open originals, 12 open UAT children and 2 earlier implementation children. Parent Bulk quantity and landscape qualification remain open pending Redmi; remaining scoped implementation continues.
+
+
 ## Arrival freshness summary child checkpoint - 12 September 2026
 
 **R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 implemented and locally checked; remains OPEN for Redmi verification.** Delivery selector, expanded panel, quiet-rail accessibility, Orders cards, tracking and order delivery context now reuse the same per-order refresh state. Active estimates distinguish Last recorded, Updating, update unavailable and Updated; revised estimates receive the same qualification. Completed orders preserve historical Original promise wording. No timestamp, fresh countdown, delay or provider update is invented. Refreshing one order does not qualify the other deliveries.

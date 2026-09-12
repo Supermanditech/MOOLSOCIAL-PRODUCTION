@@ -15990,7 +15990,11 @@ Future<void> showBuyV2QuantityEditor(
     sheetAnimationStyle: BuyV2ProductFeedbackSheetMotion.resolve(context),
     builder: (sheetContext) => Padding(
       padding: EdgeInsets.only(
-        bottom: MediaQuery.viewInsetsOf(sheetContext).bottom + bottomClearance,
+        // The keyboard already covers the system navigation clearance.
+        bottom: math.max(
+          MediaQuery.viewInsetsOf(sheetContext).bottom,
+          bottomClearance,
+        ),
       ),
       child: _QuantityEditor(
         session: session,
