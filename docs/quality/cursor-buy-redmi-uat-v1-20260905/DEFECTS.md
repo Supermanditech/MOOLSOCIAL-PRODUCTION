@@ -1,5 +1,16 @@
 # Fresh Redmi defect register
 
+## Address keyboard Next child checkpoint - 12 September 2026
+
+**R669-UAT-ADDRESS-NEXT-FIELD-VISIBILITY-001 implemented and locally checked; remains OPEN for Redmi verification.** Default focus scrolling exposed the multiline field box while leaving the street text above the tiny enlarged landscape viewport. The existing address input now reveals its editable caret after focus/layout using Flutter's existing bringIntoView behavior. Stale-focus and unmounted callbacks are rejected; text scale, address values, validation, submission and routes are unchanged.
+
+Equivalent local baseline: normal text passed, enlarged text failed with caret top39 above viewport top78. Four final Add/Edit Phone > Next > Street cases at711x320, top30, side30/47, keyboard196 and100%/200% text pass; all four actual form-boundary captures reviewed, with complete street text and caret visible. Saved Work values remain unchanged after Back. Full connected form/address-sheet/session run:460 passed,0 failed,2 pre-existing skipped additive capture tests (R56.10/R56.9). After removing one redundant test import, the complete form suite passed19 with1 existing capture skip and analysis reported no issues. Runtime source and capture logic are unchanged from the full connected run. UI locks pass. No reference update or new skip.
+
+Evidence: external redmi-r66-9-round-1/address-next-implementation-20260912-0354/local-qualification-1.json SHA256 035D6135285ACBBE075F560715BA8F9E9A70DE373F4D430A6C3E4BE9975645EF. Connected receipt singlechat-r669-address-next-final-20260912-b.result.json; stdout SHA256 0EC6ABED4CEBF06F8A7B4968FEC154512CFFE513F1946764E60173926A2599BB. Required tested parent 3d1ab7eca853ede67d69c34633fcd60d5bb4ab19; exact two owners, receipts and image hashes are retained. Earlier lazy-list fixture failure, guarded line-ending edits, insufficient whole-field alignment and interrupted fake-async capture run are preserved and excluded from qualification. Capture IO now runs in tester.runAsync.
+
+These are Flutter form-boundary captures with reserved keyboard space, not native Redmi IME or full-screen captures. No APK/build/install, integration or device closure. Counts remain13 closed/29 open originals,12 open UAT children and2 earlier implementation children. Remaining scoped fixes and provider/device qualifications remain required.
+
+
 ## Monthly basket continuation child checkpoint - 12 September 2026
 
 **R669-UAT-MONTHLY-LARGE-TEXT-CONTINUATION-001 implemented and locally checked; remains OPEN for Redmi verification.** Monthly basket now reuses the existing vertical progressive SKU grid, preserving the same product cards, Add controls and product navigation. Its previous horizontal two-lane layout left the third column undiscovered during ordinary vertical scrolling at enlarged text. General catalogue layout is unchanged.

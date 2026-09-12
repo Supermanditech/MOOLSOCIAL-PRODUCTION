@@ -1,6 +1,8 @@
-import 'dart:ui' show SemanticsAction;
+import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
@@ -650,6 +652,81 @@ void main() {
       expect(session.selectedAddressId, 'home');
     },
   );
+
+  for (final editing in [true, false]) {
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 address Next reveals street text $scale edit $editing', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(711, 320);
+      tester.view.viewPadding = const FakeViewPadding(top: 30, left: 30, right: 47);
+      tester.view.padding = const FakeViewPadding(top: 30, left: 30, right: 47);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      final original = session.addresses.firstWhere((a) => a.id == 'work');
+      if (editing) {
+      await openChoice(tester, session, textScale: scale);
+      final actions = find.byKey(const ValueKey('buy-address-actions-work'));
+      await revealInForm(tester, listKey: const ValueKey('buy-address-sheet-list'), targetKey: const ValueKey('buy-address-actions-work'));
+      await tester.pumpAndSettle();
+      await tester.tap(actions);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const ValueKey('buy-address-edit-work')));
+      await tester.pumpAndSettle();
+      } else {
+        await openAdd(tester, session, textScale: scale);
+        final line = await revealInForm(tester, listKey: const ValueKey('buy-address-add-form-list'), targetKey: const ValueKey('buy-address-add-line'));
+        await tester.enterText(line, original.line);
+        tester.testTextInput.hide();
+        await tester.pumpAndSettle();
+      }
+      final phone = find.byKey(const ValueKey('buy-address-add-phone'));
+      await revealInForm(tester, listKey: const ValueKey('buy-address-add-form-list'), targetKey: const ValueKey('buy-address-add-phone'));
+      await tester.pumpAndSettle();
+      await tester.tap(phone);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 196);
+      await tester.pumpAndSettle();
+      await tester.testTextInput.receiveAction(TextInputAction.next);
+      await tester.pumpAndSettle();
+      final street = find.byKey(const ValueKey('buy-address-add-line'));
+      final editable = find.descendant(of: street, matching: find.byType(EditableText));
+      final state = tester.state<EditableTextState>(editable);
+      expect(state.widget.focusNode.hasFocus, isTrue);
+      expect(state.widget.controller.text, original.line);
+      final render = state.renderEditable;
+      final caret = render.getLocalRectForCaret(
+        TextPosition(offset: state.widget.controller.selection.extentOffset),
+      ).shift(render.localToGlobal(Offset.zero));
+      final viewport = tester.getRect(find.byKey(const ValueKey('buy-address-add-form-list')));
+      expect(caret.top, greaterThanOrEqualTo(viewport.top), reason: 'Focused street line must be below the viewport top');
+      expect(caret.bottom, lessThanOrEqualTo(viewport.bottom));
+      expect(caret.bottom, lessThanOrEqualTo(124));
+      const directory = String.fromEnvironment('BUY_R669_ADDRESS_VISUAL_DIRECTORY');
+      if (directory.isNotEmpty) {
+        await tester.runAsync(() async {
+        final boundary = tester.renderObject<RenderRepaintBoundary>(
+          find.byKey(const ValueKey('buy-address-add-form-repaint-boundary')),
+        );
+        final image = await boundary.toImage();
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        final file = File('$directory/address-next-$scale-edit-$editing.png');
+        await file.parent.create(recursive: true);
+        await file.writeAsBytes(data!.buffer.asUint8List());
+        image.dispose();
+        });
+      }
+      expect(session.addresses.firstWhere((a) => a.id == 'work').line, original.line);
+      tester.view.viewInsets = const FakeViewPadding();
+      tester.testTextInput.hide();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.addresses.firstWhere((a) => a.id == 'work').line, original.line);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  }
 
   testWidgets('compact 140 percent keeps both primary form actions reachable', (
     tester,

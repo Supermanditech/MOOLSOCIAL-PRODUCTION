@@ -15164,15 +15164,43 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
       int minLines = 1,
       int maxLines = 1,
     }) {
-      final field = TextField(
-        key: ValueKey('buy-address-add-$id'),
-        controller: controller,
-        scrollPadding: const EdgeInsets.symmetric(vertical: 12),
-        keyboardType: keyboardType,
-        textInputAction: action,
-        minLines: minLines,
-        maxLines: maxLines,
-        decoration: InputDecoration(labelText: largeText ? null : label),
+      final field = Builder(
+        builder: (fieldContext) => Focus(
+          canRequestFocus: false,
+          onFocusChange: (focused) {
+            if (!focused) return;
+            final focusedNode = FocusManager.instance.primaryFocus;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (!fieldContext.mounted ||
+                  FocusManager.instance.primaryFocus != focusedNode) {
+                return;
+              }
+              void revealEditable(Element element) {
+                if (element is StatefulElement &&
+                    element.state is EditableTextState) {
+                  final editable = element.state as EditableTextState;
+                  final selection = editable.widget.controller.selection;
+                  if (editable.widget.focusNode.hasFocus && selection.isValid) {
+                    editable.bringIntoView(selection.extent);
+                  }
+                  return;
+                }
+                element.visitChildren(revealEditable);
+              }
+              fieldContext.visitChildElements(revealEditable);
+            });
+          },
+          child: TextField(
+            key: ValueKey('buy-address-add-$id'),
+            controller: controller,
+            scrollPadding: const EdgeInsets.symmetric(vertical: 12),
+            keyboardType: keyboardType,
+            textInputAction: action,
+            minLines: minLines,
+            maxLines: maxLines,
+            decoration: InputDecoration(labelText: largeText ? null : label),
+          ),
+        ),
       );
       if (!largeText) return field;
       return Column(
