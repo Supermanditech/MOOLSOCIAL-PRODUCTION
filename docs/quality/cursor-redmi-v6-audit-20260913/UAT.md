@@ -117,3 +117,11 @@ Read-only class inventory of buy_v2_views.dart identified these remaining famili
 - Cross-cutting Back variants, keyboard,200% text and compact fit, app background/relaunch and retained selection, account/provider-dependent isolation and stale-response cases.
 
 Each family still needs exact action enumeration; this inventory alone proves no pass. Other Buy source owners and public fields must also be reconciled before final handoff. Earlier row-level remaining columns remain authoritative gaps; none is silently closed by this worklist.
+
+## Device round 9 — exported invoice, resolution form and Help freshness defect
+
+136–148 inspected. Invoice saved through Android picker with unique name RedmiV6-audit-MS-NEW-09-20260913-0330.pdf in device Download. App success confirmed;exact191919-byte export pulled to external evidence root;one page parsed and host PDFium render inspected legible with exact order/item74 contents. PDF and render separately indexed;host rendering is not a Redmi viewer-reopen pass. Existing Downloads files untouched. Local PDFium5.13.0 test runtime is outside worktree under external evidence/pdf-audit-runtime;no project dependency changed. Earlier console extraction encoding error recovered by ASCII-safe JSON without touching PDF.
+
+Manage order ties to MS-NEW-09. Cancellation selection exposes reason;empty disables submit;four reasons visible;Need to change address selected enables submit. Back dismisses without request;order remains preparing. Help opens correct seller/order and generated unsent draft. Expanded Chat context drops tracking's last-known/update-unavailable ETA qualifier and shows raw Delivery in12min. Registered RV6-D003 with112/147 and source mapping correlation. Back restores tracking. No cancellation/message/call/payment submitted.
+
+Totals148 physical captures plus exported PDF and host render (150 evidence rows);128 action rows:119 narrow passes;3 failures;4 provider-blocked;2 observations.30 public-data mappings.Three confirmed defects remain open. Current screen: MS-NEW-09 tracking lower controls148. New test export retained as evidence;basket empty;existing addresses untouched. Generated order-support draft remains unsent. Original tracker selection and muted/unkept preference readback still pending. Full audit incomplete.

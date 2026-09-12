@@ -25,3 +25,14 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Evidence: 040–046, especially 044 before decrement, 045 transition, 046 settled destination. Exact APK/device as above. No real order or message occurred.
 - Source hypothesis: underlying cart-empty navigation and Store sheet restoration interact; investigate `buy_v2_screen.dart` Store route lifecycle and `buy_v2_session.dart` last-item handling. Cause not yet established by source or isolated regression. Buy frontend owner; no implementation in this audit.
 - Subsequent source correlation: `BuyV2Session.decrease` (near line 10318) replaces cart/checkout with catalogue when the last line is removed. `_sessionChanged` in `buy_v2_screen.dart` (near line 607) dismisses Store routes whenever the underlying session becomes catalogue. This matches the observed Store-over-cart sequence; an isolated regression has not been run or added in this audit.
+
+## RV6-D003 — Order Chat presents a stale delivery promise without its unavailable qualifier
+
+- Status: open; confirmed device information-consistency defect. Severity: moderate.
+- Journey: open MS-NEW-09 tracking; Refresh produces Order updates unavailable and last recorded estimate/update unavailable (112); open Help; expand Order conversation context (146–147).
+- Actual: Chat context labels Delivery as Delivery in12min with no last-known or unavailable qualifier. Tracking for the same order explicitly says the update is unavailable. Order and purchase identity remain correct.
+- Expected: all current order-support surfaces preserve the estimate freshness/unavailability state; an unconfirmed stored relative promise must not appear as an unqualified current countdown.
+- Customer impact: a buyer seeking help after failed tracking refresh receives a conflicting apparent delivery promise. No evidence of a wrong actual delivery or a sent message is claimed.
+- Evidence:112-tracking-refresh and147-order-chat-context; exact installed V6 review APK and Redmi as recorded. Fixture order MS-NEW-09; this finding concerns cross-surface freshness handling rather than whether fixture ETA is live.
+- Source correlation: apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart near108 maps delivery to order.promise; near339 also formats the raw promise. buy_v2_shop_chat.dart fromOrder near408/415 likewise uses order.promise. Runtime Chat context is observed directly; no implementation or isolated regression added.
+- Ownership: Buy-to-shared-Chat metadata/freshness contract; coordinate shared consumer rendering if needed in the later implementation scope. Backend live estimates remain separately unqualified.
