@@ -1319,6 +1319,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (_quickTrackerMinimized ||
         _quickTrackerHidden ||
         _quickTrackerKept ||
+        _deliveryPickerOpen ||
         _quickTrackerPointers.isNotEmpty) {
       return;
     }
@@ -1327,6 +1328,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           _quickTrackerMinimized ||
           _quickTrackerHidden ||
           _quickTrackerKept ||
+        _deliveryPickerOpen ||
           _quickTrackerPointers.isNotEmpty) {
         return;
       }
@@ -1517,9 +1519,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                         if (_deliveryOrders.length > 1) ...[
                           TextButton.icon(
                             key: const ValueKey('buy-delivery-picker-toggle'),
-                            onPressed: () => update(
-                              () => _deliveryPickerOpen = !_deliveryPickerOpen,
-                            ),
+                            onPressed: () {
+                              update(() => _deliveryPickerOpen = !_deliveryPickerOpen);
+                              _scheduleQuickTrackerCollapse(update);
+                            },
                             icon: const Icon(Icons.list_alt_outlined),
                             label: Text(
                               'Deliveries (${_deliveryOrders.length})',

@@ -1,5 +1,16 @@
 # Fresh Redmi defect register
 
+## Delivery selector reading child checkpoint - 12 September 2026
+
+**R669-UAT-DELIVERY-SELECTOR-AUTOHIDE-001 implemented and locally checked; remains OPEN for Redmi verification.** The45-second auto-collapse timer previously ignored an open delivery selector. Scheduling and timer callbacks now respect that open state; toggling the selector updates the timer. Selection/explicit closure resumes the normal quiet-rail behavior. Keep, Hide, exact delivery identity and per-order preferences are preserved.
+
+Two new regressions reproduced selector disappearance at normal/200% text. After the fix,90 seconds of simulated reading preserves the list and its scroll position; selecting Bulk opens the exact delivery, then the normal45-second timer minimizes it back to the quiet rail. Both actual Flutter captures reviewed. Full order-progress and honest-order-motion suites:90 passed,0 failed,0 skipped. Analysis and approved UI locks pass. No real orders, sounds or provider actions were used.
+
+Evidence: external redmi-r66-9-round-1/delivery-picker-implementation-20260912-0211/local-qualification-1.json SHA256 6FA4B9508B871B241135620D303B72B93319AA43CD3A135735DB8C3E4CEA39D3, including exact two owner/capture hashes. Connected receipt singlechat-r669-delivery-picker-connected-20260912-0212.result.json; stdout SHA256449D558338533B7A85F50A859CA23272341DA9B20D121D41C1C1ECF37172C1DB. Required tested parent ba2fead34c4126f7f627a0bb42fd803b2a274840. Only existing Buy screen/test and ticket documents changed.
+
+No APK/build/install, integration or device closure. Parent delivery-hide-recovery and separate tracking-return/freshness children remain open; remaining scoped work continues.
+
+
 ## Review action clearance child checkpoint - 12 September 2026
 
 **R669-UAT-REVIEW-ELIGIBILITY-ACTION-CLIPPED-001 implemented and locally checked; remains OPEN for Redmi verification.** The review sheet used the caller's Android top inset as bottom clearance. It now reuses the existing modal action bottom-inset resolver, preserving real bottom navigation clearance for Check again and Save. No eligibility, submission or draft-retention rule changed.

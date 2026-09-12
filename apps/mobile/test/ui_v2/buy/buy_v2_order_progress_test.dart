@@ -374,6 +374,44 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 delivery selector stays open while reading $scale', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(320, 780));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core, commerceAdapter: _R669DeliveryCommerce(), reviewDataEnabled: false);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      await tester.pumpWidget(app(session, scale));
+      await tester.pumpAndSettle();
+      await tapDelivery(tester, 'toggle');
+      final picker = find.byKey(const ValueKey('buy-delivery-picker-toggle'));
+      await tester.ensureVisible(picker);
+      await tester.tap(picker);
+      await tester.pumpAndSettle();
+      final choice = find.byKey(const ValueKey('buy-delivery-select-bulk-4'));
+      await tester.ensureVisible(choice);
+      await tester.pumpAndSettle();
+      final before = tester.getRect(choice);
+      await tester.pump(const Duration(seconds: 90));
+      await tester.pumpAndSettle();
+      expect(choice, findsOneWidget);
+      expect(tester.getRect(choice), before, reason: 'Reading must not hide or reset the delivery list.');
+      await capture(tester, 'r669-delivery-picker-reading-$scale');
+      await tester.tap(choice);
+      await tester.pumpAndSettle();
+      final panel = find.byKey(const ValueKey('buy-quick-delivery-status-expanded'));
+      expect(find.descendant(of: panel, matching: find.text('bulk-4')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 46));
+      await tester.pumpAndSettle();
+      expect(panel, findsNothing, reason: 'After selection, the ordinary quiet-rail timer resumes.');
+      expect(find.byKey(const ValueKey('buy-quick-delivery-toggle')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
   testWidgets('R669 delivery recovery with twelve simultaneous deliveries', (
     tester,
   ) async {
