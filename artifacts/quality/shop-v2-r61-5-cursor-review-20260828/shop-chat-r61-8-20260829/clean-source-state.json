@@ -1,0 +1,15 @@
+{
+  "schema": "moolsocial_shop_chat_r61_8_clean_source_state_v1",
+  "branch": "work/integration-repair/shop-chat-shared-v1-20260829",
+  "head": "e0b1ad3eace7094f9bc0e73ce7d36eb30dcfdb1c",
+  "sourceManifestExact": true,
+  "sourceManifestSha256": "9A1D95F77A454287D7E069924FEC0235AD3ED252E7DB27EEF13D485559247A70",
+  "expectedUncommittedEvidenceOnly": true,
+  "expectedEvidenceRoots": [
+    "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-chat-r61-8-20260829",
+    "config/apk-regression-gate-state-shop-chat-r61-8.json"
+  ],
+  "runtimePackageTouched": false,
+  "androidConfigurationTouched": false,
+  "privateValuesEmitted": false
+}

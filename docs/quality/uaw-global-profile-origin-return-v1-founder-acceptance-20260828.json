@@ -1,0 +1,11 @@
+{
+  "schema": "moolsocial_ticket_founder_acceptance_v1",
+  "ticketId": "UAW-GLOBAL-PROFILE-PREFERENCES-ORIGIN-RETURN-V1-20260828",
+  "workId": "global-profile-origin-return-v1-20260828",
+  "lane": "codex_ui",
+  "acceptedCommit": "f6cec957817f34e8048f10009b634889c9775d2f",
+  "requirementsSatisfied": true,
+  "founderDecision": "accepted",
+  "acceptedAtIst": "2026-08-28T16:06:42.8985308+05:30",
+  "privateValuesEmitted": false
+}
