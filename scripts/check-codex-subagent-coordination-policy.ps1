@@ -1138,6 +1138,14 @@ Assert-Coordination (
 
 # Single ticket continuation. Historical repair policy above remains validated.
 # This changes no other lane and cannot select arbitrary inputs or conflict owners.
+$storeBuyFinalSeptember12 = (
+  $ProductionLane -ceq 'integration' -and
+  $ProductionWorkId -ceq 'store-buy-final-20260912' -and
+  $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-FINAL-20260912' -and
+  $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+  (ConvertTo-ProductionForwardPath $root) -ceq
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-20260912'
+)
 $storeBuySeptember12 = $ProductionLane -ceq 'integration_repair' -and
   $ProductionWorkId -ceq 'store-buy-20260912'
 if ($storeBuySeptember12) {
@@ -1643,7 +1651,7 @@ if ($ProductionLane -ceq 'baseline') {
   } else {
     Assert-Coordination (
       [string]$selectedLane.agentRole -ceq $AgentRole -and
-      ($storeBuySeptember12 -or $AgentTask.StartsWith(
+      ($storeBuySeptember12 -or $storeBuyFinalSeptember12 -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
       ))

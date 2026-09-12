@@ -134,3 +134,12 @@ closed without a configured authoritative commerce adapter; host fixtures supply
 test grants only. Final integration admission, combined qualification, source
 handoff and APK build remain required. Shared cold-start and external-provider
 limitations must remain explicit in that baseline handoff.
+
+Final admission identity binding: founder standing authority permits this primary
+task /root to act only for integration lane, work store-buy-final-20260912, ticket
+UAW-INTEGRATION-STORE-BUY-FINAL-20260912 and its exact fresh integration worktree.
+Only the task-prefix comparison is bound; recorded claims, branch, governance-tag
+start, automatic two-parent merge, complete ancestry, clean managed worktrees,
+approved-tip remote equality and integration-close checks remain unchanged.
+The sealed functional correction remains 2de2f09fef0791b72a826ca75c54a09f544ba425;
+this mechanical admission commit changes no app/test source.
