@@ -314,3 +314,47 @@ unrelated root, modified bytes, missing bridge, missing source ancestor and
 wrong owner reject. Identity mocks qualify verifier logic, not a real integration.
 Actual complete UI-lock check in the correction worktree passed, session 47418,
 exit 0. No APK was built. Fresh v3 admission and final release checks remain.
+
+## REG4609 exact combined review release boundary
+
+V3 d174a64016baebf09b10e2d70365f52746267cbf is preserved clean and unpushed.
+It passed integration_verify, exact automatic tree, UI locks and approved commit
+coverage. All 211 Codex and 221 Cursor commits since common f94cfd are included,
+zero omitted. Pinned source/repair remote heads still match.
+
+Release probes found 18 backend-boundary findings, six data-egress findings
+and the old two-transition Buy brand assertion. Backend/contracts match f94cfd
+exactly. Sensitive Buy session/scanner/storage/views/Chat-copy owners match
+pinned Cursor exactly. Existing review classifiers were restricted to older
+Cursor snapshots, so V3 cannot use them or impersonate that branch.
+
+Standing authority admits five existing verifier owners only to this correction:
+check-buy-protected-baseline.ps1, check-buy-backend-contract-boundary.ps1,
+check-buy-data-egress-boundary.ps1, check-brand-integrity.ps1 and
+check-windows-powershell-compatibility.ps1. Their optional
+IntegratedReviewSourceCommit accepts only
+0a1c0e5aed5e6e840ac740cc6ac947bab8da79cf in this exact correction lane or fresh
+store-buy-final-v4-20260912 integration root/branch. It requires that source and
+both original tips as ancestors, identical committed and working apps/backend/
+contracts, unchanged f94cfd backend/contracts and no untracked boundary owners.
+The original defaults and Redmi boundaries remain intact; conflicting arguments
+reject. This is review qualification, never production promotion or live backend
+acceptance. The brand check retains structural assertions and binds the corrected
+Codex Chat owner rather than pretending it is unchanged from the common baseline.
+
+Actual correction-worktree checks passed, session 68553 exit 0: exact protected
+Buy review source (51 files), backend boundary (31 native /139 backend /14
+contract files), data egress and App brand. Twelve extracted-function fixtures
+passed: correction/v4 positives; wrong source/branch/root; missing qualified,
+Codex or Cursor ancestor; committed or working source drift; backend drift;
+untracked source. Mocked Git facts test rejection logic, not real admission.
+Windows PowerShell compatibility session 83905 exited 0: backend/data-egress
+and their self-tests, UI locks and protected Buy passed; historical protected
+Social rejection was correctly classified as an expected business boundary,
+not falsely called a protected-Social baseline pass.
+
+The data-egress result label was then corrected from inherited Redmi wording
+to integrated when the integrated argument is used; behavior is unchanged.
+Native and coordination destination pins now name only fresh v4. Recheck those
+final mechanical edits before sealing. No application source change, APK,
+installation, live backend action or original-branch mutation occurred.

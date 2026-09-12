@@ -1,7 +1,8 @@
 param(
   [string]$RepositoryRoot = "",
   [string]$BaselinePath = "",
-  [string]$RedmiReviewSourceCommit = ""
+  [string]$RedmiReviewSourceCommit = "",
+  [string]$IntegratedReviewSourceCommit = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -339,6 +340,55 @@ function Test-RedmiReviewBuySource {
   $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaryRoots)
   if ($LASTEXITCODE -ne 0 -or $untracked.Count -ne 0) { return $false }
   return $true
+}
+
+function Test-IntegratedStoreBuyReviewSource {
+  param([string]$SourceCommit)
+  if ($SourceCommit -cne '0a1c0e5aed5e6e840ac740cc6ac947bab8da79cf') { return $false }
+  $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
+  $expectedBranch = switch ($canonicalRoot) {
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
+      'work/codex-ui/store-procurement-bridge-20260912'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v4-20260912' {
+      'integration/moolsocial/store-buy-final-v4-20260912'
+    }
+    default { $null }
+  }
+  if ($null -eq $expectedBranch) { return $false }
+  $currentBranch = @(& git -C $root branch --show-current)
+  if ($LASTEXITCODE -ne 0 -or $currentBranch.Count -ne 1 -or
+      [string]$currentBranch[0] -cne $expectedBranch) { return $false }
+  foreach ($requiredTip in @(
+    $SourceCommit,
+    '2a860f9f9fd793d4f366c5952f4f8eb05326f58b',
+    '4d5ae49543cc5e88eecda2a48e948cbd18500a4d'
+  )) {
+    & git -C $root merge-base --is-ancestor $requiredTip HEAD
+    if ($LASTEXITCODE -ne 0) { return $false }
+  }
+  $boundaries = @('apps','backend','contracts')
+  & git -C $root diff --quiet $SourceCommit HEAD -- @boundaries
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root diff --quiet $SourceCommit -- @boundaries
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root diff --quiet 'f94cfd4752dd73b58a69568475803d6cf25cb8d0' -- backend contracts
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaries)
+  return $LASTEXITCODE -eq 0 -and $untracked.Count -eq 0
+}
+
+if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+  if (-not [string]::IsNullOrWhiteSpace($BaselinePath) -or
+      -not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit) -or
+      -not (Test-IntegratedStoreBuyReviewSource $IntegratedReviewSourceCommit)) {
+    throw 'Integrated review source rejected: exact source, branch, ancestry and unchanged boundaries required.'
+  }
+  Write-Output (
+    "Protected Buy integrated review qualification passed: source=$IntegratedReviewSourceCommit; " +
+    "runtimeFiles=$($relativeFiles.Count); acceptedBaseline=false; productionPromotion=false; backendQualified=false."
+  )
+  return
 }
 
 if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {

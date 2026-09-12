@@ -3,13 +3,23 @@ param(
   [string]$Surface = "App",
   [string]$ScreenbookRoot = "",
   [switch]$RequireScreenbook,
-  [string]$RedmiReviewSourceCommit = ''
+  [string]$RedmiReviewSourceCommit = '',
+  [string]$IntegratedReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
 
 $root = Split-Path -Parent $PSScriptRoot
 $redmiReviewQualified = $false
+$reviewSourceCommit = $RedmiReviewSourceCommit
+if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+  if ($Surface -cne 'App') { throw 'Integrated review brand qualification is App-only.' }
+  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+    -RepositoryRoot $root -IntegratedReviewSourceCommit $IntegratedReviewSourceCommit `
+    -RedmiReviewSourceCommit $RedmiReviewSourceCommit
+  $redmiReviewQualified = $true
+  $reviewSourceCommit = $IntegratedReviewSourceCommit
+}
 if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
   if ($Surface -cne 'App') { throw 'Redmi review brand qualification is App-only.' }
   $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
@@ -525,7 +535,7 @@ function Test-SealedBuyThemeIntegration {
   if ($redmiReviewQualified) {
     $redmiReviewProjection = Test-BuyThemeIntegrationFacts `
       $true `
-      (Test-BrandOwnerBytesEqualAtCommit -Owners @($owner) -Commit $RedmiReviewSourceCommit) `
+      (Test-BrandOwnerBytesEqualAtCommit -Owners @($owner) -Commit $reviewSourceCommit) `
       $structureExact
   }
   return $legacyProjection -or $v74Projection -or $shopV2Projection -or $redmiReviewProjection
@@ -781,9 +791,12 @@ function Test-SealedChatBrandProjection {
 }
 
 if ($redmiReviewQualified) {
+  $chatReviewSource = if ([string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+    'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
+  } else { $IntegratedReviewSourceCommit }
   Assert-True -Condition (Test-BrandOwnerBytesEqualAtCommit `
     -Owners @('apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart') `
-    -Commit 'f94cfd4752dd73b58a69568475803d6cf25cb8d0') `
+    -Commit $chatReviewSource) `
     -Message 'Redmi review changed the accepted contextual Chat owner'
   foreach ($token in @(
     'return ChatPageScaffold(', 'title: entryContext.title',

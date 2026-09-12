@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [string]$RepositoryRoot,
-  [string]$RedmiReviewSourceCommit = ''
+  [string]$RedmiReviewSourceCommit = '',
+  [string]$IntegratedReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
@@ -79,7 +80,12 @@ function Invoke-LegacyGate {
   throw "$Label failed under Windows PowerShell 5.1: $text"
 }
 
-$reviewArguments = if ([string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+$reviewArguments = if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+  if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+    throw 'Choose one review source boundary, not both.'
+  }
+  @('-IntegratedReviewSourceCommit', $IntegratedReviewSourceCommit)
+} elseif ([string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
   @()
 } else {
   @('-RedmiReviewSourceCommit', $RedmiReviewSourceCommit)

@@ -2,7 +2,8 @@
 param(
   [string]$RepositoryRoot,
   [switch]$SelfTest,
-  [string]$RedmiReviewSourceCommit = ''
+  [string]$RedmiReviewSourceCommit = '',
+  [string]$IntegratedReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,12 @@ if (-not $RepositoryRoot) {
 }
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
 $redmiReviewQualified = $false
+if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+    -RepositoryRoot $RepositoryRoot -IntegratedReviewSourceCommit $IntegratedReviewSourceCommit `
+    -RedmiReviewSourceCommit $RedmiReviewSourceCommit
+  $redmiReviewQualified = $true
+}
 if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
   $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
     -RepositoryRoot $RepositoryRoot -RedmiReviewSourceCommit $RedmiReviewSourceCommit
@@ -154,6 +161,9 @@ function Get-MobileBoundaryViolations {
           'DED10F0145682F8B125088C4CDA7BB507AB12D119731FE93C49A82258CB2B92C',
           '9D347031148DC2B45EFBF7BF991A3D265DBCE6CC95663ECDF3C4214AC522344B',
           '37A962868CB925A4D962D923B6C6DDED1F5DAEC5047FE5563666AB43AAAE53AA'
+        ) -or (
+          $IntegratedReviewSourceCommit -ceq '0a1c0e5aed5e6e840ac740cc6ac947bab8da79cf' -and
+          $soundSourceHash -ceq '7BE1D12EE7CA2ACB96B67B14EC02CAD0DCB25D613A07AF4B0473AE323EB9C0B7'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }

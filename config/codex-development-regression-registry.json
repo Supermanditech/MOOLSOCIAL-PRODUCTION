@@ -10,6 +10,16 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4609-COMBINED-REVIEW-RELEASE-BOUNDARY",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "integration", "testing", "release"],
+      "mistake": "V3 release probes reject inherited Buy source: 18 backend-boundary findings, six data-egress findings and a legacy brand-motion assertion. No new customer defect is established by these static findings.",
+      "rootCause": "Existing review classifiers accept only historical Cursor snapshots and its branch, not the exact combined qualified application. Backend/contracts remain identical to accepted f94cfd; sensitive Buy storage, views, scanner and session match pinned Cursor.",
+      "prevention": "Admit only the exact tested combined source and bounded correction/final-review identities with both source ancestors, full unchanged apps/backend/contracts, no untracked boundary owners and preserved negative/structural checks. Do not impersonate Redmi or accept arbitrary revisions. Preserve existing scanner decoded-code delay, local arrival audio, user-invoked sharing and review-only adapter classifications without granting production/backend acceptance.",
+      "gates": ["scripts/check-buy-protected-baseline.ps1", "scripts/check-buy-backend-contract-boundary.ps1", "scripts/check-buy-data-egress-boundary.ps1", "scripts/check-brand-integrity.ps1", "scripts/check-windows-powershell-compatibility.ps1"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
       "id": "REG-20260912-4608-INTEGRATED-NATIVE-LOCK-COMPOSITION",
       "status": "registered_correction_in_progress",
       "appliesTo": ["primary", "integration", "testing", "release"],

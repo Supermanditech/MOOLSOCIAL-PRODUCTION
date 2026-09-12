@@ -2,7 +2,8 @@
 param(
   [string]$RepositoryRoot,
   [switch]$SelfTest,
-  [string]$RedmiReviewSourceCommit = ''
+  [string]$RedmiReviewSourceCommit = '',
+  [string]$IntegratedReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
@@ -12,6 +13,12 @@ if (-not $RepositoryRoot) {
 }
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
 $redmiReviewQualified = $false
+if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+    -RepositoryRoot $RepositoryRoot -IntegratedReviewSourceCommit $IntegratedReviewSourceCommit `
+    -RedmiReviewSourceCommit $RedmiReviewSourceCommit
+  $redmiReviewQualified = $true
+}
 if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
   $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
     -RepositoryRoot $RepositoryRoot -RedmiReviewSourceCommit $RedmiReviewSourceCommit
@@ -330,8 +337,11 @@ if ($violations.Count -gt 0) {
 }
 
 if ($redmiReviewQualified) {
+  $reviewLabel = if ([string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+    'Redmi'
+  } else { 'integrated' }
   Write-Output (
-    "Buy data-egress Redmi review boundary passed: $($mobileFiles.Count) native V2 files; " +
+    "Buy data-egress $reviewLabel review boundary passed: $($mobileFiles.Count) native V2 files; " +
     "only exact inherited review-store, product/address share and user Copy seams; " +
     "acceptedBaseline=false; productionPromotion=false; no recipient action authorized."
   )
