@@ -10,6 +10,16 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4608-INTEGRATED-NATIVE-LOCK-COMPOSITION",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "integration", "testing", "release"],
+      "mistake": "Successor integration d7ffaf6756122d97cb5e4c804a21eaf119ef74fb is rejected by the approved UI lock because accessibility projection is restricted to the original Cursor checkout.",
+      "rootCause": "The automatic merge retains the exact Cursor accessibility bridge and accepted Codex PDF bridge, but the old verifier recognizes only the Cursor-only whole-file hash and location.",
+      "prevention": "Verify the exact combined native hash, unchanged accessibility block, accepted PDF projection, pinned source ancestors and bounded correction/integration identities. Reject altered native bytes and unrelated locations. Preserve failed candidates and immutable references; do not change Android code or weaken existing Cursor checks. Test positive and negative projections before fresh admission.",
+      "gates": ["scripts/check-approved-ui-locks.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
       "id": "REG-20260912-4607-PURCHASE-ORIGIN-TRACKING-CONTEXT",
       "admissionCommandIncident": "The fresh v2 merge command used unsupported git merge --stat=1 and exited 1 before starting. Target remains the governance-tag HEAD, no MERGE_HEAD or changed records. Use --no-stat for concise output; rerun exact admission with the clean source remote before retry. No source reconciliation, reset or history edit is needed.",
       "status": "registered_correction_in_progress",

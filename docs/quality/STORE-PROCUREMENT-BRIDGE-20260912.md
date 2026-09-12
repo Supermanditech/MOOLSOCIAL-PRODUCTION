@@ -283,3 +283,34 @@ remote, unchanged governance-tag target, all managed worktrees clean, no target
 remote and one automatic no-FF admission. Only exact pins change. Old failed
 candidate fe6cb702 and both original branches remain untouched; no source edits
 or general rule changes are included in this mechanical admission update.
+
+## REG4608 exact native composition and successor qualification
+
+Preserved successor d7ffaf6756122d97cb5e4c804a21eaf119ef74fb has parents
+c2a65ac51ed58174754b9b07f2223583c48500b3 and
+f2de6c3d58d3f8a02565506d3badd84d7cbb78e6. Both original source tips remain
+ancestors. Combined session 20104 completed exit 0: 1849 passed, 79 documented
+skips, zero failures, 9m18s. Analysis log reports zero issues. Evidence:
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-buy-final-v2-combined-20260912.log`
+and `store-buy-final-v2-analysis-20260912.log` in the same directory.
+
+Integration verification and approved-commit coverage passed, but the UI lock
+rejected the merged native owner because its accessibility projection recognizes
+only Cursor's original checkout. No Android source or approved reference changed.
+Canonical combined MainActivity SHA-256:
+8a4bf4853c24176662fa9dafc8dced9da3a929903c60438eeaa7731e511460c4.
+Its single unchanged accessibility block SHA-256:
+c6f995759d350cd64efc4dbfe9b38653fd15ee7a5401b20cc3db52ab1f1ac3ac.
+Removing only that block yields the already accepted PDF native hash:
+f28c19b40a0bcd8f660cc33bbb4683ec03057327b69695a3abf7cb09d0b0e4a4.
+
+Standing founder authority admits check-approved-ui-locks.ps1 only to this
+existing correction ticket. Its exact combined projection requires both pinned
+source ancestors, the exact native owner, whole-file/block/projected hashes,
+and the correction or fresh v3 integration root/branch pair. Existing Cursor
+checks and immutable manifests are unchanged. Nine extracted-function fixtures
+pass: correction, successor and original Cursor positive cases; wrong branch,
+unrelated root, modified bytes, missing bridge, missing source ancestor and
+wrong owner reject. Identity mocks qualify verifier logic, not a real integration.
+Actual complete UI-lock check in the correction worktree passed, session 47418,
+exit 0. No APK was built. Fresh v3 admission and final release checks remain.

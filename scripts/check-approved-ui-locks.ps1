@@ -130,6 +130,19 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-fixes-v1-20260905'
   ).TrimEnd([char[]]@('\','/'))
   $actualRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/'))
+  # REG4608: admit only the exact merged accessibility + PDF composition in
+  # this correction lane and its single fresh final-admission destination.
+  $combinedBranch = switch ($actualRoot.Replace('\','/')) {
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
+      'work/codex-ui/store-procurement-bridge-20260912'
+    }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v3-20260912' {
+      'integration/moolsocial/store-buy-final-v3-20260912'
+    }
+    default { $null }
+  }
+  $combined = $null -ne $combinedBranch
+  if ($combined) { $expectedRoot = $actualRoot }
   $expectedPath = [IO.Path]::GetFullPath((Join-Path $expectedRoot (
     'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
   )))
@@ -142,17 +155,33 @@ function Get-CursorAccessibilityNativeProjection {
     return $Source
   }
   $branch = @(& git -C $root rev-parse --abbrev-ref HEAD)
+  $requiredBranch = if ($combined) { $combinedBranch } else {
+    'work/cursor-ui/buy-redmi-fixes-v1-20260905'
+  }
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
-      [string]$branch[0] -cne 'work/cursor-ui/buy-redmi-fixes-v1-20260905') {
+      [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
   }
   & git -C $root merge-base --is-ancestor '38fa1201488ae943487b58d4afe5d851f8b9fc37' HEAD
   if ($LASTEXITCODE -ne 0) {
     throw 'Approved UI Accessibility projection requires its sealed implementation ancestor.'
   }
+  if ($combined) {
+    foreach ($tip in @(
+      '2a860f9f9fd793d4f366c5952f4f8eb05326f58b',
+      '4d5ae49543cc5e88eecda2a48e948cbd18500a4d'
+    )) {
+      & git -C $root merge-base --is-ancestor $tip HEAD
+      if ($LASTEXITCODE -ne 0) {
+        throw 'Approved UI combined native projection requires both pinned source ancestors.'
+      }
+    }
+  }
   $utf8 = [Text.UTF8Encoding]::new($false)
-  if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne
-      'bffb6fea0876c45bee5c5a6b96c790ee49738ee6e9f8738a836a4a04b40bd3ec') {
+  $expectedSourceHash = if ($combined) {
+    '8a4bf4853c24176662fa9dafc8dced9da3a929903c60438eeaa7731e511460c4'
+  } else { 'bffb6fea0876c45bee5c5a6b96c790ee49738ee6e9f8738a836a4a04b40bd3ec' }
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($Source)) -cne $expectedSourceHash) {
     throw 'Approved UI Accessibility projection rejects an altered or missing native implementation.'
   }
   $pattern = '(?ms)^        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_BEGIN\n.*?^        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_END\n'
@@ -166,8 +195,10 @@ function Get-CursorAccessibilityNativeProjection {
     throw 'Approved UI Accessibility projection rejects a changed bridge block.'
   }
   $projected = $Source.Remove($block.Index,$block.Length)
-  if ((Get-LockSha256 -Bytes $utf8.GetBytes($projected)) -cne
-      'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218') {
+  $expectedProjectionHash = if ($combined) {
+    'f28c19b40a0bcd8f660cc33bbb4683ec03057327b69695a3abf7cb09d0b0e4a4'
+  } else { 'ef54c34bb13caed0aa568976cc2d0d50cc1b2170ad716ce1cda3827fd79f7218' }
+  if ((Get-LockSha256 -Bytes $utf8.GetBytes($projected)) -cne $expectedProjectionHash) {
     throw 'Approved UI Accessibility projection changed previously accepted native bytes.'
   }
   return $projected

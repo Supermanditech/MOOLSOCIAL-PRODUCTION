@@ -1140,11 +1140,11 @@ Assert-Coordination (
 # This changes no other lane and cannot select arbitrary inputs or conflict owners.
 $storeBuyFinalSeptember12 = (
   $ProductionLane -ceq 'integration' -and
-  $ProductionWorkId -ceq 'store-buy-final-v2-20260912' -and
-  $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-FINAL-V2-20260912' -and
+  $ProductionWorkId -ceq 'store-buy-final-v3-20260912' -and
+  $ProductionTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-FINAL-V3-20260912' -and
   $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
   (ConvertTo-ProductionForwardPath $root) -ceq
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v2-20260912'
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v3-20260912'
 )
 $storeBuyFinalAdmission = (
   $ProductionLane -ceq 'codex_ui' -and
@@ -1828,6 +1828,7 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/test/work_workspace_layout_safety_test.dart',
           'apps/mobile/test/work_store_atomic_operations_test.dart',
           'docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md',
+          'scripts/check-approved-ui-locks.ps1',
           'config/codex-development-regression-registry.json',
           'config/codex-subagent-coordination-policy.json',
           'scripts/check-codex-subagent-coordination-policy.ps1'
@@ -5160,23 +5161,23 @@ if ($ProductionLane -ceq 'baseline') {
       Assert-Coordination ((Test-ProductionWorktreeClean) -and
         (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Final admission source is not clean and remote-equal.'
       Assert-Coordination (
-        $IntegrationTargetWorkId -ceq 'store-buy-final-v2-20260912' -and
-        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-FINAL-V2-20260912' -and
+        $IntegrationTargetWorkId -ceq 'store-buy-final-v3-20260912' -and
+        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-FINAL-V3-20260912' -and
         (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq
-          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v2-20260912' -and
+          'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v3-20260912' -and
         (Test-Path -LiteralPath $IntegrationTargetRoot -PathType Container)
       ) 'Final integration target identity changed.'
       $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
-        $targetBranch[0] -ceq 'integration/moolsocial/store-buy-final-v2-20260912') 'Final integration branch changed.'
+        $targetBranch[0] -ceq 'integration/moolsocial/store-buy-final-v3-20260912') 'Final integration branch changed.'
       $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetHead.Count -eq 1 -and
         $targetHead[0] -ceq $workStartCommit) 'Final integration must start at the unchanged governance tag.'
       Assert-ProductionManagedWorktreesClean
       $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin `
-        'refs/heads/integration/moolsocial/store-buy-final-v2-20260912')
+        'refs/heads/integration/moolsocial/store-buy-final-v3-20260912')
       Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Final integration remote already exists.'
-      Write-Output 'merge(store-buy-final-v2-20260912): integrate qualified Store and Buy'
+      Write-Output 'merge(store-buy-final-v3-20260912): integrate qualified Store and Buy'
     } else {
     Assert-Coordination ($ProductionLane -ceq 'integration_repair') `
       'fresh integration admission is valid only from the repair lane.'
