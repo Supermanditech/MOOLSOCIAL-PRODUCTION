@@ -269,3 +269,17 @@ A premature directory read before capture completion found no directory; the
 same original test process was awaited to exit 0 without restart. A documentation
 patch with stale context was rejected without modification, then reapplied
 against the exact read-back tail. No source/test attempt was affected.
+
+## Fresh successor admission pin
+
+Qualified correction commit: 0a1c0e5aed5e6e840ac740cc6ac947bab8da79cf,
+clean, pushed and remote-equal; handoff gate passed. Bind the existing exact
+admission to `store-buy-final-v2-20260912`, ticket
+`UAW-INTEGRATION-STORE-BUY-FINAL-V2-20260912`, branch
+`integration/moolsocial/store-buy-final-v2-20260912`, fresh worktree
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v2-20260912`.
+The checker still requires the qualified apps tree unchanged, clean exact source
+remote, unchanged governance-tag target, all managed worktrees clean, no target
+remote and one automatic no-FF admission. Only exact pins change. Old failed
+candidate fe6cb702 and both original branches remain untouched; no source edits
+or general rule changes are included in this mechanical admission update.
