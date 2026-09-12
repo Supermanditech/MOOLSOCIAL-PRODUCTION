@@ -139,6 +139,9 @@ function Get-CursorAccessibilityNativeProjection {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v6-20260912' {
       'integration/moolsocial/store-buy-final-v6-20260912'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' {
+      'work/cursor-ui/redmi-v6-audit-20260913'
+    }
     default { $null }
   }
   $combined = $null -ne $combinedBranch
@@ -161,6 +164,29 @@ function Get-CursorAccessibilityNativeProjection {
   if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
       [string]$branch[0] -cne $requiredBranch) {
     throw 'Approved UI Accessibility projection requires its exact Cursor branch.'
+  }
+  if ($requiredBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
+    $redmiBaseline = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'
+    & git -C $root merge-base --is-ancestor $redmiBaseline HEAD
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit requires the preserved V6 ancestor.'
+    }
+    $redmiBoundaries = @(
+      'apps', 'backend', 'contracts', 'packages',
+      'package.json', 'package-lock.json', 'pubspec.yaml', 'pubspec.lock'
+    )
+    & git -C $root diff --quiet $redmiBaseline HEAD -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit committed source differs from V6.'
+    }
+    & git -C $root diff --quiet $redmiBaseline -- @redmiBoundaries
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Redmi audit working source differs from V6.'
+    }
+    $redmiUntracked = @(& git -C $root ls-files --others --exclude-standard -- @redmiBoundaries)
+    if ($LASTEXITCODE -ne 0 -or $redmiUntracked.Count -ne 0) {
+      throw 'Redmi audit has untracked source.'
+    }
   }
   & git -C $root merge-base --is-ancestor '38fa1201488ae943487b58d4afe5d851f8b9fc37' HEAD
   if ($LASTEXITCODE -ne 0) {

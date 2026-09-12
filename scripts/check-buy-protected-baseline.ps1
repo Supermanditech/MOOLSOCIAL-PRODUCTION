@@ -353,12 +353,25 @@ function Test-IntegratedStoreBuyReviewSource {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v6-20260912' {
       'integration/moolsocial/store-buy-final-v6-20260912'
     }
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' {
+      'work/cursor-ui/redmi-v6-audit-20260913'
+    }
     default { $null }
   }
   if ($null -eq $expectedBranch) { return $false }
   $currentBranch = @(& git -C $root branch --show-current)
   if ($LASTEXITCODE -ne 0 -or $currentBranch.Count -ne 1 -or
       [string]$currentBranch[0] -cne $expectedBranch) { return $false }
+  if ($expectedBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
+    $redmiV6 = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'
+    & git -C $root merge-base --is-ancestor $redmiV6 HEAD
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & git -C $root diff --quiet $redmiV6 HEAD -- apps backend contracts
+    if ($LASTEXITCODE -ne 0) { return $false }
+    & git -C $root diff --quiet $redmiV6 -- apps backend contracts
+    if ($LASTEXITCODE -ne 0) { return $false }
+  }
+
   foreach ($requiredTip in @(
     $SourceCommit,
     '2a860f9f9fd793d4f366c5952f4f8eb05326f58b',

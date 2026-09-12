@@ -764,8 +764,45 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 75) `
+Assert-Coordination ($continuationBindings.Count -eq 76) `
   'founder-authorized continuation binding inventory changed.'
+
+$redmiExpectedBinding = @'
+{
+  "id": "cursor_redmi_v6_audit_20260913",
+  "state": "founder_authorized_2026_09_13",
+  "lane": "cursor_ui",
+  "role": "subagent",
+  "task": "/root/cursor_redmi_v6_audit_20260913",
+  "workId": "redmi-v6-audit-20260913",
+  "ticketId": "UAW-CURSOR-REDMI-V6-AUDIT-20260913",
+  "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+  "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+  "baselineHead": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+  "bootstrapCommitSubject": "coordination(redmi-v6-audit-20260913): admit exact V6 Redmi audit lane",
+  "bootstrapOwners": [
+    "config/codex-subagent-coordination-policy.json",
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "scripts/check-approved-ui-locks.ps1",
+    "scripts/check-buy-protected-baseline.ps1",
+    "docs/quality/UAW-CURSOR-REDMI-V6-AUDIT-20260913.md"
+  ],
+  "cursorIndependent": true,
+  "integrationRequiredBeforeSuccessorApk": true
+}
+'@ | ConvertFrom-Json
+$redmiActualBindings = @($continuationBindings | Where-Object { $_.id -ceq 'cursor_redmi_v6_audit_20260913' })
+Assert-Coordination ($redmiActualBindings.Count -eq 1) 'Exact Redmi continuation is missing or duplicated.'
+foreach ($property in $redmiExpectedBinding.PSObject.Properties) {
+  $expected = $property.Value
+  $actual = $redmiActualBindings[0].($property.Name)
+  if ($property.Name -ceq 'bootstrapOwners') {
+    Assert-Coordination ((@($actual | Sort-Object) -join '|') -ceq (@($expected | Sort-Object) -join '|')) 'Redmi bootstrap owners changed.'
+  } else {
+    Assert-Coordination ((ConvertTo-Json -InputObject $actual -Compress) -ceq (ConvertTo-Json -InputObject $expected -Compress)) "Redmi continuation changed: $($property.Name)"
+  }
+}
+
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
   Assert-ExactNames $continuationBinding @(
@@ -782,7 +819,10 @@ foreach ($continuationBinding in $continuationBindings) {
   }
   Assert-Coordination (
     [string]$continuationBinding.id -cmatch '^[a-z0-9][a-z0-9_]{4,79}$' -and
-    [string]$continuationBinding.state -cin @(
+    (
+      ([string]$continuationBinding.id -ceq 'cursor_redmi_v6_audit_20260913' -and
+       [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_13') -or
+      [string]$continuationBinding.state -cin @(
       'founder_authorized_2026_08_25',
       'founder_authorized_2026_08_26',
       'founder_authorized_2026_08_28',
@@ -792,6 +832,7 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_09_04',
       'founder_authorized_2026_09_05',
       'founder_authorized_2026_09_12'
+      )
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
@@ -1348,6 +1389,27 @@ foreach ($readOwner in $mandatoryReads) {
 
 $claims = @($policy.activeClaims)
 Assert-Coordination ($claims.Count -ge 1) 'active claim inventory is empty.'
+
+if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913') {
+  $redmiClaim = @($claims | Where-Object { $_.task -ceq '/root/cursor_redmi_v6_audit_20260913' })
+  $redmiEvidenceOwners = @(
+        'docs/quality/cursor-redmi-v6-audit-20260913/scope-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/UAT.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/JOURNEYS.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PUBLIC-DATA.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/BLOCKERS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/EVIDENCE.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/HANDOFF.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/apk-regression-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt',
+        'docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt'
+  )
+  Assert-Coordination ($redmiClaim.Count -eq 1 -and $redmiClaim[0].role -ceq 'subagent' -and
+    ((@($redmiClaim[0].owners | Sort-Object) -join '|') -ceq (@($redmiEvidenceOwners | Sort-Object) -join '|'))) 'Redmi operational claim changed.'
+}
+
 $missingOwnerNegativeFixture = Join-Path $root `
   '.codex-coordination-missing-owner-negative-fixture'
 Assert-Coordination (
@@ -1451,6 +1513,28 @@ foreach ($claim in $claims) {
       $owner -cmatch
         '^artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/[^/]+$'
     )
+    $predeclaredRedmiV6EvidenceOwner = (
+      [string]$claim.task -ceq '/root/cursor_redmi_v6_audit_20260913' -and
+      $root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' -and
+      $pendingEvidenceBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913' -and
+      $ProductionLane -ceq 'cursor_ui' -and
+      $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
+      $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and
+      $owner -cin @(
+        'docs/quality/cursor-redmi-v6-audit-20260913/scope-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/UAT.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/JOURNEYS.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/PUBLIC-DATA.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/BLOCKERS.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/EVIDENCE.csv',
+        'docs/quality/cursor-redmi-v6-audit-20260913/HANDOFF.md',
+        'docs/quality/cursor-redmi-v6-audit-20260913/apk-regression-state.json',
+        'docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt',
+        'docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt'
+      )
+    )
     $predeclaredFounderReferenceOwner = (
       [string]$claim.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905' -and
       $ProductionLane -ceq 'cursor_ui' -and
@@ -1495,7 +1579,7 @@ foreach ($claim in $claims) {
         $predeclaredR65TenEvidenceOwner -or
         $predeclaredR65ElevenEvidenceOwner -or
         $predeclaredR6615EvidenceOwner -or
-        $predeclaredR669PortableOwner -or $predeclaredFounderReferenceOwner)
+        $predeclaredR669PortableOwner -or $predeclaredFounderReferenceOwner -or $predeclaredRedmiV6EvidenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
