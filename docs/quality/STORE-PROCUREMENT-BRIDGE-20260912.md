@@ -493,3 +493,25 @@ at discovery. Stage exact future changes first, inspect the standalone
 pre_commit result before commit, and validate ownership/memory/handoff before
 any push. Connected tests and analysis above remain evidence for source
 behavior but cannot retroactively establish that missing gate timing.
+
+## User-authorized subject recovery and fresh V6 admission pins
+
+The user authorized recovery while preserving originals. Original commits
+32b71ee408eb914f60092aa538ce20798342ac2c and
+8ac9b3b935eb94c7e5eef30bb9e6b6049374309b remain at
+refs/archive/store-buy-reg4612-original-correction-20260912 and
+refs/archive/store-buy-reg4613-original-tip-20260912.
+Only their subjects changed to the required ui(work-id) prefix; the second
+parent reference changed to its reworded predecessor. Author/committer metadata
+and exact file trees are preserved. Replacements are
+10fb79b4469203371edf888e7d4b8aacb3546581 and
+01ff991a850d0bdef6480c28c49ecf6cac2dce46. The unchanged handoff gate passes.
+No force-push or published-history rewrite occurred.
+
+The four existing admission owners now pin tested correction
+10fb79b4469203371edf888e7d4b8aacb3546581 and the single fresh V6 destination,
+preserving local unqualified V5. Only exact source/destination identity
+literals change; no predicate, content hash exception, owner permission,
+exclusion or security assertion is broadened. Original checker versions
+remain in predecessor commits. V6 still requires exact candidate qualification;
+prior source evidence does not substitute for that work.

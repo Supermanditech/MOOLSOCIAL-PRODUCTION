@@ -344,14 +344,14 @@ function Test-RedmiReviewBuySource {
 
 function Test-IntegratedStoreBuyReviewSource {
   param([string]$SourceCommit)
-  if ($SourceCommit -cne 'fa7a99941de93c07e22dabf55d30f568ad5a826b') { return $false }
+  if ($SourceCommit -cne '10fb79b4469203371edf888e7d4b8aacb3546581') { return $false }
   $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
   $expectedBranch = switch ($canonicalRoot) {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
       'work/codex-ui/store-procurement-bridge-20260912'
     }
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v5-20260912' {
-      'integration/moolsocial/store-buy-final-v5-20260912'
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v6-20260912' {
+      'integration/moolsocial/store-buy-final-v6-20260912'
     }
     default { $null }
   }
