@@ -6,6 +6,14 @@ Latest explicit founder instruction,12 September2026 IST: complete real-user dev
 
 This supersedes the earlier stop-before-implementation instruction retained below. Authority: external redmi-r66-9-round-1/founder-uat-then-child-implementation-no-apk-directive-1.json SHA256F98BC8E7637675425CA1B3D4305DB74CE13EFDFAB4DB3BDF423451B16483A84B. Goal created in this chat; no runtime implementation started while the device round remains incomplete.
 
+## r66.9 round 1 checkpoint26 - review cold-draft loss and provider bindings
+
+Counts unchanged: **12 originals closed,30 open;12 open UAT children**. Captures989-1001 finish the remaining review restart case. Eligible s-tomato starts empty; a four-star25-character unsent draft is visible995. Force-stop/ordinary launch reports Status ok/COLD. Reopen exact product using explicit warm intent, then Write review1000 loses both rating and text. This extends REVIEW-BACK-DRAFT-001, not another child. No Save/Cancel/dismissal before restart; no publication. Empty editor cancelled1001. Normal display, empty cart and Saved membership remain unchanged.
+
+Read-only provider reconciliation binds exact current source files: comparisonSource and shoppingAreaSource are unbound at Buy session entry; the review catalogue uses explicit development regions/Jodhpur. Missing comparison wiring/authoritative offers and Google Maps place-to-region service remain unresolved. MEDIA-002 has Buy validation/display contracts, but WorkspaceCatalogueItem/public conversion still has no supplier-media list; real supplier publication/normalization and Redmi playback remain unqualified. These are explicit dependencies, not passes from fallback screens or host fixtures. See provider-binding-reconciliation-1.json SHA256 0536D38990718C98D913350E81168FA45F216C19DA3877003DF5B49422202AF0.
+
+Checkpoint external redmi-r66-9-round-1/round-progress-checkpoint-26.json SHA256 6AC23DF4631EEC808303E17E99E3CEFC75483EC9218CA4E03A5851DAB5314958 binds13 fresh captures, receipts, review extent and source reconciliation to the same r66.9 APK. Remaining cases are enumerated there; the full round/list is not complete and implementation remains paused. No source, Work ownership, provider, governance or APK change. Missing guessed filenames were resolved through bounded exact-path discovery without retrying any device action.
+
 ## r66.9 round 1 checkpoint25 - Wholesale filters, Help closure and delivery return child
 
 **12 original entries closed,30 open;12 open UAT children.** Original open breakdown14 partial,15 failed connected replay,1 supplier-media case not exercised. HELP-CONTEXT-001 is closed against its original shopping-help destination and connected Settings/order return acceptance using933-957, including200% text. Closure evidence help-context-redmi-closure-1.json SHA256 1468288378882AE38078EAA972D23FB63E40893B60A29F355E14A5029F867449; no live support or authenticated-service acceptance implied.
