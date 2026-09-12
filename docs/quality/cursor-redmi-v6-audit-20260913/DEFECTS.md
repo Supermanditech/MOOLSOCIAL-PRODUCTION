@@ -62,3 +62,13 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Customer impact: shopper abandoning sign-in is taken out of the app on the next Back and must reopen it. No crash or stored-data loss is claimed.
 - Source correlation: Buy _openBuyProfile pushes the shared route; global_security_v2.dart _beginSignIn uses context.go('/sign-in') and only securityLocation for return/cancel. Route-stack restoration needs later shared routing assessment; source correlation is not an isolated-test proof. No code changed.
 - Prior ACCOUNT-017 and ACCOUNT-019 remain narrow first-return passes; they do not qualify this second Back to Buy. PD-040 return requirements remain unresolved end to end.
+
+
+## RV6-D007 - Related-product Back skips the preceding product detail
+- Status: open; confirmed device navigation defect. Severity: moderate.
+- Reproduction: Saved Shop wheat atta2 > product details > scroll to You may also like > related wheat from Sardarpura Supermart > Android Back.
+- Actual: Back returns directly to Saved Shop instead of the preceding Mool Market product detail and its position. Customer must reopen the original product and find the previous information again.
+- Expected: exploring a related offer preserves the preceding product-detail context for Back; leaving the original product then returns to its Saved/catalogue origin.
+- Evidence:281-product-lower-content shows related card;282-related-canonical-product shows selected different seller;283-related-back shows Saved. The original observation CONTENT-ROUND19-03 is now classified as this failure after source reconciliation. No cart/bookmark loss or crash claimed.
+- Source correlation: buy_v2_views.dart3289/3295 related card calls session.openProduct without preserveComparisonOrigin. buy_v2_session.dart8318-8355 only pushes prior selected product when that flag is true;closeProduct8488-8506 restores the root product return after an empty origin stack. Source explains the observed shortcut;no implementation or test modification performed.
+- Ownership: Buy product continuation navigation/session. Future correction must preserve full previous product context and existing cart/order/Store return paths;this audit does not implement it.
