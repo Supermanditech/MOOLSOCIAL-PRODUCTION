@@ -19,3 +19,7 @@ Turmeric powder 97 has no eligible delivered purchase in the current review stat
 ## B-004 — Bulk checkout delivery estimate
 
 Rice 4 / five 25 kg packs reaches Confirm order with retained Work address and ₹8150 after the ₹300 coupon. Delivery is unavailable; Check delivery returns explicit unavailable feedback (088–089). The button is wired to session.refreshCheckoutDeliveryEstimates in buy_v2_views.dart near 7252. Successful authoritative estimate, recovery after provider availability and subsequent eligible order placement are not qualified. Exact runtime provider binding remains to be traced; this is not proof of a service outage or a new customer-facing implementation defect. No order/payment was submitted. Other checkout controls and Back remain independently testable.
+
+## B-005 — live order tracking refresh
+
+MS-NEW-09 opens with last-known preparation status and no live delivery updates. Refresh shows Order updates are unavailable and labels the retained estimate update unavailable (111–112). Positive provider recovery, changing courier/location/ETA and terminal-state transitions are not qualified. Recorded-order UI and safe nested navigation remain testable. No order state was changed and no contact or message sent. Runtime source binding and safe fixture alternatives remain to be reconciled before final coverage disposition.
