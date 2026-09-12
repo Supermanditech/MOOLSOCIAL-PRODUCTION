@@ -1,5 +1,16 @@
 # Fresh Redmi defect register
 
+## Three-line category controls checkpoint - 12 September 2026
+
+**R668-REQ-STORE-CATEGORY-COMPACT-001 and R668-REQ-OFFERS-HEADER-001 icon criterion implemented and locally qualified; tickets remain OPEN.** Shop/Wholesale home, Store and Offers now use the same three-line menu icon for category selection. Only three runtime icon values changed; existing48px targets, accessible labels, tooltips, categories and navigation remain. Unrelated product-grid actions retain their own icon.
+
+Connected partner-catalogue/copy-hierarchy/responsive-grid tests:213 passed,0 failed,0 skipped. Initial focused6 journeys pass; final4 Offers journeys pass after adding explicit header captures. Six actual Flutter control captures reviewed across Shop, Store and Offers, including200% portrait/landscape and reduced motion. Final analysis and UI locks pass. Runtime source is identical across these runs; the final test edit only added Offers header captures after existing visibility and icon assertions. Other generated images are retained but are not counted as reviewed icon evidence.
+
+Evidence: external redmi-r66-9-round-1/category-icon-implementation-20260912-0430/local-qualification-1.json SHA256 BA7A668A00460560B43309A9B1480449379F84607F0BF8EA40818E78E14CBC00. Connected receipt singlechat-r669-category-icon-connected-20260912-a.result.json; stdout SHA256 83391414ED588F76CFA859E276881081B721B5F5CAB1C1897C30C8C3BAFF19FC. Required tested parent08820cce22abe66a0fa842ce0c6bf2d9edba8285; exact three source/test hashes and six images retained. No new APK, device closure, integration or provider publication qualification.
+
+**Existing MEDIA-001 follow-up remains:** reviewed r669-three-line-shop-category.png shows the Fresh picks Add button overlapping part of the illustration disclosure. This connected media issue is not caused or fixed by changing category icons. Retain it for correction within the existing media finding; do not close MEDIA-001 from the thumbnail-only fix. Counts remain13 closed/29 open originals,12 open UAT children and2 earlier implementation children.
+
+
 ## Cart illustration disclosure fitment checkpoint - 12 September 2026
 
 **R668-AUDIT-MEDIA-001 Cart follow-up implemented and locally qualified; remains OPEN for Redmi verification.** The shared illustration disclosure now measures complete unwrapped words with inherited typography and the chosen text scale. If an intact word cannot fit, it uses the existing neutral photo placeholder. Larger images keep their readable disclosure and original proportions. The existing image-loading fallback also omits its optional visual label when the small frame cannot hold both icon and label, retaining semantic product identity.

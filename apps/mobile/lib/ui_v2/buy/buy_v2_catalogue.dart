@@ -549,7 +549,7 @@ class _OffersCategoryControl extends StatelessWidget {
               key: const ValueKey('buy-offers-category-control'),
               label: 'Choose offer category. Current category $label',
               tooltip: 'Offer categories · $label',
-              icon: Icons.grid_view_rounded,
+              icon: Icons.menu_rounded,
               emphasized: true,
               onTap: onTap,
             ),
@@ -3120,7 +3120,7 @@ class _CatalogueCategoryPickerButton extends StatelessWidget {
           'Choose ${session.destination.label} category. '
           'Current category ${selected.label}',
       tooltip: '${session.destination.label} categories · ${selected.label}',
-      icon: Icons.grid_view_rounded,
+      icon: Icons.menu_rounded,
       emphasized: true,
       onTap: () => showBuyV2CategoryPicker(context, session),
     );
@@ -6784,7 +6784,7 @@ class _PagedFullStoreCatalogueState extends State<_PagedFullStoreCatalogue> {
                     tooltip:
                         'Store categories · '
                         '${_category == 'all' ? 'All products' : category?.label ?? 'Choose category'}',
-                    icon: Icons.grid_view_rounded,
+                    icon: Icons.menu_rounded,
                     active: _category != 'all',
                     onTap: _chooseCategory,
                   ),

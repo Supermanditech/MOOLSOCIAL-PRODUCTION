@@ -2560,12 +2560,13 @@ void main() {
       await tester.pumpWidget(app(session));
       await tester.pumpAndSettle();
 
+      await captureR66Visual(tester, 'r669-three-line-shop-category');
       final categoryAction = find.byKey(const ValueKey('buy-category-picker'));
       expect(tester.getSize(categoryAction), const Size(48, 48));
       expect(
         find.descendant(
           of: categoryAction,
-          matching: find.byIcon(Icons.grid_view_rounded),
+          matching: find.byIcon(Icons.menu_rounded),
         ),
         findsOneWidget,
       );
@@ -8382,10 +8383,12 @@ void main() {
           expect(
             find.descendant(
               of: categoryControl,
-              matching: find.byIcon(Icons.grid_view_rounded),
+              matching: find.byIcon(Icons.menu_rounded),
             ),
             findsOneWidget,
           );
+          await captureR66Visual(tester,
+            'r669-three-line-offers-${size.width.toInt()}-$reducedMotion');
           final shopCategory = session.selectedCategoryId;
           await tester.tap(categoryControl);
           await tester.pumpAndSettle();

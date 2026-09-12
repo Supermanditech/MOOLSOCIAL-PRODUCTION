@@ -390,7 +390,7 @@ void main() {
         expect(
           find.descendant(
             of: find.byKey(const ValueKey('buy-offers-category-control')),
-            matching: find.byIcon(Icons.grid_view_rounded),
+            matching: find.byIcon(Icons.menu_rounded),
           ),
           findsOneWidget,
         );
@@ -1016,7 +1016,7 @@ void main() {
           expect(
             find.descendant(
               of: categoryControl,
-              matching: find.byIcon(Icons.grid_view_rounded),
+              matching: find.byIcon(Icons.menu_rounded),
             ),
             findsOneWidget,
           );
