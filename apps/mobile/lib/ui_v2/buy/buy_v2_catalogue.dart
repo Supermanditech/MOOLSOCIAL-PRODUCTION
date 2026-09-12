@@ -9271,16 +9271,17 @@ class _CataloguePromotionRail extends StatelessWidget {
             BuyV2ShoppingIntent.flexibleRestocking,
           ),
         ),
-        BuyV2PromotionCard(
-          key: const ValueKey('buy-promotion-wholesale-shop'),
-          title: 'Shopping for home?',
-          detail: 'Browse retail packs sized for home',
-          icon: Icons.shopping_bag_outlined,
-          accent: BuyV2Colors.green,
-          sequenceIndex: 1,
-          onTap: () =>
-              session.chooseShoppingIntent(BuyV2ShoppingIntent.homeShopping),
-        ),
+        if (!session.isStoreProcurement)
+          BuyV2PromotionCard(
+            key: const ValueKey('buy-promotion-wholesale-shop'),
+            title: 'Shopping for home?',
+            detail: 'Browse retail packs sized for home',
+            icon: Icons.shopping_bag_outlined,
+            accent: BuyV2Colors.green,
+            sequenceIndex: 1,
+            onTap: () =>
+                session.chooseShoppingIntent(BuyV2ShoppingIntent.homeShopping),
+          ),
       ],
       BuyV2Destination.medicine => [
         BuyV2PromotionCard(

@@ -11,6 +11,8 @@ import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/core/design/mool_design_system.dart';
@@ -24,6 +26,96 @@ import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+
+// Host-only authoritative-response fixtures. These never qualify live grants.
+class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
+  WorkProcurementBookmark? value;
+  @override
+  Future<WorkProcurementBookmark?> read(String account, String store) async =>
+      value?.context.accountId == account && value?.context.storeId == store
+      ? value
+      : null;
+  @override
+  Future<bool> save(WorkProcurementBookmark bookmark) async {
+    value = bookmark;
+    return true;
+  }
+
+  @override
+  Future<bool> clear(String account, String store) async {
+    value = null;
+    return true;
+  }
+}
+
+class _StorePurchaseState implements BuyV2CustomerStateStore {
+  _StorePurchaseState(this.ownerScope);
+  @override
+  final String ownerScope;
+  BuyV2CustomerStateSnapshot? value;
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => value;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    value = snapshot;
+    return true;
+  }
+}
+
+class _StorePurchaseCommerce implements BuyV2CommerceAdapter {
+  _StorePurchaseCommerce(this.context, {this.orders = const []});
+  final BuyV2ProcurementContext context;
+  final List<BuyV2Order> orders;
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async {
+    final expiry = DateTime.now().add(const Duration(hours: 1));
+    return BuyV2CommerceSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      orders: orders,
+      businessVerified: true,
+      businessVerificationState: BuyV2BusinessVerificationState.verified,
+      procurementBuyerGrant: BuyV2ProcurementBuyerGrant(
+        accountId: context.accountId,
+        storeId: context.storeId,
+        approved: true,
+        validUntil: expiry,
+      ),
+      products: BuyV2Catalogue.allProducts
+          .where((p) => p.destination == BuyV2Destination.wholesale)
+          .map(
+            (p) => p.copyWith(
+              storeId: p.storeId ?? 'fixture-supplier',
+              procurementSupplierGrant: BuyV2ProcurementSupplierGrant(
+                workspaceId: 'fixture-supply-workspace',
+                storeId: p.storeId ?? 'fixture-supplier',
+                role: BuyV2SupplierWorkspaceRole.wholesaler,
+                approved: true,
+                listingId: p.id,
+                productCanonicalId: p.canonicalId,
+                offerId: 'fixture-offer-${p.id}',
+                offerRevision: '1',
+                channel: BuyV2SupplierListingChannel.wholesale,
+                published: true,
+                validUntil: expiry,
+              ),
+            ),
+          )
+          .toList(),
+    );
+  }
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: false,
+        customerMessage: 'Alerts unavailable in this fixture.',
+      );
+  @override
+  dynamic noSuchMethod(Invocation invocation) => throw StateError(
+    'Unexpected Store fixture command: ${invocation.memberName}',
+  );
+}
 
 class _TrackingOrdersFixture extends BuyV2Session {
   _TrackingOrdersFixture({required super.core});
@@ -405,6 +497,7 @@ void main() {
     Size viewport = const Size(360, 800),
     double textScale = 1.4,
     Widget Function(Widget child)? wrapper,
+    WorkProcurementController Function()? procurementFactory,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = viewport;
@@ -436,17 +529,44 @@ void main() {
     addTearDown(journey.dispose);
     addTearDown(work.dispose);
     if (chat != null) addTearDown(chat.dispose);
+    Widget app = MoolSocialApp(
+      session: journey,
+      workSession: work,
+      chatSession: chat,
+      initialLocation: route,
+    );
+    if (procurementFactory != null) {
+      final core = BuySession();
+      final consumer = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(consumer.dispose);
+      final router = GoRouter(
+        initialLocation: route,
+        routes: [
+          GoRoute(
+            path: '/app/work/workspace/dashboard',
+            builder: (_, _) => WorkWorkspaceDashboardScreen(
+              session: work,
+              procurementSession: consumer,
+              useStoreProcurement: true,
+              procurementControllerFactory: procurementFactory,
+              accountAuthenticated: true,
+              accountIdentity: journey.accountIdentity,
+            ),
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      app = MaterialApp.router(
+        theme: MoolTheme.light(),
+        routerConfig: router,
+        debugShowCheckedModeBanner: false,
+      );
+    }
     await tester.pumpWidget(
       RepaintBoundary(
         key: const Key('store-review-root'),
-        child: (wrapper ?? (child) => child)(
-          MoolSocialApp(
-            session: journey,
-            workSession: work,
-            chatSession: chat,
-            initialLocation: route,
-          ),
-        ),
+        child: (wrapper ?? (child) => child)(app),
       ),
     );
     await tester.pumpAndSettle();
@@ -16358,6 +16478,36 @@ void main() {
       tester,
     ) async {
       final work = liveStore();
+      final bookmarks = _StorePurchaseBookmarks();
+      final states = <String, _StorePurchaseState>{};
+      WorkProcurementController createController() => WorkProcurementController(
+        currentAccountId: () => 'fixture-purchaser',
+        currentStoreId: () => work.activeWorkspace?.id,
+        storeApproved: () => work.activeWorkspace?.verified == true,
+        bookmarks: bookmarks,
+        stateStoreFactory: (scope) =>
+            states.putIfAbsent(scope, () => _StorePurchaseState(scope)),
+        sessionFactory: (identity, state) {
+          final core = BuySession();
+          addTearDown(core.dispose);
+          return BuyV2Session(
+            core: core,
+            procurementIdentity: identity,
+            customerStateStore: state,
+            commerceAdapter: _StorePurchaseCommerce(identity.value!),
+            reviewDataEnabled: false,
+          );
+        },
+      );
+      final controller = createController();
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isTrue,
+      );
+      expect(await controller.leave(), isTrue);
       work.addOrUpdateWorkspaceProduct(workspaceMasterCatalogue.first);
       expect(
         work.updateWorkspaceStock(
@@ -16374,12 +16524,17 @@ void main() {
         work: work,
         viewport: viewport,
         textScale: scale,
+        procurementFactory: () => controller,
       );
-      final buy = tester
+      final consumer = tester
           .widget<WorkWorkspaceDashboardScreen>(
             find.byType(WorkWorkspaceDashboardScreen),
           )
           .procurementSession;
+      final buy = controller.session!;
+      expect(identical(buy, consumer), isFalse);
+      final consumerQuery = consumer.query;
+      final consumerCart = consumer.cartTotal;
       buy.openDestination(BuyV2Destination.wholesale);
       final cartProduct = buy.visibleProducts.first;
       expect(buy.addProduct(cartProduct.id), isTrue);
@@ -16444,6 +16599,9 @@ void main() {
         greaterThanOrEqualTo(48),
       );
       expect(buy.query, oilQuery);
+      expect(consumer.query, consumerQuery);
+      expect(consumer.cartTotal, consumerCart);
+      expect(buy.procurementScopeCurrent, isTrue);
       expect(buy.destination, BuyV2Destination.wholesale);
       expect(buy.selectedFilter, 'nearby');
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
@@ -16547,17 +16705,17 @@ void main() {
       );
       expect(tester.takeException(), isNull);
       await captureStoreView(tester, 'restock-cleared-catalogue-$scale');
+      expect(
+        find.byKey(const ValueKey('buy-promotion-wholesale-shop')),
+        findsNothing,
+      );
+      expect(find.text('Shopping for home?'), findsNothing);
       if (scale > 1.4) {
         for (final (key, title, detail) in const [
           (
             'buy-promotion-wholesale-restock',
             'Flexible restocking',
             'Compare products with lower minimum packs',
-          ),
-          (
-            'buy-promotion-wholesale-shop',
-            'Shopping for home?',
-            'Browse retail packs sized for home',
           ),
         ]) {
           final promotion = find.byKey(ValueKey(key));
@@ -16588,6 +16746,36 @@ void main() {
       );
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
       expect(tester.takeException(), isNull);
+      // Recreate the owned session as on process restart, retaining only its
+      // scoped stores. No consumer cart or current catalogue reconstruction.
+      final origin = buy.procurementContext!.customerStateOwnerScope;
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'stockStatement',
+        ),
+        isTrue,
+      );
+      buy.updateQuery('restart search');
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox.shrink());
+      final restarted = createController();
+      addTearDown(restarted.dispose);
+      expect(
+        await restarted.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+          restoreOnly: true,
+        ),
+        isTrue,
+      );
+      expect(restarted.bookmark!.returnTo, 'stockStatement');
+      expect(
+        restarted.session!.procurementContext!.customerStateOwnerScope,
+        origin,
+      );
+      expect(restarted.session!.query, 'restart search');
+      expect(restarted.session!.quantityFor(cartProduct.id), cartQuantity);
     });
   }
 
@@ -21060,21 +21248,58 @@ void main() {
       final work = storeViewFixture(null, _ContactDraftFixtureStore());
       final storeId = work.activeWorkspace!.id;
       final originalCustomerOrder = work.currentWorkspaceOrderId;
+      final seedCore = BuySession();
+      final seed = BuyV2Session(core: seedCore);
+      final order = seed.orders.firstWhere(
+        (order) => order.destination == BuyV2Destination.wholesale,
+      );
+      seed.dispose();
+      seedCore.dispose();
+      final controller = WorkProcurementController(
+        currentAccountId: () => work.contactDraftStore?.accountScope,
+        currentStoreId: () => work.activeWorkspace?.id,
+        storeApproved: () => work.activeWorkspace?.verified == true,
+        bookmarks: _StorePurchaseBookmarks(),
+        stateStoreFactory: _StorePurchaseState.new,
+        sessionFactory: (identity, state) {
+          final core = BuySession();
+          addTearDown(core.dispose);
+          return BuyV2Session(
+            core: core,
+            procurementIdentity: identity,
+            customerStateStore: state,
+            reviewDataEnabled: false,
+            commerceAdapter: _StorePurchaseCommerce(
+              identity.value!,
+              orders: [order],
+            ),
+          );
+        },
+      );
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isTrue,
+      );
+      expect(await controller.leave(), isTrue);
       await mount(
         tester,
         route: '/app/work/workspace/dashboard',
         work: work,
         viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
         textScale: scale,
+        procurementFactory: () => controller,
       );
-      final buy = tester
+      final consumer = tester
           .widget<WorkWorkspaceDashboardScreen>(
             find.byType(WorkWorkspaceDashboardScreen),
           )
           .procurementSession;
-      final order = buy.orders.firstWhere(
-        (order) => order.destination == BuyV2Destination.wholesale,
-      );
+      final buy = controller.session!;
+      buy.openDestination(BuyV2Destination.wholesale);
+      final consumerOrder = consumer.selectedOrderId;
       final now = DateTime.now();
       final linked = WorkspacePurchaseRecord.fromBuyOrder(
         order: order,
@@ -21109,9 +21334,15 @@ void main() {
       await reveal(tester, track);
       await tester.tap(track);
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget,
+        reason: 'notice=${work.noticeMessage}; scope=${controller.scopeCurrent}; '
+          'account=${work.contactDraftStore?.accountScope}; order=${buy.selectedOrderId}; '
+          'view=${buy.view}; available=${buy.orders.map((o) => o.id).toList()}; '
+          'return=${controller.bookmark?.returnTo}');
       expect(buy.view, BuyV2View.tracking);
       expect(buy.selectedOrderId, linked.orderId);
+      expect(buy.procurementScopeCurrent, isTrue);
+      expect(consumer.selectedOrderId, consumerOrder);
       expect(work.currentWorkspaceOrderId, originalCustomerOrder);
       expect(work.workspaceStockMovements, isEmpty);
       expect(work.workspaceInvoices, isEmpty);
@@ -21151,22 +21382,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('buy-v2-screen')), findsNothing);
-      expect(find.text('Purchase tracking unavailable'), findsOneWidget);
-      if (scale == 1) {
-        expect(
-          tester
-              .getSize(find.byKey(const Key('work-tracking-unavailable')))
-              .height,
-          lessThan(300),
-        );
-      }
+      expect(controller.session, isNull);
+      expect(consumer.selectedOrderId, consumerOrder);
       await captureStoreView(tester, 'supply-tracking-scope-changed-$scale');
-      final returnAction = find.byKey(
-        const Key('work-tracking-unavailable-action'),
-      );
-      await reveal(tester, returnAction);
-      expect(returnAction.hitTestable(), findsOneWidget);
-      await tester.tap(returnAction);
+      final purchases = find.byKey(const Key('work-incoming-purchases'));
+      await reveal(tester, purchases);
+      expect(purchases.hitTestable(), findsOneWidget);
+      await tester.tap(purchases);
       await tester.pumpAndSettle();
       expect(
         find.byKey(PageStorageKey('work-purchases-other-store-false')),

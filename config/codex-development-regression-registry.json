@@ -10,6 +10,16 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4605-STORE-SCOPED-PROCUREMENT-RESTORE-BOUNDARY",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "work", "buy", "integration", "testing"],
+      "mistake": "Scoped Store catalogue replay raises setState during build when embedded Buy begins commerce restoration in initState; the original DASH10 fixture also seeded consumer rather than isolated Store state.",
+      "rootCause": "Synchronous restoreCommerce notification reaches the Store AnimatedBuilder while its embedded Buy widget is being mounted. Store procurement requires its own authenticated context and durable state instead of the shared consumer session.",
+      "prevention": "Defer initial Buy restoration until the first frame with a mounted guard; replay normal and 200% embedded Store journeys using scoped commerce-response fixtures, preserving all existing cart, Back, recovery and geometry assertions. Fixtures never qualify live buyer or supplier authority. Inspect exact patch context; a stale-context ownership patch failed safely with no files changed before correction.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/work_store_atomic_operations_test.dart"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
       "id": "REG-20260912-4604-STORE-BUY-MERGED-RECOVERY-TEST-CONTRACT",
       "attemptControlIncident": "A composed tool sequence continued into a test after the gate rejected a claim list missing the mechanically changed registry. That run finished 2/2 but is excluded from qualification. Correct the complete seven-owner invocation and require a successful gate result before launching the fresh run; do not chain unguarded follow-up actions after a possibly failing gate.",
       "status": "registered_correction_in_progress",

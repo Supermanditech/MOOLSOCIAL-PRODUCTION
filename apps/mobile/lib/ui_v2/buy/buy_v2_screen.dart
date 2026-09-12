@@ -395,8 +395,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         unawaited(_restoreSessionState());
       });
     } else {
-      _applyInitialState();
-      unawaited(_restoreSessionState());
+      // Both explicit tracking entry and commerce restoration notify listeners,
+      // including an embedding Store parent. Defer them until mounting ends.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _applyInitialState();
+        unawaited(_restoreSessionState());
+      });
     }
     _lastSearchDestination = widget.session.destination;
     _presentedQuickOrderId = _deliveryOrder?.id;

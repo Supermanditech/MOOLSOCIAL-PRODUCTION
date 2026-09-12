@@ -428,6 +428,8 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
   const WorkWorkspaceDashboardScreen({
     required this.session,
     required this.procurementSession,
+    this.useStoreProcurement = false,
+    this.procurementControllerFactory,
     this.accountIdentity,
     this.accountAuthenticated = false,
     this.initialSection,
@@ -436,6 +438,8 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
 
   final WorkSession session;
   final BuyV2Session procurementSession;
+  final bool useStoreProcurement;
+  final WorkProcurementController Function()? procurementControllerFactory;
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated;
   final String? initialSection;
@@ -448,6 +452,9 @@ class WorkWorkspaceDashboardScreen extends StatefulWidget {
 class _WorkWorkspaceDashboardScreenState
     extends State<WorkWorkspaceDashboardScreen> {
   WorkSession get session => widget.session;
+  WorkProcurementController? _storeProcurement;
+  BuyV2Session get _activeProcurement =>
+      _storeProcurement?.session ?? widget.procurementSession;
   final _workspaceMessengerKey = GlobalKey<ScaffoldMessengerState>();
   late final TextEditingController _searchController;
   final FocusNode _searchFocus = FocusNode(debugLabel: 'workspace-search');
@@ -491,6 +498,21 @@ class _WorkWorkspaceDashboardScreenState
   void initState() {
     super.initState();
     session.clearMessages();
+    if (widget.useStoreProcurement) {
+      _storeProcurement =
+          widget.procurementControllerFactory?.call() ??
+          WorkProcurementController(
+            currentAccountId: () => widget.accountAuthenticated
+                ? session.contactDraftStore?.accountScope
+                : null,
+            currentStoreId: () => session.activeWorkspace?.id,
+            storeApproved: () => session.activeWorkspace?.verified == true,
+          );
+      session.addListener(_procurementIdentityChanged);
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) unawaited(_restoreProcurement());
+      });
+    }
     _searchController = TextEditingController(
       text: session.workspaceSearchQuery,
     );
@@ -531,6 +553,8 @@ class _WorkWorkspaceDashboardScreenState
 
   @override
   void dispose() {
+    session.removeListener(_procurementIdentityChanged);
+    _storeProcurement?.dispose();
     _saleSearchController.dispose();
     _procurementRevealTimer?.cancel();
     _searchController.dispose();
@@ -1105,7 +1129,7 @@ class _WorkWorkspaceDashboardScreenState
             ? (_trackedPurchase == null ? 'restock' : 'sourcing')
             : _operation.name,
         procurement: _view == _WorkspaceControlView.procurement
-            ? widget.procurementSession
+            ? _activeProcurement
             : null,
         onSelect: (operation) => unawaited(
           _navigateFromCounterDraft(() {
@@ -1249,7 +1273,7 @@ class _WorkWorkspaceDashboardScreenState
             onDismiss: session.dismissWorkspaceAlert,
           ),
           _WorkspaceControlView.procurement => AnimatedBuilder(
-            animation: widget.procurementSession,
+            animation: _activeProcurement,
             builder: (context, _) {
               if (_trackedPurchase != null && !_trackingPurchaseAvailable) {
                 return ListView(
@@ -1268,7 +1292,7 @@ class _WorkWorkspaceDashboardScreenState
                 );
               }
               return _StoreProcurementSurface(
-                session: widget.procurementSession,
+                session: _activeProcurement,
                 accountIdentity: widget.accountIdentity,
                 accountAuthenticated: widget.accountAuthenticated,
                 ready: _procurementReady,
@@ -1286,7 +1310,7 @@ class _WorkWorkspaceDashboardScreenState
             focusedOrderId: _focusedOrderId,
             focusedCustomerId: _focusedCustomerId,
             session: session,
-            procurementSession: widget.procurementSession,
+            procurementSession: _activeProcurement,
             catalogueKey: _catalogueKey,
             counterKey: _counterKey,
             saleQuery: _saleSearchController.text,
@@ -1665,12 +1689,16 @@ class _WorkWorkspaceDashboardScreenState
       }
     }
     session.clearMessages();
+    if (operation == _WorkspaceOperation.direct && _storeProcurement != null) {
+      unawaited(_showProcurement(returnOperation: operation));
+      return;
+    }
     if (operation == _WorkspaceOperation.direct) {
       if (!_directFilterApplied) {
-        _filterBeforeDirect = widget.procurementSession.selectedFilter;
+        _filterBeforeDirect = _activeProcurement.selectedFilter;
       }
-      widget.procurementSession.openDestination(BuyV2Destination.wholesale);
-      widget.procurementSession.chooseFilter('manufacturer');
+      _activeProcurement.openDestination(BuyV2Destination.wholesale);
+      _activeProcurement.chooseFilter('manufacturer');
       _directFilterApplied = true;
     } else if (!retainDirectFilter) {
       _releaseDirectFilter();
@@ -1718,16 +1746,34 @@ class _WorkWorkspaceDashboardScreenState
     _showOperation(_WorkspaceOperation.paidWork);
   }
 
-  void _showProcurement({
+  Future<void> _showProcurement({
     _WorkspaceOperation? returnOperation,
     String? productId,
     String? searchQuery,
-  }) {
+  }) async {
     _searchFocus.unfocus();
+    final controller = _storeProcurement;
+    if (controller != null) {
+      final opened = await controller.open(
+        purpose: returnOperation == _WorkspaceOperation.direct
+            ? BuyV2ProcurementPurpose.buyDirect
+            : returnOperation == _WorkspaceOperation.groupBuying
+            ? BuyV2ProcurementPurpose.groupBulkBuying
+            : BuyV2ProcurementPurpose.restock,
+        returnTo: returnOperation?.name ?? 'dashboard',
+      );
+      if (!mounted) return;
+      if (!opened) {
+        session.showNotice(
+          'Your Store purchase could not be reopened. Please try again.',
+        );
+        return;
+      }
+    }
     session.clearMessages();
     if (returnOperation != _WorkspaceOperation.direct) _releaseDirectFilter();
     if (searchQuery != null) {
-      widget.procurementSession.updateQuery(searchQuery.trim());
+      _activeProcurement.updateQuery(searchQuery.trim());
     }
     setState(() {
       _trackedPurchase = null;
@@ -1747,6 +1793,9 @@ class _WorkWorkspaceDashboardScreenState
     final original = _trackedPurchase;
     if (original == null ||
         !widget.accountAuthenticated ||
+        (_storeProcurement != null &&
+            (!_storeProcurement!.scopeCurrent ||
+                original.accountScope != session.contactDraftStore?.accountScope)) ||
         original.shipmentId != original.orderId ||
         session.activeWorkspace?.id != original.workspaceId) {
       return false;
@@ -1762,7 +1811,7 @@ class _WorkWorkspaceDashboardScreenState
         current.purchaseId != original.purchaseId) {
       return false;
     }
-    return widget.procurementSession.orders.any(
+    return _activeProcurement.orders.any(
       (order) =>
           order.id == original.orderId &&
           order.destination == BuyV2Destination.wholesale &&
@@ -1770,13 +1819,36 @@ class _WorkWorkspaceDashboardScreenState
     );
   }
 
-  void _showPurchaseTracking(String shipmentId) {
+  Future<void> _showPurchaseTracking(String shipmentId) async {
     final purchase = session.workspacePurchases
         .where((record) => record.shipmentId == shipmentId)
         .firstOrNull;
     if (purchase == null) {
       session.showNotice('This Store purchase is no longer available.');
       return;
+    }
+    final controller = _storeProcurement;
+    if (controller != null) {
+      if (purchase.accountScope != session.contactDraftStore?.accountScope ||
+          purchase.workspaceId != session.activeWorkspace?.id) {
+        session.showNotice(
+          'Tracking is not available for this Store purchase.',
+        );
+        return;
+      }
+      final opened = await controller.open(
+        purpose:
+            controller.bookmark?.context.purpose ??
+            BuyV2ProcurementPurpose.restock,
+        returnTo: _WorkspaceOperation.sourcing.name,
+      );
+      if (!mounted) return;
+      if (!opened) {
+        session.showNotice(
+          'Tracking is not available for this Store purchase.',
+        );
+        return;
+      }
     }
     _trackedPurchase = purchase;
     if (!_trackingPurchaseAvailable) {
@@ -1787,7 +1859,7 @@ class _WorkWorkspaceDashboardScreenState
     _searchFocus.unfocus();
     _releaseDirectFilter();
     session.clearMessages();
-    if (!widget.procurementSession.openTracking(purchase.orderId)) {
+    if (!_activeProcurement.openTracking(purchase.orderId)) {
       _trackedPurchase = null;
       session.showNotice('Tracking is not available for this Store purchase.');
       return;
@@ -1800,7 +1872,17 @@ class _WorkWorkspaceDashboardScreenState
     });
   }
 
-  void _leaveProcurement() {
+  Future<void> _leaveProcurement() async {
+    final controller = _storeProcurement;
+    if (controller != null && !await controller.leave()) {
+      if (mounted) {
+        session.showNotice(
+          'Your purchase return could not be saved. Please try again.',
+        );
+      }
+      return;
+    }
+    if (!mounted) return;
     final parent = _procurementReturnOperation;
     setState(() {
       _trackedPurchase = null;
@@ -1819,10 +1901,58 @@ class _WorkWorkspaceDashboardScreenState
   void _releaseDirectFilter() {
     if (!_directFilterApplied) return;
     _directFilterApplied = false;
-    if (widget.procurementSession.selectedFilter == 'manufacturer') {
-      widget.procurementSession.chooseFilter(_filterBeforeDirect);
+    if (_activeProcurement.selectedFilter == 'manufacturer') {
+      _activeProcurement.chooseFilter(_filterBeforeDirect);
     }
     _filterBeforeDirect = null;
+  }
+
+  void _procurementIdentityChanged() {
+    final controller = _storeProcurement;
+    if (controller == null ||
+        controller.bookmark == null ||
+        controller.scopeCurrent) {
+      return;
+    }
+    controller.invalidateIfChanged();
+    if (mounted) {
+      setState(() {
+        _trackedPurchase = null;
+        _procurementReturnOperation = null;
+        if (_view == _WorkspaceControlView.procurement) {
+          _view = _WorkspaceControlView.dashboard;
+        }
+      });
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant WorkWorkspaceDashboardScreen oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session) {
+      oldWidget.session.removeListener(_procurementIdentityChanged);
+      session.addListener(_procurementIdentityChanged);
+    }
+    _procurementIdentityChanged();
+  }
+
+  Future<void> _restoreProcurement() async {
+    final controller = _storeProcurement;
+    if (controller == null) return;
+    final restored = await controller.open(
+      purpose: BuyV2ProcurementPurpose.restock,
+      returnTo: 'dashboard',
+      restoreOnly: true,
+    );
+    if (!mounted || !restored || !controller.scopeCurrent) return;
+    setState(() {
+      _procurementReturnOperation = _WorkspaceOperation.values
+          .where((value) => value.name == controller.bookmark!.returnTo)
+          .firstOrNull;
+      _procurementProductId = null;
+      _procurementReady = true;
+      _view = _WorkspaceControlView.procurement;
+    });
   }
 
   bool _isNestedWorkspaceOperation(_WorkspaceOperation operation) => const {
@@ -2250,11 +2380,45 @@ class _StoreProcurementSurface extends StatefulWidget {
 class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
   bool _trackingOpened = false;
   bool _returnScheduled = false;
+  late BuyV2View _initialView;
+  late BuyV2Destination _initialDestination;
+  String? _initialProductId, _initialOrderId;
+
+  void _captureEntry() {
+    final session = widget.session;
+    _initialView = widget.orderId != null
+        ? BuyV2View.tracking
+        : widget.productId != null
+        ? BuyV2View.product
+        : session.isStoreProcurement
+        ? session.view
+        : BuyV2View.catalogue;
+    _initialDestination =
+        widget.orderId != null ||
+            (session.isStoreProcurement &&
+                session.destination == BuyV2Destination.orders)
+        ? BuyV2Destination.orders
+        : BuyV2Destination.wholesale;
+    _initialProductId =
+        widget.productId ??
+        (_initialView == BuyV2View.product ? session.selectedProductId : null);
+    _initialOrderId =
+        widget.orderId ??
+        (<BuyV2View>{
+              BuyV2View.tracking,
+              BuyV2View.orderItems,
+              BuyV2View.assist,
+            }.contains(_initialView)
+            ? session.selectedOrderId
+            : null);
+  }
 
   @override
   void initState() {
     super.initState();
+    _captureEntry();
     _trackingOpened =
+        !widget.session.isStoreProcurement &&
         widget.orderId != null &&
         widget.session.view == BuyV2View.tracking &&
         widget.session.selectedOrderId == widget.orderId;
@@ -2264,6 +2428,11 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
   @override
   void didUpdateWidget(covariant _StoreProcurementSurface oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (oldWidget.session != widget.session ||
+        oldWidget.productId != widget.productId ||
+        oldWidget.orderId != widget.orderId) {
+      _captureEntry();
+    }
     if (oldWidget.session != widget.session) {
       oldWidget.session.removeListener(_trackingChanged);
       widget.session.addListener(_trackingChanged);
@@ -2305,7 +2474,6 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
     final session = widget.session;
     final accountIdentity = widget.accountIdentity;
     final accountAuthenticated = widget.accountAuthenticated;
-    final productId = widget.productId;
     final ready = widget.ready;
     final onExit = widget.onExit;
     final onDestinationChanged = widget.onDestinationChanged;
@@ -2349,15 +2517,10 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
                         session: session,
                         accountIdentity: accountIdentity,
                         accountAuthenticated: accountAuthenticated,
-                        initialDestination: widget.orderId == null
-                            ? BuyV2Destination.wholesale
-                            : BuyV2Destination.orders,
-                        initialView: widget.orderId != null
-                            ? BuyV2View.tracking
-                            : productId == null
-                            ? BuyV2View.catalogue
-                            : BuyV2View.product,
-                        productId: productId,
+                        initialDestination: _initialDestination,
+                        initialView: _initialView,
+                        productId: _initialProductId,
+                        orderId: _initialOrderId,
                         initialCartScope: BuyV2CartScope.wholesale,
                         onExit: onExit,
                         onDestinationChanged: onDestinationChanged,

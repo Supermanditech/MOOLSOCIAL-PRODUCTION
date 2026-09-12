@@ -4,9 +4,55 @@ import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+
+class _ProcurementBookmarks implements WorkProcurementBookmarkStore {
+  final values = <String, WorkProcurementBookmark>{};
+  Completer<void>? holdRead;
+  bool failRead = false, failSave = false;
+  @override
+  Future<WorkProcurementBookmark?> read(
+    String accountId,
+    String storeId,
+  ) async {
+    await holdRead?.future;
+    if (failRead) throw StateError('Store bookmark unavailable');
+    return values[jsonEncode([accountId, storeId])];
+  }
+
+  @override
+  Future<bool> save(WorkProcurementBookmark bookmark) async {
+    if (failSave) return false;
+    values[jsonEncode([bookmark.context.accountId, bookmark.context.storeId])] =
+        bookmark;
+    return true;
+  }
+
+  @override
+  Future<bool> clear(String accountId, String storeId) async {
+    values.remove(jsonEncode([accountId, storeId]));
+    return true;
+  }
+}
+
+class _ProcurementCustomerState implements BuyV2CustomerStateStore {
+  _ProcurementCustomerState(this.ownerScope);
+  @override
+  final String ownerScope;
+  BuyV2CustomerStateSnapshot? value;
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => value;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    value = snapshot;
+    return true;
+  }
+}
 
 class _OrderJournalStorage extends FlutterSecureStorage {
   final values = <String, String>{};
@@ -449,6 +495,285 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  group('Store procurement controller', () {
+    late String account, store;
+    late _ProcurementBookmarks bookmarks;
+    late WorkProcurementController controller;
+    final states = <String, _ProcurementCustomerState>{};
+    WorkProcurementController create() => WorkProcurementController(
+      currentAccountId: () => account,
+      currentStoreId: () => store,
+      storeApproved: () => true,
+      bookmarks: bookmarks,
+      stateStoreFactory: (scope) =>
+          states.putIfAbsent(scope, () => _ProcurementCustomerState(scope)),
+      sessionFactory: (identity, state) => BuyV2Session(
+        core: BuySession(),
+        procurementIdentity: identity,
+        customerStateStore: state,
+        reviewDataEnabled: true,
+      ),
+    );
+    setUp(() {
+      account = 'a';
+      store = 's';
+      states.clear();
+      bookmarks = _ProcurementBookmarks();
+      controller = create();
+    });
+    tearDown(() => controller.dispose());
+    test('relaunch restores exact operation and scope', () async {
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'stockStatement',
+        ),
+        isTrue,
+      );
+      final scope =
+          controller.session!.procurementContext!.customerStateOwnerScope;
+      controller.dispose();
+      controller = create();
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+          restoreOnly: true,
+        ),
+        isTrue,
+      );
+      expect(
+        controller.session!.procurementContext!.customerStateOwnerScope,
+        scope,
+      );
+      expect(controller.bookmark!.returnTo, 'stockStatement');
+      expect(controller.session!.isStoreProcurement, isTrue);
+    });
+    test(
+      'leaving prevents auto reopen but retains operation for deliberate return',
+      () async {
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        );
+        final scope =
+            controller.session!.procurementContext!.customerStateOwnerScope;
+        expect(await controller.leave(), isTrue);
+        controller.dispose();
+        controller = create();
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+            restoreOnly: true,
+          ),
+          isFalse,
+        );
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+          ),
+          isTrue,
+        );
+        expect(
+          controller.session!.procurementContext!.customerStateOwnerScope,
+          scope,
+        );
+      },
+    );
+    test(
+      'account switch invalidates the previous session immediately',
+      () async {
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        );
+        account = 'b';
+        controller.invalidateIfChanged();
+        expect(controller.session, isNull);
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+            restoreOnly: true,
+          ),
+          isFalse,
+        );
+      },
+    );
+    test('late bookmark cannot open after Store changes', () async {
+      bookmarks.holdRead = Completer<void>();
+      final pending = controller.open(
+        purpose: BuyV2ProcurementPurpose.restock,
+        returnTo: 'dashboard',
+      );
+      store = 'other';
+      bookmarks.holdRead!.complete();
+      expect(await pending, isFalse);
+      expect(controller.session, isNull);
+    });
+    test(
+      'supply purpose changes preserve distinct resumable namespaces',
+      () async {
+        final scopes = <BuyV2ProcurementPurpose, String>{};
+        for (final purpose in BuyV2ProcurementPurpose.values) {
+          expect(
+            await controller.open(purpose: purpose, returnTo: 'dashboard'),
+            isTrue,
+          );
+          scopes[purpose] =
+              controller.session!.procurementContext!.customerStateOwnerScope;
+          controller.session!.updateQuery('retained-${purpose.name}');
+          for (var i = 0; i < 12; i++) {
+            await Future<void>.delayed(Duration.zero);
+          }
+        }
+        expect(
+          scopes.values.toSet().length,
+          BuyV2ProcurementPurpose.values.length,
+        );
+        controller.dispose();
+        controller = create();
+        for (final purpose in BuyV2ProcurementPurpose.values) {
+          expect(
+            await controller.open(purpose: purpose, returnTo: 'dashboard'),
+            isTrue,
+          );
+          expect(
+            controller.session!.procurementContext!.customerStateOwnerScope,
+            scopes[purpose],
+          );
+          expect(controller.session!.query, 'retained-${purpose.name}');
+        }
+      },
+    );
+    test('failed read preserves the operation and permits retry', () async {
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isTrue,
+      );
+      final original = controller.bookmark!.context.originOperationId;
+      controller.dispose();
+      controller = create();
+      bookmarks.failRead = true;
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isFalse,
+      );
+      expect(controller.session, isNull);
+      expect(
+        bookmarks.values.values.single.context.originOperationId,
+        original,
+      );
+      bookmarks.failRead = false;
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isTrue,
+      );
+      expect(controller.bookmark!.context.originOperationId, original);
+    });
+    test('failed return save does not claim a completed return', () async {
+      await controller.open(
+        purpose: BuyV2ProcurementPurpose.restock,
+        returnTo: 'sourcing',
+      );
+      final original = controller.session;
+      bookmarks.failSave = true;
+      expect(await controller.leave(), isFalse);
+      expect(controller.bookmark!.active, isTrue);
+      expect(controller.session, same(original));
+      bookmarks.failSave = false;
+      expect(await controller.leave(), isTrue);
+      expect(controller.bookmark!.active, isFalse);
+    });
+    test(
+      'failed initial save never creates an unpersisted purchase session',
+      () async {
+        bookmarks.failSave = true;
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+          ),
+          isFalse,
+        );
+        expect(controller.session, isNull);
+        expect(bookmarks.values, isEmpty);
+      },
+    );
+  });
+  group('Store procurement bookmark', () {
+    const bookmark = WorkProcurementBookmark(
+      context: BuyV2ProcurementContext(
+        accountId: 'account-a',
+        storeId: 'store-a',
+        purpose: BuyV2ProcurementPurpose.restock,
+        originOperationId: 'operation-a',
+      ),
+      returnTo: 'stockStatement',
+    );
+    test('round trip retains exact operation and return destination', () {
+      final restored = WorkProcurementBookmark.decode(
+        bookmark.toJson(),
+        accountId: 'account-a',
+        storeId: 'store-a',
+      );
+      expect(restored, isNotNull);
+      expect(
+        restored!.context.customerStateOwnerScope,
+        bookmark.context.customerStateOwnerScope,
+      );
+      expect(restored.returnTo, 'stockStatement');
+    });
+    for (final entry in <String, Object?>{
+      'accountId': 'other-account',
+      'storeId': 'other-store',
+      'version': 2,
+      'purpose': 'consumer',
+      'returnTo': '/external',
+      'originOperationId': ' ',
+    }.entries) {
+      test('rejects changed or invalid ${entry.key}', () {
+        final value = bookmark.toJson()..[entry.key] = entry.value;
+        expect(
+          WorkProcurementBookmark.decode(
+            value,
+            accountId: 'account-a',
+            storeId: 'store-a',
+          ),
+          isNull,
+        );
+      });
+    }
+    test('rejects a different signed-in account or active Store', () {
+      expect(
+        WorkProcurementBookmark.decode(
+          bookmark.toJson(),
+          accountId: 'account-b',
+          storeId: 'store-a',
+        ),
+        isNull,
+      );
+      expect(
+        WorkProcurementBookmark.decode(
+          bookmark.toJson(),
+          accountId: 'account-a',
+          storeId: 'store-b',
+        ),
+        isNull,
+      );
+    });
+  });
   group('DASH07 receiving draft', () {
     test(
       'source snapshot match rejects revision identity and pack changes',

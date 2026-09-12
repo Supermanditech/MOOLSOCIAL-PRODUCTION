@@ -1757,6 +1757,7 @@ GoRouter createJourneyRouter(
           session: workSession,
           initialSection: state.uri.queryParameters['section'],
           procurementSession: buyV2Session,
+          useStoreProcurement: true,
           accountIdentity: session.accountIdentity,
           accountAuthenticated: session.isAuthenticated,
         ),

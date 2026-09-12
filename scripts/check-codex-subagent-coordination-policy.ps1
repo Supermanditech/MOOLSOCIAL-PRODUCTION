@@ -1800,6 +1800,8 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.baselineHead -ceq '35b97857f3635c01aa283635fda32ad43c608a1e' -and
         $effectiveOwner -cin @(
           'apps/mobile/lib/features/journey01/journey_router.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
           'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
           'apps/mobile/lib/features/work/work_services.dart',
           'apps/mobile/lib/features/work/work_models.dart',

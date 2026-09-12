@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4575,
-    "sha256": "754326A707568B58F23FF052CE04EEA1D3BFD32817C2FD7883650AEC48641405"
+    "entryCount": 4576,
+    "sha256": "3F7A3FDC98ED99C851006BB7E503F7D8A328A1374E80160E620A1801C54452DE"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -35,6 +35,7 @@
       "role": "primary",
       "owners": [
         "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_video_test.dart",
         "docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md",
@@ -361,7 +362,6 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_product_feedback_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_saved_clear_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_supplier_sheet_motion.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart",

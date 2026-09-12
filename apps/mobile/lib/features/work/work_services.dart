@@ -12,9 +12,347 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:crypto/crypto.dart' as crypto;
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared/social_content_gateway.dart';
+import '../buy/buy_v2_models.dart';
+import '../buy/buy_session.dart';
+import '../buy/buy_v2_session.dart';
+import '../buy/buy_v2_saved_products_store.dart';
 import 'work_models.dart';
+
+typedef WorkProcurementSessionFactory =
+    BuyV2Session Function(
+      ValueListenable<BuyV2ProcurementContext?> identity,
+      BuyV2CustomerStateStore stateStore,
+    );
+
+/// Owns Store sessions, never the consumer Shop session. Purchase grants remain
+/// the responsibility of the injected commerce adapter, not this controller.
+class WorkProcurementController extends ChangeNotifier {
+  WorkProcurementController({
+    required this.currentAccountId,
+    required this.currentStoreId,
+    required this.storeApproved,
+    this.bookmarks = const SecureWorkProcurementBookmarkStore(),
+    WorkProcurementSessionFactory? sessionFactory,
+    BuyV2CustomerStateStore Function(String scope)? stateStoreFactory,
+  }) : _sessionFactory = sessionFactory ?? _newSession,
+       _ownsCore = sessionFactory == null,
+       _stateStoreFactory = stateStoreFactory ?? _newStateStore;
+
+  final String? Function() currentAccountId, currentStoreId;
+  final bool Function() storeApproved;
+  final WorkProcurementBookmarkStore bookmarks;
+  final WorkProcurementSessionFactory _sessionFactory;
+  final bool _ownsCore;
+  final BuyV2CustomerStateStore Function(String) _stateStoreFactory;
+  final _identity = ValueNotifier<BuyV2ProcurementContext?>(null);
+  BuyV2Session? session;
+  WorkProcurementBookmark? bookmark;
+  int _epoch = 0;
+  bool _disposed = false;
+  Future<void> _writes = Future<void>.value();
+
+  static BuyV2CustomerStateStore _newStateStore(String scope) =>
+      BuyV2SharedPreferencesCustomerStateStore(
+        SharedPreferencesAsync(),
+        ownerScope: scope,
+      );
+  static BuyV2Session _newSession(
+    ValueListenable<BuyV2ProcurementContext?> identity,
+    BuyV2CustomerStateStore stateStore,
+  ) => BuyV2Session(
+    core: BuySession(),
+    procurementIdentity: identity,
+    customerStateStore: stateStore,
+    reviewDataEnabled: false,
+  );
+
+  bool get scopeCurrent {
+    final value = bookmark?.context;
+    return !_disposed &&
+        value != null &&
+        storeApproved() &&
+        value.accountId == currentAccountId() &&
+        value.storeId == currentStoreId();
+  }
+
+  /// Called synchronously when authentication or selected Store changes.
+  void invalidateIfChanged() {
+    if (bookmark != null && !scopeCurrent) invalidate();
+  }
+
+  void invalidate() {
+    _epoch++;
+    _identity.value = null;
+    _disposeSession();
+    bookmark = null;
+    if (!_disposed) notifyListeners();
+  }
+
+  void _disposeSession() {
+    final previous = session;
+    session = null;
+    previous?.dispose();
+    if (_ownsCore) previous?.core.dispose();
+  }
+
+  Future<bool> _write(Future<bool> Function() action) {
+    final result = Completer<bool>();
+    _writes = _writes.then((_) async {
+      try {
+        result.complete(await action());
+      } on Object {
+        result.complete(false);
+      }
+    });
+    return result.future;
+  }
+
+  Future<bool> open({
+    required BuyV2ProcurementPurpose purpose,
+    required String returnTo,
+    bool restoreOnly = false,
+  }) async {
+    final account = currentAccountId(), store = currentStoreId();
+    if (_disposed ||
+        !storeApproved() ||
+        account == null ||
+        store == null ||
+        account.trim().isEmpty ||
+        store.trim().isEmpty ||
+        !WorkProcurementBookmark.returnDestinations.contains(returnTo)) {
+      return false;
+    }
+    final epoch = ++_epoch;
+    bool current() =>
+        !_disposed &&
+        epoch == _epoch &&
+        storeApproved() &&
+        currentAccountId() == account &&
+        currentStoreId() == store;
+    WorkProcurementBookmark? previous;
+    try {
+      previous = await bookmarks.read(account, store);
+    } on Object {
+      // A failed read is not an empty cart. Preserve the saved operation.
+      return false;
+    }
+    if (!current()) return false;
+    if (restoreOnly && (previous == null || !previous.active)) return false;
+    final chosen =
+        previous != null && (restoreOnly || previous.context.purpose == purpose)
+        ? WorkProcurementBookmark(
+            context: previous.context,
+            returnTo: restoreOnly ? previous.returnTo : returnTo,
+          )
+        : WorkProcurementBookmark(
+            context: BuyV2ProcurementContext(
+              accountId: account,
+              storeId: store,
+              purpose: purpose,
+              // Purpose is already part of Buy's storage namespace. Preserve
+              // the Store visit identity when switching supply destinations so
+              // returning to an earlier purpose recovers its own retained cart.
+              originOperationId:
+                  previous?.context.originOperationId ??
+                  List.generate(
+                    16,
+                    (_) => Random.secure()
+                        .nextInt(256)
+                        .toRadixString(16)
+                        .padLeft(2, '0'),
+                  ).join(),
+            ),
+            returnTo: returnTo,
+          );
+    if (!await _write(() async => current() && await bookmarks.save(chosen)) ||
+        !current()) {
+      return false;
+    }
+    if (session != null &&
+        scopeCurrent &&
+        bookmark!.context.customerStateOwnerScope ==
+            chosen.context.customerStateOwnerScope) {
+      bookmark = chosen;
+      notifyListeners();
+      return true;
+    }
+    _identity.value = null;
+    _disposeSession();
+    bookmark = chosen;
+    _identity.value = chosen.context;
+    final opened = _sessionFactory(
+      _identity,
+      _stateStoreFactory(chosen.context.customerStateOwnerScope),
+    );
+    session = opened;
+    notifyListeners();
+    await opened.restoreCommerce();
+    if (!current() || session != opened) return false;
+    await opened.restoreCustomerState();
+    if (!current() || session != opened) return false;
+    notifyListeners();
+    return true;
+  }
+
+  Future<bool> leave() async {
+    final value = bookmark;
+    if (value == null || !scopeCurrent) return false;
+    final epoch = ++_epoch;
+    final inactive = WorkProcurementBookmark(
+      context: value.context,
+      returnTo: value.returnTo,
+      active: false,
+    );
+    final saved = await _write(() => bookmarks.save(inactive));
+    if (!saved || _disposed || epoch != _epoch || !scopeCurrent) return false;
+    bookmark = inactive;
+    return true;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    invalidate();
+    _identity.dispose();
+    super.dispose();
+  }
+}
+
+/// Durable Store navigation identity, never a buyer/supplier approval grant.
+class WorkProcurementBookmark {
+  const WorkProcurementBookmark({
+    required this.context,
+    required this.returnTo,
+    this.active = true,
+  });
+  final BuyV2ProcurementContext context;
+  final String returnTo;
+  final bool active;
+  static const returnDestinations = {
+    'dashboard',
+    'stockStatement',
+    'sourcing',
+    'direct',
+    'groupBuying',
+  };
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'active': active,
+    'accountId': context.accountId,
+    'storeId': context.storeId,
+    'purpose': context.purpose.name,
+    'originOperationId': context.originOperationId,
+    'returnTo': returnTo,
+  };
+
+  static WorkProcurementBookmark? decode(
+    Map<String, Object?> value, {
+    required String accountId,
+    required String storeId,
+  }) {
+    if (value['version'] != 1 ||
+        value['active'] is! bool ||
+        value['accountId'] != accountId ||
+        value['storeId'] != storeId ||
+        !returnDestinations.contains(value['returnTo'])) {
+      return null;
+    }
+    final operation = value['originOperationId'];
+    if (operation is! String ||
+        operation.isEmpty ||
+        operation.trim() != operation) {
+      return null;
+    }
+    final purpose = BuyV2ProcurementPurpose.values
+        .where((item) => item.name == value['purpose'])
+        .firstOrNull;
+    if (purpose == null) return null;
+    final context = BuyV2ProcurementContext(
+      accountId: accountId,
+      storeId: storeId,
+      purpose: purpose,
+      originOperationId: operation,
+    );
+    if (!context.hasIdentity) return null;
+    return WorkProcurementBookmark(
+      context: context,
+      returnTo: value['returnTo'] as String,
+      active: value['active'] as bool,
+    );
+  }
+}
+
+abstract interface class WorkProcurementBookmarkStore {
+  Future<WorkProcurementBookmark?> read(String accountId, String storeId);
+  Future<bool> save(WorkProcurementBookmark bookmark);
+  Future<bool> clear(String accountId, String storeId);
+}
+
+/// Uses its own account/Store namespace; never overwrites onboarding drafts.
+class SecureWorkProcurementBookmarkStore
+    implements WorkProcurementBookmarkStore {
+  const SecureWorkProcurementBookmarkStore();
+  static const _storage = FlutterSecureStorage();
+  String _key(String accountId, String storeId) =>
+      'moolsocial.work.procurement.v1:${Uri.encodeComponent(accountId)}:${Uri.encodeComponent(storeId)}';
+
+  @override
+  Future<WorkProcurementBookmark?> read(
+    String accountId,
+    String storeId,
+  ) async {
+    if (accountId.isEmpty || storeId.isEmpty) return null;
+    final raw = await _storage.read(key: _key(accountId, storeId));
+    if (raw == null) return null;
+    final decoded = jsonDecode(raw);
+    if (decoded is! Map<String, dynamic>) {
+      throw const FormatException('Invalid Store purchase bookmark');
+    }
+    final bookmark = WorkProcurementBookmark.decode(
+      decoded,
+      accountId: accountId,
+      storeId: storeId,
+    );
+    if (bookmark == null) {
+      throw const FormatException('Invalid Store purchase bookmark');
+    }
+    return bookmark;
+  }
+
+  @override
+  Future<bool> save(WorkProcurementBookmark bookmark) async {
+    if (!bookmark.context.hasIdentity ||
+        !WorkProcurementBookmark.returnDestinations.contains(
+          bookmark.returnTo,
+        )) {
+      return false;
+    }
+    try {
+      await _storage.write(
+        key: _key(bookmark.context.accountId, bookmark.context.storeId),
+        value: jsonEncode(bookmark.toJson()),
+      );
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> clear(String accountId, String storeId) async {
+    if (accountId.isEmpty || storeId.isEmpty) return false;
+    try {
+      await _storage.delete(key: _key(accountId, storeId));
+      return true;
+    } on Object {
+      return false;
+    }
+  }
+}
 
 const moolSocialWorkspaceUrl = String.fromEnvironment(
   'MOOLSOCIAL_WORKSPACE_URL',
