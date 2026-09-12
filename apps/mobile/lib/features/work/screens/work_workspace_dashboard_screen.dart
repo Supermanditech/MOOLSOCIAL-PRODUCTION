@@ -1795,7 +1795,14 @@ class _WorkWorkspaceDashboardScreenState
         !widget.accountAuthenticated ||
         (_storeProcurement != null &&
             (!_storeProcurement!.scopeCurrent ||
-                original.accountScope != session.contactDraftStore?.accountScope)) ||
+                original.accountScope !=
+                    session.contactDraftStore?.accountScope ||
+                original.procurementContext == null ||
+                original.procurementContext!.customerStateOwnerScope !=
+                    _storeProcurement!
+                        .bookmark
+                        ?.context
+                        .customerStateOwnerScope)) ||
         original.shipmentId != original.orderId ||
         session.activeWorkspace?.id != original.workspaceId) {
       return false;
@@ -1808,6 +1815,8 @@ class _WorkWorkspaceDashboardScreenState
         current.workspaceId != original.workspaceId ||
         current.orderId != original.orderId ||
         current.supplierId != original.supplierId ||
+        current.procurementContext?.customerStateOwnerScope !=
+            original.procurementContext?.customerStateOwnerScope ||
         current.purchaseId != original.purchaseId) {
       return false;
     }
@@ -1829,17 +1838,21 @@ class _WorkWorkspaceDashboardScreenState
     }
     final controller = _storeProcurement;
     if (controller != null) {
+      final context = purchase.procurementContext;
       if (purchase.accountScope != session.contactDraftStore?.accountScope ||
-          purchase.workspaceId != session.activeWorkspace?.id) {
+          purchase.workspaceId != session.activeWorkspace?.id ||
+          context == null ||
+          !context.hasIdentity ||
+          context.accountId != purchase.accountScope ||
+          context.storeId != purchase.workspaceId) {
         session.showNotice(
           'Tracking is not available for this Store purchase.',
         );
         return;
       }
       final opened = await controller.open(
-        purpose:
-            controller.bookmark?.context.purpose ??
-            BuyV2ProcurementPurpose.restock,
+        purpose: context.purpose,
+        exactContext: context,
         returnTo: _WorkspaceOperation.sourcing.name,
       );
       if (!mounted) return;

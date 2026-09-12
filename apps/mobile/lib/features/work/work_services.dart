@@ -114,6 +114,7 @@ class WorkProcurementController extends ChangeNotifier {
     required BuyV2ProcurementPurpose purpose,
     required String returnTo,
     bool restoreOnly = false,
+    BuyV2ProcurementContext? exactContext,
   }) async {
     final account = currentAccountId(), store = currentStoreId();
     if (_disposed ||
@@ -122,7 +123,13 @@ class WorkProcurementController extends ChangeNotifier {
         store == null ||
         account.trim().isEmpty ||
         store.trim().isEmpty ||
-        !WorkProcurementBookmark.returnDestinations.contains(returnTo)) {
+        !WorkProcurementBookmark.returnDestinations.contains(returnTo) ||
+        (exactContext != null &&
+            (restoreOnly ||
+                !exactContext.hasIdentity ||
+                exactContext.accountId != account ||
+                exactContext.storeId != store ||
+                exactContext.purpose != purpose))) {
       return false;
     }
     final epoch = ++_epoch;
@@ -141,8 +148,10 @@ class WorkProcurementController extends ChangeNotifier {
     }
     if (!current()) return false;
     if (restoreOnly && (previous == null || !previous.active)) return false;
-    final chosen =
-        previous != null && (restoreOnly || previous.context.purpose == purpose)
+    final chosen = exactContext != null
+        ? WorkProcurementBookmark(context: exactContext, returnTo: returnTo)
+        : previous != null &&
+              (restoreOnly || previous.context.purpose == purpose)
         ? WorkProcurementBookmark(
             context: previous.context,
             returnTo: restoreOnly ? previous.returnTo : returnTo,

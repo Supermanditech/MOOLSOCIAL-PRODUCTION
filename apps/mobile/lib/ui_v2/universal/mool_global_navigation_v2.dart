@@ -1809,6 +1809,29 @@ class _MoolGlobalNavigationV2State extends State<MoolGlobalNavigationV2>
             child: Hero(
               tag: moolGlobalNavigationHeroTag,
               transitionOnUserGestures: true,
+              // A Hero flight must not mount the route's live OverlayPortal a
+              // second time. Only the launcher appearance travels; its menu
+              // controller and input ownership remain with the mounted route.
+              flightShuttleBuilder: (_, _, _, _, _) => IgnorePointer(
+                child: ExcludeSemantics(
+                  child: Material(
+                    color: Colors.transparent,
+                    child: SafeArea(
+                      top: false,
+                      minimum: const EdgeInsets.only(bottom: MoolSpacing.xs),
+                      child: SizedBox(
+                        height: 64,
+                        child: Center(
+                          child: _MoolHomeLauncher(
+                            expanded: false,
+                            onPressed: () {},
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
               child: Material(
                 color: Colors.transparent,
                 child: SafeArea(

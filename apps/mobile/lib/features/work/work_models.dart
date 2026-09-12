@@ -789,6 +789,7 @@ class WorkspacePurchaseRecord {
     required this.paymentLabel,
     required List<WorkspacePurchaseLine> lines,
     this.purchaseId,
+    this.procurementContext,
     this.expectedArrival,
     this.address,
     this.deliveryPartner,
@@ -820,6 +821,10 @@ class WorkspacePurchaseRecord {
       updateNote;
   final WorkspaceReceiptState receiptState;
 
+  /// Trusted originating purchase scope, never inferred from current browsing.
+  /// Older records may render, but cannot open scoped tracking without it.
+  final BuyV2ProcurementContext? procurementContext;
+
   bool get valid =>
       [
         accountScope,
@@ -831,6 +836,10 @@ class WorkspacePurchaseRecord {
       ].every((value) => value.trim().isNotEmpty) &&
       revision > 0 &&
       amountMinor >= 0 &&
+      (procurementContext == null ||
+          (procurementContext!.hasIdentity &&
+              procurementContext!.accountId == accountScope &&
+              procurementContext!.storeId == workspaceId)) &&
       !updatedAt.isBefore(createdAt) &&
       lines.every((line) => line.valid) &&
       lines.map((line) => line.id).toSet().length == lines.length;
@@ -847,6 +856,7 @@ class WorkspacePurchaseRecord {
     required int revision,
     required DateTime createdAt,
     required DateTime updatedAt,
+    BuyV2ProcurementContext? procurementContext,
   }) {
     if (order.destination != BuyV2Destination.wholesale) {
       throw ArgumentError(
@@ -861,6 +871,7 @@ class WorkspacePurchaseRecord {
       orderId: order.id,
       shipmentId: order.id,
       purchaseId: order.purchaseId,
+      procurementContext: procurementContext,
       revision: revision,
       createdAt: createdAt,
       updatedAt: updatedAt,

@@ -154,3 +154,118 @@ existing target remote. It authorizes only one automatic no-FF admission. Subseq
 integration_verify/close run the merged current checks with no exemptions from
 ancestry, tree equality, merge count or source preservation. No historical baseline
 policy was migrated, copied into the target or bypassed by source edits there.
+
+## REG4606 combined qualification corrections (not sealed)
+
+Automatic candidate fe6cb7028beaadedd50b857c83fbe1ffb4c86a82 is preserved,
+not qualified: eight-file combined run exited 1, 1829 passed / 79 skipped /
+14 failed. Nine procurement fixtures still use the former consumer session;
+two Files transitions duplicate the live navigation OverlayPortal during a Hero
+flight; three Chat cases expose the public product-link host mismatch and an
+absent-brand expectation. Full log is retained outside this worktree at
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-buy-final-20260912-combined-v1.log`.
+
+Standing founder authority admits only three additional existing primary-owned
+files to this exact correction boundary: chat_entry_context.dart,
+mool_global_navigation_v2.dart, and global_contextual_chat_shell_test.dart.
+Registry generation is 4577. No general ownership or integration rule changed.
+
+Implemented: Chat accepts validated HTTPS first-party product listing links for
+current moolsocial.com and retained moolsocial.app, rejecting unrelated routes,
+ambiguous duplicate parameters, credentials, fragments and nonstandard ports.
+Tests retain populated supplier/product facts and represent absent brand/variant
+as null. First replay 73/1 retained; corrected full Chat replay 74/0 passed.
+Navigation Hero uses an inert visual launcher during flight, not a second live
+portal. All ten REG4551 Files/Back checks pass, including both previously failing
+cases. Logs: store-buy-reg4606-chat-v1.log, store-buy-reg4606-chat-v2.log and
+store-buy-reg4606-files-v1.log in that same external evidence directory.
+
+Still pending: nine scoped procurement fixture corrections, connected navigation
+and full combined regressions, visual checks, clean seal and fresh admission.
+These local passes do not qualify integration, a new APK or device behavior.
+
+Nine procurement fixture cases are now corrected with explicit Store context and
+host-only commerce responses. Filter/cart ownership assertions additionally prove
+the consumer session is unchanged. Full analysis passes with zero issues;
+regression-memory gate passes 4577 entries / 2518 applicable. Full Work layout
+replay is running as session 11118, log store-buy-reg4606-work-v1.log; retain and
+poll this process rather than restarting it. No pass is claimed until exit.
+Fresh origin readback still matches both original input tips and the previously
+sealed child tip 7fe3d230; these correction drafts are not yet committed.
+
+Work replay completed exit 0: 812 passed / 79 skipped / zero failures. All nine
+original fixture failures are resolved in that run. This is not a new full
+integration qualification. Cursor's additional source concern was reproduced
+with a scope-specific host adapter: a Buy Direct purchase is not found after
+the latest browsing operation changes to Restock. Test `DASH07 tracking uses
+purchase purpose after browsing Restock` fails on the expected tracking screen,
+log store-buy-tracking-purpose-reproduction-v1.log. The purchase model lacks its
+original procurement context and the dashboard opens the latest bookmark purpose.
+Required follow-up: bind exact purchase context, validate account/Store identity,
+restore the purchase's purpose/operation, test purpose switching and relaunch.
+Do not infer context for legacy records or treat missing authority as success.
+
+REG4607 correction: WorkspacePurchaseRecord now optionally carries the trusted
+original BuyV2ProcurementContext; legacy records remain renderable but cannot
+claim scoped tracking without that context. The controller accepts an exact
+context only for the current account/Store and requested purpose, persists that
+operation, and rejects invalid identities without mutation. Dashboard tracking
+uses the selected purchase context and revalidates it against the current record.
+The live backend purchase adapter must supply this context; host fixtures do not
+qualify that pending external integration.
+
+Fresh qualification: 233 atomic tests pass, including exact-context relaunch and
+foreign identity/purpose rejection. All 20 DASH07 checks pass, including Buy
+Direct and Group Bulk Buying after switching to Restock and recreating the
+controller. Logs store-buy-reg4607-atomic-v1.log and store-buy-reg4607-dash07-v2.log
+are retained in the external evidence directory. The predecessor correction-v1
+log records 19 passes before expanded coverage. Full eight-file combined replay
+now runs as session 40048, log store-buy-reg4607-combined-v2.log. It is not yet
+complete. Do not restart it or claim final qualification from partial output.
+
+### Disposition of the 79 historical skips
+
+All are in work_workspace_layout_safety_test.dart, unchanged by this correction:
+- 11 Workspace overnight capture variants gated by MOOL_CAPTURE_STORE_VIEW_V2.
+- 23 tests in the existing `local Store 1-40 review evidence` group, disabled
+  since commit 0ac4ca52. This comprises 17 historical layout/action assertions
+  and six founder captures. Examples require the former command-centre/Today
+  canvas, 60-pixel rail spacing and retired Grow wording. They are not current
+  visual authority and are not counted as passed. Historical files remain intact.
+- 20 live Store captures gated by MOOL_CAPTURE_WORK_STORE_LIVE_V1.
+- 25 other founder captures gated by MOOL_CAPTURE_WORK_STORE_1_40 (the six
+  inside the disabled group are counted only in that group, not twice).
+
+Current behavior is exercised by active Store View first-tap/Back cases, DASH02
+exact search/update/Back, DASH07 purchase tracking, DASH10 scoped restock/cart,
+Store coverage ordering/visibility separation, and Group Bulk payment-truth
+checks. Specific historical business guarantees must remain covered by these
+current tests, not inferred from a skipped capture. Actual current Flutter
+captures still need review before sealing. No physical-device or backend pass
+is implied by this skip inventory.
+
+Post-REG4607 full analysis again passed with zero issues (14 seconds), evidence
+store-buy-reg4607-analysis-v2.log. The combined process remains session 40048;
+do not start another copy. The source correction is still unsealed pending that
+result and current visual review. Final admission must use a fresh successor
+target and exact new qualified source; do not amend/reset/reuse failed fe6cb702.
+
+Full eight-file combined replay completed: session 40048 exit 0, 1849 passed,
+79 documented skips, zero failures, 8m16s. This includes both newly added
+cross-purpose tracking cases and three controller safety/relaunch tests, the
+corrected original failures, Buy session/screen, Chat, journey and C20E tests.
+Evidence: store-buy-reg4607-combined-v2.log. Final integration remains pending;
+the failed predecessor is not retroactively qualified by this source-child run.
+
+Fresh actual Flutter visual replay: both DASH10 restock tests passed with
+MOOL_CAPTURE_STORE_VIEW_V2 and unique folder store-buy-reg4607-visual-v1.
+All 13 generated PNGs were inspected: normal/200% catalogue, retained search,
+keyboard, empty-result recovery and revealed recovery action. Content scrolls
+within the enlarged viewport; the existing Store header and single navigation
+owner remain, with no duplicate consumer promotion. These captures exercise
+host fixtures, not a physical keyboard or live supplier authority. External
+log: store-buy-reg4607-visual-v1.log. Historical images were not overwritten.
+A premature directory read before capture completion found no directory; the
+same original test process was awaited to exit 0 without restart. A documentation
+patch with stale context was rejected without modification, then reapplied
+against the exact read-back tail. No source/test attempt was affected.

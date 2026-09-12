@@ -1060,6 +1060,30 @@ void main() {
     );
   });
 
+  test('REG4606 Chat accepts only first-party product listing links', () {
+    String? resolve(String link) => ChatCommerceContext.fromUri(
+      Uri(path: '/app/chat/thread', queryParameters: {'productLink': link}),
+    ).productAppRoute;
+    const route = '/app/buy?sub=wholesale&view=product&product=w-tomato';
+    for (final host in ['moolsocial.com', 'moolsocial.app']) {
+      expect(resolve('https://$host$route'), route);
+    }
+    for (final link in [
+      'http://moolsocial.com$route',
+      'https://moolsocial.com.evil.example$route',
+      'https://user@moolsocial.com$route',
+      'https://moolsocial.com:444$route',
+      'https://moolsocial.com$route#other',
+      'https://moolsocial.com$route&product=other',
+      'https://moolsocial.com$route&accountId=other',
+      'https://moolsocial.com/app/buy?view=cart&product=w-tomato',
+      'https://moolsocial.com/app/buy?view=product&product=',
+      'https://moolsocial.com/app/pay?view=product&product=w-tomato',
+    ]) {
+      expect(resolve(link), isNull, reason: link);
+    }
+  });
+
   test('Buy product route becomes complete shared Chat commerce context', () {
     final product = BuyV2Catalogue.products.firstWhere(
       (value) => value.destination == BuyV2Destination.wholesale,
@@ -1077,8 +1101,14 @@ void main() {
     expect(context.productTitle, product.title);
     expect(context.productId, product.canonicalId);
     expect(context.skuId, product.id);
-    expect(context.brand, product.brand);
-    expect(context.variant, product.variant);
+    expect(
+      context.brand,
+      product.brand.trim().isEmpty ? null : product.brand.trim(),
+    );
+    expect(
+      context.variant,
+      product.variant.trim().isEmpty ? null : product.variant.trim(),
+    );
     expect(context.pack, product.pack);
     expect(context.quantity, '4');
     expect(context.minimumOrder, '${product.minimumOrder}');

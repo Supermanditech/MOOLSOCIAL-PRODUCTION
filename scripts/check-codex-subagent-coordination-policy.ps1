@@ -1815,6 +1815,9 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq 'store_procurement_bridge_20260912' -and
         [string]$selectedContinuationBinding.baselineHead -ceq '35b97857f3635c01aa283635fda32ad43c608a1e' -and
         $effectiveOwner -cin @(
+          'apps/mobile/lib/features/chat/chat_entry_context.dart',
+          'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart',
+          'apps/mobile/test/global_contextual_chat_shell_test.dart',
           'apps/mobile/lib/features/journey01/journey_router.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',

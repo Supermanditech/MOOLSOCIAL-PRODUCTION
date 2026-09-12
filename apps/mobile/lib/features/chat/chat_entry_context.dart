@@ -437,8 +437,21 @@ class ChatCommerceContext {
   String? get productAppRoute {
     final uri = Uri.tryParse(productLink ?? '');
     if (uri == null ||
-        uri.host.toLowerCase() != 'moolsocial.app' ||
-        uri.path != '/app/buy') {
+        uri.scheme != 'https' ||
+        !const {
+          'moolsocial.com',
+          'moolsocial.app',
+        }.contains(uri.host.toLowerCase()) ||
+        uri.userInfo.isNotEmpty ||
+        uri.port != 443 ||
+        uri.fragment.isNotEmpty ||
+        uri.path != '/app/buy' ||
+        uri.queryParameters['view'] != 'product' ||
+        (uri.queryParameters['product']?.trim().isEmpty ?? true) ||
+        uri.queryParametersAll.values.any((values) => values.length != 1) ||
+        uri.queryParameters.keys.any(
+          (key) => !const {'sub', 'view', 'product'}.contains(key),
+        )) {
       return null;
     }
     return Uri(path: uri.path, queryParameters: uri.queryParameters).toString();

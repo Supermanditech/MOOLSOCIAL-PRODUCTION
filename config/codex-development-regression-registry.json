@@ -10,6 +10,27 @@
   },
   "entries": [
     {
+      "id": "REG-20260912-4607-PURCHASE-ORIGIN-TRACKING-CONTEXT",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "work", "buy", "integration", "testing"],
+      "mistake": "Buy Direct purchase tracking reports unavailable after browsing Restock because the dashboard selects the latest bookmark purpose. Scoped host reproduction fails before correction.",
+      "rootCause": "WorkspacePurchaseRecord does not retain original procurement context; tracking substitutes the latest purpose and operation. Different purposes own separate commerce histories.",
+      "prevention": "Carry exact original procurement context from the trusted purchase adapter; validate account and Store, use that purpose and operation for tracking and restore it durably. Missing or mismatched context must not infer another scope. Test Buy Direct and Group Buying after Restock and process recreation, exact order and unchanged consumer state.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/work_store_atomic_operations_test.dart"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
+      "id": "REG-20260912-4606-STORE-BUY-COMBINED-LINK-NAVIGATION-FIXTURES",
+      "chatAttempt1": "Full Chat replay passed 73 and failed one after link correction: the route-context test expects an empty brand string while the existing context normalizes absent values to null. Correct exact optional brand/variant expectations, preserving all populated facts and product-route assertions. Log store-buy-reg4606-chat-v1.log remains retained outside the worktree.",
+      "status": "registered_correction_in_progress",
+      "appliesTo": ["primary", "work", "buy", "chat", "integration", "testing"],
+      "mistake": "Final integration combined run exited 1 with 1829 passes, 79 skips and 14 failures: nine legacy shared-session procurement fixtures, two Files navigation overlay assertions and three shared Chat product-link failures.",
+      "rootCause": "Store now uses isolated procurement while old tests still seed consumer state. Buy generates moolsocial.com product links but Chat accepts only moolsocial.app. A live OverlayPortal inside a Hero is suspected of duplicate controller attachment during Files transitions; confirm with regression replay before qualification.",
+      "prevention": "Preserve failed automatic merge fe6cb7028beaadedd50b857c83fbe1ffb4c86a82. Correct scoped fixtures without weakening behavior checks, restrict Chat product navigation to validated first-party listing links with negative tests, and retain live navigation and Back assertions when correcting the overlay transition. Run focused and complete connected regressions before fresh admission. No APK or handoff qualification from partial passes.",
+      "gates": ["apps/mobile/test/work_workspace_layout_safety_test.dart", "apps/mobile/test/global_contextual_chat_shell_test.dart"],
+      "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+    },
+    {
       "id": "REG-20260912-4605-STORE-SCOPED-PROCUREMENT-RESTORE-BOUNDARY",
       "status": "registered_correction_in_progress",
       "appliesTo": ["primary", "work", "buy", "integration", "testing"],

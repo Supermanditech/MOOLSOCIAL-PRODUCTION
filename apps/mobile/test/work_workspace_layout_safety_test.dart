@@ -488,6 +488,40 @@ void main() {
     }
   }
 
+  Future<WorkProcurementController> prepareStoreProcurement(
+    WorkSession work,
+  ) async {
+    final states = <String, _StorePurchaseState>{};
+    final controller = WorkProcurementController(
+      currentAccountId: () => 'fixture-purchaser',
+      currentStoreId: () => work.activeWorkspace?.id,
+      storeApproved: () => work.activeWorkspace?.verified == true,
+      bookmarks: _StorePurchaseBookmarks(),
+      stateStoreFactory: (scope) =>
+          states.putIfAbsent(scope, () => _StorePurchaseState(scope)),
+      sessionFactory: (identity, state) {
+        final core = BuySession();
+        addTearDown(core.dispose);
+        return BuyV2Session(
+          core: core,
+          procurementIdentity: identity,
+          customerStateStore: state,
+          commerceAdapter: _StorePurchaseCommerce(identity.value!),
+          reviewDataEnabled: false,
+        );
+      },
+    );
+    expect(
+      await controller.open(
+        purpose: BuyV2ProcurementPurpose.restock,
+        returnTo: 'dashboard',
+      ),
+      isTrue,
+    );
+    expect(await controller.leave(), isTrue);
+    return controller;
+  }
+
   Future<void> mount(
     WidgetTester tester, {
     required String route,
@@ -2807,17 +2841,21 @@ void main() {
     'S09 DF04 Restock retains filter and excludes transactional depths',
     (tester) async {
       final work = liveStore();
+      final controller = await prepareStoreProcurement(work);
       await mount(
         tester,
         route: '/app/work/workspace/dashboard',
         work: work,
         textScale: 1,
+        procurementFactory: () => controller,
       );
-      final buy = tester
+      final consumer = tester
           .widget<WorkWorkspaceDashboardScreen>(
             find.byType(WorkWorkspaceDashboardScreen),
           )
           .procurementSession;
+      final buy = controller.session!;
+      expect(identical(buy, consumer), isFalse);
       buy.chooseFilter('freight');
       await openTrackedPurchases(tester);
       await tester.pumpAndSettle();
@@ -2848,6 +2886,8 @@ void main() {
       expect(find.byKey(const Key('work-store-statement')), findsOneWidget);
       expect(buy.selectedFilter, 'freight');
       expect(buy.quantityFor(product.id), quantity);
+      expect(consumer.selectedFilter, isNull);
+      expect(consumer.quantityFor(product.id), 0);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('work-store-action-edge')), findsOneWidget);
@@ -3078,17 +3118,22 @@ void main() {
     testWidgets(
       'R6617 Track stock leaves procurement filter unchanged ${filters.$1} ${filters.$2}',
       (tester) async {
+        final work = liveStore();
+        final controller = await prepareStoreProcurement(work);
         await mount(
           tester,
           route: '/app/work/workspace/dashboard',
-          work: liveStore(),
+          work: work,
           textScale: 1,
+          procurementFactory: () => controller,
         );
-        final buy = tester
+        final consumer = tester
             .widget<WorkWorkspaceDashboardScreen>(
               find.byType(WorkWorkspaceDashboardScreen),
             )
             .procurementSession;
+        final buy = controller.session!;
+        expect(identical(buy, consumer), isFalse);
         buy.chooseFilter(filters.$1);
         await openTrackedPurchases(tester);
         await tester.pumpAndSettle();
@@ -3115,6 +3160,7 @@ void main() {
           tester,
           'r665-restock-filter-${filters.$1}-${filters.$2}',
         );
+        expect(consumer.selectedFilter, isNull);
         expect(tester.takeException(), isNull);
       },
     );
@@ -7137,6 +7183,9 @@ void main() {
       tester,
     ) async {
       final work = storeViewFixture();
+      final controller = entry.$1 == 'work-quick-buy'
+          ? await prepareStoreProcurement(work)
+          : null;
       if (entry.$1 == 'work-store-sell') {
         work.workspaceCatalogueItems
           ..clear()
@@ -7153,6 +7202,7 @@ void main() {
         viewport: const Size(412, 915),
         textScale: 1,
         bottomInset: 34,
+        procurementFactory: controller == null ? null : () => controller,
       );
       await tester.tap(find.byKey(Key(entry.$1)));
       await tester.pumpAndSettle();
@@ -13904,7 +13954,13 @@ void main() {
   ) async {
     final semantics = tester.ensureSemantics();
     final work = liveStore();
-    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    final controller = await prepareStoreProcurement(work);
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      procurementFactory: () => controller,
+    );
 
     await tester.tap(find.byKey(const Key('work-quick-buy')));
     await tester.pumpAndSettle();
@@ -13962,7 +14018,13 @@ void main() {
     'in-Store Wholesale search keeps one coherent keyboard and rail owner',
     (tester) async {
       final work = liveStore();
-      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      final controller = await prepareStoreProcurement(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        procurementFactory: () => controller,
+      );
 
       await tester.tap(find.byKey(const Key('work-quick-buy')));
       await tester.pumpAndSettle();
@@ -14007,7 +14069,13 @@ void main() {
     'Android Back closes Wholesale detail before returning to Store',
     (tester) async {
       final work = liveStore();
-      await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+      final controller = await prepareStoreProcurement(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        procurementFactory: () => controller,
+      );
       await tester.tap(find.byKey(const Key('work-quick-buy')));
       await tester.pumpAndSettle();
 
@@ -21241,6 +21309,115 @@ void main() {
     );
   }
 
+  for (final purchasePurpose in [
+    BuyV2ProcurementPurpose.buyDirect,
+    BuyV2ProcurementPurpose.groupBulkBuying,
+  ]) {
+    testWidgets(
+      'DASH07 tracking uses purchase purpose after browsing Restock and relaunch $purchasePurpose',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seedCore = BuySession();
+        final seed = BuyV2Session(core: seedCore);
+        final order = seed.orders.firstWhere(
+          (order) => order.destination == BuyV2Destination.wholesale,
+        );
+        seed.dispose();
+        seedCore.dispose();
+        final bookmarks = _StorePurchaseBookmarks();
+        WorkProcurementController createController() =>
+            WorkProcurementController(
+              currentAccountId: () => work.contactDraftStore?.accountScope,
+              currentStoreId: () => work.activeWorkspace?.id,
+              storeApproved: () => work.activeWorkspace?.verified == true,
+              bookmarks: bookmarks,
+              stateStoreFactory: _StorePurchaseState.new,
+              sessionFactory: (identity, state) {
+                final core = BuySession();
+                addTearDown(core.dispose);
+                return BuyV2Session(
+                  core: core,
+                  procurementIdentity: identity,
+                  customerStateStore: state,
+                  reviewDataEnabled: false,
+                  commerceAdapter: _StorePurchaseCommerce(
+                    identity.value!,
+                    orders: identity.value!.purpose == purchasePurpose
+                        ? [order]
+                        : [],
+                  ),
+                );
+              },
+            );
+        var controller = createController();
+        expect(
+          await controller.open(
+            purpose: purchasePurpose,
+            returnTo: 'dashboard',
+          ),
+          isTrue,
+        );
+        expect(await controller.leave(), isTrue);
+        final now = DateTime.now();
+        final purchase = WorkspacePurchaseRecord.fromBuyOrder(
+          order: order,
+          procurementContext: controller.bookmark!.context,
+          accountScope: 'review-draft-account',
+          workspaceId: work.activeWorkspace!.id,
+          supplierId: 'verified-supplier-workspace',
+          revision: 1,
+          createdAt: now,
+          updatedAt: now,
+        );
+        expect(
+          work.applyWorkspacePurchases(
+            accountScope: purchase.accountScope,
+            storeId: purchase.workspaceId,
+            feedRevision: 1,
+            records: [purchase],
+            complete: true,
+          ),
+          isTrue,
+        );
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+          ),
+          isTrue,
+        );
+        expect(await controller.leave(), isTrue);
+        controller.dispose();
+        controller = createController();
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          textScale: 1,
+          procurementFactory: () => controller,
+        );
+        await reveal(tester, find.byKey(const Key('work-incoming-purchases')));
+        await tester.tap(find.byKey(const Key('work-incoming-purchases')));
+        await tester.pumpAndSettle();
+        final track = find.byKey(
+          ValueKey('work-purchase-open-${purchase.shipmentId}'),
+        );
+        await reveal(tester, track);
+        await tester.tap(track);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-v2-screen')),
+          findsOneWidget,
+          reason:
+              'The selected purchase must not use the latest Restock history. ${work.noticeMessage}',
+        );
+        expect(controller.bookmark!.context.purpose, purchasePurpose);
+        expect(controller.session!.selectedOrderId, purchase.orderId);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   for (final scale in [1.0, 2.0]) {
     testWidgets('DASH07 reused Buy tracking stays in Store $scale', (
       tester,
@@ -21304,6 +21481,7 @@ void main() {
       final linked = WorkspacePurchaseRecord.fromBuyOrder(
         order: order,
         accountScope: 'review-draft-account',
+        procurementContext: controller.bookmark!.context,
         workspaceId: storeId,
         supplierId: 'verified-supplier-workspace',
         revision: 1,
@@ -21334,11 +21512,15 @@ void main() {
       await reveal(tester, track);
       await tester.tap(track);
       await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('buy-v2-screen')), findsOneWidget,
-        reason: 'notice=${work.noticeMessage}; scope=${controller.scopeCurrent}; '
-          'account=${work.contactDraftStore?.accountScope}; order=${buy.selectedOrderId}; '
-          'view=${buy.view}; available=${buy.orders.map((o) => o.id).toList()}; '
-          'return=${controller.bookmark?.returnTo}');
+      expect(
+        find.byKey(const ValueKey('buy-v2-screen')),
+        findsOneWidget,
+        reason:
+            'notice=${work.noticeMessage}; scope=${controller.scopeCurrent}; '
+            'account=${work.contactDraftStore?.accountScope}; order=${buy.selectedOrderId}; '
+            'view=${buy.view}; available=${buy.orders.map((o) => o.id).toList()}; '
+            'return=${controller.bookmark?.returnTo}',
+      );
       expect(buy.view, BuyV2View.tracking);
       expect(buy.selectedOrderId, linked.orderId);
       expect(buy.procurementScopeCurrent, isTrue);

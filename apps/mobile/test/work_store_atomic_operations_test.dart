@@ -522,6 +522,98 @@ void main() {
       controller = create();
     });
     tearDown(() => controller.dispose());
+    for (final purpose in [
+      BuyV2ProcurementPurpose.buyDirect,
+      BuyV2ProcurementPurpose.groupBulkBuying,
+    ]) {
+      test('exact purchase context survives relaunch $purpose', () async {
+        final original = BuyV2ProcurementContext(
+          accountId: account,
+          storeId: store,
+          purpose: purpose,
+          originOperationId: 'original-purchase-operation',
+        );
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+          ),
+          isTrue,
+        );
+        expect(
+          await controller.open(
+            purpose: purpose,
+            exactContext: original,
+            returnTo: 'sourcing',
+          ),
+          isTrue,
+        );
+        controller.dispose();
+        controller = create();
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+            restoreOnly: true,
+          ),
+          isTrue,
+        );
+        expect(
+          controller.bookmark!.context.customerStateOwnerScope,
+          original.customerStateOwnerScope,
+        );
+        expect(controller.bookmark!.returnTo, 'sourcing');
+      });
+    }
+    test(
+      'exact purchase context rejects foreign identity and purpose without mutation',
+      () async {
+        expect(
+          await controller.open(
+            purpose: BuyV2ProcurementPurpose.restock,
+            returnTo: 'dashboard',
+          ),
+          isTrue,
+        );
+        final before = controller.bookmark;
+        for (final context in [
+          BuyV2ProcurementContext(
+            accountId: 'other',
+            storeId: store,
+            purpose: BuyV2ProcurementPurpose.buyDirect,
+            originOperationId: 'p',
+          ),
+          BuyV2ProcurementContext(
+            accountId: account,
+            storeId: 'other',
+            purpose: BuyV2ProcurementPurpose.buyDirect,
+            originOperationId: 'p',
+          ),
+          BuyV2ProcurementContext(
+            accountId: account,
+            storeId: store,
+            purpose: BuyV2ProcurementPurpose.restock,
+            originOperationId: 'p',
+          ),
+          BuyV2ProcurementContext(
+            accountId: account,
+            storeId: store,
+            purpose: BuyV2ProcurementPurpose.buyDirect,
+            originOperationId: '',
+          ),
+        ]) {
+          expect(
+            await controller.open(
+              purpose: BuyV2ProcurementPurpose.buyDirect,
+              exactContext: context,
+              returnTo: 'sourcing',
+            ),
+            isFalse,
+          );
+          expect(controller.bookmark, same(before));
+        }
+      },
+    );
     test('relaunch restores exact operation and scope', () async {
       expect(
         await controller.open(
