@@ -764,7 +764,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 73) `
+Assert-Coordination ($continuationBindings.Count -eq 74) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -1790,6 +1790,26 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $storeBuyFollowupOwner = (
+        $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
+        $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
+        $ProductionWorkId -ceq 'store-buy-contract-followup-20260912' -and
+        $ProductionTicketId -ceq 'UAW-STORE-BUY-CONTRACT-FOLLOWUP-20260912' -and
+        $branch -ceq 'work/codex-ui/store-buy-contract-followup-20260912' -and
+        [string]$selectedContinuationBinding.id -ceq 'store_buy_contract_followup_20260912' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq 'fb300e169e1f3bdf84052d9cc05a6d311aa51132' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/test/work_workspace_layout_safety_test.dart',
+          'apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_product_video_test.dart',
+          'docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md'
+        )
+      )
+      if ($hasContinuationBinding -and
+          [string]$selectedContinuationBinding.id -ceq 'store_buy_contract_followup_20260912') {
+        Assert-Coordination $storeBuyFollowupOwner `
+          "Store Buy correction child requested an unrelated owner: $effectiveOwner"
+      }
       $codexOppoReviewOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
@@ -2099,7 +2119,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner) {
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -2111,7 +2131,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }

@@ -34,6 +34,9 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_video_test.dart",
+        "docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md",
         "docs/quality/STORE-BUY-REPAIR-20260912.md",
         "scripts/check-approved-ui-locks.ps1",
         "apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt",
@@ -465,6 +468,26 @@
       "featureBranchesMustStartAtTag": true
     },
     "continuationBindings": [
+      {
+        "id": "store_buy_contract_followup_20260912",
+        "state": "founder_authorized_2026_09_12",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "store-buy-contract-followup-20260912",
+        "ticketId": "UAW-STORE-BUY-CONTRACT-FOLLOWUP-20260912",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912",
+        "branch": "work/codex-ui/store-buy-contract-followup-20260912",
+        "baselineHead": "fb300e169e1f3bdf84052d9cc05a6d311aa51132",
+        "bootstrapCommitSubject": "coordination(store-buy-contract-followup-20260912): bind three-file correction child",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
       {
         "id": "integration_repair_store_buy_20260912",
         "state": "founder_authorized_2026_09_12",
