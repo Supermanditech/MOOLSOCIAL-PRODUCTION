@@ -148,6 +148,15 @@ Expected: carry and restore the originating shopping mode, category/query/select
 
 ### R669-UAT-SHARE-COLD-PRODUCT-ROUTE-001 - Cold product-link launch loses the requested product
 
+## Orders return-position implementation checkpoint - 12 September 2026
+
+**R669-UAT-ORDER-ANDROID-BACK-POSITION-001 remains OPEN for future Redmi verification; frontend correction locally qualified.** The horizontal Orders continuation rail lacked an independent PageStorageKey, letting its offset overwrite the parent Orders list. Local retained position821 was replaced by330. One existing-rail storage key separates the two axes; no additional controller, route, delayed jump or session state is retained. Both failed controller experiments are preserved externally and absent from the candidate.
+
+Four actual Track order/Back regressions pass at100%/200% text for Android and on-screen Back. Connected order-progress, honest-order-motion and session suites pass526 checks; analysis and UI locks pass. Eight paired actual Flutter captures reviewed, with exact final-source images byte-identical to those reviewed. Evidence manifest: external redmi-r66-9-round-1/orders-position-implementation-20260912-0235/local-qualification-1.json SHA256 ED59282B2B62F9B3E4BFFDD5BA024AA86F79A07B57D97BACF2FEBC9B4293CE72. Required tested parent b26baf94e0b865954ed2955815d43daa50294a6e. Exact owners, terminal receipts and capture hashes are retained there and in UAT.md.
+
+This is local implementation evidence, not a Redmi closure. Original reproductions,13 closed/29 open originals,12 open UAT children and2 earlier implementation children remain intact. No new APK/build/install or integration. Remaining scoped implementation and unavailable provider/device qualifications remain required.
+
+
 **OPEN, P2; confirmed Redmi intent-delivery child of R668-AUDIT-SHARE-LINK-001.** A consumer opens the existing shared Fresh tomatoes link while the installed app is not running. The exact previously observed URL https://moolsocial.com/app/buy?sub=shop&view=product&product=s-tomato was delivered as Android VIEW/BROWSABLE to the explicit Cursor Review package. Warm delivery opens the correct Fresh tomatoes / 500 g / Shree Balaji Fresh / Rs37 product (917). After force-stop, identical URL delivery reports LaunchState COLD, but the app opens generic Shop home (918); a later capture-only observation919 remains there. No recipient message was sent and no data was cleared. This evidence isolates cold-start route consumption from domain association; it does not claim a real recipient-messenger tap was tested.
 
 Expected: retain the exact incoming product identity through cold bootstrap and show that product or an explicit unavailable/recovery state, without silently falling back to Shop home. Preserve ordinary launches, account isolation and separate procurement context. Test warm/cold product routing, Back, missing/stale product recovery and retained cart. Any required bootstrap/Android/provider owner dependency must remain explicit; do not omit it or falsely close from an in-process route test.

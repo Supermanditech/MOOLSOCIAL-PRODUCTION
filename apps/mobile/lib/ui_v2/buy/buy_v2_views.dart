@@ -9915,6 +9915,7 @@ class _OrdersContinuationRail extends StatelessWidget {
         return measured > height ? measured : height;
       }),
       child: ListView.separated(
+        key: const PageStorageKey('buy-orders-continuation-rail'),
         scrollDirection: Axis.horizontal,
         itemCount: cards.length,
         separatorBuilder: (_, _) => const SizedBox(width: 7),

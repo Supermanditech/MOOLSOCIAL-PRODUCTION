@@ -74,6 +74,17 @@ This supersedes the earlier stop-before-implementation instruction retained belo
 
 ## Completed scoped r66.9 device round - consolidated open list,12 September2026
 
+## Orders return-position child checkpoint - 12 September 2026
+
+**R669-UAT-ORDER-ANDROID-BACK-POSITION-001 implemented and locally checked; remains OPEN for Redmi verification.** The existing horizontal Orders continuation rail shared its ancestor's PageStorage identity and overwrote the vertical Orders position. Local diagnostics showed a visible offset of821 but stored330 before departure; Back restored330. Its own PageStorageKey now keeps horizontal and vertical positions separate. No controller retry, delayed jump or extra navigation state was retained. Failed primary-controller and save-on-deactivation attempts are preserved externally and removed from source.
+
+Final connected regression:526 passed,0 failed,0 skipped across order-progress, honest-order-motion and session suites. Four focused regressions use actual Track order taps, Android Back and the on-screen tracking Back button at360x800,100%/200% text. All eight before/after Flutter captures were reviewed; final-source captures match reviewed captures byte-for-byte. Analysis and approved UI locks pass. Original Redmi evidence remains distinct: the device first reproduced Android Back loss; the local fixture reproduced both return paths at normal text. The fix does not replace that evidence or close the ticket.
+
+Evidence: external redmi-r66-9-round-1/orders-position-implementation-20260912-0235/local-qualification-1.json SHA256 ED59282B2B62F9B3E4BFFDD5BA024AA86F79A07B57D97BACF2FEBC9B4293CE72. Connected receipt singlechat-r669-orders-position-connected-20260912-a.result.json; stdout SHA256 E800BA1E4F1639790816756107A07B0D031CE609164609C7C1982FE67BAF33C8. Required tested parent b26baf94e0b865954ed2955815d43daa50294a6e. Exact two source/test owners and all capture hashes are bound in the manifest.
+
+No APK/build/install, integration or device closure. Counts remain13 closed/29 open originals,12 open UAT children and2 earlier implementation children. Remaining scoped fixes and provider/device qualifications remain required; supplier-media loading is not qualified by these position captures.
+
+
 List evidence: external redmi-r66-9-round-1/complete-scoped-round1-defect-list-v1.json, SHA256 A1CAF6AC839BEB55D8666E185AEA8967C0031E9CA5860CEF983243457AB9E043. Source HEAD 6f666f15109f6df8ebba1f326512613c259c4d80; Redmi TG8HCYTGGQT885OF; APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9.
 
 **Available scoped device round and deduplicated listing are complete; full device/provider qualification is not complete.** Frozen42 =33 findings+9 requests:13 closed,29 open. Twelve UAT children and two earlier implementation children remain open separately; procurement is a separate dependency. These linked records are not44 independent fixes. Unavailable data/auth/provider/Store cases remain explicitly unverified. No implementation has started. The next authorized phase fixes this resulting batch and required dependencies locally, then safely parks it; no new APK.

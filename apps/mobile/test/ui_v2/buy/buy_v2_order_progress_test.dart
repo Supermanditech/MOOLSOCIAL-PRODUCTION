@@ -502,6 +502,85 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final androidBack in [true, false]) {
+      testWidgets(
+        'R669 Orders retains scroll after tracking $scale Android$androidBack',
+        (tester) async {
+          await tester.binding.setSurfaceSize(const Size(360, 800));
+          addTearDown(() => tester.binding.setSurfaceSize(null));
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            commerceAdapter: _R669DeliveryCommerce(),
+            reviewDataEnabled: false,
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          await session.restoreCommerce();
+          await tester.pumpWidget(app(session, scale));
+          await tester.pumpAndSettle();
+          session.openOrders();
+          await tester.pumpAndSettle();
+          final list = find.byKey(const PageStorageKey('buy-orders'));
+          Finder scroll() => find
+              .descendant(of: list, matching: find.byType(Scrollable))
+              .first;
+          final action = find.byKey(const ValueKey('buy-order-primary-bulk-4'));
+          await tester.scrollUntilVisible(
+            action,
+            300,
+            scrollable: scroll(),
+            maxScrolls: 100,
+          );
+          await tester.pumpAndSettle();
+          final before = tester
+              .state<ScrollableState>(scroll())
+              .position
+              .pixels;
+          final beforeExtent = tester
+              .state<ScrollableState>(scroll())
+              .position
+              .maxScrollExtent;
+          final beforeCount = session.visibleOrders.length;
+          expect(before, greaterThan(100));
+          await capture(
+            tester,
+            'r669-orders-scroll-before-$scale-$androidBack',
+          );
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.tracking);
+          if (androidBack) {
+            await tester.binding.handlePopRoute();
+          } else {
+            final back = find.byKey(
+              const ValueKey('buy-tracking-return-orders'),
+            );
+            await tester.ensureVisible(back);
+            await tester.tap(back);
+          }
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(session.destination, BuyV2Destination.orders);
+          final after = tester.state<ScrollableState>(scroll()).position.pixels;
+          expect(
+            after,
+            closeTo(before, 1),
+            reason:
+                'Orders should return to the same place after viewing tracking. Extent $beforeExtent -> ${tester.state<ScrollableState>(scroll()).position.maxScrollExtent}; orders $beforeCount -> ${session.visibleOrders.length}.',
+          );
+          await capture(
+            tester,
+            'r669-orders-scroll-return-$scale-$androidBack',
+          );
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
+    }
+  }
+
   testWidgets('R669 delivery recovery with twelve simultaneous deliveries', (
     tester,
   ) async {
