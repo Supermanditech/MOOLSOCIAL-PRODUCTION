@@ -1,5 +1,80 @@
 # Fresh Redmi journey inventory
 
+## Consolidated scoped implementation and dependency handoff - 12 September 2026
+
+**Current source: 68d35d185bdff4bb3fa8635a30758237cdf9ba2c. No new APK or ticket closure.** The completed scoped Redmi round produced 12 UAT children. Eleven have local implementation evidence; the cold shared-link startup child remains unimplemented outside Buy ownership. All 14 implementation slices have verified committed parents and ancestry in this branch. The 13 original device closures are retained and excluded from the lists below. Scope remains 33 findings + 9 requests plus the existing procurement dependency.
+
+**Combined final-source regression: 873 passed, 5 failed, 3 existing capture-only skips. This is not an all-green run.** The five failures are R58.8.6 checkout/cart-return golden comparisons; all five generated test images are byte-identical to the preserved pre-child baseline images. Fifteen generated failure files were archived before restoring the tracked historical bytes. No golden reference was updated and no failure was skipped. The earlier coupon qualification also retains its 10 baseline mismatches; this run covers five of those cases.
+
+The combined run covers session/procurement, order progress, product actions, responsive grid, partner catalogue, address form/sheet, shopping intent, info sheets, checkout/cart return and product content. Receipt: external singlechat-r669-scoped-final-connected-20260912-a.result.json; stdout SHA256 CDB917230188E7DC3AA99A03C23EAA7BE37DF67B7EF4BB3FA6567EBC5A591BCD. Existing per-slice actual Flutter captures, analysis and checks remain bound to their qualified sources; host tests and fixtures are not Redmi/provider acceptance.
+
+Complete immutable mapping: external redmi-r66-9-round-1/scoped-local-handoff-20260912-0510/scoped-local-handoff-1.json SHA256 **36773A4B22AFF9F3CDB533A1834ED1E56712BB4D2172CBE023F4717809B25BAC**. It retains all 29 open originals, 12 UAT children, 2 earlier children, source-bound dependencies, exact slice manifests and the procurement handoff.
+
+### Open UAT children: local implementation versus device closure
+
+| Child | Local commit | Remaining |
+|---|---|---|
+| R669-UAT-TRACKING-FRESHNESS-SUMMARY-001 | 1b4db22eb941840564de662afc64ec466023b076 | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-REVIEW-BACK-DRAFT-001 | 0e632827732e309450fb0fd1718399be5e1b210c | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-RECENT-LAST-ACTION-001 | ad2d738760c0ef8488ff3f6377f6a3a5a12b9794 | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-COUPON-MINIMUM-SPEND-001 | fbd3c441f18fd7d0232f085e8ffca19c08da03df | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-BULK-QUANTITY-KEYBOARD-001 | 7bd4a72dca2487ecfc5b0053ca97eb8673e3885d | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-MONTHLY-LARGE-TEXT-CONTINUATION-001 | 3d1ab7eca853ede67d69c34633fcd60d5bb4ab19 | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-ORDER-ANDROID-BACK-POSITION-001 | 1fa703f10eb38aecc8dfec6cc026b98529ddcd5a | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-DELIVERY-SELECTOR-AUTOHIDE-001 | a4716f8149b1aba5210efd7e631d4eb28bc5902c | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-ADDRESS-NEXT-FIELD-VISIBILITY-001 | e13672fe7654d32b5cec77f1c9b345f9e2238982 | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-REVIEW-ELIGIBILITY-ACTION-CLIPPED-001 | ba2fead34c4126f7f627a0bb42fd803b2a274840 | Redmi replay of original and connected journeys; provider cases remain separate. |
+| R669-UAT-SHARE-COLD-PRODUCT-ROUTE-001 | Unimplemented | Cold Android URI/bootstrap/router/session fix requires startup owner; native association/no-app/auth return also unresolved. |
+| R669-UAT-DELIVERY-TRACKING-RETURN-CONTEXT-001 | b26baf94e0b865954ed2955815d43daa50294a6e | Redmi replay of original and connected journeys; provider cases remain separate. |
+
+### All 29 open originals: remaining qualification
+
+Local child fixes are mapped in the preceding table and immutable manifest. The media disclosure and category-icon follow-ups are also committed. No historical closed original is counted here.
+
+| Original finding/request | Remaining qualification |
+|---|---|
+| R668-AUDIT-DELIVERY-HIDE-RECOVERY-001 | Redmi replay of selector/return fixes; actual refresh and split-order events. |
+| R668-AUDIT-WRITE-REVIEW-001 | Redmi replay of draft/action fixes; authenticated review publication remains excluded. |
+| R668-AUDIT-SHARE-LINK-001 | Cold startup exact-SKU route fix unimplemented; native association, no-app/install/auth return unqualified. |
+| R668-AUDIT-BULK-QTY-001 | Redmi enlarged landscape IME replay of quantity visibility fix. |
+| R668-AUDIT-CATALOGUE-001 | Redmi Monthly enlarged continuation replay. |
+| R668-AUDIT-MEDIA-001 | Redmi Cart disclosure and Fresh picks action-clearance replay; actual supplier image/video viewing. |
+| R668-AUDIT-MEDIA-002 | Provider publication/validation and Store media-to-Buy asset mapping; actual supported photo/video behavior. |
+| R668-AUDIT-SELLER-001 | Positive Compare-to-supplier navigation with authoritative bound offers. |
+| R668-AUDIT-RECENT-001 | Redmi final Recently viewed Add replay. |
+| R668-AUDIT-OFFER-COPY-001 | Authoritative populated benefits and publication qualification. |
+| R668-AUDIT-ADDRESS-KEYBOARD-001 | Redmi Next-field focus/caret replay with real landscape keyboard. |
+| R668-AUDIT-CART-TOTAL-LABEL-001 | Redmi coupon minimum-spend and changed-cart replay; baseline screenshot mismatches remain recorded. |
+| R668-AUDIT-CHECKOUT-PROMISE-001 | Live quote refresh and provider-confirmed fulfillment; no real order submission. |
+| R668-AUDIT-ORDER-PRODUCT-SEARCH-001 | Redmi searched Orders Android Back position replay. |
+| R668-AUDIT-ORDER-PURCHASE-SEARCH-001 | Same shared Orders Back child; purchase/split attribution replay. |
+| R668-AUDIT-COMPARE-EQUIVALENCE-001 | Bind authoritative exact product/variant/pack/quantity comparison source, selected mode/slot, charges and quote revisions. |
+| R668-AUDIT-INVOICE-MISSING-LINES-001 | Provider historical invoice retrieval/export and retained confirmation entry; never invent invoice lines. |
+| R668-AUDIT-DELIVERED-PARTNER-STATUS-001 | Provider-supplied named delivery partner/completion state. |
+| R668-AUDIT-BRAND-CATEGORY-001 | Actual supplier brand metadata/filtering. |
+| R668-AUDIT-TRACKING-FRESHNESS-001 | Redmi summary-label replay; bound live fresh/delayed/arrival events. |
+| R66-UAT-032-R668-PAGED-001 | Same Monthly continuation child; Redmi exact subset/last-item replay. |
+| R668-REQ-COMPARE-SUPPLIER-001 | Same comparison source dependency; approved vertical cards/direct price/Add and Back need authoritative offers. |
+| R668-REQ-STORE-CATEGORY-COMPACT-001 | Redmi shared three-line category icon replay. |
+| R668-REQ-LOCATION-INDIA-001 | Google Maps Places/Geocoding/permission and authoritative place-to-region source binding. |
+| R668-REQ-ADDRESS-TYPE-DENSITY-001 | Redmi landscape Next-field child replay; existing compact type selection preserved. |
+| R668-REQ-OFFERS-HEADER-001 | Redmi three-line icon replay; actual supplier/admin campaign publication. |
+| R668-AUDIT-DELIVERY-ICON-001 | Actual Bulk fleet/split-order device context; local artwork tests cover Quick/Wholesale/Bulk and supplied modes. |
+| R668-REQ-COLLECTION-DISCOVERY-001 | Store capability enable/disable/stale eligibility, authenticated collection/QR and onboarding provider path. |
+| R668-REQ-DELIVERY-CONTROLS-001 | Redmi selector/return/freshness fixes; actual arrival/audio/live split events. |
+
+### Earlier children and required owner/provider work
+
+- **R669-IMPL-WHOLESALE-LANDSCAPE-001:** earlier dock improvement retained; related numeric input child locally fixed at 7bd4a72dca2487ecfc5b0053ca97eb8673e3885d. Native enlarged landscape replay remains pending.
+- **R669-IMPL-DELIVERY-COMPLETION-PROMISE-001:** preserve original promise versus measured completion; live provider completion transition and actual supplied elapsed-time event remain unverified.
+- **Cold shared link:** apps/mobile/lib/main.dart, apps/mobile/lib/app/moolsocial_app.dart, apps/mobile/lib/features/journey01/journey_router.dart and journey_session.dart are outside the current Buy claim. Preserve the full exact-SKU URI across Android cold startup and test default association/no-app/install/auth return. This required child is not implemented or abandoned.
+- **Comparison and Maps:** no runtime implementation/binding for BuyV2ComparisonSource or BuyV2ShoppingAreaSource in current lib. The existing exact product/variant/pack/quantity, selected-mode/slot, charge-completeness and serviceability contracts need authoritative providers. No synthetic comparison winner or inferred location is substituted.
+- **Supplier media:** WorkspaceCatalogueItem/toBuyPublicProduct in apps/mobile/lib/features/work/work_models.dart has no media asset/metadata path. Supplier publication, validation, exact variant binding, actual photos/video/posters and viewer behavior remain required. Buy display contracts and illustrations do not prove this.
+- **Live commerce:** checkout quotes, live delivery events, arrival sound, review publication, campaign benefits, historical invoice retrieval, Store collection capabilities and authenticated collection/QR need their actual providers. Existing unavailable/recovery screens remain truthful.
+- **Procurement:** 5ae5059a2c1536e0dbd12373d3b6fb4b7c04f448 on required parent cb46b588f25365e8d180e7c441c26ff5143625a8 is an ancestor of the current source. Exact prior handoff remains external r669-isolated-handoff-final-20260910.json and its bound qualification manifest. Preserve account/Store/purpose, eligibility, offer revision, relaunch and return contracts together; it is not a standalone cherry-pick onto older Buy. Desktop owns Store wrapper, embedded DASH10 320x568/200%, outer return/relaunch and its OPPO replay. Backend enforcement remains pending.
+
+**Parking boundary:** all independently completed scoped Buy fixes are committed with evidence; required cold startup work, post-fix Redmi qualification and provider dependencies remain explicitly unresolved. No APK/build/install, OPPO operation, deployment, integration/main merge, dirty-file copying, real transaction/message or governance expansion is authorized by this handoff. The installed r66.9 APK identity remains AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. This checkpoint does not claim all frontend requirements complete or all tickets closed.
+
 ## Fresh picks image/action clearance checkpoint - 12 September 2026
 
 **R668-AUDIT-MEDIA-001 Fresh picks follow-up implemented and locally qualified; remains OPEN.** The photo and complete illustration disclosure now have space clear of Add and quantity controls. The existing quantity control uses its horizontal layout when the value fits and its stacked layout for long values. Existing card dimensions, product facts, saved action, Add/offer eligibility and session navigation remain. The first always-stacked spacing attempt was rejected on visual review because it made normal product images too small.
