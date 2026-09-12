@@ -397,3 +397,15 @@ confirmed both optional parameters and exact unmodified forwarding; both scripts
 parse, and git diff --check passes. The real regression-memory gate passes with
 the validated archive (4582 records, implementation phase). No evidence deletion,
 fabrication, new exception mechanism, APK build or device action occurred.
+
+## Exact successor admission pins
+
+Tested correction fa7a99941de93c07e22dabf55d30f568ad5a826b is clean and pushed
+with fresh exact remote equality; handoff passed. Four existing verifier owners
+now pin that exact tested source and only fresh final-v5 destination instead of
+the previous source/final-v4 identity. No predicate, exclusion or application
+behavior was added or removed. Session68335 exited 0: protected Buy review,
+backend/data-egress review, App brand, UI locks and diff checks passed. Explicit
+negative probes reject the old 0a1c0e5 source and unqualified f6cb6eda candidate.
+This is candidate admission provenance only; the independent review limitations
+above still apply. V4 is retained without rewriting or promotion.
