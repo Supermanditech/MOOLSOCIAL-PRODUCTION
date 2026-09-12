@@ -1584,6 +1584,50 @@ void r669SharedProductTests() {
 }
 
 void main() {
+  test('R669 review draft codec relaunch keeps cart and isolates customer', () async {
+    final preferences = _R669StringPreferences();
+    BuyV2Session make(String owner) {
+      final core = BuySession();
+      final session = BuyV2Session(core: core, customerStateStore:
+        BuyV2SharedPreferencesCustomerStateStore(preferences, ownerScope: owner));
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      return session;
+    }
+    final session = make('draft-customer-a');
+    await session.restoreCustomerState();
+    session.addProduct('s-milk');
+    final quantity = session.quantityFor('s-milk');
+    session.retainProductReviewDraft(productId: 's-milk', rating: 4,
+      comment: 'Keep my unsent review.', ownerScope: session.reviewDraftOwnerScope);
+    session.retainProductReviewDraft(productId: 's-tomato', rating: 2,
+      comment: 'A separate product.', ownerScope: session.reviewDraftOwnerScope);
+    await Future<void>.delayed(Duration.zero);
+    final restarted = make('draft-customer-a');
+    await restarted.restoreCustomerState();
+    expect(restarted.productReviewDraft('s-milk')?.rating, 4);
+    expect(restarted.productReviewDraft('s-milk')?.comment, 'Keep my unsent review.');
+    expect(restarted.productReviewDraft('s-tomato')?.comment, 'A separate product.');
+    expect(restarted.customerReviewFor('s-milk'), isNull);
+    expect(restarted.quantityFor('s-milk'), quantity);
+    final other = make('draft-customer-b');
+    await other.restoreCustomerState();
+    expect(other.productReviewDraft('s-milk'), isNull);
+    other.retainProductReviewDraft(productId: 's-milk', rating: 5,
+      comment: 'Stale owner edit', ownerScope: 'draft-customer-a');
+    expect(other.productReviewDraft('s-milk'), isNull);
+    expect(restarted.submitProductReview(productId: 's-milk', rating: 0, comment: ''), isFalse);
+    expect(restarted.productReviewDraft('s-milk'), isNotNull);
+    expect(restarted.submitProductReview(productId: 's-milk', rating: 4, comment: 'Keep my unsent review.'), isTrue);
+    expect(restarted.productReviewDraft('s-milk'), isNull);
+    expect(restarted.productReviewDraft('s-tomato'), isNotNull);
+    await Future<void>.delayed(Duration.zero);
+    final afterSubmission = make('draft-customer-a');
+    await afterSubmission.restoreCustomerState();
+    expect(afterSubmission.productReviewDraft('s-milk'), isNull);
+    expect(afterSubmission.productReviewDraft('s-tomato'), isNotNull);
+  });
+
   r669SharedProductTests();
   r669ShoppingAreaTests();
   r669ComparisonContractTests();

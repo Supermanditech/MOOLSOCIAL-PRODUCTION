@@ -118,6 +118,15 @@ class BuyV2ProcurementDraftSnapshot {
   }
 }
 
+/// Unsent customer text; never a published review or proof of eligibility.
+@immutable
+class BuyV2ProductReviewDraft {
+  const BuyV2ProductReviewDraft({required this.rating, required this.comment});
+  final int rating;
+  final String comment;
+  bool get valid => rating >= 0 && rating <= 5 && comment.length <= 8000;
+}
+
 @immutable
 class BuyV2CustomerStateSnapshot {
   const BuyV2CustomerStateSnapshot({
@@ -125,6 +134,7 @@ class BuyV2CustomerStateSnapshot {
     this.shoppingGooglePlaceId,
     this.shoppingAreaScope,
     this.cartQuantities = const {},
+    this.reviewDrafts = const {},
     this.procurementDraft,
     this.addresses = const [],
     this.selectedAddressId,
@@ -150,6 +160,7 @@ class BuyV2CustomerStateSnapshot {
   });
 
   final Map<String, int> cartQuantities;
+  final Map<String, BuyV2ProductReviewDraft> reviewDrafts;
   // Persist selection identifiers, not Google response labels or coordinates.
   final String? shoppingRegionId;
   final String? shoppingGooglePlaceId;
@@ -244,6 +255,11 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'shoppingGooglePlaceId': snapshot.shoppingGooglePlaceId,
     'shoppingAreaScope': snapshot.shoppingAreaScope,
     'cartQuantities': snapshot.cartQuantities,
+    'reviewDrafts': {
+      for (final entry in snapshot.reviewDrafts.entries)
+        if (entry.key.isNotEmpty && entry.value.valid)
+          entry.key: {'rating': entry.value.rating, 'comment': entry.value.comment},
+    },
     if (snapshot.procurementDraft case final draft?)
       'procurementDraft': _encodeProcurementDraft(draft),
     'addresses': [
@@ -276,12 +292,29 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'orders': [for (final order in snapshot.orders) _encodeOrder(order)],
   };
 
+  Map<String, BuyV2ProductReviewDraft> _decodeReviewDrafts(Object? value) {
+    if (value is! Map) return const {};
+    final drafts = <String, BuyV2ProductReviewDraft>{};
+    for (final entry in value.entries) {
+      final key = entry.key;
+      final data = entry.value;
+      if (key is! String || key.isEmpty || data is! Map) continue;
+      final rating = data['rating'];
+      final comment = data['comment'];
+      if (rating is! int || comment is! String) continue;
+      final draft = BuyV2ProductReviewDraft(rating: rating, comment: comment);
+      if (draft.valid) drafts[key] = draft;
+    }
+    return Map.unmodifiable(drafts);
+  }
+
   BuyV2CustomerStateSnapshot _decodeSnapshot(Map<String, Object?> source) =>
       BuyV2CustomerStateSnapshot(
         shoppingRegionId: _string(source['shoppingRegionId']),
         shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
         shoppingAreaScope: _string(source['shoppingAreaScope']),
         cartQuantities: _stringIntMap(source['cartQuantities']),
+        reviewDrafts: _decodeReviewDrafts(source['reviewDrafts']),
         procurementDraft: _decodeProcurementDraft(source['procurementDraft']),
         addresses: _objectList(
           source['addresses'],

@@ -147,6 +147,32 @@ Future<void> _openR669Review(WidgetTester tester) async {
 }
 
 void main() {
+  testWidgets('R669 review draft survives Android Back and explicit close', (tester) async {
+    final adapter = _R669ReviewCommerce()..eligible = true;
+    final session = await _mountR669Review(tester, adapter);
+    final comment = find.byKey(const ValueKey('buy-review-comment-s-milk'));
+    final rating = find.byKey(const ValueKey('buy-review-rating-s-milk-4'));
+    await tester.tap(rating);
+    await tester.enterText(comment, 'Keep this unsent review.');
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-product-review-sheet')), findsNothing);
+    expect(adapter.submissions, 0);
+    await _openR669Review(tester);
+    expect(tester.widget<TextFormField>(comment).controller!.text, 'Keep this unsent review.');
+    expect((tester.widget<IconButton>(rating).icon as Icon).icon, Icons.star_rounded);
+    await captureR66Visual(tester, 'r669-review-draft-back-restored');
+    await tester.tap(find.byKey(const ValueKey('buy-close-product-review')));
+    await tester.pumpAndSettle();
+    await _openR669Review(tester);
+    expect(tester.widget<TextFormField>(comment).controller!.text, 'Keep this unsent review.');
+    expect(session.productReviewDraft('s-milk')?.rating, 4);
+    expect(adapter.submissions, 0);
+    expect(tester.takeException(), isNull);
+  });
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final size in [const Size(320, 711), const Size(711, 320)]) {

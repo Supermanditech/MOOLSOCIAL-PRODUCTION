@@ -4728,6 +4728,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   late final TextEditingController _commentController;
   late final FocusNode _commentFocus;
   late int _rating;
+  late final String? _draftOwnerScope;
   bool _submissionRejected = false;
   bool _submitting = false;
 
@@ -4737,11 +4738,22 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
   @override
   void initState() {
     super.initState();
-    _rating = widget.existing?.rating ?? 0;
+    _draftOwnerScope = widget.session.reviewDraftOwnerScope;
+    final draft = widget.session.productReviewDraft(widget.product.id);
+    _rating = draft?.rating ?? widget.existing?.rating ?? 0;
     _commentController = TextEditingController(
-      text: widget.existing?.comment ?? '',
-    );
+      text: draft?.comment ?? widget.existing?.comment ?? '',
+    )..addListener(_retainDraft);
     _commentFocus = FocusNode()..addListener(_focusChanged);
+  }
+
+  void _retainDraft() {
+    widget.session.retainProductReviewDraft(
+      productId: widget.product.id,
+      rating: _rating,
+      comment: _commentController.text,
+      ownerScope: _draftOwnerScope,
+    );
   }
 
   void _focusChanged() {
@@ -4775,7 +4787,9 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
     _commentFocus
       ..removeListener(_focusChanged)
       ..dispose();
-    _commentController.dispose();
+    _commentController
+      ..removeListener(_retainDraft)
+      ..dispose();
     super.dispose();
   }
 
@@ -4851,6 +4865,7 @@ class _ProductReviewSheetState extends State<_ProductReviewSheet> {
                                         ? null
                                         : () => setState(() {
                                             _rating = value;
+                                            _retainDraft();
                                             _submissionRejected = false;
                                           }),
                                     icon: Icon(

@@ -3884,6 +3884,48 @@ class BuyV2Session extends ChangeNotifier {
   final Map<String, BuyV2MarketplaceTrustSnapshot> _marketplaceTrust = {};
   final Map<String, int> _prescriptionApprovedQuantities = {};
   final Map<String, BuyV2CustomerReview> _customerReviews = {};
+  final Map<String, BuyV2ProductReviewDraft> _reviewDrafts = {};
+  String? _reviewDraftOwnerScope;
+
+  String? get reviewDraftOwnerScope => customerStateStore?.ownerScope;
+
+  void _ensureReviewDraftOwner() {
+    if (_reviewDraftOwnerScope == reviewDraftOwnerScope) return;
+    _reviewDrafts.clear();
+    _reviewDraftOwnerScope = reviewDraftOwnerScope;
+  }
+
+  BuyV2ProductReviewDraft? productReviewDraft(String productId) {
+    _ensureReviewDraftOwner();
+    return findProduct(productId) == null ? null : _reviewDrafts[productId];
+  }
+
+  void retainProductReviewDraft({
+    required String productId,
+    required int rating,
+    required String comment,
+    required String? ownerScope,
+  }) {
+    if (ownerScope != reviewDraftOwnerScope || !procurementScopeCurrent) return;
+    _ensureReviewDraftOwner();
+    final draft = BuyV2ProductReviewDraft(rating: rating, comment: comment);
+    if (findProduct(productId) == null || !draft.valid) return;
+    if (rating == 0 && comment.isEmpty) {
+      _reviewDrafts.remove(productId);
+    } else {
+      _reviewDrafts[productId] = draft;
+    }
+    _persistCustomerState();
+  }
+
+  void _discardSubmittedReviewDraft(String productId, int rating,
+      String comment, String? ownerScope) {
+    if (ownerScope != reviewDraftOwnerScope) return;
+    final draft = productReviewDraft(productId);
+    if (draft?.rating != rating || draft?.comment.trim() != comment.trim()) return;
+    _reviewDrafts.remove(productId);
+    _persistCustomerState();
+  }
   final Map<String, String> _reportedProductReasons = {};
   final Set<String> _reviewableProductIds = {};
   final Set<String> _productFeedbackBusyIds = {};
@@ -5505,6 +5547,10 @@ class BuyV2Session extends ChangeNotifier {
         !_addresses.any((address) => address.id == _selectedAddressId)) {
       _selectedAddressId = null;
     }
+    _ensureReviewDraftOwner();
+    _reviewDrafts
+      ..clear()
+      ..addEntries(snapshot.reviewDrafts.entries.where((entry) => entry.value.valid));
     final validSavedKeys = _knownCatalogueProducts.map(_buyV2SavedKey).toSet();
     _savedKeys
       ..clear()
@@ -5703,7 +5749,9 @@ class BuyV2Session extends ChangeNotifier {
       // not resurrect its earlier unresolved quantity.
       _unresolvedCustomerCart.removeWhere((id, _) => _cart.containsKey(id));
     }
+    _ensureReviewDraftOwner();
     final snapshot = BuyV2CustomerStateSnapshot(
+      reviewDrafts: Map.unmodifiable(_reviewDrafts),
       shoppingRegionId: _catalogueRegionId,
       shoppingGooglePlaceId: _shoppingGooglePlaceId,
       shoppingAreaScope: _catalogueAreaScope.name,
@@ -9528,6 +9576,7 @@ class BuyV2Session extends ChangeNotifier {
       comment: cleanComment,
       updatedLabel: 'Added just now',
     );
+    _discardSubmittedReviewDraft(productId, rating, comment, reviewDraftOwnerScope);
     notice = 'Your review was added.';
     notifyListeners();
     return true;
@@ -9586,6 +9635,7 @@ class BuyV2Session extends ChangeNotifier {
     if (!_productFeedbackBusyIds.add(productId)) return false;
     notice = null;
     notifyListeners();
+    final draftOwnerScope = reviewDraftOwnerScope;
     try {
       final result = await commerceAdapter.submitProductReview(
         product: product,
@@ -9599,6 +9649,7 @@ class BuyV2Session extends ChangeNotifier {
           comment: cleanComment,
           updatedLabel: 'Added just now',
         );
+        _discardSubmittedReviewDraft(productId, rating, comment, draftOwnerScope);
       }
       notice = result.customerMessage;
       return result.accepted;

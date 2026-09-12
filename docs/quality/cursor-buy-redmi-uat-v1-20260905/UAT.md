@@ -1,5 +1,16 @@
 # Fresh Redmi journey inventory
 
+## Review draft child implementation checkpoint - 12 September 2026
+
+**R669-UAT-REVIEW-BACK-DRAFT-001 implemented and locally checked; remains OPEN for Redmi verification.** Parent R668-AUDIT-WRITE-REVIEW-001 and separate review action-clipping child remain open. Unsent rating/comment now live separately from published reviews, keyed to the product listing within the existing customer-state owner scope. The editor restores the draft and retains changes immediately; Back and explicit Close no longer destroy the only copy. The existing customer-state codec carries drafts across relaunch, defaults older snapshots to no drafts, and rejects malformed draft data. Cart and unrelated product drafts are preserved. Stale-owner edits are rejected; rejected submission retains the draft and successful submission removes only matching submitted content.
+
+Local validation:462 tests passed,0 failed,0 skipped across the full session and product-action suites, including new codec/relaunch/customer-isolation/cart-preservation and Android Back/Close regressions. Existing eligibility-change and rejected-save tests pass. Analysis and approved UI locks passed. An actual Flutter capture of the reopened editor shows four stars and the exact unsent text; the focused capture test passed without a real provider submission. This is not a claim of live-account/provider or new-APK verification.
+
+Evidence: external redmi-r66-9-round-1/review-child-implementation-20260912-0155/local-qualification-1.json SHA256 054CA00126E0ADED6BD4C1211B09FF67AA9636C2FCD31BC2A4BC19EA412A6D77; exact five source/test owner and capture hashes included. Connected receipt singlechat-r669-review-connected-20260912-0201.result.json, stdout SHA25605FBF6D6AD9BE139DC2F7C2A401EF6FA221DA1C851730BB1FB70DB1447ED155B. Tested parent ad2d738760c0ef8488ff3f6377f6a3a5a12b9794 is required; codec, session and editor changes form one dependency-complete slice and must not be separated for integration.
+
+No new APK/install, integration, provider action or device closure. Counts remain13 closed/29 open originals and12 open UAT children; this implementation checkpoint does not change device closure counts. Remaining scoped fixes and unavailable provider/device qualification remain required.
+
+
 ## Recently viewed child implementation checkpoint - 12 September 2026
 
 **R669-UAT-RECENT-LAST-ACTION-001 implemented and locally checked; remains OPEN for Redmi verification.** Parent R668-AUDIT-RECENT-001 also remains open. Existing bottom-sheet content now reserves the Android bottom navigation inset, making the complete final Add action reachable without changing product, supplier or cart identity.
