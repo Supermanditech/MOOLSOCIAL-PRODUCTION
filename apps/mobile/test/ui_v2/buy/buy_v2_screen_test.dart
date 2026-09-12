@@ -7045,6 +7045,74 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    for (final mode in ['quick', 'courier']) {
+      testWidgets('R669 Monthly vertical discovery $mode text $scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('w-notebook'), isTrue);
+        final retainedWholesale = session.quantityFor('w-notebook');
+        await tester.pumpWidget(app(session, textScale: scale, safePadding: const EdgeInsets.only(top: 24, bottom: 34)));
+        await tester.pumpAndSettle();
+        final monthly = find.byKey(const ValueKey('buy-promotion-shop-basket'));
+        await tester.ensureVisible(monthly);
+        await tester.tap(monthly);
+        await tester.pumpAndSettle();
+        final see = find.byKey(const ValueKey('buy-household-see-products'));
+        await tester.ensureVisible(see);
+        await tester.tap(see);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(ValueKey('buy-shop-sale-type-$mode')));
+        await tester.pumpAndSettle();
+        final expected = session.catalogueSaleTypeProducts.map((p) => p.id).toSet();
+        expect(expected, hasLength(6));
+        final visited = <String>{};
+        final scrollView = find.descendant(of: find.byType(BuyV2CatalogueView), matching: find.byType(CustomScrollView));
+        expect(scrollView, findsOneWidget);
+        for (var step = 0; step < 35; step++) {
+          for (final id in expected) {
+            final add = find.byKey(ValueKey('buy-add-$id'));
+            if (add.hitTestable().evaluate().isNotEmpty) {
+              final box = tester.getRect(add);
+              if (box.left >= 0 && box.right <= 360) visited.add(id);
+            }
+          }
+          await tester.drag(scrollView, const Offset(0, -220));
+          await tester.pumpAndSettle();
+        }
+        await captureR66Visual(tester, 'r669-monthly-$mode-$scale-bottom');
+        expect(visited, expected, reason: 'Every Monthly SKU Add action must be discoverable with vertical scrolling alone.');
+        final id = expected.last;
+        final add = find.byKey(ValueKey('buy-add-$id'));
+        await tester.ensureVisible(add);
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        final quantity = session.quantityFor(id);
+        expect(quantity, greaterThan(0));
+        final card = find.byKey(ValueKey('buy-product-$id'));
+        await tester.ensureVisible(card);
+        await tester.tap(card);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, id);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.showingMonthlyBasketProducts, isTrue);
+        expect(session.quantityFor(id), quantity);
+        expect(session.quantityFor('w-notebook'), retainedWholesale);
+        expect(session.catalogueSaleTypeProducts.map((p) => p.id).toSet(), expected);
+        await captureR66Visual(tester, 'r669-monthly-$mode-$scale-return');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('R66 032 monthly basket keeps price groups and Shop Cart scope', (
     tester,
   ) async {

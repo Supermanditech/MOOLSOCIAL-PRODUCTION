@@ -8166,7 +8166,15 @@ class _ProductGrid extends StatelessWidget {
               ),
             if (gridProducts.isNotEmpty)
               SliverToBoxAdapter(
-                child: _HorizontalProductGrid(
+                child: session.showingMonthlyBasketProducts
+                    ? BuyV2ProgressiveProductGrid(
+                        session: session,
+                        products: gridProducts,
+                        storageKey: 'buy-monthly-${session.saleTypeSignature}',
+                        semanticLabel: 'Monthly basket products',
+                        vertical: true,
+                      )
+                    : _HorizontalProductGrid(
                   session: session,
                   products: gridProducts,
                   cardWidth: layout.cardWidth,

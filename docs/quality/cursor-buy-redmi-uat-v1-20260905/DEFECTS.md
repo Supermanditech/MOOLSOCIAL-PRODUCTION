@@ -1,5 +1,16 @@
 # Fresh Redmi defect register
 
+## Monthly basket continuation child checkpoint - 12 September 2026
+
+**R669-UAT-MONTHLY-LARGE-TEXT-CONTINUATION-001 implemented and locally checked; remains OPEN for Redmi verification.** Monthly basket now reuses the existing vertical progressive SKU grid, preserving the same product cards, Add controls and product navigation. Its previous horizontal two-lane layout left the third column undiscovered during ordinary vertical scrolling at enlarged text. General catalogue layout is unchanged.
+
+Final connected regression: 584 passed, 0 failed, 1 pre-existing skipped additive capture test (R56.4 household and Saved responsive evidence captures; no new skip or reference update). Four focused tests at 360x800 and 100%/200% text cover Quick and Scheduled: all six products reached by vertical drags before any individual-card ensureVisible, Add, product entry, Android Back and retained Wholesale cart. The existing Monthly price-group/cart/checkout journey also passes. Eight actual Flutter captures reviewed. Analysis and approved UI locks pass. The corrected baseline reproduced two enlarged-text failures; earlier fixture-scale and guarded-edit attempts are preserved and excluded from fixed-source qualification.
+
+Evidence: external redmi-r66-9-round-1/monthly-continuation-implementation-20260912-0335/local-qualification-1.json SHA256 BF7BEC936158AEA336E54AC58587DC26D0E0FD4A8255B4B838E0AC90FD7F58BE, including exact two source/test owner hashes, receipts and eight captures. Connected receipt singlechat-r669-monthly-connected-20260912-a.result.json; stdout SHA256 78545EDCE8CA327ED700EB0D7DC3591DFB0F21C6D8C494B9C339BB3F2BE8B780. Required tested parent 7bd4a72dca2487ecfc5b0053ca97eb8673e3885d. Existing vertical grid dependency and full parent stack remain required for later integration.
+
+No APK/build/install, integration or device closure. Counts remain 13 closed/29 open originals, 12 open UAT children and 2 earlier implementation children. Neutral enlarged-text media does not qualify supplier-media behavior. Remaining scoped fixes and provider/device qualifications remain required.
+
+
 ## Delivery tracking return child checkpoint - 12 September 2026
 
 **R669-UAT-DELIVERY-TRACKING-RETURN-CONTEXT-001 implemented and locally checked; remains OPEN for Redmi verification.** The delivery rail now opens tracking with a single-use origin contract that reuses existing Buy navigation restoration. Back restores the originating destination/view, product/cart/comparison navigation, query/categories, checkout/order context while retaining current cart contents. Owner/Store mismatch rejects restoration; destination or Orders-root departure clears an abandoned visit. Nested order items retain the rail origin. Ordinary Orders tracking and existing Help/Alerts return contracts remain separate.
