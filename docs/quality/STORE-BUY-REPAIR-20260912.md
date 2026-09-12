@@ -33,4 +33,11 @@ existing Git gates, clean state and remote equality. Store procurement construct
 durable return/relaunch, split-order mapping and shared cold startup remain separate
 implementation dependencies; this merge alone does not close them or backend authority.
 
-Status: binding preparation only; no source reconciliation, merge or qualification yet.
+Binding bootstrap: c02639a8fb61699fdfc3ac16882c61b41aeca1d1. Parser and
+coordination_bootstrap pass. Wrong task, work ID and ticket reject; an additional
+catalogue owner in bootstrap rejects. Exact implementation claim of the four
+conflict owners plus this evidence document passes. No runtime file changed.
+
+Pre-merge checkpoint: preserve both input tips and every automatically merged blob.
+Catalogue must be reconciled region by region and tested, not wholesale-selected.
+Status: source reconciliation and combined qualification pending.
