@@ -36,3 +36,19 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Evidence:112-tracking-refresh and147-order-chat-context; exact installed V6 review APK and Redmi as recorded. Fixture order MS-NEW-09; this finding concerns cross-surface freshness handling rather than whether fixture ETA is live.
 - Source correlation: apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart near108 maps delivery to order.promise; near339 also formats the raw promise. buy_v2_shop_chat.dart fromOrder near408/415 likewise uses order.promise. Runtime Chat context is observed directly; no implementation or isolated regression added.
 - Ownership: Buy-to-shared-Chat metadata/freshness contract; coordinate shared consumer rendering if needed in the later implementation scope. Backend live estimates remain separately unqualified.
+
+## RV6-D004 - Display-name validation sentence is clipped at normal text size
+- Status: open; confirmed device visual defect. Severity: minor.
+- Journey: Buy account drawer > Personal profile > Display name > submit whitespace-only draft. Validation rejects it; Android Back hides keyboard.
+- Actual: error remains one truncated line, Enter a display name from 2 to 60 cha..., with and without keyboard at Redmi font scale1.0. The allowed numeric range remains visible; this is not a validation bypass or data-loss claim.
+- Expected: complete validation guidance fits or wraps, including characters, without requiring inference from clipped content.
+- Evidence:198-blank-name-error and199-name-error-keyboard-back. Capture197 contains an accidental whitespace from a tap while delayed autofocus opened the keyboard; it is not itself a defect. No valid profile save occurred.
+- Source correlation: apps/mobile/lib/features/journey01/journey_session.dart:466 supplies the full sentence. Shared profile form owns its error layout; exact rendering cause still to inspect. Connected shared profile UI owner, not Buy catalogue. No implementation during this audit.
+
+## RV6-D005 - Hindi preference changes its value but observed Buy and preference UI remain English
+- Status: open; confirmed device localization/wiring gap. Severity: moderate for Hindi-dependent users.
+- Journey: Buy account > Personal profile > Language > Privacy and preferences > Language > Hindi; return to Buy catalogue.
+- Actual: preference reads Hindi but headings/actions on the preference screen and returned Buy catalogue remain English, including Stores or products, Wholesale, Bulk and Add. No unavailable/restart/partial-language disclosure was visible.
+- Expected: choosing an offered app language applies to supported customer navigation and guidance; unavailable coverage must be explicit rather than implying the language changed throughout the experience. Supplier-authored product names are not required to be translated by this finding.
+- Evidence:202-language-sheet,203-hindi-selected,204-hindi-return. Current normal-text Redmi V6 APK. Relaunch language propagation remains untested; this finding is the immediate observed selection/return behavior.
+- Source correlation: features/journey01/journey_session.dart updateLanguage near443 persists languageCode and announces language changed. Shared localization and Buy strings require later owner assessment; no implementation or backend change authorized by this audit.
