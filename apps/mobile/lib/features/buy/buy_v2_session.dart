@@ -804,6 +804,15 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
     );
   }
 
+  // Seeded Store role shared by catalogue resolution and published offers.
+  // This review fixture does not grant production procurement eligibility.
+  BuyV2OfferPublisherType _publisherType(int store) =>
+      destination == BuyV2Destination.shop
+      ? BuyV2OfferPublisherType.retailer
+      : (store ~/ regions.length).isEven
+      ? BuyV2OfferPublisherType.manufacturer
+      : BuyV2OfferPublisherType.wholesaler;
+
   BuyV2Product _product(int store, int sku) {
     productObjectsCreated += 1;
     final base = _templates[sku % _templates.length];
@@ -813,6 +822,11 @@ class BuyV2DevelopmentCatalogueSource implements BuyV2CataloguePageSource {
       storeId: storeIdAt(store),
       title: '${base.title} ${sku + 1}',
       seller: _name(store),
+      sellerType: destination == BuyV2Destination.wholesale
+          ? (_publisherType(store) == BuyV2OfferPublisherType.manufacturer
+                ? 'Manufacturer'
+                : 'Wholesaler')
+          : base.sellerType,
       origin: _area(store),
       variant: '${base.variant} · SKU ${sku + 1}',
       catalogueListing: true,
@@ -1081,11 +1095,8 @@ class BuyV2DevelopmentPublishedCatalogueSource
       '$version-${_shop.providerCount}-${_shop.skusPerStore}';
 
   BuyV2OfferPublisherType _publisher(BuyV2Destination destination, int store) =>
-      destination == BuyV2Destination.shop
-      ? BuyV2OfferPublisherType.retailer
-      : (store ~/ BuyV2DevelopmentCatalogueSource.regions.length).isEven
-      ? BuyV2OfferPublisherType.manufacturer
-      : BuyV2OfferPublisherType.wholesaler;
+      (destination == BuyV2Destination.shop ? _shop : _wholesale)
+          ._publisherType(store);
 
   ({BuyV2DevelopmentCatalogueSource source, List<int> stores, List<int> skus})
   _cohort(BuyV2DevelopmentCatalogueSource source, BuyV2CatalogueQuery query) {

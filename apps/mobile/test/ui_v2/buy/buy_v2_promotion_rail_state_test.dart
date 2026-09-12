@@ -8,8 +8,89 @@ import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 fresh promotion starts at product top $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 568);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core, reviewDataEnabled: true);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: TextScaler.linear(scale),
+              disableAnimations: true,
+            ),
+            child: r66VisualCaptureRoot(child!),
+          ),
+          home: BuyV2Screen(session: session, initialOffersActive: true),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final cta = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'buy-offer-promotion-cta-',
+            ),
+      );
+      Future<void> openOffer() async {
+        await tester.ensureVisible(cta);
+        await tester.pumpAndSettle();
+        await tester.tap(cta);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+      }
+
+      await openOffer();
+      final productId = session.selectedProductId!;
+      ScrollableState productScroll() => tester.state<ScrollableState>(
+        find
+            .descendant(
+              of: find.byKey(PageStorageKey('buy-product-$productId')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      productScroll().position.jumpTo(650);
+      await tester.pumpAndSettle();
+      final retainedOffset = productScroll().position.pixels;
+      expect(retainedOffset, greaterThan(0));
+      expect(session.addProduct(productId), isTrue);
+      final quantity = session.quantityFor(productId);
+      session.openCart();
+      await tester.pumpAndSettle();
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(productScroll().position.pixels, closeTo(retainedOffset, 1));
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      await openOffer();
+      expect(session.selectedProductId, productId);
+      expect(
+        productScroll().position.pixels,
+        0,
+        reason:
+            'A fresh promotion tap must not reuse a previous review position',
+      );
+      expect(session.quantityFor(productId), quantity);
+      expect(tester.takeException(), isNull);
+      await captureR66Visual(tester, 'r669-fresh-offer-entry-$scale');
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
+  }
 
   test(
     'delivery label is not duplicated when the source is already labelled',

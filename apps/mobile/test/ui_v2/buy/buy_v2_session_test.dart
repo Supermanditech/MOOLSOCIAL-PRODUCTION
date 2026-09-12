@@ -4875,6 +4875,16 @@ void main() {
             expect(product.storeId, offer.product.storeId);
             expect(product.pack, offer.product.pack);
             expect(product.price, offer.product.price);
+            if (product.destination == BuyV2Destination.wholesale) {
+              expect(
+                product.sellerType,
+                offer.publisherType == BuyV2OfferPublisherType.manufacturer
+                    ? 'Manufacturer'
+                    : 'Wholesaler',
+                reason: 'R669 offer publisher must match the same Store SKU',
+              );
+              expect(offer.product.sellerType, product.sellerType);
+            }
           }
         }
       },
@@ -4906,6 +4916,21 @@ void main() {
             );
           }
           expect(page.items.every((o) => o.publisherType == publisher), isTrue);
+          if (publisher == BuyV2OfferPublisherType.manufacturer ||
+              publisher == BuyV2OfferPublisherType.wholesaler) {
+            expect(
+              page.items.every(
+                (o) =>
+                    o.product.sellerType ==
+                    (publisher == BuyV2OfferPublisherType.manufacturer
+                        ? 'Manufacturer'
+                        : 'Wholesaler'),
+              ),
+              isTrue,
+              reason:
+                  'Seeded publisher and supplier roles share one Store fact',
+            );
+          }
           expect(page.nextCursor, isNull);
           expect(
             page.items.every(

@@ -575,6 +575,25 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
     if (_quickTrackerNavigationSequence !=
         widget.session.navigationMotionSequence) {
+      final session = widget.session;
+      if (_storeProductRouteDepth == 0 &&
+          session.view == BuyV2View.product &&
+          session.navigationMotionDirection ==
+              BuyV2NavigationMotionDirection.forward) {
+        final sequence = session.navigationMotionSequence;
+        // Fresh product entry starts with the buying decision. Back from Cart
+        // or a nested Store visit retains its own existing scroll restoration.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              identical(widget.session, session) &&
+              session.navigationMotionSequence == sequence &&
+              session.view == BuyV2View.product &&
+              _storeProductRouteDepth == 0 &&
+              _rootProductScrollController.positions.length == 1) {
+            _rootProductScrollController.jumpTo(0);
+          }
+        });
+      }
       _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
       _quickTrackerCollapseTimer?.cancel();
       _quickTrackerPointers.clear();

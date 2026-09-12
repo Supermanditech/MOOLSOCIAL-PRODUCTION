@@ -1,5 +1,92 @@
 # Fresh Redmi defect register
 
+## Current working queue - parent/child reconciliation, 12 September 2026
+
+Founder requested following tested originals through their children instead of repeatedly reporting all originals as an untouched queue. Frozen scope remains **42 originals: 33 findings and 9 requests**. Working dispositions now total **13 CLOSED-REDMI-VERIFIED + 16 TESTED-FOLLOWUP-TRANSFERRED + 13 QUALIFICATION-PENDING**. No additional passing result or Redmi closure is claimed by this reconciliation. The earlier cumulative 29-open figure combined the latter two groups; it must not be presented as 29 untested tickets.
+
+TESTED-FOLLOWUP-TRANSFERRED means the original's available Redmi replay and failure evidence are retained, and the linked child is the active correction/retest unit. It is not a claim that the parent passed or that provider-dependent criteria disappeared. Follow the **14 UAT children and 2 earlier implementation children**, plus the remaining qualification items below. Parent and child are not independent defects to add together.
+
+| Tested original | Active child follow-up (R669-UAT- prefix) |
+|---|---|
+| R668-AUDIT-DELIVERY-HIDE-RECOVERY-001 | DELIVERY-SELECTOR-AUTOHIDE-001; DELIVERY-TRACKING-RETURN-CONTEXT-001 |
+| R668-AUDIT-WRITE-REVIEW-001 | REVIEW-BACK-DRAFT-001; REVIEW-ELIGIBILITY-ACTION-CLIPPED-001 |
+| R668-AUDIT-SHARE-LINK-001 | SHARE-COLD-PRODUCT-ROUTE-001 |
+| R668-AUDIT-BULK-QTY-001 | BULK-QUANTITY-KEYBOARD-001 |
+| R668-AUDIT-CATALOGUE-001 | MONTHLY-LARGE-TEXT-CONTINUATION-001 |
+| R668-AUDIT-RECENT-001 | RECENT-LAST-ACTION-001 |
+| R668-AUDIT-ADDRESS-KEYBOARD-001 | ADDRESS-NEXT-FIELD-VISIBILITY-001 |
+| R668-AUDIT-CART-TOTAL-LABEL-001 | COUPON-MINIMUM-SPEND-001 |
+| R668-AUDIT-ORDER-PRODUCT-SEARCH-001 | ORDER-ANDROID-BACK-POSITION-001 |
+| R668-AUDIT-ORDER-PURCHASE-SEARCH-001 | Same ORDER-ANDROID-BACK-POSITION-001; no duplicate |
+| R668-AUDIT-TRACKING-FRESHNESS-001 | TRACKING-FRESHNESS-SUMMARY-001 |
+| R66-UAT-032-R668-PAGED-001 | Same MONTHLY-LARGE-TEXT-CONTINUATION-001 |
+| R668-REQ-ADDRESS-TYPE-DENSITY-001 | Same ADDRESS-NEXT-FIELD-VISIBILITY-001 |
+| R668-REQ-DELIVERY-CONTROLS-001 | Existing freshness, selector and tracking-return children above |
+| R668-REQ-OFFERS-HEADER-001 | OFFER-PRODUCT-ENTRY-POSITION-001; related publisher-role child |
+| R668-AUDIT-OFFER-COPY-001 | OFFER-PUBLISHER-ROLE-001 |
+
+The **13 remaining qualification items** are MEDIA-001, MEDIA-002, SELLER-001, CHECKOUT-PROMISE-001, COMPARE-EQUIVALENCE-001, INVOICE-MISSING-LINES-001, DELIVERED-PARTNER-STATUS-001, BRAND-CATEGORY-001 and DELIVERY-ICON-001 under R668-AUDIT; and COMPARE-SUPPLIER-001, STORE-CATEGORY-COMPACT-001, LOCATION-INDIA-001 and COLLECTION-DISCOVERY-001 under R668-REQ. These are partially exercised or unavailable, not all untouched: exact residual criteria remain in the per-record evidence. MEDIA-001 and the Store category icon also need an APK containing their newer local corrections. Do not close provider media, positive comparison, Maps, live delivery, historical retrieval or authenticated collection from unavailable-state tests.
+
+Provider/native residual criteria on transferred originals also remain attached: real delivery/split/audio events, review publication, recipient/no-app links, actual offer benefits/publication and supplier role authority. Transferring follow-up neither implements nor qualifies them. The separate Store procurement dependency remains separate.
+
+Authority: external redmi-r66-9-round-1/installed-crosscheck-20260912/parent-child-followup-v3.json, SHA256 **9306C83225116BDC80285741923221B6D57CCB94811A9BF29018E6AF31E30EB3**. It preserves all 42 original rows, prior dispositions, captures, child relationships and remaining criteria, and binds the installed r66.9 APK. v2 was an invalid ledger-construction attempt retained for transparency; only validated v3 is authoritative. Full pre-edit document copies are preserved. Further implementation is paused for this founder-requested reconciliation; the already-started connected regression may finish.
+
+## Redmi continuation - 12 September 2026, new Offers children at captures 1165-1170
+
+Current cumulative open counts: 29 frozen pre-APK originals, 14 UAT children (previous 12 plus the two below), and 2 earlier implementation children. No new original closure. Separate procurement dependency is not included in these counts. Installed r66.9 / 2026091101 on Redmi TG8HCYTGGQT885OF; exact APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Earlier counts below are historical checkpoints. No implementation started in this device-only continuation.
+
+### R669-UAT-OFFER-PRODUCT-ENTRY-POSITION-001 - Fresh promotion entry resumes unrelated old product scroll
+
+**Latest local status,12 September2026: corrected and locally checked; OPEN for Redmi.** Fresh forward root-product entry resets after attachment with session/navigation guards; Cart/Store Back restoration is retained. Normal/200percent320x568 tests fail at650px before the correction and pass afterward, preserving quantity and Cart Back offset. Shared six-suite qualification575/575 and actual Flutter captures are recorded in UAT.md and offers-children-implementation-20260912/local-qualification-1.json (SHA256E45E923E7464FC5AAE1745CF666934F812FCDA1883B550B4542E649C53480338). No new APK or device closure. Historical reproduction follows.
+
+OPEN, P2, real Redmi reproduction; child of R668-REQ-OFFERS-HEADER-001. After browsing a product's review section, open Offers and tap the Store offer / Fresh tomatoes 1 / INR37 / 500g View offer button1165. Destination1166 starts at Specifications, ratings and reviews; product name, selected price and primary Add are above the viewport. Upward-content recovery1167 confirms the correct product/pack/price exists. Back1168 restores the exact Offers XML. Next promotion1169 then View offer1170 opens the Wholesale product midway down, again with identity and pack price above the viewport. This is entry-position reuse, not wrong-product routing or lost price. Expected: a fresh promotion CTA opens at the product's decision information; Back from nested actions still retains the user's existing product and Offers positions. Keep the existing screens, seller, quantity and cart. Captures retained under external redmi-r66-9 with PNG/XML hashes and action receipts; no cart addition or transaction. Register before implementation; source cause not yet investigated.
+
+### R669-UAT-OFFER-PUBLISHER-ROLE-001 - Manufacturer promotion conflicts with Wholesaler product identity
+
+**Latest local status,12 September2026: review-source inconsistency corrected; OPEN for Redmi and provider authority.** Development catalogue products and publication now share one seeded Store-role value, including exact-ID resolution and manufacturer/wholesaler filtered cohorts. This corrects the review fixture conflict without granting procurement permission, inventing a verified supplier or changing production provider contracts. Regression fails before the correction and passes afterward; shared575/575 qualification is bound above. A real authoritative publishing workspace remains a separate unverified dependency. Historical reproduction follows.
+
+OPEN, P2, real Redmi reproduction; child of R668-AUDIT-OFFER-COPY-001, related to R668-REQ-OFFERS-HEADER-001. Next promotion1169 explicitly advertises Manufacturer price, Fresh tomatoes 1, INR580 / 10kg crate, minimum2 packs, publisher Mool Market 000001. View offer1170 identifies the corresponding supplier as Mool Market 000001 / Wholesaler in both seller and order details. Pack and minimum total INR1160 match; no price mismatch is alleged. The UI gives inconsistent supplier-role information that can mislead a buyer seeking manufacturer sourcing. Expected: promotion wording must agree with authoritative publishing workspace role; unknown role must not claim manufacturer sourcing. Do not infer authority from seller name or fabricate backend verification. Capture1169 PNG A457C04336D5C807B89B9DF037627381DDAAA9E1E1FADA9948B20D9AAA10690B; capture1170 PNG49C86161B4F3507513A99439B34B21FF49588B69EEAB152253435EF8478B2097; exact XML/action receipts retained alongside. Prior original offer-copy record covered additional-benefit wording, not this role conflict. Register before implementation; backend role authority remains explicitly unqualified.
+
+## Installed Redmi cross-check - 12 September 2026, captures 1041-1076
+
+Founder requested real-user device cross-check and defect registration only. This is a partial cross-check of the 29 open originals, not full ticket qualification. No implementation, host regression, APK build/install, integration, order placement or external message occurred in this pass. No ticket closed and no duplicate child created. The 29 originals remain open; existing child counts are unchanged.
+
+Device TG8HCYTGGQT885OF; com.moolsocial.app.cursorreview; version 1.0.0-r66.9-cursorreview / 2026091101. Installed APK SHA256 AEF3714D4D8C708F28BB77409B13AC713A477788392A8378220D9494560F67B9. Newer local implementation commits are not this installed APK.
+
+### Confirmed existing failures / unmet request
+
+| Ticket | Fresh real-device result | Evidence in external redmi-r66-9/ |
+|---|---|---|
+| R668-AUDIT-MEDIA-001 | Cart category-illustration disclosure splits illustration as illustratio / n beneath the thumbnail. | 1049-collection-cart-destination; 1061-checkout-cart-back |
+| R668-REQ-STORE-CATEGORY-COMPACT-001 | Store catalogue still uses the four-square category control, rather than the approved matching three-line icon. Existing request, not another new child. | 1047-collection-repeat-entry |
+| R669-UAT-COUPON-MINIMUM-SPEND-001; parent R668-AUDIT-CART-TOTAL-LABEL-001 | Trade order coupon with minimum INR2500 applies to a Wholesale subtotal INR1160. Cart deducts INR150 and shows INR1010. Reproduced through visible Select and Return to Cart actions. | 1062-cart-coupon-eligibility; 1063-coupon-below-minimum-selection; 1064-coupon-below-minimum-cart-total |
+| R669-UAT-TRACKING-FRESHNESS-SUMMARY-001; parent R668-AUDIT-TRACKING-FRESHNESS-001 | MS-NEW-09 Orders card states Delivery in 12 min without a last-known qualifier; its tracking detail explicitly says last recorded estimate and live updates unavailable. | 1069-orders-crosscheck; 1070-order-tracking-freshness; 1071-tracking-android-back |
+
+### Narrow passes and unavailable qualification
+
+| Ticket / journey | Actual result and limit |
+|---|---|
+| R668-AUDIT-SELLER-001 | Product has one Visit supplier action; it opens Mool Market 000001. Evidence 1043-1044. Other origins and provider eligibility remain unqualified. |
+| R668-REQ-COLLECTION-DISCOVERY-001 | Approved Order & Collect copy and CTA reach the same store catalogue; Add respects MOQ2 and checkout selects Collect at store for that store. Sign-in is explicitly required. Evidence 1044-1050. No sign-in or order placed; provider completion remains unavailable. Capture1045 PNG was transitional; repeat1047 showed the destination. No false dead-CTA defect registered. |
+| R668-AUDIT-BULK-QTY-001 | Wholesale 10kg-crate MOQ2 adds two packs at INR580 each; cart and checkout retain INR1160. Evidence1048-1051,1061. This does not qualify enlarged quantity entry or all Bulk cases. |
+| R668-AUDIT-OFFER-COPY-001; R668-AUDIT-BRAND-CATEGORY-001 | Product distinguishes additional checkout benefits and says none available; Brand not provided remains explicit. Evidence1042-1043. Populated supplier benefit/brand data remains unverified. |
+| R668-AUDIT-ADDRESS-KEYBOARD-001; R668-REQ-ADDRESS-TYPE-DENSITY-001; child R669-UAT-ADDRESS-NEXT-FIELD-VISIBILITY-001 | Existing Work address opens with all four compact types. Phone to Street IME Next reveals text/caret in normal portrait and in this landscape/font2.0 replay. Evidence1052-1058. The previous failure did not reproduce in this particular focus/scroll state; it is not closed from one pass or attributed to uninstalled local changes. Full existing values visible unchanged after restoring settings1059; exited via X without saving1060. |
+| R668-AUDIT-CHECKOUT-PROMISE-001 | Collection/Delivery mode switching, original receiving address, Android Back and retained cart work on the available path1050-1051,1060-1061. Actual quote/payment/order/provider promises not exercised. |
+| R668-AUDIT-DELIVERED-PARTNER-STATUS-001 | Delivered MS-240741 correctly says Delivery partner details unavailable, not Not assigned yet. Evidence1072-1074. Named provider information remains unavailable. |
+| R669-IMPL-DELIVERY-COMPLETION-PROMISE-001 | Delivered list/detail label the displayed time Original promise, not actual completion time. Evidence1072-1073. Real completion timestamp remains unverified. |
+| R668-AUDIT-INVOICE-MISSING-LINES-001 | Historical MS-240741 explicitly reports missing invoice item details and offers Back/Refresh orders. Android Back preserves Delivered list. Evidence1075-1076. No successful historical-line retrieval demonstrated. |
+| Orders Back | Active tracking returns to Active list1070-1071; completed tracking returns to Delivered list1073-1074. This does not qualify the separate searched/scrolled-list position child. |
+
+### Preservation and remaining cross-check
+
+Original cart was empty. Only two temporary Fresh tomatoes1 Wholesale packs and one test coupon were added. Coupon removed1066; subtotal restored1067; minus at MOQ removed the temporary packs1068, returning to catalogue with Add and no cart pill. No original address content was modified or saved. Original font1.0, user_rotation0 and accelerometer_rotation1 were restored before1059; pre-test values are in device-settings-before.json. Device ends on Delivered Orders1076.
+
+Still requires fresh cross-check beyond this checkpoint: review/drafts/action visibility, shared-link recipient/relaunch, Recent final action, Monthly continuation/paging, enlarged quantity IME, searched order/purchase Back position, comparison and scheduled-slot supplier results, India Maps discovery, Offers header/CTA, delivery selector/hide/return controls and all unavailable supplier-media/provider cases. Partial passes above do not remove these cases or close their originals.
+
+Each numbered capture retains PNG, XML and JSON with action, APK identity and SHA256 bindings. The 1057 output-truncation recovery read its completed JSON and existing PNG without repeating the action. Capture1075 session5177 and1076 session40747 were polled to terminal exit0 before subsequent actions.
+
+
+
 ## Consolidated scoped implementation and dependency handoff - 12 September 2026
 
 **Current source: 68d35d185bdff4bb3fa8635a30758237cdf9ba2c. No new APK or ticket closure.** The completed scoped Redmi round produced 12 UAT children. Eleven have local implementation evidence; the cold shared-link startup child remains unimplemented outside Buy ownership. All 14 implementation slices have verified committed parents and ancestry in this branch. The 13 original device closures are retained and excluded from the lists below. Scope remains 33 findings + 9 requests plus the existing procurement dependency.
