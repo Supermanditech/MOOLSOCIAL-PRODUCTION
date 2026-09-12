@@ -2110,7 +2110,7 @@ class _WorkWorkspaceDashboardScreenState
   void _openProfile(BuildContext context, WorkWorkspace workspace) {
     showGlobalProfilePanelV2(
       context,
-      accountAuthenticated: true,
+      accountAuthenticated: widget.accountAuthenticated,
       activeWorkspace: GlobalProfileWorkspaceContext(
         name: workspace.name,
         roleLabel: workspace.profileLabel,
@@ -2129,6 +2129,14 @@ class _WorkWorkspaceDashboardScreenState
       onOpenRoute: (route) {
         if (route == '/app/work/my-work') {
           _showOperation(_WorkspaceOperation.settings);
+        } else if (Uri.tryParse(route)?.path == '/app/account/security') {
+          // A pushed Store can differ from the router's displayed base URI.
+          // Retain its actual destination when sign-in replaces the stack.
+          context.push(
+            globalSecurityLocationForReturn(
+              GoRouterState.of(context).uri.toString(),
+            ),
+          );
         } else {
           context.push(route);
         }
@@ -16199,11 +16207,13 @@ class _OrdersDestinationSurface extends StatefulWidget {
 
 class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
   late String _filter;
+  final _selectedFilterKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _filter = widget.session.workspaceOrderFilter;
+    _revealSelectedFilter();
   }
 
   @override
@@ -16211,7 +16221,18 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
     super.didUpdateWidget(oldWidget);
     if (_filter != widget.session.workspaceOrderFilter) {
       _filter = widget.session.workspaceOrderFilter;
+      _revealSelectedFilter();
     }
+  }
+
+  void _revealSelectedFilter() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _selectedFilterKey.currentContext;
+      if (target != null) {
+        unawaited(Scrollable.ensureVisible(target, alignment: .5));
+      }
+    });
   }
 
   @override
@@ -16330,16 +16351,20 @@ class _OrdersDestinationSurfaceState extends State<_OrdersDestinationSurface> {
                         countFor(value) > 0 ||
                         _filter == value,
                   )) ...[
-                    ChoiceChip(
-                      key: Key('work-orders-filter-${filter.toLowerCase()}'),
-                      label: Text(
-                        '${filterLabels[filter]} ${countFor(filter)}',
+                    KeyedSubtree(
+                      key: _filter == filter ? _selectedFilterKey : null,
+                      child: ChoiceChip(
+                        key: Key('work-orders-filter-${filter.toLowerCase()}'),
+                        label: Text(
+                          '${filterLabels[filter]} ${countFor(filter)}',
+                        ),
+                        selected: _filter == filter,
+                        onSelected: (_) {
+                          widget.session.setWorkspaceOrderFilter(filter);
+                          setState(() => _filter = filter);
+                          _revealSelectedFilter();
+                        },
                       ),
-                      selected: _filter == filter,
-                      onSelected: (_) {
-                        widget.session.setWorkspaceOrderFilter(filter);
-                        setState(() => _filter = filter);
-                      },
                     ),
                     const SizedBox(width: 7),
                   ],

@@ -26,6 +26,7 @@ import 'package:moolsocial/features/work/work_workspace_benefits.dart';
 import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 
 // Host-only authoritative-response fixtures. These never qualify live grants.
 class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
@@ -532,6 +533,7 @@ void main() {
     double textScale = 1.4,
     Widget Function(Widget child)? wrapper,
     WorkProcurementController Function()? procurementFactory,
+    bool dashboardAccountAuthenticated = true,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = viewport;
@@ -584,7 +586,7 @@ void main() {
               procurementSession: consumer,
               useStoreProcurement: true,
               procurementControllerFactory: procurementFactory,
-              accountAuthenticated: true,
+              accountAuthenticated: dashboardAccountAuthenticated,
               accountIdentity: journey.accountIdentity,
             ),
           ),
@@ -13903,6 +13905,130 @@ void main() {
       await tester.tap(action);
       await tester.pumpAndSettle();
       expect(work.workspaceOrderStage, 'Ready');
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final scale in [1.4, 2.0]) {
+    for (final filter in ['Ready', 'Delivery']) {
+      testWidgets('FVC002 Orders reveals selected $filter at $scale', (
+        tester,
+      ) async {
+        final work = liveStore()..setWorkspaceOrderFilter(filter);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard?section=orders',
+          work: work,
+          viewport: scale == 2 ? const Size(320, 568) : const Size(360, 800),
+          textScale: scale,
+        );
+        final strip = find.byKey(const Key('work-orders-filter-strip'));
+        final chip = find.byKey(
+          Key('work-orders-filter-${filter.toLowerCase()}'),
+        );
+        expect(tester.widget<ChoiceChip>(chip).selected, isTrue);
+        final viewport = tester.getRect(strip);
+        final selected = tester.getRect(chip);
+        expect(selected.left, greaterThanOrEqualTo(viewport.left));
+        expect(selected.right, lessThanOrEqualTo(viewport.right));
+        expect(chip.hitTestable(), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  for (final authenticated in [false, true]) {
+    testWidgets('FVC004 Store profile reflects account state $authenticated', (
+      tester,
+    ) async {
+      final work = liveStore();
+      final controller = await prepareStoreProcurement(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        procurementFactory: () => controller,
+        dashboardAccountAuthenticated: authenticated,
+      );
+      await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Sign in'),
+        authenticated ? findsNothing : findsOneWidget,
+      );
+      expect(
+        find.text('Active'),
+        authenticated ? findsWidgets : findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets(
+    'FVC005 pushed Store preserves Security return after stack replacement',
+    (tester) async {
+      final work = liveStore();
+      final journey = JourneySession();
+      final core = BuySession();
+      final buy = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(buy.dispose);
+      addTearDown(work.dispose);
+      addTearDown(journey.dispose);
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      const storeLocation = '/app/work/workspace/dashboard';
+      Uri? securityLocation;
+      final router = GoRouter(
+        initialLocation: '/app/social',
+        routes: [
+          GoRoute(
+            path: '/app/social',
+            builder: (context, _) => Scaffold(
+              body: TextButton(
+                onPressed: () => context.push(storeLocation),
+                child: const Text('Open test Store'),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: storeLocation,
+            builder: (_, _) => WorkWorkspaceDashboardScreen(
+              session: work,
+              procurementSession: buy,
+            ),
+          ),
+          GoRoute(
+            path: '/app/account/security',
+            builder: (_, state) {
+              securityLocation = state.uri;
+              return GlobalSecurityV2(session: journey);
+            },
+          ),
+        ],
+      );
+      addTearDown(router.dispose);
+      await tester.pumpWidget(
+        MaterialApp.router(theme: MoolTheme.light(), routerConfig: router),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Open test Store'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-dashboard-profile')));
+      await tester.pumpAndSettle();
+      final security = find.byKey(const Key('global-profile-security'));
+      await tester.ensureVisible(security);
+      await tester.tap(security);
+      await tester.pumpAndSettle();
+      expect(securityLocation?.queryParameters['return'], storeLocation);
+      // Completing authentication uses go(), replacing the pushed Store stack.
+      router.go(securityLocation.toString());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('global-security-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      expect(find.text('Open test Store'), findsNothing);
       expect(tester.takeException(), isNull);
     },
   );
