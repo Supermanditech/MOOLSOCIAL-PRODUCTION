@@ -1277,6 +1277,24 @@ foreach ($claim in $claims) {
       $owner -cmatch
         '^artifacts/quality/buy-v2-r65-11-cursor-draggable-cart-review-20260904/[^/]+$'
     )
+    $predeclaredFounderReferenceOwner = (
+      [string]$claim.task -ceq '/root/cursor_buy_redmi_fixes_v1_20260905' -and
+      $ProductionLane -ceq 'cursor_ui' -and
+      $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and
+      $ProductionTicketId -ceq 'UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905' -and
+      $owner -cin @(
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-320x568-android-checkout.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-360x800-android-cart.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-430x932-ios-cart.png',
+        'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png'
+      )
+    )
     $predeclaredR669PortableOwner = (
       [string]$claim.task -ceq '/root' -and
       $owner -ceq 'scripts/windows-powershell-portable-api.ps1' -and
@@ -1302,7 +1320,7 @@ foreach ($claim in $claims) {
         $predeclaredR65NineEvidenceOwner -or
         $predeclaredR65TenEvidenceOwner -or
         $predeclaredR65ElevenEvidenceOwner -or
-        $predeclaredR669PortableOwner)
+        $predeclaredR669PortableOwner -or $predeclaredFounderReferenceOwner)
     ) "recorded owner is missing: $owner"
     $key = $owner.ToLowerInvariant()
     Assert-Coordination (-not $localOwners.Contains($key)) `
@@ -1724,6 +1742,62 @@ if ($ProductionLane -ceq 'baseline') {
       $r670SourceParent = 'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2'
       $r677SourceParent = '0c36d2201c43665d38e00173df7d2df63f690344'
       $r678PersistenceParent = 'e00a6981b92399f71c68233907bc79b6588c096c'
+      # Founder-approved versioned references: exact ten owners, one admission.
+      $r681Parent = '2afcbc0afccc76cc069cf2763a1acd3eabf7e1b1'
+      & git -C $root merge-base --is-ancestor $r681Parent $head
+      $r681Context = $LASTEXITCODE -eq 0
+      if ($r681Context) {
+        $r681Assets = @{
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-android.png' = '95F77FD75CD37B817A033E00E38C5D4193BB72F1B4F9E894FF46C6BB8DF0B125'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-360x800-android.png' = '592E4E50A69BBBCE4F2C705805D79F59DC91A8027360877249D771C1686FDBA6'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-390x844-ios.png' = 'D5549BD6C2479EB56504AAB3E7FF880A154E3EFFDBA9FC44648C727E271C2F7C'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-430x932-ios.png' = 'A0C30446A85C0002B0F33D59823FCF5EC065F4975AC6A0B94152081E3BA8FDD4'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-6-c24f-checkout-cart-return-320x568-a11y140-reduced.png' = 'E90F68717401BB19B856DDD5A345815036F0EDB2F8364A1BB08DBDAF6C5F8541'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-320x568-android-checkout.png' = '95F77FD75CD37B817A033E00E38C5D4193BB72F1B4F9E894FF46C6BB8DF0B125'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-360x800-android-cart.png' = '9E52594E1E4CB6DD59C2C562880E9F5846B860C8DD3DAC8D54D9099C688D08FC'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-390x844-ios-checkout.png' = 'D5549BD6C2479EB56504AAB3E7FF880A154E3EFFDBA9FC44648C727E271C2F7C'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-430x932-ios-cart.png' = 'C47BD17943159F37C594E7CF1446765257FB6755F31CE028175098D2D06EFBDF'
+          'apps/mobile/test/ui_v2/buy/candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-320x568-a11y140-reduced.png' = 'E90F68717401BB19B856DDD5A345815036F0EDB2F8364A1BB08DBDAF6C5F8541'
+        }
+        $r681Controls = @('config/codex-subagent-coordination-policy.json','scripts/check-codex-subagent-coordination-policy.ps1')
+        $r681Before = Get-R66Utf8GitJson $r681Parent $r681Controls[0]
+        $r681After = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r681Claim = @($r681After.activeClaims | Where-Object task -CEQ '/root/cursor_buy_redmi_fixes_v1_20260905')
+        Assert-Coordination ($r681Claim.Count -eq 1 -and $r681Claim[0].owners.Count -eq 79) 'Reference admission requires exactly 79 owners.'
+        foreach ($owner in $r681Assets.Keys) {
+          Assert-Coordination (@($r681Claim[0].owners | Where-Object { $_ -ceq $owner }).Count -eq 1) "Missing exact reference owner: $owner"
+          $asset = Join-Path $root $owner
+          if (Test-Path -LiteralPath $asset) {
+            Assert-Coordination ((Get-Sha256 $asset) -ceq $r681Assets[$owner]) "Approved reference bytes changed: $owner"
+          }
+          $historical = $owner.Replace('r669-founder-review-20260912/','')
+          & git -C $root diff --quiet $r681Parent -- $historical
+          Assert-Coordination ($LASTEXITCODE -eq 0) "Historical reference changed: $historical"
+        }
+        $r681Claim[0].owners = @($r681Claim[0].owners | Where-Object { -not $r681Assets.ContainsKey($_) })
+        Assert-Coordination (($r681Before | ConvertTo-Json -Depth 100 -Compress) -ceq ($r681After | ConvertTo-Json -Depth 100 -Compress)) 'Reference admission changed unrelated policy.'
+        if ($head -ceq $r681Parent) {
+          Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) 'Pending reference admission is not a handoff.'
+          $r681Dirty = @(& git -C $root diff HEAD --name-only)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r681Dirty | Sort-Object) -join '|') -ceq (@($r681Controls | Sort-Object) -join '|')) 'Reference admission must change only two controls.'
+          $r681Untracked = @(& git -C $root ls-files --others --exclude-standard)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r681Untracked.Count -eq 0) 'Reference assets must follow admission.'
+        } else {
+          $r681Following = @(& git -C $root rev-list --first-parent --reverse "${r681Parent}..$head")
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r681Following.Count -gt 0) 'Reference admission missing.'
+          $r681Commit = [string]$r681Following[0]
+          $r681Parents = @(& git -C $root show -s --format=%P $r681Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r681Parents.Count -eq 1 -and $r681Parents[0] -ceq $r681Parent) 'Reference admission parent changed.'
+          $r681Subject = @(& git -C $root show -s --format=%s $r681Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r681Subject.Count -eq 1 -and $r681Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit ten founder-approved reference owners') 'Reference admission subject changed.'
+          $r681Changed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r681Commit)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r681Changed | Sort-Object) -join '|') -ceq (@($r681Controls | Sort-Object) -join '|')) 'Reference admission owners changed.'
+          & git -C $root diff --quiet $r681Commit -- @r681Controls
+          Assert-Coordination ($LASTEXITCODE -eq 0) 'Reference controls changed after admission.'
+          $r681Later = @(& git -C $root log --format=%H "${r681Commit}..$head" -- @r681Controls)
+          Assert-Coordination ($LASTEXITCODE -eq 0 -and $r681Later.Count -eq 0) 'Reference admission cannot be reused.'
+        }
+      }
       $r680SourceParent = 'a18aa780c0e00497ef218025bc8473a32f50a084'
       & git -C $root merge-base --is-ancestor $r680SourceParent $head
       $r680SourceContext = $LASTEXITCODE -eq 0
@@ -3295,7 +3369,7 @@ if ($ProductionLane -ceq 'baseline') {
         )
         $r679Subject = 'ui(buy-redmi-fixes-v1-20260905): admit founder-authorized share and address owners'
         $r679Before = Get-R66Utf8GitJson $r679DependencyParent $r679Owners[0]
-        $r679After = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r679After = if ($r681Context) { Get-R66Utf8GitJson $r681Parent $r679Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         Assert-R679OwnerAdmission $r679Before $r679After
         if ($head -ceq $r679DependencyParent) {
           Assert-Coordination ($ProductionPhase -cin @('implementation','pre_commit')) `
@@ -3353,7 +3427,7 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($evidence.cases -eq 68 -and (Get-Sha256 $evidence.path) -ceq $evidence.sha256) 'r66.9 boundary proposal evidence changed.'
         }
         $r680PolicyBefore = Get-R66Utf8GitJson $r680SourceParent $r670Owners[0]
-        $r680PolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+        $r680PolicyAfter = if ($r681Context) { Get-R66Utf8GitJson $r681Parent $r670Owners[0] } else { Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json }
         Assert-Coordination (($r680PolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($r680PolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'r66.9 source changed policy or owner claims.'
         $r680ScopeBefore = Get-R66Utf8GitJson $r680SourceParent $r680Owners[1]
         $r680ScopeAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $root $r680Owners[1]) | ConvertFrom-Json
@@ -3381,9 +3455,10 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r680Subject.Count -eq 1 -and [string]$r680Subject[0] -ceq 'ui(buy-redmi-fixes-v1-20260905): admit r66.9 qualified review source') 'r66.9 source admission subject changed.'
           $r680Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $r680Commit)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($r680Committed | Sort-Object) -join '|') -ceq (@($r680Owners | Sort-Object) -join '|')) 'r66.9 source admission committed an unexpected owner.'
-          & git -C $root diff --quiet $r680Commit -- @r680Owners
+          if ($r681Context) { & git -C $root diff --quiet $r680Commit $r681Parent -- @r680Owners } else { & git -C $root diff --quiet $r680Commit -- @r680Owners }
           Assert-Coordination ($LASTEXITCODE -eq 0) 'r66.9 source coordination changed after admission.'
-          $r680Later = @(& git -C $root log --format=%H "${r680Commit}..$head" -- @r680Owners)
+          $r680End = if ($r681Context) { $r681Parent } else { $head }
+          $r680Later = @(& git -C $root log --format=%H "${r680Commit}..$r680End" -- @r680Owners)
           Assert-Coordination ($LASTEXITCODE -eq 0 -and $r680Later.Count -eq 0) 'r66.9 source admission cannot be replayed or revised.'
         }
       }
