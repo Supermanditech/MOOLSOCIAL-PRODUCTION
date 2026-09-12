@@ -1,4 +1,5 @@
 import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
+import java.util.Base64
 
 plugins {
     id("com.android.application")
@@ -26,11 +27,27 @@ val facebookAppId = providers.environmentVariable(
 val facebookClientToken = providers.environmentVariable(
     "MOOLSOCIAL_FACEBOOK_CLIENT_TOKEN",
 ).orNull?.trim()?.takeIf { it.isNotEmpty() }
+val androidDebugPackage = providers.environmentVariable(
+    "MOOLSOCIAL_ANDROID_DEBUG_PACKAGE",
+).orNull?.trim()?.takeIf { it.isNotEmpty() } ?: "runtime"
+if (androidDebugPackage !in setOf("runtime", "cursorreview")) {
+    throw GradleException(
+        "Android debug package must be runtime or cursorreview.",
+    )
+}
+val debugApplicationIdSuffix = ".$androidDebugPackage"
+val debugVersionNameSuffix = "-$androidDebugPackage"
+val debugAppName = if (androidDebugPackage == "cursorreview") {
+    "MoolSocial Cursor Review"
+} else {
+    "MoolSocial Runtime"
+}
 if ((facebookAppId == null) != (facebookClientToken == null)) {
     throw GradleException(
         "Facebook Login requires both founder-controlled Android configuration values.",
     )
 }
+val facebookAutoInitEnabled = facebookAppId != null && facebookClientToken != null
 val uploadSigningConfigured = listOf(
     uploadStoreFile,
     uploadStorePassword,
@@ -56,7 +73,7 @@ if (releasePackagingTaskRequested && !uploadSigningConfigured) {
 val generatedPluginRegistrant = file(
     "src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
 )
-val sanitizeReleaseGeneratedPluginRegistrant by tasks.registering {
+val sanitizeProductionGeneratedPluginRegistrant by tasks.registering {
     doLast {
         if (!generatedPluginRegistrant.isFile) {
             throw GradleException(
@@ -84,6 +101,11 @@ val sanitizeReleaseGeneratedPluginRegistrant by tasks.registering {
                 "Firebase Core is missing from the release plugin registrant.",
             )
         }
+        if (!source.contains("dev.fluttercommunity.plus.share.SharePlusPlugin")) {
+            throw GradleException(
+                "Share Plus is missing from the release plugin registrant.",
+            )
+        }
         if (source.contains("IntegrationTestPlugin")) {
             throw GradleException(
                 "Integration test plugin remains in the release registrant.",
@@ -92,7 +114,36 @@ val sanitizeReleaseGeneratedPluginRegistrant by tasks.registering {
     }
 }
 tasks.matching { it.name == "compileReleaseJavaWithJavac" }.configureEach {
-    dependsOn(sanitizeReleaseGeneratedPluginRegistrant)
+    dependsOn(sanitizeProductionGeneratedPluginRegistrant)
+}
+if (androidDebugPackage == "cursorreview") {
+    tasks.matching { it.name == "compileDebugJavaWithJavac" }.configureEach {
+        dependsOn(sanitizeProductionGeneratedPluginRegistrant)
+    }
+    tasks.matching { it.name == "processDebugGoogleServices" }.configureEach {
+        // Cursor review is a non-promotable UI-only package. It intentionally
+        // has no Firebase client configuration and must not process one.
+        enabled = false
+    }
+}
+
+val runtimeReviewDefines = providers.gradleProperty("dart-defines").orNull
+    .orEmpty().split(",").mapNotNull { encoded ->
+        runCatching {
+            String(Base64.getDecoder().decode(encoded), Charsets.UTF_8)
+        }.getOrNull()
+    }.toSet()
+val runtimeUiReview = androidDebugPackage == "runtime" && setOf(
+    "MOOLSOCIAL_UI_REVIEW_ONLY=true",
+    "MOOLSOCIAL_DEVICE_REVIEW=true",
+    "MOOLSOCIAL_USE_EMULATORS=true",
+).all { it in runtimeReviewDefines }
+if (runtimeUiReview) {
+    // Provider-free UI review must not require a Firebase client file.
+    // All non-review builds retain normal Google Services processing.
+    tasks.matching { it.name == "processDebugGoogleServices" }.configureEach {
+        enabled = false
+    }
 }
 
 val localPropertiesFile = rootProject.file("local.properties")
@@ -178,6 +229,11 @@ android {
             "facebook_client_token",
             facebookClientToken ?: "0",
         )
+        resValue(
+            "bool",
+            "facebook_auto_init_enabled",
+            facebookAutoInitEnabled.toString(),
+        )
     }
 
     signingConfigs {
@@ -192,6 +248,16 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = debugApplicationIdSuffix
+            versionNameSuffix = debugVersionNameSuffix
+            resValue("string", "app_name", debugAppName)
+        }
+        getByName("profile") {
+            applicationIdSuffix = debugApplicationIdSuffix
+            versionNameSuffix = debugVersionNameSuffix
+            resValue("string", "app_name", debugAppName)
+        }
         release {
             signingConfig = signingConfigs.findByName("release")
             configure<CrashlyticsExtension> {
@@ -217,4 +283,5 @@ dependencies {
     // Android Credential Manager can report a provider/configuration failure
     // as a user cancellation after account selection. Keep one explicit,
     // production-proven Play Services identity bridge for the Google button.
+    implementation("com.google.android.gms:play-services-auth:21.6.0")
 }

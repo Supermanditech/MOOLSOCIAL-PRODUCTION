@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param([string]$RepositoryRoot)
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -130,7 +132,7 @@ Assert-C29R ([string]$evidence.externalGate.providerMessage -ceq 'not_sent') 'pr
 Assert-C29R ([string]$evidence.externalGate.credentialAccess -ceq 'not_performed') 'credential access was claimed'
 
 foreach ($owner in @($shared, $runtime, $evidencePath)) {
-  $relative = if ($owner -is [string] -and [IO.Path]::IsPathRooted($owner)) { [IO.Path]::GetRelativePath($root, $owner) } else { [string]$owner }
+  $relative = if ($owner -is [string] -and [IO.Path]::IsPathRooted($owner)) { (Get-MoolSocialPortableRelativePath -RelativeTo ($root) -Path ($owner)) } else { [string]$owner }
   Assert-C29RNotContains $relative 'watchHistory'
   Assert-C29RNotContains $relative 'personalized recommender'
   Assert-C29RNotContains $relative 'engagement incentive enabled'
