@@ -4,7 +4,13 @@ const require = createRequire(import.meta.url);
 const providerModule = require("../backend/functions/lib/index.js");
 
 const actual = Object.keys(providerModule).sort();
-const expected = ["youtubeOAuthCallback", "youtubeProvider"].sort();
+const expected = [
+  "moolSocialChat",
+  "moolSocialContent",
+  "moolSocialPublicAuth",
+  "youtubeOAuthCallback",
+  "youtubeProvider",
+].sort();
 
 if (JSON.stringify(actual) !== JSON.stringify(expected)) {
   process.stderr.write(

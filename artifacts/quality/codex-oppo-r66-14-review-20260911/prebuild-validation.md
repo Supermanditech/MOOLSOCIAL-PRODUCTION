@@ -1,0 +1,21 @@
+# r66.14 prebuild validation
+
+Prebuild qualification passed from clean, remote-equal 4aead991b54aec15654331345658b44ba4660d43. Build remains unauthorized until the evidence seal is committed, pushed and clean, then explicitly activated once. Both regression cycles, review-only isolation and the comment-only follow-up checks pass. No APK or device result is claimed.
+
+## Attempt 2 — passed
+
+One-build activation: the evidence seal is 73c0a2840da4e038fc90a650b069467060eb27de, freshly pushed and remote-equal with zero Git dirt before activation. Under the founder's standing OPPO authority, one RuntimeUiReview debug build of UAW-CODEX-OPPO-R66.14-REVIEW-20260911 is activated against that exact HEAD and unchanged 391-input manifest. Only this evidence and its machine-state activation are uncommitted; product/test inputs remain sealed. Post-build and OPPO gates remain pending. No Cursor integration, production promotion or release AAB is authorized. The authorization is consumed by the attempt, not reusable after failure.
+
+All existing controls passed: clean handoff and regression memory, 18-approved/2-rejected commit coverage with positive/omitted/rejected fixtures, approved UI locks, unchanged customer-copy gate, Flutter tracked-support cleanup guard, Android resource integrity (11 XML, zero unexpected deletions, one launch owner), build-foundation controls, incremental pre_build for 1.0.0-r66.14+2026091101 and existing MVP execution controls. PlayQualification remains false. Locked dependency resolution used --enforce-lockfile inside the existing support guard; no upgrade. All 391 live source-manifest hashes remain unchanged at 962D8984C32169F3307C79BF50BB81B41DE61332C2F69E1CFC1AB253682D00E2. Post-run Git digest: zero bytes/records/stderr and exit 0.
+
+Retained decision-bearing control log: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6614-prebuild-controls-attempt2.log; SHA-256 DA612BFC8FA07FE5E420792B7288E3AAE8132C1CF90912EC7E74944E4F9ABB71; terminal exit 0. REG4557 output handling: native dependency notices exceeded the response budget; the complete retained control log and exact terminal result were recovered without rerunning. Native package notices bypassed that log, so it is not claimed as complete native stdout. No unavailable notice is qualification evidence; dependency content is bound by the unchanged manifest/lock hashes. Capture the build subprocess stdout/stderr at the OS process boundary to retain native output completely.
+
+## Attempt 1 — stopped, not qualified
+
+Both 44-file cycles now pass 1824 tests / 83 existing skips / zero failures each; review-only isolation passes 5 tests. The subsequent prebuild controls passed clean handoff, registry memory, 18-approved/2-rejected commit coverage, coverage fixtures and UI locks, then stopped at the unchanged copy checker. It reported `apps/mobile/lib/features/work/work_session.dart:597: prohibited phrase 'local review'`. The phrase is solely in the comment describing counterBillReviewSignature, not rendered customer copy. No later prebuild step or APK ran.
+
+Retained log: C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/oppo-r6614-prebuild-controls-attempt1.log; SHA-256 DDED2583D76FA0E691AA1BF1AB6105CDC0A0F142CEF6CEB2A329C6C18DF4AC60; terminal exit 1. Recorded under existing REG4557 test-check correction. Reword only that internal comment without altering its meaning or executable code, verify the exact delta, refresh the manifest and repeat the unchanged copy check. Preserve this failed attempt. Build remains unauthorized.
+
+## Comment-only correction qualified locally
+
+Complete normalized-file comparison proves one comment replacement only; no executable code or test changed. The comment still states that a bill-comparison snapshot is not cryptographic/backend authorization. Current work_session.dart SHA-256: E5965C18B698D619C826263CCB0B21F86126512EE4804B1F910EB77AF13FE8BC. Refreshed 391-input manifest: 962D8984C32169F3307C79BF50BB81B41DE61332C2F69E1CFC1AB253682D00E2; all live input hashes match. Existing REG4557 retains the false-positive incident; its registry hash binding was refreshed without changing count, claims or gate behavior. Fresh checks and exact hashes are in local-validation.md. Attempt2 will retain a separate log and repeat the full existing controls, not resume after the failed check.

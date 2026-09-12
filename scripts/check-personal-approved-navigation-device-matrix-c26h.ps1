@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param([string]$RepositoryRoot)
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 if (-not $RepositoryRoot) { $RepositoryRoot = Split-Path -Parent $PSScriptRoot }
@@ -68,7 +70,7 @@ foreach ($journey in $journeys) {
 }
 $matrixDigestSource = ($states | ForEach-Object { "{0}|{1}" -f $_.id,$_.sha256 }) -join "`n"
 $digestBytes = [Text.Encoding]::UTF8.GetBytes($matrixDigestSource)
-$matrixDigest = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($digestBytes))
+$matrixDigest = (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ($digestBytes))))
 if ($matrixDigest -cne '0EC85E0A0BFE5DD3A118AC31DA369B6C07B4F7E0F53DD0FDD48E845143659ADA') {
   throw 'C26H cumulative matrix digest changed.'
 }
