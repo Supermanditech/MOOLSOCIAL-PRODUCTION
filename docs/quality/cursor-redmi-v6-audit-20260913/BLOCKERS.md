@@ -42,3 +42,7 @@ Actual JPEG/PNG/WebP and MP4 byte decoding, portrait/landscape fit, multi-asset 
 
 ### B-008 alternate workspace-public route reconciliation (round 20)
 journey_router257-287 resolves only a published workspace product and creates _WorkspacePublicBuySession using the default content adapter. WorkspaceCatalogueItem.toBuyPublicProduct in work_models1663-1699 transfers identity,price,stock-related publication flag,pack,variant and other commercial fields but no mediaAssets. BuyV2Product therefore retains its empty media default. This inspected alternate conversion does not supply real photo/video test assets either. Store source is read-only in this audit;no publication or supplier-data mutation performed. The required supplier-media publication/propagation contract and actual byte-format device matrix remain unqualified.
+
+
+### B-006 Wholesale extension (round 23)
+Delivered Wholesale PO-240728 exposes three purchased items (rice, oil and notebooks), all disabled with eligibility unavailable in Return (314-315). This extends the existing delivered-item resolution prerequisite to Wholesale. No request submitted; replacement/refund were not repeated in this round. Positive resolution remains unqualified.

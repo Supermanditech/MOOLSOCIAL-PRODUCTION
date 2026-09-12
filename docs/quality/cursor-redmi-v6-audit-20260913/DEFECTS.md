@@ -72,3 +72,12 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Evidence:281-product-lower-content shows related card;282-related-canonical-product shows selected different seller;283-related-back shows Saved. The original observation CONTENT-ROUND19-03 is now classified as this failure after source reconciliation. No cart/bookmark loss or crash claimed.
 - Source correlation: buy_v2_views.dart3289/3295 related card calls session.openProduct without preserveComparisonOrigin. buy_v2_session.dart8318-8355 only pushes prior selected product when that flag is true;closeProduct8488-8506 restores the root product return after an empty origin stack. Source explains the observed shortcut;no implementation or test modification performed.
 - Ownership: Buy product continuation navigation/session. Future correction must preserve full previous product context and existing cart/order/Store return paths;this audit does not implement it.
+
+
+## RV6-D008 - Wholesale buyer label runs into the business name
+- Status: open; confirmed Redmi visual defect. Severity: minor.
+- Journey: Orders > search Wholesale > Delivered > PO-240728 View order.
+- Actual: Delivery details renders Retailer business immediately against Shree Balaji Retail,with no clear gap at the label/value boundary. Normal font_scale1.0,720x1600 Redmi. Other details remain legible;no identity/data corruption claimed.
+- Expected: buyer-type label and business-name value have a visible separation or wrap/stack so they read as distinct fields at supported text sizes.
+- Evidence:312-wholesale-delivered-detail. This is a direct device visual finding,not an assertion from host analysis.
+- Source correlation: buy_v2_views.dart11576-11580 passes order.buyerType and buyerName into the delivery-details row. Exact row sizing correction belongs to later implementation;no product code changed.
