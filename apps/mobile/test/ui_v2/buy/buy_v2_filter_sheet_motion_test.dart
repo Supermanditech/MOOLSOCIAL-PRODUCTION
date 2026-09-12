@@ -101,7 +101,7 @@ void main() {
     expect(reduced.reverseCurve, Curves.linear);
   });
 
-  testWidgets('real catalogue tools flow reaches the R56.6 filter sheet', (
+  testWidgets('real Shop catalogue opens staged discovery refinements', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -118,27 +118,24 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('buy-active-orders-button')),
+      find.byKey(const ValueKey('buy-discovery-refinement-title')),
       findsOneWidget,
     );
+    await tester.tap(find.byKey(const ValueKey('buy-refine-section-sort')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-sort-priceLowToHigh')));
+    await tester.pumpAndSettle();
+    expect(session.productSort, BuyV2ProductSort.relevance);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-discovery-refinement-done')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.productSort, BuyV2ProductSort.priceLowToHigh);
     expect(
-      find.byKey(const ValueKey('buy-household-basket-button')),
-      findsOneWidget,
+      find.byKey(const ValueKey('buy-discovery-refinement-title')),
+      findsNothing,
     );
-    expect(find.byKey(const ValueKey('buy-filter-sheet-route')), findsOne);
-    final nearby = find.byKey(const ValueKey('buy-filter-nearby'));
-    await tester.scrollUntilVisible(
-      nearby,
-      160,
-      scrollable: find.descendant(
-        of: find.byKey(const ValueKey('buy-filter-list')),
-        matching: find.byType(Scrollable),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(nearby);
-    await tester.pumpAndSettle();
-    expect(session.selectedFilter, 'nearby');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('selection commits once only after the reverse route', (
@@ -150,7 +147,16 @@ void main() {
     session.updateQuery('tomato');
     await openSheet(tester, session);
 
-    await tester.tap(find.byKey(const ValueKey('buy-filter-nearby')));
+    final nearby = find.byKey(const ValueKey('buy-filter-nearby'));
+    await tester.scrollUntilVisible(
+      nearby,
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-filter-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(nearby);
     await tester.pump();
     expect(session.selectedFilter, isNull);
     expect(session.selectedCategoryId, 'fruits-vegetables');
@@ -181,6 +187,23 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
     await tester.pumpAndSettle();
+    final tools = find.byKey(const ValueKey('buy-refine-section-tools'));
+    final toolScroll = find.descendant(
+      of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(tools, 160, scrollable: toolScroll);
+    await tester.pumpAndSettle();
+    await tester.tap(tools);
+    await tester.pumpAndSettle();
+    final activeOrder = find.byKey(const ValueKey('buy-active-orders-button'));
+    await tester.scrollUntilVisible(activeOrder, 160, scrollable: toolScroll);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-household-basket-button')),
+      findsOneWidget,
+    );
+    expect(activeOrder.hitTestable(), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('buy-active-orders-button')));
     await tester.pump();
     expect(session.view, BuyV2View.catalogue);
@@ -226,7 +249,16 @@ void main() {
 
     session.openDestination(BuyV2Destination.medicine);
     await tester.pump();
-    await tester.tap(find.byKey(const ValueKey('buy-filter-nearby')));
+    final nearby = find.byKey(const ValueKey('buy-filter-nearby'));
+    await tester.scrollUntilVisible(
+      nearby,
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-filter-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(nearby);
     await tester.pumpAndSettle();
 
     expect(session.destination, BuyV2Destination.medicine);
@@ -243,18 +275,27 @@ void main() {
 
     final route = find.byKey(const ValueKey('buy-filter-sheet-route'));
     expect(route, findsOneWidget);
-    expect(tester.getSemantics(route).label, 'Shop filters');
-    expect(find.bySemanticsLabel('Shop filters'), findsWidgets);
-    final selected = tester.getSemantics(
-      find.byKey(const ValueKey('buy-filter-semantics-lowest')),
-    );
-    expect(selected.label, 'Lowest delivered price, selected');
-    expect(selected.flagsCollection.isButton, isTrue);
-    expect(selected.flagsCollection.isSelected, Tristate.isTrue);
+    expect(tester.getSemantics(route).label, 'Shop tools and filters');
+    expect(find.bySemanticsLabel('Shop tools and filters'), findsWidgets);
     expect(
       tester.getSize(find.byKey(const ValueKey('buy-filter-close'))).height,
       greaterThanOrEqualTo(44),
     );
+    final selectedOwner = find.byKey(
+      const ValueKey('buy-filter-semantics-lowest'),
+    );
+    await tester.scrollUntilVisible(
+      selectedOwner,
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-filter-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    final selected = tester.getSemantics(selectedOwner);
+    expect(selected.label, 'Lowest delivered price, selected');
+    expect(selected.flagsCollection.isButton, isTrue);
+    expect(selected.flagsCollection.isSelected, Tristate.isTrue);
     semantics.dispose();
   });
 
@@ -294,7 +335,16 @@ void main() {
     await openSheet(tester, session, disableAnimations: true, settle: false);
     expect(find.byKey(const ValueKey('buy-filter-sheet-route')), findsOne);
 
-    await tester.tap(find.byKey(const ValueKey('buy-filter-freight')));
+    final freight = find.byKey(const ValueKey('buy-filter-freight'));
+    await tester.scrollUntilVisible(
+      freight,
+      160,
+      scrollable: find.descendant(
+        of: find.byKey(const ValueKey('buy-filter-list')),
+        matching: find.byType(Scrollable),
+      ),
+    );
+    await tester.tap(freight);
     await tester.pump();
     await tester.pump();
     expect(session.selectedFilter, 'freight');

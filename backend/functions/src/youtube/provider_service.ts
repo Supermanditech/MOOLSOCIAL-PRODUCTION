@@ -52,6 +52,10 @@ import type {
   YouTubePublicDiscoveryClient,
 } from "../youtube-private-dev/public-discovery/public_discovery_client.js";
 import type {
+  SharedShortsCatalogueCoordinator,
+  SharedShortsCatalogueResult,
+} from "./shared_catalogue.js";
+import type {
   LiveBroadcastBindRequest,
   LiveBroadcastDeleteRequest,
   LiveBroadcastInsertRequest,
@@ -132,6 +136,10 @@ export interface YouTubeProviderServiceOptions {
   readonly publicDiscoveryClient?: Pick<
     YouTubePublicDiscoveryClient,
     "listChannelActivities" | "listChannelSections"
+  >;
+  readonly sharedShortsCatalogue?: Pick<
+    SharedShortsCatalogueCoordinator,
+    "load"
   >;
   readonly ownerClient: YouTubeOwnerClient;
   readonly transport: HttpTransport;
@@ -402,6 +410,22 @@ export class YouTubeProviderService {
       ...(regionCode === undefined ? {} : { regionCode }),
       ...(pageToken === undefined ? {} : { pageToken }),
     });
+  }
+
+  async publicShortsCatalogue(
+    requestId: string,
+  ): Promise<SharedShortsCatalogueResult> {
+    requireCapability(this.options.capabilities, "publicData");
+    const catalogue = this.options.sharedShortsCatalogue;
+    if (catalogue === undefined) {
+      throw new YouTubeProviderError(
+        "provider_unavailable",
+        "The shared YouTube catalogue is temporarily unavailable.",
+        503,
+        true,
+      );
+    }
+    return catalogue.load(requestId);
   }
 
   async publicPlaylist(

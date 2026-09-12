@@ -104,9 +104,12 @@ void main() {
     session.openCart(scope: BuyV2CartScope.shop);
     final cartSequence = session.navigationMotionSequence;
     expect(session.restoreSelectedAddressId(null), isFalse);
-    expect(session.openCheckout(), isFalse);
-    expect(session.view, BuyV2View.cart);
-    expect(session.navigationMotionSequence, cartSequence);
+    expect(session.openCheckout(), isTrue);
+    expect(session.view, BuyV2View.checkout);
+    expect(session.navigationMotionSequence, cartSequence + 1);
+    final checkoutSequence = session.navigationMotionSequence;
+    expect(session.openCheckout(), isTrue);
+    expect(session.navigationMotionSequence, checkoutSequence);
 
     session.openOrders();
     final ordersSequence = session.navigationMotionSequence;
@@ -268,29 +271,20 @@ void main() {
 
       expect(
         find.byKey(const ValueKey('buy-local-destination-tabs')),
-        findsNothing,
+        findsOneWidget,
       );
       expect(
         find.byKey(const ValueKey('buy-local-destination-tabs-overflow-cue')),
         findsNothing,
       );
-      await tester.tap(find.byKey(const Key('mool-home-launcher')));
-      await tester.pumpAndSettle();
-      for (final action in const ['shop', 'wholesale', 'medicine', 'orders']) {
-        final target = find.byKey(ValueKey('mool-navigator-buy-$action'));
-        expect(target, findsOneWidget);
-        expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
-      }
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
       session.openOrders();
       await tester.pumpAndSettle();
 
       expect(session.destination, BuyV2Destination.orders);
-      expect(find.byKey(const ValueKey('buy-shared-header')), findsOneWidget);
+      expect(find.byKey(const ValueKey('buy-shared-header')), findsNothing);
       expect(
         find.byKey(const ValueKey('buy-local-destination-tabs')),
-        findsNothing,
+        findsOneWidget,
       );
       expect(
         find.byKey(const ValueKey('buy-orders-tab-active')),

@@ -1,0 +1,22 @@
+backend\functions\src\commerce\acceptance_policy_governance_contract.test.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\acceptance_policy_governance_contract.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\acceptance_sla_policy_contract.test.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\acceptance_sla_policy_contract.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\acceptance_sla_policy_contract.ts: unapproved exported Buy backend symbol
+backend\functions\src\commerce\acceptance_sla_schedule_override_contract.test.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\acceptance_sla_schedule_override_contract.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\order_timer_policy_snapshot_contract.test.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\order_timer_policy_snapshot_contract.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\provider_readiness_contract.test.ts: unapproved Buy backend file owner
+backend\functions\src\commerce\provider_readiness_contract.ts: unapproved Buy backend file owner
+backend\functions\src\youtube\shared_catalogue_client.test.ts: unapproved Buy backend file owner
+backend\functions\src\youtube\shared_catalogue.test.ts: unapproved Buy backend file owner
+backend\functions\src\youtube\shared_catalogue.ts: unapproved Buy backend file owner
+backend\functions\src\youtube\shared_catalogue.ts: unapproved exported Buy backend symbol
+Exception: C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828\scripts\check-buy-backend-contract-boundary.ps1:427
+Line |
+ 427 |    throw (
+     |    ~~~~~~~
+     | Buy backend contract boundary failed with 15 violation(s). Do not add a production transport, endpoint,
+     | contract, database owner or simulated completion before the required founder and API decisions are recorded.
+

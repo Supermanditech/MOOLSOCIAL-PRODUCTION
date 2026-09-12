@@ -8,6 +8,35 @@ import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/review_journey_services.dart';
 
 void main() {
+  test('account identity exposes only enumerated provider labels', () {
+    expect(publicAuthenticatedProviderLabel('google.com'), 'Google');
+    expect(publicAuthenticatedProviderLabel('facebook.com'), 'Facebook');
+    expect(publicAuthenticatedProviderLabel('x'), 'X');
+    expect(publicAuthenticatedProviderLabel('instagram'), 'Instagram');
+    expect(publicAuthenticatedProviderLabel('email_link'), 'Email');
+    expect(publicAuthenticatedProviderLabel('phone'), 'Phone');
+    expect(publicAuthenticatedProviderLabel('provider-subject-123'), isNull);
+    expect(publicAuthenticatedProviderLabel(null), isNull);
+    expect(
+      publicAuthenticatedProviderAccountLabel('@vetonewsline'),
+      '@vetonewsline',
+    );
+    expect(
+      publicAuthenticatedProviderAccountLabel('@vetonews.live'),
+      '@vetonews.live',
+    );
+    expect(publicAuthenticatedProviderAccountLabel('missing-at'), isNull);
+    expect(publicAuthenticatedProviderAccountLabel('@private token'), isNull);
+    expect(publicAuthenticatedProviderAccountLabel(null), isNull);
+    const brokeredIdentity = AuthenticatedAccountIdentity(
+      providerAccountLabel: '@vetonewsline',
+      signInMethods: ['X'],
+    );
+    expect(brokeredIdentity.primaryLabel, '@vetonewsline');
+    expect(brokeredIdentity.detailLabel, 'Signed in to MoolSocial');
+    expect(brokeredIdentity.detailLabel, isNot(contains('X')));
+  });
+
   group('FirebaseSocialAuthGateway', () {
     const knownGoogleFirebaseFailures = <String, String>{
       'canceled': 'auth-cancelled',
@@ -557,6 +586,32 @@ void main() {
 
       expect(events, ['firebase-sign-out', 'google-sign-out']);
     });
+
+    test('sign-out also clears the configured Facebook SDK session', () async {
+      final events = <String>[];
+      final gateway = FirebaseSocialAuthGateway.forTesting(
+        authClient: _FakeFirebaseSocialAuthClient(
+          userIdAfterSignIn: 'user-1',
+          events: events,
+        ),
+        googleIdentityGateway: _FakeGoogleIdentityGateway(
+          idToken: 'synthetic-google-id-token',
+          events: events,
+        ),
+        facebookAdapter: _FakeFacebookNativeSdkAdapter(
+          signInOutcome: FacebookLoginOutcome.success,
+          events: events,
+        ),
+      );
+
+      await gateway.signOut();
+
+      expect(events, [
+        'firebase-sign-out',
+        'google-sign-out',
+        'facebook-sign-out',
+      ]);
+    });
   });
 
   group('NativeGoogleIdentityGateway', () {
@@ -610,6 +665,96 @@ void main() {
       expect(stages, contains('auth-google-native-no-identity'));
       expect(stages.join(' '), isNot(contains('private')));
     });
+
+    test(
+      'Android cancellation uses the bounded Play Services fallback',
+      () async {
+        var legacyCalls = 0;
+        final stages = <String>[];
+        final gateway = NativeGoogleIdentityGateway(
+          serverClientId: 'synthetic-client-id',
+          initialize: (_) async {},
+          supportsAuthenticate: () => true,
+          authenticateIdToken: () async => throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+          ),
+          legacyAuthenticateIdToken: (clientId) async {
+            expect(clientId, 'synthetic-client-id');
+            legacyCalls += 1;
+            return 'synthetic-legacy-id-token';
+          },
+          legacySignOut: () async {},
+          isAndroid: () => true,
+          legacyFallbackEnabled: true,
+          stageObserver: stages.add,
+        );
+
+        expect(
+          await gateway.authenticateIdToken(),
+          'synthetic-legacy-id-token',
+        );
+        expect(legacyCalls, 1);
+        expect(stages, contains('auth-google-native-legacy-fallback-started'));
+        expect(stages, contains('auth-google-native-legacy-identity-returned'));
+        expect(stages, isNot(contains('auth-google-native-no-identity')));
+      },
+    );
+
+    test(
+      'Android release cancellation does not reopen a legacy chooser',
+      () async {
+        var legacyCalls = 0;
+        final stages = <String>[];
+        final gateway = NativeGoogleIdentityGateway(
+          serverClientId: 'synthetic-client-id',
+          initialize: (_) async {},
+          supportsAuthenticate: () => true,
+          authenticateIdToken: () async => throw const GoogleSignInException(
+            code: GoogleSignInExceptionCode.canceled,
+          ),
+          legacyAuthenticateIdToken: (_) async {
+            legacyCalls += 1;
+            return 'must-not-be-used';
+          },
+          legacySignOut: () async {},
+          isAndroid: () => true,
+          legacyFallbackEnabled: false,
+          stageObserver: stages.add,
+        );
+
+        expect(await gateway.authenticateIdToken(), isNull);
+        expect(legacyCalls, 0);
+        expect(stages, contains('auth-google-native-no-identity'));
+        expect(
+          stages,
+          isNot(contains('auth-google-native-legacy-fallback-started')),
+        );
+      },
+    );
+
+    test(
+      'Android sign-out clears primary and fallback identity state',
+      () async {
+        var primarySignOuts = 0;
+        var legacySignOuts = 0;
+        final gateway = NativeGoogleIdentityGateway(
+          serverClientId: 'synthetic-client-id',
+          initialize: (_) async {},
+          supportsAuthenticate: () => true,
+          authenticateIdToken: () async => 'synthetic-id-token',
+          signOut: () async => primarySignOuts += 1,
+          legacyAuthenticateIdToken: (_) async => null,
+          legacySignOut: () async => legacySignOuts += 1,
+          isAndroid: () => true,
+        );
+
+        expect(await gateway.authenticateIdToken(), 'synthetic-id-token');
+        await gateway.signOut();
+
+        expect(primarySignOuts, 1);
+        expect(legacySignOuts, 1);
+      },
+    );
 
     test(
       'Google stage telemetry spans native identity and Firebase exchange',
@@ -882,10 +1027,12 @@ final class _FakeFacebookNativeSdkAdapter implements FacebookNativeSdkAdapter {
   _FakeFacebookNativeSdkAdapter({
     required this.signInOutcome,
     this.signInOrigin = FacebookLoginOrigin.completed,
+    this.events,
   });
 
   final FacebookLoginOutcome signInOutcome;
   final FacebookLoginOrigin signInOrigin;
+  final List<String>? events;
   int signInCount = 0;
   int logOutCount = 0;
 
@@ -901,6 +1048,7 @@ final class _FakeFacebookNativeSdkAdapter implements FacebookNativeSdkAdapter {
   @override
   Future<FacebookLoginOutcome> logOut() async {
     logOutCount += 1;
+    events?.add('facebook-sign-out');
     return FacebookLoginOutcome.success;
   }
 

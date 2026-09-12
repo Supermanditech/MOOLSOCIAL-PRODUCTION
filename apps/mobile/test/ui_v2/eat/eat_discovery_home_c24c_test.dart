@@ -125,6 +125,35 @@ void main() {
     expect(sessions.eat.selectedRestaurantId, 'spice-darbar');
   });
 
+  testWidgets('Food search owns first Android Back while keyboard is open', (
+    tester,
+  ) async {
+    final sessions = await _mount(
+      tester,
+      route: '/app/eat/home',
+      size: const Size(360, 800),
+    );
+    addTearDown(sessions.dispose);
+
+    final search = find.byKey(const Key('eat-home-search'));
+    await tester.tap(search);
+    await tester.enterText(search, 'Spice');
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(search).focusNode?.hasFocus, isTrue);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
+    expect(tester.widget<TextField>(search).controller?.text, 'Spice');
+    expect(tester.widget<TextField>(search).focusNode?.hasFocus, isFalse);
+    expect(
+      find.byKey(const Key('eat-restaurant-spice-darbar')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('C24C Book Table keeps truthful choices and direct booking', (
     tester,
   ) async {
@@ -150,19 +179,31 @@ void main() {
     expect(sessions.eat.tableRestaurantId, 'spice-darbar');
     expect(find.textContaining('no tables today'), findsOneWidget);
 
+    await tester.tap(find.byKey(const Key('eat-book-table')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('eat-table-review-sheet')), findsOneWidget);
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('eat-table-confirm-booking')),
+          )
+          .onPressed,
+      isNull,
+    );
     for (final key in const [
       Key('eat-table-people-6'),
-      Key('eat-table-time-800PM'),
+      Key('eat-table-time-In30min'),
       Key('eat-table-choice-family-dining'),
     ]) {
       final target = find.byKey(key);
-      await _scrollTo(tester, target, const Key('eat-table-discovery-list'));
+      await tester.ensureVisible(target);
+      await tester.pumpAndSettle();
       expect(tester.getSize(target).height, greaterThanOrEqualTo(44));
       await tester.tap(target);
       await tester.pumpAndSettle();
     }
     expect(sessions.eat.tablePeople, '6');
-    expect(sessions.eat.tableTime, '8:00 PM');
+    expect(sessions.eat.tableTime, 'In 30 min');
     expect(sessions.eat.tableChoice, 'Family dining');
     expect(
       tester.getSize(find.byKey(const Key('eat-book-table'))).height,

@@ -57,6 +57,16 @@ void main() {
     await tester.tap(find.byKey(const Key('screen04-rail-create')));
     await tester.pumpAndSettle();
     expect(
+      find.byKey(const Key('screen04-create-home')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('moolsocial-compact-destination-rail')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+    await tester.pumpAndSettle();
+    expect(
       find.byKey(const ValueKey('social-v2-create-workbench')),
       findsOneWidget,
     );
@@ -66,7 +76,7 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('screen04-create-close')));
     await tester.pumpAndSettle();
-    await _expectFamily(tester, 'social', 'feed');
+    await _expectFamily(tester, 'social', 'create');
     await _selectAndExpect(tester, 'screen04-rail-shorts', 'social', 'shorts');
 
     await _openFamily(tester, 'buy');

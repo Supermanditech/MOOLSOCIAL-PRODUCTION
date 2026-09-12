@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/design/mool_design_system.dart';
 import '../../../core/design/mool_theme.dart';
 import '../retailer_models.dart';
+import '../retailer_pos_models.dart';
 import '../retailer_session.dart';
 import '../widgets/retailer_widgets.dart';
 
@@ -31,6 +32,9 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
   void initState() {
     super.initState();
     widget.session.view = widget.initialView;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.session.loadInitialStore();
+    });
   }
 
   @override
@@ -57,10 +61,13 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
         return RetailerPageScaffold(
           session: widget.session,
           title: view == RetailerHomeView.home
-              ? 'Mahadev Fresh Mart'
+              ? widget.session.shopName
               : view.label,
           subtitle: switch (view) {
-            RetailerHomeView.home => 'Verified shop · Sardarpura',
+            RetailerHomeView.home =>
+              widget.session.shopArea.isEmpty
+                  ? 'Verified shop'
+                  : 'Verified shop · ${widget.session.shopArea}',
             RetailerHomeView.orders => 'Review and complete customer orders',
             RetailerHomeView.stock => 'Available consumer products',
             RetailerHomeView.wholesale => 'Business procurement stays separate',
@@ -123,19 +130,21 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
             children: [
               Row(
                 children: [
-                  const Expanded(
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Shop is live',
+                          widget.session.ordersOnline
+                              ? 'Shop is live'
+                              : 'Shop is paused',
                           style: TextStyle(
                             color: Colors.white,
                             fontSize: 21,
                             fontWeight: FontWeight.w900,
                           ),
                         ),
-                        Text(
+                        const Text(
                           'Customers see only available products and approved fulfilment.',
                           style: TextStyle(
                             color: Color(0xFFD9DAFF),
@@ -483,43 +492,70 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
           detail: 'Consumer quantities and household prices only',
         ),
         const SizedBox(height: MoolSpacing.sm),
-        RetailerCard(
-          child: Row(
-            children: [
-              const CircleAvatar(
-                backgroundColor: Color(0xFFEAF7E8),
-                foregroundColor: MoolColors.success,
-                child: Icon(Icons.inventory_2_outlined),
-              ),
-              const SizedBox(width: MoolSpacing.sm),
-              const Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Aashirvaad Whole Wheat Atta',
-                      style: TextStyle(
-                        color: MoolColors.ink,
-                        fontWeight: FontWeight.w900,
-                      ),
+        if (widget.session.catalogueProducts.isEmpty)
+          RetailerEmptyState(
+            keyName: 'retailer-stock-empty',
+            title: widget.session.busy
+                ? 'Loading products'
+                : 'No available products',
+            detail: widget.session.busy
+                ? 'Checking the authoritative shop catalogue.'
+                : 'Finish product setup or retry the shop refresh.',
+            actionLabel: 'Retry',
+            onAction: widget.session.loadInitialStore,
+          )
+        else
+          for (final product in widget.session.catalogueProducts) ...[
+            RetailerCard(
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    backgroundColor: product.stock > 0
+                        ? const Color(0xFFEAF7E8)
+                        : const Color(0xFFFFF4E5),
+                    foregroundColor: product.stock > 0
+                        ? MoolColors.success
+                        : const Color(0xFFB05C00),
+                    child: const Icon(Icons.inventory_2_outlined),
+                  ),
+                  const SizedBox(width: MoolSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          product.name,
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        Text(
+                          '${product.pack} · ${product.stock} available · ₹${product.price}',
+                          style: const TextStyle(color: MoolColors.muted),
+                        ),
+                      ],
                     ),
-                    Text(
-                      '1 kg · 24 available · ₹55',
-                      style: TextStyle(color: MoolColors.muted),
+                  ),
+                  TextButton(
+                    key: Key(
+                      product.id == 'atta'
+                          ? 'retailer-stock-review'
+                          : 'retailer-stock-review-${product.id}',
                     ),
-                  ],
-                ),
+                    onPressed: () {
+                      widget.session.showNotice(
+                        'Stock review is open. Quantity and price change only after saving.',
+                      );
+                      _showProductEditor(context, product);
+                    },
+                    child: const Text('Review'),
+                  ),
+                ],
               ),
-              TextButton(
-                key: const Key('retailer-stock-review'),
-                onPressed: () => widget.session.showNotice(
-                  'Stock review is open. Quantity, price and fulfilment changes require explicit saving.',
-                ),
-                child: const Text('Review'),
-              ),
-            ],
-          ),
-        ),
+            ),
+            const SizedBox(height: MoolSpacing.sm),
+          ],
         const SizedBox(height: MoolSpacing.sm),
         RetailerCard(
           keyName: 'retailer-slow-stock',
@@ -551,6 +587,101 @@ class _RetailerHomeScreenState extends State<RetailerHomeScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _showProductEditor(
+    BuildContext context,
+    RetailerPosProduct product,
+  ) {
+    final stock = TextEditingController(text: '${product.stock}');
+    final buyPrice = TextEditingController();
+    final sellPrice = TextEditingController(text: '${product.price}');
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sheetContext) => Padding(
+        padding: EdgeInsets.fromLTRB(
+          MoolSpacing.lg,
+          0,
+          MoolSpacing.lg,
+          MediaQuery.viewInsetsOf(sheetContext).bottom + MoolSpacing.lg,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Text(
+                product.name,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Text(
+                '${product.pack} · ${product.sku}',
+                style: const TextStyle(color: MoolColors.muted),
+              ),
+              const SizedBox(height: MoolSpacing.md),
+              TextField(
+                key: const Key('retailer-edit-stock'),
+                controller: stock,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Available stock'),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              TextField(
+                key: const Key('retailer-edit-buy-price'),
+                controller: buyPrice,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Current purchase price ₹',
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.sm),
+              TextField(
+                key: const Key('retailer-edit-sell-price'),
+                controller: sellPrice,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Customer price ₹',
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.md),
+              FilledButton(
+                key: const Key('retailer-save-product'),
+                onPressed: widget.session.busy
+                    ? null
+                    : () async {
+                        final saved = await widget.session.saveCatalogueProduct(
+                          productId: product.id,
+                          stock: int.tryParse(stock.text) ?? -1,
+                          buyPrice: int.tryParse(buyPrice.text) ?? 0,
+                          sellPrice: int.tryParse(sellPrice.text) ?? 0,
+                        );
+                        if (saved && sheetContext.mounted) {
+                          Navigator.pop(sheetContext);
+                        }
+                      },
+                child: const Text('Save product'),
+              ),
+              TextButton(
+                key: const Key('retailer-product-editor-cancel'),
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).whenComplete(() {
+      stock.dispose();
+      buyPrice.dispose();
+      sellPrice.dispose();
+    });
   }
 
   Widget _buildWholesale(BuildContext context) {

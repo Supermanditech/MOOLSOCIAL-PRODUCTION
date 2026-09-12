@@ -2,9 +2,19 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import test from "node:test";
 
-import { ProcessYouTubeCache } from "./adapters.js";
+import {
+  ProcessYouTubeCache,
+  YouTubeQuotaGovernorAdapter,
+} from "./adapters.js";
 import { YouTubeDataClient } from "./client.js";
 import { YouTubeProviderError } from "./errors.js";
+import {
+  FirestoreOAuthAttemptStore,
+  FirestoreYouTubeQuotaStore,
+  type ProviderDocument,
+  type ProviderDocumentDatabase,
+  type ProviderDocumentTransaction,
+} from "./firestore_store.js";
 import type {
   OAuthAttemptRecord,
   OAuthAttemptStore,
@@ -16,6 +26,7 @@ import type {
   YouTubeQuotaPort,
 } from "./ports.js";
 import { YouTubeProviderService } from "./provider_service.js";
+import { YouTubeQuotaGovernor } from "./quota.js";
 import {
   Aes256GcmEnvelopeCipher,
   InMemoryAccessTokenCache,
@@ -410,6 +421,104 @@ class MemoryPublicationStore implements YouTubePublicationStore {
     for (const [jobKey, record] of this.records) {
       if (record.userId === userId) this.records.delete(jobKey);
     }
+  }
+}
+
+class SingleUseConnectTransport extends ConnectTransport {
+  readonly authorizationCodes: string[] = [];
+
+  override async send(
+    request: HttpTransportRequest,
+  ): Promise<HttpTransportResponse> {
+    if (request.url === "https://oauth2.googleapis.com/token") {
+      const code = new URLSearchParams(request.body).get("code") ?? "";
+      if (!code || this.authorizationCodes.includes(code)) {
+        throw new Error("authorization code replayed");
+      }
+      this.authorizationCodes.push(code);
+    }
+    return super.send(request);
+  }
+}
+
+class CallbackQuotaDocumentDatabase implements ProviderDocumentDatabase {
+  private readonly documents = new Map<
+    string,
+    Readonly<Record<string, unknown>>
+  >();
+  failTransactionSetPrefix: string | null = null;
+
+  async get(path: string): Promise<Readonly<Record<string, unknown>> | undefined> {
+    const value = this.documents.get(path);
+    return value === undefined ? undefined : structuredClone(value);
+  }
+
+  async set(
+    path: string,
+    data: Readonly<Record<string, unknown>>,
+  ): Promise<void> {
+    this.documents.set(path, structuredClone(data));
+  }
+
+  async delete(path: string): Promise<void> {
+    this.documents.delete(path);
+  }
+
+  async queryByField(
+    collectionPath: string,
+    field: string,
+    value: string,
+  ): Promise<readonly ProviderDocument[]> {
+    return [...this.documents.entries()]
+      .filter(
+        ([path, data]) =>
+          path.startsWith(`${collectionPath}/`) && data[field] === value,
+      )
+      .map(([path, data]) => ({ path, data: structuredClone(data) }));
+  }
+
+  async deleteMany(paths: readonly string[]): Promise<void> {
+    paths.forEach((path) => this.documents.delete(path));
+  }
+
+  async runTransaction<T>(
+    operation: (transaction: ProviderDocumentTransaction) => Promise<T>,
+  ): Promise<T> {
+    const candidate = new Map(
+      [...this.documents.entries()].map(([path, data]) => [
+        path,
+        structuredClone(data),
+      ]),
+    );
+    let writeQueued = false;
+    const transaction: ProviderDocumentTransaction = {
+      get: async (path) => {
+        if (writeQueued) {
+          throw new Error("Firestore transaction read occurred after write");
+        }
+        return candidate.get(path);
+      },
+      create: (path, data) => {
+        writeQueued = true;
+        if (candidate.has(path)) throw new Error("already exists");
+        candidate.set(path, structuredClone(data));
+      },
+      set: (path, data) => {
+        writeQueued = true;
+        if (path.startsWith(this.failTransactionSetPrefix ?? "\u0000")) {
+          throw new Error("measurement transaction failed");
+        }
+        candidate.set(path, structuredClone(data));
+      },
+      delete: (path) => {
+        writeQueued = true;
+        candidate.delete(path);
+      },
+    };
+    const result = await operation(transaction);
+    this.documents.clear();
+    candidate.forEach((data, path) => this.documents.set(path, data));
+    return result;
   }
 }
 
@@ -1448,6 +1557,146 @@ test("server OAuth callback consumes one-time state and stores one user connecti
       error instanceof YouTubeProviderError &&
       error.code === "authentication_required",
   );
+});
+
+test("callback measurement transaction failure requires a fresh safe reconnect", async () => {
+  const now = new Date("2026-08-26T00:00:00.000Z");
+  const verifierCipher = new Aes256GcmEnvelopeCipher(
+    Buffer.alloc(32, 2),
+    "k1",
+    "youtube-oauth-verifier",
+  );
+  const database = new CallbackQuotaDocumentDatabase();
+  const attempts = new FirestoreOAuthAttemptStore(database, () => now);
+  const quota = new YouTubeQuotaGovernorAdapter(
+    new YouTubeQuotaGovernor(new FirestoreYouTubeQuotaStore(database), {
+      clock: { now: () => now },
+    }),
+  );
+  const transport = new SingleUseConnectTransport();
+  const connections = new MemoryConnectionStore(null);
+  const credentials = new MemoryCredentialStore();
+  const accessTokens = new InMemoryAccessTokenCache(() => now.getTime());
+  const service = new YouTubeProviderService({
+    capabilities: {
+      environment: "dev",
+      publicData: true,
+      ownerConnect: true,
+      privateUpload: true,
+      ownerAnalytics: true,
+      publicOrUnlistedUpload: false,
+    },
+    dataClient: new YouTubeDataClient({
+      transport,
+      quota,
+      cache: new ProcessYouTubeCache(),
+      serverApiKey: "restricted-key",
+    }),
+    ownerClient: new YouTubeOwnerClient({ transport, quota }),
+    transport,
+    connections,
+    publications: new MemoryPublicationStore(),
+    oauthAttempts: attempts,
+    refreshTokens: new RefreshTokenVault(
+      new Aes256GcmEnvelopeCipher(
+        Buffer.alloc(32, 1),
+        "k1",
+        "youtube-refresh-token",
+      ),
+      credentials,
+      () => now,
+    ),
+    accessTokens,
+    oauthVerifierCipher: verifierCipher,
+    uploadSessionCipher: new Aes256GcmEnvelopeCipher(
+      Buffer.alloc(32, 3),
+      "k1",
+      "youtube-upload-session",
+    ),
+    oauthClientId: "confidential-web-client-id",
+    oauthClientSecret: "server-held-secret",
+    oauthRedirectUri: "https://dev.moolsocial.com/google-callback/youtube",
+    clock: { now: () => now },
+  });
+
+  const failedBegin = await service.beginConnect({
+    userId: "user-1",
+    purpose: "readonly",
+  });
+  const failedState = new URL(failedBegin.authorizationUrl).searchParams.get(
+    "state",
+  );
+  assert.ok(failedState);
+  database.failTransactionSetPrefix = "youtubeProviderQuotaMeasurements/";
+  await assert.rejects(
+    service.completeConnectFromCallback(failedState, "first-code"),
+    /measurement transaction failed/,
+  );
+  assert.equal(await connections.getByUser("user-1"), null);
+  const connectionKey = callbackConnectionKey("user-1");
+  assert.equal(await credentials.get(connectionKey), undefined);
+  assert.equal(accessTokens.get(connectionKey), undefined);
+  assert.equal(
+    (await database.queryByField(
+      "youtubeProviderQuotaUsage",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    0,
+  );
+  assert.equal(
+    (await database.queryByField(
+      "youtubeProviderQuotaMeasurements",
+      "provider",
+      "YOUTUBE",
+    )).length,
+    0,
+  );
+  assert.equal(
+    transport.requests.filter((request) =>
+      request.url.startsWith("https://www.googleapis.com/youtube/v3/channels?"),
+    ).length,
+    0,
+  );
+  await assert.rejects(
+    service.completeConnectFromCallback(failedState, "first-code"),
+    (error: unknown) =>
+      error instanceof YouTubeProviderError &&
+      error.code === "authentication_required",
+  );
+
+  database.failTransactionSetPrefix = null;
+  const retryBegin = await service.beginConnect({
+    userId: "user-1",
+    purpose: "readonly",
+  });
+  const retryState = new URL(retryBegin.authorizationUrl).searchParams.get(
+    "state",
+  );
+  assert.ok(retryState);
+  assert.notEqual(retryState, failedState);
+  const connected = await service.completeConnectFromCallback(
+    retryState,
+    "second-code",
+  );
+  assert.equal(connected.channelId, "UC_CALLBACK");
+  assert.equal((await connections.getByUser("user-1"))?.status, "ACTIVE");
+  const usage = await database.queryByField(
+    "youtubeProviderQuotaUsage",
+    "provider",
+    "YOUTUBE",
+  );
+  const measurements = await database.queryByField(
+    "youtubeProviderQuotaMeasurements",
+    "provider",
+    "YOUTUBE",
+  );
+  assert.equal(usage.length, 1);
+  assert.equal(usage[0]?.data.used, 1);
+  assert.equal(measurements.length, 1);
+  assert.equal(measurements[0]?.data.acceptedReservations, 1);
+  assert.equal(measurements[0]?.data.rejectedReservations, 0);
+  assert.deepEqual(transport.authorizationCodes, ["first-code", "second-code"]);
 });
 
 test("cold start preserves cumulative scopes when incremental OAuth omits refresh token and scope", async () => {

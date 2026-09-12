@@ -103,7 +103,11 @@ void main() {
       returnKey: Key('ride-booking-screen'),
     ),
     (id: 'book', route: '/app/book/doctor', returnKey: Key('book-doctor')),
-    (id: 'work', route: '/app/work/my-work', returnKey: Key('my-work-screen')),
+    (
+      id: 'work',
+      route: '/app/work/my-work',
+      returnKey: Key('work-choose-screen'),
+    ),
   ]) {
     testWidgets('${origin.id} connected chooser Back preserves its owner', (
       tester,

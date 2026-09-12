@@ -1,0 +1,15 @@
+CandidateId=UAW-BUY-V2-R65.5-CURSOR-REDMI-CHILD-FIXES-20260904
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-BUY-V2-R65.5-CURSOR-REDMI-CHILD-FIXES-20260904;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r65.5
+VersionCode=2026090321
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-5-cursor-redmi-child-fixes-review-20260904\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-5-cursor-redmi-child-fixes-review-20260904\apk-regression-state.json
+Branch=work/cursor-ui/buy-mvp-ticket14-v1-20260902
+HEAD=8d7f158e695b1cdce9e06af17b4dd8682d79dc19
+SourceFingerprint=1F70F80C048528C454E98AAD2017939F9425D97D68F41BC02D501D2E6508745E
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-5-cursor-redmi-child-fixes-review-20260904\uaw-buy-v2-r65.5-cursor-redmi-child-fixes-20260904-device-review-debug.apk
+Bytes=208712289
+SHA256=55A4DFE0B1B8AB213CF886F3AB065D338A6D73AB0E75773C59815CE493F01E7B
+BuiltAt=2026-09-04T07:07:55.0414600+05:30

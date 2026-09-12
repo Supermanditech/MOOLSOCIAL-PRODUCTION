@@ -71,6 +71,28 @@ class SharedSession extends ChangeNotifier {
   final Set<String> _socialAuthorsLoading = {};
   final Set<String> _socialFollowsInFlight = {};
   final Map<String, String> _socialAuthorErrors = {};
+  final Set<String> _socialReportsInFlight = {};
+  final Map<String, String> _socialReportErrors = {};
+  final Set<String> _reportedSocialPosts = {};
+  final Map<String, String> _pendingSocialReportFingerprints = {};
+  final Map<String, String> _pendingSocialReportKeys = {};
+  int _socialReportSequence = 0;
+  final List<SocialPublishedItem> _socialSavedPosts = [];
+  String? _socialSavedCursor;
+  bool socialSavedLoading = false;
+  bool socialSavedLoaded = false;
+  bool socialSavedHasMore = false;
+  String? socialSavedError;
+  final List<SocialNotificationItem> _socialNotifications = [];
+  String? _socialNotificationCursor;
+  bool socialNotificationsLoading = false;
+  bool socialNotificationsLoaded = false;
+  bool socialNotificationsHasMore = false;
+  String? socialNotificationsError;
+  final Set<String> _socialNotificationsReading = {};
+  final Set<String> _blockedSocialAuthors = {};
+  final Set<String> _socialBlocksInFlight = {};
+  final Map<String, String> _socialBlockErrors = {};
 
   List<SocialPublishedItem> get socialPublishedItems =>
       List<SocialPublishedItem>.unmodifiable(_socialPublishedItems);
@@ -86,6 +108,21 @@ class SharedSession extends ChangeNotifier {
   SocialAuthorGateway? get _socialAuthorGateway =>
       _socialContentGateway is SocialAuthorGateway
       ? _socialContentGateway as SocialAuthorGateway
+      : null;
+
+  SocialModerationGateway? get _socialModerationGateway =>
+      _socialContentGateway is SocialModerationGateway
+      ? _socialContentGateway as SocialModerationGateway
+      : null;
+
+  SocialSavedGateway? get _socialSavedGateway =>
+      _socialContentGateway is SocialSavedGateway
+      ? _socialContentGateway as SocialSavedGateway
+      : null;
+
+  SocialNotificationGateway? get _socialNotificationGateway =>
+      _socialContentGateway is SocialNotificationGateway
+      ? _socialContentGateway as SocialNotificationGateway
       : null;
 
   bool socialInteractionBusy(String postId) =>
@@ -123,6 +160,31 @@ class SharedSession extends ChangeNotifier {
       _socialFollowsInFlight.contains(authorId);
 
   String? socialAuthorError(String authorId) => _socialAuthorErrors[authorId];
+
+  bool socialReportBusy(String postId) =>
+      _socialReportsInFlight.contains(postId);
+
+  String? socialReportError(String postId) => _socialReportErrors[postId];
+
+  bool socialPostReported(String postId) =>
+      _reportedSocialPosts.contains(postId);
+
+  List<SocialPublishedItem> get socialSavedPosts =>
+      List<SocialPublishedItem>.unmodifiable(_socialSavedPosts);
+
+  List<SocialNotificationItem> get socialNotifications =>
+      List<SocialNotificationItem>.unmodifiable(_socialNotifications);
+
+  bool socialNotificationReading(String notificationId) =>
+      _socialNotificationsReading.contains(notificationId);
+
+  bool socialAuthorBlocked(String authorId) =>
+      _blockedSocialAuthors.contains(authorId);
+
+  bool socialBlockBusy(String authorId) =>
+      _socialBlocksInFlight.contains(authorId);
+
+  String? socialBlockError(String authorId) => _socialBlockErrors[authorId];
 
   void saveSocialReplyDraft(String postId, String value) {
     if (value.isEmpty) {
@@ -402,6 +464,256 @@ class SharedSession extends ChangeNotifier {
     }
   }
 
+  Future<bool> reportSocialPost(
+    String postId,
+    SocialReportReason reason,
+  ) async {
+    if (_reportedSocialPosts.contains(postId)) return true;
+    if (_socialReportsInFlight.contains(postId)) return false;
+    if (!online) {
+      _socialReportErrors[postId] =
+          'You are offline. The report was not sent. Reconnect and try again.';
+      notifyListeners();
+      return false;
+    }
+    if (!authorized) {
+      _socialReportErrors[postId] = 'Sign in again before sending this report.';
+      notifyListeners();
+      return false;
+    }
+    if (!_socialPublishedItems.any((item) => item.id == postId)) {
+      _socialReportErrors[postId] =
+          'This post is no longer available. The report was not sent.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialModerationGateway;
+    if (gateway == null) {
+      _socialReportErrors[postId] =
+          'Reporting is unavailable right now. Nothing was sent.';
+      notifyListeners();
+      return false;
+    }
+    final fingerprint = '$postId\u001f${reason.name}';
+    if (_pendingSocialReportFingerprints[postId] != fingerprint ||
+        _pendingSocialReportKeys[postId] == null) {
+      _socialReportSequence += 1;
+      _pendingSocialReportFingerprints[postId] = fingerprint;
+      _pendingSocialReportKeys[postId] =
+          'social-report-${DateTime.now().microsecondsSinceEpoch}-$_socialReportSequence';
+    }
+    _socialReportsInFlight.add(postId);
+    _socialReportErrors.remove(postId);
+    notifyListeners();
+    try {
+      await gateway.reportPost(
+        postId: postId,
+        reason: reason,
+        idempotencyKey: _pendingSocialReportKeys[postId]!,
+      );
+      _reportedSocialPosts.add(postId);
+      _pendingSocialReportFingerprints.remove(postId);
+      _pendingSocialReportKeys.remove(postId);
+      _socialReportErrors.remove(postId);
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialReportErrors[postId] = error.message;
+      return false;
+    } on Object {
+      _socialReportErrors[postId] =
+          'The report could not be sent. Nothing changed. Please try again.';
+      return false;
+    } finally {
+      _socialReportsInFlight.remove(postId);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadSavedSocialPosts({bool refresh = false}) async {
+    if (socialSavedLoading) return false;
+    if (!online) {
+      socialSavedError =
+          'You are offline. Previously loaded saved posts remain available.';
+      notifyListeners();
+      return false;
+    }
+    if (!authorized) {
+      socialSavedError = 'Sign in again to view your saved posts.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialSavedGateway;
+    if (gateway == null) {
+      socialSavedError =
+          'Saved posts are unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    socialSavedLoading = true;
+    socialSavedError = null;
+    notifyListeners();
+    try {
+      final page = await gateway.saved(
+        cursor: refresh ? null : _socialSavedCursor,
+      );
+      if (refresh) _socialSavedPosts.clear();
+      for (final item in page.items) {
+        _upsertSavedSocialItem(item);
+      }
+      _socialSavedCursor = page.nextCursor;
+      socialSavedHasMore = page.nextCursor != null;
+      socialSavedLoaded = true;
+      socialSavedError = null;
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      socialSavedError = error.message;
+      return false;
+    } on Object {
+      socialSavedError =
+          'Saved posts could not load. Check your connection and try again.';
+      return false;
+    } finally {
+      socialSavedLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> loadSocialNotifications({bool refresh = false}) async {
+    if (socialNotificationsLoading) return false;
+    if (!online) {
+      socialNotificationsError =
+          'You are offline. Previously loaded notifications remain available.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialNotificationGateway;
+    if (gateway == null) {
+      socialNotificationsError =
+          'Notifications are unavailable right now. Try again later.';
+      notifyListeners();
+      return false;
+    }
+    socialNotificationsLoading = true;
+    socialNotificationsError = null;
+    notifyListeners();
+    try {
+      final page = await gateway.notifications(
+        cursor: refresh ? null : _socialNotificationCursor,
+      );
+      if (refresh) _socialNotifications.clear();
+      for (final item in page.items) {
+        final index = _socialNotifications.indexWhere(
+          (candidate) => candidate.id == item.id,
+        );
+        if (index >= 0) {
+          _socialNotifications[index] = item;
+        } else {
+          _socialNotifications.add(item);
+        }
+      }
+      _socialNotificationCursor = page.nextCursor;
+      socialNotificationsHasMore = page.nextCursor != null;
+      socialNotificationsLoaded = true;
+      socialNotificationsError = null;
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      socialNotificationsError = error.message;
+      return false;
+    } on Object {
+      socialNotificationsError =
+          'Notifications could not load. Check your connection and try again.';
+      return false;
+    } finally {
+      socialNotificationsLoading = false;
+      notifyListeners();
+    }
+  }
+
+  Future<bool> markSocialNotificationRead(String notificationId) async {
+    final index = _socialNotifications.indexWhere(
+      (item) => item.id == notificationId,
+    );
+    if (index < 0 || _socialNotifications[index].read) return index >= 0;
+    if (_socialNotificationsReading.contains(notificationId)) return false;
+    if (!online || !authorized) {
+      socialNotificationsError = !online
+          ? 'You are offline. This notification remains unread.'
+          : 'Sign in again before changing notification status.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialNotificationGateway;
+    if (gateway == null) return false;
+    _socialNotificationsReading.add(notificationId);
+    socialNotificationsError = null;
+    notifyListeners();
+    try {
+      await gateway.markNotificationRead(notificationId);
+      _socialNotifications[index] = _socialNotifications[index].copyWith(
+        read: true,
+      );
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      socialNotificationsError = error.message;
+      return false;
+    } on Object {
+      socialNotificationsError =
+          'Notification status could not update. The content can still open.';
+      return false;
+    } finally {
+      _socialNotificationsReading.remove(notificationId);
+      notifyListeners();
+    }
+  }
+
+  Future<bool> setSocialAuthorBlocked(String authorId, bool blocked) async {
+    if (_socialBlocksInFlight.contains(authorId)) return false;
+    if (!online || !authorized) {
+      _socialBlockErrors[authorId] = !online
+          ? 'You are offline. The block setting did not change.'
+          : 'Sign in again before changing this block setting.';
+      notifyListeners();
+      return false;
+    }
+    final gateway = _socialModerationGateway;
+    if (gateway == null) {
+      _socialBlockErrors[authorId] =
+          'Blocking is unavailable right now. Nothing changed.';
+      notifyListeners();
+      return false;
+    }
+    _socialBlocksInFlight.add(authorId);
+    _socialBlockErrors.remove(authorId);
+    notifyListeners();
+    try {
+      final saved = await gateway.setAuthorBlocked(
+        authorId: authorId,
+        blocked: blocked,
+      );
+      if (saved != blocked) {
+        _socialBlockErrors[authorId] =
+            'MoolSocial could not confirm this block setting.';
+        return false;
+      }
+      if (blocked) {
+        _blockedSocialAuthors.add(authorId);
+      } else {
+        _blockedSocialAuthors.remove(authorId);
+      }
+      return true;
+    } on SocialContentGatewayException catch (error) {
+      _socialBlockErrors[authorId] = error.message;
+      return false;
+    } on Object {
+      _socialBlockErrors[authorId] =
+          'The block setting could not change. Nothing changed.';
+      return false;
+    } finally {
+      _socialBlocksInFlight.remove(authorId);
+      notifyListeners();
+    }
+  }
+
   String filterFor(SharedScreenSpec spec) =>
       filters[spec.screen] ?? spec.filters.first;
 
@@ -410,6 +722,69 @@ class SharedSession extends ChangeNotifier {
   void clearMessages() {
     errorMessage = null;
     noticeMessage = null;
+  }
+
+  void resetForAuthenticationBoundary() {
+    busy = false;
+    authorized = false;
+    subscriptionActive = false;
+    errorMessage = null;
+    noticeMessage = null;
+    input = '';
+    inputResult = null;
+    filters.clear();
+    searches.clear();
+    _controlValues.clear();
+    _completedActions.clear();
+    _socialPublishedItems.clear();
+    _socialInteractionsInFlight.clear();
+    _socialInteractionErrors.clear();
+    _socialPublishSequence = 0;
+    _pendingSocialPublishFingerprint = null;
+    _pendingSocialPublishKey = null;
+    _socialFeedCursor = null;
+    socialFeedLoading = false;
+    socialFeedLoaded = false;
+    socialFeedHasMore = false;
+    socialFeedError = null;
+    _socialFeedFailureWasRefresh = true;
+    _socialComments.clear();
+    _socialCommentCursors.clear();
+    _socialCommentsLoaded.clear();
+    _socialCommentsLoading.clear();
+    _socialRepliesInFlight.clear();
+    _socialCommentErrors.clear();
+    _socialReplyDrafts.clear();
+    _pendingSocialReplyFingerprints.clear();
+    _pendingSocialReplyKeys.clear();
+    _socialReplySequence = 0;
+    _socialAuthorProfiles.clear();
+    _socialAuthorsLoading.clear();
+    _socialFollowsInFlight.clear();
+    _socialAuthorErrors.clear();
+    _socialReportsInFlight.clear();
+    _socialReportErrors.clear();
+    _reportedSocialPosts.clear();
+    _pendingSocialReportFingerprints.clear();
+    _pendingSocialReportKeys.clear();
+    _socialReportSequence = 0;
+    _socialSavedPosts.clear();
+    _socialSavedCursor = null;
+    socialSavedLoading = false;
+    socialSavedLoaded = false;
+    socialSavedHasMore = false;
+    socialSavedError = null;
+    _socialNotifications.clear();
+    _socialNotificationCursor = null;
+    socialNotificationsLoading = false;
+    socialNotificationsLoaded = false;
+    socialNotificationsHasMore = false;
+    socialNotificationsError = null;
+    _socialNotificationsReading.clear();
+    _blockedSocialAuthors.clear();
+    _socialBlocksInFlight.clear();
+    _socialBlockErrors.clear();
+    notifyListeners();
   }
 
   void dismissMessages() {
@@ -896,6 +1271,13 @@ class SharedSession extends ChangeNotifier {
         choiceIndex: choiceIndex,
       );
       _upsertSocialItem(updated);
+      if (interaction == 'save') {
+        if (updated.saved) {
+          _upsertSavedSocialItem(updated);
+        } else {
+          _socialSavedPosts.removeWhere((item) => item.id == updated.id);
+        }
+      }
       _socialInteractionErrors.remove(id);
       clearMessages();
       notifyListeners();
@@ -930,6 +1312,17 @@ class SharedSession extends ChangeNotifier {
       _socialPublishedItems.add(item);
     } else {
       _socialPublishedItems.insert(0, item);
+    }
+  }
+
+  void _upsertSavedSocialItem(SocialPublishedItem item) {
+    final index = _socialSavedPosts.indexWhere(
+      (candidate) => candidate.id == item.id,
+    );
+    if (index >= 0) {
+      _socialSavedPosts[index] = item;
+    } else {
+      _socialSavedPosts.add(item);
     }
   }
 }

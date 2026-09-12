@@ -42,7 +42,11 @@ void main() {
         find.text('YouTube Shorts are unavailable right now'),
         findsOneWidget,
       );
-      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(
+        find.textContaining('continue in MoolSocial Feed'),
+        findsOneWidget,
+      );
+      expect(find.text('Open Feed'), findsOneWidget);
       expect(find.text('Fresh basket packed this morning'), findsNothing);
       expect(find.text('Meet Rajasthan makers this week'), findsNothing);
       expect(find.text('Promoted'), findsNothing);
@@ -84,7 +88,11 @@ void main() {
         find.text('YouTube Videos are unavailable right now'),
         findsOneWidget,
       );
-      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(
+        find.textContaining('continue in MoolSocial Feed'),
+        findsOneWidget,
+      );
+      expect(find.text('Open Feed'), findsOneWidget);
       expect(find.text('Live'), findsNothing);
       expect(find.text('Learning'), findsNothing);
       expect(find.text('Local'), findsNothing);
@@ -120,6 +128,7 @@ void main() {
           retailerSession: owners.retailer,
           sharedSession: owners.shared,
           initialSubAction: 'create',
+          initialState: 'text',
         ),
       );
       expect(
@@ -241,8 +250,13 @@ void main() {
 
       expect(find.text('Account access video'), findsOneWidget);
       expect(find.byTooltip('YouTube channel status'), findsOneWidget);
-      expect(find.byTooltip('MoolSocial account'), findsNothing);
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      expect(
+        find.byKey(const Key('screen04-youtube-home-account')),
+        findsOneWidget,
+      );
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('continuous-youtube-status-owner')),
@@ -270,7 +284,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
 
       expect(
@@ -311,7 +327,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
       await tester.tap(find.byKey(const Key('youtube-connect-auth-cancel')));
       await tester.pumpAndSettle();
@@ -347,7 +365,9 @@ void main() {
         ),
       );
 
-      await tester.tap(find.byKey(const Key('screen04-youtube-home-account')));
+      await tester.tap(
+        find.byKey(const Key('screen04-youtube-home-channel-status')),
+      );
       await tester.pumpAndSettle();
       await tester.tapAt(const Offset(8, 8));
       await tester.pumpAndSettle();
@@ -381,7 +401,7 @@ void main() {
         );
 
         await tester.tap(
-          find.byKey(const Key('screen04-youtube-home-account')),
+          find.byKey(const Key('screen04-youtube-home-channel-status')),
         );
         await tester.pumpAndSettle();
         await tester.tap(
@@ -425,12 +445,189 @@ void main() {
         find.byKey(const Key('screen04-moolsocial-feed-brand')),
         findsOneWidget,
       );
-      expect(find.text('PUBLIC FEED'), findsOneWidget);
+      expect(
+        find.descendant(
+          of: find.byKey(const Key('screen04-moolsocial-feed-brand')),
+          matching: find.text('MoolSocial Feed'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Relevant public posts'), findsOneWidget);
+      expect(find.text('No posts yet'), findsOneWidget);
       expect(
         find.byKey(const Key('screen04-feed-create-post')),
         findsOneWidget,
       );
+      expect(
+        find.byKey(const Key('screen04-feed-discover-people')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(const Key('screen04-feed-start-conversation')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
       expect(find.byKey(const Key('screen04-quick-post-feed')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('screen04-feed-discover-people')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('chat-section-body-discover')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+        findsOneWidget,
+      );
+
+      expect(tester.takeException(), isNull);
+    });
+
+    testWidgets(
+      'UI review exposes Create for feedback without allowing guest publish',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final owners = _GuestOwners();
+        addTearDown(owners.dispose);
+        await owners.journey.start();
+        await _pump(
+          tester,
+          SocialUniversalV2(
+            session: owners.journey,
+            creatorSession: owners.creator,
+            retailerSession: owners.retailer,
+            sharedSession: owners.shared,
+            initialSubAction: 'feed',
+            enableCreateReviewPreview: true,
+          ),
+        );
+
+        await tester.tap(find.byKey(const Key('screen04-feed-create-post')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('social-create-review-choice')),
+          findsNothing,
+        );
+        expect(find.byKey(const Key('screen04-create-home')), findsNothing);
+        expect(owners.journey.isAuthenticated, isFalse);
+        expect(
+          find.byKey(const Key('screen04-create-preview-notice')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('screen04-create-writing-canvas')),
+          findsOneWidget,
+        );
+        expect(
+          find.byKey(const Key('screen04-create-stage-rail')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('screen04-create-more-tools')),
+          findsNothing,
+        );
+        expect(
+          find.byKey(const Key('screen04-create-inline-emoji')),
+          findsNothing,
+        );
+        for (final key in const [
+          Key('screen04-create-inline-gif'),
+          Key('screen04-create-inline-mention'),
+          Key('screen04-create-inline-topic'),
+        ]) {
+          expect(find.byKey(key), findsOneWidget);
+          expect(tester.getSize(find.byKey(key)).height, 44);
+        }
+        expect(find.text('Sign in to post'), findsNothing);
+        expect(find.text('Post'), findsOneWidget);
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.byKey(const Key('screen04-create-publish-post')),
+              )
+              .onPressed,
+          isNull,
+        );
+        await tester.enterText(
+          find.byKey(const Key('screen04-create-post-text')),
+          'Preview draft',
+        );
+        await tester.tap(find.byKey(const Key('screen04-create-open-preview')));
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const Key('screen04-create-feed-preview')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: find.byKey(const Key('screen04-create-feed-preview')),
+            matching: find.text('Preview draft'),
+          ),
+          findsOneWidget,
+        );
+        await tester.tap(
+          find.byKey(const Key('screen04-create-preview-back-to-editing')),
+        );
+        await tester.pumpAndSettle();
+
+        await tester.tap(
+          find.byKey(const Key('screen04-create-inline-mention')),
+        );
+        await tester.pump();
+        await tester.tap(find.byKey(const Key('screen04-create-inline-topic')));
+        await tester.pump();
+        expect(
+          tester
+              .widget<TextField>(
+                find.byKey(const Key('screen04-create-post-text')),
+              )
+              .controller!
+              .text,
+          'Preview draft@#',
+        );
+
+        await tester.tap(find.byKey(const Key('screen04-create-inline-gif')));
+        await tester.pumpAndSettle();
+        expect(find.textContaining('approved media service'), findsOneWidget);
+        expect(owners.journey.stage, JourneyStage.ready);
+        expect(owners.shared.socialPublishedItems, isEmpty);
+
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets('normal guest Create still goes directly to sign-in', (
+      tester,
+    ) async {
+      final owners = _GuestOwners();
+      addTearDown(owners.dispose);
+      await owners.journey.start();
+      await _pump(
+        tester,
+        SocialUniversalV2(
+          session: owners.journey,
+          creatorSession: owners.creator,
+          retailerSession: owners.retailer,
+          sharedSession: owners.shared,
+          initialSubAction: 'feed',
+        ),
+      );
+
+      await tester.tap(find.byKey(const Key('screen04-feed-create-post')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('social-create-review-choice')),
+        findsNothing,
+      );
+      expect(owners.journey.stage, JourneyStage.signIn);
+      expect(
+        owners.journey.authenticationPurpose,
+        JourneyAuthenticationPurpose.socialCreate,
+      );
     });
   });
 
@@ -451,6 +648,22 @@ void main() {
       await tester.tap(find.text('Gallery'));
       await tester.pump();
       expect(session.mediaSelected, isTrue);
+      final title = tester.widget<TextField>(
+        find.byKey(const Key('social-creator-publish-title')),
+      );
+      final caption = tester.widget<TextField>(
+        find.byKey(const Key('social-creator-publish-caption')),
+      );
+      expect(title.textInputAction, TextInputAction.next);
+      expect(caption.textInputAction, TextInputAction.done);
+      expect(title.scrollPadding, const EdgeInsets.only(bottom: 160));
+      expect(caption.scrollPadding, const EdgeInsets.only(bottom: 160));
+      expect(
+        tester
+            .widget<ListView>(find.byType(ListView).first)
+            .keyboardDismissBehavior,
+        ScrollViewKeyboardDismissBehavior.onDrag,
+      );
       final rights = find.byType(CheckboxListTile).first;
       await tester.ensureVisible(rights);
       await tester.pumpAndSettle();
@@ -508,6 +721,11 @@ void main() {
         addTearDown(session.dispose);
         await _pump(tester, SocialYouTubeConnectV2Screen(session: session));
 
+        final urlField = tester.widget<TextField>(
+          find.byKey(const Key('social-v2-youtube-url')),
+        );
+        expect(urlField.textInputAction, TextInputAction.done);
+        expect(urlField.scrollPadding, const EdgeInsets.only(bottom: 160));
         await tester.enterText(
           find.byKey(const Key('social-v2-youtube-url')),
           'https://youtube.com/watch?v=moolsocial',
@@ -519,8 +737,25 @@ void main() {
         expect(session.youtubeValidated, isTrue);
         expect(session.youtubeStep, YouTubeConnectStep.action);
         expect(find.text('Add post details'), findsOneWidget);
-
         await _scrollToAndTap(tester, find.text('Buy'));
+
+        final reference = find.byKey(const Key('social-v2-youtube-reference'));
+        await tester.ensureVisible(reference);
+        await tester.pumpAndSettle();
+        final referenceEditable = tester.widget<EditableText>(
+          find.descendant(of: reference, matching: find.byType(EditableText)),
+        );
+        expect(referenceEditable.textInputAction, TextInputAction.next);
+        expect(
+          referenceEditable.scrollPadding,
+          const EdgeInsets.only(bottom: 160),
+        );
+        final contextField = tester.widget<TextField>(
+          find.byKey(const Key('social-v2-youtube-context')),
+        );
+        expect(contextField.textInputAction, TextInputAction.done);
+        expect(contextField.scrollPadding, const EdgeInsets.only(bottom: 160));
+
         await _scrollToAndTap(
           tester,
           find.widgetWithText(
@@ -667,6 +902,14 @@ void main() {
         await _scrollToAndTap(tester, find.text('Sales'));
         await _scrollToAndTap(tester, find.text('Morning market Reel'));
         await _scrollToAndTap(tester, find.text('Continue to budget'));
+        final budget = tester.widget<EditableText>(
+          find.descendant(
+            of: find.byKey(const Key('social-promotion-budget-input')),
+            matching: find.byType(EditableText),
+          ),
+        );
+        expect(budget.textInputAction, TextInputAction.done);
+        expect(budget.scrollPadding, const EdgeInsets.only(bottom: 160));
         await _scrollToAndTap(tester, find.text('Check campaign'));
         await _scrollToAndTap(
           tester,

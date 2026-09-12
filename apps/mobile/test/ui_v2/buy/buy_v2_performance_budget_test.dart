@@ -70,22 +70,23 @@ void main() {
       'full current-seed mixed cart and checkout projection remain bounded',
       () {
         final session = createSession();
-        final unrestrictedProducts = BuyV2Catalogue.products
+        final currentProducts = BuyV2Catalogue.products
             .where((product) => !product.requiresPrescription)
             .toList(growable: false);
-        final expectedItemCount = unrestrictedProducts.fold<int>(
+        final addedProducts = <BuyV2Product>[];
+        final stopwatch = Stopwatch()..start();
+        for (final product in currentProducts) {
+          if (session.addProduct(product.id)) addedProducts.add(product);
+        }
+        expect(addedProducts, isNotEmpty);
+        final expectedItemCount = addedProducts.fold<int>(
           0,
           (total, product) => total + product.minimumOrder,
         );
-        final expectedTotal = unrestrictedProducts.fold<int>(
+        final expectedTotal = addedProducts.fold<int>(
           0,
           (total, product) => total + product.price * product.minimumOrder,
         );
-
-        final stopwatch = Stopwatch()..start();
-        for (final product in unrestrictedProducts) {
-          expect(session.addProduct(product.id), isTrue, reason: product.id);
-        }
         session.openCart();
         session.openCheckout();
 
@@ -102,14 +103,14 @@ void main() {
         stopwatch.stop();
 
         debugPrint(
-          'BUY_PERF mixed_cart_offers=${unrestrictedProducts.length} '
+          'BUY_PERF mixed_cart_offers=${addedProducts.length} '
           'projection_cycles=500 lines=$projectedLineCount '
           'groups=$projectedGroupCount '
           'elapsed_ms=${stopwatch.elapsedMilliseconds} budget_ms=8000',
         );
         expect(session.checkoutItemCount, expectedItemCount);
         expect(session.checkoutTotal, expectedTotal);
-        expect(projectedLineCount, unrestrictedProducts.length * 500);
+        expect(projectedLineCount, addedProducts.length * 500);
         expect(projectedGroupCount, greaterThan(0));
         expect(stopwatch.elapsed, lessThan(const Duration(seconds: 8)));
       },

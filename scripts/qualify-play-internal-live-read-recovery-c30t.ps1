@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param([Parameter(Mandatory)][ValidateSet(1, 2)][int]$Cycle, [string]$RepositoryRoot)
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -337,7 +339,7 @@ $manifestRows = @($relativePaths | ForEach-Object { '{0}  {1}' -f (Get-FileHash 
 $manifestPath = Join-Path $artifactRoot 'source-aggregate-manifest-accepted.txt'
 $manifestText = ($manifestRows -join [Environment]::NewLine) + [Environment]::NewLine
 $manifestBytes = [Text.UTF8Encoding]::new($false).GetBytes($manifestText)
-$manifestHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($manifestBytes))
+$manifestHash = (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ($manifestBytes))))
 if ($Cycle -eq 1) {
   Assert-C30TQualification -Condition (-not (Test-Path -LiteralPath $manifestPath)) -Message 'accepted source manifest already exists before cycle 1.'
   [IO.File]::WriteAllBytes($manifestPath, $manifestBytes)

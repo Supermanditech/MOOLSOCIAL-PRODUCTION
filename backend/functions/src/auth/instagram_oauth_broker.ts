@@ -63,6 +63,7 @@ export interface InstagramAttemptStore {
 export interface InstagramProviderIdentity {
   readonly subject: string;
   readonly accountType: string;
+  readonly username: string;
 }
 
 export interface InstagramTokenGrant {
@@ -85,7 +86,7 @@ export interface InstagramSubjectProjector {
 }
 
 export interface InstagramFirebaseTokenIssuer {
-  issue(firebaseUid: string): Promise<string>;
+  issue(firebaseUid: string, accountHandle: string): Promise<string>;
 }
 
 export interface InstagramRandomSource {
@@ -477,9 +478,13 @@ export class FirebaseAdminInstagramTokenIssuer
 {
   constructor(private readonly auth: FirebaseCustomTokenCreator) {}
 
-  issue(firebaseUid: string): Promise<string> {
+  issue(firebaseUid: string, accountHandle: string): Promise<string> {
+    if (!/^@[A-Za-z0-9._]{1,30}$/u.test(accountHandle)) {
+      throw new Error("Instagram account handle is invalid.");
+    }
     return this.auth.createCustomToken(firebaseUid, {
       auth_provider: "instagram",
+      auth_provider_account: accountHandle,
     });
   }
 }
@@ -565,6 +570,7 @@ export class InstagramPublicAuthBroker {
     }
     const authorizationUrl = new URL(INSTAGRAM_AUTHORIZATION_ENDPOINT);
     authorizationUrl.searchParams.set("response_type", "code");
+    authorizationUrl.searchParams.set("force_reauth", "true");
     authorizationUrl.searchParams.set("client_id", this.clientId);
     authorizationUrl.searchParams.set("redirect_uri", this.redirectUri);
     authorizationUrl.searchParams.set("scope", INSTAGRAM_SCOPE);
@@ -645,7 +651,10 @@ export class InstagramPublicAuthBroker {
       }
       const firebaseUid = this.subjectProjector.project(identity.subject);
       try {
-        customToken = await this.tokenIssuer.issue(firebaseUid);
+        customToken = await this.tokenIssuer.issue(
+          firebaseUid,
+          `@${identity.username}`,
+        );
       } catch {
         throw new InstagramPublicAuthError(
           "token_issue_failed",
@@ -786,7 +795,7 @@ export class FetchInstagramProviderTransport
 
   async readIdentity(accessToken: string): Promise<InstagramProviderIdentity> {
     const endpoint = new URL(INSTAGRAM_IDENTITY_ENDPOINT);
-    endpoint.searchParams.set("fields", "id,account_type");
+    endpoint.searchParams.set("fields", "id,account_type,username");
     let response: Response;
     try {
       response = await this.fetchImplementation(endpoint, {
@@ -805,7 +814,14 @@ export class FetchInstagramProviderTransport
     const body = await providerJson(response);
     const subject = boundedText(body?.id, 32);
     const accountType = boundedText(body?.account_type, 32);
-    if (!subject || !/^[0-9]{1,32}$/u.test(subject) || !accountType) {
+    const username = boundedText(body?.username, 30);
+    if (
+      !subject ||
+      !/^[0-9]{1,32}$/u.test(subject) ||
+      !accountType ||
+      !username ||
+      !/^[A-Za-z0-9._]{1,30}$/u.test(username)
+    ) {
       throw new InstagramPublicAuthError(
         "identity_unavailable",
         "The Instagram account identity could not be verified.",
@@ -813,7 +829,7 @@ export class FetchInstagramProviderTransport
         true,
       );
     }
-    return { subject, accountType };
+    return { subject, accountType, username };
   }
 
   async revokeAccessToken(accessToken: string): Promise<void> {

@@ -90,7 +90,7 @@ void main() {
 
       await tester.tap(find.byKey(const Key('work-local-workspace')));
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
       expect(find.byKey(const Key('personal-mool-root-v2')), findsNothing);
 
       await tester.tap(find.byKey(const Key('work-local-earn')));

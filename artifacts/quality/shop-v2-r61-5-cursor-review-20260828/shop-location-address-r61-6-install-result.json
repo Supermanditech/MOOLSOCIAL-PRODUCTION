@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "state": "passed_checksum_matched",
+  "candidateId": "UAW-SHOP-LOCATION-ADDRESS-R61.6-CURSOR-UI-REVIEW-20260828",
+  "sourceHead": "fd19fd4adb4ffa5a14552154f661506ed33fdb2e",
+  "device": "Redmi TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r61.6-cursorreview",
+  "versionCode": "2026082808",
+  "builtApk": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/uaw-shop-location-address-r61.6-cursor-ui-review-20260828-device-review-debug.apk",
+  "installedApk": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-redmi-installed-base.apk",
+  "bytes": 206412691,
+  "builtSha256": "66C6F44F592688C9B14839BCA4D1F961E38DA0DDF530626E83958DDA8CB198F5",
+  "installedSha256": "66C6F44F592688C9B14839BCA4D1F961E38DA0DDF530626E83958DDA8CB198F5",
+  "byteIdentical": true,
+  "coldLaunch": "passed_after_transient_launch_frame",
+  "reviewScreen": "Choose delivery address",
+  "reviewScreenshot": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-redmi-ready.png",
+  "reviewUiDump": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-redmi-ready-ui.xml",
+  "oppoTouched": false,
+  "runtimePackageTouched": false,
+  "firebaseInitialized": false
+}

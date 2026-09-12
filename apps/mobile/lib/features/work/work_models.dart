@@ -1,4 +1,909 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+
+import '../buy/buy_v2_content_contracts.dart';
+import '../buy/buy_v2_models.dart';
+
+enum WorkspaceIssueTarget { customerOrder, supplierShipment }
+
+/// Choices are supplied with the case, not inferred from an order's status.
+enum WorkspaceIssueResponse {
+  acceptRequest,
+  declineRequest,
+  provideDetails;
+
+  String get label => switch (this) {
+    acceptRequest => 'Accept request',
+    declineRequest => 'Decline request',
+    provideDetails => 'Send details',
+  };
+}
+
+typedef WorkspaceIssueDraftKey = ({
+  String account,
+  String store,
+  String caseId,
+});
+
+/// Unsent text only. It cannot authorise a case, payment or stock mutation.
+class WorkspaceIssueDraft {
+  const WorkspaceIssueDraft({
+    required this.key,
+    required this.referenceId,
+    required this.target,
+    required this.expectedRevision,
+    this.response,
+    this.note = '',
+  });
+  final WorkspaceIssueDraftKey key;
+  final String referenceId;
+  final WorkspaceIssueTarget target;
+  final int expectedRevision;
+  final WorkspaceIssueResponse? response;
+  final String note;
+
+  static bool acceptsNote(String value) => value.characters.length <= 2000;
+
+  bool get valid =>
+      [
+        key.account,
+        key.store,
+        key.caseId,
+        referenceId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      expectedRevision > 0 &&
+      acceptsNote(note);
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'account': key.account,
+    'store': key.store,
+    'caseId': key.caseId,
+    'referenceId': referenceId,
+    'target': target.name,
+    'revision': expectedRevision,
+    'response': response?.name,
+    'note': note,
+  };
+
+  static WorkspaceIssueDraft? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['account'] is! String ||
+        value['store'] is! String ||
+        value['caseId'] is! String ||
+        value['referenceId'] is! String ||
+        value['revision'] is! int ||
+        value['note'] is! String) {
+      return null;
+    }
+    final target = WorkspaceIssueTarget.values
+        .where((v) => v.name == value['target'])
+        .firstOrNull;
+    final response = WorkspaceIssueResponse.values
+        .where((v) => v.name == value['response'])
+        .firstOrNull;
+    if (target == null || (value['response'] != null && response == null)) {
+      return null;
+    }
+    final draft = WorkspaceIssueDraft(
+      key: (
+        account: value['account'],
+        store: value['store'],
+        caseId: value['caseId'],
+      ),
+      referenceId: value['referenceId'],
+      target: target,
+      expectedRevision: value['revision'],
+      response: response,
+      note: value['note'],
+    );
+    return draft.valid ? draft : null;
+  }
+}
+
+enum WorkspaceIssueKind {
+  returnRequest,
+  missingItem,
+  wrongItem,
+  damagedItem,
+  packingShortage,
+  substitution;
+
+  String get label => switch (this) {
+    returnRequest => 'Return requested',
+    missingItem => 'Missing item',
+    wrongItem => 'Wrong item',
+    damagedItem => 'Damaged item',
+    packingShortage => 'Packing shortage',
+    substitution => 'Replacement request',
+  };
+}
+
+enum WorkspaceIssueState {
+  retailerReview,
+  customerReview,
+  supplierReview,
+  moolSocialReview,
+  resolved,
+  declined,
+  cancelled;
+
+  String get label => switch (this) {
+    retailerReview => 'Your review needed',
+    customerReview => 'Awaiting customer response',
+    supplierReview => 'Awaiting supplier response',
+    moolSocialReview => 'MoolSocial is reviewing',
+    resolved => 'Case resolved',
+    declined => 'Request declined',
+    cancelled => 'Request cancelled',
+  };
+  bool get closed => const {resolved, declined, cancelled}.contains(this);
+}
+
+/// Original purchased line identity, not the current catalogue price or pack.
+class WorkspaceIssueLine {
+  const WorkspaceIssueLine({
+    required this.lineId,
+    required this.productId,
+    required this.name,
+    required this.pack,
+    required this.orderedQuantity,
+    required this.affectedQuantity,
+  });
+  final String lineId, productId, name, pack;
+  final int orderedQuantity, affectedQuantity;
+  bool get valid =>
+      lineId.trim().isNotEmpty &&
+      productId.trim().isNotEmpty &&
+      name.trim().isNotEmpty &&
+      orderedQuantity > 0 &&
+      affectedQuantity > 0 &&
+      affectedQuantity <= orderedQuantity;
+  Object get identity =>
+      (lineId, productId, name, pack, orderedQuantity, affectedQuantity);
+}
+
+/// Read-only case projection. A resolved case does not itself authorise a
+/// refund, stock posting, substitution, receipt or customer collection.
+class WorkspaceIssueRecord {
+  WorkspaceIssueRecord({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.id,
+    required this.referenceId,
+    required this.target,
+    required this.kind,
+    required this.state,
+    required this.revision,
+    required this.updatedAt,
+    required this.reason,
+    required this.nextStep,
+    required List<WorkspaceIssueLine> lines,
+    List<WorkspaceIssueResponse> permittedResponses = const [],
+    this.resolution,
+  }) : lines = List.unmodifiable(lines),
+       permittedResponses = List.unmodifiable(permittedResponses);
+
+  final String accountScope, workspaceId, id, referenceId, reason, nextStep;
+  final WorkspaceIssueTarget target;
+  final WorkspaceIssueKind kind;
+  final WorkspaceIssueState state;
+  final int revision;
+  final DateTime updatedAt;
+  final List<WorkspaceIssueLine> lines;
+  final List<WorkspaceIssueResponse> permittedResponses;
+  final String? resolution;
+  WorkspaceIssueDraftKey get draftKey =>
+      (account: accountScope, store: workspaceId, caseId: id);
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        id,
+        referenceId,
+        reason,
+        nextStep,
+      ].every((s) => s.trim().isNotEmpty) &&
+      revision > 0 &&
+      lines.isNotEmpty &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.lineId).toSet().length == lines.length &&
+      permittedResponses.toSet().length == permittedResponses.length &&
+      (state == WorkspaceIssueState.retailerReview ||
+          permittedResponses.isEmpty) &&
+      (!state.closed || resolution?.trim().isNotEmpty == true);
+
+  Object get _revisionData => (
+    accountScope,
+    workspaceId,
+    id,
+    referenceId,
+    target,
+    kind,
+    state,
+    updatedAt,
+    reason,
+    nextStep,
+    resolution,
+  );
+  bool sameRevisionContent(WorkspaceIssueRecord other) =>
+      _revisionData == other._revisionData &&
+      permittedResponses.length == other.permittedResponses.length &&
+      permittedResponses.asMap().entries.every(
+        (entry) => entry.value == other.permittedResponses[entry.key],
+      ) &&
+      lines.length == other.lines.length &&
+      lines.asMap().entries.every(
+        (entry) => entry.value.identity == other.lines[entry.key].identity,
+      );
+}
+
+/// Format validation only, using the existing supported Indian mobile range.
+/// This does not establish customer identity, consent or OTP verification.
+String? normalizeWorkspaceMobile(String value) {
+  final input = value.trim();
+  if (!RegExp(r'^(?:\+?91[ -]?)?[6-9]\d(?:[ -]?\d){8}$').hasMatch(input)) {
+    return null;
+  }
+  final digits = input.replaceAll(RegExp(r'[ +\-]'), '');
+  return digits.length == 12 ? digits.substring(2) : digits;
+}
+
+/// Reads a supported phone or the stored `name · phone` display format.
+/// Never salvage a substring from malformed data or use this as account proof.
+String? workspaceCustomerMobile(String customer) {
+  final parts = customer.split('·');
+  if (parts.length > 2 || (parts.length == 2 && parts.first.trim().isEmpty)) {
+    return null;
+  }
+  return normalizeWorkspaceMobile(parts.last);
+}
+
+enum WorkspacePaymentState {
+  unpaid,
+  pending,
+  partPaid,
+  paid,
+  failed,
+  refundPending,
+  refunded,
+  disputed,
+  unknown;
+
+  String get label => switch (this) {
+    unpaid => 'Payment due',
+    pending => 'Payment pending',
+    partPaid => 'Part paid',
+    paid => 'Paid',
+    failed => 'Payment failed',
+    refundPending => 'Refund pending',
+    refunded => 'Refunded',
+    disputed => 'Payment under review',
+    unknown => 'Payment update unavailable',
+  };
+}
+
+enum WorkspacePaymentChannel {
+  platform,
+  cash,
+  directUpi,
+  credit,
+  unknown;
+
+  String get label => switch (this) {
+    platform => 'Through MoolSocial',
+    cash => 'Cash at store',
+    directUpi => 'UPI to store',
+    credit => 'On account',
+    unknown => 'Payment method unavailable',
+  };
+}
+
+enum WorkspacePayoutState {
+  requested,
+  processing,
+  paid,
+  failed,
+  held,
+  cancelled,
+  unknown;
+
+  String get label => switch (this) {
+    requested => 'Requested',
+    processing => 'Processing',
+    paid => 'Paid to bank',
+    failed => 'Payout failed',
+    held => 'On hold',
+    cancelled => 'Cancelled',
+    unknown => 'Checking payout',
+  };
+}
+
+bool _financeAmountValid(int value, {bool signed = false}) =>
+    (signed || value >= 0) && value.abs() <= 9007199254740991;
+
+/// Authority-supplied order payment facts. Fulfilment and bank settlement are
+/// deliberately absent: paid is neither delivered nor proof of platform funds.
+class WorkspacePaymentRecord {
+  const WorkspacePaymentRecord({
+    required this.orderId,
+    required this.customerId,
+    required this.customerName,
+    required this.revision,
+    required this.updatedAt,
+    required this.amountMinor,
+    required this.paidMinor,
+    required this.dueMinor,
+    required this.refundedMinor,
+    required this.state,
+    required this.channel,
+    this.invoiceId,
+    this.transactionId,
+  });
+  final String orderId, customerId, customerName;
+  final String? invoiceId, transactionId;
+  final int revision, amountMinor, paidMinor, dueMinor, refundedMinor;
+  final DateTime updatedAt;
+  final WorkspacePaymentState state;
+  final WorkspacePaymentChannel channel;
+  Object get revisionData => (
+    orderId,
+    customerId,
+    customerName,
+    updatedAt,
+    amountMinor,
+    paidMinor,
+    dueMinor,
+    refundedMinor,
+    state,
+    channel,
+    invoiceId,
+    transactionId,
+  );
+  bool get valid =>
+      [orderId, customerId, customerName].every((s) => s.trim().isNotEmpty) &&
+      revision > 0 &&
+      [
+        amountMinor,
+        paidMinor,
+        dueMinor,
+        refundedMinor,
+      ].every((n) => _financeAmountValid(n)) &&
+      paidMinor <= amountMinor &&
+      dueMinor <= amountMinor &&
+      refundedMinor <= paidMinor &&
+      (state != WorkspacePaymentState.paid ||
+          (dueMinor == 0 && paidMinor == amountMinor)) &&
+      (state != WorkspacePaymentState.partPaid ||
+          (paidMinor > 0 && dueMinor > 0)) &&
+      (state != WorkspacePaymentState.refunded ||
+          (paidMinor > 0 && refundedMinor == paidMinor));
+  String get label => state == WorkspacePaymentState.paid
+      ? switch (channel) {
+          WorkspacePaymentChannel.platform => 'Paid through MoolSocial',
+          WorkspacePaymentChannel.cash => 'Paid in cash',
+          WorkspacePaymentChannel.directUpi => 'Paid to store',
+          _ => state.label,
+        }
+      : state.label;
+}
+
+class WorkspacePayoutRecord {
+  const WorkspacePayoutRecord({
+    required this.id,
+    required this.operationId,
+    required this.revision,
+    required this.amountMinor,
+    required this.updatedAt,
+    required this.state,
+    this.bankLabel,
+    this.expectedBy,
+    this.message,
+  });
+  final String id, operationId;
+  final int revision, amountMinor;
+  final DateTime updatedAt;
+  final WorkspacePayoutState state;
+
+  /// Masked customer-facing bank label, not raw account credentials.
+  final String? bankLabel, expectedBy, message;
+  Object get revisionData => (
+    id,
+    operationId,
+    amountMinor,
+    updatedAt,
+    state,
+    bankLabel,
+    expectedBy,
+    message,
+  );
+  bool get valid =>
+      id.trim().isNotEmpty &&
+      operationId.trim().isNotEmpty &&
+      revision > 0 &&
+      _financeAmountValid(amountMinor);
+}
+
+/// One atomic, read-only finance projection from an authenticated Store ledger.
+/// Monetary values are INR minor units. Totals cover the account/Store ledger,
+/// not a sum of the possibly partial rows. A snapshot authorizes no money move.
+class WorkspaceFinanceSnapshot {
+  WorkspaceFinanceSnapshot({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.revision,
+    required this.asOf,
+    required this.salesTodayMinor,
+    required this.duesMinor,
+    required this.availableMinor,
+    required this.heldMinor,
+    required this.requestedMinor,
+    required this.paidOutMinor,
+    required this.feesMinor,
+    required this.deliveryAdjustmentsMinor,
+    required this.refundsMinor,
+    required this.taxWithheldMinor,
+    required List<WorkspacePaymentRecord> payments,
+    required List<WorkspacePayoutRecord> payouts,
+    this.historyComplete = false,
+  }) : payments = List.unmodifiable(payments),
+       payouts = List.unmodifiable(payouts);
+  final String accountScope, workspaceId;
+  final int revision,
+      salesTodayMinor,
+      duesMinor,
+      availableMinor,
+      heldMinor,
+      requestedMinor,
+      paidOutMinor,
+      feesMinor,
+      deliveryAdjustmentsMinor,
+      refundsMinor,
+      taxWithheldMinor;
+  final DateTime asOf;
+  final bool historyComplete;
+  final List<WorkspacePaymentRecord> payments;
+  final List<WorkspacePayoutRecord> payouts;
+  bool get valid =>
+      accountScope.trim().isNotEmpty &&
+      workspaceId.trim().isNotEmpty &&
+      revision > 0 &&
+      [
+        salesTodayMinor,
+        duesMinor,
+        availableMinor,
+        heldMinor,
+        requestedMinor,
+        paidOutMinor,
+        refundsMinor,
+      ].every((n) => _financeAmountValid(n)) &&
+      [
+        feesMinor,
+        deliveryAdjustmentsMinor,
+        taxWithheldMinor,
+      ].every((n) => _financeAmountValid(n, signed: true)) &&
+      payments.every((p) => p.valid && !p.updatedAt.isAfter(asOf)) &&
+      payouts.every((p) => p.valid && !p.updatedAt.isAfter(asOf)) &&
+      payments.map((p) => p.orderId).toSet().length == payments.length &&
+      payouts.map((p) => p.id).toSet().length == payouts.length &&
+      payouts.map((p) => p.operationId).toSet().length == payouts.length;
+}
+
+enum WorkspaceSupplyStage {
+  ordered,
+  confirmed,
+  dispatched,
+  arriving,
+  delivered,
+  delayed,
+  cancelled,
+  returned,
+  unknown;
+
+  String get label => switch (this) {
+    ordered => 'Order placed',
+    confirmed => 'Supplier confirmed',
+    dispatched => 'Dispatched',
+    arriving => 'Arriving',
+    delivered => 'Delivered',
+    delayed => 'Delivery delayed',
+    cancelled => 'Cancelled',
+    returned => 'Returned',
+    unknown => 'Awaiting shipment update',
+  };
+  bool get incoming => !{delivered, cancelled, returned}.contains(this);
+}
+
+enum WorkspaceReceiptState {
+  unavailable,
+  awaiting,
+  partial,
+  confirmed,
+  disputed;
+
+  String get label => switch (this) {
+    unavailable => 'Receipt update unavailable',
+    awaiting => 'Receipt awaiting confirmation',
+    partial => 'Part received',
+    confirmed => 'Receipt confirmed',
+    disputed => 'Receipt under review',
+  };
+}
+
+typedef WorkspaceReceiptDraftKey = ({
+  String account,
+  String store,
+  String shipment,
+});
+
+enum WorkspaceReceiptProblem {
+  missing,
+  damaged,
+  wrongItem,
+  wrongPack,
+  extra,
+  other;
+
+  String get label => switch (this) {
+    missing => 'Missing packs',
+    damaged => 'Damaged packs',
+    wrongItem => 'Wrong item',
+    wrongPack => 'Wrong pack size',
+    extra => 'Extra packs',
+    other => 'Other issue',
+  };
+}
+
+/// Device-local observations, not an accepted receipt or a stock movement.
+/// Retain the original shipment revision and purchased lines; refreshed supplier
+/// facts must never silently rebase what the retailer actually checked.
+class WorkspaceReceiptDraft {
+  WorkspaceReceiptDraft({
+    required this.key,
+    required this.supplierId,
+    required this.orderId,
+    required this.shipmentRevision,
+    required this.revision,
+    required List<WorkspacePurchaseLine> lines,
+    required Map<String, String> countedPacks,
+    required Map<String, WorkspaceReceiptProblem> problems,
+    this.purchaseId,
+    this.note = '',
+  }) : lines = List.unmodifiable(lines),
+       countedPacks = Map.unmodifiable(countedPacks),
+       problems = Map.unmodifiable(problems);
+
+  final WorkspaceReceiptDraftKey key;
+  final String supplierId, orderId;
+  final String? purchaseId;
+  final int shipmentRevision, revision;
+  final List<WorkspacePurchaseLine> lines;
+  // Preserve incomplete/invalid typed values for correction after relaunch.
+  // Empty is unknown, never an inferred zero or the ordered quantity.
+  final Map<String, String> countedPacks;
+  final Map<String, WorkspaceReceiptProblem> problems;
+  final String note;
+
+  WorkspaceReceiptDraft edit({
+    required int revision,
+    required Map<String, String> countedPacks,
+    required Map<String, WorkspaceReceiptProblem> problems,
+    required String note,
+  }) => WorkspaceReceiptDraft(
+    key: key,
+    supplierId: supplierId,
+    orderId: orderId,
+    purchaseId: purchaseId,
+    shipmentRevision: shipmentRevision,
+    revision: revision,
+    lines: lines,
+    countedPacks: countedPacks,
+    problems: problems,
+    note: note,
+  );
+
+  bool get valid =>
+      [
+        key.account,
+        key.store,
+        key.shipment,
+        supplierId,
+        orderId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      (purchaseId == null || purchaseId!.trim().isNotEmpty) &&
+      shipmentRevision > 0 &&
+      revision > 0 &&
+      lines.isNotEmpty &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.id).toSet().length == lines.length &&
+      countedPacks.keys.every((id) => lines.any((line) => line.id == id)) &&
+      problems.keys.every((id) => lines.any((line) => line.id == id)) &&
+      WorkspaceIssueDraft.acceptsNote(note);
+
+  int? counted(String lineId) {
+    final text = countedPacks[lineId]?.trim() ?? '';
+    if (!RegExp(r'^\d+$').hasMatch(text)) return null;
+    final number = int.tryParse(text);
+    return number != null && number >= 0 ? number : null;
+  }
+
+  bool get quantitiesComplete =>
+      valid && lines.every((line) => counted(line.id) != null);
+
+  bool belongsTo(WorkspacePurchaseRecord record) =>
+      key.account == record.accountScope &&
+      key.store == record.workspaceId &&
+      key.shipment == record.shipmentId &&
+      supplierId == record.supplierId &&
+      orderId == record.orderId &&
+      purchaseId == record.purchaseId;
+
+  bool matchesSnapshot(WorkspacePurchaseRecord record) =>
+      belongsTo(record) &&
+      shipmentRevision == record.revision &&
+      jsonEncode(lines.map(_lineJson).toList()) ==
+          jsonEncode(record.lines.map(_lineJson).toList());
+
+  static Map<String, Object?> _lineJson(WorkspacePurchaseLine line) => {
+    'id': line.id,
+    'productId': line.productId,
+    'name': line.name,
+    'pack': line.pack,
+    'orderedPacks': line.orderedPacks,
+    'unitPriceMinor': line.unitPriceMinor,
+    'receivedPacks': line.receivedPacks,
+  };
+
+  Map<String, Object?> toJson() => {
+    'schema': 1,
+    'account': key.account,
+    'store': key.store,
+    'shipment': key.shipment,
+    'supplierId': supplierId,
+    'orderId': orderId,
+    'purchaseId': purchaseId,
+    'shipmentRevision': shipmentRevision,
+    'revision': revision,
+    'lines': lines.map(_lineJson).toList(),
+    'countedPacks': countedPacks,
+    'problems': problems.map((id, value) => MapEntry(id, value.name)),
+    'note': note,
+  };
+
+  static WorkspaceReceiptDraft? fromJson(Object? value) {
+    if (value is! Map ||
+        value['schema'] != 1 ||
+        value['account'] is! String ||
+        value['store'] is! String ||
+        value['shipment'] is! String ||
+        value['supplierId'] is! String ||
+        value['orderId'] is! String ||
+        value['shipmentRevision'] is! int ||
+        value['revision'] is! int ||
+        value['lines'] is! List ||
+        value['countedPacks'] is! Map ||
+        value['problems'] is! Map ||
+        value['note'] is! String ||
+        (value['purchaseId'] != null && value['purchaseId'] is! String)) {
+      return null;
+    }
+    final lines = <WorkspacePurchaseLine>[];
+    for (final raw in value['lines'] as List) {
+      if (raw is! Map ||
+          raw['id'] is! String ||
+          raw['productId'] is! String ||
+          raw['name'] is! String ||
+          raw['pack'] is! String ||
+          raw['orderedPacks'] is! int ||
+          raw['unitPriceMinor'] is! int ||
+          (raw['receivedPacks'] != null && raw['receivedPacks'] is! int)) {
+        return null;
+      }
+      lines.add(
+        WorkspacePurchaseLine(
+          id: raw['id'] as String,
+          productId: raw['productId'] as String,
+          name: raw['name'] as String,
+          pack: raw['pack'] as String,
+          orderedPacks: raw['orderedPacks'] as int,
+          unitPriceMinor: raw['unitPriceMinor'] as int,
+          receivedPacks: raw['receivedPacks'] as int?,
+        ),
+      );
+    }
+    final counts = <String, String>{};
+    for (final entry in (value['countedPacks'] as Map).entries) {
+      if (entry.key is! String || entry.value is! String) return null;
+      counts[entry.key as String] = entry.value as String;
+    }
+    final problems = <String, WorkspaceReceiptProblem>{};
+    for (final entry in (value['problems'] as Map).entries) {
+      if (entry.key is! String || entry.value is! String) return null;
+      final matches = WorkspaceReceiptProblem.values.where(
+        (problem) => problem.name == entry.value,
+      );
+      if (matches.length != 1) return null;
+      problems[entry.key as String] = matches.single;
+    }
+    final draft = WorkspaceReceiptDraft(
+      key: (
+        account: value['account'] as String,
+        store: value['store'] as String,
+        shipment: value['shipment'] as String,
+      ),
+      supplierId: value['supplierId'] as String,
+      orderId: value['orderId'] as String,
+      purchaseId: value['purchaseId'] as String?,
+      shipmentRevision: value['shipmentRevision'] as int,
+      revision: value['revision'] as int,
+      lines: lines,
+      countedPacks: counts,
+      problems: problems,
+      note: value['note'] as String,
+    );
+    return draft.valid ? draft : null;
+  }
+}
+
+class WorkspacePurchaseLine {
+  const WorkspacePurchaseLine({
+    required this.id,
+    required this.productId,
+    required this.name,
+    required this.pack,
+    required this.orderedPacks,
+    required this.unitPriceMinor,
+    this.receivedPacks,
+  });
+  final String id, productId, name, pack;
+  final int orderedPacks, unitPriceMinor;
+  final int? receivedPacks;
+  bool get valid =>
+      id.trim().isNotEmpty &&
+      productId.trim().isNotEmpty &&
+      name.trim().isNotEmpty &&
+      orderedPacks > 0 &&
+      unitPriceMinor >= 0 &&
+      (receivedPacks == null || receivedPacks! >= 0);
+}
+
+/// Versioned, read-only shipment facts. Link identities must come from an
+/// authenticated purchase adapter, never a display name or a URL parameter.
+/// Rendering a receipt does not post stock or authorize payment.
+class WorkspacePurchaseRecord {
+  WorkspacePurchaseRecord({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.supplierId,
+    required this.supplierName,
+    required this.orderId,
+    required this.shipmentId,
+    required this.revision,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.stage,
+    required this.amountMinor,
+    required this.itemSummary,
+    required this.paymentLabel,
+    required List<WorkspacePurchaseLine> lines,
+    this.purchaseId,
+    this.procurementContext,
+    this.expectedArrival,
+    this.address,
+    this.deliveryPartner,
+    this.trackingReference,
+    this.invoiceReference,
+    this.receiptState = WorkspaceReceiptState.unavailable,
+    this.receiptReference,
+    this.updateNote,
+  }) : lines = List.unmodifiable(lines);
+
+  final String accountScope,
+      workspaceId,
+      supplierId,
+      supplierName,
+      orderId,
+      shipmentId;
+  final int revision, amountMinor;
+  final DateTime createdAt, updatedAt;
+  final WorkspaceSupplyStage stage;
+  final String itemSummary, paymentLabel;
+  final List<WorkspacePurchaseLine> lines;
+  final String? purchaseId,
+      expectedArrival,
+      address,
+      deliveryPartner,
+      trackingReference,
+      invoiceReference,
+      receiptReference,
+      updateNote;
+  final WorkspaceReceiptState receiptState;
+
+  /// Trusted originating purchase scope, never inferred from current browsing.
+  /// Older records may render, but cannot open scoped tracking without it.
+  final BuyV2ProcurementContext? procurementContext;
+
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        supplierId,
+        supplierName,
+        orderId,
+        shipmentId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      revision > 0 &&
+      amountMinor >= 0 &&
+      (procurementContext == null ||
+          (procurementContext!.hasIdentity &&
+              procurementContext!.accountId == accountScope &&
+              procurementContext!.storeId == workspaceId)) &&
+      !updatedAt.isBefore(createdAt) &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.id).toSet().length == lines.length;
+
+  /// Buy owns order content. This projection adds only the separately supplied
+  /// trusted Store/supplier link; it cannot infer that link from Buy history.
+  /// A Buy order is one fulfilment group here. Further shipment splits require
+  /// explicit allocations from the receiving adapter, not a copied full order.
+  factory WorkspacePurchaseRecord.fromBuyOrder({
+    required BuyV2Order order,
+    required String accountScope,
+    required String workspaceId,
+    required String supplierId,
+    required int revision,
+    required DateTime createdAt,
+    required DateTime updatedAt,
+    BuyV2ProcurementContext? procurementContext,
+  }) {
+    if (order.destination != BuyV2Destination.wholesale) {
+      throw ArgumentError(
+        'Only an explicitly linked wholesale order is supported',
+      );
+    }
+    return WorkspacePurchaseRecord(
+      accountScope: accountScope,
+      workspaceId: workspaceId,
+      supplierId: supplierId,
+      supplierName: order.partner,
+      orderId: order.id,
+      shipmentId: order.id,
+      purchaseId: order.purchaseId,
+      procurementContext: procurementContext,
+      revision: revision,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      stage: switch (order.status) {
+        BuyV2OrderStatus.preparing => WorkspaceSupplyStage.ordered,
+        BuyV2OrderStatus.confirmed => WorkspaceSupplyStage.confirmed,
+        BuyV2OrderStatus.dispatched => WorkspaceSupplyStage.dispatched,
+        BuyV2OrderStatus.arriving => WorkspaceSupplyStage.arriving,
+        BuyV2OrderStatus.delivered => WorkspaceSupplyStage.delivered,
+      },
+      amountMinor: order.total * 100,
+      itemSummary: order.itemSummary,
+      paymentLabel: order.paymentStatusLabel ?? 'Payment update unavailable',
+      expectedArrival: order.updatedDeliveryEstimate ?? order.promise,
+      address: order.addressLine,
+      deliveryPartner: order.deliveryPartnerName,
+      trackingReference: order.trackingReference,
+      receiptReference: order.receiptReference,
+      lines: [
+        for (var i = 0; i < order.lines.length; i++)
+          WorkspacePurchaseLine(
+            id: '${order.id}:$i',
+            productId: order.lines[i].product.id,
+            name: order.lines[i].product.title,
+            pack: order.lines[i].product.pack,
+            orderedPacks: order.lines[i].quantity,
+            unitPriceMinor: order.lines[i].product.price * 100,
+          ),
+      ],
+    );
+  }
+}
 
 enum WorkFeedFilter { forYou, jobs, freelance, campaigns, nearby }
 
@@ -14,41 +919,1402 @@ extension WorkFeedFilterLabel on WorkFeedFilter {
 
 enum WorkReviewStage { none, drafting, gstPending, approved, setup, live }
 
+enum WorkspaceStoreState { open, paused, off }
+
+enum WorkspaceDashboardState { ready, refreshing, offline, failed }
+
+enum WorkspacePaidRequirementState {
+  draft,
+  clarification,
+  published,
+  closed,
+  full,
+}
+
+class WorkspaceProductCompliance {
+  const WorkspaceProductCompliance({
+    this.genericName,
+    this.netQuantity,
+    this.manufacturerName,
+    this.packerName,
+    this.importerName,
+    this.countryOfOrigin,
+    this.manufacturedOrPackedOn,
+    this.bestBeforeOrUseBy,
+    this.fssaiLicenseNumber,
+    this.consumerCare,
+  });
+
+  final String? genericName;
+  final String? netQuantity;
+  final String? manufacturerName;
+  final String? packerName;
+  final String? importerName;
+  final String? countryOfOrigin;
+  final String? manufacturedOrPackedOn;
+  final String? bestBeforeOrUseBy;
+  final String? fssaiLicenseNumber;
+  final String? consumerCare;
+}
+
+/// Purchased facts from the order, never reconstructed from today's catalogue.
+/// Prices are INR minor units (paise); line total includes the order's line
+/// adjustments and is not recalculated by the display layer.
+class WorkspaceOrderItemSnapshot {
+  const WorkspaceOrderItemSnapshot({
+    required this.productId,
+    required this.name,
+    required this.pack,
+    required this.quantity,
+    required this.unitPricePaise,
+    required this.lineTotalPaise,
+  });
+
+  final String productId, name, pack;
+  final int quantity, unitPricePaise, lineTotalPaise;
+}
+
+/// Local composer recovery only. These stages grant no order/payment authority.
+enum WorkspaceCounterDraftStage { editing, submitting, reviewRequired, retired }
+
+class WorkspaceCounterDraft {
+  WorkspaceCounterDraft({
+    required this.account,
+    required this.store,
+    required this.id,
+    required this.revision,
+    required this.stage,
+    required this.customer,
+    required this.source,
+    required this.fulfilment,
+    required this.payment,
+    required this.address,
+    required List<WorkspaceOrderItemSnapshot> lines,
+    this.submissionOrderId,
+  }) : lines = List.unmodifiable(lines);
+
+  final String account,
+      store,
+      id,
+      customer,
+      source,
+      fulfilment,
+      payment,
+      address;
+  final int revision;
+  final WorkspaceCounterDraftStage stage;
+  final String? submissionOrderId;
+  final List<WorkspaceOrderItemSnapshot> lines;
+
+  bool get valid =>
+      account.trim().isNotEmpty &&
+      store.trim().isNotEmpty &&
+      id.trim().isNotEmpty &&
+      revision > 0 &&
+      const {'Counter', 'Phone', 'Chat'}.contains(source) &&
+      const {
+        'At the shop',
+        'Own delivery',
+        'Mool delivery',
+      }.contains(fulfilment) &&
+      const {
+        'Cash',
+        'UPI',
+        'Pay request',
+        'On delivery',
+        'Customer due',
+      }.contains(payment) &&
+      (stage != WorkspaceCounterDraftStage.editing ||
+          submissionOrderId == null) &&
+      ((stage != WorkspaceCounterDraftStage.submitting &&
+              stage != WorkspaceCounterDraftStage.reviewRequired) ||
+          (submissionOrderId?.trim().isNotEmpty == true &&
+              customer.trim().isNotEmpty &&
+              lines.isNotEmpty)) &&
+      lines.map((line) => line.productId).toSet().length == lines.length &&
+      lines.every(
+        (line) =>
+            line.productId.trim().isNotEmpty &&
+            line.name.trim().isNotEmpty &&
+            line.pack.trim().isNotEmpty &&
+            line.quantity > 0 &&
+            line.unitPricePaise >= 0 &&
+            line.lineTotalPaise >= 0 &&
+            line.lineTotalPaise ~/ line.quantity == line.unitPricePaise &&
+            line.lineTotalPaise % line.quantity == 0,
+      );
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'purpose': 'counter-bill-draft',
+    'account': account,
+    'store': store,
+    'id': id,
+    'revision': revision,
+    'stage': stage.name,
+    'customer': customer,
+    'source': source,
+    'fulfilment': fulfilment,
+    'payment': payment,
+    'address': address,
+    'submissionOrderId': submissionOrderId,
+    'lines': [
+      for (final line in lines)
+        {
+          'productId': line.productId,
+          'name': line.name,
+          'pack': line.pack,
+          'quantity': line.quantity,
+          'unitPricePaise': line.unitPricePaise,
+          'lineTotalPaise': line.lineTotalPaise,
+        },
+    ],
+  };
+
+  static WorkspaceCounterDraft? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['purpose'] != 'counter-bill-draft' ||
+        value['revision'] is! int ||
+        value['lines'] is! List ||
+        !const [
+          'account',
+          'store',
+          'id',
+          'customer',
+          'source',
+          'fulfilment',
+          'payment',
+          'address',
+        ].every((key) => value[key] is String) ||
+        (value['submissionOrderId'] != null &&
+            value['submissionOrderId'] is! String)) {
+      return null;
+    }
+    final stage = WorkspaceCounterDraftStage.values
+        .where((stage) => stage.name == value['stage'])
+        .firstOrNull;
+    if (stage == null) return null;
+    final lines = <WorkspaceOrderItemSnapshot>[];
+    for (final item in value['lines'] as List) {
+      if (item is! Map ||
+          !const [
+            'productId',
+            'name',
+            'pack',
+          ].every((key) => item[key] is String) ||
+          !const [
+            'quantity',
+            'unitPricePaise',
+            'lineTotalPaise',
+          ].every((key) => item[key] is int)) {
+        return null;
+      }
+      lines.add(
+        WorkspaceOrderItemSnapshot(
+          productId: item['productId'] as String,
+          name: item['name'] as String,
+          pack: item['pack'] as String,
+          quantity: item['quantity'] as int,
+          unitPricePaise: item['unitPricePaise'] as int,
+          lineTotalPaise: item['lineTotalPaise'] as int,
+        ),
+      );
+    }
+    final draft = WorkspaceCounterDraft(
+      account: value['account'] as String,
+      store: value['store'] as String,
+      id: value['id'] as String,
+      revision: value['revision'] as int,
+      stage: stage,
+      customer: value['customer'] as String,
+      source: value['source'] as String,
+      fulfilment: value['fulfilment'] as String,
+      payment: value['payment'] as String,
+      address: value['address'] as String,
+      submissionOrderId: value['submissionOrderId'] as String?,
+      lines: lines,
+    );
+    return draft.valid ? draft : null;
+  }
+}
+
+class WorkspaceOrderRecord {
+  const WorkspaceOrderRecord({
+    required this.id,
+    required this.customer,
+    required this.items,
+    required this.quantities,
+    required this.amount,
+    required this.source,
+    required this.fulfilment,
+    required this.payment,
+    required this.address,
+    required this.stage,
+    required this.needsDelivery,
+    required this.createdAt,
+    this.actionDeadline,
+    this.fulfilmentDeadline,
+    this.extraMinutes = 0,
+    this.stockReserved = false,
+    this.collectionStoreId,
+    this.itemSnapshots = const [],
+    this.rejectionReason,
+  });
+
+  final String id;
+  final String customer;
+  final String items;
+  final Map<String, int> quantities;
+  final int amount;
+  final String source;
+  final String fulfilment;
+  final String payment;
+  final String address;
+  final String stage;
+  final bool needsDelivery;
+  final DateTime createdAt;
+  final DateTime? actionDeadline;
+  final DateTime? fulfilmentDeadline;
+  final int extraMinutes;
+  final bool stockReserved;
+
+  /// Set only by the order adapter for authenticated customer collection.
+  /// A legacy Pickup label is not sufficient to grant collection authority.
+  final String? collectionStoreId;
+  final List<WorkspaceOrderItemSnapshot> itemSnapshots;
+  final String? rejectionReason;
+
+  /// A changed SKU/quantity must not retain stale purchased-price information.
+  bool get hasCompleteItemSnapshot =>
+      itemSnapshots.isNotEmpty &&
+      itemSnapshots.length == quantities.length &&
+      itemSnapshots.map((line) => line.productId).toSet().length ==
+          itemSnapshots.length &&
+      itemSnapshots.every(
+        (line) =>
+            line.name.trim().isNotEmpty &&
+            line.quantity > 0 &&
+            quantities[line.productId] == line.quantity &&
+            line.unitPricePaise >= 0 &&
+            line.lineTotalPaise >= 0,
+      );
+  bool get isCustomerCollection => collectionStoreId != null;
+  bool get isCompleted =>
+      stage == 'Completed' ||
+      (!isCustomerCollection && stage == 'Delivered') ||
+      (isCustomerCollection && stage == 'Collected');
+  bool get isClosed => isCompleted || stage == 'Cancelled';
+
+  bool get isDeliveryInProgress =>
+      !isCustomerCollection &&
+      const {
+        'Ready',
+        'Delivery requested',
+        'Assigned',
+        'At store',
+        'Picked up',
+        'Out for delivery',
+        'Dispatched',
+        'Delivering',
+        'Delivery failed',
+        'Delivery cancelled',
+      }.contains(stage);
+
+  WorkspaceOrderRecord copyWith({
+    String? customer,
+    String? items,
+    Map<String, int>? quantities,
+    int? amount,
+    String? source,
+    String? fulfilment,
+    String? payment,
+    String? address,
+    String? stage,
+    bool? needsDelivery,
+    DateTime? actionDeadline,
+    bool clearActionDeadline = false,
+    DateTime? fulfilmentDeadline,
+    int? extraMinutes,
+    bool? stockReserved,
+    List<WorkspaceOrderItemSnapshot>? itemSnapshots,
+    String? rejectionReason,
+  }) => WorkspaceOrderRecord(
+    id: id,
+    customer: customer ?? this.customer,
+    items: items ?? this.items,
+    quantities: Map<String, int>.unmodifiable(quantities ?? this.quantities),
+    amount: amount ?? this.amount,
+    source: source ?? this.source,
+    fulfilment: fulfilment ?? this.fulfilment,
+    payment: payment ?? this.payment,
+    address: address ?? this.address,
+    stage: stage ?? this.stage,
+    needsDelivery: needsDelivery ?? this.needsDelivery,
+    createdAt: createdAt,
+    actionDeadline: clearActionDeadline
+        ? null
+        : actionDeadline ?? this.actionDeadline,
+    fulfilmentDeadline: fulfilmentDeadline ?? this.fulfilmentDeadline,
+    extraMinutes: extraMinutes ?? this.extraMinutes,
+    stockReserved: stockReserved ?? this.stockReserved,
+    collectionStoreId: collectionStoreId,
+    itemSnapshots: List<WorkspaceOrderItemSnapshot>.unmodifiable(
+      itemSnapshots ?? this.itemSnapshots,
+    ),
+    rejectionReason: rejectionReason ?? this.rejectionReason,
+  );
+}
+
+class WorkspaceCustomerRecord {
+  const WorkspaceCustomerRecord({
+    required this.id,
+    required this.name,
+    required this.mobile,
+    required this.orders,
+    required this.totalSpend,
+    required this.amountDue,
+    required this.lastPurchaseAt,
+    required this.followingStore,
+    required this.messagesAllowed,
+    this.lastContactAt,
+  });
+
+  final String id;
+  final String name;
+  final String mobile;
+  final List<WorkspaceOrderRecord> orders;
+  final int totalSpend;
+  final int amountDue;
+  final DateTime lastPurchaseAt;
+  final bool followingStore;
+  final bool messagesAllowed;
+  final DateTime? lastContactAt;
+
+  int get orderCount => orders.length;
+  int get averageBasket => orderCount == 0 ? 0 : totalSpend ~/ orderCount;
+  bool get repeatCustomer => orderCount > 1;
+}
+
+class WorkspaceDeliveryAssignment {
+  const WorkspaceDeliveryAssignment({
+    required this.orderId,
+    required this.partnerName,
+    required this.vehicleLabel,
+    required this.eta,
+    required this.stage,
+    this.updatedAt,
+  });
+
+  final String orderId;
+  final String partnerName;
+  final String vehicleLabel;
+  final DateTime eta;
+  final String stage;
+
+  /// Authority timestamp, not the time this device happened to receive it.
+  /// Its presence alone is not proof of fresh GPS or a guaranteed arrival.
+  final DateTime? updatedAt;
+
+  WorkspaceDeliveryStage get deliveryStage =>
+      switch (stage.trim().toLowerCase()) {
+        'assigned' => WorkspaceDeliveryStage.assigned,
+        'at store' => WorkspaceDeliveryStage.atStore,
+        'picked up' || 'collected' => WorkspaceDeliveryStage.pickedUp,
+        'out for delivery' ||
+        'dispatched' ||
+        'delivering' => WorkspaceDeliveryStage.outForDelivery,
+        'delivered' => WorkspaceDeliveryStage.delivered,
+        'cancelled' || 'delivery cancelled' => WorkspaceDeliveryStage.cancelled,
+        'failed' || 'delivery failed' => WorkspaceDeliveryStage.failed,
+        _ => WorkspaceDeliveryStage.unknown,
+      };
+}
+
+enum WorkspaceDeliveryStage {
+  assigned,
+  atStore,
+  pickedUp,
+  outForDelivery,
+  delivered,
+  cancelled,
+  failed,
+  unknown;
+
+  String get label => switch (this) {
+    assigned => 'Assigned',
+    atStore => 'At store',
+    pickedUp => 'Picked up',
+    outForDelivery => 'Out for delivery',
+    delivered => 'Delivered',
+    cancelled => 'Delivery cancelled',
+    failed => 'Delivery needs attention',
+    unknown => 'Delivery update unavailable',
+  };
+
+  int get progressIndex => switch (this) {
+    assigned => 0,
+    atStore => 1,
+    pickedUp || outForDelivery => 2,
+    delivered => 3,
+    _ => -1,
+  };
+}
+
+class WorkspacePackingLine {
+  const WorkspacePackingLine({
+    required this.id,
+    required this.label,
+    required this.quantity,
+    required this.packed,
+  });
+
+  final String id;
+  final String label;
+  final int quantity;
+  final bool packed;
+}
+
+class WorkspaceCustomerInvoice {
+  const WorkspaceCustomerInvoice({
+    required this.id,
+    required this.orderId,
+    required this.customer,
+    required this.items,
+    required this.amount,
+    required this.payment,
+    required this.issuedAt,
+    this.sharedChannels = const <String>{},
+  });
+
+  final String id;
+  final String orderId;
+  final String customer;
+  final String items;
+  final int amount;
+  final String payment;
+  final DateTime issuedAt;
+  final Set<String> sharedChannels;
+
+  bool get needsCustomerHandoff => sharedChannels.isEmpty;
+
+  WorkspaceCustomerInvoice copyWith({Set<String>? sharedChannels}) =>
+      WorkspaceCustomerInvoice(
+        id: id,
+        orderId: orderId,
+        customer: customer,
+        items: items,
+        amount: amount,
+        payment: payment,
+        issuedAt: issuedAt,
+        sharedChannels: Set<String>.unmodifiable(
+          sharedChannels ?? this.sharedChannels,
+        ),
+      );
+}
+
+class WorkspaceStoreOffer {
+  const WorkspaceStoreOffer({
+    required this.id,
+    required this.title,
+    required this.detail,
+    required this.validUntil,
+    required this.active,
+    this.productId,
+    this.audience = 'Customers who allow Store offers',
+    this.orderCap = 0,
+  });
+
+  final String id;
+  final String title;
+  final String detail;
+  final DateTime validUntil;
+  final bool active;
+  final String? productId;
+  final String audience;
+  final int orderCap;
+}
+
+enum WorkspaceStockMode { availabilityOnly, exactQuantity }
+
+enum WorkspaceStockMovementKind {
+  reserved,
+  released,
+  sale,
+  returned,
+  goodsReceived,
+  adjustment,
+  damageOrExpiry,
+  openingStock,
+}
+
+enum WorkspaceStockReferenceKind { order, supplierReceipt }
+
+class WorkspaceStockMovement {
+  const WorkspaceStockMovement({
+    required this.id,
+    required this.productId,
+    required this.productLabel,
+    required this.kind,
+    required this.quantityDelta,
+    required this.reason,
+    required this.occurredAt,
+    this.referenceKind,
+    this.referenceId,
+  });
+
+  final String id;
+  final String productId;
+  final String productLabel;
+  final WorkspaceStockMovementKind kind;
+  final int quantityDelta;
+  final String reason;
+  final DateTime occurredAt;
+  final WorkspaceStockReferenceKind? referenceKind;
+  final String? referenceId;
+
+  bool get valid =>
+      id.trim().isNotEmpty &&
+      productId.trim().isNotEmpty &&
+      productLabel.trim().isNotEmpty &&
+      reason.trim().isNotEmpty &&
+      quantityDelta != 0 &&
+      (switch (kind) {
+        WorkspaceStockMovementKind.reserved ||
+        WorkspaceStockMovementKind.sale ||
+        WorkspaceStockMovementKind.damageOrExpiry => quantityDelta < 0,
+        WorkspaceStockMovementKind.released ||
+        WorkspaceStockMovementKind.returned ||
+        WorkspaceStockMovementKind.goodsReceived ||
+        WorkspaceStockMovementKind.openingStock => quantityDelta > 0,
+        WorkspaceStockMovementKind.adjustment => true,
+      }) &&
+      ((referenceKind == null && referenceId == null) ||
+          (referenceKind != null && referenceId?.trim().isNotEmpty == true));
+  Object get contentIdentity => (
+    id,
+    productId,
+    productLabel,
+    kind,
+    quantityDelta,
+    reason,
+    occurredAt.toUtc(),
+    referenceKind,
+    referenceId,
+  );
+  String get label => switch (kind) {
+    WorkspaceStockMovementKind.reserved => 'Reserved for order',
+    WorkspaceStockMovementKind.released => 'Reservation released',
+    WorkspaceStockMovementKind.sale => 'Sale',
+    WorkspaceStockMovementKind.returned => 'Returned to stock',
+    WorkspaceStockMovementKind.goodsReceived => 'Goods received',
+    WorkspaceStockMovementKind.adjustment => 'Counted adjustment',
+    WorkspaceStockMovementKind.damageOrExpiry => 'Damage or expiry',
+    WorkspaceStockMovementKind.openingStock => 'Opening quantity',
+  };
+  static int compareNewest(WorkspaceStockMovement a, WorkspaceStockMovement b) {
+    final date = b.occurredAt.compareTo(a.occurredAt);
+    return date != 0 ? date : a.id.compareTo(b.id);
+  }
+}
+
+typedef WorkspaceStockHistoryKey = ({
+  String account,
+  String store,
+  DateTime? from,
+  DateTime? until,
+  String? productId,
+});
+
+/// Immutable read scope. Calendar dates are converted to UTC by the caller;
+/// from is inclusive, until exclusive. A cursor belongs to one snapshot only.
+class WorkspaceStockHistoryQuery {
+  const WorkspaceStockHistoryQuery({
+    required this.accountScope,
+    required this.workspaceId,
+    this.from,
+    this.until,
+    this.productId,
+  });
+  final String accountScope, workspaceId;
+  final DateTime? from, until;
+  final String? productId;
+  static const pageSize = 50;
+  WorkspaceStockHistoryKey get key => (
+    account: accountScope,
+    store: workspaceId,
+    from: from,
+    until: until,
+    productId: productId,
+  );
+  bool get valid =>
+      accountScope.trim().isNotEmpty &&
+      workspaceId.trim().isNotEmpty &&
+      (from == null || from!.isUtc) &&
+      (until == null || until!.isUtc) &&
+      (from == null || until == null || from!.isBefore(until!)) &&
+      (productId == null || productId!.trim().isNotEmpty);
+  bool includes(WorkspaceStockMovement record) =>
+      (productId == null || record.productId == productId) &&
+      (from == null || !record.occurredAt.isBefore(from!)) &&
+      (until == null || record.occurredAt.isBefore(until!));
+}
+
+/// Server pages are read-only. They must not reapply quantities or expose cost.
+class WorkspaceStockHistoryPage {
+  WorkspaceStockHistoryPage({
+    required this.query,
+    required this.snapshotId,
+    required List<WorkspaceStockMovement> records,
+    this.cursor,
+    this.nextCursor,
+    this.totalCount,
+  }) : records = List.unmodifiable(records);
+  final WorkspaceStockHistoryQuery query;
+  final String snapshotId;
+  final String? cursor, nextCursor;
+  final int? totalCount;
+  final List<WorkspaceStockMovement> records;
+  bool get valid =>
+      query.valid &&
+      snapshotId.trim().isNotEmpty &&
+      records.length <= WorkspaceStockHistoryQuery.pageSize &&
+      records.every((record) => record.valid && query.includes(record)) &&
+      records.map((record) => record.id).toSet().length == records.length &&
+      (cursor == null || cursor!.isNotEmpty) &&
+      (nextCursor == null ||
+          (nextCursor!.isNotEmpty &&
+              nextCursor != cursor &&
+              records.isNotEmpty)) &&
+      (totalCount == null || totalCount! >= records.length) &&
+      Iterable.generate(records.isNotEmpty ? records.length - 1 : 0).every(
+        (i) =>
+            WorkspaceStockMovement.compareNewest(records[i], records[i + 1]) <=
+            0,
+      );
+}
+
+class WorkspaceCatalogueItem {
+  const WorkspaceCatalogueItem({
+    required this.id,
+    required this.canonicalId,
+    required this.categoryId,
+    required this.brand,
+    required this.title,
+    required this.variant,
+    required this.pack,
+    required this.sku,
+    required this.barcode,
+    required this.purchasePrice,
+    required this.sellingPrice,
+    required this.unitPrice,
+    required this.stock,
+    required this.deliveryPromise,
+    required this.origin,
+    required this.visualLabel,
+    required this.visualKind,
+    this.mrp,
+    this.minimumOrder = 1,
+    this.returnPolicy,
+    this.requiresPrescription = false,
+    this.composition,
+    this.regulatoryNote,
+    this.compliance,
+    this.available = true,
+    this.publicListing = true,
+    this.stockMode = WorkspaceStockMode.exactQuantity,
+    this.lowStockThreshold = 5,
+  });
+
+  final String id;
+  final String canonicalId;
+  final String categoryId;
+  final String brand;
+  final String title;
+  final String variant;
+  final String pack;
+  final String sku;
+  final String barcode;
+  final int purchasePrice;
+  final int sellingPrice;
+  final String unitPrice;
+  final int stock;
+  final String deliveryPromise;
+  final String origin;
+  final String visualLabel;
+  final String visualKind;
+  final int? mrp;
+  final int minimumOrder;
+  final String? returnPolicy;
+  final bool requiresPrescription;
+  final String? composition;
+  final String? regulatoryNote;
+  final WorkspaceProductCompliance? compliance;
+  final bool available;
+  final bool publicListing;
+  final WorkspaceStockMode stockMode;
+  final int lowStockThreshold;
+
+  bool get published =>
+      publicListing &&
+      available &&
+      (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0);
+
+  BuyV2Product toBuyPublicProduct({
+    required String storeName,
+    String badge = 'Store price',
+    String confirmedOn = 'Updated by store',
+  }) => BuyV2Product(
+    id: id,
+    canonicalId: canonicalId,
+    destination: BuyV2Destination.shop,
+    categoryId: categoryId,
+    brand: brand,
+    title: title,
+    variant: variant,
+    pack: pack,
+    price: sellingPrice,
+    unitPrice: unitPrice,
+    badge: badge,
+    seller: storeName,
+    sellerType: 'Verified retailer',
+    deliveryPromise: deliveryPromise,
+    origin: origin,
+    confirmedOn: confirmedOn,
+    visualLabel: visualLabel,
+    visualKind: visualKind,
+    mrp: mrp,
+    requiresPrescription: requiresPrescription,
+    composition: composition,
+    regulatoryNote: regulatoryNote,
+    minimumOrder: minimumOrder,
+    returnPolicy: returnPolicy,
+    catalogueListing: publicListing,
+  );
+
+  BuyV2ProductFactsSnapshot toBuyPublicFacts({
+    required String storeName,
+    required String sourceId,
+    required bool storeVisible,
+    required bool acceptingOrders,
+    required DateTime observedAt,
+    String? nextOpeningLabel,
+    String? orderCutoffLabel,
+    String? deliveryFeeLabel,
+  }) {
+    final product = toBuyPublicProduct(storeName: storeName);
+    final orderable =
+        storeVisible &&
+        publicListing &&
+        available &&
+        (stockMode == WorkspaceStockMode.availabilityOnly || stock > 0) &&
+        acceptingOrders;
+    return BuyV2ProductFactsSnapshot(
+      productId: id,
+      price: sellingPrice,
+      deliveryPromise: deliveryPromise,
+      partner: storeName,
+      orderabilityLabel: orderable
+          ? 'Available to order'
+          : !storeVisible || !publicListing
+          ? 'Not listed for customers'
+          : !available ||
+                (stockMode == WorkspaceStockMode.exactQuantity && stock <= 0)
+          ? 'Out of stock'
+          : 'Store is not accepting orders',
+      sourceId: sourceId,
+      fulfilmentMode: buyV2CatalogueFulfilmentModeFor(product),
+      storeOperatingState: acceptingOrders
+          ? BuyV2StoreOperatingState.open
+          : BuyV2StoreOperatingState.closed,
+      nextOpeningLabel: nextOpeningLabel,
+      orderCutoffLabel: orderCutoffLabel,
+      deliveryFeeLabel: deliveryFeeLabel,
+      observedAt: observedAt,
+    );
+  }
+
+  WorkspaceCatalogueItem copyWith({
+    String? canonicalId,
+    String? categoryId,
+    String? brand,
+    String? title,
+    String? variant,
+    String? pack,
+    String? sku,
+    String? barcode,
+    int? purchasePrice,
+    int? sellingPrice,
+    String? unitPrice,
+    int? stock,
+    String? deliveryPromise,
+    String? origin,
+    String? visualLabel,
+    String? visualKind,
+    int? mrp,
+    int? minimumOrder,
+    String? returnPolicy,
+    bool? requiresPrescription,
+    String? composition,
+    String? regulatoryNote,
+    WorkspaceProductCompliance? compliance,
+    bool? available,
+    bool? publicListing,
+    WorkspaceStockMode? stockMode,
+    int? lowStockThreshold,
+  }) => WorkspaceCatalogueItem(
+    id: id,
+    canonicalId: canonicalId ?? this.canonicalId,
+    categoryId: categoryId ?? this.categoryId,
+    brand: brand ?? this.brand,
+    title: title ?? this.title,
+    variant: variant ?? this.variant,
+    pack: pack ?? this.pack,
+    sku: sku ?? this.sku,
+    barcode: barcode ?? this.barcode,
+    purchasePrice: purchasePrice ?? this.purchasePrice,
+    sellingPrice: sellingPrice ?? this.sellingPrice,
+    unitPrice: unitPrice ?? this.unitPrice,
+    stock: stock ?? this.stock,
+    deliveryPromise: deliveryPromise ?? this.deliveryPromise,
+    origin: origin ?? this.origin,
+    visualLabel: visualLabel ?? this.visualLabel,
+    visualKind: visualKind ?? this.visualKind,
+    mrp: mrp ?? this.mrp,
+    minimumOrder: minimumOrder ?? this.minimumOrder,
+    returnPolicy: returnPolicy ?? this.returnPolicy,
+    requiresPrescription: requiresPrescription ?? this.requiresPrescription,
+    composition: composition ?? this.composition,
+    regulatoryNote: regulatoryNote ?? this.regulatoryNote,
+    compliance: compliance ?? this.compliance,
+    available: available ?? this.available,
+    publicListing: publicListing ?? this.publicListing,
+    stockMode: stockMode ?? this.stockMode,
+    lowStockThreshold: lowStockThreshold ?? this.lowStockThreshold,
+  );
+}
+
+const workspaceMasterCatalogue = <WorkspaceCatalogueItem>[
+  WorkspaceCatalogueItem(
+    id: 'oil-fortune-1l',
+    canonicalId: 'oil-fortune-sunflower',
+    categoryId: 'cooking-oil',
+    brand: 'Fortune',
+    title: 'Fortune Sunflower Oil',
+    variant: 'Refined sunflower oil',
+    pack: '1 L pouch',
+    sku: 'FRT-1L',
+    barcode: '8906007281015',
+    purchasePrice: 248,
+    sellingPrice: 264,
+    unitPrice: '₹264/L',
+    stock: 0,
+    deliveryPromise: 'Store pickup or local delivery',
+    origin: 'India',
+    visualLabel: 'Fortune Sunflower Oil 1 L pouch',
+    visualKind: 'catalogue-packshot',
+    mrp: 270,
+    returnPolicy: 'Return accepted for a sealed damaged pack at delivery.',
+    compliance: WorkspaceProductCompliance(
+      genericName: 'Refined sunflower oil',
+      netQuantity: '1 L',
+      countryOfOrigin: 'India',
+    ),
+  ),
+  WorkspaceCatalogueItem(
+    id: 'atta-aashirvaad-1kg',
+    canonicalId: 'atta-aashirvaad-whole-wheat',
+    categoryId: 'flour-grains',
+    brand: 'Aashirvaad',
+    title: 'Aashirvaad Whole Wheat Atta',
+    variant: 'Whole wheat flour',
+    pack: '1 kg pack',
+    sku: 'AAT-1K',
+    barcode: '8901725001228',
+    purchasePrice: 98,
+    sellingPrice: 108,
+    unitPrice: '₹108/kg',
+    stock: 0,
+    deliveryPromise: 'Store pickup or local delivery',
+    origin: 'India',
+    visualLabel: 'Aashirvaad Whole Wheat Atta 1 kg',
+    visualKind: 'catalogue-packshot',
+    mrp: 112,
+    compliance: WorkspaceProductCompliance(
+      genericName: 'Whole wheat flour',
+      netQuantity: '1 kg',
+      countryOfOrigin: 'India',
+    ),
+  ),
+  WorkspaceCatalogueItem(
+    id: 'salt-tata-1kg',
+    canonicalId: 'salt-tata-iodised',
+    categoryId: 'salt-spices',
+    brand: 'Tata',
+    title: 'Tata Salt',
+    variant: 'Iodised salt',
+    pack: '1 kg pack',
+    sku: 'TSL-1K',
+    barcode: '8904043901017',
+    purchasePrice: 50,
+    sellingPrice: 56,
+    unitPrice: '₹56/kg',
+    stock: 0,
+    deliveryPromise: 'Store pickup or local delivery',
+    origin: 'India',
+    visualLabel: 'Tata Salt 1 kg pack',
+    visualKind: 'catalogue-packshot',
+    mrp: 58,
+    compliance: WorkspaceProductCompliance(
+      genericName: 'Iodised salt',
+      netQuantity: '1 kg',
+      countryOfOrigin: 'India',
+    ),
+  ),
+];
+
+class WorkspaceActivityEntry {
+  const WorkspaceActivityEntry({required this.message, required this.time});
+
+  final String message;
+  final DateTime time;
+}
+
+class WorkspaceGroupBuy {
+  const WorkspaceGroupBuy({
+    required this.id,
+    required this.productName,
+    required this.specification,
+    required this.leadRetailer,
+    required this.confirmedRetailers,
+    required this.targetQuantity,
+    required this.securedQuantity,
+    required this.unitLabel,
+    required this.regularUnitPrice,
+    required this.groupUnitPrice,
+    required this.facilitationFee,
+    required this.deliveryFee,
+    required this.confirmationAmount,
+    required this.closingLabel,
+    required this.storeDeliveryLabel,
+    required this.paymentConfirmed,
+    this.deliveryPartnerName,
+    this.participants = const [],
+  });
+
+  final String id;
+  final String productName;
+  final String specification;
+  final String leadRetailer;
+  final List<String> confirmedRetailers;
+  final int targetQuantity;
+  final int securedQuantity;
+  final String unitLabel;
+  final int regularUnitPrice;
+  final int groupUnitPrice;
+  final int facilitationFee;
+  final int deliveryFee;
+  final int confirmationAmount;
+  final String closingLabel;
+  final String storeDeliveryLabel;
+  final bool paymentConfirmed;
+  final String? deliveryPartnerName;
+  final List<WorkspaceGroupBuyParticipant> participants;
+
+  int get remainingQuantity =>
+      (targetQuantity - securedQuantity).clamp(0, targetQuantity);
+  int get savingPerUnit => regularUnitPrice - groupUnitPrice;
+  int get totalSaving => savingPerUnit * securedQuantity;
+  int get goodsValue => groupUnitPrice * securedQuantity;
+  int get deliveredTotal => goodsValue + facilitationFee + deliveryFee;
+  int get referenceTotal => regularUnitPrice * securedQuantity;
+  int get netSaving {
+    final saving = referenceTotal - deliveredTotal;
+    return saving < 0 ? 0 : saving;
+  }
+
+  int get balanceDue {
+    final balance = deliveredTotal - confirmationAmount;
+    return balance < 0 ? 0 : balance;
+  }
+}
+
+class WorkspaceGroupBuyParticipant {
+  const WorkspaceGroupBuyParticipant({
+    required this.businessName,
+    required this.locality,
+    required this.quantity,
+    required this.unitLabel,
+    required this.milestone,
+  });
+
+  final String businessName;
+  final String locality;
+  final int quantity;
+  final String unitLabel;
+  final String milestone;
+}
+
+enum WorkspaceStockSupplierType {
+  wholesaler,
+  mandi,
+  manufacturer;
+
+  String get label => switch (this) {
+    wholesaler => 'Wholesaler',
+    mandi => 'Mandi',
+    manufacturer => 'Manufacturer',
+  };
+
+  /// Exact authoritative business role, never guessed from names or copy.
+  static WorkspaceStockSupplierType? fromRole(String role) => switch (role) {
+    'wholesaler' => wholesaler,
+    'mandi' => mandi,
+    'manufacturer' => manufacturer,
+    _ => null,
+  };
+}
+
+enum WorkspaceGroupOfferStage {
+  collecting,
+  full,
+  secured,
+  packing,
+  dispatched,
+  delivered,
+  closed,
+  failed,
+  cancelled;
+
+  String get label => switch (this) {
+    collecting => 'Accepting quantities',
+    full => 'Quantity filled',
+    secured => 'Stock secured',
+    packing => 'Preparing dispatch',
+    dispatched => 'On the way',
+    delivered => 'Delivery completed',
+    closed => 'Offer closed',
+    failed => 'Purchase not completed',
+    cancelled => 'Offer cancelled',
+  };
+}
+
+enum WorkspaceGroupParticipationState {
+  unknown,
+  notJoined,
+  pending,
+  confirmationPaid,
+  balanceDue,
+  paid,
+  paymentFailed,
+  refundPending,
+  refunded,
+  cancelled;
+
+  String get label => switch (this) {
+    unknown => 'Your purchase update unavailable',
+    notJoined => 'You have not joined',
+    pending => 'Your confirmation is pending',
+    confirmationPaid => 'Your confirmation payment received',
+    balanceDue => 'Your balance is due',
+    paid => 'Your payment is complete',
+    paymentFailed => 'Your payment was not completed',
+    refundPending => 'Your refund is pending',
+    refunded => 'Your refund is complete',
+    cancelled => 'Your purchase is cancelled',
+  };
+}
+
+/// This Store's quoted amounts in paise, never the aggregate group's costs.
+/// Unknown values remain null; local UI arithmetic cannot confirm a payment.
+class WorkspaceGroupParticipation {
+  const WorkspaceGroupParticipation({
+    required this.state,
+    this.quantity,
+    this.goodsMinor,
+    this.tradeFeeMinor,
+    this.deliveryMinor,
+    this.taxMinor,
+    this.totalMinor,
+    this.referenceMinor,
+    this.paidMinor,
+    this.dueMinor,
+    this.refundMinor,
+    this.paymentDeadline,
+  });
+  final WorkspaceGroupParticipationState state;
+  final int? quantity,
+      goodsMinor,
+      tradeFeeMinor,
+      deliveryMinor,
+      taxMinor,
+      totalMinor,
+      referenceMinor,
+      paidMinor,
+      dueMinor,
+      refundMinor;
+  final DateTime? paymentDeadline;
+  int? get savingMinor => totalMinor == null || referenceMinor == null
+      ? null
+      : referenceMinor! - totalMinor!;
+  bool get valid {
+    if ([
+      quantity,
+      goodsMinor,
+      tradeFeeMinor,
+      deliveryMinor,
+      taxMinor,
+      totalMinor,
+      referenceMinor,
+      paidMinor,
+      dueMinor,
+      refundMinor,
+    ].any((value) => value != null && value < 0)) {
+      return false;
+    }
+    if (paymentDeadline != null && !paymentDeadline!.isUtc) return false;
+    if (goodsMinor != null &&
+        tradeFeeMinor != null &&
+        deliveryMinor != null &&
+        taxMinor != null &&
+        totalMinor != null &&
+        totalMinor !=
+            goodsMinor! + tradeFeeMinor! + deliveryMinor! + taxMinor!) {
+      return false;
+    }
+    if (paidMinor != null &&
+        dueMinor != null &&
+        totalMinor != null &&
+        paidMinor! + dueMinor! != totalMinor) {
+      return false;
+    }
+    if (refundMinor != null && paidMinor != null && refundMinor! > paidMinor!) {
+      return false;
+    }
+    return switch (state) {
+      WorkspaceGroupParticipationState.notJoined =>
+        (quantity == null || quantity == 0) &&
+            (paidMinor == null || paidMinor == 0),
+      WorkspaceGroupParticipationState.paid =>
+        quantity != null &&
+            quantity! > 0 &&
+            totalMinor != null &&
+            paidMinor == totalMinor &&
+            dueMinor == 0,
+      WorkspaceGroupParticipationState.balanceDue =>
+        quantity != null && quantity! > 0 && dueMinor != null && dueMinor! > 0,
+      WorkspaceGroupParticipationState.confirmationPaid =>
+        quantity != null &&
+            quantity! > 0 &&
+            paidMinor != null &&
+            paidMinor! > 0,
+      WorkspaceGroupParticipationState.refunded =>
+        refundMinor != null && refundMinor! > 0,
+      _ => true,
+    };
+  }
+}
+
+/// Read-only projection supplied by an authenticated Store offer adapter.
+/// Scope/revision validation here is not server-side eligibility or authority.
+class WorkspaceGroupOffer {
+  WorkspaceGroupOffer({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.supplierId,
+    required this.supplierName,
+    required this.supplierType,
+    required this.productId,
+    required this.revision,
+    required this.updatedAt,
+    required this.closingAt,
+    required this.stage,
+    required this.publicationConfirmed,
+    required WorkspaceGroupBuy details,
+    required this.participation,
+    this.note,
+  }) : details = WorkspaceGroupBuy(
+         id: details.id,
+         productName: details.productName,
+         specification: details.specification,
+         leadRetailer: details.leadRetailer,
+         confirmedRetailers: List.unmodifiable(details.confirmedRetailers),
+         targetQuantity: details.targetQuantity,
+         securedQuantity: details.securedQuantity,
+         unitLabel: details.unitLabel,
+         regularUnitPrice: details.regularUnitPrice,
+         groupUnitPrice: details.groupUnitPrice,
+         facilitationFee: details.facilitationFee,
+         deliveryFee: details.deliveryFee,
+         confirmationAmount: details.confirmationAmount,
+         closingLabel: details.closingLabel,
+         storeDeliveryLabel: details.storeDeliveryLabel,
+         paymentConfirmed: details.paymentConfirmed,
+         deliveryPartnerName: details.deliveryPartnerName,
+         participants: List.unmodifiable(details.participants),
+       );
+  final String accountScope, workspaceId, supplierId, supplierName, productId;
+  final WorkspaceStockSupplierType supplierType;
+  final int revision;
+  final DateTime updatedAt, closingAt;
+  final WorkspaceGroupOfferStage stage;
+  final bool publicationConfirmed;
+  final WorkspaceGroupBuy details;
+  final WorkspaceGroupParticipation participation;
+  final String? note;
+  String get id => details.id;
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        supplierId,
+        supplierName,
+        productId,
+        id,
+        details.productName,
+        details.specification,
+        details.unitLabel,
+        details.leadRetailer,
+      ].every((value) => value.trim().isNotEmpty) &&
+      revision > 0 &&
+      updatedAt.isUtc &&
+      closingAt.isUtc &&
+      publicationConfirmed &&
+      details.targetQuantity > 0 &&
+      details.securedQuantity >= 0 &&
+      details.securedQuantity <= details.targetQuantity &&
+      details.groupUnitPrice >= 0 &&
+      details.regularUnitPrice >= 0 &&
+      details.facilitationFee >= 0 &&
+      details.deliveryFee >= 0 &&
+      details.confirmationAmount >= 0 &&
+      participation.valid &&
+      (participation.quantity == null ||
+          participation.quantity! <= details.targetQuantity) &&
+      details.participants.every(
+        (person) =>
+            person.quantity >= 0 &&
+            person.businessName.trim().isNotEmpty &&
+            person.unitLabel == details.unitLabel,
+      );
+}
+
+enum WorkOpportunityPosterType {
+  moolSocial,
+  retailer,
+  wholesaler,
+  socialUser,
+  manufacturer,
+  rider,
+  doctor,
+  other,
+}
+
+extension WorkOpportunityPosterTypeLabel on WorkOpportunityPosterType {
+  String get label => switch (this) {
+    WorkOpportunityPosterType.moolSocial => 'MoolSocial',
+    WorkOpportunityPosterType.retailer => 'Retailer',
+    WorkOpportunityPosterType.wholesaler => 'Wholesaler',
+    WorkOpportunityPosterType.socialUser => 'Social user',
+    WorkOpportunityPosterType.manufacturer => 'Manufacturer',
+    WorkOpportunityPosterType.rider => 'Rider',
+    WorkOpportunityPosterType.doctor => 'Doctor',
+    WorkOpportunityPosterType.other => 'Other verified user',
+  };
+}
+
+enum WorkOpportunityCardColorToken {
+  cobalt,
+  emerald,
+  crimson,
+  violet,
+  amber,
+  teal,
+  magenta,
+  indigo,
+}
+
 class WorkOpportunity {
   const WorkOpportunity({
     required this.id,
     required this.publisher,
     required this.publisherType,
+    required this.posterType,
     required this.title,
     required this.summary,
+    required this.qualificationHeadline,
     required this.kind,
     required this.location,
+    required this.city,
+    required this.area,
+    required this.pincode,
     required this.capacity,
-    required this.payment,
+    required this.peopleNeeded,
+    required this.peopleJoined,
+    required this.applicationsInProgress,
+    required this.finalDeadline,
+    required this.paymentAmount,
+    required this.monthlyPayment,
     required this.payout,
     required this.requiredWork,
     required this.deadline,
     required this.fundingNote,
+    required this.aboutRole,
+    required this.whatYoullDo,
+    required this.whoYouAre,
+    required this.niceToHave,
+    required this.whyJoin,
+    required this.cardColorToken,
+    required this.requiresWorkspace,
     required this.icon,
     required this.filters,
+    this.hourlyPayment,
+    this.assignmentPayment,
+    this.funded = true,
     this.available = true,
   });
 
   final String id;
   final String publisher;
   final String publisherType;
+  final WorkOpportunityPosterType posterType;
   final String title;
   final String summary;
+  final String qualificationHeadline;
   final String kind;
   final String location;
+  final String city;
+  final String area;
+  final String pincode;
   final String capacity;
-  final String payment;
+  final int peopleNeeded;
+  final int peopleJoined;
+  final int applicationsInProgress;
+  final String finalDeadline;
+  int get positionsRemaining {
+    final remaining = peopleNeeded - peopleJoined - applicationsInProgress;
+    return remaining < 0 ? 0 : remaining;
+  }
+
+  final String paymentAmount;
+  String get payment => monthlyPayment;
+  final String monthlyPayment;
+  final String? hourlyPayment;
+  final String? assignmentPayment;
   final String payout;
   final String requiredWork;
   final String deadline;
   final String fundingNote;
+  final String aboutRole;
+  final List<String> whatYoullDo;
+  final List<String> whoYouAre;
+  final List<String> niceToHave;
+  final String whyJoin;
+  final WorkOpportunityCardColorToken cardColorToken;
+  final bool requiresWorkspace;
   final IconData icon;
   final Set<WorkFeedFilter> filters;
+  final bool funded;
   final bool available;
 }
 
@@ -60,12 +2326,55 @@ class WorkTerm {
   final String detail;
 }
 
+enum WorkGstMatchCategory {
+  retailGoodsSupplier,
+  wholesaleDistributor,
+  manufacturerSupplier,
+  foodServiceProvider,
+  healthcareProvider,
+  pharmacySupplier,
+  personalCareProvider,
+  bikeTravelProvider,
+  autoTravelProvider,
+  cabTravelProvider,
+  busTravelProvider,
+  quickDeliveryBiker,
+  wholesaleFleetDelivery,
+  bulkDeliveryFleet,
+  digitalContentProvider,
+  independentProfessional,
+}
+
+extension WorkGstMatchCategoryLabel on WorkGstMatchCategory {
+  String get label => switch (this) {
+    WorkGstMatchCategory.retailGoodsSupplier => 'Retail goods supplier',
+    WorkGstMatchCategory.wholesaleDistributor => 'Wholesale distributor',
+    WorkGstMatchCategory.manufacturerSupplier => 'Manufacturer or supplier',
+    WorkGstMatchCategory.foodServiceProvider => 'Food service provider',
+    WorkGstMatchCategory.healthcareProvider => 'Healthcare provider',
+    WorkGstMatchCategory.pharmacySupplier => 'Pharmacy or medicine supplier',
+    WorkGstMatchCategory.personalCareProvider =>
+      'Personal care service provider',
+    WorkGstMatchCategory.bikeTravelProvider => 'Bike travel provider',
+    WorkGstMatchCategory.autoTravelProvider => 'Auto travel provider',
+    WorkGstMatchCategory.cabTravelProvider => 'Cab travel provider',
+    WorkGstMatchCategory.busTravelProvider => 'Bus travel provider',
+    WorkGstMatchCategory.quickDeliveryBiker => 'Quick delivery biker',
+    WorkGstMatchCategory.wholesaleFleetDelivery => 'Wholesale fleet delivery',
+    WorkGstMatchCategory.bulkDeliveryFleet => 'Bulk delivery fleet',
+    WorkGstMatchCategory.digitalContentProvider =>
+      'Digital content service provider',
+    WorkGstMatchCategory.independentProfessional => 'Independent professional',
+  };
+}
+
 class WorkProfileOption {
   const WorkProfileOption({
     required this.id,
     required this.familyId,
     required this.familyLabel,
     required this.label,
+    required this.gstMatchCategory,
     required this.sellSide,
     required this.buySide,
     required this.tools,
@@ -76,10 +2385,435 @@ class WorkProfileOption {
   final String familyId;
   final String familyLabel;
   final String label;
+  final WorkGstMatchCategory gstMatchCategory;
   final String sellSide;
   final String buySide;
   final String tools;
   final IconData icon;
+
+  String get setupSubtitle => switch (id) {
+    'retailer-grocery' ||
+    'retailer-speciality' => 'Grocery / Kirana Shop or Speciality Retail Shop',
+    _ => label,
+  };
+}
+
+enum WorkContactChannel { primaryMobile, email, alternateMobile }
+
+extension WorkContactChannelValue on WorkContactChannel {
+  String get apiValue => switch (this) {
+    WorkContactChannel.primaryMobile => 'primary_mobile',
+    WorkContactChannel.email => 'email',
+    WorkContactChannel.alternateMobile => 'alternate_mobile',
+  };
+}
+
+class WorkAccountSnapshot {
+  const WorkAccountSnapshot({
+    this.displayName = '',
+    this.email = '',
+    this.mobile = '',
+    this.providerLabel = '',
+    this.providerAccount = '',
+    this.emailConfirmed = false,
+    this.mobileConfirmed = false,
+  });
+
+  final String displayName;
+  final String email;
+  final String mobile;
+  final String providerLabel;
+  final String providerAccount;
+  final bool emailConfirmed;
+  final bool mobileConfirmed;
+}
+
+enum WorkDocumentImportance { required, ifApplicable, optional }
+
+extension WorkDocumentImportanceLabel on WorkDocumentImportance {
+  String get label => switch (this) {
+    WorkDocumentImportance.required => 'Required',
+    WorkDocumentImportance.ifApplicable => 'Required when applicable',
+    WorkDocumentImportance.optional => 'Optional',
+  };
+}
+
+class WorkDocumentChecklistItem {
+  const WorkDocumentChecklistItem({
+    required this.title,
+    required this.detail,
+    required this.importance,
+    required this.icon,
+  });
+
+  final String title;
+  final String detail;
+  final WorkDocumentImportance importance;
+  final IconData icon;
+}
+
+const _identityDocument = WorkDocumentChecklistItem(
+  title: 'Account owner identity',
+  detail: 'PAN, Aadhaar or another accepted government identity document.',
+  importance: WorkDocumentImportance.required,
+  icon: Icons.badge_outlined,
+);
+
+const _gstDocument = WorkDocumentChecklistItem(
+  title: 'GST registration certificate',
+  detail:
+      'Required when GST registration applies to this Workspace. Applicability is confirmed during verification.',
+  importance: WorkDocumentImportance.ifApplicable,
+  icon: Icons.receipt_long_outlined,
+);
+
+const _payoutBankDocument = WorkDocumentChecklistItem(
+  title: 'Payout bank account proof',
+  detail:
+      'A cancelled cheque or recent bank statement PDF showing the account holder name, account number and IFSC for approved sales, service or work payments.',
+  importance: WorkDocumentImportance.required,
+  icon: Icons.account_balance_outlined,
+);
+
+List<WorkDocumentChecklistItem> _withRequiredPayoutBank(
+  List<WorkDocumentChecklistItem> profileDocuments,
+) => List<WorkDocumentChecklistItem>.unmodifiable([
+  ...profileDocuments.where(
+    (document) =>
+        document.title != _gstDocument.title &&
+        document.title != 'Payout account document',
+  ),
+  _payoutBankDocument,
+  _gstDocument,
+]);
+
+extension WorkProfileDocumentChecklist on WorkProfileOption {
+  List<WorkDocumentChecklistItem>
+  get verificationDocuments => _withRequiredPayoutBank(switch (id) {
+    'retailer-grocery' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Shop address document',
+        detail:
+            'Ownership, rent, lease, consent or a recent utility document for the shop.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.storefront_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Food business registration or licence',
+        detail: 'FSSAI registration or licence when food products require it.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.restaurant_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the shop owner.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'retailer-speciality' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Store address document',
+        detail:
+            'Ownership, rent, lease, consent or a recent utility document for the store.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.shopping_bag_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Category licence or registration',
+        detail: 'Any licence required for the products you sell.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.verified_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the store owner.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'wholesaler' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Business registration document',
+        detail:
+            'Registration or constitution document for the wholesale business.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.business_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Warehouse or business address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.warehouse_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Authorised representative document',
+        detail: 'Authorisation if another person manages this Workspace.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'manufacturer' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Business registration document',
+        detail: 'Company, partnership, LLP, proprietorship or Udyam document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.business_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Manufacturing unit address document',
+        detail:
+            'Ownership, rent, lease, consent or utility document for the unit.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.factory_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Manufacturing licence',
+        detail: 'Licence or approval required for your product category.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.approval_outlined,
+      ),
+      _gstDocument,
+    ],
+    'restaurant' || 'cloud-kitchen' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'FSSAI registration or licence',
+        detail: 'The food registration or licence applicable to your business.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.restaurant_menu_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Kitchen or restaurant address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.location_city_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the operator.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'clinic' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Professional registration certificate',
+        detail:
+            'Current medical council or applicable professional registration.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.medical_services_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Clinic address document',
+        detail: 'Address document when appointments are offered from a clinic.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.local_hospital_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Clinic operator authority',
+        detail: 'Authorisation when the doctor does not own the clinic.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'pharmacy' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Drug licence',
+        detail: 'Current retail or wholesale drug licence for the pharmacy.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.local_pharmacy_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Pharmacist or authorised-person document',
+        detail:
+            'Registration or authorisation for the responsible professional.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Pharmacy address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.store_outlined,
+      ),
+      _gstDocument,
+    ],
+    'salon' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Salon address document',
+        detail: 'Ownership, rent, lease, consent or utility document.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.content_cut_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Shop or local registration',
+        detail: 'Local registration or licence required for your salon.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.approval_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Owner or operator authority',
+        detail: 'Authorisation when the account owner is not the salon owner.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'travel-bike-provider' ||
+    'travel-auto-provider' ||
+    'travel-cab-provider' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Driving licence',
+        detail: 'Current licence for the vehicle category you operate.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Vehicle registration certificate',
+        detail: 'Current RC for the vehicle used for passenger travel.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.directions_car_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Vehicle insurance and permit',
+        detail:
+            'Current insurance and the permit applicable to the travel service.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.health_and_safety_outlined,
+      ),
+      _gstDocument,
+    ],
+    'travel-bus-provider' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Bus driving licence or operator authority',
+        detail:
+            'Current vehicle-category licence or authority from the bus operator.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Bus registration certificate',
+        detail: 'Current RC for each bus added to the Workspace.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.directions_bus_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Passenger-service permit and insurance',
+        detail:
+            'Current insurance and the permit applicable to the passenger service.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.health_and_safety_outlined,
+      ),
+      _gstDocument,
+    ],
+    'quick-delivery-biker' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Driving licence',
+        detail: 'Current licence for the delivery bike category.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.badge_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Bike registration certificate',
+        detail: 'Current RC for the bike used for delivery work.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.two_wheeler_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Bike insurance and permit',
+        detail: 'Current insurance and any permit applicable to delivery work.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.health_and_safety_outlined,
+      ),
+      _gstDocument,
+    ],
+    'wholesale-fleet-delivery' || 'bulk-delivery-fleet' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Transport business registration',
+        detail: 'Registration or constitution document for the fleet business.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.business_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Vehicle RC, permit and insurance',
+        detail:
+            'Current documents for delivery vehicles added to the Workspace.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.local_shipping_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Fleet operator authority',
+        detail: 'Authorisation for the person managing the fleet.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    'creator' => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Portfolio or channel ownership',
+        detail:
+            'A public portfolio, channel or account showing your original work.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.video_camera_front_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Payout account document',
+        detail:
+            'A bank document that confirms where approved earnings are paid.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.account_balance_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Agency or brand authorisation',
+        detail: 'Authorisation when you represent a creator agency or brand.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.assignment_ind_outlined,
+      ),
+      _gstDocument,
+    ],
+    _ => const [
+      _identityDocument,
+      WorkDocumentChecklistItem(
+        title: 'Portfolio, qualification or experience document',
+        detail: 'A document or link that demonstrates the work you offer.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.work_outline_rounded,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Payout account document',
+        detail:
+            'A bank document that confirms where approved earnings are paid.',
+        importance: WorkDocumentImportance.required,
+        icon: Icons.account_balance_outlined,
+      ),
+      WorkDocumentChecklistItem(
+        title: 'Professional licence',
+        detail: 'A current licence when your profession requires one.',
+        importance: WorkDocumentImportance.ifApplicable,
+        icon: Icons.workspace_premium_outlined,
+      ),
+      _gstDocument,
+    ],
+  });
 }
 
 class WorkProofRequirement {
@@ -87,13 +2821,14 @@ class WorkProofRequirement {
     required this.id,
     required this.label,
     required this.detail,
-    required this.required,
+    required this.importance,
   });
 
   final String id;
   final String label;
   final String detail;
-  final bool required;
+  final WorkDocumentImportance importance;
+  bool get required => importance == WorkDocumentImportance.required;
 }
 
 class WorkWorkspace {
@@ -103,12 +2838,14 @@ class WorkWorkspace {
     required this.profileLabel,
     required this.area,
     required this.verified,
+    this.profileId,
     this.gstReminder = false,
   });
 
   final String id;
   final String name;
   final String profileLabel;
+  final String? profileId;
   final String area;
   final bool verified;
   final bool gstReminder;
@@ -116,56 +2853,103 @@ class WorkWorkspace {
 
 const workOpportunities = <WorkOpportunity>[
   WorkOpportunity(
-    id: 'mool-explainer',
+    id: 'quick-delivery-biker',
     publisher: 'MoolSocial',
-    publisherType: 'Official sponsored campaign',
-    title: 'Make one MoolSocial explainer video',
+    publisherType: 'MoolSocial-owned funded task',
+    posterType: WorkOpportunityPosterType.moolSocial,
+    title: 'Quick Delivery Biker',
     summary:
-        'Create one original 45–60 second Hindi or regional-language vertical video.',
-    kind: 'Create',
-    location: 'Remote India',
-    capacity: '12 slots',
-    payment: '₹1,500 per approved video',
-    payout: 'Within 3 days',
-    requiredWork: 'Creator Work',
-    deadline: 'Closes 22 Jul · 8:00 PM',
-    fundingNote: 'Funded · disclosure required',
-    icon: Icons.movie_creation_outlined,
-    filters: {WorkFeedFilter.forYou, WorkFeedFilter.campaigns},
+        'Pick up prepaid local orders and complete OTP-confirmed deliveries during an agreed shift.',
+    qualificationHeadline: 'Bike, valid licence and Android phone required',
+    kind: 'Freelance delivery',
+    location: 'Sardarpura, Jodhpur · 342003',
+    city: 'Jodhpur',
+    area: 'Sardarpura',
+    pincode: '342003',
+    capacity: '18 funded shifts',
+    peopleNeeded: 18,
+    peopleJoined: 6,
+    applicationsInProgress: 4,
+    finalDeadline: '05 Sep 2026',
+    paymentAmount: '₹650 per completed shift',
+    monthlyPayment: 'Up to ₹19,500 monthly for 30 completed shifts',
+    hourlyPayment: '₹100 per active hour',
+    assignmentPayment: '₹650 for 8 verified drops',
+    payout: 'Within 1 working day',
+    requiredWork: 'Rider / delivery freelancer',
+    deadline: 'Apply while 18 funded shifts remain',
+    fundingNote: 'Funded · ₹11,700 total task budget',
+    aboutRole:
+        'A flexible local delivery assignment for riders who can complete a fixed, prepaid route safely and on time.',
+    whatYoullDo: [
+      'Collect the assigned prepaid orders from the pickup point.',
+      'Complete eight OTP-confirmed drops in the assigned area.',
+      'Report delivery exceptions through the route support flow.',
+    ],
+    whoYouAre: [
+      'You have a roadworthy bike, valid driving licence and smartphone.',
+      'You can navigate Sardarpura and communicate clearly with customers.',
+    ],
+    niceToHave: [
+      'Previous food, grocery or parcel delivery experience.',
+      'Your own insulated delivery bag.',
+    ],
+    whyJoin:
+        'Choose a funded shift with its route, work requirement and payout stated before you apply.',
+    cardColorToken: WorkOpportunityCardColorToken.cobalt,
+    requiresWorkspace: true,
+    icon: Icons.delivery_dining_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.jobs,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
   ),
   WorkOpportunity(
-    id: 'shakti-shorts',
-    publisher: 'Shakti Foods',
-    publisherType: 'Verified manufacturer',
-    title: 'Create two product showcase Shorts',
+    id: 'user-acquisition-onboarding',
+    publisher: 'MoolSocial Growth',
+    publisherType: 'MoolSocial-owned funded task',
+    posterType: WorkOpportunityPosterType.moolSocial,
+    title: 'MoolSocial User Acquisition & Business Onboarding Specialist',
     summary:
-        'Show the supplied product pack, preparation and final serving in two original shorts.',
-    kind: 'Create',
-    location: 'Remote India',
-    capacity: '18 slots',
-    payment: '₹1,200 per approved pair',
-    payout: 'Within 5 days',
-    requiredWork: 'Creator Work',
-    deadline: 'Closes 23 Jul · 6:00 PM',
-    fundingNote: 'Funded · product supplied',
-    icon: Icons.play_circle_outline_rounded,
-    filters: {WorkFeedFilter.forYou, WorkFeedFilter.campaigns},
-  ),
-  WorkOpportunity(
-    id: 'mahadev-orders',
-    publisher: 'Mahadev Fresh Mart',
-    publisherType: 'Verified retailer',
-    title: 'Bring completed grocery orders',
-    summary:
-        'Earn only for trackable paid orders that are delivered and remain outside the refund window.',
-    kind: 'Promote',
-    location: 'Jodhpur · 4 km',
-    capacity: '20 orders',
-    payment: '₹20 per delivered order',
-    payout: 'T+2 days',
-    requiredWork: 'Freelancer Work',
-    deadline: 'Ends 21 Jul · 9:00 PM',
-    fundingNote: 'Funded · maximum payout ₹400',
+        'Meet local retailers, explain MoolSocial and complete owner-approved onboarding.',
+    qualificationHeadline: 'Local retail network and field-sales confidence',
+    kind: 'Freelance onboarding',
+    location: 'Sardarpura, Jodhpur · 342003',
+    city: 'Jodhpur',
+    area: 'Sardarpura',
+    pincode: '342003',
+    capacity: '40 funded onboardings',
+    peopleNeeded: 40,
+    peopleJoined: 14,
+    applicationsInProgress: 9,
+    finalDeadline: '07 Sep 2026',
+    paymentAmount: '₹350 per verified retailer',
+    monthlyPayment: 'Up to ₹14,000 monthly for 40 verified onboardings',
+    assignmentPayment: '₹350 per approved onboarding',
+    payout: 'T+1 after verification',
+    requiredWork: 'Retailer acquisition freelancer',
+    deadline: 'Open while 40 funded onboardings remain',
+    fundingNote: 'Funded · maximum task budget ₹14,000',
+    aboutRole:
+        'Acquire eligible local retailers and help each owner complete an informed, consent-based MoolSocial onboarding.',
+    whatYoullDo: [
+      'Identify eligible retailers in the assigned area.',
+      'Explain the relevant app benefits without making false promises.',
+      'Submit owner consent and the required verified onboarding record.',
+    ],
+    whoYouAre: [
+      'You know local shop owners and are comfortable with field visits.',
+      'You can demonstrate a mobile app in Hindi or a local language.',
+    ],
+    niceToHave: [
+      'Retail distribution, merchant acquisition or FMCG experience.',
+    ],
+    whyJoin:
+        'Earn against each verified outcome with the acceptance rule and funded capacity visible upfront.',
+    cardColorToken: WorkOpportunityCardColorToken.emerald,
+    requiresWorkspace: false,
     icon: Icons.storefront_outlined,
     filters: {
       WorkFeedFilter.forYou,
@@ -174,60 +2958,49 @@ const workOpportunities = <WorkOpportunity>[
     },
   ),
   WorkOpportunity(
-    id: 'riya-edit',
-    publisher: 'Riya Sharma',
-    publisherType: 'Verified creator',
-    title: 'Edit three vertical short videos',
+    id: 'retailer-onboarding-specialist',
+    publisher: 'Mahadev Fresh Mart',
+    publisherType: 'Verified retailer-owned posting',
+    posterType: WorkOpportunityPosterType.retailer,
+    title: 'Retailer Onboarding Specialist',
     summary:
-        'Edit supplied clips with approved captions, pacing and brand styling.',
-    kind: 'Edit',
-    location: 'Remote India',
-    capacity: '6 packs',
-    payment: '₹900 per approved pack',
-    payout: 'Within 3 days',
-    requiredWork: 'Creator Work',
-    deadline: 'Deliver by 24 Jul',
-    fundingNote: 'Funded · files supplied',
-    icon: Icons.video_file_outlined,
-    filters: {WorkFeedFilter.forYou, WorkFeedFilter.freelance},
-  ),
-  WorkOpportunity(
-    id: 'evening-delivery',
-    publisher: 'MoolSocial Delivery',
-    publisherType: 'Verified prepaid route',
-    title: 'Complete an evening grocery route',
-    summary:
-        'Collect prepaid orders and complete eight OTP-verified drops from 6–9 PM.',
-    kind: 'Deliver',
-    location: 'Jodhpur central',
-    capacity: '10 routes',
-    payment: '₹520 for 8 drops',
-    payout: 'Next payout',
-    requiredWork: 'Delivery Work',
-    deadline: 'Today · 5:30 PM',
-    fundingNote: 'Funded · route support included',
-    icon: Icons.delivery_dining_outlined,
-    filters: {
-      WorkFeedFilter.forYou,
-      WorkFeedFilter.freelance,
-      WorkFeedFilter.nearby,
-    },
-  ),
-  WorkOpportunity(
-    id: 'business-activation',
-    publisher: 'MoolSocial',
-    publisherType: 'Verified activation work',
-    title: 'Activate local businesses',
-    summary:
-        'Complete owner-approved setup and the first verified business activation action.',
-    kind: 'Onboard',
-    location: 'Jodhpur district',
-    capacity: '40 nearby',
-    payment: '₹350 per activation',
-    payout: 'T+1 review',
-    requiredWork: 'Freelancer Work',
-    deadline: 'Apply by 25 Jul',
-    fundingNote: 'Funded · verified activation',
+        'Onboard verified kirana and speciality retailers in one assigned market.',
+    qualificationHeadline:
+        'Retailer relationships and field-app demonstration skills',
+    kind: 'Freelance onboarding',
+    location: 'Ratanada, Jodhpur · 342011',
+    city: 'Jodhpur',
+    area: 'Ratanada',
+    pincode: '342011',
+    capacity: '20 funded onboardings',
+    peopleNeeded: 20,
+    peopleJoined: 8,
+    applicationsInProgress: 5,
+    finalDeadline: '06 Sep 2026',
+    paymentAmount: '₹350 per verified retailer',
+    monthlyPayment: 'Up to ₹7,000 monthly for 20 verified onboardings',
+    assignmentPayment: '₹350 per approved onboarding',
+    payout: 'T+1 after verification',
+    requiredWork: 'Retailer onboarding freelancer',
+    deadline: 'Open while 20 funded onboardings remain',
+    fundingNote: 'Retailer funded · maximum task budget ₹7,000',
+    aboutRole:
+        'Help a verified retailer association bring eligible peers onto MoolSocial through an informed, owner-approved onboarding flow.',
+    whatYoullDo: [
+      'Meet the owner and explain the relevant retailer workflow.',
+      'Confirm business category and operating area.',
+      'Submit consent-backed onboarding evidence.',
+    ],
+    whoYouAre: [
+      'You know local retailers and can conduct field visits.',
+      'You can demonstrate an app accurately in a local language.',
+    ],
+    niceToHave: [
+      'FMCG, merchant acquisition or retail distribution experience.',
+    ],
+    whyJoin: 'Earn a stated amount for each independently verified retailer.',
+    cardColorToken: WorkOpportunityCardColorToken.amber,
+    requiresWorkspace: false,
     icon: Icons.add_business_outlined,
     filters: {
       WorkFeedFilter.forYou,
@@ -236,22 +3009,603 @@ const workOpportunities = <WorkOpportunity>[
     },
   ),
   WorkOpportunity(
-    id: 'city-coordinator',
-    publisher: 'MoolSocial',
-    publisherType: 'Verified permanent role',
-    title: 'City operations coordinator',
+    id: 'manufacturer-onboarding-specialist',
+    publisher: 'MoolSocial Trade',
+    publisherType: 'MoolSocial-owned funded task',
+    posterType: WorkOpportunityPosterType.moolSocial,
+    title: 'Manufacturer Onboarding Specialist',
     summary:
-        'Own city partner quality, support resolution and revenue execution.',
-    kind: 'Job',
-    location: 'Jodhpur · on-site',
-    capacity: '2 roles',
-    payment: '₹25k–35k monthly',
-    payout: 'Monthly salary',
-    requiredWork: 'Job Seeker Work',
-    deadline: 'Apply by 27 Jul',
-    fundingNote: 'No application fee',
-    icon: Icons.badge_outlined,
-    filters: {WorkFeedFilter.forYou, WorkFeedFilter.jobs},
+        'Use local industrial contacts to onboard verified manufacturers and their catalogue owners.',
+    qualificationHeadline: 'B2B field network and manufacturer contacts',
+    kind: 'Freelance onboarding',
+    location: 'Boranada, Jodhpur · 342012',
+    city: 'Jodhpur',
+    area: 'Boranada',
+    pincode: '342012',
+    capacity: '12 funded onboardings',
+    peopleNeeded: 12,
+    peopleJoined: 3,
+    applicationsInProgress: 4,
+    finalDeadline: '10 Sep 2026',
+    paymentAmount: '₹900 per verified manufacturer',
+    monthlyPayment: 'Up to ₹10,800 monthly for 12 verified onboardings',
+    assignmentPayment: '₹900 per approved onboarding',
+    payout: 'Within 2 working days',
+    requiredWork: 'Manufacturer acquisition freelancer',
+    deadline: 'Open while 12 funded onboardings remain',
+    fundingNote: 'Funded · maximum task budget ₹10,800',
+    aboutRole:
+        'Bring suitable manufacturers onto MoolSocial with verified business ownership and a clear trade profile.',
+    whatYoullDo: [
+      'Approach suitable manufacturers through existing or new contacts.',
+      'Explain trade discovery and catalogue requirements.',
+      'Complete a verified, owner-approved onboarding record.',
+    ],
+    whoYouAre: [
+      'You understand local manufacturing or distribution businesses.',
+      'You can verify the decision-maker before starting onboarding.',
+    ],
+    niceToHave: [
+      'Industrial sales, sourcing or channel-development experience.',
+    ],
+    whyJoin:
+        'Turn your B2B network into clearly priced, independently verifiable assignments.',
+    cardColorToken: WorkOpportunityCardColorToken.crimson,
+    requiresWorkspace: false,
+    icon: Icons.factory_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'rider-onboarding-specialist',
+    publisher: 'Arjun Fleet Services',
+    publisherType: 'Verified rider-owned posting',
+    posterType: WorkOpportunityPosterType.rider,
+    title: 'Rider Onboarding Specialist',
+    summary:
+        'Onboard eligible taxi, bike and bus operators and verify their operating category.',
+    qualificationHeadline:
+        'Transport-operator contacts across taxi, bike or bus',
+    kind: 'Freelance onboarding',
+    location: 'Mansarovar, Jaipur · 302020',
+    city: 'Jaipur',
+    area: 'Mansarovar',
+    pincode: '302020',
+    capacity: '25 funded onboardings',
+    peopleNeeded: 25,
+    peopleJoined: 10,
+    applicationsInProgress: 6,
+    finalDeadline: '08 Sep 2026',
+    paymentAmount: '₹500 per verified operator',
+    monthlyPayment: 'Up to ₹12,500 monthly for 25 verified onboardings',
+    assignmentPayment: '₹500 per approved operator',
+    payout: 'Within 2 working days',
+    requiredWork: 'Transport onboarding freelancer',
+    deadline: 'Open while 25 funded onboardings remain',
+    fundingNote: 'User funded · maximum task budget ₹12,500',
+    aboutRole:
+        'Help a verified fleet operator build a network of eligible taxi, bike and bus operators in Jaipur.',
+    whatYoullDo: [
+      'Contact operators and explain the exact participation terms.',
+      'Confirm their vehicle or fleet category and operating area.',
+      'Submit consent-backed onboarding evidence for review.',
+    ],
+    whoYouAre: [
+      'You already know local drivers, owners or transport unions.',
+      'You can distinguish taxi, bike and bus onboarding requirements.',
+    ],
+    niceToHave: [
+      'Fleet coordination or mobility-platform acquisition experience.',
+    ],
+    whyJoin:
+        'Use your transport network for a bounded, funded outcome rather than an undefined sales target.',
+    cardColorToken: WorkOpportunityCardColorToken.violet,
+    requiresWorkspace: false,
+    icon: Icons.connect_without_contact_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'doctor-onboarding-specialist',
+    publisher: 'Dr Meera Health Network',
+    publisherType: 'Verified doctor-owned posting',
+    posterType: WorkOpportunityPosterType.doctor,
+    title: 'Doctor Onboarding Specialist',
+    summary:
+        'Use existing professional connections to onboard verified doctors with consent.',
+    qualificationHeadline:
+        'Existing doctor relationships or medical-representative experience',
+    kind: 'Freelance onboarding',
+    location: 'Vijay Nagar, Indore · 452010',
+    city: 'Indore',
+    area: 'Vijay Nagar',
+    pincode: '452010',
+    capacity: '15 funded onboardings',
+    peopleNeeded: 15,
+    peopleJoined: 5,
+    applicationsInProgress: 3,
+    finalDeadline: '12 Sep 2026',
+    paymentAmount: '₹750 per verified doctor',
+    monthlyPayment: 'Up to ₹11,250 monthly for 15 verified onboardings',
+    assignmentPayment: '₹750 per approved onboarding',
+    payout: 'Within 3 working days',
+    requiredWork: 'Healthcare onboarding freelancer',
+    deadline: 'Open while 15 funded onboardings remain',
+    fundingNote: 'Doctor funded · maximum task budget ₹11,250',
+    aboutRole:
+        'Support a verified doctor network by introducing eligible clinicians and completing consent-based profile onboarding.',
+    whatYoullDo: [
+      'Contact doctors through legitimate professional relationships.',
+      'Explain profile visibility and verification requirements.',
+      'Submit only consented and verifiable onboarding records.',
+    ],
+    whoYouAre: [
+      'You have active connections with doctors or clinics.',
+      'You understand professional boundaries and consent.',
+    ],
+    niceToHave: [
+      'Medical representative or healthcare partnership experience.',
+    ],
+    whyJoin:
+        'Apply your trusted healthcare network to a transparent, per-outcome assignment.',
+    cardColorToken: WorkOpportunityCardColorToken.teal,
+    requiresWorkspace: false,
+    icon: Icons.medical_services_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'sales-specialist',
+    publisher: 'MoolSocial Commerce',
+    publisherType: 'MoolSocial-owned funded task',
+    posterType: WorkOpportunityPosterType.moolSocial,
+    title: 'MoolSocial Area Sales Specialist',
+    summary:
+        'Promote selected MoolSocial products and close in-app orders in an assigned area.',
+    qualificationHeadline: 'Field sales record and local buyer relationships',
+    kind: 'Freelance sales',
+    location: 'Kothrud, Pune · 411038',
+    city: 'Pune',
+    area: 'Kothrud',
+    pincode: '411038',
+    capacity: '4 monthly assignments',
+    peopleNeeded: 4,
+    peopleJoined: 1,
+    applicationsInProgress: 1,
+    finalDeadline: '15 Sep 2026',
+    paymentAmount: '₹24,000 monthly assignment',
+    monthlyPayment: '₹24,000 per month',
+    hourlyPayment: '₹150 equivalent per active hour',
+    payout: 'Monthly after verified activity',
+    requiredWork: 'Area sales freelancer',
+    deadline: 'Applications close 15 September',
+    fundingNote: 'Funded · 4 one-month assignments',
+    aboutRole:
+        'Own area-wise product promotion and verified in-app sales for a one-month freelance assignment.',
+    whatYoullDo: [
+      'Visit eligible buyers and demonstrate selected products.',
+      'Create an area plan and record qualified follow-ups.',
+      'Close attributable orders through MoolSocial.',
+    ],
+    whoYouAre: [
+      'You have field sales experience and can work independently.',
+      'You understand the Kothrud trade area and can travel locally.',
+    ],
+    niceToHave: ['FMCG, retail-tech or marketplace sales experience.'],
+    whyJoin:
+        'Own a defined territory with monthly compensation and measurable work expectations.',
+    cardColorToken: WorkOpportunityCardColorToken.magenta,
+    requiresWorkspace: true,
+    icon: Icons.campaign_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.jobs,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'content-creator',
+    publisher: 'Saanvi Home Foods',
+    publisherType: 'Verified manufacturer-owned posting',
+    posterType: WorkOpportunityPosterType.manufacturer,
+    title: 'Content Creator',
+    summary:
+        'Produce two original vertical product videos from the supplied brief and product pack.',
+    qualificationHeadline:
+        'Strong vertical-video portfolio and editing ability',
+    kind: 'Freelance content',
+    location: 'Remote, India',
+    city: 'India',
+    area: 'Remote',
+    pincode: '',
+    capacity: '10 funded assignments',
+    peopleNeeded: 10,
+    peopleJoined: 4,
+    applicationsInProgress: 2,
+    finalDeadline: '11 Sep 2026',
+    paymentAmount: '₹2,400 per approved assignment',
+    monthlyPayment: 'Up to ₹24,000 monthly for 10 assignments',
+    assignmentPayment: '₹2,400 for two approved videos',
+    payout: 'Within 3 working days',
+    requiredWork: 'Content creator',
+    deadline: 'Open while 10 funded assignments remain',
+    fundingNote: 'Manufacturer funded · product supplied',
+    aboutRole:
+        'Create concise product-led videos for a verified manufacturer using a supplied factual brief.',
+    whatYoullDo: [
+      'Plan and record two original vertical videos.',
+      'Edit captions, pacing and product demonstrations to the brief.',
+      'Complete one correction round when requested.',
+    ],
+    whoYouAre: [
+      'You can show a relevant original-content portfolio.',
+      'You can shoot and edit clear vertical video independently.',
+    ],
+    niceToHave: ['Hindi or regional-language presentation skills.'],
+    whyJoin:
+        'Receive the product and acceptance criteria before producing a funded assignment.',
+    cardColorToken: WorkOpportunityCardColorToken.indigo,
+    requiresWorkspace: false,
+    icon: Icons.video_camera_front_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.campaigns,
+    },
+  ),
+  WorkOpportunity(
+    id: 'social-content-creator',
+    publisher: 'Kavya Sharma',
+    publisherType: 'Verified social-user-owned posting',
+    posterType: WorkOpportunityPosterType.socialUser,
+    title: 'Social Content Creator',
+    summary:
+        'Create a local-language social story and three short edits for a funded community campaign.',
+    qualificationHeadline:
+        'Original storytelling and public social-content portfolio',
+    kind: 'Freelance social content',
+    location: 'Vaishali Nagar, Jaipur · 302021',
+    city: 'Jaipur',
+    area: 'Vaishali Nagar',
+    pincode: '302021',
+    capacity: '8 funded assignments',
+    peopleNeeded: 8,
+    peopleJoined: 3,
+    applicationsInProgress: 2,
+    finalDeadline: '09 Sep 2026',
+    paymentAmount: '₹1,800 per approved assignment',
+    monthlyPayment: 'Up to ₹14,400 monthly for 8 assignments',
+    assignmentPayment: '₹1,800 for one story and three edits',
+    payout: 'Within 3 working days',
+    requiredWork: 'Social content creator',
+    deadline: 'Open while 8 funded assignments remain',
+    fundingNote: 'User funded · disclosure required',
+    aboutRole:
+        'Create original social content for a verified user campaign with the deliverables and usage window stated upfront.',
+    whatYoullDo: [
+      'Develop one local-language story from the approved brief.',
+      'Deliver three vertical edits sized for social publishing.',
+      'Label sponsored content and use only cleared material.',
+    ],
+    whoYouAre: [
+      'You publish original social content and can share a portfolio.',
+      'You understand disclosure, consent and music-rights requirements.',
+    ],
+    niceToHave: ['A Jaipur audience or local community-reporting experience.'],
+    whyJoin:
+        'Take a bounded creative assignment with explicit deliverables, funding and rights expectations.',
+    cardColorToken: WorkOpportunityCardColorToken.crimson,
+    requiresWorkspace: false,
+    icon: Icons.auto_awesome_motion_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.campaigns,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'wholesaler-onboarding-specialist',
+    publisher: 'MoolSocial Trade',
+    publisherType: 'MoolSocial-owned funded task',
+    posterType: WorkOpportunityPosterType.moolSocial,
+    title: 'Wholesaler Onboarding Specialist',
+    summary:
+        'Identify eligible wholesalers and complete verified, owner-approved business onboarding.',
+    qualificationHeadline:
+        'Wholesale-market network and B2B onboarding ability',
+    kind: 'Freelance onboarding',
+    location: 'Madhupura, Ahmedabad · 380004',
+    city: 'Ahmedabad',
+    area: 'Madhupura',
+    pincode: '380004',
+    capacity: '16 funded onboardings',
+    peopleNeeded: 16,
+    peopleJoined: 6,
+    applicationsInProgress: 4,
+    finalDeadline: '13 Sep 2026',
+    paymentAmount: '₹700 per verified wholesaler',
+    monthlyPayment: 'Up to ₹11,200 monthly for 16 verified onboardings',
+    assignmentPayment: '₹700 per approved onboarding',
+    payout: 'Within 2 working days',
+    requiredWork: 'Wholesaler acquisition freelancer',
+    deadline: 'Open while 16 funded onboardings remain',
+    fundingNote: 'Funded · maximum task budget ₹11,200',
+    aboutRole:
+        'Grow verified wholesale supply in Ahmedabad through informed, consent-based business onboarding.',
+    whatYoullDo: [
+      'Identify eligible wholesalers and confirm the business owner.',
+      'Explain catalogue and trade-order requirements.',
+      'Submit a verified onboarding record with consent.',
+    ],
+    whoYouAre: [
+      'You know wholesale markets and can speak with business owners.',
+      'You can explain a mobile trade workflow clearly.',
+    ],
+    niceToHave: ['Distribution, sourcing or B2B marketplace experience.'],
+    whyJoin:
+        'Use your wholesale network for transparent, funded onboarding outcomes.',
+    cardColorToken: WorkOpportunityCardColorToken.indigo,
+    requiresWorkspace: false,
+    icon: Icons.warehouse_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'taxi-operator-onboarding-specialist',
+    publisher: 'Arjun Fleet Services',
+    publisherType: 'Verified rider-owned posting',
+    posterType: WorkOpportunityPosterType.rider,
+    title: 'Taxi Operator Onboarding Specialist',
+    summary:
+        'Onboard owner-drivers and taxi operators with verified vehicle and operating-area details.',
+    qualificationHeadline: 'Existing taxi-owner or driver network',
+    kind: 'Freelance onboarding',
+    location: 'Sanganer, Jaipur · 302029',
+    city: 'Jaipur',
+    area: 'Sanganer',
+    pincode: '302029',
+    capacity: '12 funded onboardings',
+    peopleNeeded: 12,
+    peopleJoined: 4,
+    applicationsInProgress: 3,
+    finalDeadline: '10 Sep 2026',
+    paymentAmount: '₹550 per verified taxi operator',
+    monthlyPayment: 'Up to ₹6,600 monthly for 12 verified operators',
+    assignmentPayment: '₹550 per approved taxi operator',
+    payout: 'Within 2 working days',
+    requiredWork: 'Taxi onboarding freelancer',
+    deadline: 'Open while 12 funded onboardings remain',
+    fundingNote: 'Rider funded · maximum task budget ₹6,600',
+    aboutRole:
+        'Recruit eligible taxi operators for a verified fleet owner in one defined Jaipur service area.',
+    whatYoullDo: [
+      'Contact owner-drivers and explain the exact participation terms.',
+      'Verify taxi category, documents and operating area.',
+      'Submit consent-backed onboarding evidence.',
+    ],
+    whoYouAre: [
+      'You have active connections with taxi owners or drivers.',
+      'You can verify documents without retaining private copies.',
+    ],
+    niceToHave: ['Taxi union, fleet desk or mobility-platform experience.'],
+    whyJoin: 'Earn per verified taxi operator through a funded local task.',
+    cardColorToken: WorkOpportunityCardColorToken.amber,
+    requiresWorkspace: false,
+    icon: Icons.local_taxi_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'bike-rider-onboarding-specialist',
+    publisher: 'Imran Khan',
+    publisherType: 'Verified rider-owned posting',
+    posterType: WorkOpportunityPosterType.rider,
+    title: 'Bike Rider Onboarding Specialist',
+    summary:
+        'Find eligible bike riders and complete licence, vehicle and service-area verification.',
+    qualificationHeadline: 'Bike-rider network and local route knowledge',
+    kind: 'Freelance onboarding',
+    location: 'Talwandi, Kota · 324005',
+    city: 'Kota',
+    area: 'Talwandi',
+    pincode: '324005',
+    capacity: '20 funded onboardings',
+    peopleNeeded: 20,
+    peopleJoined: 7,
+    applicationsInProgress: 5,
+    finalDeadline: '14 Sep 2026',
+    paymentAmount: '₹300 per verified bike rider',
+    monthlyPayment: 'Up to ₹6,000 monthly for 20 verified riders',
+    assignmentPayment: '₹300 per approved bike rider',
+    payout: 'T+1 after verification',
+    requiredWork: 'Bike-rider onboarding freelancer',
+    deadline: 'Open while 20 funded onboardings remain',
+    fundingNote: 'Rider funded · maximum task budget ₹6,000',
+    aboutRole:
+        'Help a verified rider create a local pool of eligible bike riders for defined route work.',
+    whatYoullDo: [
+      'Introduce the opportunity and its terms accurately.',
+      'Confirm licence, bike and preferred operating area.',
+      'Submit each rider only after consent.',
+    ],
+    whoYouAre: [
+      'You know active bike riders in Kota.',
+      'You can use the onboarding and verification flow reliably.',
+    ],
+    niceToHave: ['Delivery or two-wheeler community coordination experience.'],
+    whyJoin: 'Turn local rider connections into verified, funded outcomes.',
+    cardColorToken: WorkOpportunityCardColorToken.cobalt,
+    requiresWorkspace: false,
+    icon: Icons.two_wheeler_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'bus-operator-onboarding-specialist',
+    publisher: 'Rajasthan Route Partners',
+    publisherType: 'Verified other-user-owned posting',
+    posterType: WorkOpportunityPosterType.other,
+    title: 'Bus Operator Onboarding Specialist',
+    summary:
+        'Onboard verified private bus operators with route, fleet and authorized-contact details.',
+    qualificationHeadline:
+        'Bus-operator network and transport-business knowledge',
+    kind: 'Freelance onboarding',
+    location: 'Surajpole, Udaipur · 313001',
+    city: 'Udaipur',
+    area: 'Surajpole',
+    pincode: '313001',
+    capacity: '8 funded onboardings',
+    peopleNeeded: 8,
+    peopleJoined: 2,
+    applicationsInProgress: 2,
+    finalDeadline: '16 Sep 2026',
+    paymentAmount: '₹1,200 per verified bus operator',
+    monthlyPayment: 'Up to ₹9,600 monthly for 8 verified operators',
+    assignmentPayment: '₹1,200 per approved bus operator',
+    payout: 'Within 3 working days',
+    requiredWork: 'Bus-operator onboarding freelancer',
+    deadline: 'Open while 8 funded onboardings remain',
+    fundingNote: 'User funded · maximum task budget ₹9,600',
+    aboutRole:
+        'Build a verified private-bus operator directory for a local route-services user.',
+    whatYoullDo: [
+      'Contact an authorized operator representative.',
+      'Confirm routes, fleet category and business authority.',
+      'Complete consent-based onboarding for review.',
+    ],
+    whoYouAre: [
+      'You know private bus owners, agents or operator offices.',
+      'You can check business authority and route information.',
+    ],
+    niceToHave: ['Bus booking, tourism or transport-agency experience.'],
+    whyJoin: 'Earn against a small, defined set of high-value onboardings.',
+    cardColorToken: WorkOpportunityCardColorToken.crimson,
+    requiresWorkspace: false,
+    icon: Icons.directions_bus_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'wholesale-sales-specialist',
+    publisher: 'Surat Textile Distribution',
+    publisherType: 'Verified wholesaler-owned posting',
+    posterType: WorkOpportunityPosterType.wholesaler,
+    title: 'Wholesale Sales Specialist',
+    summary:
+        'Promote a defined textile catalogue and close attributable retailer orders in-app.',
+    qualificationHeadline: 'Wholesale textile sales and retailer relationships',
+    kind: 'Freelance sales',
+    location: 'Ring Road, Surat · 395002',
+    city: 'Surat',
+    area: 'Ring Road',
+    pincode: '395002',
+    capacity: '15 funded orders',
+    peopleNeeded: 15,
+    peopleJoined: 5,
+    applicationsInProgress: 4,
+    finalDeadline: '12 Sep 2026',
+    paymentAmount: '₹500 per verified wholesale order',
+    monthlyPayment: 'Up to ₹7,500 monthly for 15 verified orders',
+    assignmentPayment: '₹500 per paid, non-refunded order',
+    payout: 'T+2 after the refund window',
+    requiredWork: 'Wholesale sales freelancer',
+    deadline: 'Open while 15 funded orders remain',
+    fundingNote: 'Wholesaler funded · maximum task budget ₹7,500',
+    aboutRole:
+        'Sell a verified wholesaler catalogue to eligible retailers using attributable in-app orders.',
+    whatYoullDo: [
+      'Present the exact catalogue, pack and price terms.',
+      'Qualify retailer demand and answer product questions.',
+      'Close trackable orders without off-platform payment.',
+    ],
+    whoYouAre: [
+      'You have wholesale textile selling experience.',
+      'You maintain trusted retailer relationships.',
+    ],
+    niceToHave: ['Existing Surat textile-market accounts.'],
+    whyJoin: 'Sell a funded catalogue with transparent per-order earnings.',
+    cardColorToken: WorkOpportunityCardColorToken.magenta,
+    requiresWorkspace: true,
+    icon: Icons.sell_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
+  ),
+  WorkOpportunity(
+    id: 'bulk-sales-specialist',
+    publisher: 'RajTex Manufacturing',
+    publisherType: 'Verified manufacturer-owned posting',
+    posterType: WorkOpportunityPosterType.manufacturer,
+    title: 'Bulk Sales Specialist',
+    summary:
+        'Find institutional buyers and close funded bulk orders for a defined manufacturer range.',
+    qualificationHeadline: 'Institutional or bulk-selling track record',
+    kind: 'Freelance sales',
+    location: 'Boranada, Jodhpur · 342012',
+    city: 'Jodhpur',
+    area: 'Boranada',
+    pincode: '342012',
+    capacity: '10 funded bulk orders',
+    peopleNeeded: 10,
+    peopleJoined: 4,
+    applicationsInProgress: 2,
+    finalDeadline: '11 Sep 2026',
+    paymentAmount: '₹1,000 per verified bulk order',
+    monthlyPayment: 'Up to ₹10,000 monthly for 10 verified orders',
+    assignmentPayment: '₹1,000 per paid, non-refunded order',
+    payout: 'T+3 after the refund window',
+    requiredWork: 'Bulk sales freelancer',
+    deadline: 'Open while 10 funded orders remain',
+    fundingNote: 'Manufacturer funded · maximum task budget ₹10,000',
+    aboutRole:
+        'Develop institutional demand and close eligible high-volume orders for a verified manufacturer.',
+    whatYoullDo: [
+      'Identify buyers whose requirements match the defined range.',
+      'Explain quantity, lead-time and payment terms accurately.',
+      'Close attributable bulk orders through MoolSocial.',
+    ],
+    whoYouAre: [
+      'You have proven wholesale, institutional or bulk-selling experience.',
+      'You can manage longer B2B buying conversations.',
+    ],
+    niceToHave: [
+      'Hospitality, institutional procurement or distributor contacts.',
+    ],
+    whyJoin: 'Earn a clear amount for each accepted and settled bulk order.',
+    cardColorToken: WorkOpportunityCardColorToken.emerald,
+    requiresWorkspace: true,
+    icon: Icons.inventory_outlined,
+    filters: {
+      WorkFeedFilter.forYou,
+      WorkFeedFilter.freelance,
+      WorkFeedFilter.nearby,
+    },
   ),
 ];
 
@@ -260,25 +3614,25 @@ const workTerms = <WorkTerm>[
     id: 'payment',
     title: 'Payment and payout',
     detail:
-        '₹1,500 is reserved for one approved video. Payout releases within three working days after final approval.',
+        'Use the selected opportunity’s funded amount, monthly earning basis, optional hourly or assignment rate, and payout timing.',
   ),
   WorkTerm(
     id: 'publisher',
     title: 'What the publisher provides',
     detail:
-        'Campaign brief, approved facts, brand assets and submission instructions are provided after selection.',
+        'The selected opportunity states whether MoolSocial or a verified user posted and funded the requirement.',
   ),
   WorkTerm(
     id: 'review',
     title: 'Review, correction and rejection',
     detail:
-        'One correction is allowed. Copied media, hidden sponsorship, false claims or off-brief output may be rejected with a stated reason.',
+        'Acceptance follows the selected opportunity’s stated work and qualification requirements. A failed action remains retryable without changing application identity.',
   ),
   WorkTerm(
     id: 'rights',
     title: 'Content use and rights',
     detail:
-        'The approved campaign licence and usage period are stated before final acceptance. Ownership is not transferred beyond those terms.',
+        'Any content-specific usage, disclosure and rights requirements must be stated in the selected opportunity before application.',
   ),
 ];
 
@@ -288,9 +3642,11 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Grocery / Kirana Shop',
-    sellSide: 'Sell products to local customers',
-    buySide: 'Buy verified wholesale packs',
-    tools: 'Orders, stock, delivery and business book',
+    gstMatchCategory: WorkGstMatchCategory.retailGoodsSupplier,
+    sellSide:
+        'Grow a trusted neighbourhood store and serve more local customers.',
+    buySide: 'Source verified wholesale packs from eligible suppliers.',
+    tools: 'Run catalogue, stock, orders, delivery and business records.',
     icon: Icons.storefront_rounded,
   ),
   WorkProfileOption(
@@ -298,9 +3654,12 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Speciality Retail Shop',
-    sellSide: 'Sell category products',
-    buySide: 'Procure from eligible suppliers',
-    tools: 'Catalogue, stock, orders and invoices',
+    gstMatchCategory: WorkGstMatchCategory.retailGoodsSupplier,
+    sellSide:
+        'Showcase specialist products to customers searching by category.',
+    buySide:
+        'Build reliable supplier relationships and source with confidence.',
+    tools: 'Manage catalogue, inventory, orders, invoices and fulfilment.',
     icon: Icons.shopping_bag_outlined,
   ),
   WorkProfileOption(
@@ -308,9 +3667,11 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Wholesaler / Distributor',
-    sellSide: 'List case packs and trade terms',
-    buySide: 'Source from manufacturers',
-    tools: 'Business orders, credit and dispatch',
+    gstMatchCategory: WorkGstMatchCategory.wholesaleDistributor,
+    sellSide:
+        'Reach verified retailers with clear case packs, pricing and trade terms.',
+    buySide: 'Connect with manufacturers and strengthen your sourcing network.',
+    tools: 'Manage business orders, buyer terms, credit and dispatch.',
     icon: Icons.warehouse_outlined,
   ),
   WorkProfileOption(
@@ -318,9 +3679,11 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'products-trade',
     familyLabel: 'Products & Trade',
     label: 'Manufacturer / Supplier',
-    sellSide: 'Reach eligible trade buyers',
-    buySide: 'Source materials and services',
-    tools: 'Sales targets, distribution and fulfilment',
+    gstMatchCategory: WorkGstMatchCategory.manufacturerSupplier,
+    sellSide:
+        'Expand distribution by reaching eligible retailers and wholesalers.',
+    buySide: 'Source business materials and specialist services.',
+    tools: 'Track sales opportunities, distribution partners and fulfilment.',
     icon: Icons.factory_outlined,
   ),
   WorkProfileOption(
@@ -328,9 +3691,11 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'food-business',
     familyLabel: 'Food Business',
     label: 'Restaurant / Café',
-    sellSide: 'Serve delivery, pickup and tables',
-    buySide: 'Procure food and supplies',
-    tools: 'Menu, kitchen, orders and tables',
+    gstMatchCategory: WorkGstMatchCategory.foodServiceProvider,
+    sellSide:
+        'Welcome more diners through delivery, pickup and table bookings.',
+    buySide: 'Source ingredients, packaging and operating supplies.',
+    tools: 'Run menus, kitchen flow, orders, tables and customer service.',
     icon: Icons.restaurant_rounded,
   ),
   WorkProfileOption(
@@ -338,9 +3703,10 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'food-business',
     familyLabel: 'Food Business',
     label: 'Cloud Kitchen / Tiffin',
-    sellSide: 'Sell meals and subscriptions',
-    buySide: 'Procure ingredients and packaging',
-    tools: 'Menu, plans, delivery and kitchen',
+    gstMatchCategory: WorkGstMatchCategory.foodServiceProvider,
+    sellSide: 'Grow meal orders, tiffin plans and recurring subscriptions.',
+    buySide: 'Source ingredients and packaging from suitable suppliers.',
+    tools: 'Manage menus, meal plans, kitchen flow and delivery.',
     icon: Icons.soup_kitchen_outlined,
   ),
   WorkProfileOption(
@@ -348,9 +3714,11 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'health',
     familyLabel: 'Health & Medicine',
     label: 'Clinic / Doctor',
-    sellSide: 'Offer verified appointments',
-    buySide: 'Manage approved supplies',
-    tools: 'Appointments, consent and follow-up',
+    gstMatchCategory: WorkGstMatchCategory.healthcareProvider,
+    sellSide:
+        'Build a trusted patient presence and offer verified appointments.',
+    buySide: 'Organise eligible clinic and professional supplies.',
+    tools: 'Manage availability, consent, appointments and follow-up.',
     icon: Icons.medical_services_outlined,
   ),
   WorkProfileOption(
@@ -358,9 +3726,10 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'health',
     familyLabel: 'Health & Medicine',
     label: 'Pharmacy',
-    sellSide: 'Fulfil eligible medicine orders',
-    buySide: 'Procure from licensed suppliers',
-    tools: 'Prescription checks, stock and orders',
+    gstMatchCategory: WorkGstMatchCategory.pharmacySupplier,
+    sellSide: 'Serve eligible medicine orders with licensed fulfilment.',
+    buySide: 'Source medicines and products from licensed suppliers.',
+    tools: 'Manage prescription review, compliant stock and orders.',
     icon: Icons.local_pharmacy_outlined,
   ),
   WorkProfileOption(
@@ -368,39 +3737,88 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'services',
     familyLabel: 'Services & Salon',
     label: 'Salon / Wellness',
-    sellSide: 'Offer appointments and packages',
-    buySide: 'Procure professional products',
-    tools: 'Slots, staff, bills and repeat visits',
+    gstMatchCategory: WorkGstMatchCategory.personalCareProvider,
+    sellSide:
+        'Attract repeat customers with appointments, services and packages.',
+    buySide: 'Source professional products for your team and customers.',
+    tools: 'Manage schedules, staff, billing and repeat visits.',
     icon: Icons.content_cut_rounded,
   ),
   WorkProfileOption(
-    id: 'service-provider',
-    familyId: 'services',
-    familyLabel: 'Services & Salon',
-    label: 'Local Service Provider',
-    sellSide: 'Accept defined service tasks',
-    buySide: 'Source tools and supplies',
-    tools: 'Availability, proof, payout and support',
-    icon: Icons.handyman_outlined,
-  ),
-  WorkProfileOption(
-    id: 'captain',
-    familyId: 'ride',
-    familyLabel: 'Ride & Transport',
-    label: 'Ride / Delivery Captain',
-    sellSide: 'Accept eligible trips and routes',
-    buySide: 'Access vehicle services',
-    tools: 'Trips, safety, earnings and documents',
+    id: 'travel-bike-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Bike Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.bikeTravelProvider,
+    sellSide: 'Offer eligible passenger bike trips in your operating area.',
+    buySide: 'Find bike care and operating services.',
+    tools: 'Manage trip availability, safety, documents and earnings.',
     icon: Icons.two_wheeler_rounded,
   ),
   WorkProfileOption(
-    id: 'fleet',
-    familyId: 'ride',
-    familyLabel: 'Ride & Transport',
-    label: 'Fleet / Transport Business',
-    sellSide: 'Offer verified capacity',
-    buySide: 'Source routes and services',
-    tools: 'Vehicles, drivers, routes and settlement',
+    id: 'travel-auto-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Auto Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.autoTravelProvider,
+    sellSide: 'Offer eligible auto trips in your operating area.',
+    buySide: 'Find auto care and operating services.',
+    tools: 'Manage trip availability, safety, documents and earnings.',
+    icon: Icons.electric_rickshaw_outlined,
+  ),
+  WorkProfileOption(
+    id: 'travel-cab-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Cab Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.cabTravelProvider,
+    sellSide: 'Offer eligible cab trips in your operating area.',
+    buySide: 'Find cab care and operating services.',
+    tools: 'Manage trip availability, safety, documents and earnings.',
+    icon: Icons.local_taxi_outlined,
+  ),
+  WorkProfileOption(
+    id: 'travel-bus-provider',
+    familyId: 'travel',
+    familyLabel: 'Travel Partners',
+    label: 'Bus Travel Provider',
+    gstMatchCategory: WorkGstMatchCategory.busTravelProvider,
+    sellSide: 'Offer eligible passenger bus routes and service capacity.',
+    buySide: 'Find route and fleet operating services.',
+    tools: 'Manage buses, drivers, routes, safety and settlements.',
+    icon: Icons.directions_bus_outlined,
+  ),
+  WorkProfileOption(
+    id: 'quick-delivery-biker',
+    familyId: 'delivery',
+    familyLabel: 'Delivery & Logistics',
+    label: 'Quick Delivery Biker',
+    gstMatchCategory: WorkGstMatchCategory.quickDeliveryBiker,
+    sellSide: 'Accept eligible local quick-delivery assignments.',
+    buySide: 'Find bike care and delivery operating services.',
+    tools: 'Manage delivery availability, routes, proof and earnings.',
+    icon: Icons.delivery_dining_outlined,
+  ),
+  WorkProfileOption(
+    id: 'wholesale-fleet-delivery',
+    familyId: 'delivery',
+    familyLabel: 'Delivery & Logistics',
+    label: 'Wholesale Fleet Delivery',
+    gstMatchCategory: WorkGstMatchCategory.wholesaleFleetDelivery,
+    sellSide: 'Offer verified fleet capacity for wholesale deliveries.',
+    buySide: 'Find suitable wholesale routes and operating services.',
+    tools: 'Manage vehicles, drivers, wholesale routes and settlements.',
+    icon: Icons.local_shipping_outlined,
+  ),
+  WorkProfileOption(
+    id: 'bulk-delivery-fleet',
+    familyId: 'delivery',
+    familyLabel: 'Delivery & Logistics',
+    label: 'Bulk Delivery Fleet',
+    gstMatchCategory: WorkGstMatchCategory.bulkDeliveryFleet,
+    sellSide: 'Offer verified vehicle capacity for bulk deliveries.',
+    buySide: 'Find suitable bulk routes and operating services.',
+    tools: 'Manage vehicles, drivers, bulk routes and settlements.',
     icon: Icons.local_shipping_outlined,
   ),
   WorkProfileOption(
@@ -408,9 +3826,10 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'create-work',
     familyLabel: 'Create & Work',
     label: 'Creator',
-    sellSide: 'Complete funded creator campaigns',
-    buySide: 'Hire creator support services',
-    tools: 'YouTube Connect, campaigns and earnings',
+    gstMatchCategory: WorkGstMatchCategory.digitalContentProvider,
+    sellSide: 'Turn your audience and skills into paid brand opportunities.',
+    buySide: 'Find professional tools and creator support.',
+    tools: 'Manage channels, campaigns, deliverables and earnings.',
     icon: Icons.video_camera_front_outlined,
   ),
   WorkProfileOption(
@@ -418,9 +3837,10 @@ const workProfiles = <WorkProfileOption>[
     familyId: 'create-work',
     familyLabel: 'Create & Work',
     label: 'Freelancer / Job Seeker',
-    sellSide: 'Apply for funded work and roles',
-    buySide: 'Access professional services',
-    tools: 'Applications, proof, payout and profile',
+    gstMatchCategory: WorkGstMatchCategory.independentProfessional,
+    sellSide: 'Showcase your skills and pursue paid assignments and roles.',
+    buySide: 'Access professional services that support your work.',
+    tools: 'Manage applications, portfolio documents, payouts and profile.',
     icon: Icons.work_outline_rounded,
   ),
 ];
@@ -429,25 +3849,25 @@ const workProofs = <WorkProofRequirement>[
   WorkProofRequirement(
     id: 'personal-kyc',
     label: 'Personal identity',
-    detail: 'Verified account owner · already received',
-    required: true,
+    detail: 'Signed-in account identity · included with this application',
+    importance: WorkDocumentImportance.required,
   ),
   WorkProofRequirement(
     id: 'shop-front',
-    label: 'Shop or work-place proof',
-    detail: 'Clear current photo with the work name or operating location',
-    required: true,
+    label: 'Shop or workplace document',
+    detail: 'A clear current document showing the work name or location',
+    importance: WorkDocumentImportance.required,
   ),
   WorkProofRequirement(
     id: 'owner-authority',
     label: 'Owner or operator authority',
     detail: 'Registration, licence, bill or authorization showing your link',
-    required: true,
+    importance: WorkDocumentImportance.required,
   ),
   WorkProofRequirement(
     id: 'gst',
     label: 'GST certificate',
-    detail: 'Add now when applicable, or continue with a visible reminder',
-    required: false,
+    detail: 'Required when GST registration applies to this Workspace',
+    importance: WorkDocumentImportance.ifApplicable,
   ),
 ];

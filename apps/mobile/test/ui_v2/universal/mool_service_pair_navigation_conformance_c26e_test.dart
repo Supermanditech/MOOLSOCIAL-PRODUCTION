@@ -44,6 +44,25 @@ void main() {
     expect(find.byKey(const Key('eat-local-order')), findsOneWidget);
     expect(find.byKey(const Key('eat-local-table')), findsOneWidget);
     expect(find.byKey(const Key('eat-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('eat-global-profile')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('eat-global-profile')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    expect(
+      find.byKey(const Key('global-profile-context-food-table-discovery')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-food-table-discovery'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('eat-table-screen')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('eat-home-screen')), findsOneWidget);
 
     await _openFamily(tester, 'ride');
     _expectFixedRail(tester);
@@ -52,6 +71,35 @@ void main() {
       expect(find.byKey(Key('ride-local-$id')), findsOneWidget);
     }
     expect(find.byKey(const Key('ride-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('ride-global-profile')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('ride-global-profile')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('global-profile-context-travel-bus-discovery')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-travel-bus-discovery'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('bus-booking-home')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('travel-global-profile')));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('global-profile-context-travel-cab-discovery')),
+      findsOneWidget,
+    );
+    await tester.tap(
+      find.byKey(
+        const Key('global-profile-context-action-travel-cab-discovery'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('ride-local-navigation')), findsOneWidget);
 
     await tester.tap(find.byKey(const Key('mool-compact-launcher')));
     await tester.pumpAndSettle();
@@ -73,6 +121,7 @@ void main() {
     _expectFixedRail(tester);
     _expectActions(const ['bike', 'auto', 'cab', 'bus']);
     expect(find.byKey(const Key('travel-local-bus')), findsOneWidget);
+    expect(find.byKey(const Key('travel-global-profile')), findsOneWidget);
 
     await _openFamily(tester, 'eat');
     expect(find.byKey(const Key('eat-local-navigation')), findsOneWidget);

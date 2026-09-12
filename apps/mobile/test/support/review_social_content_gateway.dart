@@ -4,7 +4,13 @@ import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
 
 class ReviewSocialContentGateway
-    implements SocialContentGateway, SocialCommentGateway, SocialAuthorGateway {
+    implements
+        SocialContentGateway,
+        SocialCommentGateway,
+        SocialAuthorGateway,
+        SocialModerationGateway,
+        SocialSavedGateway,
+        SocialNotificationGateway {
   ReviewSocialContentGateway({DateTime Function()? now})
     : _now = now ?? DateTime.now;
 
@@ -16,6 +22,9 @@ class ReviewSocialContentGateway
   final Map<String, int> _followerCounts = {};
   int _sequence = 0;
   int _commentSequence = 0;
+  final List<(String, SocialReportReason, String)> reports = [];
+  final Set<String> readNotifications = {};
+  final Map<String, bool> blockedAuthors = {};
 
   String? get latestItemId => _items.firstOrNull?.id;
 
@@ -74,6 +83,47 @@ class ReviewSocialContentGateway
       items: List.unmodifiable(_items.sublist(offset, end)),
       nextCursor: end < _items.length ? '$end' : null,
     );
+  }
+
+  @override
+  Future<SocialFeedPage> saved({String? cursor, int limit = 20}) async {
+    final savedItems = _items.where((item) => item.saved).toList();
+    final offset = cursor == null ? 0 : int.tryParse(cursor) ?? 0;
+    final end = min(offset + limit, savedItems.length);
+    return SocialFeedPage(
+      items: List.unmodifiable(savedItems.sublist(offset, end)),
+      nextCursor: end < savedItems.length ? '$end' : null,
+    );
+  }
+
+  @override
+  Future<SocialNotificationPage> notifications({
+    String? cursor,
+    int limit = 30,
+  }) async {
+    if (_items.isEmpty || cursor != null) {
+      return const SocialNotificationPage(items: []);
+    }
+    final item = _items.first;
+    return SocialNotificationPage(
+      items: [
+        SocialNotificationItem(
+          id: 'TEST-NOTIFICATION-0001',
+          kind: SocialNotificationKind.reaction,
+          title: '${item.authorName} liked a post',
+          preview: item.body,
+          publishedAt: _now(),
+          read: readNotifications.contains('TEST-NOTIFICATION-0001'),
+          postId: item.id,
+          authorId: item.authorId,
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<void> markNotificationRead(String notificationId) async {
+    readNotifications.add(notificationId);
   }
 
   @override
@@ -188,6 +238,30 @@ class ReviewSocialContentGateway
       _followedAuthors[authorId] = followed;
     }
     return author(authorId: authorId, authenticated: true);
+  }
+
+  @override
+  Future<void> reportPost({
+    required String postId,
+    required SocialReportReason reason,
+    required String idempotencyKey,
+  }) async {
+    if (!_items.any((item) => item.id == postId)) throw _notFound();
+    if (!reports.any((entry) => entry.$3 == idempotencyKey)) {
+      reports.add((postId, reason, idempotencyKey));
+    }
+  }
+
+  @override
+  Future<bool> setAuthorBlocked({
+    required String authorId,
+    required bool blocked,
+  }) async {
+    if (!_items.any((item) => item.authorId == authorId)) {
+      throw _authorNotFound();
+    }
+    blockedAuthors[authorId] = blocked;
+    return blocked;
   }
 
   SocialPublishedItem _vote(SocialPublishedItem item, int? choiceIndex) {

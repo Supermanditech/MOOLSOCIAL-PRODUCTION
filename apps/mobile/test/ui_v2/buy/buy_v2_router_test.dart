@@ -71,7 +71,7 @@ void main() {
     await mountRoute(tester, '/app/buy/medicine');
 
     expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    expect(find.text('Search medicines and wellness'), findsOneWidget);
+    expect(find.text('Search medicines'), findsOneWidget);
     expect(find.byKey(const Key('buy-medicine-screen')), findsNothing);
   });
 
@@ -79,62 +79,24 @@ void main() {
     tester,
   ) async {
     await mountRoute(tester, '/app/buy?sub=wholesale');
-    expect(find.text('Search bulk products and suppliers'), findsOneWidget);
+    expect(find.text('Search bulk products'), findsOneWidget);
 
     await tapConnectedAction(tester, 'buy', 'orders');
     expect(find.text('PURCHASES'), findsOneWidget);
     expect(find.text('Orders'), findsWidgets);
   });
 
-  testWidgets('Buy account owner opens from a destination without losing V2', (
+  testWidgets('Offers deep link restores the exact Offers catalogue', (
     tester,
   ) async {
-    await mountRoute(tester, '/app/buy?sub=wholesale');
-    expect(find.text('Search bulk products and suppliers'), findsOneWidget);
+    await mountRoute(tester, '/app/buy?sub=offers');
 
-    await tester.tap(find.byKey(const Key('buy-open-account')));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(const Key('buy-account-hub')), findsOneWidget);
-    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
-    expect(find.text('Search bulk products and suppliers'), findsOneWidget);
-  });
-
-  testWidgets('Buy account is reachable from tertiary purchase states', (
-    tester,
-  ) async {
-    for (final route in const [
-      '/app/buy/product/s-rice',
-      '/app/buy/order/MS-240782',
-      '/app/buy/order/MS-240782/problem',
-    ]) {
-      await mountRoute(tester, route);
-      expect(
-        find.byKey(const Key('buy-open-account')),
-        findsOneWidget,
-        reason: route,
-      );
-
-      await tester.tap(find.byKey(const Key('buy-open-account')));
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('buy-account-hub')),
-        findsOneWidget,
-        reason: route,
-      );
-
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(
-        find.byKey(const Key('buy-v2-screen')),
-        findsOneWidget,
-        reason: route,
-      );
-    }
+    expect(find.byKey(const PageStorageKey('buy-offers')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-offers-publisher-summary')),
+      findsOneWidget,
+    );
+    expect(find.text('Search current offers'), findsOneWidget);
   });
 
   testWidgets('Screen 04 Mool Buy action opens only the native Buy V2', (
@@ -185,8 +147,25 @@ void main() {
     (tester) async {
       await mountRoute(tester, '/app/buy/product/missing-product');
 
-      expect(find.text('This product could not be found.'), findsOneWidget);
+      expect(find.byKey(const Key('buy-linked-product-recovery')), findsOneWidget);
+      expect(find.text('Product unavailable'), findsOneWidget);
+      expect(
+        find.text(
+          'This product could not be opened. Try again or return to shopping.',
+        ),
+        findsOneWidget,
+      );
       expect(find.byKey(const Key('buy-product-detail')), findsNothing);
+      await tester.tap(find.byKey(const Key('buy-catalogue-retry')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('buy-linked-product-recovery')), findsOneWidget);
+      expect(find.byKey(const Key('buy-product-detail')), findsNothing);
+      await tester.tap(find.byKey(const Key('buy-procurement-return')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('buy-linked-product-recovery')), findsNothing);
+      expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+      expect(find.byKey(const Key('buy-product-detail')), findsNothing);
+      expect(tester.takeException(), isNull);
 
       await mountRoute(tester, '/app/buy/order/missing-order');
 

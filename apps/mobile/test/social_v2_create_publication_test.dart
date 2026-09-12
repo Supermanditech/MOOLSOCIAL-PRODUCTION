@@ -11,15 +11,129 @@ import 'package:moolsocial/features/shared/shared_models.dart';
 import 'package:moolsocial/features/shared/shared_services.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
 import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/shared/social_create_draft_repository.dart';
 import 'package:moolsocial/features/shared/social_media_picker.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_create_workbench.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_public_content.dart';
+import 'package:share_plus/share_plus.dart';
 
 import 'support/review_social_content_gateway.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  const shareOrigin = Rect.fromLTWH(12, 24, 180, 44);
+  final shareRequest = SocialV2ShareRequest(
+    uri: Uri.https('moolsocial.com', '/app/social', {
+      'sub': 'feed',
+      'item': 'post-1',
+    }),
+    title: 'Share MoolSocial post',
+    subject: 'MoolSocial post',
+    sharePositionOrigin: shareOrigin,
+  );
+
+  test(
+    'native share gateway forwards exact safe URI and presentation',
+    () async {
+      ShareParams? captured;
+      final gateway = SocialV2PlatformShareGateway(
+        invoker: (params) async {
+          captured = params;
+          return const ShareResult('target.app', ShareResultStatus.success);
+        },
+      );
+
+      final outcome = await gateway.share(shareRequest);
+
+      expect(outcome, SocialV2ShareOutcome.selected);
+      expect(captured?.uri, shareRequest.uri);
+      expect(captured?.title, 'Share MoolSocial post');
+      expect(captured?.subject, 'MoolSocial post');
+      expect(captured?.sharePositionOrigin, shareOrigin);
+      expect(captured?.downloadFallbackEnabled, isFalse);
+      expect(captured?.mailToFallbackEnabled, isFalse);
+      expect(captured?.text, isNull);
+      expect(captured?.files, isNull);
+    },
+  );
+
+  test(
+    'native share gateway preserves dismissed and unavailable truth',
+    () async {
+      final dismissed = SocialV2PlatformShareGateway(
+        invoker: (_) async =>
+            const ShareResult('', ShareResultStatus.dismissed),
+      );
+      final unavailable = SocialV2PlatformShareGateway(
+        invoker: (_) async => ShareResult.unavailable,
+      );
+      final failed = SocialV2PlatformShareGateway(
+        invoker: (_) => throw StateError('platform share failed'),
+      );
+
+      expect(
+        await dismissed.share(shareRequest),
+        SocialV2ShareOutcome.dismissed,
+      );
+      expect(
+        await unavailable.share(shareRequest),
+        SocialV2ShareOutcome.unavailable,
+      );
+      expect(
+        await failed.share(shareRequest),
+        SocialV2ShareOutcome.unavailable,
+      );
+    },
+  );
+
+  test(
+    'native share gateway rejects unsafe input before platform egress',
+    () async {
+      var calls = 0;
+      final gateway = SocialV2PlatformShareGateway(
+        invoker: (_) async {
+          calls += 1;
+          return const ShareResult('target.app', ShareResultStatus.success);
+        },
+      );
+
+      final result = await gateway.share(
+        SocialV2ShareRequest(
+          uri: Uri.parse('http://moolsocial.com/app/social?item=post-1'),
+          title: 'Share MoolSocial post',
+          sharePositionOrigin: shareOrigin,
+        ),
+      );
+
+      expect(result, SocialV2ShareOutcome.unavailable);
+      expect(calls, 0);
+    },
+  );
+
+  test(
+    'native share gateway contains duplicate taps with one operation',
+    () async {
+      var calls = 0;
+      final result = Completer<ShareResult>();
+      final gateway = SocialV2PlatformShareGateway(
+        invoker: (_) {
+          calls += 1;
+          return result.future;
+        },
+      );
+
+      final first = gateway.share(shareRequest);
+      final second = gateway.share(shareRequest);
+      expect(identical(first, second), isTrue);
+      expect(calls, 1);
+
+      result.complete(const ShareResult('', ShareResultStatus.dismissed));
+      expect(await first, SocialV2ShareOutcome.dismissed);
+      expect(await second, SocialV2ShareOutcome.dismissed);
+    },
+  );
 
   test('Feed published time uses the authoritative provider timestamp', () {
     final now = DateTime.utc(2026, 8, 13, 12);
@@ -281,14 +395,11 @@ void main() {
       owners.shared.socialPublishedItems.single.body,
       'Jodhpur makers meet this Saturday.',
     );
-    final post = find.byKey(
-      Key('social-public-post-${owners.shared.socialPublishedItems.single.id}'),
+    expect(
+      find.byKey(const Key('screen04-feed-post-cta-after-timeline')),
+      findsNothing,
     );
-    final postCta = find.byKey(
-      const Key('screen04-feed-post-cta-after-timeline'),
-    );
-    expect(postCta, findsOneWidget);
-    expect(tester.getTopLeft(post).dy, lessThan(tester.getTopLeft(postCta).dy));
+    expect(find.byKey(const Key('screen04-rail-create')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -357,7 +468,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Feed renders real public posts before its post CTA', (
+  testWidgets('Feed renders real public posts without a repeated Create CTA', (
     tester,
   ) async {
     final owners = _Owners();
@@ -379,14 +490,14 @@ void main() {
     await _pump(tester, owners.consumer(sub: 'feed'));
 
     final post = find.byKey(Key('social-public-post-${publicPost.id}'));
-    final postCta = find.byKey(
-      const Key('screen04-feed-post-cta-after-timeline'),
-    );
     expect(post, findsOneWidget);
     expect(find.text('Riya Sharma'), findsOneWidget);
-    expect(postCta, findsOneWidget);
-    expect(tester.getTopLeft(post).dy, lessThan(tester.getTopLeft(postCta).dy));
-    expect(find.byKey(const Key('screen04-feed-create-post')), findsOneWidget);
+    expect(
+      find.byKey(const Key('screen04-feed-post-cta-after-timeline')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('screen04-feed-create-post')), findsNothing);
+    expect(find.byKey(const Key('screen04-rail-create')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -443,6 +554,110 @@ void main() {
       'https://moolsocial.com/app/social?sub=feed&item=${publicPost.id}',
     );
     expect(find.text('Post link copied'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Feed opens native share with the exact stable public URL', (
+    tester,
+  ) async {
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final publicPost = await owners.socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'native-share-public-post-1',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'Share this public post through the phone.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await owners.shared.loadSocialFeed(refresh: true);
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.dismissed,
+    );
+
+    await _pump(
+      tester,
+      owners.consumer(sub: 'feed', shareGateway: shareGateway),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-public-share-${publicPost.id}')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('social-share-other-apps')), findsOneWidget);
+    expect(find.byKey(const Key('social-copy-post-link')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('social-share-other-apps')));
+    await tester.pumpAndSettle();
+
+    expect(shareGateway.calls, 1);
+    expect(
+      shareGateway.request?.uri,
+      Uri.parse(
+        'https://moolsocial.com/app/social?sub=feed&item=${publicPost.id}',
+      ),
+    );
+    expect(shareGateway.request?.title, 'Share MoolSocial post');
+    expect(shareGateway.request?.subject, 'MoolSocial post');
+    expect(shareGateway.request?.sharePositionOrigin.isFinite, isTrue);
+    expect(shareGateway.request?.sharePositionOrigin.width, greaterThan(0));
+    expect(shareGateway.request?.sharePositionOrigin.height, greaterThan(0));
+    expect(find.byKey(const Key('social-share-other-apps')), findsNothing);
+    expect(find.text('Post link copied'), findsNothing);
+    expect(find.text('Shared'), findsNothing);
+    expect(
+      find.byKey(Key('social-public-post-${publicPost.id}')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Feed share failure keeps Copy link as a truthful recovery', (
+    tester,
+  ) async {
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final publicPost = await owners.socialGateway.publish(
+      const SocialPublishDraft(
+        idempotencyKey: 'native-share-unavailable-post-1',
+        type: SocialPublishedContentType.post,
+        authorName: 'Riya Sharma',
+        authorHandle: '@riyasharma',
+        body: 'Keep the public link recoverable.',
+        audience: 'Public',
+        mediaPaths: <String>[],
+        mediaAreAssets: false,
+        choices: <SocialPublishedChoice>[],
+      ),
+    );
+    await owners.shared.loadSocialFeed(refresh: true);
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.unavailable,
+    );
+
+    await _pump(
+      tester,
+      owners.consumer(sub: 'feed', shareGateway: shareGateway),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(Key('social-public-share-${publicPost.id}')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('social-share-other-apps')));
+    await tester.pumpAndSettle();
+
+    expect(
+      find.text(
+        'Sharing is unavailable right now. You can copy the link instead.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('Shared'), findsNothing);
+    await tester.tap(find.byKey(Key('social-public-share-${publicPost.id}')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('social-copy-post-link')), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -1019,7 +1234,7 @@ void main() {
       'Keep this production draft.',
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-image')));
+    await _tapCreateTool(tester, 'screen04-create-tool-image');
     await tester.pumpAndSettle();
 
     expect(
@@ -1036,7 +1251,7 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Create applies a newer explicit tool route in place', (
+  testWidgets('dirty Create rejects a conflicting explicit tool route', (
     tester,
   ) async {
     final owners = _Owners();
@@ -1052,8 +1267,9 @@ void main() {
 
     expect(
       find.byKey(const Key('screen04-create-quiz-choice-0')),
-      findsOneWidget,
+      findsNothing,
     );
+    expect(find.text('New text post'), findsOneWidget);
     expect(
       tester
           .widget<TextField>(find.byKey(const Key('screen04-create-post-text')))
@@ -1130,9 +1346,14 @@ void main() {
     await _pump(tester, owners.consumer(sub: 'create'));
 
     final workbench = find.byKey(const Key('screen04-create-workbench'));
+    final writing = find.byKey(const Key('screen04-create-writing-canvas'));
+    final formatWorkspace = find.byKey(
+      const ValueKey('screen04-create-post-workbench'),
+    );
     expect(workbench, findsOneWidget);
     for (final key in const [
       'screen04-create-tool-image',
+      'screen04-create-tool-camera',
       'screen04-create-tool-carousel',
       'screen04-create-tool-image-poll',
       'screen04-create-tool-quick-poll',
@@ -1146,21 +1367,42 @@ void main() {
       findsNothing,
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-image')));
+    await _tapCreateTool(tester, 'screen04-create-tool-image');
     await tester.pumpAndSettle();
     expect(workbench, findsOneWidget);
     expect(find.text('market.png'), findsNothing);
+    expect(owners.picker.lastImageSource, SocialMediaSource.gallery);
+    expect(
+      tester.getTopLeft(formatWorkspace).dy,
+      lessThan(tester.getTopLeft(writing).dy),
+    );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-carousel')));
+    await _tapCreateTool(tester, 'screen04-create-tool-camera');
+    await tester.pumpAndSettle();
+    expect(owners.picker.lastImageSource, SocialMediaSource.camera);
+    expect(
+      tester.getTopLeft(formatWorkspace).dy,
+      lessThan(tester.getTopLeft(writing).dy),
+    );
+
+    await _tapCreateTool(tester, 'screen04-create-tool-carousel');
     await tester.pumpAndSettle();
     expect(workbench, findsOneWidget);
     expect(find.text('2 / 10 photos'), findsOneWidget);
+    expect(
+      tester.getTopLeft(formatWorkspace).dy,
+      lessThan(tester.getTopLeft(writing).dy),
+    );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-post')));
+    await _tapCreateTool(tester, 'screen04-create-tool-post');
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-create-post-text')), findsOneWidget);
+    expect(
+      tester.getTopLeft(writing).dy,
+      lessThan(tester.getTopLeft(formatWorkspace).dy),
+    );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-image-poll')));
+    await _tapCreateTool(tester, 'screen04-create-tool-image-poll');
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-create-image-poll-choice-0')),
@@ -1171,7 +1413,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-quick-poll')));
+    await _tapCreateTool(tester, 'screen04-create-tool-quick-poll');
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-create-quick-poll-choice-0')),
@@ -1182,7 +1424,7 @@ void main() {
       findsOneWidget,
     );
 
-    await tester.tap(find.byKey(const Key('screen04-create-tool-quiz')));
+    await _tapCreateTool(tester, 'screen04-create-tool-quiz');
     await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-create-quiz-choice-0')),
@@ -1223,9 +1465,11 @@ void main() {
           find.byKey(const Key('social-v2-create-workbench')),
           findsNothing,
         );
-        final create = find.byKey(const Key('screen04-feed-create-post'));
-        await tester.ensureVisible(create);
-        await tester.tap(create);
+        expect(
+          find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+          findsOneWidget,
+        );
+        await tester.tap(find.byKey(const Key('screen04-rail-create')));
         await tester.pumpAndSettle();
         expect(
           find.byKey(const Key('social-v2-create-workbench')),
@@ -1240,7 +1484,7 @@ void main() {
       await leaveAndReturn();
       expect(find.text('Keep this unfinished public draft.'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-image')));
+      await _tapCreateTool(tester, 'screen04-create-tool-image');
       await tester.pumpAndSettle();
       expect(find.text('New image post'), findsOneWidget);
       expect(find.byType(SocialMediaPreviewV2), findsOneWidget);
@@ -1248,18 +1492,16 @@ void main() {
       expect(find.text('New image post'), findsOneWidget);
       expect(find.byType(SocialMediaPreviewV2), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-carousel')));
+      await _tapCreateTool(tester, 'screen04-create-tool-carousel');
       await tester.pumpAndSettle();
       expect(find.text('2 / 10 photos'), findsOneWidget);
       await leaveAndReturn();
       expect(find.text('New carousel'), findsOneWidget);
       expect(find.text('2 / 10 photos'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-post')));
+      await _tapCreateTool(tester, 'screen04-create-tool-post');
       await tester.pumpAndSettle();
-      await tester.tap(
-        find.byKey(const Key('screen04-create-tool-image-poll')),
-      );
+      await _tapCreateTool(tester, 'screen04-create-tool-image-poll');
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('screen04-create-image-poll-choice-0')),
@@ -1274,9 +1516,7 @@ void main() {
       expect(find.text('Blue basket'), findsOneWidget);
       expect(find.byType(SocialMediaPreviewV2), findsOneWidget);
 
-      await tester.tap(
-        find.byKey(const Key('screen04-create-tool-quick-poll')),
-      );
+      await _tapCreateTool(tester, 'screen04-create-tool-quick-poll');
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('screen04-create-quick-poll-choice-1')),
@@ -1286,7 +1526,7 @@ void main() {
       expect(find.text('New quick poll'), findsOneWidget);
       expect(find.text('Tomorrow morning'), findsOneWidget);
 
-      await tester.tap(find.byKey(const Key('screen04-create-tool-quiz')));
+      await _tapCreateTool(tester, 'screen04-create-tool-quiz');
       await tester.pumpAndSettle();
       await tester.enterText(
         find.byKey(const Key('screen04-create-quiz-choice-2')),
@@ -1327,10 +1567,10 @@ void main() {
       );
 
       expect(tester.testTextInput.isVisible, isFalse);
-      await tester.tap(find.byKey(const Key('screen04-create-youtube-short')));
+      await _tapCreateTool(tester, 'screen04-create-youtube-short');
       await tester.pump();
       expect(youtubeCalls, 1);
-      await tester.tap(find.byKey(const Key('screen04-create-tool-quiz')));
+      await _tapCreateTool(tester, 'screen04-create-tool-quiz');
       await tester.pumpAndSettle();
       expect(
         find.byKey(const Key('screen04-create-quiz-choice-3')),
@@ -1465,6 +1705,13 @@ Future<void> _pump(WidgetTester tester, Widget child) async {
   await tester.pump();
 }
 
+Future<void> _tapCreateTool(WidgetTester tester, String key) async {
+  final tool = find.byKey(Key(key));
+  await tester.ensureVisible(tool);
+  await tester.pump();
+  await tester.tap(tool);
+}
+
 class _Owners {
   _Owners({JourneySession? journey}) : journey = journey ?? JourneySession() {
     this.journey.emailAddress = 'asha.sharma@moolsocial.in';
@@ -1472,6 +1719,7 @@ class _Owners {
       gateway: _ImmediateSharedGateway(),
       socialContentGateway: socialGateway,
     );
+    unawaited(draftCache.configureDurability(_PublicationDraftRepository()));
   }
 
   final JourneySession journey;
@@ -1480,24 +1728,68 @@ class _Owners {
   final socialGateway = ReviewSocialContentGateway();
   late final SharedSession shared;
   final picker = _FakeSocialMediaPicker();
+  final draftCache = SocialCreateDraftStateCache();
 
-  SocialUniversalV2 consumer({String? sub, String? state, String? item}) =>
-      SocialUniversalV2(
-        session: journey,
-        creatorSession: creator,
-        retailerSession: retailer,
-        sharedSession: shared,
-        mediaPicker: picker,
-        initialSubAction: sub,
-        initialState: state,
-        initialItem: item,
-      );
+  SocialUniversalV2 consumer({
+    String? sub,
+    String? state,
+    String? item,
+    SocialV2ShareGateway? shareGateway,
+  }) => SocialUniversalV2(
+    session: journey,
+    creatorSession: creator,
+    retailerSession: retailer,
+    sharedSession: shared,
+    mediaPicker: picker,
+    createDraftStateCache: draftCache,
+    initialSubAction: sub,
+    initialState: state,
+    initialItem: item,
+    shareGateway: shareGateway,
+  );
 
   void dispose() {
     journey.dispose();
     creator.dispose();
     retailer.dispose();
     shared.dispose();
+  }
+}
+
+class _RecordingShareGateway implements SocialV2ShareGateway {
+  _RecordingShareGateway({required this.outcome});
+
+  final SocialV2ShareOutcome outcome;
+  int calls = 0;
+  SocialV2ShareRequest? request;
+
+  @override
+  Future<SocialV2ShareOutcome> share(SocialV2ShareRequest value) async {
+    calls += 1;
+    request = value;
+    return outcome;
+  }
+}
+
+final class _PublicationDraftRepository implements SocialCreateDraftRepository {
+  SocialCreateDraftSnapshot? snapshot;
+
+  @override
+  Future<SocialCreateDraftRead> read() async => SocialCreateDraftRead(
+    freshness: snapshot == null
+        ? SocialCreateDraftFreshness.missing
+        : SocialCreateDraftFreshness.fresh,
+    snapshot: snapshot,
+  );
+
+  @override
+  Future<void> write(SocialCreateDraftSnapshot value) async {
+    snapshot = value;
+  }
+
+  @override
+  Future<void> clear() async {
+    snapshot = null;
   }
 }
 
@@ -1680,14 +1972,17 @@ class _FakeSocialMediaPicker implements SocialMediaPicker {
     kind: SocialMediaKind.video,
     isAsset: true,
   );
+  SocialMediaSource? lastImageSource;
 
   @override
   Future<List<SocialPickedMedia>> pickCarousel({int limit = 10}) async =>
       const [_image, _image];
 
   @override
-  Future<SocialPickedMedia?> pickImage(SocialMediaSource source) async =>
-      _image;
+  Future<SocialPickedMedia?> pickImage(SocialMediaSource source) async {
+    lastImageSource = source;
+    return _image;
+  }
 
   @override
   Future<SocialPickedMedia?> pickReel(SocialMediaSource source) async => _reel;

@@ -7,7 +7,9 @@ param(
   [string]$RepositoryRoot,
   [string]$ApkAnalyzerPath,
   [string]$ProguardFolderPath,
-  [switch]$RequireMappingAware
+  [switch]$RequireMappingAware,
+  [string]$ExpectedApplicationId = 'com.moolsocial.app',
+  [switch]$AllowDebugTestPlugin
 )
 
 Set-StrictMode -Version Latest
@@ -111,6 +113,7 @@ $packageText = $packageOutput -join "`n"
 $required = @(
   'io.flutter.plugins.GeneratedPluginRegistrant',
   'io.flutter.plugins.firebase.core.FlutterFirebaseCorePlugin',
+  'dev.fluttercommunity.plus.share.SharePlusPlugin',
   'com.moolsocial.app.MainActivity'
 )
 foreach ($className in $required) {
@@ -118,12 +121,14 @@ foreach ($className in $required) {
     throw "APK integrity gate rejected: required class is missing: $className"
   }
 }
-foreach ($forbidden in @(
-  'dev.flutter.plugins.integration_test.IntegrationTestPlugin',
-  'dev.flutter.plugins.integration_test'
-)) {
-  if ($packageText.Contains($forbidden)) {
-    throw "APK integrity gate rejected: test-only class is present: $forbidden"
+if (-not $AllowDebugTestPlugin) {
+  foreach ($forbidden in @(
+    'dev.flutter.plugins.integration_test.IntegrationTestPlugin',
+    'dev.flutter.plugins.integration_test'
+  )) {
+    if ($packageText.Contains($forbidden)) {
+      throw "APK integrity gate rejected: test-only class is present: $forbidden"
+    }
   }
 }
 
@@ -132,14 +137,28 @@ $applicationIdExit = $LASTEXITCODE
 if ($applicationIdExit -ne 0) {
   throw 'APK integrity gate rejected: manifest identity inspection failed.'
 }
-$applicationId = ($applicationIdOutput -join '').Trim()
-if ($applicationId -cne 'com.moolsocial.app') {
+$applicationIdCandidates = @(
+  $applicationIdOutput | ForEach-Object { ([string]$_).Trim() } |
+    Where-Object {
+      $_ -cmatch '^[A-Za-z][A-Za-z0-9_]*(?:[.][A-Za-z0-9_]+)+$'
+    } | Select-Object -Unique
+)
+if ($applicationIdCandidates.Count -ne 1) {
+  throw 'APK integrity gate rejected: manifest identity output is ambiguous.'
+}
+$applicationId = [string]$applicationIdCandidates[0]
+if ($applicationId -cne $ExpectedApplicationId) {
   throw 'APK integrity gate rejected: package identity changed.'
+}
+$integrationTestState = if ($AllowDebugTestPlugin) {
+  'allowed_debug_only'
+} else {
+  'absent'
 }
 
 Write-Output (
   'APK production plugin integrity passed: ' +
   "candidate=$CandidateId; package=$applicationId; " +
   "mappingAware=$($mappingAware.ToString().ToLowerInvariant()); " +
-  'registrant=true; firebaseCore=true; integrationTest=false.'
+  "registrant=true; firebaseCore=true; sharePlus=true; integrationTest=$integrationTestState."
 )

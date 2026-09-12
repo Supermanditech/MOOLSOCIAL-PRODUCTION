@@ -260,6 +260,9 @@ class _SocialYouTubeConnectV2ScreenState
                 controller: _url,
                 keyboardType: TextInputType.url,
                 autocorrect: false,
+                scrollPadding: socialV2InputScrollPadding,
+                textInputAction: TextInputAction.done,
+                onEditingComplete: () => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(
                   labelText: 'YouTube video or Short link',
                   hintText: 'youtube.com/watch?v=…',
@@ -387,16 +390,24 @@ class _SocialYouTubeConnectV2ScreenState
           },
         ),
         TextFormField(
+          key: const Key('social-v2-youtube-reference'),
           initialValue: session.youtubeReference,
+          scrollPadding: socialV2InputScrollPadding,
+          textInputAction: TextInputAction.next,
+          onEditingComplete: () => FocusScope.of(context).nextFocus(),
           decoration: const InputDecoration(
             labelText: 'Product, service or work',
           ),
           onChanged: session.setYouTubeReference,
         ),
         TextField(
+          key: const Key('social-v2-youtube-context'),
           controller: _context,
           minLines: 3,
           maxLines: 5,
+          scrollPadding: socialV2InputScrollPadding,
+          textInputAction: TextInputAction.done,
+          onEditingComplete: () => FocusScope.of(context).unfocus(),
           decoration: const InputDecoration(
             labelText: 'What the viewer can do next',
           ),

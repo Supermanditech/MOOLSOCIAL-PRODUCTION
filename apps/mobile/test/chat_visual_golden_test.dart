@@ -52,7 +52,9 @@ void main() {
     ]) {
       expect(find.byKey(retiredAction), findsNothing);
     }
-    await expectLater(find.byType(Scaffold).first, matchesGoldenFile(golden));
+    final owner = find.byKey(const Key('chat-page-surface'));
+    expect(owner, findsOneWidget);
+    await expectLater(owner, matchesGoldenFile(golden));
   }
 
   final screens = <(String, String, String, ChatGateway Function())>[

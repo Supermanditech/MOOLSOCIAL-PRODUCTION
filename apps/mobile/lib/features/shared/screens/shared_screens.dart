@@ -6,18 +6,24 @@ import '../../../../core/design/mool_theme.dart';
 import '../../../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../shared_models.dart';
 import '../shared_session.dart';
+import '../../work/work_services.dart';
+import '../../work/screens/work_onboarding_screens.dart';
 
 class SharedHubScreen extends StatefulWidget {
   const SharedHubScreen({
     required this.session,
     required this.screen,
     this.initialItemId,
+    this.onSignOut,
+    this.filePicker,
     super.key,
   });
 
   final SharedSession session;
   final int screen;
   final String? initialItemId;
+  final Future<void> Function()? onSignOut;
+  final WorkProofPicker? filePicker;
 
   @override
   State<SharedHubScreen> createState() => _SharedHubScreenState();
@@ -25,6 +31,21 @@ class SharedHubScreen extends StatefulWidget {
 
 class _SharedHubScreenState extends State<SharedHubScreen> {
   bool openedInitialItem = false;
+  bool _pickingFile = false;
+  String? _fileError;
+  final _filesScroll = ScrollController();
+
+  @override
+  void dispose() {
+    _filesScroll.dispose();
+    super.dispose();
+  }
+
+  void _showFileError(String message) {
+    if (!mounted) return;
+    setState(() => _fileError = message);
+    if (_filesScroll.hasClients) _filesScroll.jumpTo(0);
+  }
 
   SharedScreenSpec get spec => sharedScreenSpec(widget.screen);
 
@@ -52,44 +73,68 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
         key: Key('shared-screen-${spec.screen}'),
         backgroundColor: MoolColors.canvas,
         appBar: AppBar(
+          toolbarHeight: spec.screen == 160
+              ? (MediaQuery.textScalerOf(context).scale(20) * 1.3 + 16).clamp(
+                  kToolbarHeight,
+                  double.infinity,
+                )
+              : null,
           leading: IconButton(
             key: Key('shared-${spec.screen}-back'),
             tooltip: 'Back',
-            onPressed: () => context.go(
-              spec.screen == 162 ? '/app/social' : '/app/account/workspaces',
-            ),
+            onPressed: () {
+              if (spec.screen == 160 && context.canPop()) {
+                context.pop();
+                return;
+              }
+              context.go(
+                spec.screen == 162 ? '/app/social' : '/app/account/workspaces',
+              );
+            },
             icon: const Icon(Icons.arrow_back_ios_new_rounded),
           ),
           titleSpacing: 0,
-          title: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                spec.title,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.navy,
-                  fontWeight: FontWeight.w900,
+          title: spec.screen == 160
+              ? Text(
+                  spec.title,
+                  key: const Key('shared-files-title'),
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                  ),
+                )
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      spec.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    Text(
+                      spec.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: MoolColors.muted,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-              Text(
-                spec.subtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: MoolColors.muted,
-                  fontSize: 10,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
           actions: [
             if (spec.topAction != null)
               TextButton.icon(
                 key: Key('shared-${spec.screen}-top-action'),
-                onPressed: widget.session.busy ? null : _topAction,
+                onPressed: widget.session.busy || _pickingFile
+                    ? null
+                    : _topAction,
                 icon: Icon(
                   spec.topAction == 'Scan'
                       ? Icons.qr_code_scanner_rounded
@@ -122,6 +167,7 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
           ],
         ),
         body: ListView(
+          controller: spec.screen == 160 ? _filesScroll : null,
           key: Key('shared-${spec.screen}-list'),
           padding: const EdgeInsets.fromLTRB(
             MoolSpacing.md,
@@ -130,6 +176,11 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
             MoolSpacing.xl,
           ),
           children: [
+            if (spec.screen == 160 && _fileError != null)
+              Semantics(
+                liveRegion: true,
+                child: Text(_fileError!, key: const Key('shared-file-error')),
+              ),
             _SharedHero(spec: spec),
             const SizedBox(height: MoolSpacing.sm),
             MoolLocalNavigationRail(
@@ -269,6 +320,15 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
                 if (index < items.length - 1)
                   const SizedBox(height: MoolSpacing.sm),
               ],
+            if (spec.screen == 161 && widget.onSignOut != null) ...[
+              const SizedBox(height: MoolSpacing.lg),
+              OutlinedButton.icon(
+                key: const Key('shared-161-sign-out'),
+                onPressed: widget.session.busy ? null : _confirmSignOut,
+                icon: const Icon(Icons.logout_rounded),
+                label: const Text('Sign out of MoolSocial'),
+              ),
+            ],
           ],
         ),
       );
@@ -282,6 +342,31 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
         queryParameters: {'return': _routeForScreen(spec.screen)},
       ).toString(),
     );
+  }
+
+  Future<void> _confirmSignOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Sign out of MoolSocial?'),
+        content: const Text(
+          'Your language and serviceable area will stay saved on this device.',
+        ),
+        actions: [
+          TextButton(
+            key: const Key('shared-161-cancel-sign-out'),
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Stay signed in'),
+          ),
+          FilledButton(
+            key: const Key('shared-161-confirm-sign-out'),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Sign out'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true && mounted) await widget.onSignOut?.call();
   }
 
   Future<void> _openItem(SharedItem item) {
@@ -317,63 +402,123 @@ class _SharedHubScreenState extends State<SharedHubScreen> {
   }
 
   Future<void> _addFileSheet() {
+    final systemBottom = MediaQuery.viewPaddingOf(context).bottom;
+    FocusManager.instance.primaryFocus?.unfocus();
     return showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       showDragHandle: true,
-      builder: (sheetContext) => SingleChildScrollView(
-        key: const Key('shared-file-add-sheet'),
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.lg,
-          0,
-          MoolSpacing.lg,
-          MoolSpacing.lg,
+      builder: (sheetContext) => SafeArea(
+        top: false,
+        minimum: EdgeInsets.only(
+          bottom: MediaQuery.viewInsetsOf(sheetContext).bottom > 0
+              ? 0
+              : systemBottom,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            const Text(
-              'Add a secure file',
-              style: TextStyle(
-                color: MoolColors.navy,
-                fontSize: 23,
-                fontWeight: FontWeight.w900,
+        child: SingleChildScrollView(
+          key: const Key('shared-file-add-sheet'),
+          padding: EdgeInsets.fromLTRB(
+            MoolSpacing.lg,
+            0,
+            MoolSpacing.lg,
+            MoolSpacing.lg + MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Choose a file',
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 23,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
-            const Text(
-              'Purpose, access and retention are shown before sharing.',
-              style: TextStyle(color: MoolColors.muted),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            for (final choice in const [
-              ('camera', 'Camera', Icons.photo_camera_outlined),
-              ('scan', 'Scan document', Icons.document_scanner_outlined),
-              ('gallery', 'Gallery', Icons.photo_library_outlined),
-              ('file', 'Choose file', Icons.attach_file_rounded),
-            ])
-              ListTile(
-                key: Key('shared-file-add-${choice.$1}'),
-                leading: Icon(choice.$3),
-                title: Text(choice.$2),
-                trailing: const Icon(Icons.chevron_right_rounded),
-                onTap: () {
-                  widget.session.completeLocal(
-                    '${choice.$2} opened. No file was shared.',
-                  );
-                  Navigator.pop(sheetContext);
-                },
+              const Text(
+                'Preview only. Nothing is uploaded or shared. PDF, JPG, PNG or WebP · up to 10 MB.',
+                style: TextStyle(color: MoolColors.muted),
               ),
-            TextButton(
-              key: const Key('shared-file-add-cancel'),
-              onPressed: () => Navigator.pop(sheetContext),
-              child: const Text('Cancel'),
-            ),
-          ],
+              const SizedBox(height: MoolSpacing.md),
+              for (final choice in const [
+                ('camera', 'Camera', Icons.photo_camera_outlined),
+                (
+                  'scan',
+                  'Photograph document',
+                  Icons.document_scanner_outlined,
+                ),
+                ('gallery', 'Gallery', Icons.photo_library_outlined),
+                ('file', 'Choose file', Icons.attach_file_rounded),
+              ])
+                ListTile(
+                  key: Key('shared-file-add-${choice.$1}'),
+                  contentPadding: EdgeInsets.zero,
+                  minLeadingWidth: 24,
+                  horizontalTitleGap: 12,
+                  leading: Icon(choice.$3),
+                  title: Text(choice.$2),
+                  onTap: () {
+                    Navigator.pop(sheetContext);
+                    _pickLocalFile(switch (choice.$1) {
+                      'camera' || 'scan' => WorkProofSource.camera,
+                      'gallery' => WorkProofSource.gallery,
+                      _ => WorkProofSource.upload,
+                    });
+                  },
+                ),
+              TextButton(
+                key: const Key('shared-file-add-cancel'),
+                onPressed: () => Navigator.pop(sheetContext),
+                child: const Text('Cancel'),
+              ),
+            ],
+          ),
         ),
       ),
     );
+  }
+
+  Future<void> _pickLocalFile(WorkProofSource source) async {
+    if (_pickingFile) return;
+    setState(() {
+      _pickingFile = true;
+      _fileError = null;
+    });
+    try {
+      final file = await (widget.filePicker ?? NativeWorkProofPicker()).pick(
+        source,
+      );
+      if (!mounted || file == null) return;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        builder: (sheetContext) => SafeArea(
+          top: false,
+          child: SizedBox(
+            height: MediaQuery.sizeOf(sheetContext).height * .75,
+            child: WorkDocumentPreview(
+              label: 'Local preview · not uploaded or shared',
+              file: file,
+              onClose: () => Navigator.pop(sheetContext),
+              onReplace: () {
+                Navigator.pop(sheetContext);
+                _addFileSheet();
+              },
+            ),
+          ),
+        ),
+      );
+    } on WorkGatewayException catch (error) {
+      _showFileError(error.message);
+    } catch (_) {
+      _showFileError(
+        'Could not open the file. Try again. Nothing was uploaded or shared.',
+      );
+    } finally {
+      if (mounted) setState(() => _pickingFile = false);
+    }
   }
 
   Future<void> _permissionRecovery(String permission) {

@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "installed_exact_checksum_device_review_pending",
+  "buildAuthorization": "consumed",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md"
+  },
+  "candidate": {
+    "id": "UAW-CODEX-OPPO-R66.10-REVIEW-20260908",
+    "versionName": "1.0.0-r66.10",
+    "versionCode": 2026090805,
+    "buildMode": "debug",
+    "gateProfile": "uaw_runtime_ui_review_debug",
+    "branch": "work/codex-ui/codex-oppo-review-v1-20260905",
+    "head": "7a12f127c09798f8fd208de8a92837c6956058af"
+  },
+  "source": {
+    "manifestPath": "artifacts/quality/codex-oppo-r66-10-review-20260908/source-manifest.txt",
+    "manifestSha256": "057E24CF2F0259DBE46E3363D2627990ACD5A409DD9769F417A7A9E40F6F0B5F",
+    "fileCount": 381
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CODEX-OPPO-R66.10-REVIEW-20260908"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/source-manifest.txt"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/local-validation.md"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/local-validation.md"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/candidate-contract.md"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/candidate-contract.md"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/local-validation.md"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/local-validation.md"
+      ]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md"
+      ]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": [
+        "artifacts/quality/codex-oppo-r66-10-review-20260908/prebuild-validation.md"
+      ]
+    }
+  ],
+  "premiumMotionPolicy": {
+    "state": "locally_verified_oppo_replay_pending",
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "candidateContract": "artifacts/quality/codex-oppo-r66-10-review-20260908/candidate-contract.md",
+    "disposition": "artifacts/quality/codex-oppo-r66-10-review-20260908/motion-disposition.md",
+    "applied": [
+      "Work_progress_selection_and_completion_finite_transitions",
+      "truthful_acceptance_deadline_with_original_ten_minute_target",
+      "Store_dashboard_and_first_tap_blue_white_finish",
+      "confirmed_value_and_state_finite_transitions",
+      "stable_geometry_reduced_motion_and_background_catchup"
+    ],
+    "reused": [
+      "native_pressed_feedback",
+      "reduced_motion_static_resolution"
+    ],
+    "dependencyHeld": [
+      "native_OPPO_performance_and_founder_acceptance",
+      "authoritative_admin_order_rider_payment_events"
+    ],
+    "inapplicable": [
+      "fabricated_live_activity_and_perpetual_decorative_blinking"
+    ]
+  },
+  "postBuildGates": [
+    {
+      "id": "apk-integrity",
+      "state": "passed",
+      "evidence": "artifacts/quality/codex-oppo-r66-10-review-20260908/uaw-codex-oppo-r66.10-review-20260908-build-provenance.txt"
+    },
+    {
+      "id": "oppo-install",
+      "state": "passed",
+      "evidence": "artifacts/quality/codex-oppo-r66-10-review-20260908/post-install.json"
+    },
+    {
+      "id": "oppo-real-user-review",
+      "state": "pending",
+      "evidence": "artifacts/quality/codex-oppo-r66-10-review-20260908/device-review.md"
+    },
+    {
+      "id": "founder-review",
+      "state": "pending"
+    }
+  ]
+}

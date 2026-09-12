@@ -1,5 +1,7 @@
 param(
-  [switch]$SkipFlutter
+  [switch]$SkipFlutter,
+  [switch]$AllowReviewedExistingRuntime,
+  [switch]$ProviderOnlyC30M
 )
 
 Set-StrictMode -Version Latest
@@ -14,9 +16,11 @@ foreach ($deploymentScript in @(
   "check-youtube-private-dev-preflight.ps1",
   "check-youtube-private-dev-security-prerequisites.ps1",
   "contain-youtube-private-dev.ps1",
+  "deploy-youtube-provider-c30m.ps1",
   "deploy-youtube-private-dev.ps1",
   "prepare-youtube-private-dev-runtime.ps1",
   "test-youtube-private-dev-deployment-controls.ps1",
+  "test-youtube-provider-c30m-deployment-controls.ps1",
   "youtube-private-dev-control-common.ps1",
   "verify-youtube-private-dev-deployment.ps1"
 )) {
@@ -36,12 +40,11 @@ foreach ($deploymentScript in @(
   }
 }
 
-if (
-  Test-Path -LiteralPath (
-    Join-Path $repoRoot `
-      "backend/functions/.env.moolsocial-dev-503018"
-  ) -PathType Leaf
-) {
+$ignoredRuntimeExists = Test-Path -LiteralPath (
+  Join-Path $repoRoot `
+    "backend/functions/.env.moolsocial-dev-503018"
+) -PathType Leaf
+if (-not $AllowReviewedExistingRuntime -and $ignoredRuntimeExists) {
   throw (
     "The ignored Firebase runtime environment exists before packaging. " +
     "Review its ownership and remove it before any deployment workflow."
@@ -62,17 +65,19 @@ function Invoke-Checked {
   }
 }
 
-Invoke-Checked {
-  powershell -NoProfile -ExecutionPolicy Bypass `
-    -File (Join-Path $PSScriptRoot `
-      "test-youtube-private-dev-deployment-controls.ps1")
-} "Private Dev deployment-control tests failed."
+if (-not $ProviderOnlyC30M) {
+  Invoke-Checked {
+    powershell -NoProfile -ExecutionPolicy Bypass `
+      -File (Join-Path $PSScriptRoot `
+        "test-youtube-private-dev-deployment-controls.ps1")
+  } "Private Dev deployment-control tests failed."
 
-Invoke-Checked {
-  powershell -NoProfile -ExecutionPolicy Bypass `
-    -File (Join-Path $PSScriptRoot `
-      "check-youtube-private-dev-preflight.ps1")
-} "Private Dev repository preflight failed."
+  Invoke-Checked {
+    powershell -NoProfile -ExecutionPolicy Bypass `
+      -File (Join-Path $PSScriptRoot `
+        "check-youtube-private-dev-preflight.ps1")
+  } "Private Dev repository preflight failed."
+}
 
 Invoke-Checked {
   powershell -NoProfile -ExecutionPolicy Bypass `
@@ -115,9 +120,10 @@ if (-not $SkipFlutter) {
 }
 
 Invoke-Checked {
-  powershell -NoProfile -ExecutionPolicy Bypass `
-    -File (Join-Path $PSScriptRoot `
-      "check-youtube-private-dev-content.ps1")
+  & (Join-Path $PSScriptRoot `
+    "check-youtube-private-dev-content.ps1") `
+    -AllowReviewedExistingRuntime:$AllowReviewedExistingRuntime `
+    -ProviderOnlyC30M:$ProviderOnlyC30M
 } "Tracked and untracked package-content verification failed."
 
 Invoke-Checked {
@@ -138,9 +144,11 @@ Invoke-Checked {
     scripts/check-youtube-private-dev-security-prerequisites.ps1 `
     scripts/activate-youtube-private-dev-proof.ps1 `
     scripts/contain-youtube-private-dev.ps1 `
+    scripts/deploy-youtube-provider-c30m.ps1 `
     scripts/deploy-youtube-private-dev.ps1 `
     scripts/prepare-youtube-private-dev-runtime.ps1 `
     scripts/test-youtube-private-dev-deployment-controls.ps1 `
+    scripts/test-youtube-provider-c30m-deployment-controls.ps1 `
     scripts/youtube-private-dev-control-common.ps1 `
     scripts/verify-youtube-private-dev-deployment.ps1
 } "Whitespace or patch-integrity verification failed."

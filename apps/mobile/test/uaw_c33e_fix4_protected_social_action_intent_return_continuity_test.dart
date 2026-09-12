@@ -337,5 +337,5 @@ SocialPublishedItem _poll() => SocialPublishedItem(
     SocialPublishedChoice(label: 'World'),
     SocialPublishedChoice(label: 'Business'),
   ],
-  closesAt: DateTime.utc(2026, 8, 22),
+  closesAt: DateTime.utc(2100, 1, 1),
 );

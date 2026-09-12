@@ -1,0 +1,24 @@
+{
+  "schema": "moolsocial_ticket_founder_acceptance_v1",
+  "state": "approved",
+  "approvedAtDate": "2026-08-29",
+  "ticketId": "UAW-CURSOR-UI-SHOP-LOCATION-ADDRESS-V1-20260828",
+  "buildTicketId": "UAW-INTEGRATION-REPAIR-SHOP-LOCATION-ADDRESS-R61-6-CURSOR-REVIEW-BUILD-CHILD9-20260828",
+  "candidateId": "UAW-SHOP-LOCATION-ADDRESS-R61.6-CURSOR-UI-REVIEW-20260828",
+  "sourceHead": "fd19fd4adb4ffa5a14552154f661506ed33fdb2e",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r61.6-cursorreview",
+  "versionCode": "2026082808",
+  "apkSha256": "66C6F44F592688C9B14839BCA4D1F961E38DA0DDF530626E83958DDA8CB198F5",
+  "device": "Redmi TG8HCYTGGQT885OF",
+  "approvalMessage": "APPROVED FOLLOW GIT DISCIPLINE THEN I WILL GIVE NEW TICKETS",
+  "approvedScope": [
+    "Shop location chooser",
+    "Home and Work selection and editing",
+    "Request an address",
+    "Add address and validation recovery",
+    "Shop selected and pressed navigation feedback",
+    "shared global profile and exact Back recovery"
+  ],
+  "nextShopDestinationStarted": false
+}

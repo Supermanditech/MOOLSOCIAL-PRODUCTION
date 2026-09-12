@@ -300,7 +300,7 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
         const SocialV2ListTile(
           icon: Icons.video_library_outlined,
           title: 'Choose what you create',
-          detail: 'Reels, posts, carousels or provider-hosted video',
+          detail: 'Reels, posts, carousels or video on a connected service',
           badge: '2',
         ),
         const SocialV2ListTile(
@@ -675,7 +675,7 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
         _MetricGrid(
           values: [
             ('MoolSocial reach', values.$1, 'Eligible Social impressions'),
-            ('External reach', values.$2, 'Connected-provider reports'),
+            ('External reach', values.$2, 'Connected account reports'),
             ('Delivered orders', values.$3, 'Returns removed'),
             ('Payable', values.$4, 'Attributable delivered orders'),
           ],
@@ -719,7 +719,7 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
           ),
         ),
         const SocialV2Notice(
-          title: 'Provider metrics explain content performance',
+          title: 'Connected account insights explain content performance',
           detail:
               'MoolSocial order-line attribution controls creator commission.',
         ),
@@ -954,9 +954,13 @@ class _CreatorSocialV2ScreenState extends State<CreatorSocialV2Screen> {
       subtitle: 'Explain the evidence clearly',
       children: [
         TextField(
+          key: const Key('social-creator-appeal-input'),
           controller: controller,
           minLines: 3,
           maxLines: 6,
+          scrollPadding: socialV2InputScrollPadding,
+          textInputAction: TextInputAction.done,
+          onEditingComplete: () => FocusScope.of(context).unfocus(),
           decoration: const InputDecoration(
             labelText: 'Evidence and explanation',
           ),
@@ -1274,15 +1278,23 @@ class _PublishComposerState extends State<_PublishComposer> {
                   detail: 'Ready for title, caption and destination',
                 ),
               TextField(
+                key: const Key('social-creator-publish-title'),
                 controller: _title,
+                scrollPadding: socialV2InputScrollPadding,
+                textInputAction: TextInputAction.next,
+                onEditingComplete: () => FocusScope.of(context).nextFocus(),
                 decoration: const InputDecoration(labelText: 'Title'),
                 onChanged: session.setPostTitle,
               ),
               const SizedBox(height: 9),
               TextField(
+                key: const Key('social-creator-publish-caption'),
                 controller: _caption,
                 minLines: 3,
                 maxLines: 6,
+                scrollPadding: socialV2InputScrollPadding,
+                textInputAction: TextInputAction.done,
+                onEditingComplete: () => FocusScope.of(context).unfocus(),
                 decoration: const InputDecoration(labelText: 'Caption'),
                 onChanged: session.setPostCaption,
               ),

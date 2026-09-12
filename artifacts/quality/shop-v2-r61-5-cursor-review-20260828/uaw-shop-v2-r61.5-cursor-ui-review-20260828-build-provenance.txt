@@ -1,0 +1,15 @@
+CandidateId=UAW-SHOP-V2-R61.5-CURSOR-UI-REVIEW-20260828
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-SHOP-V2-R61.5-CURSOR-UI-REVIEW-20260828;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r61.5
+VersionCode=2026082807
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828\config\apk-regression-gate-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828\config\apk-regression-gate-state.json
+Branch=work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828
+HEAD=6958d34479f8cab6ae3a24c52035f845a436a0d5
+SourceFingerprint=AB8B3459934451659A066E481F54297C0FA40E0D482393FA4058E0A9A3E8A2A1
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828\artifacts\quality\shop-v2-r61-5-cursor-review-20260828\uaw-shop-v2-r61.5-cursor-ui-review-20260828-device-review-debug.apk
+Bytes=206411291
+SHA256=A71A229D14106DE671C42EF0D0A30F882203932E04193155A7EE99E429CAE9A4
+BuiltAt=2026-08-28T23:27:14.6597511+05:30

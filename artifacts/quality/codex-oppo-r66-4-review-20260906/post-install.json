@@ -1,0 +1,22 @@
+{
+  "candidate": "UAW-CODEX-OPPO-R66.4-REVIEW-20260906",
+  "sourceHead": "541597205dddbc3d3e9b51120f53b3530d5d68a6",
+  "serial": "2b3e0f71",
+  "model": "CPH2375",
+  "package": "com.moolsocial.app.runtime",
+  "versionCode": 2026090603,
+  "versionName": "1.0.0-r66.4-runtime",
+  "install": "update_install_r_no_clear_no_uninstall",
+  "installedSha256": "0DB0897FD8C35F1E69D73FA98752D5E04652F101C98F94221D96B0B500C21256",
+  "localSha256": "0DB0897FD8C35F1E69D73FA98752D5E04652F101C98F94221D96B0B500C21256",
+  "apkBytes": 209514197,
+  "verifiedUtc": "2026-09-06T07:05:01.5535795Z",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "coldLaunch": "passed; MainActivity;6396ms",
+  "startupNavigation": "Shop > Mool > Work > Workspace; native rendering confirmed",
+  "leftOn": "Grow with MoolSocial / Workspace selection",
+  "fontScale": 1,
+  "deviceJourneys": "startup_and_workspace_entry_only; comprehensive_child_replay_pending",
+  "founderAppearance": "pending",
+  "backendQualification": "not_claimed_review_gateway"
+}

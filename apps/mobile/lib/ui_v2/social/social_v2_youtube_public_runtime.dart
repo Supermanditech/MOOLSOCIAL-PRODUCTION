@@ -1,6 +1,7 @@
 import '../../core/youtube/youtube_private_dev_client.dart';
 import '../../core/youtube/youtube_private_dev_models.dart';
 import '../../core/youtube/youtube_private_dev_transport.dart';
+import '../../features/shared/youtube_public_catalogue_repository.dart';
 
 const screen04YouTubeRegionCode = 'IN';
 const screen04YouTubeShortMaximumSeconds = 180;
@@ -91,8 +92,30 @@ class Screen04YouTubePublicVideo {
   final String? channelViewCount;
 }
 
+class Screen04YouTubePublicChannelCatalogue {
+  const Screen04YouTubePublicChannelCatalogue({
+    required this.channel,
+    required this.videos,
+  });
+
+  final YouTubePublicChannelDetails channel;
+  final List<Screen04YouTubePublicVideo> videos;
+}
+
 final screen04YouTubeCatalogueSnapshots =
     Screen04YouTubeCatalogueSnapshotStore();
+
+final class Screen04YouTubeCatalogueHydrationResult {
+  const Screen04YouTubeCatalogueHydrationResult({
+    required this.videosReadSucceeded,
+    required this.shortsReadSucceeded,
+  });
+
+  final bool videosReadSucceeded;
+  final bool shortsReadSucceeded;
+
+  bool get degraded => !videosReadSucceeded || !shortsReadSucceeded;
+}
 
 class Screen04YouTubeCatalogueSnapshotStore {
   Screen04YouTubeCatalogueSnapshotStore({
@@ -104,17 +127,154 @@ class Screen04YouTubeCatalogueSnapshotStore {
   final DateTime Function() _now;
   _Screen04YouTubeCatalogueSnapshot? _videos;
   _Screen04YouTubeCatalogueSnapshot? _shorts;
+  YouTubePublicCatalogueRepository? _durableRepository;
+  Future<void> _durableMutationTail = Future<void>.value();
+  int _durabilityGeneration = 0;
+  int _videosMutationGeneration = 0;
+  int _shortsMutationGeneration = 0;
 
   List<Screen04YouTubePublicVideo>? readFreshVideos() => _readFresh(_videos);
 
   List<Screen04YouTubePublicVideo>? readFreshShorts() => _readFresh(_shorts);
 
+  List<Screen04YouTubePublicVideo>? readVideos() => _videos?.items;
+
+  List<Screen04YouTubePublicVideo>? readShorts() => _shorts?.items;
+
+  bool get videosAreFresh => _readFresh(_videos) != null;
+
+  bool get shortsAreFresh => _readFresh(_shorts) != null;
+
+  Future<Screen04YouTubeCatalogueHydrationResult> configureDurability(
+    YouTubePublicCatalogueRepository repository,
+  ) async {
+    _durableRepository = repository;
+    final generation = ++_durabilityGeneration;
+    final reads = await Future.wait<bool>([
+      _hydrateKind(
+        repository,
+        YouTubePublicCatalogueKind.videos,
+        generation,
+        _videosMutationGeneration,
+      ),
+      _hydrateKind(
+        repository,
+        YouTubePublicCatalogueKind.shorts,
+        generation,
+        _shortsMutationGeneration,
+      ),
+    ]);
+    return Screen04YouTubeCatalogueHydrationResult(
+      videosReadSucceeded: reads[0],
+      shortsReadSucceeded: reads[1],
+    );
+  }
+
+  Future<void> settleDurableWrites() => _durableMutationTail;
+
   void replaceVideos(List<Screen04YouTubePublicVideo> videos) {
+    _videosMutationGeneration += 1;
     _videos = _capture(videos);
+    _persist(YouTubePublicCatalogueKind.videos, videos);
   }
 
   void replaceShorts(List<Screen04YouTubePublicVideo> shorts) {
+    _shortsMutationGeneration += 1;
     _shorts = _capture(shorts);
+    _persist(YouTubePublicCatalogueKind.shorts, shorts);
+  }
+
+  Future<bool> _hydrateKind(
+    YouTubePublicCatalogueRepository repository,
+    YouTubePublicCatalogueKind kind,
+    int generation,
+    int mutationGeneration,
+  ) async {
+    YouTubePublicCatalogueRead read;
+    try {
+      read = await repository.read(kind);
+    } on Object {
+      return false;
+    }
+    if (generation != _durabilityGeneration ||
+        !identical(repository, _durableRepository) ||
+        mutationGeneration != _mutationGenerationFor(kind)) {
+      return true;
+    }
+    final snapshot = read.snapshot;
+    if (snapshot == null) {
+      _restore(kind, null);
+      return true;
+    }
+    if (snapshot.kind != kind ||
+        (read.freshness != YouTubeCatalogueFreshness.fresh &&
+            read.freshness != YouTubeCatalogueFreshness.stale) ||
+        snapshot.items.any(
+          (item) => !_isDurableItemEligibleForKind(kind, item),
+        )) {
+      _restore(kind, null);
+      try {
+        await repository.clear(kind);
+      } on Object {
+        // An invalid public cache remains unavailable even if cleanup fails.
+        return false;
+      }
+      return true;
+    }
+    _restore(
+      kind,
+      _Screen04YouTubeCatalogueSnapshot(
+        items: List<Screen04YouTubePublicVideo>.unmodifiable(
+          snapshot.items.map(mapYouTubePublicCatalogueItemToScreen04Video),
+        ),
+        capturedAt: snapshot.capturedAtUtc,
+      ),
+    );
+    return true;
+  }
+
+  int _mutationGenerationFor(YouTubePublicCatalogueKind kind) => switch (kind) {
+    YouTubePublicCatalogueKind.videos => _videosMutationGeneration,
+    YouTubePublicCatalogueKind.shorts => _shortsMutationGeneration,
+  };
+
+  void _persist(
+    YouTubePublicCatalogueKind kind,
+    List<Screen04YouTubePublicVideo> items,
+  ) {
+    final repository = _durableRepository;
+    if (repository == null) return;
+    late final Future<void> mutation;
+    try {
+      mutation = repository.replace(
+        kind,
+        items
+            .map(mapScreen04VideoToYouTubePublicCatalogueItem)
+            .toList(growable: false),
+      );
+    } on Object {
+      return;
+    }
+    final observedMutation = mutation.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _durableMutationTail = Future.wait<void>([
+      _durableMutationTail,
+      observedMutation,
+    ]).then<void>((_) {});
+  }
+
+  void _restore(
+    YouTubePublicCatalogueKind kind,
+    _Screen04YouTubeCatalogueSnapshot? snapshot,
+  ) {
+    switch (kind) {
+      case YouTubePublicCatalogueKind.videos:
+        _videos = snapshot;
+      case YouTubePublicCatalogueKind.shorts:
+        _shorts = snapshot;
+    }
   }
 
   _Screen04YouTubeCatalogueSnapshot _capture(
@@ -132,6 +292,78 @@ class Screen04YouTubeCatalogueSnapshotStore {
     if (age.isNegative || age > timeToLive) return null;
     return snapshot.items;
   }
+}
+
+YouTubePublicCatalogueItem mapScreen04VideoToYouTubePublicCatalogueItem(
+  Screen04YouTubePublicVideo video,
+) => YouTubePublicCatalogueItem(
+  videoId: video.videoId,
+  title: video.title,
+  channelId: video.channelId,
+  channelTitle: video.channelTitle,
+  description: video.description,
+  thumbnailUrl: video.thumbnailUrl,
+  publishedAt: video.publishedAt,
+  duration: video.duration,
+  captionAvailable: video.captionAvailable,
+  viewCount: video.viewCount,
+  likeCount: video.likeCount,
+  commentCount: video.commentCount,
+  embeddable: video.embeddable,
+  hasKnownDeviceRegionExclusion: video.hasKnownDeviceRegionExclusion,
+  hashtags: video.hashtags,
+  channelDescription: video.channelDescription,
+  channelThumbnailUrl: video.channelThumbnailUrl,
+  subscriberCount: video.subscriberCount,
+  channelVideoCount: video.channelVideoCount,
+  channelViewCount: video.channelViewCount,
+);
+
+Screen04YouTubePublicVideo mapYouTubePublicCatalogueItemToScreen04Video(
+  YouTubePublicCatalogueItem item,
+) => Screen04YouTubePublicVideo(
+  videoId: item.videoId,
+  title: item.title,
+  channelId: item.channelId,
+  channelTitle: item.channelTitle,
+  description: item.description,
+  thumbnailUrl: item.thumbnailUrl,
+  publishedAt: item.publishedAt,
+  duration: item.duration,
+  captionAvailable: item.captionAvailable,
+  viewCount: item.viewCount,
+  likeCount: item.likeCount,
+  commentCount: item.commentCount,
+  embeddable: item.embeddable,
+  hasKnownDeviceRegionExclusion: item.hasKnownDeviceRegionExclusion,
+  hashtags: item.hashtags,
+  channelDescription: item.channelDescription,
+  channelThumbnailUrl: item.channelThumbnailUrl,
+  subscriberCount: item.subscriberCount,
+  channelVideoCount: item.channelVideoCount,
+  channelViewCount: item.channelViewCount,
+);
+
+bool _isDurableItemEligibleForKind(
+  YouTubePublicCatalogueKind kind,
+  YouTubePublicCatalogueItem item,
+) {
+  if (!item.embeddable || item.hasKnownDeviceRegionExclusion) return false;
+  if (kind == YouTubePublicCatalogueKind.videos) return true;
+  final durationSeconds = screen04YouTubeDurationSeconds(item.duration);
+  if (durationSeconds == null ||
+      durationSeconds <= 0 ||
+      durationSeconds > screen04YouTubeShortMaximumSeconds) {
+    return false;
+  }
+  final declaration = <String>[
+    item.title,
+    item.description,
+    ...item.hashtags,
+  ].join(' ').toLowerCase();
+  return RegExp(
+    r'(^|[^a-z0-9])#?(?:youtube\s*)?shorts?(?=$|[^a-z0-9])',
+  ).hasMatch(declaration);
 }
 
 class _Screen04YouTubeCatalogueSnapshot {
@@ -245,12 +477,69 @@ Future<List<Screen04YouTubePublicVideo>> loadScreen04YouTubePublicSearch(
       throw StateError('Public YouTube search is unavailable.');
     }
 
-    final page = await client.search(query: submittedQuery);
-    return page.items
-        .where(_isEligiblePublicVideo)
-        .take(screen04YouTubeCatalogueTarget)
-        .map(mapScreen04YouTubePublicVideo)
+    final eligible = await collectScreen04YouTubeCatalogue(
+      loadPage: (pageToken) =>
+          client.search(query: submittedQuery, pageToken: pageToken),
+      isEligible: _isEligiblePublicVideo,
+    );
+    final channels = <String, YouTubePublicChannelDetails>{};
+    for (final item in eligible) {
+      if (channels.containsKey(item.channelId)) continue;
+      try {
+        channels[item.channelId] = await client.channelDetails(
+          channelId: item.channelId,
+        );
+      } on Object {
+        // Search remains usable when optional public channel enrichment fails.
+      }
+    }
+    return eligible
+        .map(
+          (item) => mapScreen04YouTubePublicVideo(
+            item,
+            channel: channels[item.channelId],
+          ),
+        )
         .toList(growable: false);
+  } finally {
+    transport.close(force: true);
+  }
+}
+
+Future<Screen04YouTubePublicChannelCatalogue>
+loadScreen04YouTubePublicChannelCatalogue(String channelId) async {
+  final selectedChannelId = channelId.trim();
+  if (selectedChannelId.isEmpty) {
+    throw ArgumentError.value(channelId, 'channelId', 'must not be empty');
+  }
+
+  final transport = IoYouTubeHttpTransport();
+  try {
+    final client = YouTubePrivateDevClient.fromBuildConfiguration(
+      transport: transport,
+    );
+    final capabilities = await client.capabilities();
+    if (!capabilities.publicData) {
+      throw StateError('Public YouTube channel viewing is unavailable.');
+    }
+    final channel = await client.channelDetails(channelId: selectedChannelId);
+    final uploadsPlaylistId = channel.uploadsPlaylistId?.trim();
+    if (uploadsPlaylistId == null || uploadsPlaylistId.isEmpty) {
+      throw StateError('This channel has no public uploads catalogue.');
+    }
+    final eligible = await collectScreen04YouTubeCatalogue(
+      loadPage: (pageToken) =>
+          client.playlist(playlistId: uploadsPlaylistId, pageToken: pageToken),
+      isEligible: _isEligiblePublicVideo,
+    );
+    return Screen04YouTubePublicChannelCatalogue(
+      channel: channel,
+      videos: List<Screen04YouTubePublicVideo>.unmodifiable(
+        eligible.map(
+          (video) => mapScreen04YouTubePublicVideo(video, channel: channel),
+        ),
+      ),
+    );
   } finally {
     transport.close(force: true);
   }

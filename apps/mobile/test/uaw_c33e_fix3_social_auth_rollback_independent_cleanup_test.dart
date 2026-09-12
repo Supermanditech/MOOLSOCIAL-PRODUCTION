@@ -95,6 +95,8 @@ void main() {
           session.errorMessage,
           contains('account service is unavailable'),
         );
+        expect(session.errorMessage, contains('could not be cleared safely'));
+        expect(session.errorMessage, contains('close and reopen'));
         expect(session.errorMessage, isNot(contains('cleanup')));
       },
     );

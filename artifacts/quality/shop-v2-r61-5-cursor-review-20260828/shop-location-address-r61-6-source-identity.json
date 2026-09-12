@@ -1,0 +1,20 @@
+{
+  "state": "founder_approved_device_qualified",
+  "candidateId": "UAW-SHOP-LOCATION-ADDRESS-R61.6-CURSOR-UI-REVIEW-20260828",
+  "branch": "work/integration-repair/shop-address-r61-6-build-c9-20260828",
+  "head": "fd19fd4adb4ffa5a14552154f661506ed33fdb2e",
+  "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/shop-location-address-r61-6-source-manifest.txt",
+  "manifestSha256": "A99577653849E0121FA1924383FEEB0F256E480DC31A744CF1B6802B0B472CEF",
+  "manifestFiles": 636,
+  "focusedTestsPassed": 142,
+  "intentionalSkips": 3,
+  "analysis": "clean",
+  "runtimeProfile": "CursorUiReview",
+  "package": "com.moolsocial.app.cursorreview",
+  "device": "TG8HCYTGGQT885OF",
+  "firebaseStartup": "bypassed_ui_review_only",
+  "apkBytes": 206412691,
+  "apkSha256": "66C6F44F592688C9B14839BCA4D1F961E38DA0DDF530626E83958DDA8CB198F5",
+  "installedByteIdentical": true,
+  "founderApproval": "approved"
+}

@@ -1237,7 +1237,7 @@ class _IntentEntryCard extends StatelessWidget {
               final productionRoute = switch ((spec.section, spec.id)) {
                 ('buy', 'grocery') ||
                 ('buy', 'categories') => '/app/buy/grocery',
-                ('buy', 'medicine') => '/app/buy/medicine',
+                ('book', 'medicine') => '/app/book/medicine',
                 ('buy', 'basket') => '/app/buy/basket',
                 ('eat', 'order-food') => '/app/eat/order',
                 ('eat', 'book-table') => '/app/eat/table',
@@ -2104,7 +2104,7 @@ Future<void> _showPermissionRecovery(
 String _routeForQuery(String value) {
   final query = value.toLowerCase();
   if (query.contains('medicine') || query.contains('pharmacy')) {
-    return '/app/buy/medicine';
+    return '/app/book/medicine';
   }
   if (query.contains('basket')) return '/app/buy?sub=basket';
   if (query.contains('grocery')) return '/app/buy?sub=grocery';
@@ -2500,15 +2500,26 @@ Future<void> _showProfile(BuildContext context, JourneySession session) {
                   ),
                 ),
                 const SizedBox(height: 8),
-                const ListTile(
+                ListTile(
+                  key: const Key('profile-authenticated-identity'),
                   contentPadding: EdgeInsets.zero,
-                  leading: CircleAvatar(
+                  leading: const CircleAvatar(
                     backgroundColor: MoolColors.navy,
                     foregroundColor: Colors.white,
                     child: Icon(Icons.person_rounded),
                   ),
-                  title: Text('MoolSocial member'),
-                  subtitle: Text('Your purchases, bookings and work stay here'),
+                  title: Text(
+                    session.accountIdentity?.primaryLabel ??
+                        (session.isAuthenticated
+                            ? 'MoolSocial member'
+                            : 'MoolSocial guest'),
+                  ),
+                  subtitle: Text(
+                    session.accountIdentity?.detailLabel ??
+                        (session.isAuthenticated
+                            ? 'Signed in to MoolSocial'
+                            : 'Sign in to keep your activity with you'),
+                  ),
                 ),
                 ListTile(
                   key: const Key('profile-language'),
@@ -2625,7 +2636,19 @@ Future<void> _showProfile(BuildContext context, JourneySession session) {
                               ],
                             ),
                           );
-                          if (confirmed ?? false) await session.signOut();
+                          if (confirmed ?? false) {
+                            final signedOut = await session.signOut();
+                            if (!signedOut && context.mounted) {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text(
+                                    session.errorMessage ??
+                                        'Sign-out could not be completed. Please try again.',
+                                  ),
+                                ),
+                              );
+                            }
+                          }
                         },
                   child: const Text('Sign out'),
                 ),
@@ -2992,7 +3015,7 @@ String _searchActionRoute(String section, String? subAction) {
   if (section == 'buy') {
     return switch (subAction) {
       'grocery' || 'categories' => '/app/buy/grocery',
-      'medicine' => '/app/buy/medicine',
+      'medicine' => '/app/book/medicine',
       'basket' => '/app/buy/basket',
       _ => '/app/buy',
     };

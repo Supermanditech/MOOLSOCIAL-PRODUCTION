@@ -1,9 +1,9 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/youtube/youtube_private_dev_models.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
@@ -120,20 +120,23 @@ void main() {
     owners.dispose();
   });
 
-  testWidgets(
-    'every Social subaction survives connected-chooser open and system Back',
-    (tester) async {
-      const directRouteOwnerKeys = <String, Key>{
-        'shorts': Key('screen04-youtube-shorts-state-provider-access'),
-        'videos': Key('screen04-youtube-videos-state-provider-access'),
-        'feed': Key('screen04-moolsocial-feed-state-empty'),
-        'create': Key('screen04-create-workbench'),
-      };
-      for (final choice in screen04World('social').choices) {
+  for (final choice in screen04World('social').choices) {
+    testWidgets(
+      'Social ${choice.id} survives connected-chooser open and system Back',
+      (tester) async {
+        const directRouteOwnerKeys = <String, Key>{
+          'shorts': Key('screen04-youtube-shorts-state-provider-access'),
+          'videos': Key('screen04-youtube-videos-state-provider-access'),
+          'feed': Key('screen04-moolsocial-feed-state-empty'),
+          'create': Key('screen04-create-home'),
+        };
         final owners = _AuthenticatedOwners();
+        addTearDown(owners.dispose);
         await owners.journey.start();
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.view.resetPhysicalSize);
         await tester.pumpWidget(
           MoolSocialApp(
             key: ValueKey('social-${choice.id}'),
@@ -144,23 +147,19 @@ void main() {
             initialLocation: '/app/social?sub=${choice.id}',
           ),
         );
+        addTearDown(() async {
+          await tester.pumpWidget(const SizedBox.shrink());
+          await tester.pumpAndSettle();
+        });
         await tester.pumpAndSettle();
         expect(
           find.byKey(directRouteOwnerKeys[choice.id]!),
           choice.id == 'videos' ? findsWidgets : findsOneWidget,
         );
+        expect(find.byKey(const Key('screen04-context-tabs')), findsOneWidget);
         if (choice.id == 'create') {
-          expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-          expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
-          await tester.tap(find.byKey(const Key('screen04-create-close')));
-          await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-            findsOneWidget,
-          );
-        } else {
-          expect(
-            find.byKey(const Key('screen04-context-tabs')),
+            find.byKey(const Key('mool-compact-launcher')),
             findsOneWidget,
           );
         }
@@ -179,10 +178,7 @@ void main() {
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
         if (choice.id == 'create') {
-          expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-            findsOneWidget,
-          );
+          expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
         } else {
           expect(
             find.byKey(directRouteOwnerKeys[choice.id]!),
@@ -190,14 +186,11 @@ void main() {
           );
         }
         expect(tester.takeException(), isNull, reason: choice.id);
-        owners.dispose();
-      }
-      tester.view.resetDevicePixelRatio();
-      tester.view.resetPhysicalSize();
-    },
-  );
+      },
+    );
+  }
 
-  testWidgets('Create hides the dock until the composer closes', (
+  testWidgets('Create landing owns the dock and nested composer controls', (
     tester,
   ) async {
     final owners = _AuthenticatedOwners();
@@ -216,8 +209,19 @@ void main() {
         initialLocation: '/app/social?sub=create',
       ),
     );
+    addTearDown(() async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+    });
     await tester.pumpAndSettle();
 
+    expect(find.byKey(const Key('screen04-create-home')), findsOneWidget);
+    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
+    expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
+    expect(find.byKey(const Key('screen04-context-tabs')), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('screen04-create-post-entry')));
+    await tester.pumpAndSettle();
     expect(find.byKey(const Key('screen04-create-workbench')), findsOneWidget);
     expect(find.byKey(const Key('screen04-create-post-text')), findsOneWidget);
     expect(find.text('Reel'), findsNothing);
@@ -241,25 +245,6 @@ void main() {
     expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
     expect(find.byKey(const Key('social-global-chat')), findsNothing);
     expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-
-    await tester.tap(find.byKey(const Key('screen04-create-close')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const Key('screen04-create-workbench')), findsNothing);
-    expect(find.byKey(const Key('mool-compact-launcher')), findsOneWidget);
-    expect(find.byKey(const Key('social-global-chat')), findsOneWidget);
-
-    await tester.tap(find.byKey(const Key('mool-compact-launcher')));
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('mool-connected-action-navigator')),
-      findsOneWidget,
-    );
-    await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
-    expect(
-      find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
-      findsOneWidget,
-    );
     expect(tester.takeException(), isNull);
   });
 
@@ -364,22 +349,8 @@ void main() {
   testWidgets('Videos uses native Back and restores provider discovery', (
     tester,
   ) async {
-    String? copiedText;
-    tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      SystemChannels.platform,
-      (call) async {
-        if (call.method == 'Clipboard.setData') {
-          copiedText =
-              (call.arguments as Map<Object?, Object?>)['text'] as String?;
-        }
-        return null;
-      },
-    );
-    addTearDown(
-      () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        null,
-      ),
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.dismissed,
     );
     final owners = _Owners();
     addTearDown(owners.dispose);
@@ -436,6 +407,7 @@ void main() {
         youtubePublicAccessOverride: true,
         youtubeVideosLoader: () async => providerVideos,
         youtubeShortsLoader: () async => const [],
+        shareGateway: shareGateway,
       ),
     );
     await tester.pump();
@@ -511,8 +483,19 @@ void main() {
     await tester.ensureVisible(share);
     await tester.tap(share);
     await tester.pump();
-    expect(copiedText, 'https://www.youtube.com/watch?v=def456UVW10');
-    expect(find.text('YouTube link copied'), findsOneWidget);
+    expect(shareGateway.calls, 1);
+    expect(
+      shareGateway.request?.uri,
+      Uri.parse('https://www.youtube.com/watch?v=def456UVW10'),
+    );
+    expect(shareGateway.request?.title, 'Share YouTube video');
+    expect(shareGateway.request?.subject, 'YouTube video');
+    expect(shareGateway.request?.sharePositionOrigin.isFinite, isTrue);
+    expect(shareGateway.request?.sharePositionOrigin.width, greaterThan(0));
+    expect(shareGateway.request?.sharePositionOrigin.height, greaterThan(0));
+    expect(find.text('YouTube link copied'), findsNothing);
+    expect(find.text('Shared'), findsNothing);
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -521,77 +504,276 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('YouTube video contains unavailable share without false success', (
+    tester,
+  ) async {
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.unavailable,
+    );
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final providerVideo = Screen04YouTubePublicVideo(
+      videoId: 'ghi789RST11',
+      title: 'Provider clipboard recovery',
+      channelId: 'UC333',
+      channelTitle: 'Provider recovery',
+      description: 'A provider video used to verify link recovery.',
+      thumbnailUrl: Uri.https('i.ytimg.com', '/vi/ghi789RST11/hqdefault.jpg'),
+      publishedAt: DateTime.utc(2026, 8, 9),
+      duration: 'PT3M12S',
+      captionAvailable: true,
+      viewCount: '4200',
+      likeCount: '310',
+      commentCount: '18',
+      embeddable: true,
+      hasKnownDeviceRegionExclusion: false,
+      hashtags: const ['#Recovery'],
+      channelDescription: 'Current public recovery videos.',
+      subscriberCount: '27000',
+      channelVideoCount: '81',
+      channelViewCount: '1900000',
+    );
+    await _pump(
+      tester,
+      const Size(360, 720),
+      1,
+      owners.consumer(
+        sub: 'videos',
+        youtubePublicAccessOverride: true,
+        youtubeVideosLoader: () async => [providerVideo],
+        youtubeShortsLoader: () async => const [],
+        shareGateway: shareGateway,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 100));
+
+    await tester.tap(find.text('Provider clipboard recovery'));
+    await tester.pump();
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('screen04-video-share')));
+    await tester.tap(find.byKey(const Key('screen04-video-share')));
+    await tester.pump();
+
+    expect(
+      find.text(
+        'Sharing is unavailable right now. You can open this video on YouTube instead.',
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('YouTube link copied'), findsNothing);
+    expect(find.text('Shared'), findsNothing);
+    expect(shareGateway.calls, 1);
+    expect(
+      shareGateway.request?.uri,
+      Uri.parse('https://www.youtube.com/watch?v=ghi789RST11'),
+    );
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'YouTube video contains clipboard failure without false success',
+    'public provider badge and channel taps stay in MoolSocial Videos',
     (tester) async {
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        SystemChannels.platform,
-        (call) async {
-          if (call.method == 'Clipboard.setData') {
-            throw PlatformException(code: 'clipboard-unavailable');
-          }
-          return null;
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-          SystemChannels.platform,
-          null,
-        ),
-      );
       final owners = _Owners();
       addTearDown(owners.dispose);
-      final providerVideo = Screen04YouTubePublicVideo(
-        videoId: 'ghi789RST11',
-        title: 'Provider clipboard recovery',
-        channelId: 'UC333',
-        channelTitle: 'Provider recovery',
-        description: 'A provider video used to verify link recovery.',
-        thumbnailUrl: Uri.https('i.ytimg.com', '/vi/ghi789RST11/hqdefault.jpg'),
-        publishedAt: DateTime.utc(2026, 8, 9),
-        duration: 'PT3M12S',
+      final sourceVideo = Screen04YouTubePublicVideo(
+        videoId: 'channelSrc01',
+        title: 'Channel source video',
+        channelId: 'UCchannel123',
+        channelTitle: 'Public channel',
+        description: 'The video used to open its public channel.',
+        thumbnailUrl: Uri.https(
+          'i.ytimg.com',
+          '/vi/channelSrc01/hqdefault.jpg',
+        ),
+        publishedAt: DateTime.utc(2026, 8, 20),
+        duration: 'PT6M',
         captionAvailable: true,
-        viewCount: '4200',
-        likeCount: '310',
-        commentCount: '18',
+        viewCount: '1200',
+        likeCount: '80',
+        commentCount: '12',
         embeddable: true,
         hasKnownDeviceRegionExclusion: false,
-        hashtags: const ['#Recovery'],
-        channelDescription: 'Current public recovery videos.',
-        subscriberCount: '27000',
-        channelVideoCount: '81',
-        channelViewCount: '1900000',
+        hashtags: const ['#Public'],
       );
+      final channelVideos = <Screen04YouTubePublicVideo>[
+        sourceVideo,
+        Screen04YouTubePublicVideo(
+          videoId: 'channelDst02',
+          title: 'Another channel upload',
+          channelId: 'UCchannel123',
+          channelTitle: 'Public channel',
+          description: 'Another eligible public upload.',
+          thumbnailUrl: Uri.https(
+            'i.ytimg.com',
+            '/vi/channelDst02/hqdefault.jpg',
+          ),
+          publishedAt: DateTime.utc(2026, 8, 21),
+          duration: 'PT8M',
+          captionAvailable: true,
+          viewCount: '2400',
+          likeCount: '140',
+          commentCount: '21',
+          embeddable: true,
+          hasKnownDeviceRegionExclusion: false,
+          hashtags: const ['#Public'],
+        ),
+      ];
+      var requestedChannelId = '';
+
       await _pump(
         tester,
-        const Size(360, 720),
+        const Size(390, 844),
         1,
         owners.consumer(
           sub: 'videos',
           youtubePublicAccessOverride: true,
-          youtubeVideosLoader: () async => [providerVideo],
+          youtubeVideosLoader: () async => [sourceVideo],
           youtubeShortsLoader: () async => const [],
+          youtubeChannelLoader: (channelId) async {
+            requestedChannelId = channelId;
+            return Screen04YouTubePublicChannelCatalogue(
+              channel: YouTubePublicChannelDetails(
+                channelId: channelId,
+                title: 'Public channel',
+                description: 'Public channel uploads.',
+                publishedAt: DateTime.utc(2020),
+                uploadsPlaylistId: 'UUchannel123',
+                statistics: const YouTubePublicChannelStatistics(
+                  hiddenSubscriberCount: false,
+                  subscriberCount: '5000',
+                  videoCount: '2',
+                  viewCount: '3600',
+                ),
+                topicCategories: const [],
+              ),
+              videos: channelVideos,
+            );
+          },
         ),
       );
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 100));
-
-      await tester.tap(find.text('Provider clipboard recovery'));
-      await tester.pump();
+      await tester.pumpAndSettle();
+      final attribution = find.byKey(const Key('screen04-youtube-attribution'));
+      expect(attribution, findsOneWidget);
+      await tester.tap(attribution);
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
-      await tester.ensureVisible(find.byKey(const Key('screen04-video-share')));
-      await tester.tap(find.byKey(const Key('screen04-video-share')));
-      await tester.pump();
+      await tester.ensureVisible(
+        find.byKey(const Key('screen04-video-channel')),
+      );
+      await tester.tap(find.byKey(const Key('screen04-video-channel')));
+      await tester.pumpAndSettle();
 
+      expect(requestedChannelId, 'UCchannel123');
       expect(
-        find.text('YouTube link could not be copied. Try again.'),
+        find.byKey(const Key('screen04-youtube-channel-catalogue')),
         findsOneWidget,
       );
-      expect(find.text('YouTube link copied'), findsNothing);
+      expect(find.text('Videos from Public channel'), findsOneWidget);
+      expect(find.text('Another channel upload'), findsOneWidget);
+      expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
+
+      await tester.tap(find.text('Another channel upload'));
+      await tester.pumpAndSettle();
       expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
-      expect(tester.takeException(), isNull);
+      expect(find.text('Another channel upload'), findsWidgets);
     },
   );
+
+  testWidgets('YouTube Search share preserves the exact result return', (
+    tester,
+  ) async {
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    final homeVideo = Screen04YouTubePublicVideo(
+      videoId: 'home123ABC45',
+      title: 'Provider home result',
+      channelId: 'UCHOME',
+      channelTitle: 'Provider home',
+      description: 'A provider home result.',
+      thumbnailUrl: Uri.https('i.ytimg.com', '/vi/home123ABC45/hqdefault.jpg'),
+      publishedAt: DateTime.utc(2026, 8, 8),
+      duration: 'PT5M4S',
+      captionAvailable: true,
+      viewCount: '1200',
+      likeCount: '80',
+      commentCount: '12',
+      embeddable: true,
+      hasKnownDeviceRegionExclusion: false,
+      hashtags: const [],
+    );
+    final searchVideo = Screen04YouTubePublicVideo(
+      videoId: 'search789XY1',
+      title: 'Provider searched maker story',
+      channelId: 'UCSEARCH',
+      channelTitle: 'Provider search',
+      description: 'A provider search result.',
+      thumbnailUrl: Uri.https('i.ytimg.com', '/vi/search789XY1/hqdefault.jpg'),
+      publishedAt: DateTime.utc(2026, 8, 9),
+      duration: 'PT8M12S',
+      captionAvailable: true,
+      viewCount: '8400',
+      likeCount: '510',
+      commentCount: '44',
+      embeddable: true,
+      hasKnownDeviceRegionExclusion: false,
+      hashtags: const [],
+    );
+    final shareGateway = _RecordingShareGateway(
+      outcome: SocialV2ShareOutcome.dismissed,
+    );
+
+    await _pump(
+      tester,
+      const Size(390, 844),
+      1,
+      owners.consumer(
+        sub: 'videos',
+        youtubePublicAccessOverride: true,
+        youtubeVideosLoader: () async => [homeVideo],
+        youtubeShortsLoader: () async => const [],
+        youtubeSearchLoader: (_) async => [searchVideo],
+        shareGateway: shareGateway,
+      ),
+    );
+    await tester.pump(const Duration(milliseconds: 100));
+    await tester.tap(find.byKey(const Key('screen04-youtube-home-search')));
+    await tester.pumpAndSettle();
+    final searchInput = find.byKey(const Key('screen04-youtube-search-input'));
+    await tester.enterText(searchInput, 'maker story');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pumpAndSettle();
+    expect(find.text('Provider searched maker story'), findsOneWidget);
+
+    await tester.tap(find.text('Provider searched maker story'));
+    await tester.pump();
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    expect(find.byTooltip('Back to YouTube Search results'), findsOneWidget);
+    await tester.ensureVisible(find.byKey(const Key('screen04-video-share')));
+    await tester.tap(find.byKey(const Key('screen04-video-share')));
+    await tester.pump();
+
+    expect(shareGateway.calls, 1);
+    expect(
+      shareGateway.request?.uri,
+      Uri.parse('https://www.youtube.com/watch?v=search789XY1'),
+    );
+    expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('screen04-youtube-search-surface')),
+      findsOneWidget,
+    );
+    expect(find.text('Provider searched maker story'), findsOneWidget);
+    expect(
+      tester.widget<TextField>(searchInput).controller?.text,
+      'maker story',
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('YouTube Shorts show finished recovery copy when unavailable', (
     tester,
@@ -613,7 +795,8 @@ void main() {
       find.text('YouTube Shorts are unavailable right now'),
       findsOneWidget,
     );
-    expect(find.text('Please try again later.'), findsOneWidget);
+    expect(find.textContaining('continue in MoolSocial Feed'), findsOneWidget);
+    expect(find.text('Open Feed'), findsOneWidget);
     expect(
       find.textContaining('will not replace it with unverified videos'),
       findsNothing,
@@ -812,7 +995,7 @@ void main() {
         'shorts': Key('screen04-youtube-shorts-state-provider-access'),
         'videos': Key('screen04-youtube-videos-state-provider-access'),
         'feed': Key('screen04-moolsocial-feed-state-empty'),
-        'create': ValueKey('screen04-create-workbench'),
+        'create': ValueKey('screen04-create-home'),
       };
       for (final choice in social.choices) {
         await _openConnectedAction(tester, family: 'social', action: choice.id);
@@ -821,12 +1004,12 @@ void main() {
           choice.id == 'videos' ? findsWidgets : findsOneWidget,
         );
         if (choice.id == 'create') {
-          expect(find.byKey(const Key('screen04-context-tabs')), findsNothing);
-          expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
-          await tester.tap(find.byKey(const Key('screen04-create-close')));
-          await tester.pumpAndSettle();
           expect(
-            find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
+            find.byKey(const Key('screen04-context-tabs')),
+            findsOneWidget,
+          );
+          expect(
+            find.byKey(const Key('mool-compact-launcher')),
             findsOneWidget,
           );
         } else {
@@ -899,14 +1082,12 @@ void main() {
 
     await tester.tap(find.byKey(const Key('screen04-profile')));
     await tester.pumpAndSettle();
-    expect(find.text('Your MoolSocial account'), findsOneWidget);
-    expect(
-      find.byKey(const Key('screen04-account-youtube-connection')),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    expect(find.text('Your MoolSocial profile'), findsOneWidget);
+    expect(find.text('Personal profile'), findsOneWidget);
     expect(find.text('Creator workspace'), findsNothing);
-    expect(find.textContaining('Minimum read-only access'), findsOneWidget);
-    await tester.tap(find.byTooltip('Close'));
+    expect(find.textContaining('Minimum read-only access'), findsNothing);
+    await tester.tap(find.byKey(const Key('global-profile-close')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const Key('screen04-search')));
@@ -926,6 +1107,38 @@ void main() {
     expect(find.text('Voice search'), findsOneWidget);
     expect(tester.takeException(), isNull);
     _expectCustomerCopy(tester, 'header actions');
+  });
+
+  testWidgets('authenticated account uses the one global profile surface', (
+    tester,
+  ) async {
+    final owners = _AuthenticatedOwners();
+    addTearDown(owners.dispose);
+    await owners.journey.start();
+    await _pump(
+      tester,
+      const Size(390, 844),
+      1,
+      SocialUniversalV2(
+        session: owners.journey,
+        creatorSession: owners.creator,
+        retailerSession: owners.retailer,
+        sharedSession: owners.shared,
+        initialWorld: 'buy',
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('screen04-profile')));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('global-profile-panel-v2')), findsOneWidget);
+    expect(find.text('Your MoolSocial profile'), findsOneWidget);
+    expect(find.text('Personal profile'), findsOneWidget);
+    expect(
+      find.byKey(const Key('screen04-account-authenticated-identity')),
+      findsNothing,
+    );
+    expect(find.text('Sign out or switch account'), findsNothing);
   });
 }
 
@@ -1023,6 +1236,9 @@ class _Owners {
     bool? youtubePublicAccessOverride,
     Screen04YouTubePublicVideoLoader? youtubeVideosLoader,
     Screen04YouTubePublicVideoLoader? youtubeShortsLoader,
+    Screen04YouTubePublicSearchLoader? youtubeSearchLoader,
+    Screen04YouTubePublicChannelLoader? youtubeChannelLoader,
+    SocialV2ShareGateway? shareGateway,
   }) {
     return SocialUniversalV2(
       session: journey,
@@ -1034,6 +1250,9 @@ class _Owners {
       youtubePublicAccessOverride: youtubePublicAccessOverride,
       youtubeVideosLoader: youtubeVideosLoader,
       youtubeShortsLoader: youtubeShortsLoader,
+      youtubeSearchLoader: youtubeSearchLoader,
+      youtubeChannelLoader: youtubeChannelLoader,
+      shareGateway: shareGateway,
     );
   }
 
@@ -1042,6 +1261,21 @@ class _Owners {
     creator.dispose();
     retailer.dispose();
     shared.dispose();
+  }
+}
+
+class _RecordingShareGateway implements SocialV2ShareGateway {
+  _RecordingShareGateway({required this.outcome});
+
+  final SocialV2ShareOutcome outcome;
+  int calls = 0;
+  SocialV2ShareRequest? request;
+
+  @override
+  Future<SocialV2ShareOutcome> share(SocialV2ShareRequest value) async {
+    calls += 1;
+    request = value;
+    return outcome;
   }
 }
 
@@ -1056,6 +1290,13 @@ class _AuthenticatedOwners {
       ),
     ),
     otpGateway: ReviewOtpGateway(signedIn: true),
+    accountIdentityGateway: ReviewAuthenticatedAccountIdentityGateway(
+      identity: const AuthenticatedAccountIdentity(
+        displayName: 'Test Member',
+        emailAddress: 'member@example.com',
+        signInMethods: ['Google'],
+      ),
+    ),
   );
   final creator = CreatorSession()..creatorWorkspaceActive = true;
   final retailer = RetailerSession();

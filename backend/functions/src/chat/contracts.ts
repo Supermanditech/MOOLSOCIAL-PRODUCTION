@@ -27,6 +27,121 @@ export interface ChatThreadRecord {
   type: ChatThreadType;
   unreadCount: number;
   verified: boolean;
+  targetUserId?: string;
+  requestStatus?: ChatMessageRequestStatus;
+  participants?: ChatGroupMemberRecord[];
+  groupDescription?: string;
+}
+
+export interface ChatGroupMemberRecord {
+  userId: string;
+  name: string;
+  handle: string;
+  isAdmin: boolean;
+  isMe: boolean;
+}
+
+export type ChatGroupInvitePermission = "admins" | "members";
+
+export interface ChatGroupInfoRecord {
+  threadId: string;
+  title: string;
+  description: string;
+  members: ChatGroupMemberRecord[];
+  invitePermission: ChatGroupInvitePermission;
+  canInvite: boolean;
+  canManage: boolean;
+  canLeave: boolean;
+}
+
+export interface ChatGroupInviteRecord {
+  id: string;
+  threadId: string;
+  groupTitle: string;
+  invitedByUserId: string;
+  invitedByName: string;
+  invitedAt: string;
+}
+
+export interface ChatNotificationPreferences {
+  messagesEnabled: boolean;
+  callsEnabled: boolean;
+  groupInvitesEnabled: boolean;
+  showPreview: boolean;
+  quietHoursEnabled: boolean;
+  quietStartMinutes: number;
+  quietEndMinutes: number;
+  utcOffsetMinutes: number;
+  updatedAt: string;
+}
+
+export type ChatNotificationCategory = "message" | "call" | "group_invite";
+
+export interface ChatNotificationEvent {
+  category: ChatNotificationCategory;
+  recipientUserIds: string[];
+  title: string;
+  preview: string;
+  data: Readonly<Record<string, string>>;
+}
+
+export interface ChatNotificationDispatcher {
+  dispatch(event: ChatNotificationEvent): Promise<void>;
+}
+
+export type ChatMessagePermission = "everyone" | "connections" | "nobody";
+export type ChatMessageRequestStatus = "pending" | "accepted";
+
+export interface ChatPrivacySettings {
+  whoCanMessage: ChatMessagePermission;
+  messageRequestsEnabled: boolean;
+  shareLastSeen: boolean;
+  readReceipts: boolean;
+  updatedAt: string;
+}
+
+export interface ChatBlockedAccount {
+  userId: string;
+  name: string;
+  handle: string;
+  blockedAt: string;
+}
+
+export interface ChatMessageRequestRecord {
+  thread: ChatThreadRecord;
+  requestedByUserId: string;
+  requestedAt: string;
+}
+
+export type ChatCallKind = "voice" | "video";
+export type ChatPresenceState = "active" | "background" | "offline";
+export type ChatCallStatus = "ringing" | "accepted" | "declined" | "ended";
+
+export interface ChatCallPreferences {
+  voiceCallsEnabled: boolean;
+  videoCallsEnabled: boolean;
+  updatedAt: string;
+}
+
+export interface ChatCallAvailability {
+  threadId: string;
+  kind: ChatCallKind;
+  recipientUserId: string;
+  recipientName: string;
+  canStart: boolean;
+  status: "available" | "offline" | "calls_off" | "busy";
+  message: string;
+}
+
+export interface ChatCallRecord {
+  id: string;
+  threadId: string;
+  kind: ChatCallKind;
+  callerUserId: string;
+  recipientUserId: string;
+  status: ChatCallStatus;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface ChatMessageRecord {
@@ -44,6 +159,58 @@ export interface ChatMessageRecord {
   readByOthers: boolean;
   forwarded: boolean;
   photo?: ChatPhotoAttachmentRecord;
+  attachment?: ChatAttachmentRecord;
+}
+
+export type ChatAttachmentKind = "document" | "video" | "voice";
+
+export interface ChatAttachmentRecord {
+  id: string;
+  kind: ChatAttachmentKind;
+  name: string;
+  contentType: string;
+  sizeBytes: number;
+  durationMilliseconds?: number;
+  readUrl: string;
+  readUrlExpiresAt: string;
+}
+
+export interface ChatAttachmentUploadGrant extends ChatPhotoUploadGrant {}
+
+export interface ChatValidatedAttachment {
+  uploadId: string;
+  objectPath: string;
+  generation: string;
+  kind: ChatAttachmentKind;
+  contentType: string;
+  sizeBytes: number;
+  durationMilliseconds?: number;
+}
+
+export interface ChatAttachmentStore {
+  prepare(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatAttachmentUploadGrant>;
+  validate(input: {
+    userId: string;
+    threadId: string;
+    kind: ChatAttachmentKind;
+    uploadId: string;
+    fileName: string;
+    contentType: string;
+    sizeBytes: number;
+    durationMilliseconds?: number;
+  }): Promise<ChatValidatedAttachment>;
+  readUrl(input: {
+    objectPath: string;
+    generation: string;
+  }): Promise<{ readUrl: string; expiresAt: string }>;
 }
 
 export interface ChatPhotoAttachmentRecord {
@@ -138,6 +305,66 @@ export interface ChatRepository {
     requestDigest: string,
     replyToMessageId?: string,
   ): Promise<ChatMessageRecord>;
+  prepareAttachmentUpload?(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds?: number,
+  ): Promise<ChatAttachmentUploadGrant>;
+  sendAttachmentMessage?(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatAttachmentKind,
+    uploadId: string,
+    fileName: string,
+    contentType: string,
+    sizeBytes: number,
+    durationMilliseconds: number | undefined,
+    caption: string,
+    idempotencyKey: string,
+    requestDigest: string,
+    replyToMessageId?: string,
+  ): Promise<ChatMessageRecord>;
+  getGroupInfo?(userId: string, threadId: string): Promise<ChatGroupInfoRecord>;
+  inviteGroupMember?(
+    actor: ChatProfile,
+    threadId: string,
+    target: ChatProfile,
+  ): Promise<ChatGroupInviteRecord>;
+  updateGroupPermissions?(
+    userId: string,
+    threadId: string,
+    invitePermission: ChatGroupInvitePermission,
+  ): Promise<ChatGroupInfoRecord>;
+  leaveGroup?(
+    userId: string,
+    threadId: string,
+  ): Promise<{ threadId: string; left: boolean }>;
+  listGroupInvites?(userId: string): Promise<ChatGroupInviteRecord[]>;
+  respondToGroupInvite?(
+    userId: string,
+    inviteId: string,
+    accepted: boolean,
+  ): Promise<{ inviteId: string; accepted: boolean; threadId: string }>;
+  getNotificationPreferences?(
+    userId: string,
+  ): Promise<ChatNotificationPreferences>;
+  updateNotificationPreferences?(
+    userId: string,
+    preferences: Omit<ChatNotificationPreferences, "updatedAt">,
+  ): Promise<ChatNotificationPreferences>;
+  registerNotificationDevice?(
+    userId: string,
+    token: string,
+    platform: "android" | "ios",
+  ): Promise<{ registered: boolean }>;
+  unregisterNotificationDevice?(
+    userId: string,
+    token: string,
+  ): Promise<{ registered: boolean }>;
   setReaction(
     actor: ChatProfile,
     threadId: string,
@@ -153,6 +380,50 @@ export interface ChatRepository {
     requestDigest: string,
   ): Promise<ChatMessageRecord>;
   markThreadRead(userId: string, threadId: string): Promise<ChatReadResult>;
+  getPrivacySettings?(userId: string): Promise<ChatPrivacySettings>;
+  updatePrivacySettings?(
+    userId: string,
+    settings: Omit<ChatPrivacySettings, "updatedAt">,
+  ): Promise<ChatPrivacySettings>;
+  listBlockedAccounts?(userId: string): Promise<ChatBlockedAccount[]>;
+  setBlockedAccount?(
+    actor: ChatProfile,
+    target: ChatProfile,
+    blocked: boolean,
+  ): Promise<{ blocked: boolean }>;
+  listMessageRequests?(userId: string): Promise<ChatMessageRequestRecord[]>;
+  resolveMessageRequest?(
+    userId: string,
+    threadId: string,
+    accepted: boolean,
+  ): Promise<{ threadId: string; accepted: boolean }>;
+  getCallPreferences?(userId: string): Promise<ChatCallPreferences>;
+  updateCallPreferences?(
+    userId: string,
+    preferences: Omit<ChatCallPreferences, "updatedAt">,
+  ): Promise<ChatCallPreferences>;
+  setPresence?(
+    userId: string,
+    state: ChatPresenceState,
+  ): Promise<{ state: ChatPresenceState; updatedAt: string }>;
+  getCallAvailability?(
+    userId: string,
+    threadId: string,
+    kind: ChatCallKind,
+  ): Promise<ChatCallAvailability>;
+  startCall?(
+    actor: ChatProfile,
+    threadId: string,
+    kind: ChatCallKind,
+    idempotencyKey: string,
+  ): Promise<ChatCallRecord>;
+  respondToCall?(
+    userId: string,
+    callId: string,
+    accepted: boolean,
+  ): Promise<ChatCallRecord>;
+  endCall?(userId: string, callId: string): Promise<ChatCallRecord>;
+  listIncomingCalls?(userId: string): Promise<ChatCallRecord[]>;
 }
 
 export type ChatProfileResolver = (userId: string) => Promise<ChatProfile>;

@@ -31,7 +31,7 @@ void main() {
     session.openDestination(BuyV2Destination.wholesale);
     await tester.pump();
     expect(
-      find.descendant(of: header, matching: find.text('Flexible packs')),
+      find.descendant(of: header, matching: find.text('Lower minimums')),
       findsNothing,
     );
     await tester.tap(

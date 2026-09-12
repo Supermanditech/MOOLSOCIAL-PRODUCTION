@@ -1,11 +1,230 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import 'buy_v2_design.dart';
 import 'buy_v2_manual_code_sheet_motion.dart';
+
+typedef BuyV2CollectionCameraBuilder =
+    Widget Function(BuildContext context, ValueChanged<String> onDetected);
+
+/// An automatic, order-bound camera surface. The parent order owns validation,
+/// recovery and status; this camera never interprets a QR as a product or URL.
+class BuyV2CollectionCamera extends StatefulWidget {
+  const BuyV2CollectionCamera({
+    super.key,
+    required this.onDetected,
+    this.maximumPreviewHeight = 320,
+  });
+
+  final ValueChanged<String> onDetected;
+  final double maximumPreviewHeight;
+
+  @override
+  State<BuyV2CollectionCamera> createState() => _BuyV2CollectionCameraState();
+}
+
+class _BuyV2CollectionCameraState extends State<BuyV2CollectionCamera>
+    with WidgetsBindingObserver {
+  final _controller = MobileScannerController(
+    autoStart: false,
+    detectionSpeed: DetectionSpeed.noDuplicates,
+    formats: const [BarcodeFormat.qrCode],
+  );
+  bool _starting = false;
+  bool _handled = false;
+  bool _foreground = true;
+  bool _settingsNeeded = false;
+  bool _permissionNeeded = false;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_start(requestPermission: true));
+    });
+  }
+
+  Future<void> _start({bool requestPermission = false}) async {
+    if (_starting || _handled || !mounted || !_foreground) return;
+    setState(() {
+      _starting = true;
+      _message = null;
+    });
+    try {
+      final permission = requestPermission
+          ? await Permission.camera.request()
+          : await Permission.camera.status;
+      if (!mounted || !_foreground || _handled) return;
+      if (!permission.isGranted) {
+        setState(() {
+          _permissionNeeded = true;
+          _settingsNeeded =
+              permission.isPermanentlyDenied || permission.isRestricted;
+          _message = 'Allow camera access to scan this order at the counter.';
+        });
+        return;
+      }
+      _permissionNeeded = false;
+      _settingsNeeded = false;
+      await _controller.start();
+      if (!_foreground || _handled) await _stop();
+      if (mounted && _foreground && !_handled && _controller.value.isRunning) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted || !_foreground || _handled) return;
+          unawaited(Scrollable.ensureVisible(context, alignment: 0));
+        });
+      }
+    } on Object {
+      if (mounted) {
+        setState(() => _message = 'Camera could not start. Try again here.');
+      }
+    } finally {
+      if (mounted) setState(() => _starting = false);
+    }
+  }
+
+  Future<void> _stop() async {
+    try {
+      await _controller.stop();
+    } on Object {
+      // Camera teardown cannot authorise or complete an order.
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      _foreground = true;
+      if (!_starting) unawaited(_start());
+    } else if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      _foreground = false;
+      unawaited(_stop());
+    } else if (!_starting && _controller.value.hasCameraPermission) {
+      _foreground = false;
+      unawaited(_stop());
+    }
+  }
+
+  void _detect(BarcodeCapture capture) {
+    if (!mounted || _handled || !_foreground) return;
+    for (final barcode in capture.barcodes) {
+      final raw = barcode.rawValue;
+      if (barcode.format != BarcodeFormat.qrCode || raw == null) continue;
+      _handled = true;
+      unawaited(_stop());
+      widget.onDetected(raw);
+      break;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    unawaited(_controller.dispose());
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Column(
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: [
+      ClipRRect(
+        borderRadius: BorderRadius.circular(12),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: widget.maximumPreviewHeight),
+          child: AspectRatio(
+            aspectRatio: 4 / 3,
+            child: MobileScanner(
+              key: const ValueKey('buy-collection-camera-preview'),
+              controller: _controller,
+              fit: BoxFit.contain,
+              tapToFocus: true,
+              onDetect: _detect,
+              placeholderBuilder: (_) => const ColoredBox(
+                color: Color(0xFF10182B),
+                child: Center(
+                  child: Icon(
+                    Icons.qr_code_scanner,
+                    color: Colors.white,
+                    size: 48,
+                  ),
+                ),
+              ),
+              errorBuilder: (_, _) => ColoredBox(
+                color: Color(0xFF10182B),
+                child: Center(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'Camera unavailable',
+                          style: TextStyle(color: Colors.white),
+                        ),
+                        if (_message == null)
+                          TextButton(
+                            key: const ValueKey('buy-collection-camera-retry'),
+                            style: TextButton.styleFrom(
+                              minimumSize: const Size(0, 44),
+                              foregroundColor: Colors.white,
+                            ),
+                            onPressed: _starting
+                                ? null
+                                : () async {
+                                    await _stop();
+                                    await _start(requestPermission: true);
+                                  },
+                            child: const Text('Retry camera'),
+                          ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const SizedBox(height: 8),
+      Text(
+        _message ??
+            'Point at the QR on the store’s order card. Scans automatically.',
+        style: context.buyBody,
+      ),
+      if (_message != null)
+        TextButton.icon(
+          key: const ValueKey('buy-collection-camera-recover'),
+          style: TextButton.styleFrom(minimumSize: const Size(0, 44)),
+          onPressed: _starting
+              ? null
+              : () async {
+                  if (_settingsNeeded) {
+                    await openAppSettings();
+                  } else {
+                    await _start(requestPermission: true);
+                  }
+                },
+          icon: const Icon(Icons.camera_alt_outlined, size: 18),
+          label: Text(
+            _settingsNeeded
+                ? 'Open camera settings'
+                : _permissionNeeded
+                ? 'Allow camera'
+                : 'Retry camera',
+          ),
+        ),
+    ],
+  );
+}
 
 typedef BuyV2ScannerLauncher = Future<String?> Function(BuildContext context);
 
@@ -73,6 +292,7 @@ class _BuyV2ManualCodePanel extends StatefulWidget {
 
 class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
   final TextEditingController _controller = TextEditingController();
+  bool _showCodeError = false;
 
   @override
   void dispose() {
@@ -82,7 +302,11 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
 
   void _submit([String? value]) {
     final code = (value ?? _controller.text).trim();
-    if (code.isNotEmpty) Navigator.of(context).pop(code);
+    if (code.isEmpty) {
+      setState(() => _showCodeError = true);
+      return;
+    }
+    Navigator.of(context).pop(code);
   }
 
   @override
@@ -96,104 +320,185 @@ class _BuyV2ManualCodePanelState extends State<_BuyV2ManualCodePanel> {
       namesRoute: true,
       explicitChildNodes: true,
       label: '$title form',
-      child: ConstrainedBox(
-        key: const ValueKey('buy-manual-code-panel'),
-        constraints: const BoxConstraints(maxHeight: 238),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: BuyV2Colors.softOrange,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(
-                      Icons.qr_code_scanner_rounded,
-                      color: BuyV2Colors.orange,
-                      size: 19,
-                    ),
+      child: SafeArea(
+        top: false,
+        bottom: MediaQuery.viewInsetsOf(context).bottom == 0,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final scale = MediaQuery.textScalerOf(context).scale(1);
+            final height =
+                (238 +
+                        (scale - 1).clamp(0, 3) * 100 +
+                        (_showCodeError ? 32 : 0))
+                    .clamp(0.0, constraints.maxHeight)
+                    .toDouble();
+            final stackActions = scale > 1.6 || constraints.maxWidth < 280;
+            final compactEntry =
+                !widget.cameraUnavailable &&
+                MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                constraints.maxHeight < 300 &&
+                scale > 1.6;
+            final cancel = Semantics(
+              key: const ValueKey('buy-cancel-product-code-semantics'),
+              container: true,
+              button: true,
+              enabled: true,
+              label: 'Cancel',
+              excludeSemantics: true,
+              onTap: () => Navigator.of(context).pop(),
+              child: TextButton(
+                key: const ValueKey('buy-cancel-product-code'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
                   ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            color: BuyV2Colors.ink,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w900,
-                          ),
-                        ),
-                        Text(
-                          widget.cameraUnavailable
-                              ? 'Use a code now, or allow camera access in settings.'
-                              : 'Barcode, QR or catalogue code',
-                          style: const TextStyle(
-                            color: BuyV2Colors.muted,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (widget.canOpenSettings)
-                    IconButton(
-                      key: const ValueKey('buy-scanner-open-settings'),
-                      tooltip: 'Open camera settings',
-                      onPressed: () async {
-                        await openAppSettings();
-                      },
-                      icon: const Icon(Icons.settings_rounded),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 7),
-              TextField(
-                key: const ValueKey('buy-product-code-field'),
-                controller: _controller,
-                autofocus: !widget.cameraUnavailable,
-                textInputAction: TextInputAction.search,
-                decoration: const InputDecoration(
-                  isDense: true,
-                  labelText: 'Product code',
-                  hintText: 'Scan number or product code',
-                  prefixIcon: Icon(Icons.barcode_reader),
                 ),
-                onSubmitted: _submit,
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('Cancel', textAlign: TextAlign.center),
               ),
-              const SizedBox(height: 6),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () => Navigator.of(context).pop(),
-                      child: const Text('Cancel'),
-                    ),
+            );
+            final submit = Semantics(
+              key: const ValueKey('buy-use-product-code-semantics'),
+              container: true,
+              button: true,
+              enabled: true,
+              label: 'Find product',
+              excludeSemantics: true,
+              onTap: _submit,
+              child: FilledButton.icon(
+                key: const ValueKey('buy-use-product-code'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size(0, 44),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 10,
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton.icon(
-                      key: const ValueKey('buy-use-product-code'),
-                      onPressed: _submit,
-                      icon: const Icon(Icons.search_rounded, size: 18),
-                      label: const Text('Find product'),
-                    ),
-                  ),
-                ],
+                ),
+                onPressed: _submit,
+                icon: const Icon(Icons.search_rounded, size: 18),
+                label: const Text('Find product', textAlign: TextAlign.center),
               ),
-            ],
-          ),
+            );
+            return SizedBox(
+              key: const ValueKey('buy-manual-code-panel'),
+              height: height,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Expanded(
+                      child: SingleChildScrollView(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            if (!compactEntry) ...[
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 32,
+                                    height: 32,
+                                    decoration: BoxDecoration(
+                                      color: BuyV2Colors.softOrange,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: const Icon(
+                                      Icons.qr_code_scanner_rounded,
+                                      color: BuyV2Colors.orange,
+                                      size: 19,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          title,
+                                          style: const TextStyle(
+                                            color: BuyV2Colors.ink,
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w900,
+                                          ),
+                                        ),
+                                        Text(
+                                          widget.cameraUnavailable
+                                              ? 'Use a code now, or allow camera access in settings.'
+                                              : 'Barcode, QR or catalogue code',
+                                          style: const TextStyle(
+                                            color: BuyV2Colors.muted,
+                                            fontSize: 10,
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  if (widget.canOpenSettings)
+                                    IconButton(
+                                      key: const ValueKey(
+                                        'buy-scanner-open-settings',
+                                      ),
+                                      tooltip: 'Open camera settings',
+                                      onPressed: () async {
+                                        await openAppSettings();
+                                      },
+                                      icon: const Icon(Icons.settings_rounded),
+                                    ),
+                                ],
+                              ),
+                              const SizedBox(height: 7),
+                            ],
+                            if (compactEntry) const SizedBox(height: 12),
+                            TextField(
+                              key: const ValueKey('buy-product-code-field'),
+                              controller: _controller,
+                              autofocus: !widget.cameraUnavailable,
+                              textInputAction: TextInputAction.search,
+                              decoration: InputDecoration(
+                                isDense: true,
+                                labelText: 'Product code',
+                                hintText: 'Scan number or product code',
+                                errorText: _showCodeError
+                                    ? 'Enter a product code'
+                                    : null,
+                                errorMaxLines: 2,
+                                prefixIcon: const Icon(Icons.barcode_reader),
+                              ),
+                              onChanged: (_) {
+                                if (_showCodeError) {
+                                  setState(() => _showCodeError = false);
+                                }
+                              },
+                              onSubmitted: _submit,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    if (stackActions)
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [submit, const SizedBox(height: 6), cancel],
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(child: cancel),
+                          const SizedBox(width: 8),
+                          Expanded(flex: 2, child: submit),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -207,7 +512,8 @@ class BuyV2ProductScanner extends StatefulWidget {
   State<BuyV2ProductScanner> createState() => _BuyV2ProductScannerState();
 }
 
-class _BuyV2ProductScannerState extends State<BuyV2ProductScanner> {
+class _BuyV2ProductScannerState extends State<BuyV2ProductScanner>
+    with SingleTickerProviderStateMixin {
   late final MobileScannerController _controller = MobileScannerController(
     detectionSpeed: DetectionSpeed.noDuplicates,
     formats: const [
@@ -221,10 +527,52 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner> {
       BarcodeFormat.dataMatrix,
     ],
   );
+  late final AnimationController _scanLineController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1500),
+    value: .5,
+  );
+  Timer? _scanFeedbackTimer;
   bool _handled = false;
+  bool _scanActionBusy = false;
+  bool _manualOpen = false;
+  bool? _motionEnabled;
+  String? _scanStatus;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_syncScanMotion);
+  }
+
+  void _syncScanMotion() {
+    if (!mounted) return;
+    final active = _controller.value.isRunning && !_handled && !_manualOpen;
+    if (_motionEnabled == true && active) {
+      if (!_scanLineController.isAnimating) {
+        unawaited(_scanLineController.repeat(reverse: true));
+      }
+    } else {
+      _scanLineController
+        ..stop()
+        ..value = .5;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final motionEnabled = !MediaQuery.disableAnimationsOf(context);
+    if (_motionEnabled == motionEnabled) return;
+    _motionEnabled = motionEnabled;
+    _syncScanMotion();
+  }
 
   @override
   void dispose() {
+    _scanFeedbackTimer?.cancel();
+    _controller.removeListener(_syncScanMotion);
+    _scanLineController.dispose();
     unawaited(_controller.dispose());
     super.dispose();
   }
@@ -232,26 +580,147 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner> {
   Future<void> _complete(String code) async {
     if (_handled || code.trim().isEmpty) return;
     _handled = true;
-    await _controller.stop();
+    _scanFeedbackTimer?.cancel();
+    if (mounted) {
+      setState(() {
+        _scanActionBusy = false;
+        _scanStatus = 'Code found';
+      });
+    }
+    unawaited(HapticFeedback.mediumImpact());
+    try {
+      await _controller.stop();
+    } on Object {
+      // A decoded/manual result must not be lost if camera teardown fails.
+    }
+    await Future<void>.delayed(const Duration(milliseconds: 180));
     if (mounted) Navigator.of(context).pop(code.trim());
   }
 
+  Future<void> _scanNow() async {
+    if (_handled ||
+        _scanActionBusy ||
+        _manualOpen ||
+        _controller.value.isStarting) {
+      return;
+    }
+    _scanFeedbackTimer?.cancel();
+    setState(() {
+      _scanActionBusy = true;
+      _scanStatus = null;
+    });
+    unawaited(HapticFeedback.selectionClick());
+    try {
+      final direction = _controller.value.cameraDirection;
+      await _controller.stop();
+      if (!mounted || _handled || _manualOpen) return;
+      await _controller.start(
+        cameraDirection: direction == CameraFacing.unknown ? null : direction,
+      );
+    } on Object {
+      if (!mounted || _handled) return;
+      setState(() {
+        _scanActionBusy = false;
+        _scanStatus = 'Camera could not restart. Enter the code instead.';
+      });
+      return;
+    }
+    if (!mounted || _handled || _manualOpen) return;
+    if (!_controller.value.isRunning) {
+      setState(() {
+        _scanActionBusy = false;
+        _scanStatus = 'Camera could not start. Enter the code instead.';
+      });
+      return;
+    }
+    setState(() => _scanStatus = 'Scanning now — hold the code steady');
+    _scanFeedbackTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (!mounted || _handled) return;
+      setState(() {
+        _scanActionBusy = false;
+        _scanStatus = 'Still scanning — move closer or enter the code';
+      });
+    });
+  }
+
   Future<void> _enterCode() async {
-    await _controller.stop();
+    if (_handled || _manualOpen || _scanActionBusy) return;
+    _scanFeedbackTimer?.cancel();
+    final direction = _controller.value.cameraDirection;
+    setState(() {
+      _manualOpen = true;
+      _scanStatus = null;
+    });
+    _syncScanMotion();
+    try {
+      await _controller.stop();
+    } on Object {
+      // Manual entry remains available even when the camera cannot stop cleanly.
+    }
     if (!mounted) return;
     final code = await showBuyV2ManualCodeSheet(context);
     if (!mounted) return;
+    setState(() => _manualOpen = false);
     if (code != null) {
       await _complete(code);
     } else {
-      await _controller.start();
+      try {
+        await _controller.start(
+          cameraDirection: direction == CameraFacing.unknown ? null : direction,
+        );
+        if (mounted && !_controller.value.isRunning) {
+          setState(
+            () =>
+                _scanStatus = 'Camera could not start. Enter the code instead.',
+          );
+        }
+      } on Object {
+        if (mounted) {
+          setState(
+            () =>
+                _scanStatus = 'Camera could not start. Enter the code instead.',
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _changeCameraControl({required bool torch}) async {
+    if (_handled ||
+        _scanActionBusy ||
+        _manualOpen ||
+        !_controller.value.isRunning) {
+      return;
+    }
+    final previous = _controller.value;
+    _scanFeedbackTimer?.cancel();
+    setState(() {
+      _scanActionBusy = true;
+      _scanStatus = null;
+    });
+    try {
+      if (torch) {
+        await _controller.toggleTorch();
+      } else {
+        await _controller.switchCamera();
+      }
+      if (!mounted || _handled) return;
+      if (!torch &&
+          _controller.value.cameraDirection == previous.cameraDirection) {
+        _scanStatus = 'Another camera is not available';
+      }
+    } on Object {
+      if (!mounted || _handled) return;
+      _scanStatus = torch
+          ? 'Torch could not change. Try again.'
+          : 'Camera could not switch. Try again or enter the code.';
+    } finally {
+      if (mounted && !_handled) setState(() => _scanActionBusy = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final frameSize = (size.width * .64).clamp(210.0, 292.0);
     return Scaffold(
       key: const ValueKey('buy-product-scanner'),
       backgroundColor: Colors.black,
@@ -262,6 +731,7 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner> {
             controller: _controller,
             tapToFocus: true,
             onDetect: (capture) {
+              if (_manualOpen) return;
               for (final barcode in capture.barcodes) {
                 final value = barcode.rawValue?.trim();
                 if (value != null && value.isNotEmpty) {
@@ -273,115 +743,428 @@ class _BuyV2ProductScannerState extends State<BuyV2ProductScanner> {
             placeholderBuilder: (context) => const Center(
               child: CircularProgressIndicator(color: Colors.white),
             ),
-            errorBuilder: (context, error) => _ScannerCameraError(
-              message: error.errorDetails?.message,
-              onManual: _enterCode,
-            ),
+            errorBuilder: (context, error) =>
+                const ColoredBox(color: Color(0xFF09091D)),
           ),
-          Center(
-            child: IgnorePointer(
-              child: SizedBox(
-                width: frameSize,
-                height: frameSize,
-                child: CustomPaint(painter: const _ScannerFramePainter()),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
-              child: Column(
-                children: [
-                  Row(
-                    children: [
-                      _ScannerControl(
-                        key: const ValueKey('buy-close-scanner'),
-                        icon: Icons.close_rounded,
-                        label: 'Close scanner',
-                        onTap: () => Navigator.of(context).pop(),
-                      ),
-                      const Spacer(),
-                      _ScannerControl(
-                        key: const ValueKey('buy-scanner-torch'),
-                        icon: Icons.flashlight_on_rounded,
-                        label: 'Torch',
-                        onTap: _controller.toggleTorch,
-                      ),
-                      const SizedBox(width: 8),
-                      _ScannerControl(
-                        key: const ValueKey('buy-scanner-camera'),
-                        icon: Icons.cameraswitch_rounded,
-                        label: 'Switch camera',
-                        onTap: _controller.switchCamera,
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  Container(
-                    constraints: const BoxConstraints(maxWidth: 430),
-                    padding: const EdgeInsets.fromLTRB(12, 7, 6, 6),
-                    decoration: BoxDecoration(
-                      color: const Color(0xE6121230),
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(color: Colors.white24),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Colors.black45,
-                          blurRadius: 22,
-                          offset: Offset(0, 8),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      children: [
-                        const Expanded(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'CAMERA · BARCODE · QR',
-                                style: TextStyle(
-                                  color: BuyV2Colors.orange,
-                                  fontSize: 9,
-                                  letterSpacing: 1.1,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                              SizedBox(height: 2),
-                              Text(
-                                'Place one code inside the frame',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w900,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        TextButton(
-                          key: const ValueKey('buy-scanner-enter-code'),
-                          onPressed: _enterCode,
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(88, 44),
-                            foregroundColor: BuyV2Colors.orange,
-                            backgroundColor: Colors.white10,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: const Text('Enter code'),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          ValueListenableBuilder<MobileScannerState>(
+            valueListenable: _controller,
+            builder: (context, camera, _) => _ScannerOverlay(
+              camera: camera,
+              feedback: _scanStatus,
+              busy: _scanActionBusy || camera.isStarting || _handled,
+              manualOpen: _manualOpen,
+              scanLine: _scanLineController,
+              onClose: () => Navigator.of(context).pop(),
+              onTorch: () => _changeCameraControl(torch: true),
+              onCamera: () => _changeCameraControl(torch: false),
+              onScanNow: _scanNow,
+              onEnterCode: _enterCode,
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+@visibleForTesting
+Widget buildBuyV2ScannerOverlayForTesting({
+  required MobileScannerState camera,
+  String? feedback,
+  bool busy = false,
+  bool manualOpen = false,
+  Animation<double> scanLine = const AlwaysStoppedAnimation(.5),
+  required VoidCallback onClose,
+  required Future<void> Function() onTorch,
+  required Future<void> Function() onCamera,
+  required Future<void> Function() onScanNow,
+  required Future<void> Function() onEnterCode,
+}) => _ScannerOverlay(
+  camera: camera,
+  feedback: feedback,
+  busy: busy,
+  manualOpen: manualOpen,
+  scanLine: scanLine,
+  onClose: onClose,
+  onTorch: onTorch,
+  onCamera: onCamera,
+  onScanNow: onScanNow,
+  onEnterCode: onEnterCode,
+);
+
+class _ScannerOverlay extends StatelessWidget {
+  const _ScannerOverlay({
+    required this.camera,
+    required this.feedback,
+    required this.busy,
+    required this.manualOpen,
+    required this.scanLine,
+    required this.onClose,
+    required this.onTorch,
+    required this.onCamera,
+    required this.onScanNow,
+    required this.onEnterCode,
+  });
+
+  final MobileScannerState camera;
+  final String? feedback;
+  final bool busy;
+  final bool manualOpen;
+  final Animation<double> scanLine;
+  final VoidCallback onClose;
+  final Future<void> Function() onTorch;
+  final Future<void> Function() onCamera;
+  final Future<void> Function() onScanNow;
+  final Future<void> Function() onEnterCode;
+
+  @override
+  Widget build(BuildContext context) {
+    final active = camera.isRunning && !manualOpen && camera.error == null;
+    final status = manualOpen
+        ? 'Scanning paused while you enter a code'
+        : feedback == 'Code found'
+        ? feedback!
+        : camera.error != null
+        ? 'Camera unavailable. Try Scan now or enter the code.'
+        : camera.isStarting || !camera.isInitialized
+        ? 'Starting camera…'
+        : !active
+        ? 'Camera paused. Tap Scan now to resume.'
+        : feedback ?? 'Automatic scanning is active';
+    final torchAvailable =
+        active && camera.torchState != TorchState.unavailable;
+    final torchOn = camera.torchState == TorchState.on;
+    final torchAutomatic = camera.torchState == TorchState.auto;
+    final canSwitch =
+        active &&
+        (camera.availableCameras == null || camera.availableCameras! > 1) &&
+        (camera.cameraDirection == CameraFacing.front ||
+            camera.cameraDirection == CameraFacing.back);
+    final actions = SingleChildScrollView(
+      child: _ScannerActionPanel(
+        status: status,
+        scanning: busy && active,
+        busy: busy || manualOpen || camera.isStarting,
+        onScanNow: onScanNow,
+        onEnterCode: onEnterCode,
+      ),
+    );
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 14),
+        child: LayoutBuilder(
+          builder: (context, constraints) => Column(
+            children: [
+              Row(
+                children: [
+                  _ScannerControl(
+                    key: const ValueKey('buy-close-scanner'),
+                    icon: Icons.close_rounded,
+                    label: 'Close scanner',
+                    onTap: onClose,
+                  ),
+                  const Spacer(),
+                  _ScannerControl(
+                    key: const ValueKey('buy-scanner-torch'),
+                    icon: torchAutomatic
+                        ? Icons.flash_auto_rounded
+                        : torchOn
+                        ? Icons.flashlight_on_rounded
+                        : Icons.flashlight_off_rounded,
+                    label: !torchAvailable
+                        ? 'Torch unavailable on this camera'
+                        : torchAutomatic
+                        ? 'Torch automatic'
+                        : torchOn
+                        ? 'Torch on'
+                        : 'Torch off',
+                    toggled: torchAvailable && !torchAutomatic ? torchOn : null,
+                    onTap: torchAvailable && !busy ? () => onTorch() : null,
+                  ),
+                  const SizedBox(width: 8),
+                  _ScannerControl(
+                    key: const ValueKey('buy-scanner-camera'),
+                    icon: Icons.cameraswitch_rounded,
+                    label: !canSwitch
+                        ? 'Another camera is not available'
+                        : camera.cameraDirection == CameraFacing.front
+                        ? 'Switch to rear camera'
+                        : 'Switch to front camera',
+                    onTap: canSwitch && !busy ? () => onCamera() : null,
+                  ),
+                ],
+              ),
+              Expanded(
+                child: constraints.maxWidth > constraints.maxHeight
+                    ? Row(
+                        children: [
+                          Expanded(
+                            child: _ScannerFrame(
+                              active: active,
+                              scanLine: scanLine,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(child: actions),
+                        ],
+                      )
+                    : Column(
+                        children: [
+                          Expanded(
+                            child: _ScannerFrame(
+                              active: active,
+                              scanLine: scanLine,
+                            ),
+                          ),
+                          ConstrainedBox(
+                            constraints: BoxConstraints(
+                              maxHeight: constraints.maxHeight * .65,
+                            ),
+                            child: actions,
+                          ),
+                        ],
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ScannerFrame extends StatelessWidget {
+  const _ScannerFrame({required this.active, required this.scanLine});
+  final bool active;
+  final Animation<double> scanLine;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final side = (constraints.maxWidth * .64)
+          .clamp(0.0, 292.0)
+          .clamp(0.0, (constraints.maxHeight - 24).clamp(0.0, double.infinity))
+          .toDouble();
+      return Center(
+        child: IgnorePointer(
+          child: SizedBox.square(
+            key: const ValueKey('buy-scanner-frame'),
+            dimension: side,
+            child: Stack(
+              children: [
+                if (side > 48)
+                  const Positioned.fill(
+                    child: CustomPaint(painter: _ScannerFramePainter()),
+                  ),
+                if (active && side > 48)
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: scanLine,
+                      builder: (context, _) => Align(
+                        alignment: Alignment(0, (scanLine.value * 1.55) - .775),
+                        child: Container(
+                          key: const ValueKey('buy-scanner-active-line'),
+                          height: 2.5,
+                          margin: const EdgeInsets.symmetric(horizontal: 24),
+                          decoration: BoxDecoration(
+                            color: BuyV2Colors.royal,
+                            borderRadius: BorderRadius.circular(2),
+                            boxShadow: const [
+                              BoxShadow(
+                                color: Color(0x990A65FF),
+                                blurRadius: 10,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
+}
+
+@visibleForTesting
+Widget buildBuyV2ScannerActionPanelForTesting({
+  required String status,
+  required bool scanning,
+  required Future<void> Function() onScanNow,
+  required Future<void> Function() onEnterCode,
+}) => _ScannerActionPanel(
+  status: status,
+  scanning: scanning,
+  onScanNow: onScanNow,
+  onEnterCode: onEnterCode,
+);
+
+class _ScannerActionPanel extends StatelessWidget {
+  const _ScannerActionPanel({
+    required this.status,
+    required this.scanning,
+    this.busy = false,
+    required this.onScanNow,
+    required this.onEnterCode,
+  });
+
+  final String status;
+  final bool scanning;
+  final bool busy;
+  final Future<void> Function() onScanNow;
+  final Future<void> Function() onEnterCode;
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final stackActions =
+            constraints.maxWidth.clamp(0, 430) < 320 ||
+            MediaQuery.textScalerOf(context).scale(12) > 20;
+        final scanAction = ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: FilledButton.icon(
+            key: const ValueKey('buy-scanner-scan-now'),
+            onPressed: scanning || busy ? null : () => onScanNow(),
+            style: FilledButton.styleFrom(
+              backgroundColor: BuyV2Colors.royal,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: BuyV2Colors.royal,
+              disabledForegroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            icon: scanning
+                ? const SizedBox.square(
+                    dimension: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.center_focus_strong_rounded, size: 18),
+            label: Text(
+              scanning ? 'Scanning…' : 'Scan now',
+              textAlign: TextAlign.center,
+            ),
+          ),
+        );
+        final manualAction = ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: OutlinedButton(
+            key: const ValueKey('buy-scanner-enter-code'),
+            onPressed: busy ? null : () => onEnterCode(),
+            style: OutlinedButton.styleFrom(
+              backgroundColor: const Color(0xFF121230),
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: const Color(0xFF121230),
+              disabledForegroundColor: Colors.white60,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              side: const BorderSide(color: Colors.white70),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text('Enter code', textAlign: TextAlign.center),
+          ),
+        );
+        return Semantics(
+          key: const ValueKey('buy-scanner-active-status'),
+          liveRegion: true,
+          label: status,
+          child: Container(
+            constraints: const BoxConstraints(maxWidth: 430),
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: const Color(0xE6121230),
+              borderRadius: BorderRadius.circular(15),
+              border: Border.all(color: Colors.white24),
+              boxShadow: const [
+                BoxShadow(
+                  color: Colors.black45,
+                  blurRadius: 22,
+                  offset: Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'BARCODE · QR',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 9,
+                    letterSpacing: 1.1,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                const Text(
+                  'Place one code inside the frame',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    AnimatedContainer(
+                      duration: MediaQuery.disableAnimationsOf(context)
+                          ? Duration.zero
+                          : const Duration(milliseconds: 180),
+                      width: scanning ? 9 : 7,
+                      height: scanning ? 9 : 7,
+                      decoration: BoxDecoration(
+                        color: scanning ? BuyV2Colors.royal : Colors.white70,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: AnimatedSwitcher(
+                        duration: MediaQuery.disableAnimationsOf(context)
+                            ? Duration.zero
+                            : const Duration(milliseconds: 180),
+                        child: Text(
+                          status,
+                          key: ValueKey(status),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                if (stackActions) ...[
+                  scanAction,
+                  const SizedBox(height: 7),
+                  manualAction,
+                ] else
+                  Row(
+                    children: [
+                      Expanded(flex: 2, child: scanAction),
+                      const SizedBox(width: 8),
+                      Expanded(child: manualAction),
+                    ],
+                  ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -392,78 +1175,39 @@ class _ScannerControl extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.onTap,
+    this.toggled,
   });
 
   final IconData icon;
   final String label;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
+  final bool? toggled;
 
   @override
   Widget build(BuildContext context) {
     return Semantics(
       label: label,
       button: true,
-      child: Material(
-        color: const Color(0xB8121230),
-        shape: const CircleBorder(),
-        child: InkWell(
-          onTap: onTap,
-          customBorder: const CircleBorder(),
-          child: SizedBox(
-            width: 44,
-            height: 44,
-            child: Icon(icon, color: Colors.white, size: 22),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ScannerCameraError extends StatelessWidget {
-  const _ScannerCameraError({required this.message, required this.onManual});
-
-  final String? message;
-  final VoidCallback onManual;
-
-  @override
-  Widget build(BuildContext context) {
-    return ColoredBox(
-      color: const Color(0xFF09091D),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.no_photography_rounded,
-                color: Colors.white,
-                size: 42,
+      enabled: onTap != null,
+      toggled: toggled,
+      child: Tooltip(
+        message: label,
+        excludeFromSemantics: true,
+        child: Material(
+          color: toggled == true ? BuyV2Colors.royal : const Color(0xB8121230),
+          shape: const CircleBorder(),
+          child: InkWell(
+            onTap: onTap,
+            customBorder: const CircleBorder(),
+            child: SizedBox(
+              width: 44,
+              height: 44,
+              child: Icon(
+                icon,
+                color: onTap == null ? Colors.white54 : Colors.white,
+                size: 22,
               ),
-              const SizedBox(height: 10),
-              const Text(
-                'Camera could not start',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 17,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              if (message case final detail? when detail.trim().isNotEmpty) ...[
-                const SizedBox(height: 4),
-                Text(
-                  detail,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white70, fontSize: 10),
-                ),
-              ],
-              const SizedBox(height: 12),
-              FilledButton(
-                onPressed: onManual,
-                child: const Text('Enter product code'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

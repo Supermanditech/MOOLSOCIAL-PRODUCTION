@@ -25,6 +25,8 @@ enum RetailerOrderStage {
   outForDelivery,
   nearby,
   delivered,
+  cancelled,
+  returned,
   cannotFulfil,
 }
 
@@ -43,6 +45,8 @@ extension RetailerOrderStageLabel on RetailerOrderStage {
     RetailerOrderStage.outForDelivery => 'Out for delivery',
     RetailerOrderStage.nearby => 'Near customer',
     RetailerOrderStage.delivered => 'Delivered',
+    RetailerOrderStage.cancelled => 'Cancelled',
+    RetailerOrderStage.returned => 'Returned',
     RetailerOrderStage.cannotFulfil => 'Not fulfilled',
   };
 }

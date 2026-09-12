@@ -1,0 +1,4 @@
+PASS self-test
+Buy data-egress boundary self-test passed: seven forbidden cases were rejected and two safe cases were accepted.
+PASS actual
+Buy data-egress boundary passed: 27 native V2 files contain no direct log/analytics/share/store/credential sink; only the approved address-request and sealed user-invoked Chat Copy clipboard actions are allowed.

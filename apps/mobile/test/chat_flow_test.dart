@@ -1,13 +1,580 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/features/chat/chat_models.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
+import 'package:moolsocial/features/chat/widgets/chat_motion.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/shared/shared_models.dart';
+import 'package:moolsocial/features/shared/social_content_gateway.dart';
+import 'package:moolsocial/features/shared/shared_session.dart';
+
+class _SupportDraftMemory implements ChatSupportDraftStore {
+  @override
+  String? accountScope = 'account';
+  final data = <(String, String), String>{};
+  Completer<String?>? delayed;
+  bool failWrite = false;
+  bool failRead = false;
+  @override
+  Future<String?> read(String scope, String applicationId) async {
+    if (failRead) throw StateError('test read unavailable');
+    return delayed == null
+        ? data[(scope, applicationId)]
+        : await delayed!.future;
+  }
+
+  @override
+  Future<void> write(String scope, String applicationId, String text) async {
+    if (failWrite) throw StateError('test write unavailable');
+    data[(scope, applicationId)] = text;
+  }
+}
 
 void main() {
+  for (final boundary in ['clear', 'account', 'dispose']) {
+    test('R6617 late support read respects $boundary', () async {
+      final store = _SupportDraftMemory()..delayed = Completer<String?>();
+      final chat = ChatSession(supportDraftStore: store);
+      final pending = chat.restoreSupportDraft('A');
+      await Future<void>.delayed(Duration.zero);
+      if (boundary == 'clear') {
+        chat.discardDraftForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        );
+      } else if (boundary == 'account') {
+        store.accountScope = 'other';
+        chat.resetForAuthenticationBoundary();
+      } else {
+        chat.dispose();
+      }
+      store.delayed!.complete('Must not return');
+      expect(await pending, isFalse);
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        isEmpty,
+      );
+      await chat.flushSupportDrafts();
+      if (boundary == 'clear') expect(store.data[('account', 'A')], '');
+      if (boundary != 'dispose') chat.dispose();
+    });
+  }
+  test(
+    'R6617 support storage errors and retry remain application scoped',
+    () async {
+      final store = _SupportDraftMemory()..failWrite = true;
+      final chat = ChatSession(supportDraftStore: store);
+      addTearDown(chat.dispose);
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'Keep this text',
+        workspaceApplicationId: 'A',
+      );
+      await chat.flushSupportDrafts();
+      expect(chat.supportDraftStorageErrorFor('A'), isNotNull);
+      expect(chat.supportDraftStorageErrorFor('B'), isNull);
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'Keep this text',
+      );
+      store.failWrite = false;
+      await chat.retrySupportDraftStorage('A');
+      expect(chat.supportDraftStorageErrorFor('A'), isNull);
+      expect(store.data[('account', 'A')], 'Keep this text');
+      store.failRead = true;
+      expect(await chat.restoreSupportDraft('B'), isFalse);
+      expect(chat.supportDraftStorageErrorFor('B'), isNotNull);
+      store.failRead = false;
+      store.data[('account', 'B')] = 'Recovered B';
+      expect(await chat.retrySupportDraftStorage('B'), isTrue);
+      expect(chat.supportDraftStorageErrorFor('B'), isNull);
+    },
+  );
+  for (final signOut in [false, true]) {
+    test(
+      'R6617 queued support save ${signOut ? 'invalidated by signout' : 'survives disposal'}',
+      () async {
+        final store = _SupportDraftMemory();
+        final chat = ChatSession(supportDraftStore: store);
+        chat.setDraftTextForSession(
+          'workspace-support',
+          'Unsent note',
+          workspaceApplicationId: 'A',
+        );
+        if (signOut) chat.resetForAuthenticationBoundary();
+        chat.dispose();
+        await chat.flushSupportDrafts();
+        expect(store.data[('account', 'A')], signOut ? isNull : 'Unsent note');
+      },
+    );
+  }
+  test(
+    'R6617 support drafts restart with application and account isolation',
+    () async {
+      final store = _SupportDraftMemory();
+      final first = ChatSession(supportDraftStore: store);
+      first.setDraftTextForSession(
+        'workspace-support',
+        'First draft',
+        workspaceApplicationId: 'A',
+      );
+      first.setDraftTextForSession(
+        'workspace-support',
+        '',
+        workspaceApplicationId: 'B',
+      );
+      await first.flushSupportDrafts();
+      first.dispose();
+      final restored = ChatSession(supportDraftStore: store);
+      addTearDown(restored.dispose);
+      expect(await restored.restoreSupportDraft('A'), isTrue);
+      expect(await restored.restoreSupportDraft('B'), isTrue);
+      expect(
+        restored.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'First draft',
+      );
+      expect(
+        restored.hasSavedDraftForSession(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        isTrue,
+      );
+      store.accountScope = 'other';
+      restored.resetForAuthenticationBoundary();
+      expect(await restored.restoreSupportDraft('A'), isFalse);
+      expect(
+        restored.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        isEmpty,
+      );
+    },
+  );
+  test('R6617 late support draft read never overwrites typing', () async {
+    final store = _SupportDraftMemory()..delayed = Completer<String?>();
+    final chat = ChatSession(supportDraftStore: store);
+    addTearDown(chat.dispose);
+    final loading = chat.restoreSupportDraft('A');
+    await Future<void>.delayed(Duration.zero);
+    chat.setDraftTextForSession(
+      'workspace-support',
+      'New typing',
+      workspaceApplicationId: 'A',
+    );
+    store.delayed!.complete('Old saved text');
+    expect(await loading, isFalse);
+    expect(
+      chat.draftTextForSession(
+        'workspace-support',
+        workspaceApplicationId: 'A',
+      ),
+      'New typing',
+    );
+    await chat.flushSupportDrafts();
+  });
+  test(
+    'r6611 support drafts preserve applications, generic text and explicit empty',
+    () {
+      final chat = ChatSession();
+      addTearDown(chat.dispose);
+      const thread = 'workspace-support';
+      chat.setDraftTextForSession(thread, 'Existing unsent support draft');
+      chat.setDraftTextForSession(
+        thread,
+        'Application A notes',
+        workspaceApplicationId: 'A',
+      );
+      chat.setDraftTextForSession(
+        thread,
+        'Application B notes',
+        workspaceApplicationId: 'B',
+      );
+      expect(chat.draftTextForSession(thread), 'Existing unsent support draft');
+      expect(
+        chat.draftTextForSession(thread, workspaceApplicationId: 'A'),
+        'Application A notes',
+      );
+      expect(
+        chat.draftTextForSession(thread, workspaceApplicationId: 'B'),
+        'Application B notes',
+      );
+      chat.setDraftTextForSession(thread, '', workspaceApplicationId: 'A');
+      expect(
+        chat.hasSavedDraftForSession(thread, workspaceApplicationId: 'A'),
+        isTrue,
+      );
+      expect(
+        chat.hasDraftForSession(thread, workspaceApplicationId: 'A'),
+        isFalse,
+      );
+      chat.discardDraftForSession(thread, workspaceApplicationId: 'B');
+      expect(chat.draftTextForSession(thread), 'Existing unsent support draft');
+      expect(
+        chat.hasSavedDraftForSession(thread, workspaceApplicationId: 'B'),
+        isTrue,
+      );
+      // Application parameters cannot fork an unrelated Buy conversation.
+      chat.setDraftTextForSession(
+        'mahadev',
+        'Buy draft',
+        workspaceApplicationId: 'A',
+      );
+      expect(chat.draftTextForSession('mahadev'), 'Buy draft');
+    },
+  );
+
+  test(
+    'r6611 support pending document and reply belong to their initiating application',
+    () async {
+      final picker = _R6611AttachmentPicker();
+      final gateway = _R6611DraftGateway();
+      final chat = ChatSession.production(
+        gateway: gateway,
+        attachmentPicker: picker,
+      );
+      addTearDown(chat.dispose);
+      const thread = 'workspace-support';
+      await chat.loadMessages(thread);
+      expect(
+        chat.startReply(
+          thread,
+          'support-question',
+          workspaceApplicationId: 'A',
+        ),
+        isTrue,
+      );
+      final pending = chat.selectAttachment(
+        thread,
+        ChatAttachmentKind.document,
+        workspaceApplicationId: 'A',
+      );
+      chat.setDraftTextForSession(
+        thread,
+        'B remains untouched',
+        workspaceApplicationId: 'B',
+      );
+      picker.result.complete(_r6611Document());
+      expect(await pending, isTrue);
+      expect(
+        chat.selectedAttachment(thread, workspaceApplicationId: 'A')?.name,
+        'application-proof.pdf',
+      );
+      expect(
+        chat.replyTarget(thread, workspaceApplicationId: 'A')?.id,
+        'support-question',
+      );
+      expect(
+        chat.selectedAttachment(thread, workspaceApplicationId: 'B'),
+        isNull,
+      );
+      expect(chat.replyTarget(thread, workspaceApplicationId: 'B'), isNull);
+      expect(chat.selectedAttachment(thread), isNull);
+      chat.discardDraftForSession(thread, workspaceApplicationId: 'B');
+      expect(
+        chat.hasDraftForSession(thread, workspaceApplicationId: 'A'),
+        isTrue,
+      );
+      chat.cancelSelectedAttachment(thread, workspaceApplicationId: 'A');
+      chat.cancelReply(thread, workspaceApplicationId: 'A');
+      expect(
+        chat.hasDraftForSession(thread, workspaceApplicationId: 'A'),
+        isFalse,
+      );
+    },
+  );
+
+  test(
+    'r6611 support late photo stays scoped and unknown native recovery is not assigned',
+    () async {
+      final picker = _R6611PhotoPicker();
+      final chat = ChatSession.production(
+        gateway: _R6611DraftGateway(),
+        photoPicker: picker,
+      );
+      addTearDown(chat.dispose);
+      final pending = chat.selectPhoto(
+        'workspace-support',
+        ChatPhotoSource.gallery,
+        workspaceApplicationId: 'A',
+      );
+      picker.result.complete(
+        ChatPickedPhoto(
+          name: 'proof.jpg',
+          contentType: 'image/jpeg',
+          bytes: Uint8List.fromList([1, 2]),
+        ),
+      );
+      expect(await pending, isTrue);
+      expect(
+        chat
+            .selectedPhoto('workspace-support', workspaceApplicationId: 'A')
+            ?.name,
+        'proof.jpg',
+      );
+      expect(
+        chat.selectedPhoto('workspace-support', workspaceApplicationId: 'B'),
+        isNull,
+      );
+      expect(
+        await chat.recoverInterruptedPhotoSelection(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        isFalse,
+      );
+      expect(picker.recoveryCalls, 0);
+      chat.cancelSelectedPhoto(
+        'workspace-support',
+        workspaceApplicationId: 'B',
+      );
+      expect(
+        chat.selectedPhoto('workspace-support', workspaceApplicationId: 'A'),
+        isNotNull,
+      );
+    },
+  );
+
+  for (final reset in [true, false]) {
+    test(
+      'r6611 support stale document completion is suppressed after ${reset ? 'account reset' : 'disposal'}',
+      () async {
+        final picker = _R6611AttachmentPicker();
+        final chat = ChatSession.production(
+          gateway: _R6611DraftGateway(),
+          attachmentPicker: picker,
+        );
+        final pending = chat.selectAttachment(
+          'workspace-support',
+          ChatAttachmentKind.document,
+          workspaceApplicationId: 'A',
+        );
+        if (reset) {
+          chat.resetForAuthenticationBoundary();
+          chat.setDraftTextForSession(
+            'workspace-support',
+            'New account',
+            workspaceApplicationId: 'A',
+          );
+        } else {
+          chat.dispose();
+        }
+        picker.result.complete(_r6611Document());
+        expect(await pending, isFalse);
+        expect(
+          chat.selectedAttachment(
+            'workspace-support',
+            workspaceApplicationId: 'A',
+          ),
+          isNull,
+        );
+        if (reset) {
+          expect(
+            chat.draftTextForSession(
+              'workspace-support',
+              workspaceApplicationId: 'A',
+            ),
+            'New account',
+          );
+          chat.dispose();
+        }
+      },
+    );
+  }
+
+  test(
+    'r6611 support late send after account reset cannot insert old messages',
+    () async {
+      final gateway = _R6611DraftGateway();
+      final chat = ChatSession.production(gateway: gateway);
+      addTearDown(chat.dispose);
+      final send = chat.send(
+        'workspace-support',
+        'Application A',
+        workspaceApplicationId: 'A',
+      );
+      chat.resetForAuthenticationBoundary();
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'New account draft',
+        workspaceApplicationId: 'A',
+      );
+      gateway.sendResult.complete(
+        const ChatMessage(
+          id: 'sent-old',
+          sender: 'You',
+          text: 'Application A',
+          timeLabel: 'Now',
+          mine: true,
+        ),
+      );
+      expect(await send, isFalse);
+      expect(chat.messages('workspace-support'), isEmpty);
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'New account draft',
+      );
+      expect(gateway.sentThreads, ['workspace-support']);
+    },
+  );
+
+  test(
+    'r6611 support failed send preserves draft and records retry origin',
+    () async {
+      final gateway = _R6611DraftGateway();
+      final chat = ChatSession.production(gateway: gateway);
+      addTearDown(chat.dispose);
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'A unsent',
+        workspaceApplicationId: 'A',
+      );
+      chat.setDraftTextForSession(
+        'workspace-support',
+        'B unsent',
+        workspaceApplicationId: 'B',
+      );
+      final send = chat.send(
+        'workspace-support',
+        'A unsent',
+        workspaceApplicationId: 'A',
+      );
+      gateway.sendResult.completeError(
+        const ChatServiceException('Connection interrupted.'),
+      );
+      expect(await send, isFalse);
+      final failed = chat.messages('workspace-support').single;
+      expect(chat.retryDraftMatchesApplication(failed.id, 'A'), isTrue);
+      expect(chat.retryDraftMatchesApplication(failed.id, 'B'), isFalse);
+      expect(
+        chat.threadActionError(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'Connection interrupted.',
+      );
+      expect(
+        chat.threadActionError(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        isNull,
+      );
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'A',
+        ),
+        'A unsent',
+      );
+      expect(
+        chat.draftTextForSession(
+          'workspace-support',
+          workspaceApplicationId: 'B',
+        ),
+        'B unsent',
+      );
+    },
+  );
+
+  for (final application in <String?>[null, 'A']) {
+    test(
+      'r6611 support retry preserves a newer draft and reply $application',
+      () async {
+        final gateway = _R6611DraftGateway();
+        final chat = ChatSession.production(gateway: gateway);
+        addTearDown(chat.dispose);
+        const thread = 'workspace-support';
+        await chat.loadMessages(thread);
+        chat.setDraftTextForSession(
+          thread,
+          'Original words',
+          workspaceApplicationId: application,
+        );
+        final first = chat.send(
+          thread,
+          'Original words',
+          workspaceApplicationId: application,
+        );
+        gateway.sendResult.completeError(
+          const ChatServiceException('Try again.'),
+        );
+        expect(await first, isFalse);
+        final failed = chat.messages(thread).last;
+        expect(
+          chat.retryDraftMatchesApplication(failed.id, application),
+          isTrue,
+        );
+        chat.setDraftTextForSession(
+          thread,
+          '',
+          workspaceApplicationId: application,
+        );
+        chat.setDraftTextForSession(
+          thread,
+          'Original words',
+          workspaceApplicationId: application,
+        );
+        expect(
+          chat.startReply(
+            thread,
+            'support-question',
+            workspaceApplicationId: application,
+          ),
+          isTrue,
+        );
+        expect(
+          chat.retryDraftMatchesApplication(failed.id, application),
+          isFalse,
+        );
+        gateway.sendResult = Completer<ChatMessage>();
+        final retry = chat.retry(thread, failed.id);
+        gateway.sendResult.complete(
+          const ChatMessage(
+            id: 'confirmed-retry',
+            sender: 'You',
+            text: 'Original words',
+            timeLabel: 'Now',
+            mine: true,
+          ),
+        );
+        expect(await retry, isTrue);
+        expect(
+          gateway.sentReplies,
+          [null, null],
+          reason: 'A retry must not borrow a newly selected reply.',
+        );
+        expect(
+          chat.replyTarget(thread, workspaceApplicationId: application)?.id,
+          'support-question',
+        );
+        expect(
+          chat.draftTextForSession(thread, workspaceApplicationId: application),
+          'Original words',
+        );
+      },
+    );
+  }
   Future<JourneySession> readyJourney() async {
     final session = JourneySession(
       store: MemoryJourneyStore(
@@ -24,23 +591,135 @@ void main() {
     return session;
   }
 
+  Future<JourneySession> readyGuestJourney() async {
+    final session = JourneySession(
+      store: MemoryJourneyStore(
+        snapshot: const JourneySnapshot(
+          languageCode: 'en',
+          areaMode: 'manual',
+          areaLabel: 'Sardarpura',
+          setupComplete: true,
+        ),
+      ),
+      allowGuestReady: true,
+    );
+    await session.start();
+    return session;
+  }
+
   Future<void> mount(
     WidgetTester tester, {
     required String route,
     required JourneySession journey,
     required ChatSession chat,
+    SharedSession? sharedSession,
     Size size = const Size(412, 915),
   }) async {
     await tester.binding.setSurfaceSize(size);
     await tester.pumpWidget(
-      MoolSocialApp(
-        key: ValueKey(route),
-        session: journey,
-        chatSession: chat,
-        initialLocation: route,
+      RepaintBoundary(
+        key: const Key('support-draft-review-root'),
+        child: MoolSocialApp(
+          key: ValueKey(route),
+          session: journey,
+          chatSession: chat,
+          sharedSession: sharedSession,
+          initialLocation: route,
+        ),
       ),
     );
     await tester.pumpAndSettle();
+  }
+
+  testWidgets('R6617 support composer restores saved application draft', (
+    tester,
+  ) async {
+    final store = _SupportDraftMemory()
+      ..data[('account', 'A')] = 'Saved application question';
+    final chat = ChatSession(supportDraftStore: store);
+    final journey = await readyJourney();
+    addTearDown(() {
+      chat.dispose();
+      journey.dispose();
+      tester.binding.setSurfaceSize(null);
+    });
+    final route = Uri(
+      path: '/app/chat/thread/workspace-support',
+      queryParameters: {
+        'return': '/app/work/workspace/proof',
+        'workspaceApplication': 'A',
+        'workspaceBusiness': 'Test Kirana',
+      },
+    ).toString();
+    await mount(tester, route: route, journey: journey, chat: chat);
+    expect(
+      tester
+          .widget<TextField>(find.byKey(const Key('chat-message-field')))
+          .controller!
+          .text,
+      'Saved application question',
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R6617 support draft storage retry with keyboard $scale', (
+      tester,
+    ) async {
+      final store = _SupportDraftMemory()..failRead = true;
+      final chat = ChatSession(supportDraftStore: store);
+      final journey = await readyJourney();
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(() {
+        chat.dispose();
+        journey.dispose();
+        tester.binding.setSurfaceSize(null);
+        tester.platformDispatcher.clearTextScaleFactorTestValue();
+        tester.view.resetViewInsets();
+      });
+      final route = Uri(
+        path: '/app/chat/thread/workspace-support',
+        queryParameters: {
+          'return': '/app/work/workspace/proof',
+          'workspaceApplication': 'A',
+          'workspaceBusiness': 'Test Kirana',
+        },
+      ).toString();
+      await mount(
+        tester,
+        route: route,
+        journey: journey,
+        chat: chat,
+        size: const Size(320, 568),
+      );
+      final field = find.byKey(const Key('chat-message-field'));
+      await tester.tap(field);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 230);
+      await tester.pumpAndSettle();
+      final retry = find.byKey(const Key('chat-support-draft-storage-retry'));
+      expect(retry.hitTestable(), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+        const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+        expect(RegExp(r'^[a-z0-9-]+$').hasMatch(folder), isTrue);
+        await expectLater(
+          find.byKey(const Key('support-draft-review-root')),
+          matchesGoldenFile(
+            '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/support-storage-retry-$scale.png',
+          ),
+        );
+      }
+      store.failRead = false;
+      store.data[('account', 'A')] = 'Recovered question';
+      await tester.tap(retry);
+      await tester.pumpAndSettle();
+      expect(
+        tester.widget<TextField>(field).controller!.text,
+        'Recovered question',
+      );
+      expect(retry, findsNothing);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   Future<void> tapVisible(WidgetTester tester, Key key) async {
@@ -120,6 +799,15 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('No matching conversations'), findsOneWidget);
+      tester.view.viewInsets = const FakeViewPadding(bottom: 320);
+      await tester.pumpAndSettle();
+      final emptyTitle = tester.getRect(find.text('No matching conversations'));
+      final navigation = tester.getRect(
+        find.byKey(const Key('chat-native-navigation')),
+      );
+      expect(emptyTitle.bottom, lessThanOrEqualTo(navigation.top));
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-reset-search'));
 
       await tapVisible(tester, const Key('chat-filter-unread'));
@@ -127,33 +815,41 @@ void main() {
         find.byKey(const Key('chat-open-thread-home-basket')),
         findsNothing,
       );
-      expect(find.byKey(const Key('chat-open-thread-mahadev')), findsOneWidget);
+      expect(
+        find.byKey(const Key('chat-open-thread-shop-order')),
+        findsOneWidget,
+      );
 
       await tapVisible(tester, const Key('chat-new'));
-      expect(find.byKey(const Key('chat-new-open-feed')), findsOneWidget);
       expect(
-        find.textContaining('Open a public MoolSocial post'),
+        find.byKey(const ValueKey('chat-section-body-discover')),
         findsOneWidget,
       );
-      expect(find.byKey(const Key('chat-new-business')), findsNothing);
-      await tapVisible(tester, const Key('chat-new-cancel'));
+      expect(find.byKey(const Key('chat-new-open-feed')), findsNothing);
+      expect(find.byKey(const Key('chat-new-discover-people')), findsNothing);
+      await tapVisible(tester, const Key('chat-section-chats'));
       await tapVisible(tester, const Key('chat-filter-all'));
 
-      await tapVisible(tester, const Key('chat-voice-search'));
-      await tapVisible(tester, const Key('chat-use-voice-search'));
-      expect(find.text('Enter a conversation name.'), findsOneWidget);
-      await tester.enterText(
-        find.byKey(const Key('chat-voice-search-field')),
-        'Home Basket',
-      );
-      await tapVisible(tester, const Key('chat-use-voice-search'));
+      await tapVisible(tester, const Key('chat-open-inline-search'));
+      final inlineSearch = find.byKey(const Key('chat-search-field'));
       expect(
-        find.byKey(const Key('chat-open-thread-home-basket')),
+        tester.widget<TextField>(inlineSearch).focusNode!.hasFocus,
+        isTrue,
+      );
+      expect(
+        find.byKey(const Key('chat-search-assistance-field')),
+        findsNothing,
+      );
+      await tester.enterText(inlineSearch, 'Fresh Basket');
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-open-thread-shop-order')),
         findsOneWidget,
       );
 
-      await tapVisible(tester, const Key('chat-open-thread-home-basket'));
+      await tapVisible(tester, const Key('chat-open-thread-shop-order'));
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(find.text('Your grocery order is being packed.'), findsOneWidget);
       await tapVisible(tester, const Key('chat-back'));
       expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
       expect(find.byKey(const Key('chat-back')), findsNothing);
@@ -164,8 +860,700 @@ void main() {
     },
   );
 
+  testWidgets('Search motion is finite and reduced motion resolves static', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+    );
+
+    AnimatedContainer focusMotion() => tester.widget<AnimatedContainer>(
+      find.byKey(const Key('chat-search-focus-motion')),
+    );
+    AnimatedSwitcher actionMotion() => tester.widget<AnimatedSwitcher>(
+      find.descendant(
+        of: find.byKey(const Key('chat-search-action-icon-motion')),
+        matching: find.byType(AnimatedSwitcher),
+      ),
+    );
+    TweenAnimationBuilder<double> entryMotion() =>
+        tester.widget<TweenAnimationBuilder<double>>(
+          find.descendant(
+            of: find.byKey(const Key('chat-thread-entry-motion-home-basket')),
+            matching: find.byType(TweenAnimationBuilder<double>),
+          ),
+        );
+
+    expect(focusMotion().duration, ChatMotion.focus);
+    expect(actionMotion().duration, ChatMotion.focus);
+    expect(
+      entryMotion().duration,
+      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 100),
+    );
+
+    final field = find.byKey(const Key('chat-search-field'));
+    await tester.tap(field);
+    await tester.enterText(field, 'Home');
+    await tester.pump();
+    expect(find.byKey(const Key('chat-clear-search')), findsOneWidget);
+    expect(find.byKey(const Key('chat-open-inline-search')), findsNothing);
+    await tester.tap(find.byKey(const Key('chat-clear-search')));
+    await tester.pumpAndSettle();
+    expect(tester.widget<TextField>(field).controller?.text, isEmpty);
+    expect(find.byKey(const Key('chat-close-inline-search')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-close-inline-search')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-open-inline-search')), findsOneWidget);
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    await tester.pump();
+    expect(focusMotion().duration, Duration.zero);
+    expect(actionMotion().duration, Duration.zero);
+    expect(entryMotion().duration, Duration.zero);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('inline Chat search prioritizes results on compact large text', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.view.reset);
+    tester.platformDispatcher.textScaleFactorTestValue = 1.4;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/social?sub=feed',
+      journey: journey,
+      chat: chat,
+      size: const Size(320, 568),
+    );
+
+    await tapVisible(tester, const Key('chat-open-inline-search'));
+    tester.view.viewInsets = const FakeViewPadding(bottom: 240);
+    final field = find.byKey(const Key('chat-search-field'));
+    await tester.enterText(field, 'Order');
+    await tester.pumpAndSettle();
+
+    final result = find.byKey(const Key('chat-open-thread-order-support'));
+    final navigation = find.byKey(const Key('chat-native-navigation'));
+    expect(result, findsOneWidget);
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    expect(find.byKey(const Key('chat-filter-all')), findsNothing);
+    expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(568 - 240));
+    expect(
+      tester.getTopLeft(result).dy,
+      lessThan(tester.getTopLeft(navigation).dy),
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Inbox, thread and composer motion resolve static when reduced', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+    );
+
+    TweenAnimationBuilder<double> routeMotion() =>
+        tester.widget<TweenAnimationBuilder<double>>(
+          find.byKey(const Key('chat-route-entry-tween')),
+        );
+    TweenAnimationBuilder<double> incomingMotion(Object stateKey) =>
+        tester.widget<TweenAnimationBuilder<double>>(
+          find.byKey(ValueKey<Object>('chat-incoming-motion-tween-$stateKey')),
+        );
+
+    expect(routeMotion().duration, ChatMotion.routeChange);
+    for (final scale in tester.widgetList<AnimatedScale>(
+      find.byKey(const Key('chat-selection-motion')),
+    )) {
+      expect(scale.duration, ChatMotion.focus);
+    }
+    expect(
+      incomingMotion('home-basket').duration,
+      Duration(milliseconds: ChatMotion.stateChange.inMilliseconds + 100),
+    );
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    await tester.pump();
+    expect(routeMotion().duration, Duration.zero);
+    for (final scale in tester.widgetList<AnimatedScale>(
+      find.byKey(const Key('chat-selection-motion')),
+    )) {
+      expect(scale.duration, Duration.zero);
+    }
+    expect(incomingMotion('home-basket').duration, Duration.zero);
+    tester.platformDispatcher.clearAccessibilityFeaturesTestValue();
+    await tester.pump();
+
+    await tapVisible(tester, const Key('chat-open-thread-home-basket'));
+    expect(routeMotion().duration, ChatMotion.routeChange);
+    expect(incomingMotion('m1').duration, ChatMotion.stateChange);
+    final composerIcon = find.descendant(
+      of: find.byKey(const Key('chat-composer-action-icon-motion')),
+      matching: find.byType(AnimatedSwitcher),
+    );
+    expect(
+      tester.widget<AnimatedSwitcher>(composerIcon).duration,
+      ChatMotion.focus,
+    );
+    final attachmentMotion = find.descendant(
+      of: find.byKey(const Key('chat-attachment-expand-motion')),
+      matching: find.byType(AnimatedSize),
+    );
+    expect(
+      tester.widget<AnimatedSize>(attachmentMotion).duration,
+      ChatMotion.stateChange,
+    );
+    await tapVisible(tester, const Key('chat-attach'));
+    expect(find.byKey(const Key('chat-attachment-tray')), findsOneWidget);
+    expect(
+      ChatMotion.sheetStyle(
+        tester.element(find.byKey(const Key('chat-thread-screen'))),
+      ).duration,
+      ChatMotion.routeChange,
+    );
+
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    await tester.pump();
+    expect(routeMotion().duration, Duration.zero);
+    expect(incomingMotion('m1').duration, Duration.zero);
+    expect(
+      tester.widget<AnimatedSwitcher>(composerIcon).duration,
+      Duration.zero,
+    );
+    expect(
+      tester.widget<AnimatedSize>(attachmentMotion).duration,
+      Duration.zero,
+    );
+    expect(
+      ChatMotion.sheetStyle(
+        tester.element(find.byKey(const Key('chat-thread-screen'))),
+      ).duration,
+      Duration.zero,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
-    'Chat keeps a high-contrast new-chat action and compact global edges',
+    'Android Back dismisses transient Chat surfaces before leaving their owner',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyJourney();
+      final chat = ChatSession(
+        sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+      );
+      addTearDown(journey.dispose);
+      addTearDown(chat.dispose);
+      await mount(
+        tester,
+        route: '/app/chat/inbox?return=/app/mool',
+        journey: journey,
+        chat: chat,
+      );
+
+      await tapVisible(tester, const Key('chat-open-inline-search'));
+      expect(find.byKey(const Key('chat-close-inline-search')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-close-inline-search'));
+      expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-open-thread-home-basket'));
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsNothing);
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-voice-message'));
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsOneWidget,
+      );
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-voice-message-recovery')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-thread-video'));
+      expect(find.byKey(const Key('chat-video-recovery')), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-video-recovery')), findsNothing);
+      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('Start conversation opens public Feed discovery inside Chat', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/work/my-work',
+      journey: journey,
+      chat: chat,
+      size: const Size(360, 800),
+    );
+
+    await tapVisible(tester, const Key('chat-new'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    await tapVisible(tester, const Key('chat-discover-open-feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(find.text('Public Feed unavailable'), findsOneWidget);
+    expect(find.byKey(const Key('chat-feed-retry')), findsOneWidget);
+    expect(find.byKey(const Key('chat-feed-back-to-chats')), findsOneWidget);
+    expect(
+      tester.getBottomRight(find.byKey(const Key('chat-feed-retry'))).dy,
+      lessThanOrEqualTo(728),
+    );
+    expect(
+      tester
+          .getBottomRight(find.byKey(const Key('chat-feed-back-to-chats')))
+          .dy,
+      lessThanOrEqualTo(728),
+    );
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    expect(find.byKey(const Key('screen04-universal-v2')), findsNothing);
+    await tapVisible(tester, const Key('chat-feed-back-to-chats'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-chats')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('chat-new')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('empty inbox separates Open Feed from the Person+ action', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession.production(gateway: _PeopleChatGateway());
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+      size: const Size(320, 568),
+    );
+    await tester.pumpAndSettle();
+
+    final openFeed = find.byKey(const Key('chat-open-feed'));
+    final startConversation = find.byKey(const Key('chat-empty-start'));
+    expect(openFeed, findsOneWidget);
+    expect(startConversation, findsOneWidget);
+    expect(find.byKey(const Key('chat-new')), findsNothing);
+    final feedRect = tester.getRect(openFeed);
+    final startRect = tester.getRect(startConversation);
+    final navigationRect = tester.getRect(
+      find.byKey(const Key('chat-native-navigation')),
+    );
+    expect(feedRect.overlaps(startRect), isFalse);
+    expect(feedRect.overlaps(navigationRect), isFalse);
+    expect(startRect.overlaps(navigationRect), isFalse);
+    expect(feedRect.width, greaterThanOrEqualTo(44));
+    expect(feedRect.height, greaterThanOrEqualTo(44));
+    expect(startRect.width, greaterThanOrEqualTo(44));
+    expect(startRect.height, greaterThanOrEqualTo(44));
+    expect(feedRect.left, greaterThanOrEqualTo(0));
+    expect(startRect.right, lessThanOrEqualTo(320));
+    expect(feedRect.bottom, lessThanOrEqualTo(navigationRect.top));
+    expect(startRect.bottom, lessThanOrEqualTo(navigationRect.top));
+
+    await tester.tap(startConversation);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Open Feed continues through approved message requests', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final socialGateway = _PeopleSocialGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    final chatGateway = _PeopleChatGateway();
+    final chat = ChatSession.production(gateway: chatGateway);
+    addTearDown(journey.dispose);
+    addTearDown(shared.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/work/my-work',
+      journey: journey,
+      chat: chat,
+      sharedSession: shared,
+      size: const Size(360, 800),
+    );
+
+    await tapVisible(tester, const Key('chat-more'));
+    expect(find.text('Open public Feed'), findsOneWidget);
+    await tester.tap(find.text('Open public Feed'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(find.text('Alice News'), findsWidgets);
+    expect(find.text('Public discovery post'), findsWidgets);
+
+    await tapVisible(tester, const Key('screen04-feed-network-discover'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+
+    await tapVisible(tester, const Key('social-public-like-post-a'));
+    await tester.pumpAndSettle();
+    expect(socialGateway.interactions, [('post-a', 'like')]);
+
+    await tapVisible(tester, const Key('social-author-profile-post-a'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('social-author-panel-person-a')),
+      findsOneWidget,
+    );
+    await tapVisible(
+      tester,
+      const Key('social-author-message-request-person-a'),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('social-message-request-dialog-person-a')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('social-message-request-send')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(chatGateway.createdTargets, isEmpty);
+    expect(find.textContaining('awaiting approval'), findsOneWidget);
+
+    await tapVisible(tester, const Key('social-global-chat'));
+    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-section-discover'));
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tapVisible(tester, const Key('chat-person-connect-person-b'));
+    await tapVisible(tester, const Key('chat-person-message-person-b'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-message-request-dialog-person-b')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('chat-message-request-send')));
+    await tester.pumpAndSettle();
+    expect(chatGateway.createdTargets, isEmpty);
+    expect(find.text('Awaiting approval'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('screen04-universal-v2')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Discover follows people and keeps private chat approval-gated', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final socialGateway = _PeopleSocialGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    final chatGateway = _PeopleChatGateway();
+    final chat = ChatSession.production(gateway: chatGateway);
+    addTearDown(journey.dispose);
+    addTearDown(shared.dispose);
+    addTearDown(chat.dispose);
+
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/social?sub=feed',
+      journey: journey,
+      chat: chat,
+      sharedSession: shared,
+    );
+
+    expect(find.byKey(const Key('chat-section-chats')), findsOneWidget);
+    await tapVisible(tester, const Key('chat-section-discover'));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+    expect(find.text('Alice News'), findsOneWidget);
+    expect(find.text('Bharat Creator'), findsOneWidget);
+    expect(
+      find.byIcon(Icons.verified_rounded),
+      findsNothing,
+      reason: 'A loaded profile is not proof of verified identity.',
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('chat-person-message-person-b')),
+          )
+          .onPressed,
+      isNotNull,
+    );
+
+    await tapVisible(tester, const Key('chat-person-connect-person-a'));
+    expect(socialGateway.followed['person-a'], isTrue);
+    expect(find.widgetWithText(OutlinedButton, 'Following'), findsOneWidget);
+
+    await tapVisible(tester, const Key('chat-section-people'));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-b')), findsNothing);
+
+    await tapVisible(tester, const Key('chat-section-discover'));
+    await tester.pumpAndSettle();
+    await tapVisible(tester, const Key('chat-person-connect-person-b'));
+    expect(socialGateway.followed['person-b'], isTrue);
+    await tapVisible(tester, const Key('chat-person-message-person-b'));
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const Key('chat-message-request-dialog-person-b')),
+      findsOneWidget,
+    );
+    await tester.tap(find.byKey(const Key('chat-message-request-send')));
+    await tester.pumpAndSettle();
+    expect(chatGateway.createdTargets, isEmpty);
+    expect(find.text('Awaiting approval'), findsOneWidget);
+    expect(find.byKey(const Key('chat-thread-screen')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'guest Discover stays readable and preserves exact sign-in return',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final journey = await readyGuestJourney();
+      final socialGateway = _PeopleSocialGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      final chat = ChatSession.production(gateway: _PeopleChatGateway());
+      addTearDown(journey.dispose);
+      addTearDown(shared.dispose);
+      addTearDown(chat.dispose);
+
+      await mount(
+        tester,
+        route:
+            '/app/chat/inbox?section=discover&return=%2Fapp%2Fsocial%3Fsub%3Dfeed',
+        journey: journey,
+        chat: chat,
+        sharedSession: shared,
+        size: const Size(360, 800),
+      );
+
+      expect(find.text('Alice News'), findsOneWidget);
+      expect(find.text('Sign in to follow'), findsWidgets);
+      await tapVisible(tester, const Key('chat-person-connect-person-a'));
+      await tester.pumpAndSettle();
+
+      expect(journey.stage, JourneyStage.signIn);
+      expect(journey.returnTo, contains('/app/chat/inbox'));
+      expect(journey.returnTo, contains('section=discover'));
+      expect(socialGateway.followed['person-a'], isFalse);
+      expect(find.byKey(const Key('screen03-login-v5')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets(
+    'Following search, clear and unfollow complete without a dead end',
+    (tester) async {
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      addTearDown(tester.view.reset);
+      final journey = await readyJourney();
+      final socialGateway = _PeopleSocialGateway();
+      final shared = SharedSession(socialContentGateway: socialGateway);
+      final chat = ChatSession.production(gateway: _PeopleChatGateway());
+      addTearDown(journey.dispose);
+      addTearDown(shared.dispose);
+      addTearDown(chat.dispose);
+
+      await mount(
+        tester,
+        route: '/app/chat/inbox?return=/app/mool',
+        journey: journey,
+        chat: chat,
+        sharedSession: shared,
+      );
+      await tapVisible(tester, const Key('chat-section-discover'));
+
+      expect(
+        tester
+            .widget<AnimatedContainer>(
+              find.byKey(const Key('chat-people-search-focus-motion')),
+            )
+            .duration,
+        ChatMotion.focus,
+      );
+      expect(
+        tester
+            .widget<TweenAnimationBuilder<double>>(
+              find.byKey(
+                const ValueKey<Object>('chat-incoming-motion-tween-person-a'),
+              ),
+            )
+            .duration,
+        ChatMotion.stateChange,
+      );
+
+      await tester.enterText(
+        find.byKey(const Key('chat-people-search')),
+        'Bharat',
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-person-person-a')), findsNothing);
+      expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-people-search-clear'));
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-person-connect-person-a'));
+      expect(socialGateway.followed['person-a'], isTrue);
+      await tapVisible(tester, const Key('chat-section-people'));
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      await tapVisible(tester, const Key('chat-person-connect-person-a'));
+      expect(socialGateway.followed['person-a'], isFalse);
+      expect(find.text('You are not following anyone yet'), findsOneWidget);
+
+      tester.view.viewInsets = const FakeViewPadding(bottom: 300);
+      await tester.enterText(
+        find.byKey(const Key('chat-people-search')),
+        'No matching member',
+      );
+      await tester.pumpAndSettle();
+      final clearEmptySearch = find.byKey(
+        const Key('chat-people-clear-empty-search'),
+      );
+      expect(find.text('No matching people'), findsOneWidget);
+      expect(clearEmptySearch, findsOneWidget);
+      final media = MediaQuery.of(tester.element(clearEmptySearch));
+      expect(
+        tester.getBottomRight(clearEmptySearch).dy,
+        lessThanOrEqualTo(media.size.height - media.viewInsets.bottom),
+      );
+      await tapVisible(tester, const Key('chat-people-clear-empty-search'));
+      tester.view.viewInsets = const FakeViewPadding();
+      await tester.pumpAndSettle();
+      expect(find.text('You are not following anyone yet'), findsOneWidget);
+
+      await tapVisible(tester, const Key('chat-people-open-discover'));
+      expect(
+        find.byKey(const ValueKey('chat-section-body-discover')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+      expect(
+        tester
+            .widget<FilledButton>(
+              find.byKey(const Key('chat-person-message-person-a')),
+            )
+            .onPressed,
+        isNotNull,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('People first-load error retries into the completed directory', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final socialGateway = _RetryPeopleSocialGateway();
+    final shared = SharedSession(socialContentGateway: socialGateway);
+    final chat = ChatSession.production(gateway: _PeopleChatGateway());
+    addTearDown(journey.dispose);
+    addTearDown(shared.dispose);
+    addTearDown(chat.dispose);
+
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/mool',
+      journey: journey,
+      chat: chat,
+      sharedSession: shared,
+    );
+    await tapVisible(tester, const Key('chat-section-discover'));
+
+    expect(socialGateway.feedCalls, 1);
+    expect(find.byKey(const Key('chat-people-retry')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-a')), findsNothing);
+    await tapVisible(tester, const Key('chat-people-retry'));
+
+    expect(socialGateway.feedCalls, 2);
+    expect(find.byKey(const Key('chat-people-retry')), findsNothing);
+    expect(find.byKey(const Key('chat-person-person-a')), findsOneWidget);
+    expect(find.byKey(const Key('chat-person-person-b')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+    'Chat keeps compact add-person and every filter visible at large text',
     (tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       tester.platformDispatcher.textScaleFactorTestValue = 1.4;
@@ -187,37 +1575,145 @@ void main() {
       final newChat = tester.widget<IconButton>(
         find.byKey(const Key('chat-new')),
       );
-      final background = newChat.style?.backgroundColor?.resolve(
-        const <WidgetState>{},
+      expect(
+        newChat.style?.backgroundColor?.resolve(const <WidgetState>{}),
+        const Color(0xFF000080),
       );
-      final foreground = newChat.style?.foregroundColor?.resolve(
-        const <WidgetState>{},
+      expect(
+        newChat.style?.foregroundColor?.resolve(const <WidgetState>{}),
+        Colors.white,
       );
-      expect(background, isNotNull);
-      expect(foreground, Colors.white);
-      expect(background, isNot(foreground));
+      expect(newChat.tooltip, 'Start a conversation');
+      expect(find.text('New conversation'), findsNothing);
+      expect(
+        find.ancestor(
+          of: find.byKey(const Key('chat-new')),
+          matching: find.byType(CustomScrollView),
+        ),
+        findsOneWidget,
+      );
 
       expect(
         find.byKey(const Key('chat-global-edge-navigation')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         find.byKey(const Key('chat-compact-global-edge-rail')),
-        findsOneWidget,
+        findsNothing,
       );
-      final mool = find.byKey(const Key('mool-compact-launcher'));
-      final chatEdge = find.byKey(const Key('chat-global-chat-edge'));
-      expect(mool, findsOneWidget);
-      expect(chatEdge, findsOneWidget);
-      expect(tester.getSize(mool).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(mool).height, greaterThanOrEqualTo(44));
-      expect(tester.getSize(chatEdge).width, greaterThanOrEqualTo(44));
-      expect(tester.getSize(chatEdge).height, greaterThanOrEqualTo(44));
-      expect(tester.getCenter(mool).dx, lessThan(72));
-      expect(tester.getCenter(chatEdge).dx, greaterThan(288));
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
+      expect(find.byKey(const Key('chat-inbox-back')), findsOneWidget);
+      expect(find.byKey(const Key('chat-native-navigation')), findsOneWidget);
+      final addPerson = find.byKey(const Key('chat-new'));
+      expect(tester.getSize(addPerson).width, greaterThanOrEqualTo(44));
+      expect(tester.getSize(addPerson).width, lessThanOrEqualTo(48));
+      expect(tester.getSize(addPerson).height, greaterThanOrEqualTo(44));
+      expect(tester.getSize(addPerson).height, lessThanOrEqualTo(48));
+      final search = find.byKey(const Key('chat-search-field'));
+      expect(
+        (tester.getCenter(addPerson).dy - tester.getCenter(search).dy).abs(),
+        lessThanOrEqualTo(4),
+      );
+
+      final filterStrip = find.byKey(const Key('chat-filter-strip'));
+      final businessFilter = find.byKey(const Key('chat-filter-business'));
+      expect(filterStrip, findsOneWidget);
+      expect(businessFilter, findsOneWidget);
+      expect(
+        find.descendant(of: filterStrip, matching: find.byType(ListView)),
+        findsNothing,
+      );
+      final businessBounds = tester.getRect(businessFilter);
+      expect(businessBounds.left, greaterThanOrEqualTo(0));
+      expect(businessBounds.right, lessThanOrEqualTo(360));
+      final businessLabel = tester.renderObject<RenderParagraph>(
+        find.descendant(of: businessFilter, matching: find.text('Business')),
+      );
+      expect(businessLabel.didExceedMaxLines, isFalse);
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Chat section motion resolves immediately for reduced motion', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    tester.platformDispatcher.accessibilityFeaturesTestValue =
+        FakeAccessibilityFeatures(disableAnimations: true);
+    addTearDown(tester.platformDispatcher.clearAccessibilityFeaturesTestValue);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route: '/app/chat/inbox?return=/app/social',
+      journey: journey,
+      chat: chat,
+    );
+
+    final switcher = tester.widget<AnimatedSwitcher>(
+      find.byKey(const Key('chat-section-motion')),
+    );
+    expect(switcher.duration, Duration.zero);
+    expect(switcher.reverseDuration, Duration.zero);
+
+    await tester.tap(find.byKey(const Key('chat-section-discover')));
+    await tester.pump();
+    expect(
+      find.byKey(const ValueKey('chat-section-body-discover')),
+      findsOneWidget,
+    );
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('notification settings preview cannot pretend to save choices', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyGuestJourney();
+    final chat = ChatSession.production(gateway: _PeopleChatGateway());
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+
+    await mount(
+      tester,
+      route:
+          '/app/chat/notifications?return=%2Fapp%2Fsocial%3Fsub%3Dfeed&preview=true',
+      journey: journey,
+      chat: chat,
+      size: const Size(360, 800),
+    );
+
+    expect(
+      find.byKey(const Key('chat-notification-settings-screen')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('chat-notification-preview-notice')),
+      findsOneWidget,
+    );
+    expect(
+      tester
+          .widget<SwitchListTile>(
+            find.byKey(const Key('chat-notification-messages')),
+          )
+          .onChanged,
+      isNull,
+    );
+    expect(
+      tester
+          .widget<FilledButton>(
+            find.byKey(const Key('chat-notification-device-enable')),
+          )
+          .onPressed,
+      isNull,
+    );
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('Universal Chat choices open the matching production inbox', (
     tester,
@@ -274,10 +1770,7 @@ void main() {
 
       for (final key in const [
         Key('chat-like-m1'),
-        Key('chat-attach'),
         Key('chat-camera'),
-        Key('chat-thread-call'),
-        Key('chat-thread-video'),
         Key('chat-thread-more'),
         Key('chat-mode-media'),
         Key('chat-mode-poll'),
@@ -286,14 +1779,26 @@ void main() {
       ]) {
         expect(find.byKey(key), findsNothing, reason: '$key');
       }
+      expect(find.byKey(const Key('chat-attach')), findsOneWidget);
+      expect(find.byKey(const Key('chat-composer-camera')), findsOneWidget);
+      expect(find.byKey(const Key('chat-thread-call')), findsOneWidget);
+      expect(find.byKey(const Key('chat-thread-video')), findsOneWidget);
+      expect(find.byKey(const Key('chat-voice-message')), findsOneWidget);
 
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('chat-message-actions')), findsOneWidget);
       await tapVisible(tester, const Key('chat-react-m1'));
       expect(chat.messages('home-basket').first.reactionCount, 3);
       expect(chat.messages('home-basket').first.reactedByMe, isTrue);
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-react-m1'));
       expect(chat.messages('home-basket').first.reactionCount, 2);
       expect(chat.messages('home-basket').first.reactedByMe, isFalse);
 
+      await tester.longPress(find.byKey(const Key('chat-message-m1')));
+      await tester.pumpAndSettle();
       await tapVisible(tester, const Key('chat-reply-m1'));
       expect(
         find.byKey(const Key('chat-composer-reply-context')),
@@ -306,7 +1811,7 @@ void main() {
         'Please add rice to the household list.',
       );
       await tapVisible(tester, const Key('chat-send'));
-      expect(find.text('Message delivered.'), findsOneWidget);
+      expect(find.text('Message delivered.'), findsNothing);
       expect(
         chat.messages('home-basket').last.text,
         'Please add rice to the household list.',
@@ -315,26 +1820,28 @@ void main() {
         chat.messages('home-basket').last.deliveryState,
         ChatDeliveryState.delivered,
       );
+      expect(
+        find.byKey(
+          Key('chat-delivery-status-${chat.messages('home-basket').last.id}'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('Delivered · unread'), findsWidgets);
       expect(chat.messages('home-basket').last.replyTo?.messageId, 'm1');
       expect(
         find.byKey(const Key('chat-composer-reply-context')),
         findsNothing,
       );
 
-      await tapVisible(tester, const Key('chat-send'));
-      expect(find.text('Write a message.'), findsOneWidget);
-      await tapVisible(tester, const Key('mool-compact-launcher'));
+      await tapVisible(tester, const Key('chat-voice-message'));
       expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
+        find.byKey(const Key('chat-voice-message-recovery')),
         findsOneWidget,
       );
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
+      await tapVisible(tester, const Key('chat-capability-continue'));
+      expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+      expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
       expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-      expect(
-        find.byKey(const Key('mool-connected-action-navigator')),
-        findsNothing,
-      );
       expect(tester.takeException(), isNull);
     },
   );
@@ -380,7 +1887,12 @@ void main() {
         .toList();
     expect(replayed, hasLength(1), reason: 'Retry must not duplicate messages');
     expect(replayed.single.deliveryState, ChatDeliveryState.delivered);
-    expect(find.text('Message delivered.'), findsOneWidget);
+    expect(find.text('Message delivered.'), findsNothing);
+    expect(
+      find.byKey(Key('chat-delivery-status-${replayed.single.id}')),
+      findsOneWidget,
+    );
+    expect(find.text('Delivered · unread'), findsWidgets);
 
     expect(find.byKey(const Key('chat-mode-details')), findsNothing);
     expect(find.byKey(const Key('chat-mode-updates')), findsNothing);
@@ -424,6 +1936,97 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('supplier loading resolves to an honest named empty state', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final gateway = _ControlledMessagesChatGateway();
+    final chat = ChatSession.production(gateway: gateway);
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    final route = Uri(
+      path: '/app/chat/thread/shop-partner-shop-jodhpur-grocery',
+      queryParameters: {
+        'return': '/app/buy?sub=shop&view=product&product=grocery-atta-1kg',
+        'directReturn': 'true',
+        'context': 'supplier-product',
+        'supplier': 'Jodhpur Grocery',
+        'supplierType': 'Retail partner',
+        'productTitle': 'Whole Wheat Atta',
+        'skuId': 'grocery-atta-1kg',
+      },
+    ).toString();
+
+    await tester.binding.setSurfaceSize(const Size(412, 915));
+    await tester.pumpWidget(
+      MoolSocialApp(
+        key: ValueKey(route),
+        session: journey,
+        chatSession: chat,
+        initialLocation: route,
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    expect(
+      find.byKey(const Key('chat-thread-loading-message')),
+      findsOneWidget,
+    );
+    expect(find.text('Loading messages'), findsNothing);
+    expect(
+      find.text('Getting your latest messages from Jodhpur Grocery'),
+      findsOneWidget,
+    );
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+      'Jodhpur Grocery',
+    );
+
+    gateway.completeMessages(const []);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-thread-loading-message')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-empty-state')), findsOneWidget);
+    expect(find.text('No messages with Jodhpur Grocery yet'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('supplier message failure retries into the named empty state', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final gateway = _RetryMessagesChatGateway();
+    final chat = ChatSession.production(gateway: gateway);
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    final route = Uri(
+      path: '/app/chat/thread/shop-partner-wholesale-marwar-supplies',
+      queryParameters: {
+        'return': '/app/buy?sub=wholesale',
+        'directReturn': 'true',
+        'context': 'supplier-store',
+        'supplier': 'Marwar Supplies',
+        'supplierType': 'Wholesale partner',
+      },
+    ).toString();
+
+    await mount(tester, route: route, journey: journey, chat: chat);
+    expect(find.byKey(const Key('chat-retry-messages')), findsOneWidget);
+    expect(find.text('Messages could not load'), findsOneWidget);
+    expect(
+      tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+      'Marwar Supplies',
+    );
+
+    await tapVisible(tester, const Key('chat-retry-messages'));
+    await tester.pumpAndSettle();
+    expect(gateway.messageCalls, 2);
+    expect(find.byKey(const Key('chat-retry-messages')), findsNothing);
+    expect(find.byKey(const Key('chat-thread-empty-state')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('compact phone keeps chat controls tappable without overflow', (
     tester,
   ) async {
@@ -444,16 +2047,339 @@ void main() {
       size: const Size(360, 800),
     );
 
-    for (final key in const [
-      Key('chat-back'),
-      Key('mool-compact-launcher'),
-      Key('chat-global-chat-edge'),
-      Key('chat-send'),
-    ]) {
+    for (final key in const [Key('chat-back'), Key('chat-voice-message')]) {
       final size = tester.getSize(find.byKey(key));
       expect(size.width, greaterThanOrEqualTo(44), reason: '$key width');
       expect(size.height, greaterThanOrEqualTo(44), reason: '$key height');
     }
+    expect(find.byKey(const Key('mool-compact-launcher')), findsNothing);
+    expect(find.byKey(const Key('chat-global-chat-edge')), findsNothing);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('OPPO bottom inset keeps the composer above system navigation', (
+    tester,
+  ) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.viewPadding = const FakeViewPadding(top: 41, bottom: 44);
+    addTearDown(tester.view.reset);
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await tester.pumpWidget(
+      MoolSocialApp(
+        session: journey,
+        chatSession: chat,
+        initialLocation: '/app/chat/thread/home-basket?return=/app/social',
+      ),
+    );
+    await tester.pumpAndSettle();
+    debugDefaultTargetPlatformOverride = null;
+
+    final field = find.byKey(const Key('chat-message-field'));
+    final media = MediaQuery.of(tester.element(field));
+    expect(media.viewPadding.bottom, greaterThan(0));
+    final safeBottom = media.size.height - media.viewPadding.bottom;
+    final exportedClearance = media.viewPadding.top - (58 - 44);
+    final exportedSafeBottom = safeBottom - exportedClearance;
+    for (final key in const [
+      Key('chat-attach'),
+      Key('chat-composer-camera'),
+      Key('chat-voice-message'),
+    ]) {
+      final rect = tester.getRect(find.byKey(key));
+      expect(rect.width, greaterThanOrEqualTo(44), reason: '$key width');
+      expect(rect.height, greaterThanOrEqualTo(44), reason: '$key height');
+      expect(rect.bottom, lessThanOrEqualTo(exportedSafeBottom));
+    }
+    expect(tester.getBottomRight(field).dy, lessThanOrEqualTo(safeBottom));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Store invoice handoff keeps recipient and draft visible', (
+    tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final journey = await readyJourney();
+    final chat = ChatSession(
+      sendGateway: ReviewChatSendGateway(latency: Duration.zero),
+    );
+    addTearDown(journey.dispose);
+    addTearDown(chat.dispose);
+    await mount(
+      tester,
+      route:
+          '/app/chat/inbox?type=business&recipient=Rakesh%20%C2%B7%209829012345&draft=INV-100%20%C2%B7%20%E2%82%B9264&return=/app/work/workspace/dashboard',
+      journey: journey,
+      chat: chat,
+    );
+
+    expect(find.byKey(const Key('chat-pending-draft-card')), findsOneWidget);
+    expect(find.text('For Rakesh · 9829012345'), findsOneWidget);
+    expect(find.textContaining('INV-100'), findsOneWidget);
+    await tester.tap(find.byKey(const Key('chat-pending-draft-find-customer')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('chat-people-search')), findsOneWidget);
+  });
+}
+
+class _PeopleSocialGateway
+    implements SocialContentGateway, SocialAuthorGateway {
+  final Map<String, bool> followed = {'person-a': false, 'person-b': false};
+  final List<(String, String)> interactions = [];
+
+  @override
+  Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
+    return SocialFeedPage(
+      items: [
+        _post('post-a', 'person-a', 'Alice News', '@alice'),
+        _post('post-b', 'person-b', 'Bharat Creator', '@bharat'),
+      ],
+    );
+  }
+
+  @override
+  Future<SocialAuthorProfile> author({
+    required String authorId,
+    bool authenticated = false,
+    int limit = 12,
+  }) async => _profile(authorId);
+
+  @override
+  Future<SocialAuthorProfile> follow({
+    required String authorId,
+    required bool followed,
+  }) async {
+    this.followed[authorId] = followed;
+    return _profile(authorId);
+  }
+
+  SocialAuthorProfile _profile(String authorId) {
+    final alice = authorId == 'person-a';
+    return SocialAuthorProfile(
+      authorId: authorId,
+      authorName: alice ? 'Alice News' : 'Bharat Creator',
+      authorHandle: alice ? '@alice' : '@bharat',
+      followerCount: alice ? 42 : 75,
+      followed: followed[authorId] ?? false,
+      isSelf: false,
+      posts: [
+        _post(
+          alice ? 'post-a' : 'post-b',
+          authorId,
+          alice ? 'Alice News' : 'Bharat Creator',
+          alice ? '@alice' : '@bharat',
+        ),
+      ],
+    );
+  }
+
+  @override
+  Future<SocialPublishedItem> interact({
+    required String postId,
+    required String interaction,
+    int? choiceIndex,
+  }) async {
+    interactions.add((postId, interaction));
+    final isAlice = postId == 'post-a';
+    return _post(
+      postId,
+      isAlice ? 'person-a' : 'person-b',
+      isAlice ? 'Alice News' : 'Bharat Creator',
+      isAlice ? '@alice' : '@bharat',
+    ).copyWith(
+      liked: interaction == 'like',
+      likeCount: interaction == 'like' ? 1 : 0,
+    );
+  }
+
+  @override
+  Future<SocialPublishedItem> publish(SocialPublishDraft draft) =>
+      Future.error(UnsupportedError('Not used by this test.'));
+}
+
+class _RetryPeopleSocialGateway extends _PeopleSocialGateway {
+  int feedCalls = 0;
+
+  @override
+  Future<SocialFeedPage> feed({String? cursor, int limit = 20}) async {
+    feedCalls += 1;
+    if (feedCalls == 1) {
+      throw StateError('temporary people directory failure');
+    }
+    return super.feed(cursor: cursor, limit: limit);
+  }
+}
+
+SocialPublishedItem _post(
+  String id,
+  String authorId,
+  String authorName,
+  String authorHandle,
+) => SocialPublishedItem(
+  id: id,
+  authorId: authorId,
+  type: SocialPublishedContentType.post,
+  authorName: authorName,
+  authorHandle: authorHandle,
+  body: 'Public discovery post',
+  audience: 'Public',
+  publishedAt: DateTime.utc(2026, 8, 24),
+);
+
+ChatPickedAttachment _r6611Document() => ChatPickedAttachment(
+  kind: ChatAttachmentKind.document,
+  name: 'application-proof.pdf',
+  contentType: 'application/pdf',
+  bytes: Uint8List.fromList([37, 80, 68, 70]),
+);
+
+class _R6611AttachmentPicker implements ChatAttachmentPicker {
+  final result = Completer<ChatPickedAttachment?>();
+  @override
+  Future<ChatPickedAttachment?> pick(ChatAttachmentKind kind) => result.future;
+}
+
+class _R6611PhotoPicker implements ChatPhotoPicker {
+  final result = Completer<ChatPickedPhoto?>();
+  int recoveryCalls = 0;
+  @override
+  Future<ChatPickedPhoto?> pick(ChatPhotoSource source) => result.future;
+  @override
+  Future<ChatPickedPhoto?> recoverInterruptedSelection() async {
+    recoveryCalls += 1;
+    return null;
+  }
+}
+
+class _R6611DraftGateway extends _PeopleChatGateway
+    implements ChatPhotoGateway {
+  var sendResult = Completer<ChatMessage>();
+  final List<String> sentThreads = [];
+  final List<String?> sentReplies = [];
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) async => const [
+    ChatMessage(
+      id: 'support-question',
+      sender: 'MoolSocial',
+      text: 'Please confirm your application.',
+      timeLabel: 'Now',
+      mine: false,
+    ),
+  ];
+  @override
+  Future<ChatMessage> sendMessage({
+    required String threadId,
+    required String text,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) {
+    sentThreads.add(threadId);
+    sentReplies.add(replyToMessageId);
+    return sendResult.future;
+  }
+
+  @override
+  Future<ChatMessage> sendPhoto({
+    required String threadId,
+    required ChatPickedPhoto photo,
+    required String caption,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) => Future.error(UnsupportedError('Not sent by this test.'));
+}
+
+class _PeopleChatGateway implements ChatGateway {
+  final List<String> createdTargets = [];
+
+  @override
+  Future<List<ChatThread>> listThreads({int limit = 30}) async => const [];
+
+  @override
+  Future<ChatThread> createDirectThread({required String targetUserId}) async {
+    createdTargets.add(targetUserId);
+    return ChatThread(
+      id: 'direct-$targetUserId',
+      title: targetUserId == 'person-a' ? 'Alice News' : 'Bharat Creator',
+      subtitle: 'MoolSocial person',
+      preview: 'No messages yet',
+      timeLabel: 'Now',
+      type: ChatThreadType.people,
+    );
+  }
+
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) async => const [];
+
+  @override
+  Future<void> markThreadRead({required String threadId}) async {}
+
+  @override
+  Future<ChatMessage> forwardMessage({
+    required String sourceThreadId,
+    required String sourceMessageId,
+    required String targetThreadId,
+    required String idempotencyKey,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+
+  @override
+  Future<ChatMessage> sendMessage({
+    required String threadId,
+    required String text,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+
+  @override
+  Future<ChatMessage> setReaction({
+    required String threadId,
+    required String messageId,
+    required bool reacted,
+  }) => Future.error(UnsupportedError('Not used by this test.'));
+}
+
+class _ControlledMessagesChatGateway extends _PeopleChatGateway {
+  final Completer<List<ChatMessage>> _messages = Completer();
+
+  void completeMessages(List<ChatMessage> values) {
+    if (!_messages.isCompleted) _messages.complete(values);
+  }
+
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) => _messages.future;
+}
+
+class _RetryMessagesChatGateway extends _PeopleChatGateway {
+  int messageCalls = 0;
+
+  @override
+  Future<List<ChatMessage>> listMessages({
+    required String threadId,
+    int limit = 50,
+  }) async {
+    messageCalls += 1;
+    if (messageCalls == 1) {
+      throw const ChatServiceException(
+        'Messages are unavailable right now.',
+        code: 'offline',
+        retryable: true,
+      );
+    }
+    return const [];
+  }
 }

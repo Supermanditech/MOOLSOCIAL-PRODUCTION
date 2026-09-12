@@ -1,0 +1,12 @@
+{
+  "schema": "moolsocial_ticket_oppo_acceptance_v1",
+  "ticketId": "UAW-GLOBAL-PROFILE-SERVICE-AREA-FITMENT-V1-20260828",
+  "workId": "global-profile-service-area-fitment-v1-20260828",
+  "lane": "codex_ui",
+  "acceptedCommit": "1d5ffd4c7448f82c6b2865673a0df372253b5a49",
+  "deviceClass": "OPPO",
+  "ticketRequirementTested": true,
+  "result": "passed",
+  "testedAtIst": "2026-08-28T15:33:45.0930973+05:30",
+  "privateValuesEmitted": false
+}

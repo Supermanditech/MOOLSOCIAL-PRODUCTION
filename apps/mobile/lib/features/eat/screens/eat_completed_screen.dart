@@ -109,9 +109,8 @@ class EatCompletedScreen extends StatelessWidget {
                 Expanded(
                   child: OutlinedButton.icon(
                     key: const Key('eat-view-bill'),
-                    onPressed: () => session.showNotice(
-                      'Digital bill opened for order $orderId.',
-                    ),
+                    onPressed: () =>
+                        context.go('/app/eat/order/$orderId/invoice'),
                     icon: const Icon(Icons.receipt_long_outlined),
                     label: const Text('View bill'),
                   ),

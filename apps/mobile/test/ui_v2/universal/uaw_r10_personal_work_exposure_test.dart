@@ -53,7 +53,7 @@ void main() {
 
   for (final destination in const [
     (id: 'earn', ownerKey: Key('work-earn-screen'), label: 'Earn Today'),
-    (id: 'workspace', ownerKey: Key('my-work-screen'), label: 'Workspace'),
+    (id: 'workspace', ownerKey: Key('work-choose-screen'), label: 'Workspace'),
   ]) {
     testWidgets(
       'production Work root reaches ${destination.label} in one connected tap',
@@ -97,7 +97,7 @@ void main() {
 
   for (final destination in const [
     (route: '/app/work/earn', ownerKey: Key('work-earn-screen')),
-    (route: '/app/work/my-work', ownerKey: Key('my-work-screen')),
+    (route: '/app/work/my-work', ownerKey: Key('work-choose-screen')),
   ]) {
     testWidgets(
       'direct ${destination.route} exposes its owner and connected launcher',

@@ -7,6 +7,13 @@ import '../ride_models.dart';
 import '../ride_session.dart';
 import '../widgets/ride_widgets.dart';
 
+String _rideVehicleLabel(RideTrip trip) => switch (trip.package.type) {
+  RideType.bike => 'Blue Bike',
+  RideType.auto =>
+    trip.package.name == 'Shared Auto' ? 'White Shared Auto' : 'White Auto',
+  RideType.cab => 'White ${trip.package.name} cab',
+};
+
 class RideTripScreen extends StatelessWidget {
   const RideTripScreen({
     required this.session,
@@ -156,6 +163,7 @@ class _CaptainArriving extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trip = session.trip!;
     return RidePageScaffold(
       session: session,
       title: session.rideCancelled ? 'Ride cancelled' : 'Arjun is arriving',
@@ -202,9 +210,9 @@ class _CaptainArriving extends StatelessWidget {
           RideCard(
             child: Column(
               children: [
-                const Row(
+                Row(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       radius: 26,
                       backgroundColor: MoolColors.navy,
                       child: Text(
@@ -215,12 +223,12 @@ class _CaptainArriving extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: MoolSpacing.sm),
+                    const SizedBox(width: MoolSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Arjun Singh',
                             style: TextStyle(
                               color: MoolColors.ink,
@@ -228,7 +236,7 @@ class _CaptainArriving extends StatelessWidget {
                               fontWeight: FontWeight.w900,
                             ),
                           ),
-                          Text(
+                          const Text(
                             '4.9 ★ · 2,840 rides · verified',
                             style: TextStyle(
                               color: MoolColors.muted,
@@ -237,8 +245,8 @@ class _CaptainArriving extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'White Auto · RJ19 AB 2841',
-                            style: TextStyle(
+                            '${_rideVehicleLabel(trip)} · RJ19 AB 2841',
+                            style: const TextStyle(
                               color: MoolColors.ink,
                               fontSize: 12,
                               fontWeight: FontWeight.w800,
@@ -265,7 +273,7 @@ class _CaptainArriving extends StatelessWidget {
                       label: 'Chat',
                       icon: Icons.chat_bubble_outline_rounded,
                       onPressed: () => context.go(
-                        '/app/chat/thread/ride-$tripId?return=/app/ride/trip/$tripId',
+                        '/app/chat/thread/ride-captain?return=/app/ride/trip/$tripId',
                       ),
                     ),
                     const SizedBox(width: MoolSpacing.xs),
@@ -395,6 +403,7 @@ class _LiveTrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final trip = session.trip!;
     return RidePageScaffold(
       session: session,
       title: 'Trip in progress',
@@ -425,9 +434,9 @@ class _LiveTrip extends StatelessWidget {
           RideCard(
             child: Column(
               children: [
-                const Row(
+                Row(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       backgroundColor: MoolColors.navy,
                       child: Text(
                         'AS',
@@ -437,12 +446,12 @@ class _LiveTrip extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: MoolSpacing.sm),
+                    const SizedBox(width: MoolSpacing.sm),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Arjun Singh · 4.9 ★',
                             style: TextStyle(
                               color: MoolColors.ink,
@@ -450,8 +459,8 @@ class _LiveTrip extends StatelessWidget {
                             ),
                           ),
                           Text(
-                            'White Auto · RJ19 AB 2841',
-                            style: TextStyle(
+                            '${_rideVehicleLabel(trip)} · RJ19 AB 2841',
+                            style: const TextStyle(
                               color: MoolColors.muted,
                               fontSize: 12,
                               fontWeight: FontWeight.w600,
@@ -478,7 +487,7 @@ class _LiveTrip extends StatelessWidget {
                       label: 'Chat',
                       icon: Icons.chat_bubble_outline_rounded,
                       onPressed: () => context.go(
-                        '/app/chat/thread/ride-$tripId?return=/app/ride/trip/$tripId',
+                        '/app/chat/thread/ride-captain?return=/app/ride/trip/$tripId',
                       ),
                     ),
                     const SizedBox(width: MoolSpacing.xs),
@@ -841,9 +850,9 @@ class _RideReceipt extends StatelessWidget {
                 ),
                 _TripPoint(icon: Icons.location_on_rounded, text: session.drop),
                 const Divider(height: MoolSpacing.lg),
-                const Row(
+                Row(
                   children: [
-                    CircleAvatar(
+                    const CircleAvatar(
                       backgroundColor: MoolColors.navy,
                       child: Text(
                         'AS',
@@ -853,11 +862,11 @@ class _RideReceipt extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: MoolSpacing.sm),
+                    const SizedBox(width: MoolSpacing.sm),
                     Expanded(
                       child: Text(
-                        'Arjun Singh · White Auto\nRJ19 AB 2841',
-                        style: TextStyle(
+                        'Arjun Singh · ${_rideVehicleLabel(session.trip!)}\nRJ19 AB 2841',
+                        style: const TextStyle(
                           color: MoolColors.ink,
                           fontWeight: FontWeight.w800,
                         ),

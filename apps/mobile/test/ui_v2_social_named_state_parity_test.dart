@@ -10,6 +10,8 @@ import 'package:moolsocial/ui_v2/social/social_v2_creator.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_plans_promotion.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_connect.dart';
 
+import 'support/review_social_content_gateway.dart';
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -62,7 +64,8 @@ void main() {
       find.text('YouTube Shorts are unavailable right now'),
       findsOneWidget,
     );
-    expect(find.text('Please try again later.'), findsOneWidget);
+    expect(find.textContaining('continue in MoolSocial Feed'), findsOneWidget);
+    expect(find.text('Open Feed'), findsOneWidget);
     expect(find.text('Fresh basket packed this morning'), findsNothing);
     expect(find.text('Comment'), findsNothing);
 
@@ -80,6 +83,7 @@ void main() {
     expect(find.text('YouTube Shorts are unavailable'), findsOneWidget);
 
     await _pump(tester, owners.consumer(sub: 'feed'));
+    await tester.pumpAndSettle();
     expect(
       find.byKey(const Key('screen04-moolsocial-feed-state-empty')),
       findsOneWidget,
@@ -132,7 +136,8 @@ void main() {
         find.text('YouTube Videos are unavailable right now'),
         findsOneWidget,
       );
-      expect(find.text('Please try again later.'), findsOneWidget);
+      expect(find.textContaining('continue in MoolSocial Feed'), findsOneWidget);
+      expect(find.text('Open Feed'), findsOneWidget);
       expect(find.text('5-minute morning mobility'), findsNothing);
       expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
       expect(find.text('Subscribe'), findsNothing);
@@ -368,7 +373,9 @@ class _Owners {
   final journey = JourneySession();
   final creator = CreatorSession()..creatorWorkspaceActive = true;
   final retailer = RetailerSession();
-  final shared = SharedSession();
+  final shared = SharedSession(
+    socialContentGateway: ReviewSocialContentGateway(),
+  );
 
   SocialUniversalV2 consumer({String? sub, String? state}) => SocialUniversalV2(
     session: journey,

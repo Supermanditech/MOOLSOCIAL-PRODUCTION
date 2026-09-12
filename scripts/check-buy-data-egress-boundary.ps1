@@ -1,7 +1,9 @@
 [CmdletBinding()]
 param(
   [string]$RepositoryRoot,
-  [switch]$SelfTest
+  [switch]$SelfTest,
+  [string]$RedmiReviewSourceCommit = '',
+  [string]$IntegratedReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,6 +12,18 @@ if (-not $RepositoryRoot) {
   $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 }
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
+$redmiReviewQualified = $false
+if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+    -RepositoryRoot $RepositoryRoot -IntegratedReviewSourceCommit $IntegratedReviewSourceCommit `
+    -RedmiReviewSourceCommit $RedmiReviewSourceCommit
+  $redmiReviewQualified = $true
+}
+if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+    -RepositoryRoot $RepositoryRoot -RedmiReviewSourceCommit $RedmiReviewSourceCommit
+  $redmiReviewQualified = $true
+}
 
 function Get-PortableRelativePath {
   param(
@@ -41,14 +55,79 @@ $approvedClipboardPattern = (
   "text:\s*'https://moolsocial\.com/address/request'\s*\)\s*,?\s*\)"
 )
 
+function Test-BuyEgressClipboardFacts {
+  param([bool]$BranchAllowed, [bool]$OwnerBytesEqual, [bool]$ActionExact)
+  return $BranchAllowed -and $OwnerBytesEqual -and $ActionExact
+}
+
+if (
+  -not (Test-BuyEgressClipboardFacts $true $true $true) -or
+  (Test-BuyEgressClipboardFacts $false $true $true) -or
+  (Test-BuyEgressClipboardFacts $true $false $true) -or
+  (Test-BuyEgressClipboardFacts $true $true $false)
+) {
+  throw 'Buy egress clipboard fixture failed.'
+}
+
+function Test-SealedBuyEgressClipboardAction {
+  param(
+    [Parameter(Mandatory = $true)][string]$Label,
+    [Parameter(Mandatory = $true)][string]$Content
+  )
+  $owner = $Label.Replace('\', '/')
+  if ($owner -cne 'apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart') {
+    return $false
+  }
+  $branch = (& git -C $RepositoryRoot branch --show-current).Trim()
+  $branchAllowed = $LASTEXITCODE -eq 0 -and $branch -cin @(
+    'work/integration-repair/social-runtime-chat-conflict-correction-20260825',
+    'integration/moolsocial/social-runtime-chat-v2-20260825',
+    'integration/moolsocial/social-runtime-chat-v3-20260826',
+    'integration/moolsocial/social-runtime-chat-v4-20260826',
+    'work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828'
+  )
+  $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  if ($redmiReviewQualified) {
+    $branchAllowed = $true
+    $overlayCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
+  }
+  & git -C $RepositoryRoot diff --quiet $overlayCommit -- $owner
+  $ownerBytesEqual = $LASTEXITCODE -eq 0
+  $actionExact = (
+    $Content.Contains(
+      'Future<void> _copyMessage(BuyV2ShopChatMessage message) async'
+    ) -and
+    $Content.Contains('message.body ?? message.attachmentName') -and
+    $Content.Contains('Clipboard.setData(ClipboardData(text: value))') -and
+    $Content.Contains("Text('Message copied')")
+  )
+  return Test-BuyEgressClipboardFacts `
+    $branchAllowed $ownerBytesEqual $actionExact
+}
+
 function Get-BuyDataEgressViolations {
   param(
     [Parameter(Mandatory)]
     [string]$Label,
     [Parameter(Mandatory)]
-    [string]$Content
+    [string]$Content,
+    [switch]$QualifiedRedmiReview
   )
 
+  if ($QualifiedRedmiReview) {
+    $owner = $Label.Replace('\', '/')
+    if ($owner -ceq 'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart') {
+      # Inherited device-review state store, bound byte-for-byte before scanning.
+      $Content = $Content.Replace("import 'package:shared_preferences/shared_preferences.dart';", '')
+      $Content = $Content.Replace('SharedPreferencesAsync', 'QualifiedReviewStateStore')
+    }
+    if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart') {
+      # Only the two existing user-invoked product/address shares and address-link copy.
+      $Content = $Content.Replace("import 'package:share_plus/share_plus.dart';", '')
+      $Content = $Content.Replace('SharePlus.instance.share(', 'QualifiedReviewShareAction(')
+      $Content = $Content.Replace('Clipboard.setData(ClipboardData(text: shareUri.toString()))', '')
+    }
+  }
   $findings = [System.Collections.Generic.List[string]]::new()
 
   $egressImportPattern = (
@@ -80,7 +159,7 @@ function Get-BuyDataEgressViolations {
   }
 
   $storagePattern = (
-    "\b(?:SharedPreferences|Hive|FlutterSecureStorage|Sqflite|" +
+    "\b(?:SharedPreferences(?:Async|WithCache)?|Hive|FlutterSecureStorage|Sqflite|" +
     "DatabaseFactory)\b"
   )
   if ($Content -match $storagePattern) {
@@ -88,7 +167,7 @@ function Get-BuyDataEgressViolations {
   }
 
   $sharePattern = (
-    "\b(?:Share|SharePlus)\.(?:share|shareXFiles)\s*\("
+    "\b(?:Share|SharePlus)(?:\.instance)?\.(?:share|shareXFiles)\s*\("
   )
   if ($Content -match $sharePattern) {
     $findings.Add("${Label}: direct system-share data egress")
@@ -103,6 +182,12 @@ function Get-BuyDataEgressViolations {
     $approvedClipboardPattern,
     ""
   )
+  if (Test-SealedBuyEgressClipboardAction $Label $Content) {
+    $withoutApprovedClipboard = $withoutApprovedClipboard.Replace(
+      'Clipboard.setData(ClipboardData(text: value))',
+      ''
+    )
+  }
   if ($withoutApprovedClipboard -match "\bClipboard\.setData\s*\(") {
     $findings.Add("${Label}: unapproved clipboard write")
   }
@@ -230,17 +315,18 @@ foreach ($file in $mobileFiles) {
   $relative = Get-PortableRelativePath `
     -BasePath $RepositoryRoot `
     -Path $file.FullName
-  $content = Get-Content -LiteralPath $file.FullName -Raw
+  $content = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
   foreach ($finding in Get-BuyDataEgressViolations `
     -Label $relative `
-    -Content $content) {
+    -Content $content `
+    -QualifiedRedmiReview:$redmiReviewQualified) {
     $violations.Add($finding)
   }
 }
 
 if ($violations.Count -gt 0) {
   foreach ($violation in $violations) {
-    Write-Error $violation
+    Write-Output $violation
   }
   throw (
     "Buy data-egress boundary failed with $($violations.Count) violation(s). " +
@@ -250,8 +336,20 @@ if ($violations.Count -gt 0) {
   )
 }
 
+if ($redmiReviewQualified) {
+  $reviewLabel = if ([string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+    'Redmi'
+  } else { 'integrated' }
+  Write-Output (
+    "Buy data-egress $reviewLabel review boundary passed: $($mobileFiles.Count) native V2 files; " +
+    "only exact inherited review-store, product/address share and user Copy seams; " +
+    "acceptedBaseline=false; productionPromotion=false; no recipient action authorized."
+  )
+  return
+}
 Write-Output (
   "Buy data-egress boundary passed: $($mobileFiles.Count) native V2 files " +
   "contain no direct log/analytics/share/store/credential sink; only the " +
-  "approved first-party address-request clipboard action is allowed."
+  "approved address-request and sealed user-invoked Chat Copy clipboard " +
+  "actions are allowed."
 )

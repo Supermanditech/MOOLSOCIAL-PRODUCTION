@@ -11,9 +11,15 @@ export class YouTubeQuotaGovernorAdapter implements YouTubeQuotaPort {
   constructor(private readonly governor: YouTubeQuotaGovernor) {}
 
   async reserve(reservation: QuotaReservation): Promise<void> {
-    await this.governor.reserve(
+    await this.governor.reserveMeasured(
       reservation.bucket,
       reservation.amount,
+      {
+      principal: reservation.principal,
+      operation: reservation.operation,
+      requestId: reservation.requestId,
+      local: true,
+      },
     );
   }
 }

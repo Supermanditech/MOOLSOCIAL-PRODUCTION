@@ -2,9 +2,15 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
-import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/services.dart';
+import 'package:just_audio/just_audio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:record/record.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../shared/social_media_picker.dart';
 import '../shared/social_content_gateway.dart';
@@ -27,6 +33,159 @@ class ChatPickedPhoto {
   final Uint8List bytes;
 }
 
+class ChatPickedAttachment {
+  const ChatPickedAttachment({
+    required this.kind,
+    required this.name,
+    required this.contentType,
+    required this.bytes,
+    this.duration,
+  });
+
+  final ChatAttachmentKind kind;
+  final String name;
+  final String contentType;
+  final Uint8List bytes;
+  final Duration? duration;
+}
+
+abstract interface class ChatAttachmentPicker {
+  Future<ChatPickedAttachment?> pick(ChatAttachmentKind kind);
+}
+
+class NativeChatAttachmentPicker implements ChatAttachmentPicker {
+  @override
+  Future<ChatPickedAttachment?> pick(ChatAttachmentKind kind) async {
+    if (kind == ChatAttachmentKind.voice) {
+      throw const ChatServiceException(
+        'Use the microphone button to record a voice message.',
+      );
+    }
+    final file = await FilePicker.pickFile(
+      type: kind == ChatAttachmentKind.video ? FileType.video : FileType.custom,
+      allowedExtensions: kind == ChatAttachmentKind.document
+          ? const ['pdf', 'txt', 'docx']
+          : null,
+    );
+    if (file == null) return null;
+    final bytes = await file.readAsBytes();
+    final contentType = _attachmentContentType(file.name, kind);
+    _validatePickedAttachment(kind, contentType, bytes.length);
+    return ChatPickedAttachment(
+      kind: kind,
+      name: file.name,
+      contentType: contentType,
+      bytes: bytes,
+    );
+  }
+}
+
+abstract interface class ChatVoiceRecorder {
+  Future<void> start();
+  Future<ChatPickedAttachment> stop();
+  Future<void> cancel();
+  void dispose();
+}
+
+class NativeChatVoiceRecorder implements ChatVoiceRecorder {
+  AudioRecorder? _recorder;
+  DateTime? _startedAt;
+
+  AudioRecorder get _activeRecorder => _recorder ??= AudioRecorder();
+
+  @override
+  Future<void> start() async {
+    if (!await _activeRecorder.hasPermission()) {
+      throw const ChatServiceException(
+        'Microphone access was denied. Allow microphone access in device settings, then try again.',
+        code: 'microphone_permission_denied',
+      );
+    }
+    final directory = await getTemporaryDirectory();
+    final path =
+        '${directory.path}/moolsocial-voice-${DateTime.now().microsecondsSinceEpoch}.m4a';
+    await _activeRecorder.start(
+      const RecordConfig(
+        encoder: AudioEncoder.aacLc,
+        bitRate: 64000,
+        sampleRate: 44100,
+      ),
+      path: path,
+    );
+    _startedAt = DateTime.now();
+  }
+
+  @override
+  Future<ChatPickedAttachment> stop() async {
+    final startedAt = _startedAt;
+    final path = await _activeRecorder.stop();
+    _startedAt = null;
+    if (path == null || startedAt == null) {
+      throw const ChatServiceException('Voice recording was not completed.');
+    }
+    final duration = DateTime.now().difference(startedAt);
+    final bytes = await File(path).readAsBytes();
+    _validatePickedAttachment(
+      ChatAttachmentKind.voice,
+      'audio/mp4',
+      bytes.length,
+      duration: duration,
+    );
+    return ChatPickedAttachment(
+      kind: ChatAttachmentKind.voice,
+      name: 'Voice message.m4a',
+      contentType: 'audio/mp4',
+      bytes: bytes,
+      duration: duration,
+    );
+  }
+
+  @override
+  Future<void> cancel() async {
+    _startedAt = null;
+    await _activeRecorder.cancel();
+  }
+
+  @override
+  void dispose() => _recorder?.dispose();
+}
+
+abstract interface class ChatAttachmentPlayback {
+  Future<void> open(ChatAttachment attachment);
+  void dispose();
+}
+
+class NativeChatAttachmentPlayback implements ChatAttachmentPlayback {
+  AudioPlayer? _player;
+
+  AudioPlayer get _activePlayer => _player ??= AudioPlayer();
+
+  @override
+  Future<void> open(ChatAttachment attachment) async {
+    if (attachment.kind == ChatAttachmentKind.voice) {
+      await _activePlayer.setUrl(attachment.readUrl.toString());
+      unawaited(_activePlayer.play());
+      return;
+    }
+    final opened = await launchUrl(
+      attachment.readUrl,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!opened) {
+      throw const ChatServiceException(
+        'That attachment could not be opened. Try again.',
+        retryable: true,
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    final player = _player;
+    if (player != null) unawaited(player.dispose());
+  }
+}
+
 abstract interface class ChatPhotoPicker {
   Future<ChatPickedPhoto?> pick(ChatPhotoSource source);
 
@@ -41,12 +200,34 @@ class NativeChatPhotoPicker implements ChatPhotoPicker {
 
   @override
   Future<ChatPickedPhoto?> pick(ChatPhotoSource source) async {
-    final selected = await _picker.pickImage(
-      source == ChatPhotoSource.camera
-          ? SocialMediaSource.camera
-          : SocialMediaSource.gallery,
-    );
-    return selected == null ? null : _load(selected);
+    try {
+      final selected = await _picker.pickImage(
+        source == ChatPhotoSource.camera
+            ? SocialMediaSource.camera
+            : SocialMediaSource.gallery,
+      );
+      return selected == null ? null : _load(selected);
+    } on PlatformException catch (error) {
+      throw switch (error.code) {
+        'camera_access_denied' => const ChatServiceException(
+          'Camera access was denied. Allow camera access in device settings, then try again.',
+          code: 'camera_permission_denied',
+        ),
+        'camera_access_restricted' => const ChatServiceException(
+          'Camera access is restricted on this device. You can choose a photo instead.',
+          code: 'camera_permission_restricted',
+        ),
+        'photo_access_denied' => const ChatServiceException(
+          'Photo access was denied. Allow photo access in device settings, then try again.',
+          code: 'photo_permission_denied',
+        ),
+        'photo_access_restricted' => const ChatServiceException(
+          'Photo access is restricted on this device. You can take a new photo or continue with a message.',
+          code: 'photo_permission_restricted',
+        ),
+        _ => error,
+      };
+    }
   }
 
   @override
@@ -150,6 +331,135 @@ abstract interface class ChatPhotoGateway {
   });
 }
 
+abstract interface class ChatAttachmentGateway {
+  Future<ChatMessage> sendAttachment({
+    required String threadId,
+    required ChatPickedAttachment attachment,
+    required String caption,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  });
+}
+
+abstract interface class ChatPrivacyGateway {
+  Future<ChatPrivacySettings> getPrivacySettings();
+
+  Future<ChatPrivacySettings> updatePrivacySettings(
+    ChatPrivacySettings settings,
+  );
+
+  Future<List<ChatBlockedAccount>> listBlockedAccounts();
+
+  Future<bool> setBlockedAccount({
+    required String targetUserId,
+    required bool blocked,
+  });
+
+  Future<List<ChatMessageRequest>> listMessageRequests();
+
+  Future<bool> resolveMessageRequest({
+    required String threadId,
+    required bool accepted,
+  });
+}
+
+abstract interface class ChatCallGateway {
+  Future<ChatCallPreferences> getCallPreferences();
+
+  Future<ChatCallPreferences> updateCallPreferences(
+    ChatCallPreferences preferences,
+  );
+
+  Future<void> setPresence(ChatPresenceState state);
+
+  Future<ChatCallAvailability> getCallAvailability({
+    required String threadId,
+    required ChatCallKind kind,
+  });
+
+  Future<ChatCall> startCall({
+    required String threadId,
+    required ChatCallKind kind,
+    required String idempotencyKey,
+  });
+
+  Future<ChatCall> respondToCall({
+    required String callId,
+    required bool accepted,
+  });
+
+  Future<ChatCall> endCall({required String callId});
+
+  Future<List<ChatCall>> listIncomingCalls();
+}
+
+abstract interface class ChatGroupGateway {
+  Future<ChatGroupInfo> getGroupInfo({required String threadId});
+
+  Future<ChatGroupInvite> inviteGroupMember({
+    required String threadId,
+    required String targetUserId,
+  });
+
+  Future<ChatGroupInfo> updateGroupPermissions({
+    required String threadId,
+    required ChatGroupInvitePermission invitePermission,
+  });
+
+  Future<bool> leaveGroup({required String threadId});
+
+  Future<List<ChatGroupInvite>> listGroupInvites();
+
+  Future<bool> respondToGroupInvite({
+    required String inviteId,
+    required bool accepted,
+  });
+}
+
+abstract interface class ChatNotificationGateway {
+  Future<ChatNotificationPreferences> getNotificationPreferences();
+  Future<ChatNotificationPreferences> updateNotificationPreferences(
+    ChatNotificationPreferences preferences,
+  );
+  Future<bool> registerNotificationDevice({
+    required String token,
+    required String platform,
+  });
+  Future<bool> unregisterNotificationDevice({required String token});
+}
+
+abstract interface class ChatNotificationClient {
+  Future<ChatNotificationPermission> permission({required bool request});
+  Future<String?> token();
+  String get platform;
+}
+
+class FirebaseChatNotificationClient implements ChatNotificationClient {
+  @override
+  String get platform => Platform.isIOS ? 'ios' : 'android';
+
+  @override
+  Future<ChatNotificationPermission> permission({required bool request}) async {
+    final settings = request
+        ? await FirebaseMessaging.instance.requestPermission(
+            alert: true,
+            badge: true,
+            sound: true,
+          )
+        : await FirebaseMessaging.instance.getNotificationSettings();
+    return switch (settings.authorizationStatus) {
+      AuthorizationStatus.authorized => ChatNotificationPermission.authorized,
+      AuthorizationStatus.provisional => ChatNotificationPermission.provisional,
+      AuthorizationStatus.denied || AuthorizationStatus.deniedPermanently =>
+        ChatNotificationPermission.denied,
+      AuthorizationStatus.notDetermined => ChatNotificationPermission.unknown,
+    };
+  }
+
+  @override
+  Future<String?> token() => FirebaseMessaging.instance.getToken();
+}
+
 abstract interface class ChatPhotoUploadTransport {
   Future<void> put({
     required Uri url,
@@ -235,6 +545,34 @@ class IoChatPhotoUploadTransport implements ChatPhotoUploadTransport {
   }
 }
 
+class IoChatAttachmentUploadTransport implements ChatPhotoUploadTransport {
+  IoChatAttachmentUploadTransport({ChatPhotoUploadTransport? delegate})
+    : _delegate = delegate ?? IoChatPhotoUploadTransport();
+
+  final ChatPhotoUploadTransport _delegate;
+
+  @override
+  Future<void> put({
+    required Uri url,
+    required Map<String, String> headers,
+    required Uint8List bytes,
+  }) async {
+    try {
+      await _delegate.put(url: url, headers: headers, bytes: bytes);
+    } on ChatServiceException catch (error) {
+      throw ChatServiceException(
+        error.code == 'photo_upload_expired'
+            ? 'Attachment upload expired. Try sending it again.'
+            : 'Attachment could not upload. Check your connection and try again.',
+        code: error.code == 'photo_upload_expired'
+            ? 'attachment_upload_expired'
+            : 'attachment_upload_failed',
+        retryable: error.retryable,
+      );
+    }
+  }
+}
+
 ChatGateway buildChatGateway() {
   if (moolSocialChatUrl.trim().isEmpty) {
     return const UnavailableChatGateway();
@@ -246,7 +584,13 @@ ChatGateway buildChatGateway() {
   );
 }
 
-class UnavailableChatGateway implements ChatGateway {
+class UnavailableChatGateway
+    implements
+        ChatGateway,
+        ChatPrivacyGateway,
+        ChatCallGateway,
+        ChatGroupGateway,
+        ChatNotificationGateway {
   const UnavailableChatGateway();
 
   ChatServiceException get _error => const ChatServiceException(
@@ -293,26 +637,148 @@ class UnavailableChatGateway implements ChatGateway {
 
   @override
   Future<void> markThreadRead({required String threadId}) async => throw _error;
+
+  @override
+  Future<ChatPrivacySettings> getPrivacySettings() async => throw _error;
+
+  @override
+  Future<List<ChatBlockedAccount>> listBlockedAccounts() async => throw _error;
+
+  @override
+  Future<List<ChatMessageRequest>> listMessageRequests() async => throw _error;
+
+  @override
+  Future<bool> resolveMessageRequest({
+    required String threadId,
+    required bool accepted,
+  }) async => throw _error;
+
+  @override
+  Future<bool> setBlockedAccount({
+    required String targetUserId,
+    required bool blocked,
+  }) async => throw _error;
+
+  @override
+  Future<ChatPrivacySettings> updatePrivacySettings(
+    ChatPrivacySettings settings,
+  ) async => throw _error;
+
+  @override
+  Future<ChatCallPreferences> getCallPreferences() async => throw _error;
+
+  @override
+  Future<ChatCallPreferences> updateCallPreferences(
+    ChatCallPreferences preferences,
+  ) async => throw _error;
+
+  @override
+  Future<void> setPresence(ChatPresenceState state) async => throw _error;
+
+  @override
+  Future<ChatCallAvailability> getCallAvailability({
+    required String threadId,
+    required ChatCallKind kind,
+  }) async => throw _error;
+
+  @override
+  Future<ChatCall> startCall({
+    required String threadId,
+    required ChatCallKind kind,
+    required String idempotencyKey,
+  }) async => throw _error;
+
+  @override
+  Future<ChatCall> respondToCall({
+    required String callId,
+    required bool accepted,
+  }) async => throw _error;
+
+  @override
+  Future<ChatCall> endCall({required String callId}) async => throw _error;
+
+  @override
+  Future<List<ChatCall>> listIncomingCalls() async => throw _error;
+
+  @override
+  Future<ChatGroupInfo> getGroupInfo({required String threadId}) async =>
+      throw _error;
+
+  @override
+  Future<ChatGroupInvite> inviteGroupMember({
+    required String threadId,
+    required String targetUserId,
+  }) async => throw _error;
+
+  @override
+  Future<ChatGroupInfo> updateGroupPermissions({
+    required String threadId,
+    required ChatGroupInvitePermission invitePermission,
+  }) async => throw _error;
+
+  @override
+  Future<bool> leaveGroup({required String threadId}) async => throw _error;
+
+  @override
+  Future<List<ChatGroupInvite>> listGroupInvites() async => throw _error;
+
+  @override
+  Future<bool> respondToGroupInvite({
+    required String inviteId,
+    required bool accepted,
+  }) async => throw _error;
+
+  @override
+  Future<ChatNotificationPreferences> getNotificationPreferences() async =>
+      throw _error;
+
+  @override
+  Future<ChatNotificationPreferences> updateNotificationPreferences(
+    ChatNotificationPreferences preferences,
+  ) async => throw _error;
+
+  @override
+  Future<bool> registerNotificationDevice({
+    required String token,
+    required String platform,
+  }) async => throw _error;
+
+  @override
+  Future<bool> unregisterNotificationDevice({required String token}) async =>
+      throw _error;
 }
 
-class AuthenticatedChatGateway implements ChatGateway, ChatPhotoGateway {
+class AuthenticatedChatGateway
+    implements
+        ChatGateway,
+        ChatPhotoGateway,
+        ChatAttachmentGateway,
+        ChatPrivacyGateway,
+        ChatCallGateway,
+        ChatGroupGateway,
+        ChatNotificationGateway {
   AuthenticatedChatGateway({
     required Uri endpoint,
     required this.credentials,
     required this.transport,
     ChatPhotoUploadTransport? photoUploadTransport,
+    ChatPhotoUploadTransport? attachmentUploadTransport,
     Random? random,
   }) : endpoint = _validateChatEndpoint(endpoint),
        photoUploadTransport =
            photoUploadTransport ?? IoChatPhotoUploadTransport(),
+       attachmentUploadTransport =
+           attachmentUploadTransport ?? IoChatAttachmentUploadTransport(),
        random = random ?? Random.secure();
 
   final Uri endpoint;
   final SocialContentCredentials credentials;
   final SocialContentTransport transport;
   final ChatPhotoUploadTransport photoUploadTransport;
+  final ChatPhotoUploadTransport attachmentUploadTransport;
   final Random random;
   final Map<String, _ChatPhotoUploadState> _photoUploads = {};
+  final Map<String, _ChatAttachmentUploadState> _attachmentUploads = {};
 
   @override
   Future<List<ChatThread>> listThreads({int limit = 30}) async {
@@ -447,6 +913,73 @@ class AuthenticatedChatGateway implements ChatGateway, ChatPhotoGateway {
   }
 
   @override
+  Future<ChatMessage> sendAttachment({
+    required String threadId,
+    required ChatPickedAttachment attachment,
+    required String caption,
+    required String idempotencyKey,
+    String? replyToMessageId,
+  }) async {
+    final fingerprint = sha256.convert(attachment.bytes).toString();
+    var state = _attachmentUploads[idempotencyKey];
+    if (state != null && state.fingerprint != fingerprint) {
+      throw const ChatServiceException(
+        'Choose the attachment again before retrying.',
+        code: 'attachment_retry_conflict',
+      );
+    }
+    if (state == null) {
+      final grant = _decodeAttachmentUploadGrant(
+        _map(
+          await _invoke(
+            'prepareAttachmentUpload',
+            limitedUseAppCheck: true,
+            body: _attachmentBody(threadId, attachment),
+          ),
+        ),
+        attachment,
+      );
+      state = _ChatAttachmentUploadState(
+        fingerprint: fingerprint,
+        grant: grant,
+      );
+      _attachmentUploads[idempotencyKey] = state;
+    }
+    if (!state.uploaded) {
+      try {
+        await attachmentUploadTransport.put(
+          url: state.grant.uploadUrl,
+          headers: state.grant.requiredHeaders,
+          bytes: attachment.bytes,
+        );
+        state.uploaded = true;
+      } on ChatServiceException catch (error) {
+        if (error.code == 'attachment_upload_expired') {
+          _attachmentUploads.remove(idempotencyKey);
+        }
+        rethrow;
+      }
+    }
+    final delivered = _decodeMessage(
+      _map(
+        await _invoke(
+          'sendAttachmentMessage',
+          limitedUseAppCheck: true,
+          body: {
+            ..._attachmentBody(threadId, attachment),
+            'uploadId': state.grant.uploadId,
+            if (caption.trim().isNotEmpty) 'caption': caption.trim(),
+            'idempotencyKey': idempotencyKey,
+            'replyToMessageId': ?replyToMessageId,
+          },
+        ),
+      ),
+    );
+    _attachmentUploads.remove(idempotencyKey);
+    return delivered;
+  }
+
+  @override
   Future<ChatMessage> setReaction({
     required String threadId,
     required String messageId,
@@ -497,6 +1030,270 @@ class AuthenticatedChatGateway implements ChatGateway, ChatPhotoGateway {
       limitedUseAppCheck: true,
       body: {'threadId': threadId},
     );
+  }
+
+  @override
+  Future<ChatPrivacySettings> getPrivacySettings() async =>
+      _decodePrivacySettings(
+        _map(await _invoke('getPrivacySettings', body: const {})),
+      );
+
+  @override
+  Future<ChatPrivacySettings> updatePrivacySettings(
+    ChatPrivacySettings settings,
+  ) async => _decodePrivacySettings(
+    _map(
+      await _invoke(
+        'updatePrivacySettings',
+        limitedUseAppCheck: true,
+        body: _encodePrivacySettings(settings),
+      ),
+    ),
+  );
+
+  @override
+  Future<List<ChatBlockedAccount>> listBlockedAccounts() async => _list(
+    await _invoke('listBlockedAccounts', body: const {}),
+  ).map((item) => _decodeBlockedAccount(_map(item))).toList(growable: false);
+
+  @override
+  Future<bool> setBlockedAccount({
+    required String targetUserId,
+    required bool blocked,
+  }) async {
+    final result = _map(
+      await _invoke(
+        'setBlockedAccount',
+        limitedUseAppCheck: true,
+        body: {'targetUserId': targetUserId, 'blocked': blocked},
+      ),
+    );
+    return result['blocked'] == true;
+  }
+
+  @override
+  Future<List<ChatMessageRequest>> listMessageRequests() async => _list(
+    await _invoke('listMessageRequests', body: const {}),
+  ).map((item) => _decodeMessageRequest(_map(item))).toList(growable: false);
+
+  @override
+  Future<bool> resolveMessageRequest({
+    required String threadId,
+    required bool accepted,
+  }) async {
+    final result = _map(
+      await _invoke(
+        'resolveMessageRequest',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId, 'accepted': accepted},
+      ),
+    );
+    return result['accepted'] == true;
+  }
+
+  @override
+  Future<ChatCallPreferences> getCallPreferences() async =>
+      _decodeCallPreferences(
+        _map(await _invoke('getCallPreferences', body: const {})),
+      );
+
+  @override
+  Future<ChatCallPreferences> updateCallPreferences(
+    ChatCallPreferences preferences,
+  ) async => _decodeCallPreferences(
+    _map(
+      await _invoke(
+        'updateCallPreferences',
+        limitedUseAppCheck: true,
+        body: {
+          'voiceCallsEnabled': preferences.voiceCallsEnabled,
+          'videoCallsEnabled': preferences.videoCallsEnabled,
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<void> setPresence(ChatPresenceState state) async {
+    await _invoke(
+      'setPresence',
+      limitedUseAppCheck: true,
+      body: {'state': state.name},
+    );
+  }
+
+  @override
+  Future<ChatCallAvailability> getCallAvailability({
+    required String threadId,
+    required ChatCallKind kind,
+  }) async => _decodeCallAvailability(
+    _map(
+      await _invoke(
+        'getCallAvailability',
+        body: {'threadId': threadId, 'kind': kind.name},
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatCall> startCall({
+    required String threadId,
+    required ChatCallKind kind,
+    required String idempotencyKey,
+  }) async => _decodeCall(
+    _map(
+      await _invoke(
+        'startCall',
+        limitedUseAppCheck: true,
+        body: {
+          'threadId': threadId,
+          'kind': kind.name,
+          'idempotencyKey': idempotencyKey,
+        },
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatCall> respondToCall({
+    required String callId,
+    required bool accepted,
+  }) async => _decodeCall(
+    _map(
+      await _invoke(
+        'respondToCall',
+        limitedUseAppCheck: true,
+        body: {'callId': callId, 'accepted': accepted},
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatCall> endCall({required String callId}) async => _decodeCall(
+    _map(
+      await _invoke(
+        'endCall',
+        limitedUseAppCheck: true,
+        body: {'callId': callId},
+      ),
+    ),
+  );
+
+  @override
+  Future<List<ChatCall>> listIncomingCalls() async => _list(
+    await _invoke('listIncomingCalls', body: const {}),
+  ).map((item) => _decodeCall(_map(item))).toList(growable: false);
+
+  @override
+  Future<ChatGroupInfo> getGroupInfo({required String threadId}) async =>
+      _decodeGroupInfo(
+        _map(await _invoke('getGroupInfo', body: {'threadId': threadId})),
+      );
+
+  @override
+  Future<ChatGroupInvite> inviteGroupMember({
+    required String threadId,
+    required String targetUserId,
+  }) async => _decodeGroupInvite(
+    _map(
+      await _invoke(
+        'inviteGroupMember',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId, 'targetUserId': targetUserId},
+      ),
+    ),
+  );
+
+  @override
+  Future<ChatGroupInfo> updateGroupPermissions({
+    required String threadId,
+    required ChatGroupInvitePermission invitePermission,
+  }) async => _decodeGroupInfo(
+    _map(
+      await _invoke(
+        'updateGroupPermissions',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId, 'invitePermission': invitePermission.name},
+      ),
+    ),
+  );
+
+  @override
+  Future<bool> leaveGroup({required String threadId}) async {
+    final value = _map(
+      await _invoke(
+        'leaveGroup',
+        limitedUseAppCheck: true,
+        body: {'threadId': threadId},
+      ),
+    );
+    return value['left'] == true;
+  }
+
+  @override
+  Future<List<ChatGroupInvite>> listGroupInvites() async => _list(
+    await _invoke('listGroupInvites', body: const {}),
+  ).map((item) => _decodeGroupInvite(_map(item))).toList(growable: false);
+
+  @override
+  Future<bool> respondToGroupInvite({
+    required String inviteId,
+    required bool accepted,
+  }) async {
+    final value = _map(
+      await _invoke(
+        'respondToGroupInvite',
+        limitedUseAppCheck: true,
+        body: {'inviteId': inviteId, 'accepted': accepted},
+      ),
+    );
+    return value['accepted'] == true;
+  }
+
+  @override
+  Future<ChatNotificationPreferences> getNotificationPreferences() async =>
+      _decodeNotificationPreferences(
+        _map(await _invoke('getNotificationPreferences', body: const {})),
+      );
+
+  @override
+  Future<ChatNotificationPreferences> updateNotificationPreferences(
+    ChatNotificationPreferences preferences,
+  ) async => _decodeNotificationPreferences(
+    _map(
+      await _invoke(
+        'updateNotificationPreferences',
+        limitedUseAppCheck: true,
+        body: _encodeNotificationPreferences(preferences),
+      ),
+    ),
+  );
+
+  @override
+  Future<bool> registerNotificationDevice({
+    required String token,
+    required String platform,
+  }) async {
+    final value = _map(
+      await _invoke(
+        'registerNotificationDevice',
+        limitedUseAppCheck: true,
+        body: {'token': token, 'platform': platform},
+      ),
+    );
+    return value['registered'] == true;
+  }
+
+  @override
+  Future<bool> unregisterNotificationDevice({required String token}) async {
+    final value = _map(
+      await _invoke(
+        'unregisterNotificationDevice',
+        limitedUseAppCheck: true,
+        body: {'token': token},
+      ),
+    );
+    return value['registered'] == true;
   }
 
   Future<Object?> _invoke(
@@ -599,16 +1396,181 @@ ChatThread _decodeThread(Map<String, Object?> data) {
       'support' => ChatThreadType.support,
       _ => ChatThreadType.people,
     },
+    safetyTarget: switch (data['safetyTarget']) {
+      'person' => ChatSafetyTarget.person,
+      'business' => ChatSafetyTarget.business,
+      'conversation' => ChatSafetyTarget.conversation,
+      _ => null,
+    },
     unreadCount: _integer(data['unreadCount']),
     verified: data['verified'] == true,
+    targetUserId: _optionalString(data['targetUserId']),
+    messageRequestPending: data['requestStatus'] == 'pending',
+    participants: _decodeParticipants(data['participants']),
+    groupDescription: _optionalString(data['groupDescription']),
   );
 }
+
+List<ChatParticipant> _decodeParticipants(Object? value) {
+  if (value == null) return const [];
+  return _list(value)
+      .map((item) {
+        final data = _map(item);
+        return ChatParticipant(
+          id: _requiredString(data['userId']),
+          name: _requiredString(data['name']),
+          subtitle: _optionalString(data['handle']) ?? 'Group member',
+          isMe: data['isMe'] == true,
+          isAdmin: data['isAdmin'] == true,
+        );
+      })
+      .toList(growable: false);
+}
+
+ChatGroupInfo _decodeGroupInfo(Map<String, Object?> data) => ChatGroupInfo(
+  threadId: _requiredString(data['threadId']),
+  title: _requiredString(data['title']),
+  description: _requiredString(data['description']),
+  members: _decodeParticipants(data['members']),
+  invitePermission: _requiredString(data['invitePermission']) == 'members'
+      ? ChatGroupInvitePermission.members
+      : ChatGroupInvitePermission.admins,
+  canInvite: data['canInvite'] == true,
+  canManage: data['canManage'] == true,
+  canLeave: data['canLeave'] == true,
+);
+
+ChatGroupInvite _decodeGroupInvite(Map<String, Object?> data) =>
+    ChatGroupInvite(
+      id: _requiredString(data['id']),
+      threadId: _requiredString(data['threadId']),
+      groupTitle: _requiredString(data['groupTitle']),
+      invitedByUserId: _requiredString(data['invitedByUserId']),
+      invitedByName: _requiredString(data['invitedByName']),
+      invitedAt: _requiredDateTime(data['invitedAt']),
+    );
+
+ChatNotificationPreferences _decodeNotificationPreferences(
+  Map<String, Object?> data,
+) => ChatNotificationPreferences(
+  messagesEnabled: data['messagesEnabled'] == true,
+  callsEnabled: data['callsEnabled'] == true,
+  groupInvitesEnabled: data['groupInvitesEnabled'] == true,
+  showPreview: data['showPreview'] == true,
+  quietHoursEnabled: data['quietHoursEnabled'] == true,
+  quietStartMinutes: _integer(data['quietStartMinutes']),
+  quietEndMinutes: _integer(data['quietEndMinutes']),
+  utcOffsetMinutes: data['utcOffsetMinutes'] is int
+      ? data['utcOffsetMinutes']! as int
+      : 0,
+  updatedAt: _optionalDateTime(data['updatedAt']),
+);
+
+Map<String, Object?> _encodeNotificationPreferences(
+  ChatNotificationPreferences preferences,
+) => {
+  'messagesEnabled': preferences.messagesEnabled,
+  'callsEnabled': preferences.callsEnabled,
+  'groupInvitesEnabled': preferences.groupInvitesEnabled,
+  'showPreview': preferences.showPreview,
+  'quietHoursEnabled': preferences.quietHoursEnabled,
+  'quietStartMinutes': preferences.quietStartMinutes,
+  'quietEndMinutes': preferences.quietEndMinutes,
+  'utcOffsetMinutes': preferences.utcOffsetMinutes,
+};
+
+ChatPrivacySettings _decodePrivacySettings(Map<String, Object?> data) =>
+    ChatPrivacySettings(
+      whoCanMessage: switch (_requiredString(data['whoCanMessage'])) {
+        'connections' => ChatMessagePermission.connections,
+        'nobody' => ChatMessagePermission.nobody,
+        _ => ChatMessagePermission.everyone,
+      },
+      messageRequestsEnabled: data['messageRequestsEnabled'] == true,
+      shareLastSeen: data['shareLastSeen'] == true,
+      readReceipts: data['readReceipts'] == true,
+      updatedAt: _optionalDateTime(data['updatedAt']),
+    );
+
+Map<String, Object?> _encodePrivacySettings(ChatPrivacySettings settings) => {
+  'whoCanMessage': settings.whoCanMessage.name,
+  'messageRequestsEnabled': settings.messageRequestsEnabled,
+  'shareLastSeen': settings.shareLastSeen,
+  'readReceipts': settings.readReceipts,
+};
+
+ChatBlockedAccount _decodeBlockedAccount(Map<String, Object?> data) =>
+    ChatBlockedAccount(
+      userId: _requiredString(data['userId']),
+      name: _requiredString(data['name']),
+      handle: _requiredString(data['handle']),
+      blockedAt: _requiredDateTime(data['blockedAt']),
+    );
+
+ChatMessageRequest _decodeMessageRequest(Map<String, Object?> data) =>
+    ChatMessageRequest(
+      thread: _decodeThread(_map(data['thread'])),
+      requestedByUserId: _requiredString(data['requestedByUserId']),
+      requestedAt: _requiredDateTime(data['requestedAt']),
+    );
+
+ChatCallPreferences _decodeCallPreferences(Map<String, Object?> data) =>
+    ChatCallPreferences(
+      voiceCallsEnabled: data['voiceCallsEnabled'] == true,
+      videoCallsEnabled: data['videoCallsEnabled'] == true,
+      updatedAt: _optionalDateTime(data['updatedAt']),
+    );
+
+ChatCallAvailability _decodeCallAvailability(Map<String, Object?> data) =>
+    ChatCallAvailability(
+      threadId: _requiredString(data['threadId']),
+      kind: _decodeCallKind(data['kind']),
+      recipientUserId: _requiredString(data['recipientUserId']),
+      recipientName: _requiredString(data['recipientName']),
+      canStart: data['canStart'] == true,
+      status: switch (_requiredString(data['status'])) {
+        'available' => ChatCallAvailabilityStatus.available,
+        'offline' => ChatCallAvailabilityStatus.offline,
+        'calls_off' => ChatCallAvailabilityStatus.callsOff,
+        'busy' => ChatCallAvailabilityStatus.busy,
+        _ => throw const ChatServiceException(
+          'Chat returned an invalid call status. Try again.',
+          code: 'invalid_response',
+        ),
+      },
+      message: _requiredString(data['message']),
+    );
+
+ChatCall _decodeCall(Map<String, Object?> data) => ChatCall(
+  id: _requiredString(data['id']),
+  threadId: _requiredString(data['threadId']),
+  kind: _decodeCallKind(data['kind']),
+  callerUserId: _requiredString(data['callerUserId']),
+  recipientUserId: _requiredString(data['recipientUserId']),
+  status: switch (_requiredString(data['status'])) {
+    'accepted' => ChatCallStatus.accepted,
+    'declined' => ChatCallStatus.declined,
+    'ended' => ChatCallStatus.ended,
+    'ringing' => ChatCallStatus.ringing,
+    _ => throw const ChatServiceException(
+      'Chat returned an invalid call status. Try again.',
+      code: 'invalid_response',
+    ),
+  },
+  createdAt: _requiredDateTime(data['createdAt']),
+  updatedAt: _requiredDateTime(data['updatedAt']),
+);
+
+ChatCallKind _decodeCallKind(Object? value) =>
+    _requiredString(value) == 'video' ? ChatCallKind.video : ChatCallKind.voice;
 
 ChatMessage _decodeMessage(Map<String, Object?> data) {
   final mine = data['mine'] == true;
   final photo = _decodePhoto(data['photo']);
+  final attachment = _decodeAttachment(data['attachment']);
   final rawText = data['text'];
-  if (rawText is! String || (rawText.trim().isEmpty && photo == null)) {
+  if (rawText is! String ||
+      (rawText.trim().isEmpty && photo == null && attachment == null)) {
     throw const ChatServiceException(
       'Chat returned an invalid response. Try again.',
       code: 'invalid_response',
@@ -630,6 +1592,100 @@ ChatMessage _decodeMessage(Map<String, Object?> data) {
     readCount: _integer(data['readCount']),
     forwarded: data['forwarded'] == true,
     photo: photo,
+    attachment: attachment,
+  );
+}
+
+ChatAttachment? _decodeAttachment(Object? value) {
+  if (value == null) return null;
+  final data = _map(value);
+  final kind = switch (_requiredString(data['kind'])) {
+    'document' => ChatAttachmentKind.document,
+    'video' => ChatAttachmentKind.video,
+    'voice' => ChatAttachmentKind.voice,
+    _ => throw const ChatServiceException(
+      'Chat returned an invalid attachment. Try again.',
+      code: 'invalid_response',
+    ),
+  };
+  final sizeBytes = _integer(data['sizeBytes']);
+  final url = Uri.tryParse(_requiredString(data['readUrl']));
+  final expiresAt = DateTime.tryParse(
+    _requiredString(data['readUrlExpiresAt']),
+  );
+  final durationMilliseconds = _integer(data['durationMilliseconds']);
+  if (sizeBytes < 1 || url == null || expiresAt == null) {
+    throw const ChatServiceException(
+      'Chat returned an invalid attachment. Try again.',
+      code: 'invalid_response',
+    );
+  }
+  _requirePrivateStorageUrl(url);
+  return ChatAttachment(
+    id: _requiredString(data['id']),
+    kind: kind,
+    name: _requiredString(data['name']),
+    contentType: _requiredString(data['contentType']),
+    sizeBytes: sizeBytes,
+    readUrl: url,
+    readUrlExpiresAt: expiresAt,
+    duration: durationMilliseconds > 0
+        ? Duration(milliseconds: durationMilliseconds)
+        : null,
+  );
+}
+
+Map<String, Object?> _attachmentBody(
+  String threadId,
+  ChatPickedAttachment attachment,
+) => {
+  'threadId': threadId,
+  'kind': attachment.kind.name,
+  'fileName': attachment.name,
+  'contentType': attachment.contentType,
+  'sizeBytes': attachment.bytes.length,
+  if (attachment.duration != null)
+    'durationMilliseconds': attachment.duration!.inMilliseconds,
+};
+
+_ChatPhotoUploadGrant _decodeAttachmentUploadGrant(
+  Map<String, Object?> data,
+  ChatPickedAttachment attachment,
+) {
+  final uploadUrl = Uri.tryParse(_requiredString(data['uploadUrl']));
+  final expiresAt = DateTime.tryParse(_requiredString(data['expiresAt']));
+  final headers = _stringMap(data['requiredHeaders']);
+  const requiredNames = {
+    'content-type',
+    'content-length',
+    'x-goog-if-generation-match',
+    'x-goog-meta-moolsocial-schema',
+    'x-goog-meta-moolsocial-kind',
+    'x-goog-meta-moolsocial-owner',
+    'x-goog-meta-moolsocial-thread',
+    'x-goog-meta-moolsocial-name',
+    'x-goog-meta-moolsocial-size',
+    'x-goog-meta-moolsocial-duration',
+  };
+  if (uploadUrl == null ||
+      expiresAt == null ||
+      !headers.keys.toSet().containsAll(requiredNames) ||
+      headers.keys.toSet().difference(requiredNames).isNotEmpty ||
+      headers['content-type'] != attachment.contentType ||
+      headers['content-length'] != '${attachment.bytes.length}' ||
+      headers['x-goog-meta-moolsocial-kind'] != attachment.kind.name ||
+      headers['x-goog-if-generation-match'] != '0') {
+    throw const ChatServiceException(
+      'Attachment upload could not be prepared. Choose it again.',
+      code: 'invalid_response',
+    );
+  }
+  _requirePrivateStorageUrl(uploadUrl);
+  return _ChatPhotoUploadGrant(
+    uploadId: _requiredString(data['uploadId']),
+    uploadUrl: uploadUrl,
+    expiresAt: expiresAt,
+    requiredHeaders: headers,
   );
 }
 
@@ -751,6 +1807,26 @@ String _requiredString(Object? value) {
   return value.trim();
 }
 
+String? _optionalString(Object? value) {
+  if (value == null) return null;
+  return _requiredString(value);
+}
+
+DateTime _requiredDateTime(Object? value) {
+  final parsed = DateTime.tryParse(_requiredString(value));
+  if (parsed == null) {
+    throw const ChatServiceException(
+      'Chat returned an invalid response. Try again.',
+      code: 'invalid_response',
+      retryable: true,
+    );
+  }
+  return parsed;
+}
+
+DateTime? _optionalDateTime(Object? value) =>
+    value == null ? null : _requiredDateTime(value);
+
 int _integer(Object? value) => value is int ? value : 0;
 
 Map<String, String> _stringMap(Object? value) {
@@ -816,6 +1892,50 @@ String _safePhotoName(String value, String contentType) {
   return clean.length <= 120 ? clean : clean.substring(clean.length - 120);
 }
 
+String _attachmentContentType(String fileName, ChatAttachmentKind kind) {
+  final extension = fileName.split('.').last.toLowerCase();
+  return switch ((kind, extension)) {
+    (ChatAttachmentKind.document, 'pdf') => 'application/pdf',
+    (ChatAttachmentKind.document, 'txt') => 'text/plain',
+    (ChatAttachmentKind.document, 'docx') =>
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    (ChatAttachmentKind.video, 'mov') => 'video/quicktime',
+    (ChatAttachmentKind.video, 'mp4') => 'video/mp4',
+    _ => throw const ChatServiceException(
+      'Choose a supported document or video.',
+      code: 'invalid_attachment',
+    ),
+  };
+}
+
+void _validatePickedAttachment(
+  ChatAttachmentKind kind,
+  String contentType,
+  int sizeBytes, {
+  Duration? duration,
+}) {
+  final maximum = switch (kind) {
+    ChatAttachmentKind.document => 15 * 1024 * 1024,
+    ChatAttachmentKind.video => 50 * 1024 * 1024,
+    ChatAttachmentKind.voice => 10 * 1024 * 1024,
+  };
+  final durationValid =
+      kind != ChatAttachmentKind.voice ||
+      (duration != null &&
+          duration >= const Duration(milliseconds: 500) &&
+          duration <= const Duration(minutes: 5));
+  if (sizeBytes < 1 || sizeBytes > maximum || !durationValid) {
+    throw ChatServiceException(
+      kind == ChatAttachmentKind.document
+          ? 'Choose a PDF, text or DOCX document up to 15 MB.'
+          : kind == ChatAttachmentKind.video
+          ? 'Choose an MP4 or MOV video up to 50 MB.'
+          : 'Record a voice message between 1 second and 5 minutes.',
+      code: 'invalid_attachment',
+    );
+  }
+}
+
 class _ChatPhotoUploadGrant {
   const _ChatPhotoUploadGrant({
     required this.uploadId,
@@ -832,6 +1952,14 @@ class _ChatPhotoUploadGrant {
 
 class _ChatPhotoUploadState {
   _ChatPhotoUploadState({required this.fingerprint, required this.grant});
+
+  final String fingerprint;
+  final _ChatPhotoUploadGrant grant;
+  bool uploaded = false;
+}
+
+class _ChatAttachmentUploadState {
+  _ChatAttachmentUploadState({required this.fingerprint, required this.grant});
 
   final String fingerprint;
   final _ChatPhotoUploadGrant grant;

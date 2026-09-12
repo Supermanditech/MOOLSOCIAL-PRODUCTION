@@ -94,10 +94,80 @@ try {
   if (-not $rejected) {
     throw 'Google bridge readiness test rejected: telemetry-negative fixture passed.'
   }
+
+  [IO.File]::WriteAllText(
+    $gatewayFixture,
+    $gatewaySource,
+    [Text.UTF8Encoding]::new($false)
+  )
+  $activitySource = Get-Content -LiteralPath $activityFixture -Raw
+  $broken = $activitySource.Replace(
+    'if (requestCode == googleIdentityRequestCode)',
+    'if (requestCode == removedGoogleIdentityRequestCode)'
+  )
+  if ($broken -ceq $activitySource) {
+    throw 'Google bridge readiness test rejected: activity fallback fixture target is missing.'
+  }
+  [IO.File]::WriteAllText(
+    $activityFixture,
+    $broken,
+    [Text.UTF8Encoding]::new($false)
+  )
+  $rejected = $false
+  try {
+    & $gate `
+      -RepositoryRoot $root `
+      -AndroidActivityPath $activityFixture `
+      -AndroidBuildPath $buildFixture `
+      -DartGatewayPath $gatewayFixture `
+      -DartTestPath $testFixture | Out-Null
+  } catch {
+    $rejected = $_.Exception.Message -like (
+      'Google Android identity bridge readiness rejected:*'
+    )
+  }
+  if (-not $rejected) {
+    throw 'Google bridge readiness test rejected: activity fallback-negative fixture passed.'
+  }
+
+  [IO.File]::WriteAllText(
+    $activityFixture,
+    $activitySource,
+    [Text.UTF8Encoding]::new($false)
+  )
+  $buildSource = Get-Content -LiteralPath $buildFixture -Raw
+  $broken = $buildSource.Replace(
+    'implementation("com.google.android.gms:play-services-auth:21.6.0")',
+    'implementation("removed-play-services-auth")'
+  )
+  if ($broken -ceq $buildSource) {
+    throw 'Google bridge readiness test rejected: dependency fixture target is missing.'
+  }
+  [IO.File]::WriteAllText(
+    $buildFixture,
+    $broken,
+    [Text.UTF8Encoding]::new($false)
+  )
+  $rejected = $false
+  try {
+    & $gate `
+      -RepositoryRoot $root `
+      -AndroidActivityPath $activityFixture `
+      -AndroidBuildPath $buildFixture `
+      -DartGatewayPath $gatewayFixture `
+      -DartTestPath $testFixture | Out-Null
+  } catch {
+    $rejected = $_.Exception.Message -like (
+      'Google Android identity bridge readiness rejected:*'
+    )
+  }
+  if (-not $rejected) {
+    throw 'Google bridge readiness test rejected: dependency-negative fixture passed.'
+  }
 } finally {
   if (Test-Path -LiteralPath $fixtureRoot -PathType Container) {
     Remove-Item -LiteralPath $fixtureRoot -Recurse -Force
   }
 }
 
-Write-Output 'Google Android identity bridge readiness tests passed: live=1; negative=2.'
+Write-Output 'Google Android identity bridge readiness tests passed: live=1; negative=4.'

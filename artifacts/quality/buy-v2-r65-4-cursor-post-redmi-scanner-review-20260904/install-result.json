@@ -1,0 +1,13 @@
+{
+  "candidate": "UAW-BUY-V2-R65.4-CURSOR-POST-REDMI-SCANNER-20260904",
+  "device": "Redmi 23106RN0DA",
+  "serial": "TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "previousVersionName": "1.0.0-r65.3-cursorreview",
+  "previousVersionCode": "2026090319",
+  "installedVersionName": "1.0.0-r65.4-cursorreview",
+  "installedVersionCode": "2026090320",
+  "installMode": "adb install -r",
+  "result": "Success",
+  "installedAtIst": "2026-09-04T05:23:01.0324755+05:30"
+}
