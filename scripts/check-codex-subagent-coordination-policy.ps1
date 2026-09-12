@@ -764,7 +764,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 74) `
+Assert-Coordination ($continuationBindings.Count -eq 75) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -1790,6 +1790,33 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (-not $isCoordinationBootstrap) {
     foreach ($effectiveOwner in $effectiveOwners) {
+      $storeProcurementBridgeOwner = (
+        $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
+        $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
+        $ProductionWorkId -ceq 'store-procurement-bridge-20260912' -and
+        $ProductionTicketId -ceq 'UAW-STORE-PROCUREMENT-BRIDGE-20260912' -and
+        $branch -ceq 'work/codex-ui/store-procurement-bridge-20260912' -and
+        [string]$selectedContinuationBinding.id -ceq 'store_procurement_bridge_20260912' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq '35b97857f3635c01aa283635fda32ad43c608a1e' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/lib/features/journey01/journey_router.dart',
+          'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+          'apps/mobile/lib/features/work/work_services.dart',
+          'apps/mobile/lib/features/work/work_models.dart',
+          'apps/mobile/lib/features/work/work_session.dart',
+          'apps/mobile/test/work_workspace_layout_safety_test.dart',
+          'apps/mobile/test/work_store_atomic_operations_test.dart',
+          'docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md',
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1'
+        )
+      )
+      if ($hasContinuationBinding -and
+          [string]$selectedContinuationBinding.id -ceq 'store_procurement_bridge_20260912') {
+        Assert-Coordination $storeProcurementBridgeOwner `
+          "Store procurement bridge requested an unrelated owner: $effectiveOwner"
+      }
       $storeBuyFollowupOwner = (
         $hasContinuationBinding -and $AgentRole -ceq 'primary' -and
         $AgentTask -ceq '/root' -and $ProductionLane -ceq 'codex_ui' -and
@@ -2122,7 +2149,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner) {
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -2134,7 +2161,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
