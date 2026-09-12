@@ -2400,7 +2400,7 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/'
+            'candidate_captures/r669-founder-review-20260912/'
             'buy-v2-r58-8-6-c24f-checkout-cart-return-${viewport.label}.png',
           ),
         );

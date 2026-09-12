@@ -3706,7 +3706,7 @@ void main() {
         await expectLater(
           find.byType(BuyV2Screen),
           matchesGoldenFile(
-            'candidate_captures/buy-v2-r58-8-7-c24f-${viewport.label}.png',
+            'candidate_captures/r669-founder-review-20260912/buy-v2-r58-8-7-c24f-${viewport.label}.png',
           ),
         );
       },

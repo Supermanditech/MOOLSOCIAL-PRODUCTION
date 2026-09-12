@@ -1,5 +1,11 @@
 # Fresh Redmi defect register
 
+## Coupon/reference local qualification completed — 12 September 2026
+
+R669-UAT-COUPON-MINIMUM-SPEND-001 is **implemented and locally qualified; OPEN for applicable Redmi acceptance**. Founder-approved versioned reference assets, admitted at9e81505dd5aab6a6a29f91c6413512a460c3b3b7, resolve the ten historical R58.8.6/7 comparison holds. The two existing test paths now select those new references; all behavioral assertions and historical images remain unchanged. Fresh complete six-suite coupon/cart/session regression passes712 tests,0 failures,0 skips, including all10 reference cases. Analysis and UI locks pass. Evidence: external redmi-r66-9-round-1/remaining-qualification-20260912/approved-reference-qualification/local-qualification-v1.json SHA256F00FFCA894BB75DC3C7D24D07B11CFA084B69312C666D29E5BDB61C679CEB27F; UAT.md contains full command/source/capture bindings.
+
+Updated implementation accounting:17 children =16 locally qualified implementations +1 unimplemented shared-owner cold-share child;0 implemented/local-incomplete. No device closure follows this reference qualification. Original13 provider/native residual records and Desktop Store procurement wiring/combined verification remain open. Earlier15+1 local categories and reference holds below are retained history, superseded only for this local qualification. No product code, APK, integration, provider operation or historical reference changed.
+
 ## Current working queue - parent/child reconciliation, 12 September 2026
 
 Founder requested following tested originals through their children instead of repeatedly reporting all originals as an untouched queue. Frozen scope remains **42 originals: 33 findings and 9 requests**. Working dispositions now total **13 CLOSED-REDMI-VERIFIED + 16 TESTED-FOLLOWUP-TRANSFERRED + 13 QUALIFICATION-PENDING**. No additional passing result or Redmi closure is claimed by this reconciliation. The earlier cumulative 29-open figure combined the latter two groups; it must not be presented as 29 untested tickets.
