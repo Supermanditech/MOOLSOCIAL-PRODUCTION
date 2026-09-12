@@ -1,5 +1,16 @@
 # Fresh Redmi journey inventory
 
+## Cart illustration disclosure fitment checkpoint - 12 September 2026
+
+**R668-AUDIT-MEDIA-001 Cart follow-up implemented and locally qualified; remains OPEN for Redmi verification.** The shared illustration disclosure now measures complete unwrapped words with inherited typography and the chosen text scale. If an intact word cannot fit, it uses the existing neutral photo placeholder. Larger images keep their readable disclosure and original proportions. The existing image-loading fallback also omits its optional visual label when the small frame cannot hold both icon and label, retaining semantic product identity.
+
+Final connected product-actions/product-content/session checks:478 passed,0 failed,0 skipped. Five focused visual checks pass, with five actual Flutter captures reviewed: normal/200% Cart, narrow thumbnail, and multi-product thumbnail sizes at both scales. Tests inspect actual RenderParagraph word boxes to reject split words; intact disclosure and neutral fallback are both allowed. Quantity remains1. Analysis and approved UI locks pass; no reference changed.
+
+The original generated Redmi Category illustration listing differs from the host's specific Illustration listing. Initial plain host Cart checks did not reproduce the device frame and are not device qualification. Actual visual-font focused-b did reproduce Illustration across two lines despite minIntrinsicWidth; explicit word measurement corrects that failure. The same visual round exposed3/15px loading fallback overflow at200%, also corrected. All failed attempts, draft copies and corrected assertions are retained. No supplier-photo or publication success is inferred.
+
+Evidence: external redmi-r66-9-round-1/cart-media-disclosure-implementation-20260912-0415/local-qualification-1.json SHA256 81A78979F5EBEA67D3112B5AEEDF350E98347E05E45919CCA9D13EBCADD81334. Connected receipt singlechat-r669-cart-media-connected-20260912-a.result.json; stdout SHA256 232AE87A128CE6FDB3FCA84B59DD0E60A6291D93FFE2762237F00B38A417F538. Required tested parent c74d7d3adaf0a857e324e8c97929ccc86a1a6a51. Exact two source/test owner hashes and five images are bound in the manifest. Original Redmi capture217 remains open for future verification. No APK/build/install, integration or device closure. Counts and remaining provider/ownership qualifications are unchanged.
+
+
 ## Shared-link cold-start dependency checkpoint - 12 September 2026
 
 **R669-UAT-SHARE-COLD-PRODUCT-ROUTE-001 remains OPEN and unimplemented for cold bootstrap.** Read-only source trace at e13672fe7654d32b5cec77f1c9b345f9e2238982 confirms the Buy screen accepts explicit productId, calls openLinkedProduct, and avoids restoring a saved browsing position over an explicit link. The physical Redmi warm917/cold918-919 difference still requires startup route preservation to be investigated and qualified. The review-only main bootstrap seeds /app/buy; the normal bootstrap selects /boot except existing provider entries. Router/session initial-URI capture and restoration ordering are candidate boundaries, not a proven single root cause.

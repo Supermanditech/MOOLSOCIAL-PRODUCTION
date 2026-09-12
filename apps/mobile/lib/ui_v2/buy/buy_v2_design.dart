@@ -2051,13 +2051,32 @@ class _BuyV2IllustrationDisclosure extends StatelessWidget {
         color: BuyV2Colors.muted,
       );
       final painter = TextPainter(
-        text: TextSpan(text: label, style: style),
+        text: TextSpan(
+          text: label,
+          style: DefaultTextStyle.of(context).style.merge(style),
+        ),
         textDirection: Directionality.of(context),
         textScaler: MediaQuery.textScalerOf(context),
       )..layout(maxWidth: (constraints.maxWidth - 8).clamp(1, double.infinity));
       final labelHeight = painter.height;
+      var minimumWordWidth = 0.0;
+      for (final word in label.split(RegExp(r'\s+'))) {
+        final wordPainter = TextPainter(
+          text: TextSpan(
+            text: word,
+            style: DefaultTextStyle.of(context).style.merge(style),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        if (wordPainter.width > minimumWordWidth) {
+          minimumWordWidth = wordPainter.width;
+        }
+        wordPainter.dispose();
+      }
       painter.dispose();
       if (constraints.maxWidth < 48 ||
+          minimumWordWidth > constraints.maxWidth - 8 ||
           constraints.maxHeight < labelHeight + 28) {
         return BuyV2ProductPhotoUnavailable(product: product);
       }
@@ -2170,7 +2189,32 @@ class _BuyV2ProductMediaFallback extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final shortest = constraints.biggest.shortestSide;
-            final iconSize = (shortest * .38).clamp(20.0, 46.0);
+            final iconSize = (shortest * .38).clamp(0.0, 46.0);
+            const labelStyle = TextStyle(
+              color: BuyV2Colors.muted,
+              fontSize: 7,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .4,
+            );
+            final labelMeasure = TextPainter(
+              text: TextSpan(
+                text: product.visualLabel,
+                style: DefaultTextStyle.of(context).style.merge(labelStyle),
+              ),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+              maxLines: 1,
+            )..layout(maxWidth: constraints.maxWidth);
+            final labelFits = constraints.maxHeight >=
+                iconSize + 3 + labelMeasure.height;
+            labelMeasure.dispose();
+            if (!labelFits) {
+              return Center(child: Icon(
+                _fallbackIcon(product.categoryId),
+                size: iconSize,
+                color: BuyV2Colors.navy,
+              ));
+            }
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -2185,12 +2229,7 @@ class _BuyV2ProductMediaFallback extends StatelessWidget {
                     product.visualLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: BuyV2Colors.muted,
-                      fontSize: 7,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: .4,
-                    ),
+                    style: labelStyle,
                   ),
                 ],
               ),

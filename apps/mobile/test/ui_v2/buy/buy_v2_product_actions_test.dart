@@ -14,6 +14,29 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+void _expectIntactDisclosure(WidgetTester tester, Finder scope, String id) {
+  final disclosure = find.descendant(
+    of: scope,
+    matching: find.byKey(ValueKey('buy-product-illustration-$id')),
+  );
+  if (disclosure.evaluate().isEmpty) {
+    expect(find.descendant(of: scope,
+      matching: find.byKey(ValueKey('buy-product-photo-unavailable-$id'))),
+      findsOneWidget);
+    return;
+  }
+  final label = tester.widget<Text>(disclosure).data!;
+  final paragraph = tester.renderObject<RenderParagraph>(disclosure);
+  for (final word in RegExp(r'\S+').allMatches(label)) {
+    final boxes = paragraph.getBoxesForSelection(
+      TextSelection(baseOffset: word.start, extentOffset: word.end),
+    );
+    expect(boxes, hasLength(1), reason: 'A disclosure word must not split across lines: ${word.group(0)}');
+    expect(boxes.single.left, greaterThanOrEqualTo(0));
+    expect(boxes.single.right, lessThanOrEqualTo(paragraph.size.width + .01));
+  }
+}
+
 final class _R669PhotoContentAdapter implements BuyV2ProductContentAdapter {
   const _R669PhotoContentAdapter(this.available);
   final bool available;
@@ -446,6 +469,50 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('R669 cart illustration disclosure remains intact $scale', (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.view.reset);
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final session = BuyV2Session(core: BuySession());
+      addTearDown(session.dispose);
+      session.addProduct('s-tomato');
+      await tester.pumpWidget(MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) => r66VisualCaptureRoot(child!),
+        home: BuyV2Screen(session: session, initialView: BuyV2View.cart),
+      ));
+      await tester.pumpAndSettle();
+      final thumbnail = find.byKey(const ValueKey('buy-cart-packshot-s-tomato'));
+      await tester.ensureVisible(thumbnail);
+      await tester.pumpAndSettle();
+      _expectIntactDisclosure(tester, thumbnail, 's-tomato');
+
+      expect(session.quantityFor('s-tomato'), 1);
+      await captureR66Visual(tester, 'r669-cart-illustration-disclosure-$scale');
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('R669 narrow illustration disclosure does not split words', (tester) async {
+    final product = BuyV2Catalogue.allProducts.firstWhere((p) => p.id == 's-tomato');
+    await tester.pumpWidget(MaterialApp(
+      theme: MoolTheme.light(),
+      builder: (context, child) => r66VisualCaptureRoot(child!),
+      home: Scaffold(body: Center(child: SizedBox(
+        width: 60, height: 120,
+        child: BuyV2ProductPackshot(product: product),
+      ))),
+    ));
+    await tester.pumpAndSettle();
+    _expectIntactDisclosure(tester, find.byType(BuyV2ProductPackshot), 's-tomato');
+
+    await captureR66Visual(tester, 'r669-narrow-illustration-disclosure');
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('R669 media complete illustration crops', (tester) async {
     tester.view.devicePixelRatio = 1;
