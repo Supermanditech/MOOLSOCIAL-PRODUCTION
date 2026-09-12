@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -4468,11 +4467,8 @@ Future<void> _showProductReviewSheet(
 ) async {
   final existing = session.customerReviewFor(product.id);
   var editorOpened = session.productReviewUnavailableReason(product.id) == null;
-  final callerViewPadding = MediaQuery.viewPaddingOf(context);
   final exportedBottomClearance =
-      defaultTargetPlatform == TargetPlatform.android
-      ? callerViewPadding.top
-      : callerViewPadding.bottom;
+      BuyV2AddressSheetMotion.resolveModalActionBottomInset(context);
   await showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,

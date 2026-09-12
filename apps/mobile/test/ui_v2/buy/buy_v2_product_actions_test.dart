@@ -91,11 +91,12 @@ Future<BuyV2Session> _mountR669Review(
   _R669ReviewCommerce adapter, {
   Size size = const Size(320, 711),
   double scale = 1,
+  double bottomInset = 34,
 }) async {
   tester.view.devicePixelRatio = 1;
   tester.view.physicalSize = size;
-  tester.view.padding = const FakeViewPadding(top: 24, bottom: 34);
-  tester.view.viewPadding = const FakeViewPadding(top: 24, bottom: 34);
+  tester.view.padding = FakeViewPadding(top: 24, bottom: bottomInset);
+  tester.view.viewPadding = FakeViewPadding(top: 24, bottom: bottomInset);
   addTearDown(tester.view.reset);
   final core = BuySession();
   final session = BuyV2Session(
@@ -147,6 +148,22 @@ Future<void> _openR669Review(WidgetTester tester) async {
 }
 
 void main() {
+  for (final eligible in [false, true]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 review complete action clears bottom navigation $eligible $scale', (tester) async {
+        final adapter = _R669ReviewCommerce()..eligible = eligible;
+        await _mountR669Review(tester, adapter, size: const Size(320, 568), scale: scale, bottomInset: 72);
+        final action = find.byKey(ValueKey(eligible ? 'buy-submit-review-s-milk' : 'buy-review-check-eligibility'));
+        await tester.ensureVisible(action);
+        await tester.pumpAndSettle();
+        expect(tester.getRect(action).bottom, lessThanOrEqualTo(496), reason: 'Complete action must clear Android navigation, not only its tap centre.');
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'r669-review-bottom-clearance-$eligible-$scale');
+        expect(adapter.submissions, 0);
+      });
+    }
+  }
+
   testWidgets('R669 review draft survives Android Back and explicit close', (tester) async {
     final adapter = _R669ReviewCommerce()..eligible = true;
     final session = await _mountR669Review(tester, adapter);

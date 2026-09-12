@@ -1,5 +1,14 @@
 # Fresh Redmi journey inventory
 
+## Review action clearance child checkpoint - 12 September 2026
+
+**R669-UAT-REVIEW-ELIGIBILITY-ACTION-CLIPPED-001 implemented and locally checked; remains OPEN for Redmi verification.** The review sheet used the caller's Android top inset as bottom clearance. It now reuses the existing modal action bottom-inset resolver, preserving real bottom navigation clearance for Check again and Save. No eligibility, submission or draft-retention rule changed.
+
+Four full-button-bound regressions at320x568,100%/200% text with72px bottom navigation cover eligible and ineligible states. They reproduced clipping before the fix; all four now pass and four actual Flutter captures were inspected. Full product-action suite passes37/37 with no skips, including keyboard, eligibility retry, rejected save, Back/drafts and retained cart; final analysis has no issues and approved UI locks pass. Unused foundation import removed after the first analysis; the final complete suite was rerun on that exact source.
+
+Evidence: external redmi-r66-9-round-1/review-fit-implementation-20260912-0206/local-qualification-1.json SHA256 7CA9F6E12E02DAAE5CFBC3D5000C17CE9F9E15149FD8B7BD51C975764B69CC05; exact source/test and capture hashes retained. Final receipt singlechat-r669-review-fit-final-20260912-0208.result.json; stdout SHA2562F64D36282FCD62F62F8258FCBBB6EBB01BF2721CAB132AA42F5000A5E4BA333. Required tested parent0e632827732e309450fb0fd1718399be5e1b210c. Only existing Buy views/test and these ticket documents changed. Local evidence does not close this child or its Write review parent. No APK/build/install, integration, provider action or real review submission; remaining scoped work continues.
+
+
 ## Review draft child implementation checkpoint - 12 September 2026
 
 **R669-UAT-REVIEW-BACK-DRAFT-001 implemented and locally checked; remains OPEN for Redmi verification.** Parent R668-AUDIT-WRITE-REVIEW-001 and separate review action-clipping child remain open. Unsent rating/comment now live separately from published reviews, keyed to the product listing within the existing customer-state owner scope. The editor restores the draft and retains changes immediately; Back and explicit Close no longer destroy the only copy. The existing customer-state codec carries drafts across relaunch, defaults older snapshots to no drafts, and rejects malformed draft data. Cart and unrelated product drafts are preserved. Stale-owner edits are rejected; rejected submission retains the draft and successful submission removes only matching submitted content.
