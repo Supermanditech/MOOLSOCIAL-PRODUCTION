@@ -38,6 +38,55 @@ void main() {
     ),
   );
 
+  for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 Recent last Add clears Android navigation ${destination.name} $scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+        tester.view.padding = const FakeViewPadding(bottom: 48);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        session.openDestination(destination);
+        final products = BuyV2Catalogue.products.where((p) => p.destination == destination).take(3).toList();
+        expect(products.length, 3);
+        for (final product in products) {
+          session.openProduct(product.id);
+          session.goBack();
+        }
+        await tester.pumpWidget(app(session));
+        await tester.pumpAndSettle();
+        final last = session.recentlyViewedProductsFor(destination).last;
+        unawaited(showBuyV2RecentlyViewed(tester.element(find.byType(BuyV2Screen)), session));
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(const ValueKey('buy-recently-viewed-info-sheet'));
+        final scroll = find.descendant(of: sheet, matching: find.byType(Scrollable)).last;
+        final position = tester.state<ScrollableState>(scroll).position;
+        position.jumpTo(position.maxScrollExtent);
+        await tester.pumpAndSettle();
+        final add = find.byKey(ValueKey('buy-recently-viewed-add-${last.id}'));
+        expect(add, findsOneWidget);
+        expect(tester.getRect(add).bottom, lessThanOrEqualTo(520), reason: 'The complete last action must be above the Android navigation area.');
+        await captureR66Visual(tester, 'r669-recent-last-add-${destination.name}-$scale');
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(last.id), greaterThan(0));
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing);
+        expect(session.destination, destination);
+        expect(session.quantityFor(last.id), greaterThan(0));
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+      });
+    }
+  }
+
   Future<void> capture(WidgetTester tester, String name) async {
     if (const bool.fromEnvironment('BUY_R663_VISUAL_CAPTURE')) {
       return captureR66Visual(tester, '030-$name');

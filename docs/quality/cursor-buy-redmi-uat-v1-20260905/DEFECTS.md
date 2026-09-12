@@ -1,5 +1,16 @@
 # Fresh Redmi defect register
 
+## Recently viewed child implementation checkpoint - 12 September 2026
+
+**R669-UAT-RECENT-LAST-ACTION-001 implemented and locally checked; remains OPEN for Redmi verification.** Parent R668-AUDIT-RECENT-001 also remains open. Existing bottom-sheet content now reserves the Android bottom navigation inset, making the complete final Add action reachable without changing product, supplier or cart identity.
+
+The new regression reproduced all four failures before the fix: at 320x568 with a48px bottom inset, the last Add button ended at545 instead of at/before520. Shop and Wholesale at100%/200% text now pass; Add and Back retain the correct destination and quantity. Four actual Flutter captures were inspected. Full Recently viewed, shopping settings and shopping alerts suites:131 passed,0 failed,0 skipped. Analysis and approved UI locks passed. No approved golden changed.
+
+Evidence: external redmi-r66-9-round-1/recent-child-implementation-20260912-0142/local-qualification-1.json SHA256 C329F3A93802000E7AAAB3F5B93BAD7793AF594D2D6E8C9F5E7C9858BF40A716. Exact two source/test hashes and four capture hashes are recorded there. Connected receipt singlechat-r669-recent-connected-20260912-0145.result.json; stdout SHA2569FF91E2348E92F2C8B98756E8564C91B87CE0A6D3E6A31A539F77A45D33BEACF. Required tested parent fbd3c441f18fd7d0232f085e8ffca19c08da03df; no claim of standalone qualification on an older branch. Only existing Buy catalogue/test owners and these ticket documents changed.
+
+No new APK, install, integration or device closure. This local fix does not change the13 closed/29 open original count or close a UAT child. Remaining scoped implementation and provider/device qualification remain required.
+
+
 ## Coupon child implementation checkpoint - 12 September 2026
 
 **R669-UAT-COUPON-MINIMUM-SPEND-001 remains OPEN for Redmi verification; its frontend fix is implemented and locally checked.** Parent R668-AUDIT-CART-TOTAL-LABEL-001 remains open. The completed scoped round/list at commit 69dfd21a3950902109d72412618fdce644ea7bf8 authorized this implementation phase; older progress statements below are historical.

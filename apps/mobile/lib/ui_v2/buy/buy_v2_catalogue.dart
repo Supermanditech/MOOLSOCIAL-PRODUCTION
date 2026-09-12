@@ -7323,7 +7323,12 @@ class _RecentlyViewedProductsSheet extends StatelessWidget {
       child: SizedBox(
         height: sheetHeight,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: EdgeInsets.fromLTRB(
+            16,
+            0,
+            16,
+            16 + MediaQuery.viewPaddingOf(context).bottom,
+          ),
           child: AnimatedBuilder(
             animation: session,
             builder: (context, _) {
