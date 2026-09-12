@@ -52,3 +52,13 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Expected: choosing an offered app language applies to supported customer navigation and guidance; unavailable coverage must be explicit rather than implying the language changed throughout the experience. Supplier-authored product names are not required to be translated by this finding.
 - Evidence:202-language-sheet,203-hindi-selected,204-hindi-return. Current normal-text Redmi V6 APK. Relaunch language propagation remains untested; this finding is the immediate observed selection/return behavior.
 - Source correlation: features/journey01/journey_session.dart updateLanguage near443 persists languageCode and announces language changed. Shared localization and Buy strings require later owner assessment; no implementation or backend change authorized by this audit.
+
+## RV6-D006 - Cancelling sign-in loses the originating Buy Back route
+- Status: open; confirmed device navigation defect. Severity: moderate.
+- Controlled reproduction: fresh Buy Quick catalogue > profile drawer > Security > Sign in > Android Back returns Security > Android Back exits to Android launcher instead of Buy.
+- Control: Buy > Security > Android Back without entering sign-in returns the same Buy catalogue (231-232).
+- Evidence:230-235 controlled sequence;233 chooser,234 cancellation to Security,235 launcher. Earlier228 showed the same symptom after the prior Security round but is supporting observation only. No provider selected or authentication performed.
+- Expected: cancellation preserves the originating Buy stack/context so subsequent Back restores shopping, just as the control path does.
+- Customer impact: shopper abandoning sign-in is taken out of the app on the next Back and must reopen it. No crash or stored-data loss is claimed.
+- Source correlation: Buy _openBuyProfile pushes the shared route; global_security_v2.dart _beginSignIn uses context.go('/sign-in') and only securityLocation for return/cancel. Route-stack restoration needs later shared routing assessment; source correlation is not an isolated-test proof. No code changed.
+- Prior ACCOUNT-017 and ACCOUNT-019 remain narrow first-return passes; they do not qualify this second Back to Buy. PD-040 return requirements remain unresolved end to end.
