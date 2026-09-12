@@ -23,3 +23,7 @@ Rice 4 / five 25 kg packs reaches Confirm order with retained Work address and �
 ## B-005 — live order tracking refresh
 
 MS-NEW-09 opens with last-known preparation status and no live delivery updates. Refresh shows Order updates are unavailable and labels the retained estimate update unavailable (111–112). Positive provider recovery, changing courier/location/ETA and terminal-state transitions are not qualified. Recorded-order UI and safe nested navigation remain testable. No order state was changed and no contact or message sent. Runtime source binding and safe fixture alternatives remain to be reconciled before final coverage disposition.
+
+## B-006 — delivered-item resolution eligibility
+
+For delivered Shop MS-240741, Return/Replacement/Refund each shows no confirmed eligible items. All eight purchased product rows remain visible with eligibility unavailable and disabled checkboxes; Check eligibility again in Refund preserves unavailable state (156–160). No request submitted. Positive selection quantities reasons evidence attachments and accepted/rejected resolution execution cannot be qualified from this state. Other eligible fixtures must be sought before final disposition; no live return/refund or artificial source mutation is authorized. This is a provider/test-data prerequisite, not automatically a product defect.
