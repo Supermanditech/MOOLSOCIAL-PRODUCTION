@@ -1,5 +1,14 @@
 # Fresh Redmi defect register
 
+## Shared-link cold-start dependency checkpoint - 12 September 2026
+
+**R669-UAT-SHARE-COLD-PRODUCT-ROUTE-001 remains OPEN and unimplemented for cold bootstrap.** Read-only source trace at e13672fe7654d32b5cec77f1c9b345f9e2238982 confirms the Buy screen accepts explicit productId, calls openLinkedProduct, and avoids restoring a saved browsing position over an explicit link. The physical Redmi warm917/cold918-919 difference still requires startup route preservation to be investigated and qualified. The review-only main bootstrap seeds /app/buy; the normal bootstrap selects /boot except existing provider entries. Router/session initial-URI capture and restoration ordering are candidate boundaries, not a proven single root cause.
+
+Exact dependency owners are apps/mobile/lib/main.dart, apps/mobile/lib/app/moolsocial_app.dart, apps/mobile/lib/features/journey01/journey_router.dart and apps/mobile/lib/features/journey01/journey_session.dart; none is in the current Cursor Buy owner claim. No edit, admission, integration or device action was performed. Required outcome: retain full incoming product URI through cold startup, resolve the exact SKU or explicit unavailable recovery, preserve Back/cart/account isolation and procurement separation. Host Buy passes cannot close this Android cold-launch defect. HTTPS association, public no-app fallback and install/auth return remain separately unqualified.
+
+Retained audit: external redmi-r66-9-round-1/share-cold-boundary-audit-20260912-0411/boundary-audit-1.json SHA256 5449A4702AA25A6111E05730E81804382B1DA065A0E0B65383EA8DCAFC760639, binding source hashes, exact claim membership and required owner checks. Original device evidence share-cold-product-route-child-1.json SHA256 083ADC96894F4ED9071E273A95189BDE6CD6F1F2B6DBB1276F903E16B953E1C8 remains authoritative. This child is retained, not dropped or falsely fixed. Independent Buy-owned residual implementation continues, including the recorded Cart illustration disclosure fitment. No new APK or closure; counts unchanged.
+
+
 ## Address keyboard Next child checkpoint - 12 September 2026
 
 **R669-UAT-ADDRESS-NEXT-FIELD-VISIBILITY-001 implemented and locally checked; remains OPEN for Redmi verification.** Default focus scrolling exposed the multiline field box while leaving the street text above the tiny enlarged landscape viewport. The existing address input now reveals its editable caret after focus/layout using Flutter's existing bringIntoView behavior. Stale-focus and unmounted callbacks are rejected; text scale, address values, validation, submission and routes are unchanged.
