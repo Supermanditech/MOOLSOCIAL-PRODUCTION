@@ -11,8 +11,18 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+
+class _R669TrackingOwnerStore implements BuyV2CustomerStateStore {
+  @override
+  String? ownerScope = 'tracking-owner-a';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
 
 class _R669DeliveryCommerce implements BuyV2CommerceAdapter {
   _R669DeliveryCommerce() {
@@ -290,6 +300,38 @@ BuyV2Order _r66Order(BuyV2OrderStatus status, BuyV2Destination destination) =>
     );
 
 void main() {
+  test('R669 rail tracking nested Cart return and stale owner rejection', () async {
+    final core = BuySession();
+    final store = _R669TrackingOwnerStore();
+    final session = BuyV2Session(core: core, commerceAdapter: _R669DeliveryCommerce(), customerStateStore: store, reviewDataEnabled: false);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    await session.restoreCommerce();
+    session.openDestination(BuyV2Destination.wholesale);
+    session.addProduct('w-notebook');
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    final quantity = session.quantityFor('w-notebook');
+    expect(session.openDeliveryTracking('quick-1'), isTrue);
+    expect(session.openOrderItems('quick-1'), isTrue);
+    session.goBack();
+    expect(session.view, BuyV2View.tracking);
+    session.goBack();
+    expect(session.view, BuyV2View.cart);
+    expect(session.cartScope, BuyV2CartScope.wholesale);
+    expect(session.quantityFor('w-notebook'), quantity);
+    expect(session.openDeliveryTracking('quick-1'), isTrue);
+    store.ownerScope = 'tracking-owner-b';
+    session.goBack();
+    expect(session.destination, BuyV2Destination.orders);
+    expect(session.view, BuyV2View.catalogue);
+    session.openDestination(BuyV2Destination.wholesale);
+    expect(session.openDeliveryTracking('quick-1'), isTrue);
+    session.openOrders();
+    session.openTracking('quick-1');
+    session.goBack();
+    expect(session.destination, BuyV2Destination.orders);
+    expect(session.view, BuyV2View.catalogue);
+  });
   Widget app(
     BuyV2Session session,
     double scale, {
@@ -407,6 +449,54 @@ void main() {
       await tester.pumpAndSettle();
       expect(panel, findsNothing, reason: 'After selection, the ordinary quiet-rail timer resumes.');
       expect(find.byKey(const ValueKey('buy-quick-delivery-toggle')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox.shrink());
+    });
+  }
+
+  for (final origin in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+    testWidgets('R669 rail tracking Back restores ${origin.name} shopping', (tester) async {
+      await tester.binding.setSurfaceSize(const Size(360, 800));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core, commerceAdapter: _R669DeliveryCommerce(), reviewDataEnabled: false);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      await session.restoreCommerce();
+      final mode = origin == BuyV2Destination.wholesale
+          ? BuyV2FulfilmentMode.bulkFreight
+          : BuyV2FulfilmentMode.quickLocal;
+      session.addProduct('w-notebook');
+      final quantity = session.quantityFor('w-notebook');
+      await tester.pumpWidget(app(session, 1));
+      await tester.pumpAndSettle();
+      session.openDestination(origin);
+      if (origin == BuyV2Destination.wholesale) {
+        session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+      }
+      session.chooseFulfilmentMode(mode);
+      session.query = 'retained supplier search';
+      await tester.pumpAndSettle();
+      expect(session.destination, origin);
+      await tapDelivery(tester, 'toggle');
+      await tapDelivery(tester, 'open');
+      expect(session.view, BuyV2View.tracking);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(session.destination, origin);
+      expect(session.view, BuyV2View.catalogue);
+      expect(session.query, 'retained supplier search');
+      expect(session.selectedFulfilmentMode, mode);
+      if (origin == BuyV2Destination.wholesale) {
+        expect(session.wholesaleSaleType, BuyV2WholesaleSaleType.bulk);
+      }
+      expect(session.quantityFor('w-notebook'), quantity);
+      await capture(tester, 'r669-rail-tracking-return-${origin.name}');
+      session.openOrders();
+      expect(session.openTracking('quick-1'), isTrue);
+      session.goBack();
+      expect(session.destination, BuyV2Destination.orders);
+      expect(session.view, BuyV2View.catalogue);
       expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox.shrink());
     });

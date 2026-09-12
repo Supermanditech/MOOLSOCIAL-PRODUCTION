@@ -8191,6 +8191,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void openDestination(BuyV2Destination value) {
+    _deliveryTrackingVisit = null;
     final previous = _navigationSurfaceIdentity;
     _clearRecoveryOriginIfActive();
     _accountChildReturnActive = false;
@@ -8699,6 +8700,7 @@ class BuyV2Session extends ChangeNotifier {
     BuyV2NavigationMotionDirection direction =
         BuyV2NavigationMotionDirection.replace,
   }) {
+    _deliveryTrackingVisit = null;
     final previous = _navigationSurfaceIdentity;
     destination = BuyV2Destination.orders;
     view = BuyV2View.catalogue;
@@ -8736,7 +8738,62 @@ class BuyV2Session extends ChangeNotifier {
     );
   }
 
+  ({String orderId, String? ownerScope, VoidCallback restore})? _deliveryTrackingVisit;
+
+  /// A delivery-rail visit returns to its existing shopping surface once.
+  bool openDeliveryTracking(String orderId) {
+    if (!procurementScopeCurrent || !_orders.any((order) => order.id == orderId)) return false;
+    if (hasShoppingHelpReturnOrigin || hasShoppingAlertReturnOrigin) return openTracking(orderId);
+    final restoreNavigation = beginStoreNavigationVisit();
+    final origin = (
+      ownerScope: customerStateStore?.ownerScope,
+      checkoutScope: checkoutScope,
+      checkoutStep: checkoutStep,
+      ordersTab: ordersTab,
+      orderId: _selectedOrderId,
+      query: query,
+      filter: selectedFilter,
+      shopCategoryId: shopCategoryId,
+      wholesaleCategoryId: wholesaleCategoryId,
+      medicineCategoryId: medicineCategoryId,
+    );
+    if (!openTracking(orderId)) return false;
+    _deliveryTrackingVisit = (
+      orderId: orderId,
+      ownerScope: origin.ownerScope,
+      restore: () {
+        checkoutScope = origin.checkoutScope;
+        checkoutStep = origin.checkoutStep;
+        ordersTab = origin.ordersTab;
+        _selectedOrderId = origin.orderId;
+        query = origin.query;
+        selectedFilter = origin.filter;
+        shopCategoryId = origin.shopCategoryId;
+        wholesaleCategoryId = origin.wholesaleCategoryId;
+        medicineCategoryId = origin.medicineCategoryId;
+        restoreNavigation();
+      },
+    );
+    return true;
+  }
+
+  bool _returnFromDeliveryTracking() {
+    final visit = _deliveryTrackingVisit;
+    _deliveryTrackingVisit = null;
+    if (visit == null ||
+        visit.orderId != _selectedOrderId ||
+        visit.ownerScope != customerStateStore?.ownerScope ||
+        !procurementScopeCurrent) {
+      return false;
+    }
+    visit.restore();
+    return true;
+  }
+
   bool openTracking(String orderId) {
+    if (view != BuyV2View.orderItems || _deliveryTrackingVisit?.orderId != orderId) {
+      _deliveryTrackingVisit = null;
+    }
     final previous = _navigationSurfaceIdentity;
     final order = _orders
         .where((candidate) => candidate.id == orderId)
@@ -8775,6 +8832,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   void returnToOrders() {
+    if (_returnFromDeliveryTracking()) return;
     if (_returnToShoppingHelp()) return;
     if (_returnToShoppingAlerts()) return;
     final previous = _navigationSurfaceIdentity;

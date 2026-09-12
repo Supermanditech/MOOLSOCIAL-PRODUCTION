@@ -1578,7 +1578,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                             _rememberDeliveryPreferences();
                             _scheduleQuickTrackerCollapse(update);
                           },
-                          onOpen: () => session.openTracking(order.id),
+                          onOpen: () => session.openDeliveryTracking(order.id),
                         ),
                       ],
                     ),

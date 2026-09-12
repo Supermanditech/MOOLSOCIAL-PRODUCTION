@@ -1,5 +1,16 @@
 # Fresh Redmi defect register
 
+## Delivery tracking return child checkpoint - 12 September 2026
+
+**R669-UAT-DELIVERY-TRACKING-RETURN-CONTEXT-001 implemented and locally checked; remains OPEN for Redmi verification.** The delivery rail now opens tracking with a single-use origin contract that reuses existing Buy navigation restoration. Back restores the originating destination/view, product/cart/comparison navigation, query/categories, checkout/order context while retaining current cart contents. Owner/Store mismatch rejects restoration; destination or Orders-root departure clears an abandoned visit. Nested order items retain the rail origin. Ordinary Orders tracking and existing Help/Alerts return contracts remain separate.
+
+Final local regression:533 passed,0 failed,0 skipped across order-progress, session, shopping-alerts and Help/Chat suites. New tests exercise actual rail taps and Android Back from Quick Shop and the actual Bulk tab, retained query/mode/cart, nested scoped Cart return, stale-owner rejection and abandoned Orders navigation. Final focused3 checks and two actual Flutter captures pass review. Analysis has no issues and approved UI locks pass. Earlier fixture mistakes were corrected: initial mount defaults to Shop, and bulkFreight filtering alone is not the Bulk purchase tab. Final captures explicitly show Bulk selected.
+
+Evidence: external redmi-r66-9-round-1/tracking-return-implementation-20260912-0219/local-qualification-1.json SHA256 F3ACC047A8C7E7A986CA52CC5410296F02564C406861FA91DF4D7B459517E5AC, including exact three owner/capture hashes. Final receipt singlechat-r669-tracking-return-final-20260912-0225.result.json; stdout SHA2566D2F102EB04736B01CF5B650D63DD83E9FF64721AC9393560458D303F7CB81AC. Required tested parent a4716f8149b1aba5210efd7e631d4eb28bc5902c. Session contract and rail wiring must remain together in integration; no Desktop/Store-wrapper owner changed.
+
+No APK/build/install, integration, provider action or device closure. The separate Orders Android-Back scroll-position child remains open; this origin fix does not claim that defect resolved. Remaining scoped fixes and provider/device qualifications remain required.
+
+
 ## Delivery selector reading child checkpoint - 12 September 2026
 
 **R669-UAT-DELIVERY-SELECTOR-AUTOHIDE-001 implemented and locally checked; remains OPEN for Redmi verification.** The45-second auto-collapse timer previously ignored an open delivery selector. Scheduling and timer callbacks now respect that open state; toggling the selector updates the timer. Selection/explicit closure resumes the normal quiet-rail behavior. Keep, Hide, exact delivery identity and per-order preferences are preserved.
