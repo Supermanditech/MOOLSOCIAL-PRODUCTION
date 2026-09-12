@@ -71,6 +71,27 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_BEGIN
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.moolsocial.app/accessibility",
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "openSettings" -> {
+                    val opened = try {
+                        startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        true
+                    } catch (_: android.content.ActivityNotFoundException) {
+                        false
+                    } catch (_: SecurityException) {
+                        false
+                    }
+                    result.success(opened)
+                }
+                else -> result.notImplemented()
+            }
+        }
+        // MOOLSOCIAL_ACCESSIBILITY_BRIDGE_END
         MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger,
             invoiceChannel,

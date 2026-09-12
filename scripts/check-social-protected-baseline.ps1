@@ -233,7 +233,24 @@ function Test-SealedSocialOverlay {
     -OverlayCommit $v74Commit `
     -ContextAllowed $v74ContextAllowed
 
-  return $legacyOverlayAccepted -or $v74OverlayAccepted
+  # The Redmi correction ticket inherits this later accepted combined tree.
+  # Admission still requires the exact inventory and every protected byte.
+  $redmiAcceptedCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
+  $redmiContextAllowed = $false
+  if ($branch -ceq 'work/cursor-ui/buy-redmi-fixes-v1-20260905') {
+    & git -C $root merge-base --is-ancestor $redmiAcceptedCommit HEAD
+    $redmiContextAllowed = $LASTEXITCODE -eq 0
+  }
+  $redmiOverlayAccepted = Test-SealedSocialOverlayCandidate `
+    -CurrentOwners $CurrentOwners `
+    -OverlayCommit $redmiAcceptedCommit `
+    -ContextAllowed $redmiContextAllowed
+
+  return (
+    $legacyOverlayAccepted -or
+    $v74OverlayAccepted -or
+    $redmiOverlayAccepted
+  )
 }
 
 $sealedOverlayAccepted = Test-SealedSocialOverlay $relativeFiles

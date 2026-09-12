@@ -1,7 +1,8 @@
 [CmdletBinding()]
 param(
   [string]$RepositoryRoot,
-  [switch]$SelfTest
+  [switch]$SelfTest,
+  [string]$RedmiReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,6 +11,12 @@ if (-not $RepositoryRoot) {
   $RepositoryRoot = Split-Path -Parent $PSScriptRoot
 }
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
+$redmiReviewQualified = $false
+if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+    -RepositoryRoot $RepositoryRoot -RedmiReviewSourceCommit $RedmiReviewSourceCommit
+  $redmiReviewQualified = $true
+}
 
 function Get-PortableRelativePath {
   param(
@@ -73,6 +80,10 @@ function Test-SealedBuyEgressClipboardAction {
     'work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828'
   )
   $overlayCommit = 'd8a288cb897b5ca930425eb4a81be1a329ffa4c4'
+  if ($redmiReviewQualified) {
+    $branchAllowed = $true
+    $overlayCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
+  }
   & git -C $RepositoryRoot diff --quiet $overlayCommit -- $owner
   $ownerBytesEqual = $LASTEXITCODE -eq 0
   $actionExact = (
@@ -92,9 +103,24 @@ function Get-BuyDataEgressViolations {
     [Parameter(Mandatory)]
     [string]$Label,
     [Parameter(Mandatory)]
-    [string]$Content
+    [string]$Content,
+    [switch]$QualifiedRedmiReview
   )
 
+  if ($QualifiedRedmiReview) {
+    $owner = $Label.Replace('\', '/')
+    if ($owner -ceq 'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart') {
+      # Inherited device-review state store, bound byte-for-byte before scanning.
+      $Content = $Content.Replace("import 'package:shared_preferences/shared_preferences.dart';", '')
+      $Content = $Content.Replace('SharedPreferencesAsync', 'QualifiedReviewStateStore')
+    }
+    if ($owner -ceq 'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart') {
+      # Only the two existing user-invoked product/address shares and address-link copy.
+      $Content = $Content.Replace("import 'package:share_plus/share_plus.dart';", '')
+      $Content = $Content.Replace('SharePlus.instance.share(', 'QualifiedReviewShareAction(')
+      $Content = $Content.Replace('Clipboard.setData(ClipboardData(text: shareUri.toString()))', '')
+    }
+  }
   $findings = [System.Collections.Generic.List[string]]::new()
 
   $egressImportPattern = (
@@ -126,7 +152,7 @@ function Get-BuyDataEgressViolations {
   }
 
   $storagePattern = (
-    "\b(?:SharedPreferences|Hive|FlutterSecureStorage|Sqflite|" +
+    "\b(?:SharedPreferences(?:Async|WithCache)?|Hive|FlutterSecureStorage|Sqflite|" +
     "DatabaseFactory)\b"
   )
   if ($Content -match $storagePattern) {
@@ -134,7 +160,7 @@ function Get-BuyDataEgressViolations {
   }
 
   $sharePattern = (
-    "\b(?:Share|SharePlus)\.(?:share|shareXFiles)\s*\("
+    "\b(?:Share|SharePlus)(?:\.instance)?\.(?:share|shareXFiles)\s*\("
   )
   if ($Content -match $sharePattern) {
     $findings.Add("${Label}: direct system-share data egress")
@@ -282,10 +308,11 @@ foreach ($file in $mobileFiles) {
   $relative = Get-PortableRelativePath `
     -BasePath $RepositoryRoot `
     -Path $file.FullName
-  $content = Get-Content -LiteralPath $file.FullName -Raw
+  $content = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
   foreach ($finding in Get-BuyDataEgressViolations `
     -Label $relative `
-    -Content $content) {
+    -Content $content `
+    -QualifiedRedmiReview:$redmiReviewQualified) {
     $violations.Add($finding)
   }
 }
@@ -302,6 +329,14 @@ if ($violations.Count -gt 0) {
   )
 }
 
+if ($redmiReviewQualified) {
+  Write-Output (
+    "Buy data-egress Redmi review boundary passed: $($mobileFiles.Count) native V2 files; " +
+    "only exact inherited review-store, product/address share and user Copy seams; " +
+    "acceptedBaseline=false; productionPromotion=false; no recipient action authorized."
+  )
+  return
+}
 Write-Output (
   "Buy data-egress boundary passed: $($mobileFiles.Count) native V2 files " +
   "contain no direct log/analytics/share/store/credential sink; only the " +

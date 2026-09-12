@@ -3,6 +3,8 @@ param(
   [Parameter(Mandatory = $true)][string]$OutputPath,
   [string]$RepositoryRoot
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
@@ -44,11 +46,7 @@ function Get-Fingerprint {
       "$($_.path)|$($_.bytes)|$($_.sha256)"
     }) -join "`n"
   ) + "`n"
-  return [Convert]::ToHexString(
-    [Security.Cryptography.SHA256]::HashData(
-      [Text.Encoding]::UTF8.GetBytes($payload)
-    )
-  )
+  return (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ([Text.Encoding]::UTF8.GetBytes($payload)))))
 }
 
 $providerPaths = @(
@@ -104,11 +102,7 @@ $baseline = Get-Content -Raw -LiteralPath (
 )
 $reviewRuntime = Get-YouTubePrivateDevAcceptedPublicReviewEnvironmentContent `
   -BaselineContent $baseline
-$runtimeHash = [Convert]::ToHexString(
-  [Security.Cryptography.SHA256]::HashData(
-    [Text.Encoding]::ASCII.GetBytes($reviewRuntime)
-  )
-)
+$runtimeHash = (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ([Text.Encoding]::ASCII.GetBytes($reviewRuntime)))))
 $branch = (& git -C $root rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
 $head = (& git -C $root rev-parse HEAD 2>$null | Out-String).Trim()
 if (

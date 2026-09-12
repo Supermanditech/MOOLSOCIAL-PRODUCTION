@@ -101,7 +101,7 @@ void main() {
     expect(reduced.reverseCurve, Curves.linear);
   });
 
-  testWidgets('real catalogue tools flow reaches the R56.6 filter sheet', (
+  testWidgets('real Shop catalogue opens staged discovery refinements', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -118,27 +118,24 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
     await tester.pumpAndSettle();
     expect(
-      find.byKey(const ValueKey('buy-active-orders-button')),
+      find.byKey(const ValueKey('buy-discovery-refinement-title')),
       findsOneWidget,
     );
+    await tester.tap(find.byKey(const ValueKey('buy-refine-section-sort')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-sort-priceLowToHigh')));
+    await tester.pumpAndSettle();
+    expect(session.productSort, BuyV2ProductSort.relevance);
+    await tester.tap(
+      find.byKey(const ValueKey('buy-discovery-refinement-done')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.productSort, BuyV2ProductSort.priceLowToHigh);
     expect(
-      find.byKey(const ValueKey('buy-household-basket-button')),
-      findsOneWidget,
+      find.byKey(const ValueKey('buy-discovery-refinement-title')),
+      findsNothing,
     );
-    expect(find.byKey(const ValueKey('buy-filter-sheet-route')), findsOne);
-    final nearby = find.byKey(const ValueKey('buy-filter-nearby'));
-    await tester.scrollUntilVisible(
-      nearby,
-      160,
-      scrollable: find.descendant(
-        of: find.byKey(const ValueKey('buy-filter-list')),
-        matching: find.byType(Scrollable),
-      ),
-    );
-    await tester.pumpAndSettle();
-    await tester.tap(nearby);
-    await tester.pumpAndSettle();
-    expect(session.selectedFilter, 'nearby');
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('selection commits once only after the reverse route', (
@@ -190,6 +187,23 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
     await tester.pumpAndSettle();
+    final tools = find.byKey(const ValueKey('buy-refine-section-tools'));
+    final toolScroll = find.descendant(
+      of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+      matching: find.byType(Scrollable),
+    );
+    await tester.scrollUntilVisible(tools, 160, scrollable: toolScroll);
+    await tester.pumpAndSettle();
+    await tester.tap(tools);
+    await tester.pumpAndSettle();
+    final activeOrder = find.byKey(const ValueKey('buy-active-orders-button'));
+    await tester.scrollUntilVisible(activeOrder, 160, scrollable: toolScroll);
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(const ValueKey('buy-household-basket-button')),
+      findsOneWidget,
+    );
+    expect(activeOrder.hitTestable(), findsOneWidget);
     await tester.tap(find.byKey(const ValueKey('buy-active-orders-button')));
     await tester.pump();
     expect(session.view, BuyV2View.catalogue);

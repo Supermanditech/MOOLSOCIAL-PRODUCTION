@@ -16,10 +16,126 @@ abstract interface class BuyV2SavedProductsStore {
   Future<bool> write(Set<String> savedProductKeys);
 }
 
+/// Buy navigation retained within the exact Store operation owner scope.
+@immutable
+class BuyV2ProcurementNavigationSnapshot {
+  const BuyV2ProcurementNavigationSnapshot({
+    this.destination = BuyV2Destination.wholesale,
+    this.view = BuyV2View.catalogue,
+    this.categoryId = 'all',
+    this.query = '',
+    this.filter,
+    this.productId,
+    this.orderId,
+    this.cartScope = BuyV2CartScope.wholesale,
+    this.checkoutScope = BuyV2CartScope.wholesale,
+    this.productReturnDestination = BuyV2Destination.wholesale,
+    this.productReturnView = BuyV2View.catalogue,
+    this.comparisonOrigins = const [],
+    this.cartReturnProductId,
+    this.cartReturnDestination = BuyV2Destination.wholesale,
+    this.cartReturnOriginDestination,
+    this.cartReturnOriginView,
+    this.cartReturnComparisonOrigins = const [],
+    this.showingSavedProducts = false,
+    this.cartScrollOffset = 0,
+  });
+
+  final BuyV2Destination destination;
+  final BuyV2View view;
+  final String categoryId;
+  final String query;
+  final String? filter;
+  final String? productId;
+  final String? orderId;
+  final BuyV2CartScope cartScope;
+  final BuyV2CartScope checkoutScope;
+  final BuyV2Destination productReturnDestination;
+  final BuyV2View productReturnView;
+  final List<String> comparisonOrigins;
+  final String? cartReturnProductId;
+  final BuyV2Destination cartReturnDestination;
+  final BuyV2Destination? cartReturnOriginDestination;
+  final BuyV2View? cartReturnOriginView;
+  final List<String> cartReturnComparisonOrigins;
+  final bool showingSavedProducts;
+  final double cartScrollOffset;
+}
+
+/// Retained display/offer identity only. Cached data never grants eligibility.
+@immutable
+class BuyV2ProcurementDraftSnapshot {
+  const BuyV2ProcurementDraftSnapshot({
+    required this.ownerScope,
+    this.cartProducts = const {},
+    this.navigation,
+  });
+
+  final String ownerScope;
+  final Map<String, BuyV2Product> cartProducts;
+  final BuyV2ProcurementNavigationSnapshot? navigation;
+
+  static BuyV2Product retainedProduct(String id, BuyV2Product? product) {
+    final previous = product?.procurementSupplierGrant;
+    final identity = BuyV2ProcurementSupplierGrant(
+      workspaceId: previous?.workspaceId ?? '',
+      storeId: previous?.storeId ?? product?.storeId ?? '',
+      role: BuyV2SupplierWorkspaceRole.unknown,
+      approved: false,
+      listingId: previous?.listingId ?? id,
+      productCanonicalId:
+          previous?.productCanonicalId ?? product?.canonicalId ?? id,
+      offerId: previous?.offerId ?? '',
+      offerRevision: previous?.offerRevision ?? '',
+      channel: BuyV2SupplierListingChannel.unknown,
+      published: false,
+      validUntil: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+    );
+    if (product != null) {
+      return product.copyWith(procurementSupplierGrant: identity);
+    }
+    return BuyV2Product(
+      id: id,
+      destination: BuyV2Destination.wholesale,
+      categoryId: 'all',
+      brand: '',
+      title: 'Unavailable item',
+      variant: '',
+      pack: 'Pack details unavailable',
+      price: 0,
+      unitPrice: 'Price unavailable',
+      badge: '',
+      seller: 'Supplier unavailable',
+      sellerType: '',
+      deliveryPromise: 'Availability not confirmed',
+      origin: '',
+      confirmedOn: '',
+      visualLabel: '',
+      visualKind: '',
+      procurementSupplierGrant: identity,
+      catalogueListing: false,
+    );
+  }
+}
+
+/// Unsent customer text; never a published review or proof of eligibility.
+@immutable
+class BuyV2ProductReviewDraft {
+  const BuyV2ProductReviewDraft({required this.rating, required this.comment});
+  final int rating;
+  final String comment;
+  bool get valid => rating >= 0 && rating <= 5 && comment.length <= 8000;
+}
+
 @immutable
 class BuyV2CustomerStateSnapshot {
   const BuyV2CustomerStateSnapshot({
+    this.shoppingRegionId,
+    this.shoppingGooglePlaceId,
+    this.shoppingAreaScope,
     this.cartQuantities = const {},
+    this.reviewDrafts = const {},
+    this.procurementDraft,
     this.addresses = const [],
     this.selectedAddressId,
     this.savedProductKeys = const {},
@@ -44,6 +160,12 @@ class BuyV2CustomerStateSnapshot {
   });
 
   final Map<String, int> cartQuantities;
+  final Map<String, BuyV2ProductReviewDraft> reviewDrafts;
+  // Persist selection identifiers, not Google response labels or coordinates.
+  final String? shoppingRegionId;
+  final String? shoppingGooglePlaceId;
+  final String? shoppingAreaScope;
+  final BuyV2ProcurementDraftSnapshot? procurementDraft;
   final List<BuyV2Address> addresses;
   final String? selectedAddressId;
   final Set<String> savedProductKeys;
@@ -104,6 +226,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
       if (source == null || source.trim().isEmpty) return null;
       final decoded = jsonDecode(source);
       if (decoded is! Map<String, Object?>) return null;
+      if (decoded.containsKey('procurementDraft') &&
+          _decodeProcurementDraft(decoded['procurementDraft']) == null) {
+        return null;
+      }
       return _decodeSnapshot(decoded);
     } on Object {
       return null;
@@ -112,6 +238,10 @@ final class BuyV2SharedPreferencesCustomerStateStore
 
   @override
   Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async {
+    if (snapshot.procurementDraft case final draft?
+        when draft.ownerScope != ownerScope) {
+      return false;
+    }
     try {
       await _preferences.setString(_key, jsonEncode(_encodeSnapshot(snapshot)));
       return true;
@@ -121,7 +251,17 @@ final class BuyV2SharedPreferencesCustomerStateStore
   }
 
   Map<String, Object?> _encodeSnapshot(BuyV2CustomerStateSnapshot snapshot) => {
+    'shoppingRegionId': snapshot.shoppingRegionId,
+    'shoppingGooglePlaceId': snapshot.shoppingGooglePlaceId,
+    'shoppingAreaScope': snapshot.shoppingAreaScope,
     'cartQuantities': snapshot.cartQuantities,
+    'reviewDrafts': {
+      for (final entry in snapshot.reviewDrafts.entries)
+        if (entry.key.isNotEmpty && entry.value.valid)
+          entry.key: {'rating': entry.value.rating, 'comment': entry.value.comment},
+    },
+    if (snapshot.procurementDraft case final draft?)
+      'procurementDraft': _encodeProcurementDraft(draft),
     'addresses': [
       for (final address in snapshot.addresses) _encodeAddress(address),
     ],
@@ -152,9 +292,30 @@ final class BuyV2SharedPreferencesCustomerStateStore
     'orders': [for (final order in snapshot.orders) _encodeOrder(order)],
   };
 
+  Map<String, BuyV2ProductReviewDraft> _decodeReviewDrafts(Object? value) {
+    if (value is! Map) return const {};
+    final drafts = <String, BuyV2ProductReviewDraft>{};
+    for (final entry in value.entries) {
+      final key = entry.key;
+      final data = entry.value;
+      if (key is! String || key.isEmpty || data is! Map) continue;
+      final rating = data['rating'];
+      final comment = data['comment'];
+      if (rating is! int || comment is! String) continue;
+      final draft = BuyV2ProductReviewDraft(rating: rating, comment: comment);
+      if (draft.valid) drafts[key] = draft;
+    }
+    return Map.unmodifiable(drafts);
+  }
+
   BuyV2CustomerStateSnapshot _decodeSnapshot(Map<String, Object?> source) =>
       BuyV2CustomerStateSnapshot(
+        shoppingRegionId: _string(source['shoppingRegionId']),
+        shoppingGooglePlaceId: _string(source['shoppingGooglePlaceId']),
+        shoppingAreaScope: _string(source['shoppingAreaScope']),
         cartQuantities: _stringIntMap(source['cartQuantities']),
+        reviewDrafts: _decodeReviewDrafts(source['reviewDrafts']),
+        procurementDraft: _decodeProcurementDraft(source['procurementDraft']),
         addresses: _objectList(
           source['addresses'],
         ).map(_decodeAddress).whereType<BuyV2Address>().toList(growable: false),
@@ -184,6 +345,231 @@ final class BuyV2SharedPreferencesCustomerStateStore
           source['orders'],
         ).map(_decodeOrder).whereType<BuyV2Order>().toList(growable: false),
       );
+
+  Map<String, Object?> _encodeProcurementDraft(
+    BuyV2ProcurementDraftSnapshot draft,
+  ) => {
+    'version': 1,
+    'ownerScope': draft.ownerScope,
+    if (draft.navigation case final navigation?)
+      'navigation': _encodeProcurementNavigation(navigation),
+    'cartProducts': {
+      for (final entry in draft.cartProducts.entries)
+        entry.key: {
+          'id': entry.value.id,
+          'canonicalId': entry.value.canonicalId,
+          'storeId': entry.value.storeId,
+          'categoryId': entry.value.categoryId,
+          'brand': entry.value.brand,
+          'title': entry.value.title,
+          'variant': entry.value.variant,
+          'pack': entry.value.pack,
+          'price': entry.value.price,
+          'unitPrice': entry.value.unitPrice,
+          'seller': entry.value.seller,
+          'sellerType': entry.value.sellerType,
+          'visualKind': entry.value.visualKind,
+          'visualLabel': entry.value.visualLabel,
+          'minimumOrder': entry.value.minimumOrder,
+          'workspaceId': entry.value.procurementSupplierGrant?.workspaceId,
+          'offerId': entry.value.procurementSupplierGrant?.offerId,
+          'offerRevision': entry.value.procurementSupplierGrant?.offerRevision,
+        },
+    },
+  };
+
+  BuyV2ProcurementDraftSnapshot? _decodeProcurementDraft(Object? value) {
+    if (value is! Map) return null;
+    final source = _objectMap(value);
+    final scope = _string(source['ownerScope']);
+    if (source['version'] != 1 || scope == null || scope != ownerScope) {
+      return null;
+    }
+    final products = <String, BuyV2Product>{};
+    for (final entry in _objectMap(source['cartProducts']).entries) {
+      final item = _objectMap(entry.value);
+      final id = _string(item['id']);
+      final price = item['price'];
+      final minimum = item['minimumOrder'];
+      if (id != entry.key ||
+          id == null ||
+          price is! int ||
+          price < 0 ||
+          minimum is! int ||
+          minimum < 1) {
+        continue;
+      }
+      final identity = BuyV2ProcurementSupplierGrant(
+        workspaceId: _string(item['workspaceId']) ?? '',
+        storeId: _string(item['storeId']) ?? '',
+        role: BuyV2SupplierWorkspaceRole.unknown,
+        approved: false,
+        listingId: id,
+        productCanonicalId: _string(item['canonicalId']) ?? '',
+        offerId: _string(item['offerId']) ?? '',
+        offerRevision: _string(item['offerRevision']) ?? '',
+        channel: BuyV2SupplierListingChannel.unknown,
+        published: false,
+        validUntil: DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      );
+      products[id] = BuyV2Product(
+        id: id,
+        canonicalId: _string(item['canonicalId']),
+        storeId: _string(item['storeId']),
+        destination: BuyV2Destination.wholesale,
+        categoryId: _string(item['categoryId']) ?? 'all',
+        brand: _string(item['brand']) ?? '',
+        title: _string(item['title']) ?? 'Unavailable item',
+        variant: _string(item['variant']) ?? '',
+        pack: _string(item['pack']) ?? 'Pack details unavailable',
+        price: price,
+        unitPrice: _string(item['unitPrice']) ?? '',
+        badge: '',
+        seller: _string(item['seller']) ?? 'Supplier unavailable',
+        sellerType: _string(item['sellerType']) ?? '',
+        deliveryPromise: 'Availability not confirmed',
+        origin: '',
+        confirmedOn: '',
+        visualLabel: _string(item['visualLabel']) ?? '',
+        visualKind: _string(item['visualKind']) ?? '',
+        minimumOrder: minimum,
+        procurementSupplierGrant: identity,
+        catalogueListing: false,
+      );
+    }
+    return BuyV2ProcurementDraftSnapshot(
+      ownerScope: scope,
+      cartProducts: Map.unmodifiable(products),
+      navigation: _decodeProcurementNavigation(source['navigation']),
+    );
+  }
+
+  Map<String, Object?> _encodeProcurementNavigation(
+    BuyV2ProcurementNavigationSnapshot value,
+  ) => {
+    'version': 1,
+    'destination': value.destination.name,
+    'view': value.view.name,
+    'categoryId': value.categoryId,
+    'query': value.query,
+    'filter': value.filter,
+    'productId': value.productId,
+    'orderId': value.orderId,
+    'cartScope': value.cartScope.name,
+    'checkoutScope': value.checkoutScope.name,
+    'productReturnDestination': value.productReturnDestination.name,
+    'productReturnView': value.productReturnView.name,
+    'comparisonOrigins': value.comparisonOrigins,
+    'cartReturnProductId': value.cartReturnProductId,
+    'cartReturnDestination': value.cartReturnDestination.name,
+    'cartReturnOriginDestination': value.cartReturnOriginDestination?.name,
+    'cartReturnOriginView': value.cartReturnOriginView?.name,
+    'cartReturnComparisonOrigins': value.cartReturnComparisonOrigins,
+    'showingSavedProducts': value.showingSavedProducts,
+    'cartScrollOffset': value.cartScrollOffset,
+  };
+
+  BuyV2ProcurementNavigationSnapshot? _decodeProcurementNavigation(
+    Object? value,
+  ) {
+    if (value is! Map) {
+      return null;
+    }
+    final source = _objectMap(value);
+    if (source['version'] != 1 ||
+        source['categoryId'] is! String ||
+        source['query'] is! String) {
+      return null;
+    }
+    final destination = _enumByName(
+      BuyV2Destination.values,
+      _string(source['destination']),
+    );
+    if (destination == null) {
+      return null;
+    }
+    final view = _enumByName(BuyV2View.values, _string(source['view']));
+    if (view == null) {
+      return null;
+    }
+    final cartScope = _enumByName(
+      BuyV2CartScope.values,
+      _string(source['cartScope']),
+    );
+    if (cartScope == null) {
+      return null;
+    }
+    final checkoutScope = _enumByName(
+      BuyV2CartScope.values,
+      _string(source['checkoutScope']),
+    );
+    if (checkoutScope == null) {
+      return null;
+    }
+    final productReturnDestination = _enumByName(
+      BuyV2Destination.values,
+      _string(source['productReturnDestination']),
+    );
+    if (productReturnDestination == null) {
+      return null;
+    }
+    final productReturnView = _enumByName(
+      BuyV2View.values,
+      _string(source['productReturnView']),
+    );
+    if (productReturnView == null) {
+      return null;
+    }
+    final cartReturnDestination = _enumByName(
+      BuyV2Destination.values,
+      _string(source['cartReturnDestination']),
+    );
+    if (cartReturnDestination == null) {
+      return null;
+    }
+    final cartReturnOriginDestination = _enumByName(
+      BuyV2Destination.values,
+      _string(source['cartReturnOriginDestination']),
+    );
+    if (source['cartReturnOriginDestination'] != null &&
+        cartReturnOriginDestination == null) {
+      return null;
+    }
+    final cartReturnOriginView = _enumByName(
+      BuyV2View.values,
+      _string(source['cartReturnOriginView']),
+    );
+    if (source['cartReturnOriginView'] != null &&
+        cartReturnOriginView == null) {
+      return null;
+    }
+    final offset = source['cartScrollOffset'];
+    return BuyV2ProcurementNavigationSnapshot(
+      destination: destination,
+      view: view,
+      categoryId: source['categoryId'] as String,
+      query: source['query'] as String,
+      filter: _string(source['filter']),
+      productId: _string(source['productId']),
+      orderId: _string(source['orderId']),
+      cartScope: cartScope,
+      checkoutScope: checkoutScope,
+      productReturnDestination: productReturnDestination,
+      productReturnView: productReturnView,
+      comparisonOrigins: _stringList(source['comparisonOrigins']),
+      cartReturnProductId: _string(source['cartReturnProductId']),
+      cartReturnDestination: cartReturnDestination,
+      cartReturnOriginDestination: cartReturnOriginDestination,
+      cartReturnOriginView: cartReturnOriginView,
+      cartReturnComparisonOrigins: _stringList(
+        source['cartReturnComparisonOrigins'],
+      ),
+      showingSavedProducts: source['showingSavedProducts'] == true,
+      cartScrollOffset: offset is num && offset.isFinite && offset >= 0
+          ? offset.toDouble()
+          : 0,
+    );
+  }
 
   Map<String, Object?> _encodeAddress(BuyV2Address address) => {
     'id': address.id,

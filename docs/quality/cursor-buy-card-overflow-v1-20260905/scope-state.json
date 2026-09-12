@@ -1,0 +1,62 @@
+{
+  "schemaVersion": 1,
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "selected_ticket_assessed",
+    "currentTicketId": "UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905",
+      "customerOutcome": "Catalogue decision information remains readable without vertical overflow on narrow phones and with enlarged text.",
+      "necessityProof": "The supplied boundary diagnostic identifies 2.4 to 20 pixel overflows in the existing featured-card information column.",
+      "implementationDisposition": ["reuse", "test_only_acceptance"],
+      "sharedImplementationOwners": ["apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": ["normal/enlarged text", "narrow/representative phones", "information/action containment", "Shop/Wholesale and prescription regressions"],
+      "adjustments": ["Let existing information content determine its vertical allocation; preserve the outer compact card and reuse all actions."],
+      "explicitExclusions": ["Care routing", "Chat", "Workspaces", "backend", "integration", "reference rewrites"],
+      "dependenciesAndApprovals": ["Founder selected f94cfd47 baseline and assigned the exact source; Redmi review builds separately authorized."],
+      "manifestPath": "docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md",
+      "manifestSha256": "BF41BF048BD69396DBB02D98493FB5D2F7BFA7CC8C57997517A924C82DCF90BC",
+      "evidencePath": "docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md",
+      "timelineImpactDays": 0,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true
+    }
+  },
+  "state": "ticket_disclosed_and_authorized",
+  "checkpoint": {"successorRegistered": true},
+  "ticket": {
+    "id": "UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905",
+    "classification": "mvp_required",
+    "customerOutcome": "Read complete catalogue decision information without a RenderFlex overflow.",
+    "classificationReason": "Corrects a confirmed accessibility/layout defect in an existing customer journey.",
+    "minimumCompleteScope": ["Existing featured-card information layout", "Focused responsive and prescription regressions"],
+    "explicitExclusions": ["New screen/route", "shared Care/Chat/Work source", "backend", "integration", "production app changes"],
+    "dependenciesAndApprovals": ["Founder authorization recorded in the exact ticket manifest", "Exact baseline f94cfd4752dd73b58a69568475803d6cf25cb8d0"],
+    "testAndEvidencePlan": ["Reproduce", "focused analysis", "two focused regression cycles", "exact-source gated Redmi review"]
+  },
+  "founderDisclosure": {"state": "presented_before_execution", "evidence": "docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md"},
+  "authorization": {"state": "existing_ticket_authority_confirmed", "beyondMvpExplicitlyAuthorized": false, "evidence": "docs/quality/UAW-CURSOR-BUY-CARD-OVERFLOW-V1-20260905.md"},
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": false,
+    "deviceInstallAuthorized": false,
+    "externalServiceWriteAuthorized": false
+  }
+}

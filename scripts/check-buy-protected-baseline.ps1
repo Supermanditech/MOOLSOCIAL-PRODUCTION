@@ -1,6 +1,7 @@
 param(
   [string]$RepositoryRoot = "",
-  [string]$BaselinePath = ""
+  [string]$BaselinePath = "",
+  [string]$RedmiReviewSourceCommit = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -244,6 +245,112 @@ function Test-SealedBuyOverlay {
     $v74OverlayAccepted -or
     $shopV2OverlayAccepted
   )
+}
+
+function Test-RedmiReviewBuySource {
+  param([string]$SourceCommit, [string[]]$CurrentOwners)
+  # This is an unaccepted, locally tested review source, never a replacement baseline.
+  $qualifiedSources = @(
+    'd07559609ffad7371a6a98d765d4fefa186dc065',
+    'd119c85eccc85af99c86c32ae526f57421855ff3',
+    '28b1b6126a4f145f8c639cfc3029860507845845',
+    'd7e7d04541e486f0b33a7b6fe3c15cbc9b533fc2',
+    '2a8c52472b19964ca6d0046d31827197a9e3f74b',
+    '6de5f0c82a57a66dd3172f0ad6080949ca09b5f0',
+    '0c36d2201c43665d38e00173df7d2df63f690344',
+    'a18aa780c0e00497ef218025bc8473a32f50a084'
+  )
+  $acceptedBase = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
+  if ($SourceCommit -cnotin $qualifiedSources) { return $false }
+  $branch = @(& git -C $root branch --show-current)
+  if ($LASTEXITCODE -ne 0 -or $branch.Count -ne 1 -or
+      [string]$branch[0] -cne 'work/cursor-ui/buy-redmi-fixes-v1-20260905') { return $false }
+  & git -C $root merge-base --is-ancestor $acceptedBase $SourceCommit
+  if ($LASTEXITCODE -ne 0) { return $false }
+  & git -C $root merge-base --is-ancestor $SourceCommit HEAD
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $acceptedOwners = @(Get-SealedBuyOverlayInventory $acceptedBase)
+  if ($acceptedOwners.Count -ne 51 -or
+      (@($CurrentOwners | Sort-Object) -join '|') -cne ($acceptedOwners -join '|')) { return $false }
+  if (-not (Test-SealedBuyOverlayCandidate $CurrentOwners $SourceCommit $true)) { return $false }
+  $boundaryRoots = @('apps/mobile/lib','apps/mobile/android','apps/mobile/ios','backend','contracts')
+  $expectedDelta = @(
+    'apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart',
+    'apps/mobile/lib/features/buy/buy_v2_session.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+    'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'
+  )
+  if ($SourceCommit -cin @($qualifiedSources[1], $qualifiedSources[2])) {
+    $expectedDelta = @('apps/mobile/lib/features/buy/buy_v2_models.dart') + $expectedDelta
+  }
+  if ($SourceCommit -ceq $qualifiedSources[2]) {
+    $expectedDelta = $expectedDelta + @('apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart')
+  }
+  if ($SourceCommit -cin @($qualifiedSources[3], $qualifiedSources[4], $qualifiedSources[5], $qualifiedSources[6])) {
+    $expectedDelta = @(
+      'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt',
+      'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+      'apps/mobile/lib/features/buy/buy_v2_models.dart',
+      'apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart',
+      'apps/mobile/lib/features/buy/buy_v2_session.dart',
+      'apps/mobile/lib/features/work/scan_and_pick_contract.dart',
+      'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart',
+      'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
+      'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+      'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+      'apps/mobile/lib/ui_v2/profile/global_security_v2.dart',
+      'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart'
+    )
+  }
+  if ($SourceCommit -ceq 'a18aa780c0e00497ef218025bc8473a32f50a084') {
+    $expectedDelta = @(
+      'apps/mobile/android/app/src/main/kotlin/com/moolsocial/app/MainActivity.kt'
+      'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart'
+      'apps/mobile/lib/features/buy/buy_v2_models.dart'
+      'apps/mobile/lib/features/buy/buy_v2_order_resolution_contracts.dart'
+      'apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart'
+      'apps/mobile/lib/features/buy/buy_v2_session.dart'
+      'apps/mobile/lib/features/work/scan_and_pick_contract.dart'
+      'apps/mobile/lib/features/work/screens/work_onboarding_screens.dart'
+      'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart'
+      'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'
+      'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart'
+      'apps/mobile/lib/ui_v2/profile/global_security_v2.dart'
+      'apps/mobile/lib/ui_v2/universal/mool_global_navigation_v2.dart'
+    )
+  }
+  $sourceDelta = @(& git -C $root diff --name-only $acceptedBase $SourceCommit -- @boundaryRoots)
+  if ($LASTEXITCODE -ne 0 -or
+      (@($sourceDelta | Sort-Object) -join '|') -cne ($expectedDelta -join '|')) { return $false }
+  & git -C $root diff --quiet $SourceCommit -- @boundaryRoots
+  if ($LASTEXITCODE -ne 0) { return $false }
+  $untracked = @(& git -C $root ls-files --others --exclude-standard -- @boundaryRoots)
+  if ($LASTEXITCODE -ne 0 -or $untracked.Count -ne 0) { return $false }
+  return $true
+}
+
+if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+  if (-not [string]::IsNullOrWhiteSpace($BaselinePath) -or
+      -not (Test-RedmiReviewBuySource $RedmiReviewSourceCommit $relativeFiles)) {
+    throw 'Redmi review source qualification rejected: exact branch, ancestry, inventory and source boundary are required.'
+  }
+  Write-Output (
+    "Protected Buy Redmi review qualification passed: source=$RedmiReviewSourceCommit; " +
+    "runtimeFiles=$($relativeFiles.Count); acceptedBaseline=false; productionPromotion=false."
+  )
+  return
 }
 
 $sealedOverlayAccepted = Test-SealedBuyOverlay $relativeFiles

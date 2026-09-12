@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
@@ -283,6 +284,53 @@ void main() {
     expect(snapshot['pack'], product.pack);
     expect(snapshot['delivery'], product.deliveryPromise);
   });
+
+  for (final destination in const [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+    BuyV2Destination.medicine,
+  ]) {
+    test(
+      'supplier Chat shares exact public SKU link for ${destination.name}',
+      () {
+        final product = BuyV2Catalogue.products
+            .firstWhere((candidate) => candidate.destination == destination)
+            .copyWith(id: 'supplier/SKU 50g & variant=2?#');
+        final chat = Uri.parse(
+          const BuyV2ChatRouteAdapter().productQuestionLocationFor(
+            product: product,
+            quantity: 3,
+          ),
+        );
+        final link = Uri.parse(chat.queryParameters['productLink']!);
+        expect(link.scheme, 'https');
+        expect(link.host, 'moolsocial.com');
+        expect(link.path, '/app/buy');
+        expect(link.fragment, isEmpty);
+        expect(link.queryParameters, {
+          'sub': destination.name,
+          'view': 'product',
+          'product': product.id,
+        });
+        expect(link, buyV2SharedProductUri(product));
+        expect(
+          chat.queryParameters['draft']!.split('\n'),
+          contains('Product link: $link'),
+        );
+        expect(
+          chat.queryParameters['draft'],
+          isNot(contains('moolsocial.app')),
+        );
+        final returnRoute = Uri.parse(chat.queryParameters['return']!);
+        expect(returnRoute.path, '/app/buy');
+        expect(returnRoute.queryParameters, link.queryParameters);
+        expect(chat.queryParameters['directReturn'], 'true');
+        expect(chat.queryParameters['skuId'], product.id);
+        expect(chat.queryParameters['supplier'], product.seller);
+        expect(chat.queryParameters['quantity'], '3');
+      },
+    );
+  }
 
   test('retailer wholesaler and manufacturer all receive supplier Chat', () {
     final products = <BuyV2Product>[
@@ -807,6 +855,10 @@ void main() {
           .first;
       final ask = find.bySemanticsLabel('Ask manufacturer');
       await tester.scrollUntilVisible(ask, 220, scrollable: productScroll);
+      await tester.pumpAndSettle();
+      await tester.ensureVisible(ask);
+      await tester.pumpAndSettle();
+      expect(ask.hitTestable(), findsOneWidget);
       await tester.tap(ask);
       await tester.pumpAndSettle();
 

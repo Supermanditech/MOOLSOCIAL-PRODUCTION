@@ -1,7 +1,8 @@
-import 'dart:ui' show Tristate;
+import 'dart:io';
+import 'dart:ui' show ImageByteFormat, Tristate;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/semantics.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
@@ -11,8 +12,27 @@ import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_invoice.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_views.dart';
+
+import 'buy_v2_screen_test.dart' show captureR66Visual;
+
+class _R66OrderCustomerStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'r66-order-group-customer';
+
+  BuyV2CustomerStateSnapshot? snapshot;
+
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    snapshot = value;
+    return true;
+  }
+}
 
 class _MemoryGstInvoiceProfileStore implements BuyV2GstInvoiceProfileStore {
   @override
@@ -211,6 +231,25 @@ class _CheckoutQuoteAdapter implements BuyV2CheckoutQuoteAdapter {
   }
 }
 
+class _R669PendingEstimateFacts implements BuyV2ProductFactsAdapter {
+  String? deadline;
+  int? price;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final facts = const BuyV2CatalogueProductFactsAdapter().snapshotFor(
+      product,
+    );
+    if (product.id != 's-milk') return facts;
+    return facts.copyWith(
+      deliveryPromise: 'Delivery time confirmed at checkout',
+      promisedByLabel: deadline,
+      price: price,
+      sourceId: 'r669-delivery-estimate-test-provider',
+    );
+  }
+}
+
 class _DeliveryPromiseFactsAdapter implements BuyV2ProductFactsAdapter {
   @override
   BuyV2ProductFactsSnapshot snapshotFor(
@@ -347,6 +386,53 @@ Future<bool> _submitAndCompleteReviewPayment(BuyV2Session session) async {
   return session.reconcilePayment();
 }
 
+Future<void> _captureR66Checkout(
+  WidgetTester tester,
+  int amount,
+  double width,
+  double scale,
+  String stage,
+) async {
+  if (!const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE')) return;
+  const requestedStage = String.fromEnvironment(
+    'BUY_R66_CHECKOUT_CAPTURE_STAGE',
+  );
+  if (!['address', 'payment', 'confirm', 'action'].contains(requestedStage)) {
+    throw StateError('Choose one exact checkout capture stage');
+  }
+  if (stage != requestedStage) return;
+  final boundary = tester.renderObject<RenderRepaintBoundary>(
+    find.byKey(const ValueKey('r66-checkout-review-capture')),
+  );
+  await tester.runAsync(() async {
+    final directory = Directory('build/r66-checkout-review-v3-20260905');
+    await directory.create(recursive: true);
+    final output = File(
+      '${directory.path}/$stage-INR$amount-width$width-text$scale.png',
+    );
+    if (await output.exists()) {
+      throw StateError('Checkout capture already exists');
+    }
+    final image = await boundary.toImage(pixelRatio: 2);
+    try {
+      final data = await image.toByteData(format: ImageByteFormat.png);
+      if (data == null) throw StateError('Checkout capture encoding failed');
+      await output.writeAsBytes(data.buffer.asUint8List());
+    } finally {
+      image.dispose();
+    }
+  });
+}
+
+class _R66CheckoutAmountFixture extends BuyV2Session {
+  _R66CheckoutAmountFixture(this.displayAmount, {required super.core});
+
+  final int displayAmount;
+
+  @override
+  int get checkoutAmountDueNow => displayAmount;
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -371,7 +457,12 @@ void main() {
           textScaler: TextScaler.linear(textScale),
           disableAnimations: reducedMotion,
         ),
-        child: child!,
+        child: const bool.fromEnvironment('BUY_R66_CHECKOUT_CAPTURE')
+            ? RepaintBoundary(
+                key: const ValueKey('r66-checkout-review-capture'),
+                child: child!,
+              )
+            : child!,
       ),
       home: BuyV2Screen(
         session: session,
@@ -411,6 +502,794 @@ void main() {
     expect(session.continueCheckoutFromPayment(), isTrue);
     expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
   }
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 final delivery estimate recovery $size $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final facts = _R669PendingEstimateFacts();
+        final session = BuyV2Session(core: core, productFactsAdapter: facts);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('s-milk'), isTrue);
+        expect(session.addProduct('w-notebook'), isTrue);
+        session.openCart(scope: BuyV2CartScope.all);
+        expect(session.openCheckout(), isTrue);
+        advanceCheckoutToConfirm(session);
+        final orderCount = session.orders.length;
+        final total = session.scopedPayableTotal;
+        expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+        expect(session.confirmOrder(), isFalse);
+        expect(await session.submitOrder(), isFalse);
+        expect(session.orders.length, orderCount);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const ValueKey('r66-cart-capture'),
+            child: app(
+              session,
+              size: size,
+              textScale: scale,
+              safeArea: const EdgeInsets.only(top: 24, bottom: 34),
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final dock = find.byKey(const ValueKey('buy-checkout-action-bar'));
+        final check = find.descendant(
+          of: dock,
+          matching: find.text('Check delivery'),
+        );
+        expect(check.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(of: dock, matching: find.text('Place order')),
+          findsNothing,
+        );
+        await tester.tap(check);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+        final group = session.checkoutFulfilmentGroups.firstWhere(
+          (group) => group.productIds.contains('s-milk'),
+        );
+        final delivery = find.byKey(
+          ValueKey('buy-checkout-confirm-delivery-${group.key}'),
+        );
+        final unavailable = find.descendant(
+          of: delivery,
+          matching: find.text(
+            'Unavailable · Check delivery before placing your order',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          unavailable,
+          160,
+          maxScrolls: 50,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const PageStorageKey('buy-checkout-confirm')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.pumpAndSettle();
+        expect(unavailable.hitTestable(), findsOneWidget);
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.textContaining('at checkout'),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.renderObject<RenderParagraph>(unavailable).didExceedMaxLines,
+          isFalse,
+        );
+        await captureR66Visual(
+          tester,
+          'r669-checkout-estimate-unavailable-${size.width}-$scale',
+        );
+        facts.deadline = '11 September, 2–4 PM';
+        await tester.tap(check);
+        await tester.pump(const Duration(seconds: 3));
+        await tester.pumpAndSettle();
+        expect(session.checkoutDeliveryEstimateReviewRequired, isFalse);
+        expect(
+          find.descendant(of: dock, matching: find.text('Place order')),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.text('11 September, 2–4 PM'),
+          ),
+          findsOneWidget,
+        );
+        expect(
+          find.descendant(
+            of: delivery,
+            matching: find.textContaining('at checkout'),
+          ),
+          findsNothing,
+        );
+        await captureR66Visual(
+          tester,
+          'r669-checkout-estimate-ready-${size.width}-$scale',
+        );
+        expect(session.orders.length, orderCount);
+        expect(session.scopedPayableTotal, total);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(session.quantityFor('w-notebook'), 1);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
+  test('R669 missing estimate preserves required price review', () async {
+    final core = BuySession();
+    final facts = _R669PendingEstimateFacts();
+    final session = BuyV2Session(core: core, productFactsAdapter: facts);
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    session.addProduct('s-milk');
+    session.openCart(scope: BuyV2CartScope.all);
+    expect(session.openCheckout(), isTrue);
+    advanceCheckoutToConfirm(session);
+    final orderCount = session.orders.length;
+    facts.price = 77;
+    expect(await session.submitOrder(), isFalse);
+    expect(session.checkoutPriceReviewRequired, isTrue);
+    expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+    facts.deadline = '11 September, 2–4 PM';
+    expect(session.refreshCheckoutDeliveryEstimates(), isTrue);
+    expect(session.checkoutPriceReviewRequired, isTrue);
+    expect(session.orders.length, orderCount);
+  });
+
+  for (final size in [const Size(320, 711), const Size(711, 320)]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('R669 cart subtotal and mixed invoice scope $size $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final semantics = tester.ensureSemantics();
+        try {
+          final core = BuySession();
+          final session = BuyV2Session(
+            core: core,
+            cartBenefitsAdapter: const BuyV2SeededCartBenefitsAdapter(),
+          );
+          addTearDown(core.dispose);
+          addTearDown(session.dispose);
+          expect(session.addProduct('w-notebook'), isTrue);
+          expect(
+            session.addProduct(productFor(BuyV2Destination.shop).id),
+            isTrue,
+          );
+          session.openCart(scope: BuyV2CartScope.all);
+          await tester.pumpWidget(
+            RepaintBoundary(
+              key: const ValueKey('r66-cart-capture'),
+              child: app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 34),
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          session.chooseCartBenefit(
+            session
+                .cartBenefits(
+                  kind: BuyV2CartBenefitKind.coupon,
+                  destination: BuyV2Destination.wholesale,
+                )
+                .last,
+          );
+          final subtotal = session.scopedCartTotal;
+          expect(session.scopedCouponSaving, 300);
+          expect(session.scopedPayableTotal, subtotal - 300);
+          final quantities = {
+            for (final line in session.cartLines)
+              line.product.id: line.quantity,
+          };
+          final orderCount = session.orders.length;
+          await tester.pump(const Duration(seconds: 3));
+          await tester.pumpAndSettle();
+          expect(session.notice, isNull);
+          final scope = find.byKey(const ValueKey('buy-cart-scope-all'));
+          expect(
+            find.descendant(of: scope, matching: find.text('Subtotal')),
+            findsOneWidget,
+          );
+          expect(
+            find.descendant(
+              of: scope,
+              matching: find.text(buyV2Money(subtotal)),
+            ),
+            findsOneWidget,
+          );
+          expect(find.text('₹ Total'), findsNothing);
+          final header = tester.widget<BuyV2FiniteValueTransition>(
+            find.byKey(const ValueKey('buy-cart-header-value-motion')),
+          );
+          expect(header.text, contains('Subtotal ${buyV2Money(subtotal)}'));
+          final dock = find.byKey(const ValueKey('buy-cart-action-bar'));
+          if (size.width > size.height) {
+            await captureR66Visual(
+              tester,
+              'r669-cart-subtotal-header-${size.width}-$scale',
+            );
+            await tester.scrollUntilVisible(
+              dock,
+              180,
+              maxScrolls: 50,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const PageStorageKey('buy-cart-all')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+          }
+          expect(
+            find.descendant(
+              of: dock,
+              matching: find.text(buyV2Money(subtotal - 300)),
+            ),
+            findsOneWidget,
+          );
+          await captureR66Visual(
+            tester,
+            'r669-cart-subtotal-${size.width}-$scale',
+          );
+          expect(session.openCheckout(), isTrue);
+          advanceCheckoutToConfirm(session);
+          await tester.pumpAndSettle();
+          Future<void> reveal(Finder target, {double delta = 140}) async {
+            await tester.scrollUntilVisible(
+              target,
+              delta,
+              maxScrolls: 50,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(
+                      PageStorageKey(
+                        'buy-checkout-${session.checkoutStep.name}',
+                      ),
+                    ),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.pumpAndSettle();
+            expect(target.hitTestable(), findsOneWidget);
+          }
+
+          for (final destination in [
+            BuyV2Destination.shop,
+            BuyV2Destination.wholesale,
+          ]) {
+            final toggle = find.byKey(
+              ValueKey('buy-gst-request-${destination.name}'),
+            );
+            await reveal(toggle);
+            expect(
+              find.text('${destination.label} · Add GST details'),
+              findsOneWidget,
+            );
+            expect(
+              tester.getSemantics(toggle).getSemanticsData().label,
+              '${destination.label}. Add GST details',
+            );
+            final title = find.descendant(
+              of: toggle,
+              matching: find.text('${destination.label} · Add GST details'),
+            );
+            expect(
+              tester.renderObject<RenderParagraph>(title).didExceedMaxLines,
+              isFalse,
+            );
+            await captureR66Visual(
+              tester,
+              'r669-gst-${destination.name}-${size.width}-$scale',
+            );
+            await tester.tap(toggle);
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(ValueKey('buy-gst-add-${destination.name}')),
+              findsOneWidget,
+            );
+            final other = destination == BuyV2Destination.shop
+                ? BuyV2Destination.wholesale
+                : BuyV2Destination.shop;
+            expect(
+              find.byKey(ValueKey('buy-gst-add-${other.name}')),
+              findsNothing,
+            );
+            await reveal(toggle, delta: -140);
+            expect(
+              tester.getSemantics(toggle).getSemanticsData().label,
+              '${destination.label}. Remove GST details',
+            );
+            await tester.tap(toggle);
+            await tester.pumpAndSettle();
+            expect(
+              find.byKey(ValueKey('buy-gst-add-${destination.name}')),
+              findsNothing,
+            );
+          }
+          for (final step in [
+            BuyV2CheckoutStep.confirm,
+            BuyV2CheckoutStep.payment,
+          ]) {
+            expect(session.checkoutStep, step);
+            final back = find.byKey(const ValueKey('buy-checkout-back'));
+            await reveal(back, delta: -140);
+            await tester.tap(back);
+            await tester.pumpAndSettle();
+          }
+          expect(session.checkoutStep, BuyV2CheckoutStep.address);
+          final returnCart = find.byKey(
+            const ValueKey('buy-checkout-return-cart'),
+          );
+          await reveal(returnCart, delta: -140);
+          await tester.tap(returnCart);
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          expect(session.scopedPayableTotal, subtotal - 300);
+          expect({
+            for (final line in session.cartLines)
+              line.product.id: line.quantity,
+          }, quantities);
+          expect(session.orders.length, orderCount);
+          expect(tester.takeException(), isNull);
+        } finally {
+          semantics.dispose();
+        }
+      });
+    }
+  }
+
+  for (final width in [320.0, 360.0, 430.0]) {
+    for (final scale in [1.0, 2.0]) {
+      for (final amount in [1, 10000000]) {
+        testWidgets(
+          'R66 checkout complete action INR$amount at $width text$scale',
+          (tester) async {
+            final size = Size(width, 800);
+            await tester.binding.setSurfaceSize(size);
+            addTearDown(() => tester.binding.setSurfaceSize(null));
+            final core = BuySession();
+            final session = _R66CheckoutAmountFixture(amount, core: core);
+            addTearDown(session.dispose);
+            addTearDown(core.dispose);
+            expect(session.addProduct('w-notebook'), isTrue);
+            session.openCart(scope: BuyV2CartScope.wholesale);
+            expect(session.openCheckout(), isTrue);
+            expect(session.choosePayment('PhonePe'), isTrue);
+            await tester.pumpWidget(
+              app(
+                session,
+                size: size,
+                textScale: scale,
+                safeArea: const EdgeInsets.only(top: 24, bottom: 32),
+                paymentHandoff: (_) async => true,
+              ),
+            );
+            await tester.pumpAndSettle();
+
+            void expectCompleteFooter(String label) {
+              final progress = find.byKey(
+                ValueKey('buy-checkout-progress-${session.checkoutStep.name}'),
+              );
+              final cellHeights = <double>[];
+              for (final stepLabel in ['Address', 'Payment', 'Confirm order']) {
+                final text = find.descendant(
+                  of: progress,
+                  matching: find.text(stepLabel),
+                );
+                final paragraph = tester.renderObject<RenderParagraph>(text);
+                for (final word in stepLabel.split(' ')) {
+                  final wordPainter = TextPainter(
+                    text: TextSpan(text: word, style: paragraph.text.style),
+                    textDirection: paragraph.textDirection,
+                    textScaler: paragraph.textScaler,
+                  )..layout();
+                  expect(
+                    paragraph.size.width + .1,
+                    greaterThanOrEqualTo(wordPainter.width),
+                    reason: 'Unbroken checkout word: $word',
+                  );
+                  wordPainter.dispose();
+                }
+                expect(
+                  paragraph.didExceedMaxLines,
+                  isFalse,
+                  reason: 'Complete checkout step: $stepLabel',
+                );
+                cellHeights.add(
+                  tester
+                      .getSize(
+                        find
+                            .ancestor(
+                              of: text,
+                              matching: find.byType(AnimatedContainer),
+                            )
+                            .first,
+                      )
+                      .height,
+                );
+              }
+              expect(cellHeights.toSet(), hasLength(1));
+              final bar = find.byKey(const ValueKey('buy-checkout-action-bar'));
+              final action = find.byKey(
+                ValueKey('buy-checkout-primary-${session.checkoutStep.name}'),
+              );
+              final actionRect = tester.getRect(action);
+              expect(actionRect.height, greaterThanOrEqualTo(44));
+              expect(actionRect.left, greaterThanOrEqualTo(0));
+              expect(actionRect.right, lessThanOrEqualTo(width));
+              expect(actionRect.bottom, lessThanOrEqualTo(768));
+              expect(
+                find.descendant(of: action, matching: find.text(label)),
+                findsOneWidget,
+              );
+              expect(
+                find.descendant(
+                  of: bar,
+                  matching: find.text(buyV2Money(amount)),
+                ),
+                findsOneWidget,
+              );
+              for (final finder
+                  in find
+                      .descendant(of: bar, matching: find.byType(RichText))
+                      .evaluate()
+                      .map(
+                        (element) => find.byElementPredicate(
+                          (candidate) => identical(candidate, element),
+                        ),
+                      )) {
+                final paragraph = tester.renderObject<RenderParagraph>(finder);
+                expect(
+                  paragraph.didExceedMaxLines,
+                  isFalse,
+                  reason: paragraph.text.toPlainText(),
+                );
+                final natural = TextPainter(
+                  text: paragraph.text,
+                  textDirection: paragraph.textDirection,
+                  textScaler: paragraph.textScaler,
+                )..layout(maxWidth: paragraph.size.width);
+                expect(
+                  paragraph.size.height + .1,
+                  greaterThanOrEqualTo(natural.height),
+                  reason: paragraph.text.toPlainText(),
+                );
+                natural.dispose();
+                final textRect = tester.getRect(finder);
+                expect(textRect.left, greaterThanOrEqualTo(0));
+                expect(textRect.right, lessThanOrEqualTo(width));
+                expect(textRect.bottom, lessThanOrEqualTo(768));
+              }
+              expect(tester.takeException(), isNull);
+            }
+
+            expectCompleteFooter('Continue to payment');
+            await _captureR66Checkout(tester, amount, width, scale, 'address');
+            await tester.tap(
+              find.byKey(const ValueKey('buy-checkout-primary-address')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.checkoutStep, BuyV2CheckoutStep.payment);
+            expectCompleteFooter('Review order');
+            await _captureR66Checkout(tester, amount, width, scale, 'payment');
+            await tester.tap(
+              find.byKey(const ValueKey('buy-checkout-primary-payment')),
+            );
+            await tester.pumpAndSettle();
+            expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+            expectCompleteFooter('Place order');
+            await _captureR66Checkout(tester, amount, width, scale, 'confirm');
+            expect(await session.submitOrder(), isFalse);
+            await tester.pumpAndSettle();
+            expect(
+              session.checkoutSubmissionState,
+              BuyV2CheckoutSubmissionState.paymentActionRequired,
+            );
+            expectCompleteFooter('Pay ${buyV2Money(amount)}');
+            await _captureR66Checkout(tester, amount, width, scale, 'action');
+            expect(session.confirmedOrders, isEmpty);
+            expect(session.quantityFor('w-notebook'), 1);
+          },
+        );
+      }
+    }
+  }
+
+  testWidgets(
+    'R66 checkout hides footer for IME without losing stage or Back',
+    (tester) async {
+      const size = Size(320, 568);
+      await tester.binding.setSurfaceSize(size);
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(session.dispose);
+      addTearDown(core.dispose);
+      expect(session.addProduct('w-notebook'), isTrue);
+      session.openCart(scope: BuyV2CartScope.wholesale);
+      expect(session.openCheckout(), isTrue);
+      expect(session.choosePayment('PhonePe'), isTrue);
+      for (final step in [
+        BuyV2CheckoutStep.address,
+        BuyV2CheckoutStep.payment,
+      ]) {
+        if (step == BuyV2CheckoutStep.payment) {
+          expect(session.continueCheckoutFromAddress(), isTrue);
+        }
+        for (final keyboard in [true, false]) {
+          await tester.pumpWidget(
+            app(
+              session,
+              size: size,
+              textScale: 2,
+              safeArea: const EdgeInsets.only(top: 24, bottom: 24),
+              viewInsets: EdgeInsets.only(bottom: keyboard ? 260 : 0),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const ValueKey('buy-checkout-action-bar')),
+            keyboard ? findsNothing : findsOneWidget,
+          );
+          expect(session.checkoutStep, step);
+          expect(session.cartScope, BuyV2CartScope.wholesale);
+          expect(session.selectedPayment, 'PhonePe');
+          expect(session.quantityFor('w-notebook'), 1);
+          expect(tester.takeException(), isNull);
+        }
+      }
+      await tester.tap(find.byKey(const ValueKey('buy-checkout-back')));
+      await tester.pumpAndSettle();
+      expect(session.checkoutStep, BuyV2CheckoutStep.address);
+      await tester.tap(find.byKey(const ValueKey('buy-checkout-return-cart')));
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.cart);
+      expect(session.cartScope, BuyV2CartScope.wholesale);
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  Future<BuyV2Session> mountPaymentAction(
+    WidgetTester tester,
+    String provider, {
+    BuyV2PaymentHandoff? handoff,
+  }) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final core = BuySession();
+    final session = BuyV2Session(core: core);
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(session.addProduct('w-notebook'), isTrue);
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    await tester.pumpWidget(app(session, paymentHandoff: handoff));
+    await tester.pumpAndSettle();
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment(provider), isTrue);
+    advanceCheckoutToConfirm(session);
+    expect(await session.submitOrder(), isFalse);
+    await tester.pumpAndSettle();
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentActionRequired,
+    );
+    return session;
+  }
+
+  for (final provider in ['PhonePe', 'Paytm', 'Pine Labs']) {
+    testWidgets('R66 missing $provider handoff cannot simulate payment', (
+      tester,
+    ) async {
+      final session = await mountPaymentAction(tester, provider);
+      final reference = session.paymentReference;
+      final attempt = session.checkoutIdempotencyKey;
+      expect(find.text('Payment unavailable right now'), findsOneWidget);
+      expect(find.text('Ready for secure payment'), findsNothing);
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-payment-handoff-completed')),
+        findsNothing,
+      );
+      expect(find.text('Payment completed'), findsNothing);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.paymentActionRequired,
+      );
+      expect(session.paymentReference, reference);
+      expect(session.checkoutIdempotencyKey, attempt);
+      expect(session.confirmedOrders, isEmpty);
+      expect(session.quantityFor('w-notebook'), 1);
+      final cancel = find.byKey(const ValueKey('buy-checkout-cancel-payment'));
+      await tester.ensureVisible(cancel);
+      await tester.tap(cancel);
+      await tester.pumpAndSettle();
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.cancelled,
+      );
+      await tester.tap(
+        find.byKey(const ValueKey('buy-checkout-primary-payment')),
+      );
+      await tester.pumpAndSettle();
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.idle,
+      );
+      expect(session.quantityFor('w-notebook'), 1);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('R66 injected handoff launches once and remains unconfirmed', (
+    tester,
+  ) async {
+    final opened = <Uri>[];
+    final session = await mountPaymentAction(
+      tester,
+      'PhonePe',
+      handoff: (uri) async {
+        opened.add(uri);
+        return true;
+      },
+    );
+    expect(find.text('Ready for secure payment'), findsOneWidget);
+    final expectedUri = session.paymentActionUri;
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-payment')),
+    );
+    await tester.pumpAndSettle();
+    expect(opened, [expectedUri]);
+    expect(
+      session.checkoutSubmissionState,
+      BuyV2CheckoutSubmissionState.paymentPending,
+    );
+    expect(session.confirmedOrders, isEmpty);
+    expect(
+      find.byKey(const ValueKey('buy-payment-handoff-completed')),
+      findsNothing,
+    );
+    expect(session.quantityFor('w-notebook'), 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('R66 confirmed purchase opens only its own retained deliveries', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final store = _R66OrderCustomerStore();
+    final earlierCore = BuySession();
+    final earlier = BuyV2Session(core: earlierCore, customerStateStore: store);
+    expect(earlier.addProduct('w-notebook'), isTrue);
+    earlier.openCart(scope: BuyV2CartScope.wholesale);
+    expect(earlier.openCheckout(), isTrue);
+    expect(earlier.choosePayment('Purchase order'), isTrue);
+    earlier.purchaseOrderReference = 'R66-LOCAL-PO';
+    advanceCheckoutToConfirm(earlier);
+    expect(await earlier.submitOrder(), isTrue);
+    final previousPurchase = earlier.confirmedPurchaseId!;
+    final previousOrder = earlier.confirmedOrders.single;
+    await tester.pump();
+    earlier.dispose();
+    earlierCore.dispose();
+
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      customerStateStore: store,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    await session.restoreCustomerState();
+    final retail = session.product('s-tomato');
+    final anotherStore = BuyV2Catalogue.products.firstWhere(
+      (product) =>
+          product.destination == BuyV2Destination.shop &&
+          product.seller != retail.seller &&
+          !product.requiresPrescription,
+    );
+    expect(session.addProduct(retail.id), isTrue);
+    expect(session.addProduct(anotherStore.id), isTrue);
+    session.openCart(scope: BuyV2CartScope.shop);
+    expect(session.openCheckout(), isTrue);
+    expect(session.choosePayment('Cash on Delivery'), isTrue);
+    advanceCheckoutToConfirm(session);
+    final total = session.checkoutPayableTotal;
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-checkout-primary-confirm')),
+    );
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.confirmation);
+    expect(session.confirmedOrders, hasLength(2));
+    final purchase = session.confirmedPurchaseId!;
+    expect(purchase, isNot(previousPurchase));
+    final details = find.byKey(
+      const ValueKey('buy-confirmation-order-details'),
+    );
+    await tester.scrollUntilVisible(
+      details,
+      250,
+      scrollable: find
+          .descendant(
+            of: find.byType(BuyV2ConfirmationView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(details);
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.orders);
+    expect(session.view, BuyV2View.catalogue);
+    final group = find.byKey(ValueKey('buy-purchase-group-$purchase'));
+    expect(group, findsOneWidget);
+    expect(
+      find.descendant(
+        of: group,
+        matching: find.text('2 deliveries · ${buyV2Money(total)}'),
+      ),
+      findsOneWidget,
+    );
+    final oldGroup = find.byKey(
+      ValueKey('buy-purchase-group-$previousPurchase'),
+    );
+    expect(
+      find.descendant(
+        of: oldGroup,
+        matching: find.text('1 delivery · ${buyV2Money(previousOrder.total)}'),
+      ),
+      findsOneWidget,
+    );
+    final delivery = session.confirmedOrders.first;
+    final track = find.byKey(ValueKey('buy-order-primary-${delivery.id}'));
+    await tester.scrollUntilVisible(
+      track,
+      200,
+      scrollable: find
+          .descendant(
+            of: find.byType(BuyV2OrdersView),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
+    await tester.tap(track);
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.tracking);
+    expect(session.selectedOrderId, delivery.id);
+    expect(session.selectedOrderOrNull!.purchaseId, purchase);
+    expect(session.selectedOrderOrNull!.total, delivery.total);
+    expect(session.selectedOrderOrNull!.partner, delivery.partner);
+    expect(tester.takeException(), isNull);
+  });
 
   testWidgets('visible Checkout return restores every exact Cart scope', (
     tester,
@@ -517,14 +1396,15 @@ void main() {
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    expect(find.text('Add GST details'), findsOneWidget);
+    expect(find.text('Shop · Add GST details'), findsOneWidget);
     expect(find.textContaining('Personal'), findsNothing);
     expect(find.textContaining('Business purchase'), findsNothing);
     expect(find.text('Place order'), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('buy-gst-request-shop')));
     await tester.pumpAndSettle();
-    expect(find.text('Add GST details'), findsWidgets);
+    expect(find.text('Shop · Add GST details'), findsOneWidget);
+    expect(find.text('Add GST details'), findsOneWidget);
     expect(find.byKey(const ValueKey('buy-gst-add-shop')), findsOneWidget);
 
     await tester.tap(find.byKey(const ValueKey('buy-gst-add-shop')));
@@ -545,7 +1425,7 @@ void main() {
     await tester.tap(find.byKey(const ValueKey('buy-gst-save')));
     await tester.pumpAndSettle();
 
-    expect(find.text('GST added'), findsOneWidget);
+    expect(find.text('Shop · GST added'), findsOneWidget);
     expect(find.text('Shree Balaji Retail'), findsWidgets);
     expect(find.textContaining('08ABCDE1234F1Z5'), findsOneWidget);
     expect(find.text('Place order'), findsOneWidget);
@@ -565,6 +1445,7 @@ void main() {
       final session = BuyV2Session(
         core: BuySession(),
         commercialPaymentTermsAdapter: adapter,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
       );
       addTearDown(session.dispose);
       final shop = productFor(BuyV2Destination.shop);
@@ -668,6 +1549,7 @@ void main() {
       core: BuySession(),
       checkoutQuoteAdapter: quoteAdapter,
       commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
     );
     addTearDown(session.dispose);
     expect(session.addProduct(productFor(BuyV2Destination.shop).id), isTrue);
@@ -811,6 +1693,63 @@ void main() {
     },
   );
 
+  testWidgets('R66 missing balance handoff preserves the unpaid balance', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(390, 844));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    final balanceAdapter = _BalancePaymentAdapter();
+    final core = BuySession();
+    final session = BuyV2Session(
+      core: core,
+      commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
+      balancePaymentAdapter: balanceAdapter,
+      productFactsAdapter: _DeliveryPromiseFactsAdapter(),
+    );
+    addTearDown(session.dispose);
+    addTearDown(core.dispose);
+    expect(
+      session.addProduct(productFor(BuyV2Destination.wholesale).id),
+      isTrue,
+    );
+    session.openCart(scope: BuyV2CartScope.wholesale);
+    expect(session.openCheckout(), isTrue);
+    await session.refreshCommercialPaymentTerms();
+    final group = session.checkoutFulfilmentGroups.single;
+    final booking = session
+        .commercialPaymentTermsFor(group.key)
+        .firstWhere(
+          (term) =>
+              term.kind ==
+              BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+        );
+    expect(session.chooseCommercialPaymentTerm(booking), isTrue);
+    expect(await _submitAndCompleteReviewPayment(session), isTrue);
+    final order = session.confirmedOrders.single;
+    balanceAdapter.amountDue = order.balanceDue;
+    expect(session.openTracking(order.id), isTrue);
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey('buy-tracking-balance-pay-balance')),
+    );
+    await tester.pumpAndSettle();
+    expect(balanceAdapter.startCalls, 1);
+    expect(find.text('Balance payment unavailable'), findsOneWidget);
+    expect(find.text('Ready for payment'), findsNothing);
+    expect(
+      find.byKey(const ValueKey('buy-tracking-balance-continue-payment')),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey('buy-payment-handoff-completed')),
+      findsNothing,
+    );
+    expect(balanceAdapter.reconcileCalls, 0);
+    expect(order.balanceDue, greaterThan(0));
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets(
     'later balance pays once and reconciles without duplicate payment',
     (tester) async {
@@ -821,6 +1760,7 @@ void main() {
         core: BuySession(),
         commercialPaymentTermsAdapter: _PaymentTermsAdapter(),
         balancePaymentAdapter: balanceAdapter,
+        productFactsAdapter: _DeliveryPromiseFactsAdapter(),
       );
       addTearDown(session.dispose);
       final product = productFor(BuyV2Destination.wholesale);
@@ -1460,7 +2400,7 @@ void main() {
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
-            'candidate_captures/'
+            'candidate_captures/r669-founder-review-20260912/'
             'buy-v2-r58-8-6-c24f-checkout-cart-return-${viewport.label}.png',
           ),
         );

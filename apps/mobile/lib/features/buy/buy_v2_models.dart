@@ -33,6 +33,175 @@ enum BuyV2CheckoutStep { address, payment, confirm }
 
 enum BuyV2CartScope { all, shop, wholesale, medicine }
 
+enum BuyV2ProcurementPurpose { restock, groupBulkBuying, buyDirect }
+
+enum BuyV2SupplierWorkspaceRole {
+  unknown,
+  consumer,
+  retailer,
+  wholesaler,
+  mandi,
+  manufacturer,
+}
+
+enum BuyV2SupplierListingChannel { unknown, consumer, wholesale, bulk }
+
+/// Store-owned entry identity, not a public URL or a grant of purchase access.
+/// The originating Store wrapper owns restoration of [originOperationId].
+class BuyV2ProcurementContext {
+  const BuyV2ProcurementContext({
+    required this.accountId,
+    required this.storeId,
+    required this.purpose,
+    required this.originOperationId,
+  });
+
+  final String accountId;
+  final String storeId;
+  final BuyV2ProcurementPurpose purpose;
+  final String originOperationId;
+
+  bool get hasIdentity => [
+    accountId,
+    storeId,
+    originOperationId,
+  ].every((value) => value.isNotEmpty && value.trim() == value);
+
+  /// Reuses the existing customer-state owner scope without mixing carts.
+  /// A wrapper must still verify the current account and approved Store.
+  String get customerStateOwnerScope =>
+      'buy-procurement:${Uri.encodeComponent(accountId)}:'
+      '${Uri.encodeComponent(storeId)}:${purpose.name}:'
+      '${Uri.encodeComponent(originOperationId)}';
+}
+
+/// Provider-supplied approval for the purchasing account's exact Store.
+class BuyV2ProcurementBuyerGrant {
+  const BuyV2ProcurementBuyerGrant({
+    required this.accountId,
+    required this.storeId,
+    required this.approved,
+    required this.validUntil,
+  });
+
+  final String accountId;
+  final String storeId;
+  final bool approved;
+  final DateTime validUntil;
+}
+
+/// Supplier workspace authority for one published offer. Display seller names,
+/// category labels and group participants cannot supply this authority.
+/// Stock, pack/MOQ, serviceability and charges still require the existing
+/// product/quote checks; an eligible role alone never makes checkout ready.
+class BuyV2ProcurementSupplierGrant {
+  const BuyV2ProcurementSupplierGrant({
+    required this.workspaceId,
+    required this.storeId,
+    required this.role,
+    required this.approved,
+    required this.listingId,
+    required this.productCanonicalId,
+    required this.offerId,
+    required this.offerRevision,
+    required this.channel,
+    required this.published,
+    required this.validUntil,
+  });
+
+  final String workspaceId;
+  final String storeId;
+  final BuyV2SupplierWorkspaceRole role;
+  final bool approved;
+  final String listingId;
+  final String productCanonicalId;
+  final String offerId;
+  final String offerRevision;
+  final BuyV2SupplierListingChannel channel;
+  final bool published;
+  final DateTime validUntil;
+}
+
+enum BuyV2ProcurementEligibility {
+  notRequested,
+  eligible,
+  contextUnavailable,
+  buyerUnavailable,
+  supplierUnavailable,
+  roleNotPermitted,
+  listingNotPermitted,
+  offerChanged,
+}
+
+/// Shared mandatory eligibility decision. It does not apply customer filters,
+/// mutate a cart, admit payment, or authorize historical order visibility.
+BuyV2ProcurementEligibility buyV2ProcurementEligibility({
+  required BuyV2ProcurementContext? context,
+  required String? activeAccountId,
+  required String? activeStoreId,
+  required BuyV2ProcurementBuyerGrant? buyer,
+  required BuyV2ProcurementSupplierGrant? supplier,
+  required BuyV2Product product,
+  required DateTime now,
+  String? expectedOfferId,
+  String? expectedOfferRevision,
+}) {
+  if (context == null) return BuyV2ProcurementEligibility.notRequested;
+  if (!context.hasIdentity ||
+      activeAccountId != context.accountId ||
+      activeStoreId != context.storeId) {
+    return BuyV2ProcurementEligibility.contextUnavailable;
+  }
+  if (buyer == null ||
+      !buyer.approved ||
+      buyer.accountId != context.accountId ||
+      buyer.storeId != context.storeId ||
+      !now.isBefore(buyer.validUntil)) {
+    return BuyV2ProcurementEligibility.buyerUnavailable;
+  }
+  if (supplier == null ||
+      !supplier.approved ||
+      !now.isBefore(supplier.validUntil) ||
+      [
+        supplier.workspaceId,
+        supplier.storeId,
+        supplier.listingId,
+        supplier.productCanonicalId,
+        supplier.offerId,
+        supplier.offerRevision,
+      ].any((value) => value.isEmpty || value.trim() != value)) {
+    return BuyV2ProcurementEligibility.supplierUnavailable;
+  }
+  final rolePermitted = switch (context.purpose) {
+    BuyV2ProcurementPurpose.buyDirect =>
+      supplier.role == BuyV2SupplierWorkspaceRole.manufacturer,
+    BuyV2ProcurementPurpose.restock ||
+    BuyV2ProcurementPurpose.groupBulkBuying => const {
+      BuyV2SupplierWorkspaceRole.wholesaler,
+      BuyV2SupplierWorkspaceRole.mandi,
+      BuyV2SupplierWorkspaceRole.manufacturer,
+    }.contains(supplier.role),
+  };
+  if (!rolePermitted) return BuyV2ProcurementEligibility.roleNotPermitted;
+  if (!supplier.published ||
+      product.destination != BuyV2Destination.wholesale ||
+      !const {
+        BuyV2SupplierListingChannel.wholesale,
+        BuyV2SupplierListingChannel.bulk,
+      }.contains(supplier.channel)) {
+    return BuyV2ProcurementEligibility.listingNotPermitted;
+  }
+  if (supplier.storeId != product.storeId ||
+      supplier.listingId != product.id ||
+      supplier.productCanonicalId != product.canonicalId ||
+      (expectedOfferId != null && expectedOfferId != supplier.offerId) ||
+      (expectedOfferRevision != null &&
+          expectedOfferRevision != supplier.offerRevision)) {
+    return BuyV2ProcurementEligibility.offerChanged;
+  }
+  return BuyV2ProcurementEligibility.eligible;
+}
+
 enum BuyV2ProductSort {
   relevance,
   priceLowToHigh,
@@ -133,6 +302,92 @@ class BuyV2ProductCompliance {
   final String? consumerCare;
 }
 
+enum BuyV2ProductContentMediaKind {
+  cataloguePackshot,
+  asset,
+  network,
+  networkVideo,
+}
+
+/// Provider-inspected file facts. Client validation cannot verify file bytes.
+class BuyV2MediaFileMetadata {
+  const BuyV2MediaFileMetadata({
+    required this.mimeType,
+    required this.byteLength,
+    required this.width,
+    required this.height,
+    this.normalized = false,
+    this.frameCount,
+    this.duration,
+    this.frameRate,
+    this.videoCodec,
+    this.videoProfile,
+    this.audioCodec,
+  });
+
+  final String mimeType;
+  final int byteLength;
+  final int width;
+  final int height;
+  final bool normalized;
+  final int? frameCount;
+  final Duration? duration;
+  final double? frameRate;
+  final String? videoCodec;
+  final String? videoProfile;
+  final String? audioCodec;
+}
+
+/// Explicit publication identity, never inferred from a product title/category.
+class BuyV2ProductMediaBinding {
+  const BuyV2ProductMediaBinding({
+    required this.supplierWorkspaceId,
+    required this.storeId,
+    required this.productId,
+    required this.skuId,
+    required this.assetRevision,
+    required this.file,
+    this.posterFile,
+  });
+
+  final String supplierWorkspaceId;
+  final String storeId;
+  final String productId;
+  final String skuId;
+  final String assetRevision;
+  final BuyV2MediaFileMetadata file;
+  final BuyV2MediaFileMetadata? posterFile;
+}
+
+class BuyV2ProductMediaAsset {
+  const BuyV2ProductMediaAsset({
+    required this.id,
+    required this.label,
+    required this.semanticLabel,
+    required this.kind,
+    this.source,
+    this.posterSource,
+    this.transcript,
+    this.binding,
+  }) : assert(
+         kind == BuyV2ProductContentMediaKind.cataloguePackshot ||
+             (source != null && source != ''),
+       ),
+       assert(
+         kind != BuyV2ProductContentMediaKind.networkVideo ||
+             (transcript != null && transcript != ''),
+       );
+
+  final String id;
+  final String label;
+  final String semanticLabel;
+  final BuyV2ProductContentMediaKind kind;
+  final String? source;
+  final String? posterSource;
+  final String? transcript;
+  final BuyV2ProductMediaBinding? binding;
+}
+
 class BuyV2Product {
   const BuyV2Product({
     required this.id,
@@ -153,6 +408,10 @@ class BuyV2Product {
     required this.confirmedOn,
     required this.visualLabel,
     required this.visualKind,
+    this.merchandisingLabel = '',
+    this.procurementSupplierGrant,
+    this.mediaAssets = const [],
+    this.storeId,
     this.mrp,
     this.requiresPrescription = false,
     this.composition,
@@ -168,9 +427,19 @@ class BuyV2Product {
 
   final String id;
   final String canonicalId;
+
+  /// Stable branch identity from the catalogue source; never a seller label.
+  final String? storeId;
   final BuyV2Destination destination;
   final String categoryId;
   final String brand;
+
+  /// A catalogue grouping is not a brand or manufacturer identity.
+  final String merchandisingLabel;
+  final BuyV2ProcurementSupplierGrant? procurementSupplierGrant;
+  final List<BuyV2ProductMediaAsset> mediaAssets;
+  String get brandLabel =>
+      brand.trim().isEmpty ? 'Brand not provided' : brand.trim();
   final String title;
   final String variant;
   final String pack;
@@ -199,6 +468,13 @@ class BuyV2Product {
   BuyV2Product copyWith({
     String? id,
     String? canonicalId,
+    String? storeId,
+    String? brand,
+    String? merchandisingLabel,
+    BuyV2ProcurementSupplierGrant? procurementSupplierGrant,
+    List<BuyV2ProductMediaAsset>? mediaAssets,
+    String? title,
+    String? origin,
     String? variant,
     String? pack,
     int? price,
@@ -215,10 +491,15 @@ class BuyV2Product {
   }) => BuyV2Product(
     id: id ?? this.id,
     canonicalId: canonicalId ?? this.canonicalId,
+    storeId: storeId ?? this.storeId,
     destination: destination,
     categoryId: categoryId,
-    brand: brand,
-    title: title,
+    brand: brand ?? this.brand,
+    merchandisingLabel: merchandisingLabel ?? this.merchandisingLabel,
+    procurementSupplierGrant:
+        procurementSupplierGrant ?? this.procurementSupplierGrant,
+    mediaAssets: mediaAssets ?? this.mediaAssets,
+    title: title ?? this.title,
     variant: variant ?? this.variant,
     pack: pack ?? this.pack,
     price: price ?? this.price,
@@ -227,7 +508,7 @@ class BuyV2Product {
     seller: seller ?? this.seller,
     sellerType: sellerType ?? this.sellerType,
     deliveryPromise: deliveryPromise ?? this.deliveryPromise,
-    origin: origin,
+    origin: origin ?? this.origin,
     confirmedOn: confirmedOn ?? this.confirmedOn,
     visualLabel: visualLabel,
     visualKind: visualKind,
@@ -245,6 +526,19 @@ class BuyV2Product {
   );
 
   String get partnerRole => buyV2PartnerRoleFor(destination, sellerType);
+
+  /// Legacy catalogues without branch IDs retain their existing grouping.
+  /// Once either listing has an ID, display names cannot match a branch.
+  bool isFromSameStoreAs(BuyV2Product other) {
+    final identity = storeId;
+    if (identity != null || other.storeId != null) {
+      return identity != null &&
+          identity.isNotEmpty &&
+          identity.trim() == identity &&
+          identity == other.storeId;
+    }
+    return seller == other.seller;
+  }
 
   String? get regulatoryTrustFact =>
       destination == BuyV2Destination.medicine ? 'Licensed pharmacy' : null;
@@ -316,6 +610,16 @@ class BuyV2FulfilmentGroup {
   final String? dispatchPromise;
   final String? deliveryProviderName;
   final String? deliveryServiceLevel;
+
+  /// A pre-checkout placeholder is not a delivery estimate at final review.
+  bool get hasPlaceholderDeliveryPromise {
+    final value = promise.trim().toLowerCase();
+    return value.isEmpty || value == 'delivery time confirmed at checkout';
+  }
+
+  bool get hasDeliveryEstimate =>
+      !hasPlaceholderDeliveryPromise ||
+      (promisedByLabel?.trim().isNotEmpty ?? false);
 
   int get itemCount => lines.fold(0, (total, line) => total + line.quantity);
 
@@ -435,6 +739,18 @@ class BuyV2TaxInvoiceDetails {
   int get totalTax => lines.fold(0, (total, line) => total + line.totalTax);
 }
 
+/// A customer-collection reference supplied by the authenticated commerce
+/// adapter. It is routing context, never evidence of payment or collection.
+class BuyV2CollectionOrderReference {
+  const BuyV2CollectionOrderReference({
+    required this.storeId,
+    required this.purchaserAccountId,
+  });
+
+  final String storeId;
+  final String purchaserAccountId;
+}
+
 class BuyV2Order {
   const BuyV2Order({
     required this.id,
@@ -448,6 +764,8 @@ class BuyV2Order {
     required this.destinationLabel,
     required this.progress,
     required this.status,
+    this.totalMinor,
+    this.collection,
     this.purchaseId,
     this.promisedByLabel,
     this.updatedDeliveryEstimate,
@@ -488,13 +806,18 @@ class BuyV2Order {
   final BuyV2Destination destination;
   final String title;
   final String itemSummary;
+
+  /// Legacy whole-rupee compatibility value. Collection amounts are exact in
+  /// totalMinor and validated against the authenticated collection snapshot.
   final int total;
+  final int? totalMinor;
   final String partner;
   final String partnerType;
   final String promise;
   final String destinationLabel;
   final double progress;
   final BuyV2OrderStatus status;
+  final BuyV2CollectionOrderReference? collection;
   final String? purchaseId;
   final String? promisedByLabel;
   final String? updatedDeliveryEstimate;
@@ -535,7 +858,7 @@ class _BuyV2CommerceSeed {
   const _BuyV2CommerceSeed({
     required this.id,
     required this.title,
-    required this.brand,
+    required this.merchandisingLabel,
     required this.shopCategory,
     required this.wholesaleCategory,
     required this.variant,
@@ -568,7 +891,7 @@ class _BuyV2CommerceSeed {
     return _BuyV2CommerceSeed(
       id: values[0],
       title: values[1],
-      brand: values[2],
+      merchandisingLabel: values[2],
       shopCategory: values[3],
       wholesaleCategory: values[4],
       variant: values[5],
@@ -593,7 +916,7 @@ class _BuyV2CommerceSeed {
 
   final String id;
   final String title;
-  final String brand;
+  final String merchandisingLabel;
   final String shopCategory;
   final String wholesaleCategory;
   final String variant;
@@ -804,7 +1127,7 @@ abstract final class BuyV2Catalogue {
       pack: '500 ml pouch',
       price: 35,
       unitPrice: '₹70/L',
-      badge: 'Quick local choice',
+      badge: '500 ml pack',
     ),
     _commerceVariant(
       canonicalId: 'milk',
@@ -893,7 +1216,10 @@ abstract final class BuyV2Catalogue {
       canonicalId: seed.id,
       destination: destination,
       categoryId: wholesale ? seed.wholesaleCategory : seed.shopCategory,
-      brand: seed.brand.toUpperCase(),
+      // The review source's third column contains merchandising groups,
+      // not substantiated brand identities. Do not invent a brand for it.
+      brand: '',
+      merchandisingLabel: seed.merchandisingLabel,
       title: seed.title,
       variant: _catalogueVariant(seed),
       pack: wholesale ? seed.wholesalePack : seed.shopPack,
@@ -928,18 +1254,29 @@ abstract final class BuyV2Catalogue {
       caseSensitive: false,
     ).firstMatch(value);
     if (minutes != null) {
-      return 'Delivered in ${minutes.group(1)} min';
+      return 'Delivery in ${minutes.group(1)} min';
     }
     if (RegExp(
       r'^(today|tomorrow)\s+by\s+',
       caseSensitive: false,
     ).hasMatch(value)) {
-      return 'Delivered ${value.toLowerCase()}';
+      // Seed rows have no observation date or order cutoff. A wall-clock label
+      // cannot be reused as today's promise, including after midnight.
+      return 'Delivery time confirmed at checkout';
     }
     return value;
   }
 
-  static String _wholesalePromise(String source) => source.trim();
+  static String _wholesalePromise(String source) {
+    final value = source.trim();
+    if (RegExp(
+      r'^(today|tomorrow)\s+by\s+',
+      caseSensitive: false,
+    ).hasMatch(value)) {
+      return 'Delivery time confirmed at checkout';
+    }
+    return value;
+  }
 
   static String _returnPolicy(
     _BuyV2CommerceSeed seed, {

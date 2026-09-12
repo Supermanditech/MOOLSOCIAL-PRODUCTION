@@ -28,17 +28,22 @@ void main() {
       session.openCart(scope: BuyV2CartScope.shop);
       session.openCheckout();
       session.checkoutSubmissionState = BuyV2CheckoutSubmissionState.failed;
+      session.checkoutStep = BuyV2CheckoutStep.payment;
       session.notifyListeners();
       await tester.pumpAndSettle();
 
       expect(session.view, BuyV2View.checkout);
-      await tester.tap(
-        find.byKey(const ValueKey('buy-checkout-submission-help')),
-      );
+      await tester.tap(find.byKey(const Key('mool-global-chat')));
       await tester.pumpAndSettle();
 
       expect(chatOpens, 1);
       expect(session.view, BuyV2View.checkout);
+      expect(
+        session.checkoutSubmissionState,
+        BuyV2CheckoutSubmissionState.failed,
+      );
+      expect(session.quantityFor('s-tomato'), 1);
+      expect(tester.takeException(), isNull);
       expect(find.byKey(const ValueKey('buy-assist-hero')), findsNothing);
     },
   );

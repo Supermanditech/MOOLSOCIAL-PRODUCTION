@@ -1,4 +1,6 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -15,6 +17,7 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
     this.surfaceTone = GlobalProfileSurfaceTone.light,
     this.openNotificationSettings,
     this.openPrivacyPolicy,
+    this.openAccessibilitySettings,
     super.key,
   });
 
@@ -22,6 +25,7 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
   final GlobalProfileSurfaceTone surfaceTone;
   final Future<bool> Function()? openNotificationSettings;
   final Future<bool> Function()? openPrivacyPolicy;
+  final Future<bool> Function()? openAccessibilitySettings;
 
   @override
   Widget build(BuildContext context) {
@@ -112,6 +116,10 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
                             'Not set',
                         palette: palette,
                         onTap: () => _showArea(context, palette),
+                      ),
+                      _AccessibilityPreference(
+                        palette: palette,
+                        openSettings: openAccessibilitySettings,
                       ),
                     ],
                   ),
@@ -311,6 +319,86 @@ class GlobalPrivacyPreferencesV2 extends StatelessWidget {
     } on Object {
       return false;
     }
+  }
+}
+
+class _AccessibilityPreference extends StatefulWidget {
+  const _AccessibilityPreference({required this.palette, this.openSettings});
+
+  final GlobalProfileSurfacePalette palette;
+  final Future<bool> Function()? openSettings;
+
+  @override
+  State<_AccessibilityPreference> createState() =>
+      _AccessibilityPreferenceState();
+}
+
+class _AccessibilityPreferenceState extends State<_AccessibilityPreference> {
+  static const _channel = MethodChannel('com.moolsocial.app/accessibility');
+  bool _opening = false;
+  String? _message;
+
+  Future<void> _openSettings() async {
+    if (_opening) return;
+    final override = widget.openSettings;
+    if (override == null &&
+        (kIsWeb || defaultTargetPlatform != TargetPlatform.android)) {
+      setState(() {
+        _message = 'Open Accessibility in your device settings.';
+      });
+      return;
+    }
+    setState(() {
+      _opening = true;
+      _message = null;
+    });
+    var opened = false;
+    try {
+      opened =
+          await (override != null
+                  ? override()
+                  : _channel
+                        .invokeMethod<bool>('openSettings')
+                        .then((value) => value == true))
+              .timeout(const Duration(seconds: 5));
+    } on Object {
+      opened = false;
+    }
+    if (!mounted) return;
+    setState(() {
+      _opening = false;
+      _message = opened
+          ? null
+          : 'Device settings could not be opened. Tap Accessibility to try again.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scaledText = MediaQuery.textScalerOf(context).scale(14);
+    final textSize = scaledText > 14.5
+        ? 'Larger text'
+        : scaledText < 13.5
+        ? 'Smaller text'
+        : 'Standard text';
+    final motion = MediaQuery.disableAnimationsOf(context)
+        ? 'Reduced motion'
+        : 'Standard motion';
+    return Semantics(
+      key: const Key('global-preferences-accessibility-status'),
+      liveRegion: _message != null,
+      child: _PreferenceTile(
+        keyName: 'global-preferences-accessibility',
+        icon: Icons.accessibility_new_rounded,
+        title: 'Accessibility',
+        value: _opening
+            ? 'Opening device settings…'
+            : _message ?? '$textSize · $motion\nFollows device settings',
+        palette: widget.palette,
+        enabled: !_opening,
+        onTap: _openSettings,
+      ),
+    );
   }
 }
 
@@ -572,6 +660,7 @@ class _PreferenceTile extends StatelessWidget {
     required this.value,
     required this.palette,
     required this.onTap,
+    this.enabled = true,
   });
 
   final String keyName;
@@ -580,10 +669,13 @@ class _PreferenceTile extends StatelessWidget {
   final String value;
   final GlobalProfileSurfacePalette palette;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) => ListTile(
     key: ValueKey(keyName),
+    enabled: enabled,
+    minTileHeight: 56,
     contentPadding: const EdgeInsets.symmetric(horizontal: MoolSpacing.sm),
     visualDensity: const VisualDensity(vertical: -1),
     leading: Container(
@@ -606,8 +698,6 @@ class _PreferenceTile extends StatelessWidget {
     ),
     subtitle: Text(
       value,
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
       style: TextStyle(
         color: palette.muted,
         fontSize: 9.5,
@@ -620,6 +710,6 @@ class _PreferenceTile extends StatelessWidget {
       color: palette.accent,
       size: 19,
     ),
-    onTap: onTap,
+    onTap: enabled ? onTap : null,
   );
 }
