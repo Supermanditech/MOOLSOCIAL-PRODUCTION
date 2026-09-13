@@ -574,3 +574,10 @@ Five narrow passes;no new defect.477 action rows;379 device passes;733 captures;
 Completed PD063 from exact query/page/source contracts and Pager429-688,plus Store binding and scroll retention. Records backend query/snapshot/cursor obligations,identifiers,optional total,cache bounds,missing/error behavior,query/refresh reset and publication/withdrawal limits. Source checks reject inconsistent pages but do not qualify live provider enforcement. Device725-733 remains narrow fixture navigation evidence. No device action,new defect or implementation in this round.
 
 63 public-data mappings;other counts unchanged. Complete user-journey denominator still unavailable:source/action inventory incomplete. Pending work must not be calculated by subtracting passes from action rows because records include repeated checks,observations and conditional descendants. Full audit remains open.
+
+
+## Round 87 - verified Store Previous and Refresh
+
+Implementation gate passed. First action used older coordinates before a fresh screen read;734 unexpectedly showed tomato product rather than prior Oil catalogue. Cause unknown;this is not a Previous pass or confirmed defect. Future continuation must capture current screen before a navigation tap. Used visible Back-to-Store735 then Browse736 to establish final Oil page. Previous737 displays161-200 of238. Refresh738 resets1-40 with Oil retained. No request,payment,cart or settings change. Original initial-state ambiguity retained,not overwritten.
+
+Two narrow passes;reconciled round85 Previous residuals.479 action rows;381 device passes;738 captures;740 evidence rows;63 mappings;17 distinct defects. Full audit remains incomplete.
