@@ -926,10 +926,10 @@ Source hashes bind the following index to the inspected files:
 | SRC-0323 | buy_v2_views.dart:6255 | _GstInvoiceCard | onPressed | Restore-failure Retry conditional; failure fixture and restore outcome unqualified |
 | SRC-0324 | buy_v2_views.dart:6283 | _confirmRemoveGstProfile | onPressed | Remove-profile Keep dialog action unqualified |
 | SRC-0325 | buy_v2_views.dart:6288 | _confirmRemoveGstProfile | onPressed | GST-ROUND79-03 isolated Remove; multi-profile/cross-destination handling unqualified |
-| SRC-0326 | buy_v2_views.dart:6463 | _BuyV2GstInvoiceSheetState | onSubmitted | Legal-name keyboard Next focus transfer unqualified |
-| SRC-0327 | buy_v2_views.dart:6488 | _BuyV2GstInvoiceSheetState | onSubmitted | GSTIN keyboard Next focus transfer unqualified |
-| SRC-0328 | buy_v2_views.dart:6514 | _BuyV2GstInvoiceSheetState | onSubmitted | Billing-address keyboard Done unfocus unqualified |
-| SRC-0329 | buy_v2_views.dart:6530 | _BuyV2GstInvoiceSheetState | onChanged | GST-ROUND79-01 save with temporary reuse on; toggle off/restore lifecycle unqualified |
+| SRC-0326 | buy_v2_views.dart:6463 | _BuyV2GstInvoiceSheetState | onSubmitted | GST-ROUND95-02 empty Legal-name keyboard Next focus transfer passed; populated/accessibility variants unqualified |
+| SRC-0327 | buy_v2_views.dart:6488 | _BuyV2GstInvoiceSheetState | onSubmitted | GST-ROUND95-03 empty GSTIN keyboard Next focus transfer passed; populated/accessibility variants unqualified |
+| SRC-0328 | buy_v2_views.dart:6514 | _BuyV2GstInvoiceSheetState | onSubmitted | GST-ROUND95-04 Billing keyboard Done unfocus passed; form retained without saving |
+| SRC-0329 | buy_v2_views.dart:6530 | _BuyV2GstInvoiceSheetState | onChanged | GST-ROUND79-01 temporary reuse on save; ROUND95-01 toggle off passed; save-off/restore lifecycle unqualified |
 | SRC-0330 | buy_v2_views.dart:6592 | _BuyV2GstInvoiceSheetState | onPressed | GST-003..005 invalid forms; GST-ROUND79-01 local save; full boundaries/busy/failure unqualified |
 | SRC-0331 | buy_v2_views.dart:6706 | _CheckoutQuoteCard | onPressed | unclassified |
 | SRC-0332 | buy_v2_views.dart:6857 | _CheckoutCommercialPaymentTerms | onPressed | unclassified |
@@ -1205,3 +1205,14 @@ Exact outstanding cart checks include nonempty Browse more products reconciliati
 Exact outstanding GST checks include saved-profile explicit selection and multiple profiles; edit/reuse; Keep cancellation; name/GSTIN/billing keyboard Next/Done; remember toggle off; validation boundary and whitespace/case behavior; restore Retry failure and busy controls; failed-save retention; account/destination/process-death isolation; enlarged text and screen reader. Existing successful local save does not qualify storage/privacy, issuer validity, invoice issuance or backend behavior. The form performs local format validation before controller.save; no production tax-authority validation is inferred.
 
 The GST switch inner callback is IgnorePointer decoration; its parent handles physical toggle and separate Semantics handles accessible activation. These are recorded as one business action with distinct unqualified accessibility coverage, not fabricated separate passes. Cart confirm captures the scope before the sheet and clears that scope after confirmation; no claim about concurrent changes without device evidence.
+
+
+## Round 95 - GST keyboard traversal and reuse toggle on Redmi
+
+Fresh768 showed default filters; Close769 returned to Scheduled Shop. Added isolated wheat item770 (one item/279), opened cart771, address772 (Work retained), payment773 (Paytm retained). Swipe774 remained on Payment; its filename gst-off is a naming error, not GST evidence. Review order775 reached summary without placing an order. GST on776, Add777.
+
+Turned temporary reuse off778. Legal name focus779 preceded keyboard settlement780. Keyboard Next781 focused GSTIN, Next782 focused Billing address, Done783 hid keyboard and retained form. Four narrow device passes: reuse toggle off and three keyboard transitions with empty fields. No values entered or saved. Populated/validation/accessibility variants and save-with-reuse-off remain unqualified.
+
+AndroidBack784 cancelled form, GST switched off785. Tapping Address progress indicator786 left summary unchanged (not claimed as navigation; Change action used next). Change787 opened original addresses with Work selected; Cart788 retained one279item; minus789 removed only the isolated item and returned to Scheduled Shop with original Saved1. Cart empty; no profile was created; no order/payment/message or provider submission.
+
+Twenty-two reviewed captures:789 physical captures;791 evidence rows;490 action rows including392 device passes. Seventeen distinct confirmed defects unchanged. Source326-329 reconciled to these exact narrow results. Full action inventory, remaining conditional coverage and public-field mapping remain incomplete.
