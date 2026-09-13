@@ -64,3 +64,8 @@ Source inventory round66 found Retry,slot selection,Confirm new time,and proof-d
 ## B-013 - Post-order balance payment provider states
 
 Source inventory round66 found Pay balance,Continue payment,Check payment,and Retry at views10373-10500. Public session wiring omits balancePaymentAdapter;session4297/4325 fails closed without it. Due/overdue/pending/unknown/offline/action-required states require safe authoritative fixtures and handoff;none qualified on Redmi. SOURCE-ROUND66-05..08 remain provider-blocked. Live payment is excluded. Source mapping PD-061 is not settlement/security qualification or a new confirmed defect.
+
+
+## B-014 - Wholesale unverified-business action state
+
+PRODUCT-ROUND163-02 covers two still-unqualified conditional entry controls: Open business profile (views902-906/2250) and Verify business (views2846-2853). Current Redmi1119-1120 exposes Add to Cart and no verification card. Review session initializes verified (session1993-2007);snapshot loading can replace verification values (4787-4791). Both controls route to /app/work/workspace/choose. Need an isolated pending/rejected/unavailable business state bound to the correct purchasing account/workspace to test both entries and return without changing the founder's account. No such state was exercised;no authentication or backend edits performed. These controls are conditional,not globally unreachable. Production authority/revocation and enum-versus-legacy-bool consistency remain separate qualification requirements in PD-071. This is a coverage gap,not a reproduced product defect;other audit work can continue.

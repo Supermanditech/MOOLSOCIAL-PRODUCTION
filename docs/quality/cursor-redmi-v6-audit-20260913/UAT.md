@@ -868,7 +868,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0265 | buy_v2_shop_chat.dart:4541 | _ShopChatInfoCard | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
 | SRC-0266 | buy_v2_views.dart:68 | _openOrderInvoice | onPressed | invoice unavailable dialog Back; exact failure-dialog target requires device evidence; successful invoice does not qualify |
 | SRC-0267 | buy_v2_views.dart:78 | _openOrderInvoice | onPressed | invoice unavailable Refresh orders; provider recovery unverified |
-| SRC-0268 | buy_v2_views.dart:593 | BuyV2ProductView | onPressed | device_pass STORE-001 and COLLECTION-ROUND18-01 Visit store; supplier counterpart separate |
+| SRC-0268 | buy_v2_views.dart:593 | BuyV2ProductView | onPressed | device_pass STORE-001/COLLECTION-ROUND18-01 Visit store; PRODUCT-ROUND163-01 exact Wholesale Visit supplier and X returns original product/scroll; provider identity authority separate |
 | SRC-0269 | buy_v2_views.dart:620 | BuyV2ProductView | onTap | device_pass PRODUCT-ROUND162-02 visible Shop return from Scheduled first-page notebook; other parents/compared-product B002 and Semantics unqualified |
 | SRC-0270 | buy_v2_views.dart:952 | BuyV2ProductView | onTap | Medicine-specific supplier decision row; outside public Shop/Wholesale |
 | SRC-0271 | buy_v2_views.dart:1440 | _ProductQuickActions | onPressed | device_pass PRODUCT-ROUND162-01 exact product Save/unsave; catalogue count/marker and reopen verified; original wheat retained; process death/account sync/accessibility unqualified |
@@ -883,11 +883,11 @@ Source hashes bind the following index to the inspected files:
 | SRC-0280 | buy_v2_views.dart:1956 | _ProductComparisonSheetState | onPressed | blocked_test_data B-002 More suppliers; pagination and identity retention unverified |
 | SRC-0281 | buy_v2_views.dart:2137 | _ProductVariantOption | onTap | variant Semantics select; screen-reader unverified |
 | SRC-0282 | buy_v2_views.dart:2153 | _ProductVariantOption | onTap | device_pass VARIANT-ROUND22-03 and ROUND58-01/02/03 milk variants; unavailable/stale variants unverified |
-| SRC-0283 | buy_v2_views.dart:2250 | _WholesaleVerificationCard | onPressed | conditional Open business profile; exact public Wholesale entry/return and auth boundary unverified |
+| SRC-0283 | buy_v2_views.dart:2250 | _WholesaleVerificationCard | onPressed | blocked_test_data B014 PRODUCT-ROUND163-02; card requires !businessVerified; current1119-1120 verified review state; exact workspace chooser entry/return unqualified |
 | SRC-0284 | buy_v2_views.dart:2489 | _WholesaleTradeDecisionPanelState | onPressed | Wholesale Check availability refresh facts/local signal; provider success and failure branches unverified |
 | SRC-0285 | buy_v2_views.dart:2502 | _WholesaleTradeDecisionPanelState | onPressed | Wholesale unavailable Change product exact control unverified; Back not equivalent |
 | SRC-0286 | buy_v2_views.dart:2751 | _WholesaleTradeSignalCard | onPressed | local insight Retry provider path unverified; no fixture claim of real local insight |
-| SRC-0287 | buy_v2_views.dart:2851 | _WholesaleTradeActionDock | onPressed | Verify business unverified-business dock; profile/auth route boundary not yet device-qualified |
+| SRC-0287 | buy_v2_views.dart:2851 | _WholesaleTradeActionDock | onPressed | blocked_test_data B014 PRODUCT-ROUND163-02; unverified dock routes workspace chooser; current verified Add dock does not qualify this action |
 | SRC-0288 | buy_v2_views.dart:2861 | _WholesaleTradeActionDock | onPressed | Wholesale dock Check availability; distinct from panel retry; provider branches unverified |
 | SRC-0289 | buy_v2_views.dart:3143 | _ProductOfferDecisionPanel | onPressed | consumer offer Check availability refresh; provider outcome unverified |
 | SRC-0290 | buy_v2_views.dart:3155 | _ProductOfferDecisionPanel | onPressed | consumer unavailable Change product exact target unverified |
@@ -1989,3 +1989,9 @@ These are 14 named product action groups reconciled from SRC0268-0308, not 14 co
 | PROD-P14 Report issue | SRC0298/0306-0308 | REPORT reasons/cancel recorded; busy/duplicate/rejection/accepted branches unqualified; actual submission excluded |
 
 SRC0276 quick-action Semantics is not a separate pointer journey and remains untested with screen reader. SRC0266-0267 invoice error actions belong order recovery; SRC0309-0310 missing address/order actions belong recovery. Next reconcile cart/checkout/orders/shared groups and physically inspect PROD-P08/P09 reachable branches. Do not rerun default save solely to inflate coverage. Full audit remains incomplete.
+
+
+## Round163 - Wholesale supplier return and verification-state boundary
+Gate terminal0; clean evidence state verified.1119 tomato1 Wholesale10kg/580 MOQ2 shows Add to Cart;1120 decision panel shows order details and no unverified-business card.1121 Visit supplier opens Mool Market000001 Manufacturer catalogue;1122 X returns same tomato product and scroll. AndroidBack then Shop1123 restores original Scheduled Saved1 emptycart. No cart/saved/address/business profile mutations. PRODUCT-ROUND163-01 passed; no new defect.
+Source views902/2846 requires !businessVerified for Open business profile/Verify business; both push /app/work/workspace/choose. Session1993-2007 review/nonreview initialization differs;4787-4791 snapshot combines verified enum OR legacy boolean. Source output had a non-ASCII display glyph; relevant source conditions were reread with ascii escaping before mapping. No encoding defect inferred. PRODUCT-ROUND163-02 and B014 explicitly retain untested pending/rejected/unavailable action/return cases. PD071 records purchasing-business authority, binding, revision, conflict and revocation requirements without claiming runtime qualification. Availability retry/provider-error controls remain separate PROD-P09 gaps.
+614 action/check records;501 passes;22 blocked_test_data rows;22 distinct defects;1123 physical captures;1125 evidence rows;71 public-data rows. Next cart/checkout/order semantic reconciliation and remaining reachable conditional cases; full audit incomplete.
