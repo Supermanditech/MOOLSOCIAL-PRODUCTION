@@ -1048,9 +1048,9 @@ Source hashes bind the following index to the inspected files:
 | SRC-0445 | buy_v2_views.dart:13922 | _BuyV2FilterOption | onTap | unverified accessibility semantics activation; pointer filters separately indexed SRC0426-0442 |
 | SRC-0446 | buy_v2_views.dart:13935 | _BuyV2FilterOption | onTap | pointer forwarder to filter choice; scoped filter evidence only; all option values not inferred |
 | SRC-0447 | buy_v2_views.dart:14062 | showBuyV2PaymentSheet | onPressed | device_pass SETTINGS-ROUND136-01 exact payment sheet X957-958 returns Shopping settings with Paytm unchanged |
-| SRC-0448 | buy_v2_views.dart:14094 | showBuyV2PaymentSheet | onTap | CHECKOUT-004 Paytm choice device pass capture087; other runtime payment choices unverified |
+| SRC-0448 | buy_v2_views.dart:14094 | showBuyV2PaymentSheet | onTap | device_pass SETTINGS-ROUND137-01 Paytm re-selection in exact settings sheet961-962; old087 proves Wholesale checkout only; switching other choices remains unverified |
 | SRC-0449 | buy_v2_views.dart:14139 | _BuyV2PaymentChoice | onTap | unverified accessibility semantics activation for payment choices |
-| SRC-0450 | buy_v2_views.dart:14153 | _BuyV2PaymentChoice | onTap | pointer forwarder to payment choice SRC0448; Paytm only directly qualified |
+| SRC-0450 | buy_v2_views.dart:14153 | _BuyV2PaymentChoice | onTap | pointer forwarder SRC0448; exact settings-sheet Paytm re-selection961-962; other choices and semantic activation unverified |
 | SRC-0451 | buy_v2_views.dart:14288 | showBuyV2PrescriptionSheet | onPressed | Medicine prescription boundary BOUNDARY-ROUND36-01; downstream prescription sheet outside public Shop audit |
 | SRC-0452 | buy_v2_views.dart:14345 | showBuyV2PrescriptionSheet | onTap | Medicine saved prescription approval outside scoped Shop; no approval performed |
 | SRC-0453 | buy_v2_views.dart:14355 | showBuyV2PrescriptionSheet | onTap | Medicine saved prescription approval outside scoped Shop; no approval performed |
@@ -1065,12 +1065,12 @@ Source hashes bind the following index to the inspected files:
 | SRC-0462 | buy_v2_views.dart:14657 | _BuyV2AddressChoice | onTap | pointer forwarder to address choice SRC0456; scoped Work restoration evidence |
 | SRC-0463 | buy_v2_views.dart:14764 | _BuyV2AddressChoice | onTap | unverified semantic menu activation; pointer Work menu ADDR-002 is distinct |
 | SRC-0464 | buy_v2_views.dart:14769 | _BuyV2AddressChoice | onSelected | ADDR-003 Work Edit; isolated edit/save ADDR-ROUND57-02 and deletion AUDIT-ROUND40-06/07; other original addresses preserved |
-| SRC-0465 | buy_v2_views.dart:15010 | _BuyV2AddressRequestFormState | onTap | pending exact request-address Share action; ADDR-005 sheet entry is not share completion; real recipient messaging excluded |
+| SRC-0465 | buy_v2_views.dart:15010 | _BuyV2AddressRequestFormState | onTap | device_pass ADDR-ROUND137-01 Share request opens Android chooser966 and Cancel967; fixture link only; recipient binding expiry actual receipt and sending not qualified |
 | SRC-0466 | buy_v2_views.dart:15017 | _BuyV2AddressRequestFormState | onTap | pending exact request-address Copy action; provider-issued recipient binding and expiry not qualified |
 | SRC-0467 | buy_v2_views.dart:15027 | _BuyV2AddressRequestFormState | onPressed | ADDR-006 manual entry capture120 and validation ADDR-007 through010; recipient prefill variations pending |
 | SRC-0468 | buy_v2_views.dart:15278 | _BuyV2AddAddressFormState | onSelected | Other place creation AUDIT-ROUND40-04 and ADDR-ROUND57-01; other kind chips not individually inferred |
 | SRC-0469 | buy_v2_views.dart:15346 | _BuyV2AddAddressFormState | onPressed | ADDR-007 through009 required-field validation; isolated create AUDIT-ROUND40-04 and edit ADDR-ROUND57-02; other validations pending |
-| SRC-0470 | buy_v2_views.dart:15393 | _AddressFormHeader | onPressed | ADDR-004 edit Close and ADDR-010 partial form Close; request-header Close variant pending |
+| SRC-0470 | buy_v2_views.dart:15393 | _AddressFormHeader | onPressed | ADDR-004 edit Close and ADDR-010 partial Close; request-header X now ADDR-ROUND137-02 capture968; keyboard/filled recipient variants separate |
 | SRC-0471 | buy_v2_views.dart:15426 | _ReturnAffordance | onTap | pointer return forwarder; each parent destination separately indexed; no blanket pass |
 | SRC-0472 | buy_v2_views.dart:15468 | _ReturnAffordance | onTap | unverified semantic return activation; pointer/Android Back not equivalent |
 | SRC-0473 | buy_v2_views.dart:15650 | _DecisionActionRow | onTap | unverified semantic decision-row activation; each parent decision separately indexed |
@@ -1771,3 +1771,14 @@ Five device pass records and one observation added.565 action/check rows,456 dev
 Caller readback establishes catalogue4434/4443 opens address/payment sheets from Shopping settings; checkout uses different full stages. Captures952-956 navigate Sort/filter -> Shopping tools -> Shopping settings;955 is transition only,956 settled. Payment preference957 -> exact X958 retains Paytm and Shopping settings. Delivery addresses959 -> exact X960 retains Work and settings. No preferences or customer records changed;device remains at Shopping settings960.
 
 SRC0341/0350 updated to round135 evidence;SRC0447/0455 now qualified against exact X controls rather than earlier Android Back or payment selection. Collection change controls, runtime/semantic choices, no-address recovery and other parent callers retain distinct qualification. No new defect. Current20 defects;two new device pass records. Full inventory remains incomplete.
+
+
+## Round137 - corrected payment evidence and request-share cancellation
+
+Re-inspected existing087-payment-switch PNG: it is Wholesale checkout, not showBuyV2PaymentSheet. Corrected SRC0448/0450 rather than treating that earlier source mapping as valid. Exact settings sheet961 -> Paytm re-selection962 returns settings and preserves Paytm. This is re-selection only, not a different-method switch or runtime payment execution.
+
+Delivery selector963 -> Request an address964 -> Share965 preparing -> Android chooser966 -> Cancel967 returns form with Share request ready. No recipient app chosen and no message sent. Request form X968 returns original Home/Work selector with Work retained. Source features/buy/buy_v2_session.dart380-386 review adapter supplies generic https://moolsocial.com/address/request fixture;production-unavailable adapter249 and workspace router198 return unavailable. No claim of secure recipient binding, expiry or recipient completion. Copy link remains unverified;clipboard not changed.
+
+One initial session-source lookup incorrectly used ui_v2/buy/buy_v2_session.dart and failed. Bounded search recovered actual features/buy/buy_v2_session.dart under standing read-recovery authority;no product edits or conclusions from missing file.
+
+Eight new captures;three scoped device passes;20 defects unchanged.570 action/check records,461 device passes,968 physical captures. Full audit remains open.
