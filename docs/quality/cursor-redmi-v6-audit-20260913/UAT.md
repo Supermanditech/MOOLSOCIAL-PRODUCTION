@@ -1713,3 +1713,14 @@ All271 supplemental rows now have a parent, conditional, framework or blocked di
 ## Round 131 - Delivery Minimize, rail reopen and Hide restoration
 
 Physical Redmi908-915. Explicit panel Minimize closes status but leaves collapse chevron without delivery icon/count in settled911 and repeat913;RV6-D019 registered. Rail reopen912/914 retains12 deliveries and MS-NEW-09. Hide915 restores initial compact bike9+, Scheduled Saved1 and emptycart. Sound and Keep remain OFF;no order mutation or provider call. Source Minimize screen1584/2766-2768 and expanded icon1381-1423 correlated;root cause unproven. SUPSRC0126 now physically checked with failure, not pending-only. Timer45seconds from source1350 is not itself a measured playback/lifetime pass. Two functional passes and one visual failure added;19 distinct defects;915 physical captures;917 evidence rows;550 action records;446 device passes. Full audit still incomplete.
+
+
+## Round132 - shared notification and privacy destinations
+
+Physical Redmi captures916-929 retained and hash-bound in EVIDENCE.csv. Chat inbox/menu/settings entry916-921 retained original four seeded threads, preview preferences and settings. Notifications922/923 shows device permission separately from message/call/invitation/preview preferences and quiet hours. Android Back924 retains settings position. Message requests926 empty state and Android Back927 pass; Blocked accounts928 empty state and header Back929 pass. No setting, conversation, relationship, order or payment changed. Current device remains at Chat settings privacy section929.
+
+Source chat_notification_settings_screen.dart lines29-60 binds load/save/device enable to session provider methods. No account-backed preference writes or permission changes were attempted. Populated requests/blocked accounts and notification persistence/delivery remain explicitly unqualified, with separate blocked rows. Empty-state passes do not qualify those descendants. Group invitations, audience selection/cancel and other remaining shared destinations remain pending.
+
+The previous oversized notification-source read returned no usable contents; recovered using only the first80 lines under standing bounded-read authorization. No conclusions rely on the truncated output.
+
+Register now has555 action/check rows,449 device passes and19 distinct defects;929 physical captures. These are not deduplicated complete journey counts. No new defect confirmed this round. Full action inventory and field-level reconciliation remain open; no implementation or new APK.
