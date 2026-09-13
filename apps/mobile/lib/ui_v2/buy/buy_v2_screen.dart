@@ -364,6 +364,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   String? _presentedQuickOrderId;
   final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
   int _storeProductRouteDepth = 0;
+  int _partnerCatalogueDepth = 0;
+  BuyV2View? _observedStoreSessionView;
+  int? _retainedStoreEmptyCartSequence;
   int _storeNavigationGeneration = 0;
   BuyV2Product? get _storeBrowseAnchor =>
       _storeBrowseAnchors.isEmpty ? null : _storeBrowseAnchors.values.last;
@@ -549,6 +552,21 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
 
   void _sessionChanged() {
     if (!mounted) return;
+    final previousStoreView = _observedStoreSessionView;
+    final session = widget.session;
+    _observedStoreSessionView = session.view;
+    if (_partnerCatalogueDepth > 0 &&
+        (previousStoreView == BuyV2View.cart ||
+            previousStoreView == BuyV2View.checkout) &&
+        session.view == BuyV2View.catalogue &&
+        session.cartLines.isEmpty &&
+        session.navigationMotionDirection ==
+            BuyV2NavigationMotionDirection.back) {
+      // Emptying the basket updates the covered Cart, not the customer's
+      // active Store catalogue. Retain only this navigation sequence;
+      // subsequent navigation and scope changes keep their existing handling.
+      _retainedStoreEmptyCartSequence = session.navigationMotionSequence;
+    }
     if (!widget.session.procurementScopeCurrent) {
       _resetArrivalSound();
       _noticeTimer?.cancel();
@@ -605,9 +623,14 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       if (!_quickTrackerKept) _quickTrackerMinimized = true;
     }
     if (_storeProductRouteDepth > 0 &&
-        widget.session.view == BuyV2View.catalogue) {
+        widget.session.view == BuyV2View.catalogue &&
+        _retainedStoreEmptyCartSequence != session.navigationMotionSequence) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && widget.session.view == BuyV2View.catalogue) {
+        if (mounted &&
+            identical(widget.session, session) &&
+            session.view == BuyV2View.catalogue &&
+            _retainedStoreEmptyCartSequence !=
+                session.navigationMotionSequence) {
           _dismissStoreProductRoutes();
         }
       });
@@ -2071,6 +2094,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (!brandOnly) {
       _rememberStoreBrowse(product);
     }
+    _partnerCatalogueDepth++;
+    _observedStoreSessionView = session.view;
     unawaited(
       showBuyV2PartnerCatalogue(
         context,
@@ -2092,6 +2117,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           },
         ),
       ).whenComplete(() {
+        _partnerCatalogueDepth--;
+        if (_partnerCatalogueDepth == 0) _retainedStoreEmptyCartSequence = null;
         if (originOffset == null) return;
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted ||

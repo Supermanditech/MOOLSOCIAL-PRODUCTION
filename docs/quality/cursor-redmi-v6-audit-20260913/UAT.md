@@ -2116,3 +2116,30 @@ Local visual evidence (PNG SHA256;not part of frozen physical514 passes):
 - C:\GUARANTEED OUTCOME\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\rv6-d001-local-20260914\area-true-text-2.0.png | 6435CE2BAFCCD0AFDB4A77CA3ACAAEB93C909F25669EA08D8CAB847225476548
 
 D001 locally implemented and qualified;ticket remains open pending successor-APK Redmi verification. No device action or APK build. D002-D022 implementation remains pending. Historical audit checkpoint and frozen evidence remain intact.
+
+
+## RV6-D002 local implementation checkpoint - 14 September 2026
+
+- Source base/admission: `cea1699a42bf182c9648719b8780b5ec9afd05ba`, following D001 implementation `d532b9dea97a52473a5a95e090a9831fd9635696`. Admission passed implementation, pre-commit and handoff gates; three unrelated-owner negative cases rejected; clean live remote equality verified before product edits. Only the Buy screen and existing partner-catalogue test were added to the lane.
+- Correction: retain the active Store catalogue for the exact navigation sequence caused by emptying the covered Cart/Checkout. Later navigation, explicit destination changes and existing procurement scope protection retain their handling. No session/cart business logic was changed.
+- Changed product/test owners: `apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart`; `apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart`. Existing D001 ownership/checkpoint and frozen audit evidence preserved.
+- Before correction: two UI-driven Shop/Wholesale tests reproduced dismissal of the entire Store after the sole cart line was removed; both failed the retained-Store assertion (test process exit 1). After correction, both passed.
+- Final focused coverage: eight cases across legacy and paginated Store catalogues, Shop/Wholesale, text 1.0/2.0 at 390x844. Actual Store/cart/continue/browse/remove taps; empty basket rail absent, Add restored, delayed feedback does not dismiss, re-add works, Back retains Store preview, explicit destination change exits, added quantity preserved. Four paginated cases additionally select and retain the product category across Cart return. Paginated source includes Fresh tomatoes in the first Store, matching the recorded operation type.
+- Connected regression: the complete partner-catalogue suite passed 72 checks before addition of the four paginated D002 cases. Those four then passed separately and again with captures; total distinct locally passed cases across these runs is 76, not a claim of a single 76-test invocation. Repeat/focused counts overlap and are not added as new coverage.
+- Final Flutter analysis of the two changed owners: zero issues, exit 0. Tests used `--no-pub`; no generated files changed. No physical Redmi action, new APK, ticket closure or broad audit occurred.
+- Eight actual Flutter captures inspected below: Store and Add state retained; empty cart rail absent. Captures preserve the action's scroll position, so headers/edge cards may be offscreen. At 200% text some fixture images show unavailable-image placeholders. These captures qualify D002 navigation/state only, not supplier-media rendering or all-screen visual fit. Physical acceptance remains the recorded Redmi 040-046 reproduction on the later checksum-bound successor APK.
+- Execution recovery: a bounded evidence read first failed with Python stdout cp1252 encoding and was reissued with explicit UTF-8; it made no file changes. A lookup of a nonexistent guessed widget file failed; a bounded search found the actual quantity control in the catalogue. Neither is counted as a test or pass. Unrelated formatter-only source changes were removed before final qualification.
+- Status: locally implemented and tested; still open pending scoped Redmi acceptance and Git sealing/readback. D003-D022 remain unimplemented.
+
+Capture directory: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d002-local-20260914`.
+
+| Capture | SHA256 |
+|---|---|
+| `rv6-d002-paged-shop-text-1.0-empty-store.png` | `02E3E9CFE2DD5EB8B1179C407851A87E8CB5E63B674370B5CB3B3F3A023ADCD5` |
+| `rv6-d002-paged-shop-text-2.0-empty-store.png` | `2075D82E5435550BF3514E79F052463725EFEFA6F5599CBBAF75230FAFCF8FAB` |
+| `rv6-d002-paged-wholesale-text-1.0-empty-store.png` | `3EAA3153131E3253C2364BE0D273CB8F3CC0687C2CB14788DC0BF6348FD547F1` |
+| `rv6-d002-paged-wholesale-text-2.0-empty-store.png` | `1F11EBFCDB043492D7E0F50221A2315A570EC677B26F2E0B980B89A589668832` |
+| `rv6-d002-s-eggs-text-1.0-empty-store.png` | `A2262EE0C48FFD8E4CED14DF636A84CBE10A44A431AFADDD5A8BEC145453F3EE` |
+| `rv6-d002-s-eggs-text-2.0-empty-store.png` | `26D9152DA239BDB9827D9AC76C1173B1CDD40061D63158EBC9544CF6E1861969` |
+| `rv6-d002-w-notebook-text-1.0-empty-store.png` | `82F9127394E62EC9B68107854F9EC1CC858EF5EFC56FEF5E0B02123E504FE244` |
+| `rv6-d002-w-notebook-text-2.0-empty-store.png` | `29DA324DCAF3C7D4A97848EB2941395299DBF547811A6F317A2528CA865A48AC` |

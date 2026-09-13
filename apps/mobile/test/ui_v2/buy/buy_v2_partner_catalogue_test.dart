@@ -16,6 +16,263 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
+  for (final id in ['s-eggs', 'w-notebook']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'RV6 D002 last Store item removal retains catalogue $id text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          session.addProduct(id);
+          final product = session.product(id);
+          session.openProduct(id);
+          await tester.pumpWidget(_app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          final shop = product.destination == BuyV2Destination.shop;
+          final prefix = shop ? 'buy-shop-seller' : 'buy-wholesale-supplier';
+          final storeAction = find.byKey(
+            ValueKey(
+              '${shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-$id',
+            ),
+          );
+          await _revealProductAction(tester, id, storeAction);
+          await tester.tap(storeAction);
+          await tester.pumpAndSettle();
+          Future<void> browseAll() async {
+            final action = find.byKey(ValueKey('$prefix-view-more-$id'));
+            await tester.ensureVisible(action);
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+          }
+
+          await browseAll();
+          final full = find.byKey(ValueKey('$prefix-full-catalogue-list'));
+          expect(full, findsOneWidget);
+          await tester.tap(
+            find.byKey(const ValueKey('buy-store-cart-bar')).hitTestable(),
+          );
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          final continueStore = find.byKey(
+            const ValueKey('buy-cart-continue-store'),
+          );
+          await tester.ensureVisible(continueStore);
+          await tester.tap(continueStore);
+          await tester.pumpAndSettle();
+          await browseAll();
+          final card = find.descendant(
+            of: full,
+            matching: find.byKey(ValueKey('buy-product-$id')),
+          );
+          final remove = find.descendant(
+            of: card,
+            matching: find.byTooltip('Remove from Cart'),
+          );
+          await tester.ensureVisible(remove);
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), 0);
+          expect(
+            full,
+            findsOneWidget,
+            reason: 'Removing a cart line must not leave the Store',
+          );
+          expect(
+            find.byKey(const ValueKey('buy-store-cart-bar')).hitTestable(),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: full,
+              matching: find.byKey(ValueKey('buy-add-$id')),
+            ),
+            findsOneWidget,
+          );
+          await tester.pump(const Duration(seconds: 4));
+          await tester.pumpAndSettle();
+          expect(
+            full,
+            findsOneWidget,
+            reason: 'Later basket feedback must also retain the Store',
+          );
+          await captureR66Visual(
+            tester,
+            'rv6-d002-$id-text-$scale-empty-store',
+          );
+          final add = find.descendant(
+            of: full,
+            matching: find.byKey(ValueKey('buy-add-$id')),
+          );
+          await tester.ensureVisible(add);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder);
+          expect(full, findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsOneWidget);
+          session.openDestination(
+            shop ? BuyV2Destination.wholesale : BuyV2Destination.shop,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('$prefix-sheet-$id')),
+            findsNothing,
+            reason: 'Explicit destination changes must still leave the Store',
+          );
+          expect(session.quantityFor(id), product.minimumOrder);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'RV6 D002 paged Store last item retains category ${destination.name} text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.reset);
+          final core = BuySession();
+          final source = _StoreJourneySource(destination);
+          final id = source.productIdAt(0, 0);
+          final session = BuyV2Session(
+            core: core,
+            reviewDataEnabled: true,
+            cataloguePageSource: source,
+            initialCatalogueRegionId: 'jodhpur',
+          )..destination = destination;
+          await session.openLinkedProduct(id);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          session.addProduct(id);
+          final product = session.product(id);
+          session.openProduct(id);
+          await tester.pumpWidget(_app(session, textScale: scale));
+          await tester.pumpAndSettle();
+          final shop = product.destination == BuyV2Destination.shop;
+          final prefix = shop ? 'buy-shop-seller' : 'buy-wholesale-supplier';
+          final storeAction = find.byKey(
+            ValueKey(
+              '${shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-$id',
+            ),
+          );
+          await _revealProductAction(tester, id, storeAction);
+          await tester.tap(storeAction);
+          await tester.pumpAndSettle();
+          Future<void> browseAll() async {
+            final action = find.byKey(ValueKey('$prefix-view-more-$id'));
+            await tester.ensureVisible(action);
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+          }
+
+          await browseAll();
+          final storeScope = 'store-${destination.name}-${source.storeIdAt(0)}';
+          final full = find.byKey(ValueKey('buy-paged-scroll-$storeScope'));
+          final categoryControl = find.byKey(
+            const ValueKey('buy-store-category-control'),
+          );
+          await _revealPagedHeader(tester, storeScope, categoryControl);
+          await tester.tap(categoryControl);
+          await tester.pumpAndSettle();
+          final category = find.byKey(
+            ValueKey('buy-store-category-${product.categoryId}'),
+          );
+          await tester.ensureVisible(category);
+          await tester.tap(category);
+          await tester.pumpAndSettle();
+          expect(source.productQueries.last.categoryId, product.categoryId);
+          expect(full, findsOneWidget);
+          await tester.tap(
+            find.byKey(const ValueKey('buy-store-cart-bar')).hitTestable(),
+          );
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.cart);
+          final continueStore = find.byKey(
+            const ValueKey('buy-cart-continue-store'),
+          );
+          await tester.ensureVisible(continueStore);
+          await tester.tap(continueStore);
+          await tester.pumpAndSettle();
+          await browseAll();
+          expect(source.productQueries.last.categoryId, product.categoryId);
+          final card = find.descendant(
+            of: full,
+            matching: find.byKey(ValueKey('buy-product-$id')),
+          );
+          final remove = find.descendant(
+            of: card,
+            matching: find.byTooltip('Remove from Cart'),
+          );
+          await tester.ensureVisible(remove);
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), 0);
+          expect(
+            full,
+            findsOneWidget,
+            reason: 'Removing a cart line must not leave the Store',
+          );
+          expect(
+            find.byKey(const ValueKey('buy-store-cart-bar')).hitTestable(),
+            findsNothing,
+          );
+          expect(
+            find.descendant(
+              of: full,
+              matching: find.byKey(ValueKey('buy-add-$id')),
+            ),
+            findsOneWidget,
+          );
+          await tester.pump(const Duration(seconds: 4));
+          await tester.pumpAndSettle();
+          expect(
+            full,
+            findsOneWidget,
+            reason: 'Later basket feedback must also retain the Store',
+          );
+          await captureR66Visual(
+            tester,
+            'rv6-d002-paged-${destination.name}-text-$scale-empty-store',
+          );
+          final add = find.descendant(
+            of: full,
+            matching: find.byKey(ValueKey('buy-add-$id')),
+          );
+          await tester.ensureVisible(add);
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(id), product.minimumOrder);
+          expect(full, findsOneWidget);
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsOneWidget);
+          session.openDestination(
+            shop ? BuyV2Destination.wholesale : BuyV2Destination.shop,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('$prefix-sheet-$id')),
+            findsNothing,
+            reason: 'Explicit destination changes must still leave the Store',
+          );
+          expect(session.quantityFor(id), product.minimumOrder);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   TestWidgetsFlutterBinding.ensureInitialized();
 
   for (final id in ['s-curd', 'w-notebook']) {

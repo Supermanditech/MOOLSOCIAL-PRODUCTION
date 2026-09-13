@@ -16,7 +16,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 
 ## RV6-D002 — Removing the last item while browsing a Store exits the Store
 
-- Status: open, confirmed device navigation defect. Severity: moderate.
+- Status: open; locally implemented and qualified, pending successor APK and Redmi acceptance. Severity: moderate.
 - Journey: Turmeric product → Visit store → Browse all products → Fruits & vegetables → add Fresh tomatoes 1 → open cart → Continue browsing Mool Market 000001 → Browse all products → decrement Fresh tomatoes from 1 to 0.
 - Precondition: only this test-added item in Shop cart; selected Store category still retained on return (capture 044).
 - Actual: the product briefly becomes Add (045), then both Store sheets disappear and the app returns to the general Shop catalogue at its earlier page/horizontal position (046), without Back or Close being pressed.
@@ -25,6 +25,8 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Evidence: 040–046, especially 044 before decrement, 045 transition, 046 settled destination. Exact APK/device as above. No real order or message occurred.
 - Source hypothesis: underlying cart-empty navigation and Store sheet restoration interact; investigate `buy_v2_screen.dart` Store route lifecycle and `buy_v2_session.dart` last-item handling. Cause not yet established by source or isolated regression. Buy frontend owner; no implementation in this audit.
 - Subsequent source correlation: `BuyV2Session.decrease` (near line 10318) replaces cart/checkout with catalogue when the last line is removed. `_sessionChanged` in `buy_v2_screen.dart` (near line 607) dismisses Store routes whenever the underlying session becomes catalogue. This matches the observed Store-over-cart sequence; an isolated regression has not been run or added in this audit.
+
+- Local implementation: Buy screen retains Store browsing through the exact empty-cart navigation sequence. Eight focused cases passed (legacy/paginated, Shop/Wholesale, normal/200% text), 72 connected checks passed before the four paginated additions; counts overlap. Eight Flutter captures and final analysis verified; exact evidence and limitations in UAT.md, RV6-D002 local checkpoint. Original physical 040-046 acceptance remains pending.
 
 ## RV6-D003 — Order Chat presents a stale delivery promise without its unavailable qualifier
 

@@ -128,11 +128,11 @@
     "baseline": "a846c558fe4bd606a69cfc613112979ba6d6a022",
     "admission": "48366d66307e425f4cee3b9094a9cea4ce4b9084",
     "locallyQualified": [
-      "RV6-D001"
+      "RV6-D001",
+      "RV6-D002"
     ],
     "deviceQualified": [],
     "remainingLocal": [
-      "RV6-D002",
       "RV6-D003",
       "RV6-D004",
       "RV6-D005",
@@ -156,6 +156,9 @@
     ],
     "newApkBuilt": false,
     "deviceTestingStarted": false,
-    "frozenAuditCheckpoint": "HANDOFF.md remains historical authority for514 passes and1177 verified artifacts;no broad audit resumed"
+    "frozenAuditCheckpoint": "HANDOFF.md remains historical authority for514 passes and1177 verified artifacts;no broad audit resumed",
+    "additionalAdmissions": {
+      "RV6-D002": "cea1699a42bf182c9648719b8780b5ec9afd05ba"
+    }
   }
 }
