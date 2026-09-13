@@ -943,8 +943,8 @@ Source hashes bind the following index to the inspected files:
 | SRC-0340 | buy_v2_views.dart:7610 | _CheckoutAddressStage | onSelected | Collect at store chip distinct from Store entry COLLECTION-ROUND18-02; exact chip unverified |
 | SRC-0341 | buy_v2_views.dart:7665 | _CheckoutAddressStage | onPressed | device_pass CHECKOUT-ROUND135-03 Add another address and empty form X944-945; populated draft/validation separate |
 | SRC-0342 | buy_v2_views.dart:7698 | _CheckoutAddressChoice | onTap | address choice Semantics action; screen-reader unverified |
-| SRC-0343 | buy_v2_views.dart:7711 | _CheckoutAddressChoice | onTap | checkout address pointer selection; selected Work observed but exact switch action requires reconciliation |
-| SRC-0344 | buy_v2_views.dart:7748 | _CheckoutAddressChoice | onPressed | checkout address Edit exact button; address-sheet Edit not automatically equivalent |
+| SRC-0343 | buy_v2_views.dart:7711 | _CheckoutAddressChoice | onTap | device_pass CHECKOUT-ROUND166-01 exact Home then Work checkout pointer selection; original Work restored;provider/relaunch/accessibility unqualified |
+| SRC-0344 | buy_v2_views.dart:7748 | _CheckoutAddressChoice | onPressed | device_pass CHECKOUT-ROUND166-02 checkout Work Edit opens exact original fields and X returns same Work selection;no edit/save/validation qualification inferred |
 | SRC-0345 | buy_v2_views.dart:7840 | _CheckoutPaymentStage | onTap | review-data payment choice CHECKOUT-004 Paytm; live provider selection not inferred |
 | SRC-0346 | buy_v2_views.dart:7921 | _CheckoutPaymentStage | onTap | runtime payment choice/locked notice conditional unverified; review choice separate SRC-0345 |
 | SRC-0347 | buy_v2_views.dart:7951 | _CheckoutPaymentStage | onChanged | procurement PO reference conditional field; workspace procurement scope; public consumer pass not inferred |
@@ -1087,15 +1087,15 @@ Source hashes bind the following index to the inspected files:
 | SRC-0484 | buy_v2_views.dart:16225 | _CompactProductStepper | onPressed | QTY-ROUND27-01 editor entry and QTY-ROUND33-01 Wholesale minimum editor; other placements not inferred |
 | SRC-0485 | buy_v2_views.dart:16253 | _CompactProductStepper | onPressed | QTY-ROUND115-04 product compact plus2 to3; total837 retained on Back |
 | SRC-0486 | buy_v2_views.dart:16360 | _CartScopeBar | onTap | device_pass CART-ROUND12-03 empty Wholesale scope; MIXED-ROUND63-01 both nonempty Shop/Wholesale/combined scope quantities and subtotals; process-death/account switching/provider context remain |
-| SRC-0487 | buy_v2_views.dart:16594 | _CartBenefitPanel | onTap | pending exact coupon benefit panel CTA; other coupon entry evidence must be reconciled |
+| SRC-0487 | buy_v2_views.dart:16594 | _CartBenefitPanel | onTap | device_pass COUPON-ROUND166-02 exact Shop Coupons row opens Coupons;other destination and populated state separate |
 | SRC-0488 | buy_v2_views.dart:16614 | _CartBenefitPanel | onTap | COUPON-003 Payment offers entry capture082; no actual payment qualification |
 | SRC-0489 | buy_v2_views.dart:16677 | _CartBenefitEntry | onTap | benefit entry pointer forwarder to SRC0487/0488; no additional journey |
-| SRC-0490 | buy_v2_views.dart:16916 | _CartBenefitsPageState | onPressed | pending exact Coupons toolbar Back; other returns not inferred |
+| SRC-0490 | buy_v2_views.dart:16916 | _CartBenefitsPageState | onPressed | device_pass COUPON-ROUND166-02 exact Coupons toolbar Back retains Shop cart210;other selected/provider states separate |
 | SRC-0491 | buy_v2_views.dart:16950 | _CartBenefitsPageState | onChanged | pending per-destination coupon selector; initial Wholesale/Shop entries are not every tab switch |
 | SRC-0492 | buy_v2_views.dart:16957 | _CartBenefitsPageState | onChanged | COUPON-003 Payment offers kind switch; reverse Coupon tab exact check pending |
-| SRC-0493 | buy_v2_views.dart:17065 | _CartBenefitsPageState | onPressed | pending exact benefit completion-to-cart CTA and retained selection |
+| SRC-0493 | buy_v2_views.dart:17065 | _CartBenefitsPageState | onPressed | device_pass COUPON-ROUND166-01 exact footer Return to Cart from empty Coupons retains210/no selection;selected state not inferred |
 | SRC-0494 | buy_v2_views.dart:17139 | _CartBenefitDestinationSelector | onTap | destination selector forwarder SRC0491; every eligible destination pending |
-| SRC-0495 | buy_v2_views.dart:17235 | _CartBenefitKindSelector | onTap | pending explicit Coupon kind tab after Payment offers |
+| SRC-0495 | buy_v2_views.dart:17235 | _CartBenefitKindSelector | onTap | device_pass COUPON-ROUND166-01 explicit Coupons tab after Payment offers;Shop low-value empty state;other destination/populated states unqualified |
 | SRC-0496 | buy_v2_views.dart:17245 | _CartBenefitKindSelector | onTap | COUPON-003 Payment offers; scoped fixture only |
 | SRC-0497 | buy_v2_views.dart:17275 | _CartBenefitKindButton | onTap | kind-button forwarder SRC0495/0496; no additional destination |
 | SRC-0498 | buy_v2_views.dart:17350 | _CartBenefitEligibilityState | onPressed | blocked live benefit provider Retry; review coupon fixtures do not qualify authoritative refresh |
@@ -2042,3 +2042,9 @@ Counts unchanged:614 action/check records;501 passes;22 defects;1123 physical ca
 Gate terminal0; clean status digest verified before evidence edits.1124 isolated notebook6 pack6 quantity1/210 added from original Scheduled Shop.1125 cart Browse more;1126 same Shop quantity;1127 reopened cart. Continue browsing names prior Store000041 despite cart item000001. Initial rapid tap on reentry1127 remained cart;not classified failure. Settled tap1128 opens correctly named Store000041;X1129 restores unchanged cart. Source2493-2498 uses per-destination prior browsing anchor;2540-2543 binds label and callback to same anchor. Retained as CART-ROUND165-02 observation,not a defect based solely on different item seller. No order identity/price mutation observed;stale unavailable or cross-account anchors remain unqualified.
 1130 Review opens Address with original Work selected;visible Cart button1131 restores notebook1/210.1132 Browse more then notebook minus1133 removes only test item;known D021 extra tile height reobserved,not duplicated. Wholesale/Shop reentry1134 restores original compact Scheduled catalogue Saved1 wheat and emptycart. No address/payment/saved changes or order submission.
 CART-ROUND165-01 and CHECKOUT-ROUND165-01 are narrow passes.617 action/check records;503 passes;20 device observations;22 distinct defects;1134 captures;1136 evidence rows. Exact Payment/Confirm Back and busy guards remain; checkout Select/Edit and reverse benefit kind next. Full audit open.
+
+
+## Round166 - Coupon reverse navigation and checkout address controls
+Gate terminal0; clean digest verified before evidence writes.1135-1136 temporary notebook6 one pack210;1137 Payment offers;1138 reverse Coupons tab displays no eligible Shop coupon;1139 footer Return to Cart unchanged210/no selection.1140 exact cart Coupons entry;1141 toolbar Back unchanged basket. No coupon/payment offer selected or payment action performed.
+1142 checkout original Work;1143 Home pointer selection correct342003;1144 Work restored correct342005;1145 Work Edit opens matching original fields;1146 X returns exact checkout Work selection. No address field edits/save/delete.1147 cart retained210;1148 catalogue;remove only notebook and module reentry1149 restores original Scheduled wheat Saved1 emptycart. Original Home/Work and Paytm retained;no real transaction.
+Four narrow passes COUPON-ROUND166-01/02 and CHECKOUT-ROUND166-01/02; no new defect.621 action/check records;507 passes;22 defects;1149 physical captures;1151 evidence rows;71 public-data mappings. Selected-benefit replacement/removal, multi-destination coupons, checkout address draft/save/keyboard/provider/relaunch, Payment/Confirm Back and busy guard remain separate. Next orders/shared-screen inventory and remaining reachable cases;full audit incomplete.

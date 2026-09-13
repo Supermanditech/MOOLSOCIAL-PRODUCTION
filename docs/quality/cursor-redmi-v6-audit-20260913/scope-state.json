@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 617,
+    "recordedActionRows": 621,
     "dispositions": {
       "device_observation": 20,
-      "device_pass": 503,
+      "device_pass": 507,
       "blocked_provider": 27,
       "device_failure": 24,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 1134,
-    "evidenceRows": 1136,
+    "physicalCaptures": 1149,
+    "evidenceRows": 1151,
     "publicDataRows": 71,
     "confirmedDistinctDefects": 22,
     "countsAreExhaustiveDenominator": false
@@ -89,15 +89,15 @@
     }
   ],
   "nextWork": [
-    "Next CHECK-P06 exact checkout address Select/Edit and CART-P15 reverse benefit kind;remaining Payment/Confirm visible Back and busy guard separate. Orders/shared/address/mini-cart inventory remains.",
+    "Round166 exact coupon reverse kind/footer/toolbar and checkout address Select/Edit-X qualified in narrow review contexts. Continue orders/shared-screen inventory and remaining conditional cases;selected benefit removals and Payment/Confirm Back remain.",
     "Reconcile remaining product/cart/orders/shared callback families and conditional/provider descendants into stable named cases; no exhaustive denominator claim yet",
     "Saved-address process-death persistence and remaining accessibility/keyboard/recovery dimensions require exact device evidence",
     "Complete public-data field and publication lifecycle reconciliation and final evidence handoff"
   ],
   "preservation": {
-    "cart": "1133 isolated notebook removed;1134 original Scheduled wheat Saved1 emptycart and compact layout restored;Work address unchanged",
+    "cart": "1149 isolated notebook removed;original Scheduled wheat Saved1 emptycart;1146 Work selected and original address fields unchanged",
     "savedShop": "original wheat count1 retained650;Saved/Scheduled active after module reentry",
-    "addresses": "Original Home/Work retained; settings selection Home then Work restored986; no add/edit/delete; Paytm retained",
+    "addresses": "Home temporarily selected1143;Work restored1144;Work Edit inspected without field changes then X1146;original Home/Work retained",
     "noNewApk": true,
     "noProductEdits": true,
     "chatPreviews": "Original OFF restored; four original inbox snippets, pin and unread1 retained883; Buy Scheduled Saved1 emptycart884"
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 165
+  "latestAuditRound": 166
 }
