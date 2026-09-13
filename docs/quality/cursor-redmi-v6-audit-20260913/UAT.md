@@ -1665,3 +1665,10 @@ Totals: 884 physical captures, 886 evidence rows, 539 action records including 4
 ## Round 123 - Catalogue supplemental action reconciliation
 
 Read exact catalogue source ranges260-285,1115-1200,1230-1276,1788-1855,2570-2610,2680-2705,3065-3085. Reconciled SUPSRC-0001 through0020 against existing device rows. Repeated forwarders are explicitly linked to their parent controls; product, Store-search and Offers pagination are not treated as interchangeable. Live-source retry, multi-page Store search, supplier revision and error recovery remain unqualified where exact device evidence is absent. No physical-device pass or defect added by this source reconciliation. Complete unique-action/journey denominator remains pending the rest of the supplemental/shared inventory. No application changes.
+
+
+## Round 124 - Ordinary Scheduled Shop pagination and product return
+
+Physical Redmi captures885-891: original empty-query catalogue885, exposed footer886, Next887 (carry bags82 first), product82 entry888, Android Back889 retaining later-page products, footer890, Previous891 restoring wheat2/notebook6/eggs10. Scheduled mode, Saved1 and empty cart remained. No cart, saved or address mutation; ordinary product visit may add its normal recently-viewed history. Two scoped passes recorded. No new defect. SUPSRC-0003 ordinary Shop Previous subset and SUPSRC-0009 parent product/Back subset now have device evidence; filtered search and Store-search pagination remain separate and pending. Final screen is original page at footer.
+
+Totals: 891 physical captures;893 evidence rows;541 action records;440 device passes;17 distinct defects. Complete unique-journey denominator remains unqualified. No implementation or APK changes.
