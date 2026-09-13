@@ -40,7 +40,6 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
         "scripts/build-buy-device-review.ps1",
         "scripts/test-public-auth-sideload-build-controls.ps1",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_product_video.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_video_test.dart",
         "docs/quality/STORE-BUY-CONTRACT-FOLLOWUP-20260912.md",
@@ -359,7 +358,9 @@
         "docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt",
         "docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
       ]
     }
   ],
