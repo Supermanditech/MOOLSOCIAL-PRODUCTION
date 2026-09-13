@@ -4,6 +4,159 @@ These instructions are mandatory for every Codex task in this repository.
 Repository evidence is the durable source of truth; do not depend on an earlier
 chat being available.
 
+## Founder-confirmed Facebook and Instagram production state (2026-08-25)
+
+This is the durable, sanitized provider-console memory for the active Social
+authentication runtime work. Do not ask the founder to repeat a completed
+console check unless a direct live readback or runtime failure contradicts it.
+Never copy provider IDs, secrets, tokens, account credentials, email addresses,
+key-hash values or install-referrer material from the retained screenshots into
+source, logs, chat or review copy.
+
+Retained local evidence lives outside the repository at:
+
+- `C:\Users\jisal\Documents\Codex\2026-08-23\moolsocial-auth-runtime-24-08-2026\work\evidence\facebook-meta-configuration-20260824`
+- `C:\Users\jisal\Documents\Codex\2026-08-23\moolsocial-auth-runtime-24-08-2026\work\evidence\instagram-meta-configuration-20260824`
+
+Facebook founder-confirmed complete facts:
+
+- The dedicated `MoolSocial` Meta app is the Facebook Login owner. The separate
+  `MoolSocial Pro Connect` app is not the Facebook Login owner.
+- App domain `moolsocial.com` and Website site URL
+  `https://moolsocial.com/` are saved and survive refresh.
+- The public privacy and terms URLs are saved, and the approved 1024-by-1024
+  MoolSocial app icon is saved. Meta no longer shows the prior eligibility
+  warning for the icon or user-data-deletion requirement.
+- User data deletion uses the signed production callback
+  `https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialPublicAuth/facebook/data-deletion`.
+  The public manual request page remains `https://moolsocial.com/delete-account`.
+- The exact Firebase OAuth handler redirect and the production Facebook
+  deauthorization callback are saved. Client OAuth, HTTPS enforcement and
+  strict redirect mode are enabled; Web OAuth, embedded-browser OAuth and the
+  JavaScript SDK remain intentionally disabled.
+- Android package `com.moolsocial.app`, launch activity
+  `com.moolsocial.app.MainActivity` and two unique provider key-hash entries are
+  saved. Re-pasting the installed r60.90 release APK key hash produced a
+  temporary duplicate which Meta removed on refresh, proving that signer was
+  already registered. The final APK must still independently verify the same
+  signer before review upload.
+- The app requests only `public_profile`; email, friends, posting, advertising
+  and marketing permissions are intentionally absent. Meta recorded 52
+  `public_profile` test calls. Business verification and use-case customization
+  are complete.
+- Allowed-use certification was founder-confirmed for authentication, Firebase
+  session creation and signed-in identity display only.
+- Data-handling answers were founder-confirmed as: Google LLC/Firebase and
+  Google Cloud are the processor for IT/cloud processing in the United States
+  and India; SuperMandi Tech Pvt Ltd in India is the responsible controller;
+  no national-security disclosure occurred in the preceding twelve months;
+  no unsupported public-authority request policies were claimed.
+- Android reviewer instructions are prepared for the final APK, describe the
+  native Facebook Login journey, identify `public_profile` as the only Meta
+  permission, require account identity plus sign-out verification and contain
+  no reviewer credentials.
+
+Facebook intentionally deferred facts:
+
+- The app remains `Unpublished`. Do not upload r60.90, click final review
+  submission or publish it.
+- Reopen Facebook App Review only after the final consolidated higher-version
+  APK is built, independently signer-verified and OPPO-recorded. Upload that
+  exact APK and its sanitized end-to-end Facebook Login recording, then finish
+  review and publication. Meta testing status may take up to 24 hours to
+  refresh.
+
+Instagram founder-confirmed complete facts:
+
+- The dedicated `MoolSocial Pro Connect` Meta app owns Instagram Business
+  Login. Its use-case customization and test-use-case steps are complete, but
+  it remains `Unpublished`.
+- The generated production Business Login URL uses the exact redirect
+  `https://moolsocial.com/app/auth/instagram` and explicitly includes
+  `force_reauth=true`.
+- The saved deauthorization and data-deletion callbacks are exactly
+  `https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialPublicAuth/instagram/deauthorize`
+  and
+  `https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialPublicAuth/instagram/data-deletion`.
+- The approved MoolSocial app icon, `https://moolsocial.com/privacy/` and the
+  `Shopping` category are saved for App Review.
+- The review request contains only `instagram_business_basic`. The founder
+  removed Meta's preselected recommendations for messaging, comment management,
+  content publishing, insights and Human Agent. Do not re-add those permissions,
+  configure webhooks, generate provider tokens or become a Tech Provider without
+  a separate exact feature requirement and authorization.
+- The `instagram_business_basic` review description is prepared and states the
+  real minimum flow: eligible Business/Creator identity, one-time code exchange,
+  validation of provider ID/account type/public username, Firebase custom-token
+  session creation, public handle display and revocation of transient Instagram
+  access material. It claims no media, insights, comments, messages, publishing,
+  advertising or account action authority.
+
+Instagram intentionally deferred facts and required fix:
+
+- Allowed usage cannot be saved until the final APK screencast is attached and
+  the founder completes its certification. Data handling and reviewer
+  instructions remain locked behind that step. Do not upload r60.90 or submit
+  the current incomplete review.
+- Commit `3662f155b8972398bae4c301fa00b681d4b93ef7` implements Meta's
+  required/generated `force_reauth=true` authorization parameter in the
+  backend URL, mobile exact-query validator and focused positive/negative
+  tests. Backend tests passed 13/13, mobile tests passed 6/6, TypeScript
+  typecheck and focused Dart analysis passed. Do not reimplement this fix.
+- Production deployment of that commit is intentionally held until the final
+  consolidated APK is ready because installed r60.90 enforces the predecessor
+  exact-query contract and would reject the new parameter. Deploy the backend
+  change in the coordinated final-candidate window, then install and test the
+  successor APK without leaving a mixed client/server contract.
+- After the final consolidated APK is installed and proven on OPPO, record the
+  complete Instagram professional-account connect, app return, Firebase session,
+  displayed provider handle and sign-out journey. Attach that sanitized recording
+  to `instagram_business_basic`, complete the remaining review sections, submit
+  and publish only after every production runtime check passes.
+
+X founder-confirmed production state (2026-08-25):
+
+- Retained sanitized X console evidence lives outside the repository at
+  `C:\Users\jisal\Documents\Codex\2026-08-23\moolsocial-auth-runtime-24-08-2026\work\evidence\x-developer-configuration-20260825`.
+- The existing X app is active and connected to the existing pay-per-use
+  project. Do not create another X app/project, disconnect it, regenerate keys
+  or tokens, buy unrelated access, or expose any console identifier.
+- OAuth 2.0 is configured as a Native App/public PKCE client with Read-only
+  permission. Read-and-write, Direct Messages and email access remain disabled.
+- The exact callback is `https://moolsocial.com/app/auth/x`. Website,
+  organization URL, terms and privacy URLs use the live `moolsocial.com`
+  destinations and survive console save/readback.
+- Founder corrected the provider-facing app identity from the prior internal
+  account-style label and generic metadata to the `MoolSocial` name, approved
+  MoolSocial icon and the exact read-only authentication description. Do not
+  ask to repeat those branding changes.
+- The deployed broker already uses OAuth 2.0 Authorization Code with S256 PKCE,
+  an exact state-bound callback, the authenticated-user identity endpoint,
+  Firebase custom-token exchange and transient provider-token revocation. The
+  live begin operation succeeded before this console audit; final callback and
+  durable MoolSocial-session acceptance remain pending.
+- The connected project currently has zero usable X API credit and no payment
+  method. This is a confirmed external production blocker for the
+  post-authorization authenticated-user identity lookup. OAuth consent alone
+  is not acceptance. Do not add billing or purchase credits without a separate
+  explicit founder authorization for that paid-service action.
+- Founder decision on 2026-08-25: do not buy X API credit now. After the final
+  consolidated APK is installed, attempt exactly one real X runtime journey on
+  the existing configuration. If it fails with a sanitized credit, billing or
+  paid-access classification, stop without repeated provider attempts or a
+  purchase and queue X paid activation beside the separate Apple Sign-In
+  backlog.
+- Apple Sign-In remains a separate disabled provider ticket, not an automatic
+  replacement for X and not evidence that X passed. Do not expose or implement
+  Apple as a fallback inside the X journey. Apple requires its own platform,
+  provider, redirect, revocation, session, UI and founder/runtime acceptance
+  before it can be counted as supported.
+- After usable credit is explicitly authorized and provisioned, the final OPPO
+  journey must prove: fresh X authorization, hosted/app-link return, broker
+  completion, authenticated-user identity, Firebase credential acceptance,
+  displayed X handle, durable MoolSocial session, sign-out and a second-account
+  recovery path. Retain only sanitized status/operation evidence.
+
 ## Git and preservation gate
 
 Before any implementation:
@@ -159,6 +312,20 @@ The machine gate must reject duplicate full registry IDs, duplicate numeric
 prefixes, duplicate tasks, overlapping owner claims, primary-only subagent
 claims, stale registry generation, missing mandatory reads and branch/HEAD
 drift. These requirements apply to every future task, not only C34L.
+
+## Mandatory incremental ticket baseline gate
+
+- Before any Cursor/Codex UI, backend, runtime or integration edit, test,
+  build or handoff, run
+  `scripts/check-cross-agent-incremental-ticket-gate.ps1` with the exact lane,
+  ticket, UI scope, package and candidate version.
+- Every ticket starts clean at the annotated remote-exact tag recorded in
+  `config/cross-agent-incremental-ticket-gate.json`; later work must descend
+  from it. Candidate version codes increase for every ticket and package.
+- Backend work is blocked until the exact UI scope, commit and contract hash
+  are founder accepted. Unreachable or blocked UI cannot create backend scope.
+- One ticket is open per lane and package. A clean accepted ticket becomes the
+  next tagged baseline before another ticket starts.
 
 For `docs/quality/ACTIVE-CODEX-HANDOFF.md`, discover only the first two `^## `
 heading line numbers without emitting content. The current checkpoint is lines

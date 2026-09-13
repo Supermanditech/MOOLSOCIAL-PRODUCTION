@@ -6,6 +6,8 @@ param(
   [int]$Cycle,
   [string]$EvidenceDirectory
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -72,7 +74,7 @@ function Get-C29NManifestRecords {
 function Get-C29NManifestSha([string[]]$Records) {
   $bytes = [Text.Encoding]::UTF8.GetBytes(($Records -join "`n"))
   $sha = [Security.Cryptography.SHA256]::Create()
-  try { return [Convert]::ToHexString($sha.ComputeHash($bytes)) } finally { $sha.Dispose() }
+  try { return (ConvertTo-MoolSocialPortableHex -Bytes ($sha.ComputeHash($bytes))) } finally { $sha.Dispose() }
 }
 
 $cyclePath = Join-Path $evidenceRoot "qualifying-cycle-$Cycle.json"

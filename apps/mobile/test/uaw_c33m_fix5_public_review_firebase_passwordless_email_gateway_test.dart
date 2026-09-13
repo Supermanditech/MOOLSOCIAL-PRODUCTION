@@ -66,17 +66,36 @@ void main() {
 
   test('email-link Firebase failures retain exact sanitized stages', () {
     const cases = <String, String>{
-      'invalid-recipient-email': 'invalid-email',
-      'missing-continue-uri': 'email-link-configuration',
-      'unauthorized-domain': 'email-link-configuration',
-      'internal-error': 'email-link-provider-internal',
-      'provider-specific-unmapped-failure': 'email-link-firebase-unclassified',
+      'invalid-recipient-email': 'invalid-recipient-email',
+      'missing-continue-uri': 'missing-continue-uri',
+      'unauthorized-domain': 'unauthorized-domain',
+      'internal-error': 'internal-error',
+      'provider-specific-unmapped-failure':
+          'provider-specific-unmapped-failure',
+      'timeout': 'timeout',
+      '  NETWORK-REQUEST-FAILED  ': 'network-request-failed',
     };
 
     for (final entry in cases.entries) {
       final failure = sanitizedEmailLinkFailure(entry.key);
       expect(failure.code, entry.value, reason: entry.key);
       expect(failure.userMessage, isNot(contains(entry.key)));
+    }
+  });
+
+  test('unsafe Firebase failure payloads never enter telemetry or copy', () {
+    for (final unsafeCode in [
+      '',
+      'auth/error',
+      'credential payload',
+      'danger\ncode',
+      'a' * 65,
+    ]) {
+      final failure = sanitizedEmailLinkFailure(unsafeCode);
+      expect(failure.code, 'email-link-firebase-unclassified');
+      if (unsafeCode.isNotEmpty) {
+        expect(failure.userMessage, isNot(contains(unsafeCode)));
+      }
     }
   });
 }
