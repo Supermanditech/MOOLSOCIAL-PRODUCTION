@@ -54,12 +54,15 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Redmi closure remains pending exact successor APK reproduction of captures198/199. No device action or valid real profile save occurred during local qualification.
 
 ## RV6-D005 - Hindi preference changes its value but observed Buy and preference UI remain English
-- Status: open; confirmed device localization/wiring gap. Severity: moderate for Hindi-dependent users.
+- Status: open; unavailable-coverage disclosure implemented and locally qualified; successor Redmi acceptance pending. Severity: moderate for Hindi-dependent users.
 - Journey: Buy account > Personal profile > Language > Privacy and preferences > Language > Hindi; return to Buy catalogue.
 - Actual: preference reads Hindi but headings/actions on the preference screen and returned Buy catalogue remain English, including Stores or products, Wholesale, Bulk and Add. No unavailable/restart/partial-language disclosure was visible.
 - Expected: choosing an offered app language applies to supported customer navigation and guidance; unavailable coverage must be explicit rather than implying the language changed throughout the experience. Supplier-authored product names are not required to be translated by this finding.
 - Evidence:202-language-sheet,203-hindi-selected,204-hindi-return. Current normal-text Redmi V6 APK. Relaunch language propagation remains untested; this finding is the immediate observed selection/return behavior.
 - Source correlation: features/journey01/journey_session.dart updateLanguage near443 persists languageCode and announces language changed. Shared localization and Buy strings require later owner assessment; no implementation or backend change authorized by this audit.
+- Local correction (2026-09-14): language picker explicitly states Buy/settings use English and Hindi selection saves a preference only. Picker scrolls when constrained. Preferences and Personal profile summaries retain the Hindi choice while stating actual app screens are English. This follows the recorded unavailable-coverage criterion; it does not implement or claim a translated Buy experience.
+- Local qualification: 42 combined profile/preferences checks passed, including D004 regressions and two D005 320x568/100%-200% selection, reopen, persisted-session restoration and English-switch checks. Four D005 Flutter captures reviewed; analysis of three changed Dart owners reports zero issues. Full Buy/physical Redmi return and Android Hindi glyph rendering await the successor APK.
+- Ownership admission: 0ee85fd2d98595b0134b6190d3e9af58532990f3. Session source was explicitly rejected by the UI-lane gate and excluded before admission; its authentication, persistence and stored success message are unchanged. The recorded preference screen does not render that stored success message. Existing legacy session-message/localization behavior is not claimed corrected or translated. See UAT.md for exact qualification and preservation evidence.
 
 ## RV6-D006 - Cancelling sign-in loses the originating Buy Back route
 - Status: open; confirmed device navigation defect. Severity: moderate.

@@ -168,9 +168,9 @@ class GlobalPersonalProfileV2 extends StatelessWidget {
                           _ProfileDetail(
                             keyName: 'global-personal-profile-language',
                             icon: Icons.language_rounded,
-                            label: 'Language',
+                            label: 'Language preference',
                             value: session.languageCode == 'hi'
-                                ? 'हिन्दी'
+                                ? 'Hindi preferred · App screens: English'
                                 : 'English',
                             onTap: () => _openAccountRoute(
                               context,

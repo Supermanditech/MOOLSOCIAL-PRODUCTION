@@ -131,11 +131,11 @@
       "RV6-D001",
       "RV6-D002",
       "RV6-D003",
-      "RV6-D004"
+      "RV6-D004",
+      "RV6-D005"
     ],
     "deviceQualified": [],
     "remainingLocal": [
-      "RV6-D005",
       "RV6-D006",
       "RV6-D007",
       "RV6-D008",
@@ -160,12 +160,14 @@
     "additionalAdmissions": {
       "RV6-D002": "cea1699a42bf182c9648719b8780b5ec9afd05ba",
       "RV6-D003": "3b0fd2fcdbcc444ead93590f7992e6ccb8d9b384",
-      "RV6-D004": "41c5e36cfd2950521c918271afb56dcff2e02354"
+      "RV6-D004": "41c5e36cfd2950521c918271afb56dcff2e02354",
+      "RV6-D005": "0ee85fd2d98595b0134b6190d3e9af58532990f3"
     },
     "sealedImplementationCommits": {
       "RV6-D001": "d532b9dea97a52473a5a95e090a9831fd9635696",
       "RV6-D002": "55877c20437bdc34c1a90de19904381e94014cde",
-      "RV6-D003": "e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa"
+      "RV6-D003": "e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa",
+      "RV6-D004": "2967bf188ffe6587a9f3e6409584ce3686504f60"
     }
   }
 }
