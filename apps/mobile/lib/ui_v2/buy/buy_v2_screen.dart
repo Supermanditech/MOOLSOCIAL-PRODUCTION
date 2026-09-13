@@ -1036,7 +1036,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         child: _BuySystemBars(
           child: Scaffold(
             key: const ValueKey('buy-v2-screen'),
-            extendBody: true,
+            extendBody: !widget.embeddedStore,
             backgroundColor: Colors.white,
             body: DecoratedBox(
               decoration: BoxDecoration(
@@ -1183,8 +1183,25 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            bottomNavigationBar: keyboardVisible || widget.embeddedStore
+            bottomNavigationBar: keyboardVisible
                 ? null
+                : widget.embeddedStore
+                ? (_miniCartParked && _showsMiniCart(session)
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            heightFactor: 1,
+                            child: _BuyMiniCartBar(
+                              session: session,
+                              aggregate: false,
+                              compact: true,
+                              initialPosition: _miniCartPosition,
+                              onPositionChanged: (_) {},
+                            ),
+                          ),
+                        )
+                      : null)
                 : _buildDestinationNavigation(
                     session,
                     _moolNavigationController,

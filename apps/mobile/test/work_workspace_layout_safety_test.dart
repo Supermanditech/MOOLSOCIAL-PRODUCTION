@@ -14693,16 +14693,23 @@ void main() {
     );
     expect(
       tester
-          .getSemantics(find.byKey(const ValueKey('buy-search-control')))
+          .getSemantics(find.byKey(const Key('work-dashboard-search')))
           .flagsCollection
           .isHidden,
       isFalse,
     );
     expect(find.text('Wholesale and Bulk'), findsNothing);
-    final storeName = find.byKey(const Key('work-procurement-store-name'));
+    final storeName = find.byKey(const Key('work-store-full-name'));
     expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
     expect(tester.widget<Text>(storeName).maxLines, isNull);
-    expect(tester.widget<AppBar>(find.byType(AppBar).first).toolbarHeight, 48);
+    expect(
+      find.byKey(const Key('work-dashboard-inline-header')),
+      findsOneWidget,
+    );
+    expect(
+      tester.renderObject<RenderParagraph>(storeName).didExceedMaxLines,
+      isFalse,
+    );
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -14737,9 +14744,9 @@ void main() {
 
       await tester.tap(find.byKey(const Key('work-quick-buy')));
       await tester.pumpAndSettle();
-      await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+      await tester.tap(find.byKey(const Key('work-dashboard-search')));
       await tester.pumpAndSettle();
-      final search = find.byKey(const ValueKey('buy-search-field'));
+      final search = find.byKey(const Key('work-dashboard-search-field'));
       expect(search, findsOneWidget);
 
       await tester.enterText(search, 'cooking oil bulk pack');
@@ -17351,29 +17358,33 @@ void main() {
       );
       const oilQuery = 'Fortune Sunflower Oil 1 L pouch';
       expect(find.text('Wholesale and Bulk'), findsNothing);
-      final storeName = find.byKey(const Key('work-procurement-store-name'));
+      final storeName = find.byKey(const Key('work-store-full-name'));
       expect(tester.widget<Text>(storeName).data, work.activeWorkspace!.name);
       expect(tester.widget<Text>(storeName).maxLines, isNull);
-      expect(tester.widget<Text>(storeName).textScaler!.scale(1), scale);
+      expect(
+        tester.renderObject<RenderParagraph>(storeName).textScaler.scale(1),
+        scale,
+      );
       expect(
         tester.renderObject<RenderParagraph>(storeName).didExceedMaxLines,
         isFalse,
       );
+      expect(find.byType(AppBar), findsOneWidget);
       expect(
-        tester.widget<AppBar>(find.byType(AppBar).first).toolbarHeight,
-        closeTo(
-          (tester.getSize(storeName).height + 16).clamp(48.0, double.infinity),
-          1,
-        ),
-        reason:
-            'The Store header must fit its actual text without empty height. '
-            'Size=${tester.getSize(storeName)}; '
-            'widget=${tester.widget<Text>(storeName).style}; '
-            'rendered=${tester.renderObject<RenderParagraph>(storeName).text.style}',
+        tester
+            .getSize(find.byKey(const Key('work-dashboard-inline-header')))
+            .height,
+        greaterThanOrEqualTo(tester.getSize(storeName).height),
       );
       expect(
         tester.getSize(find.byKey(const Key('work-back'))).height,
         greaterThanOrEqualTo(48),
+      );
+      expect(
+        tester.getRect(storeName).top,
+        greaterThanOrEqualTo(0),
+        reason:
+            'The full Store name must remain inside the visible shared header.',
       );
       expect(buy.query, oilQuery);
       expect(consumer.query, consumerQuery);
@@ -17382,7 +17393,7 @@ void main() {
       expect(buy.destination, BuyV2Destination.wholesale);
       expect(buy.selectedFilter, 'nearby');
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
-      final searchControl = find.byKey(const ValueKey('buy-search-control'));
+      final searchControl = find.byKey(const Key('work-dashboard-search'));
       expect(
         find.descendant(of: searchControl, matching: find.text(oilQuery)),
         findsOneWidget,
@@ -17391,7 +17402,7 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.tap(searchControl);
       await tester.pumpAndSettle();
-      final search = find.byKey(const ValueKey('buy-search-field'));
+      final search = find.byKey(const Key('work-dashboard-search-field'));
       expect(tester.widget<TextField>(search).controller!.text, oilQuery);
       await tester.enterText(search, 'sunflower oil');
       tester.view.viewInsets = const FakeViewPadding(bottom: 220);

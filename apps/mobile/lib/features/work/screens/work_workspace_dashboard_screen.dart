@@ -983,6 +983,7 @@ class _WorkWorkspaceDashboardScreenState
         _operation == _WorkspaceOperation.counterOrder;
     final procurementOpen = _view == _WorkspaceControlView.procurement;
     final hasHeaderBack =
+        procurementOpen ||
         _view == _WorkspaceControlView.operation ||
         _view == _WorkspaceControlView.alerts ||
         _reviewedOrder != null;
@@ -1000,12 +1001,16 @@ class _WorkWorkspaceDashboardScreenState
         )..layout(
           maxWidth:
               (MediaQuery.sizeOf(context).width -
-                      127 -
-                      (hasHeaderBack ? 47 : 0))
+                      (procurementOpen ? 137 : 127) -
+                      (hasHeaderBack ? (procurementOpen ? 51 : 47) : 0))
                   .clamp(64.0, double.infinity),
         );
     final storeHeaderHeight =
-        47 + (namePainter.height + 8).clamp(44.0, double.infinity);
+        47 +
+        (namePainter.height + 8).clamp(
+          procurementOpen ? 48.0 : 44.0,
+          double.infinity,
+        );
     namePainter.dispose();
     return WorkPageScaffold(
       session: session,
@@ -1022,8 +1027,23 @@ class _WorkWorkspaceDashboardScreenState
                   saleOpen ||
                   (procurementOpen && _procurementSearchOpen),
               keepSearchUtilities: saleOpen || procurementOpen,
+              nameTextStyle: procurementOpen
+                  ? Theme.of(context).textTheme.titleLarge!.copyWith(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                    )
+                  : null,
+              nameTextScaler: procurementOpen
+                  ? MediaQuery.textScalerOf(context)
+                  : null,
+              backKey: Key(
+                procurementOpen ? 'work-back' : 'work-operation-back',
+              ),
+              backSize: procurementOpen ? 48 : 44,
               searchHint: procurementOpen
-                  ? 'Search wholesale or bulk'
+                  ? (_activeProcurement.query.isEmpty
+                        ? 'Search wholesale or bulk'
+                        : _activeProcurement.query)
                   : saleOpen
                   ? 'Search products'
                   : 'Search your store',
@@ -1032,7 +1052,9 @@ class _WorkWorkspaceDashboardScreenState
                   : _searchController,
               searchFocusNode: _searchFocus,
               onSwitchWorkspace: () => _showWorkspaceSwitcher(context),
-              onBack: _view == _WorkspaceControlView.operation
+              onBack: procurementOpen
+                  ? () => unawaited(_leaveProcurement())
+                  : _view == _WorkspaceControlView.operation
                   ? () => unawaited(_leaveOperation())
                   : _view == _WorkspaceControlView.alerts
                   ? _showDashboard
@@ -2747,6 +2769,10 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
     required this.profile,
     required this.searchOpen,
     this.searchHint = 'Search your store',
+    this.nameTextScaler,
+    this.nameTextStyle,
+    this.backKey = const Key('work-operation-back'),
+    this.backSize = 44,
     this.keepSearchUtilities = false,
     required this.searchController,
     required this.searchFocusNode,
@@ -2766,6 +2792,10 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
   final WorkProfileOption profile;
   final bool searchOpen;
   final String searchHint;
+  final TextScaler? nameTextScaler;
+  final TextStyle? nameTextStyle;
+  final Key backKey;
+  final double backSize;
   final bool keepSearchUtilities;
   final TextEditingController searchController;
   final FocusNode searchFocusNode;
@@ -2792,10 +2822,10 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
             children: [
               if (onBack != null) ...[
                 SizedBox(
-                  width: 44,
-                  height: 44,
+                  width: backSize,
+                  height: backSize,
                   child: IconButton(
-                    key: const Key('work-operation-back'),
+                    key: backKey,
                     tooltip: 'Back',
                     onPressed: onBack,
                     padding: EdgeInsets.zero,
@@ -2839,6 +2869,8 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                               child: Text(
                                 workspace.name,
                                 key: const Key('work-store-full-name'),
+                                textScaler: nameTextScaler,
+                                style: nameTextStyle,
                                 softWrap: true,
                               ),
                             ),
