@@ -1235,26 +1235,26 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 
 | Candidate | Source:line | Callback | Reconciliation |
 |---|---|---|---|
-| SUPSRC-0001 | buy_v2_catalogue.dart:276 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0002 | buy_v2_catalogue.dart:1141 | onArea | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0003 | buy_v2_catalogue.dart:1144 | onPrevious | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0004 | buy_v2_catalogue.dart:1147 | onNext | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0005 | buy_v2_catalogue.dart:1150 | onRefresh | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0006 | buy_v2_catalogue.dart:1172 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0007 | buy_v2_catalogue.dart:1179 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0008 | buy_v2_catalogue.dart:1186 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0009 | buy_v2_catalogue.dart:1247 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0010 | buy_v2_catalogue.dart:1267 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0011 | buy_v2_catalogue.dart:1806 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0012 | buy_v2_catalogue.dart:1808 | onSaved | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0013 | buy_v2_catalogue.dart:1832 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0014 | buy_v2_catalogue.dart:1843 | onShowAll | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0015 | buy_v2_catalogue.dart:2587 | onPrevious | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0016 | buy_v2_catalogue.dart:2590 | onNext | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0017 | buy_v2_catalogue.dart:2591 | onRefresh | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0018 | buy_v2_catalogue.dart:2599 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0019 | buy_v2_catalogue.dart:2694 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0020 | buy_v2_catalogue.dart:3077 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0001 | buy_v2_catalogue.dart:276 | onRetry | Live-source Offers retry -> _load; separate non-paged provider state; physical retry/error recovery unqualified; no pass inferred from paged review Offers |
+| SUPSRC-0002 | buy_v2_catalogue.dart:1141 | onArea | Catalogue footer area -> showBuyV2CatalogueArea; same area-sheet action as SUPSRC-0006, not a second journey; all area selection descendants require reconciliation |
+| SUPSRC-0003 | buy_v2_catalogue.dart:1144 | onPrevious | Paged catalogue Previous -> _pager.previous; Offers round70 and Store round87 subsets qualified; ordinary Shop/search previous and retained filters remain separate |
+| SUPSRC-0004 | buy_v2_catalogue.dart:1147 | onNext | Paged catalogue Next -> _pager.next; CAT-002, Wholesale round60 and Offers round70 subsets; conditional end/cursor and other contexts not blanket-qualified |
+| SUPSRC-0005 | buy_v2_catalogue.dart:1150 | onRefresh | Paged catalogue Refresh -> _pager.refresh; FILTER-ROUND59-04 and OFFERS-ROUND67-06 observations only; provider publication success unqualified |
+| SUPSRC-0006 | buy_v2_catalogue.dart:1172 | onAction | Missing-region Choose area -> same showBuyV2CatalogueArea as SUPSRC-0002; missing-region entry and return context require physical qualification |
+| SUPSRC-0007 | buy_v2_catalogue.dart:1179 | onAction | Expired/revised publication Refresh offers -> _pager.refresh; ACCESS-ROUND76-01 expiry subset passed; supplier revision/withdrawal authority still unqualified |
+| SUPSRC-0008 | buy_v2_catalogue.dart:1186 | onAction | Paged error Try again -> _pager.retry; same recovery as SUPSRC-0010 in alternate placement; injected/provider error and successful recovery pending |
+| SUPSRC-0009 | buy_v2_catalogue.dart:1247 | onOpenProduct | Product-card onOpenProduct forwarded from parent; no extra button at assignment; parent context and card tap/Add must be qualified separately |
+| SUPSRC-0010 | buy_v2_catalogue.dart:1267 | onAction | Footer error Try again -> _pager.retry; alternate placement of SUPSRC-0008; physical error layout/return recovery pending |
+| SUPSRC-0011 | buy_v2_catalogue.dart:1806 | onVisitProduct | Catalogue toolbar onVisitProduct forwarder into tools; parent Saved/Recently viewed product actions, not standalone tap |
+| SUPSRC-0012 | buy_v2_catalogue.dart:1808 | onSaved | Saved toolbar toggle -> session.showSavedProducts(!savedOnly), concrete button at3072; SAVED round15/16/17 evidence subsets; no blanket account/process-death qualification |
+| SUPSRC-0013 | buy_v2_catalogue.dart:1832 | onOpenStore | Main catalogue Store-search result open forwarder -> onOpenStore; per-result tap/return context needs evidence reconciliation; not a new standalone control |
+| SUPSRC-0014 | buy_v2_catalogue.dart:1843 | onShowAll | Empty saved Show all -> session.showSavedProducts(false); SAVED-ROUND43-03 physically passed474-475; ordinary search and other empty branches distinct |
+| SUPSRC-0015 | buy_v2_catalogue.dart:2587 | onPrevious | Store-search result pager Previous -> _pager.previous; distinct from product pagination; multi-page Store results physical fixture/retention pending |
+| SUPSRC-0016 | buy_v2_catalogue.dart:2590 | onNext | Store-search result pager Next -> _pager.next; distinct from product pagination; multi-page Store results physical fixture/retention pending |
+| SUPSRC-0017 | buy_v2_catalogue.dart:2591 | onRefresh | Store-search result Refresh -> _pager.refresh; physical Store-result refresh and retained product/search context pending |
+| SUPSRC-0018 | buy_v2_catalogue.dart:2599 | onAction | Store-search error Try stores again -> _pager.retry; provider/error fixture and recovery pending; no product-pager pass substitution |
+| SUPSRC-0019 | buy_v2_catalogue.dart:2694 | onOpenStore | Dedicated search Store-result open forwarder -> onOpenStore; same result component as SUPSRC-0013 but distinct entry/return context pending reconciliation |
+| SUPSRC-0020 | buy_v2_catalogue.dart:3077 | onVisitProduct | Toolbar tools onVisitProduct forwarder; alias of SUPSRC-0011 through _CatalogueToolsMenu; Saved/Recently viewed destinations carry actual actions |
 | SUPSRC-0021 | buy_v2_catalogue.dart:3470 | onFocus | Category-search semantic focus; direct accessibility activation pending; pointer category round106 is separate |
 | SUPSRC-0022 | buy_v2_catalogue.dart:3471 | onSetText | Category-search semantic SetText; accessibility value/edit behaviour pending |
 | SUPSRC-0023 | buy_v2_catalogue.dart:3557 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1660,3 +1660,8 @@ Captures 872-884, bound in EVIDENCE.csv to the existing V6 Cursor Review APK. Se
 Recovery: the earlier capture881 tool response was truncated. Bounded read recovered the existing PNG without overwrite; fresh882 confirmed current shown-feedback state before any navigation. Device remained authorized. Original preview state restored. No application restart or data clearing.
 
 Totals: 884 physical captures, 886 evidence rows, 539 action records including 438 device passes; 17 distinct confirmed defects unchanged. These are check records, not unique completed end-to-end journeys. Inventory and shared/conditional descendants remain incomplete. Session preview masking is qualified only for this inbox round; provider privacy, account isolation and process-death behaviour are not established.
+
+
+## Round 123 - Catalogue supplemental action reconciliation
+
+Read exact catalogue source ranges260-285,1115-1200,1230-1276,1788-1855,2570-2610,2680-2705,3065-3085. Reconciled SUPSRC-0001 through0020 against existing device rows. Repeated forwarders are explicitly linked to their parent controls; product, Store-search and Offers pagination are not treated as interchangeable. Live-source retry, multi-page Store search, supplier revision and error recovery remain unqualified where exact device evidence is absent. No physical-device pass or defect added by this source reconciliation. Complete unique-action/journey denominator remains pending the rest of the supplemental/shared inventory. No application changes.
