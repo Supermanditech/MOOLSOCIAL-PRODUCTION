@@ -81,3 +81,11 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Expected: buyer-type label and business-name value have a visible separation or wrap/stack so they read as distinct fields at supported text sizes.
 - Evidence:312-wholesale-delivered-detail. This is a direct device visual finding,not an assertion from host analysis.
 - Source correlation: buy_v2_views.dart11576-11580 passes order.buyerType and buyerName into the delivery-details row. Exact row sizing correction belongs to later implementation;no product code changed.
+
+
+## RV6-D009 - Confirmation deep link displays success without a confirmed purchase
+Status: open. Severity: high (false order confirmation). APK: UAW-CURSOR-REDMI-V6-REVIEW-20260913;Redmi TG8HCYTGGQT885OF.
+Reproduction: with empty cart and no order submitted,deliver declared HTTPS intent https://moolsocial.com/app/buy?view=confirmation to installed Cursor Review. Capture358 shows green check,Order placed,0 products/0 total,0 deliveries,and current saved recipient/address. This is a device-reproduced false-success state,not a completed order/payment.
+Expected: require authoritative confirmed purchase identity and nonempty accepted orders before any success claim;otherwise show unavailable/recovery or return safely without inventing success or using an unrelated saved address.
+Source: journey_router.dart2025 maps confirmation query;buy_v2_screen.dart544-546 directly sets initialView;buy_v2_views.dart8739-8804 unconditionally renders success/confirmed totals and selectedAddress. Normal completion path session11231-11261 is separate and was not invoked by this test.
+Impact: a stale/shared/malformed link can tell a customer an order was placed despite no purchase. Real payment/account backend behavior remains unqualified. Do not fix during this audit. Evidence358 retained. View order details opens existing Active orders with unchanged12active/2delivered359. Reopening link then Continue shopping returns Shop/empty cart360. No new order/payment created by tested navigation.
