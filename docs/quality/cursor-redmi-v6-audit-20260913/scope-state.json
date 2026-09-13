@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 1,
+  "auditStatus": "in_progress",
+  "scope": "Physical Redmi public Buy audit and public data-requirement mapping; no implementation",
+  "device": "TG8HCYTGGQT885OF",
+  "baseline": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+  "candidate": "UAW-CURSOR-REDMI-V6-REVIEW-20260913",
+  "reconciledFromHead": "91e81cde8970378de607837622ed05ddc4ff7a8c",
+  "buildAndInstall": {
+    "recordedState": "built_installed_audit_pending",
+    "authority": "apk-regression-state.json",
+    "qualificationLimit": "Review build; neither production nor backend qualification"
+  },
+  "coverage": {
+    "inventoryComplete": false,
+    "recordedActionRows": 376,
+    "dispositions": {
+      "device_observation": 10,
+      "device_pass": 313,
+      "blocked_provider": 13,
+      "device_failure": 18,
+      "excluded_authorization": 1,
+      "source_unreachable": 3,
+      "blocked_authentication": 1,
+      "device_fail": 1,
+      "blocked_test_data": 11,
+      "source_gap": 1,
+      "data_observation": 3,
+      "scope_boundary_observed": 1
+    },
+    "physicalCaptures": 580,
+    "evidenceRows": 582,
+    "publicDataRows": 58,
+    "confirmedDistinctDefects": 16,
+    "countsAreExhaustiveDenominator": false
+  },
+  "requirements": [
+    {
+      "requirement": "V6 preservation and admission/build/install identity",
+      "state": "recorded_evidence_requires_final_reconciliation",
+      "evidence": [
+        "PREBUILD.md",
+        "source-manifest.txt",
+        "apk-regression-state.json",
+        "uaw-cursor-redmi-v6-review-20260913-build-provenance.txt",
+        "UAT.md"
+      ]
+    },
+    {
+      "requirement": "Every reachable action and nested return path",
+      "state": "incomplete",
+      "evidence": [
+        "JOURNEYS.csv",
+        "UAT.md"
+      ],
+      "remaining": "Reconcile all older remaining notes against later evidence; complete source-derived action inventory; physically qualify remaining reachable cases"
+    },
+    {
+      "requirement": "Normal/error/recovery/keyboard/retention/relaunch/accessibility",
+      "state": "partially_qualified",
+      "evidence": [
+        "JOURNEYS.csv"
+      ],
+      "remaining": "Specific per-action residuals remain; 150 percent text is not 200 percent; process persistence not established by in-session Back"
+    },
+    {
+      "requirement": "Field-level public data ownership and lifecycle",
+      "state": "incomplete",
+      "evidence": [
+        "PUBLIC-DATA.csv"
+      ],
+      "remaining": "Reconcile every displayed field/action with source inventory; retain provider/auth/publication/freshness limitations"
+    },
+    {
+      "requirement": "Confirmed defects and blocked coverage",
+      "state": "ongoing",
+      "evidence": [
+        "DEFECTS.md",
+        "BLOCKERS.md",
+        "JOURNEYS.csv"
+      ],
+      "remaining": "Register new genuine failures; retain explicit missing-fixture and external constraints"
+    },
+    {
+      "requirement": "Final handoff",
+      "state": "not_created",
+      "evidence": [],
+      "remaining": "Create HANDOFF.md only with accurate complete/incomplete dispositions; no exhaustive claim while reachable gaps remain"
+    }
+  ],
+  "nextWork": [
+    "Finish stale remaining-note reconciliation without changing original observations",
+    "Saved-address isolated edit/save and relaunch verification",
+    "Remaining filter/Store/product/cart/order branches from source inventory",
+    "Complete public-data field reconciliation and final evidence handoff"
+  ],
+  "preservation": {
+    "cart": "empty after isolated cleanup570",
+    "savedShop": "original wheat count1 retained580",
+    "addresses": "originals unmodified this round",
+    "noNewApk": true,
+    "noProductEdits": true
+  },
+  "limitations": [
+    "Backend/authentication/provider/payment qualification excluded",
+    "Global history clear not performed over original history",
+    "Fixture passes do not establish publication authority or runtime enforcement",
+    "No goal-completion claim"
+  ]
+}
