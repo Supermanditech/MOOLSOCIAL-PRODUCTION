@@ -1587,3 +1587,26 @@ Remaining59 original references have evidence, forwarder, scope, conditional-blo
 ## Round 115 - physical cart quantity and product return
 
 Captures824-835. Five scoped device-pass records: cart quantity entry, visible Update quantity, cart-product entry/Back, product plus, isolated basket removal. Exact SKU wheat5kg;1/279 to2/558 via button then3/837 via product plus; Back retained cart3/837. Minus3 to2 to1 to0 restored empty Scheduled Shop and Saved1. No new defect. Totals835 captures,837 evidence rows,511 journey records,412 device-pass records,17 defects. Original callback triage complete; semantic/shared/conditional inventory and pending device actions remain open. No product implementation.
+
+
+## Round 116 - shared inbox action grouping
+
+Source apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart SHA256 E9BCBEA050891D497A5BD182E951DC15E8B4ECE2024244777F1AB96DAC0271F6. All37 callback references in this file grouped below; groups may contain distinct branches and are not a tested-journey count. Existing physical evidence must be matched before declaring passes. No device actions, data mutations or new defects this round. Thread, archive and connected settings inventory remains open.
+
+| Group | Source lines | User action | Current disposition |
+| --- | --- | --- | --- |
+| CHAT-INBOX-A01 | 356;361 | Connection request Not now / Send request | Entry and cancel pending reconciliation; Send request excluded real messages; no execution |
+| CHAT-INBOX-A02 | 479 | Undo archive snackbar | Pending isolated fixture; do not archive original conversations |
+| CHAT-INBOX-A03 | 539 | More menu settings / archived destinations | Pending exact menu items and return reconciliation |
+| CHAT-INBOX-A04 | 583;637;641;800;857;917;919 | Chats / People / Discover selection and return | Buy-connected boundary and return checks pending; broad social discovery is not expanded into Buy scope |
+| CHAT-INBOX-A05 | 633;634 | People search and provider refresh | Conditional shared boundary; no authoritative directory qualification |
+| CHAT-INBOX-A06 | 635;636 | Connect or begin person chat | No real connection requests/messages authorized; draft-only entry must preserve existing drafts |
+| CHAT-INBOX-A07 | 638;918 | Open Feed | Downstream social feed outside Buy audit; shared boundary return needs reconciliation |
+| CHAT-INBOX-A08 | 724;726;745;770 | Conversation search open/type/submit/clear/close | Exact existing Chat evidence pending reconciliation; keyboard submit differs from clear and close |
+| CHAT-INBOX-A09 | 911;1389 | Empty-search reset / no-query Discover | Reset and Discover are distinct branches; exact device evidence pending |
+| CHAT-INBOX-A10 | 950;1118;1189 | Conversation menu via More button or long press | Two entry gestures; pending existing evidence and isolated-data availability |
+| CHAT-INBOX-A11 | 952;1117 | Open conversation | Pending exact seller-context and return evidence mapping; tap forwarder is not a second journey |
+| CHAT-INBOX-A12 | 1010 | Conversation filter chips | Each visible eligible chip pending reconciliation |
+| CHAT-INBOX-A13 | 1260;1278;1290;1300 | Pin / attention / read / archive | Distinct state changes; original user conversation states preserved; isolate before execution |
+| CHAT-INBOX-A14 | 1403;1409 | Empty state Open Feed / Start conversation | Forwarded boundary actions A07/A04; no extra journey count |
+| CHAT-INBOX-A15 | 662;1492 | Load failure Try again | One provider retry path; unavailable/error fixture not a successful live refresh |
