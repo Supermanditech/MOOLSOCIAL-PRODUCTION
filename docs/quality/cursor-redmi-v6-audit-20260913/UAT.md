@@ -1068,7 +1068,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0465 | buy_v2_views.dart:15010 | _BuyV2AddressRequestFormState | onTap | device_pass ADDR-ROUND137-01 Share request opens Android chooser966 and Cancel967; fixture link only; recipient binding expiry actual receipt and sending not qualified |
 | SRC-0466 | buy_v2_views.dart:15017 | _BuyV2AddressRequestFormState | onTap | pending exact request-address Copy action; provider-issued recipient binding and expiry not qualified |
 | SRC-0467 | buy_v2_views.dart:15027 | _BuyV2AddressRequestFormState | onPressed | ADDR-006 manual entry120 and validation007-010; named recipient transfer with keyboard now ADDR-ROUND138-01/02 captures970-973; process-death and remaining input variants unverified |
-| SRC-0468 | buy_v2_views.dart:15278 | _BuyV2AddAddressFormState | onSelected | Other place creation AUDIT-ROUND40-04 and ADDR-ROUND57-01; other kind chips not individually inferred |
+| SRC-0468 | buy_v2_views.dart:15278 | _BuyV2AddAddressFormState | onSelected | Other place create ROUND40/57;all four kind chips now ADDR-ROUND139-01 through04 captures978-981 retain recipient;per-kind save validation and persistence remain separate |
 | SRC-0469 | buy_v2_views.dart:15346 | _BuyV2AddAddressFormState | onPressed | ADDR-007 through009 required-field validation; isolated create AUDIT-ROUND40-04 and edit ADDR-ROUND57-02; other validations pending |
 | SRC-0470 | buy_v2_views.dart:15393 | _AddressFormHeader | onPressed | ADDR-004 edit Close and ADDR-010 partial Close; request X968 and named request keyboard-open X974-975 qualified; other parent contexts separate |
 | SRC-0471 | buy_v2_views.dart:15426 | _ReturnAffordance | onTap | pointer return forwarder; each parent destination separately indexed; no blanket pass |
@@ -1789,3 +1789,10 @@ Eight new captures;three scoped device passes;20 defects unchanged.570 action/ch
 Redmi969-975. Entered isolated unsaved AuditRecipient970 while keyboard visible. Add it myself971 transfers name into recipient field. Android Back972 returns underlying request;settled973 retains name and focused keyboard with readable controls. This is nested-form return, not a keyboard-only dismissal claim. Request X974 and settled975 dismiss keyboard and retain original Home/Work only,Work selected. No address saved,clipboard change,request creation or message. Transition frames972/974 do not establish clipping failures.
 
 Three scoped device passes;SRC0467/0470 reconciled.573 action/check rows,464 device passes,20 confirmed defects,975 physical captures. Full audit and unique complete journey denominator remain incomplete. Device at original address selector975.
+
+
+## Round139 - address type selection and draft preservation
+
+Redmi976-982. Open unsaved Add address976;enter isolated AuditType recipient and dismiss keyboard977. Select Work978,Third party979,Other place980,Home981. Each selection visibly changes correctly and preserves entered recipient. X982 cancels form;only original Home/Work remain with Work selected. No address saved or backend write. These passes cover pointer chip selection and same-form text retention, not per-kind save validation, persistence or serviceability. SRC0468 updated accordingly.
+
+Five device passes added;578 action/check rows,469 device passes,20 confirmed defects,982 physical captures. Full audit and unique journey denominator remain incomplete. Device at original address selector982.
