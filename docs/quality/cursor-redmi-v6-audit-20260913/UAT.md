@@ -486,3 +486,9 @@ PD-062 records exact purchased SKU/line/account/Store bindings, decimal quantity
 Original font_scale1.0 read before change;set2.0/readback2.0. Captures671-672 show two-column Offers cards, visible price/delivery/Add fit and wrapped promotion. Category sheet673 wraps visible labels with accessible close icon. Android Back dismissed;restore1.0/readback1.0;674 reviewed. Category illustration fallback icons at200 return to illustrations at1.0: observation ACCESS-ROUND72-02 pending source investigation, not yet confirmed defect. No cart/address/saved edits or transactions.
 
 439 actions;355 device passes;674 captures;676 evidence rows;62 public mappings;16 confirmed defects. This is limited Offers accessibility coverage, not whole-module200 qualification. No process-death claim.
+
+## Round 73 - illustration fallback reconciliation
+
+ACCESS-ROUND72-02 source explanation: buy_v2_design.dart2044-2081 measures illustration-label words using current text scale and returns BuyV2ProductPhotoUnavailable when width or remaining height cannot fit. Lines2112-2126 expose product-specific unavailable semantics and crossed-image icon. This is consistent with671-672 and restored674;no evidence here of real supplier-photo failure. Observation retained, no new defect. Real supplier media and screen-reader output remain unverified. Initial catalogue read had a Python syntax error before any read/write;corrected bounded design-file read completed.
+
+No device actions or product edits;all counters unchanged. Full audit remains active.
