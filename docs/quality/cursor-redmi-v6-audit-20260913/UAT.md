@@ -460,3 +460,9 @@ Physical651-659 reviewed. Nextpromotion652 showsmanufacturer580/10kgMOQ2;Previou
 Source-only reconciliation of buy_v2_views.dart 10794-11250 expands the earlier capture275 signed-out collection boundary into eight explicit descendants in COLLECTION-ROUND68-01 through 08: return context, scan eligibility, close camera, QR reconciliation, lifecycle/account isolation, order help, purchased lines/receipt, and terminal/status transitions. All eight remain blocked_authentication, not device passes or new confirmed defects. An authorised authenticated non-live collection fixture and provider are needed; no real claim/payment/transaction was performed. Existing COLLECTION-ROUND18-05 remains the parent boundary, so row counts are not distinct defect counts.
 
 429 action rows; 659 physical captures unchanged; 16 distinct confirmed defects unchanged. No product, device, APK or user-data mutation. Complete source-derived enumeration and final handoff remain unfinished.
+
+## Round 69 - physical Offers category and product return
+
+Redmi TG8HCYTGGQT885OF connected. Captures660-664 physically reviewed: Offers resumed660; category icon opened661; Dairy & bakery selected662 with paneer46 INR92/200g promotion and dairy results; View offer opened exact product663; Android Back retained dairy promotion/grid664. Three device passes, no new confirmed defect. No cart/address/saved edits or transaction. Product visit can update recent history. Provider price/trust claims are not qualified by fixture navigation.
+
+432 action rows;349 device passes;664 physical captures;666 evidence rows;61 public mappings;16 distinct defects. All-category reset, remaining categories and terminal pagination remain pending; full audit and handoff incomplete.
