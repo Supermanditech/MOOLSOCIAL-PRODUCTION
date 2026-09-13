@@ -145,3 +145,12 @@ Reproduction:one isolated wheat pack279;Confirm order -> enable GST -> Add;enter
 
 ### RV6-D017 source correlation
 Buy GST InputChip at buy_v2_views.dart6158-6175 uses Text(profile.legalName),selected state and no explicit foreground styling. Shared core/design/mool_theme.dart174-185 supplies selectedColor navy and labelStyle navy;secondaryLabelStyle white is separately defined. This supports the captured selected-chip contrast failure;exact Flutter theme resolution should be verified during correction. Prefer a scoped Buy fix or separately owned shared-theme regression assessment;no ownership expansion or implementation during this audit.
+
+
+## RV6-D018 - Product Back loses paginated search destination and position
+Status: open. Severity: moderate navigation/retention failure. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
+Reproduction: Scheduled Shop -> search milk -> keyboard Search after settled query (898) -> Next (899, range41-80) -> open Toned fresh milk1184 (900) -> Android Back. Settled902 returns main Shop catalogue starting milk8/cereal74/chocolate144, not originating search page41-80. Query milk is retained but page and dedicated search surface are lost. Capture901 is a transition frame, not a separate blank-screen defect. Expected: return to the same search result page and retained query so the customer can continue browsing without repaging. No cart mutation or real transaction. Distinct from related-product Back D007: origin here is paginated search results. Ordinary catalogue page return passed round124; it does not cover this branch. Root cause and implementation remain pending; preserve exact route/search context in correction.
+
+
+### RV6-D018 recovery clarification
+Capture904 after explicitly reopening the search field restores range41-80 and milk1184. The search pager state is retained internally: the confirmed failure is wrong Back destination and visible loss of browsing position until an extra search tap, not irreversible cursor/data loss. Clearing query905 and Done906/settled907 restores ordinary Scheduled Shop, Saved1 and empty cart. Correct the return surface; do not reset or replace preserved search state unnecessarily.

@@ -1672,3 +1672,10 @@ Read exact catalogue source ranges260-285,1115-1200,1230-1276,1788-1855,2570-261
 Physical Redmi captures885-891: original empty-query catalogue885, exposed footer886, Next887 (carry bags82 first), product82 entry888, Android Back889 retaining later-page products, footer890, Previous891 restoring wheat2/notebook6/eggs10. Scheduled mode, Saved1 and empty cart remained. No cart, saved or address mutation; ordinary product visit may add its normal recently-viewed history. Two scoped passes recorded. No new defect. SUPSRC-0003 ordinary Shop Previous subset and SUPSRC-0009 parent product/Back subset now have device evidence; filtered search and Store-search pagination remain separate and pending. Final screen is original page at footer.
 
 Totals: 891 physical captures;893 evidence rows;541 action records;440 device passes;17 distinct defects. Complete unique-journey denominator remains unqualified. No implementation or APK changes.
+
+
+## Round 125 - Search keyboard submission, paging and wrong product Back destination
+
+Physical captures892-907. Settled milk query897; keyboard Search898 dismisses keyboard and retains results. Next899 reaches41-80; milk1184 product900; AndroidBack901 transition, settled902 ordinary first-page catalogue. RV6-D018 registered: wrong return surface. Reopen search903/904 recovers41-80 internally, so no claim of permanent pager loss. Clear905 and Done906/settled907 restores Scheduled Saved1 emptycart. Search history milk naturally moves to top; existing entries retained; no history clearing. Product visit adds normal recent-view history. No cart/address mutation.
+
+Initial attempt895 unexpectedly produced milke while layout/loading changed; Backspace896 corrected it. This is an observation with undetermined input/keyboard cause, not a reproduced app failure. Later settled keyboard submission passed898. Four passes, one failure and one observation recorded. 907 physical captures;909 evidence rows;547 action records;444 passes;18 distinct defects. Root cause of D018 unimplemented. Shared/provider and complete action inventory remain open; no exhaustive journey count claimed.
