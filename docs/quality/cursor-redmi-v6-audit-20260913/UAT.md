@@ -1731,3 +1731,27 @@ Register now has555 action/check rows,449 device passes and19 distinct defects;9
 Physical Redmi930-936. Who can message you931/settled932 clips the No new conversations explanation above Android navigation; upward swipe933 cannot reveal remaining text. Registered RV6-D020 before continuing. Font scale readback1.0; source chat_settings_screen.dart529 confirms complete text. Source85-125 shows null selection returns without _savePrivacy. Android Back934 preserves Everyone and settings position. Group invitations935 empty state fits; Android Back936 preserves settings position. No service mutation, real invitation or group membership change. Populated invitation decisions explicitly blocked by absent isolated fixture.
 
 Two device passes,one failure,one conditional blocked row added. Totals559 action/check rows,451 device passes,20 distinct defects,936 physical captures. Complete deduplicated journey denominator remains unreconciled. Current device at settings privacy section936; original preferences retained. No implementation or APK.
+
+
+## Round134 - shared privacy descendant and data ownership reconciliation
+
+Source-backed mapping PD066-069 added for notification preferences/device permission, message requests, blocked accounts and group invitations. These are private customer/platform contracts reached from Buy, not supplier-owned public listing fields. Account/recipient binding, immutable identities, units, freshness, acknowledgement and unavailable behavior are explicitly separated from fixture navigation passes. No device action this round and no additional device pass claimed.
+
+Bounded descendant inventory supplement (not a completed journey denominator):
+
+| Action group | Source | Current qualification |
+| --- | --- | --- |
+| Request list empty and Back | chat_privacy_screens.dart31-88 | Redmi926-927 pass |
+| Request load Retry | chat_privacy_screens.dart76/344 | Provider-error fixture required; unverified |
+| Request Decline and failure feedback | chat_privacy_screens.dart130/173-199 | Populated isolated request required; unverified |
+| Request Accept and thread insertion | chat_privacy_screens.dart148;chat_session.dart1451-1473 | Populated isolated request required; unverified |
+| Blocked list empty and Back | chat_privacy_screens.dart222-279 | Redmi928-929 pass |
+| Blocked list Retry | chat_privacy_screens.dart267/344 | Provider-error fixture required; unverified |
+| Unblock and failure recovery | chat_privacy_screens.dart297;chat_session.dart1387-1423 | Populated isolated relationship required; unverified |
+| Group invitations empty and Back | chat_group_invites_screen.dart30-60 | Redmi935-936 pass |
+| Invitation Decline and response failure | chat_group_invites_screen.dart95/130-139 | Populated isolated invitation required; unverified |
+| Invitation Accept and response failure | chat_group_invites_screen.dart109/130-139 | Populated isolated invitation required; unverified |
+
+Source investigations, not confirmed Redmi defects: notification load caches until refresh and fixture updates may be local only; actual permission/persistence/delivery remains unqualified. Requests/blocked list no-gateway paths return false without new error; current empty UI must not be described as authoritative server emptiness. Group invitation body selects empty view directly from list state; load-failure distinction requires a provider-error reproduction. These observations require follow-up evidence, not automatic defect closure or invented failure claims.
+
+No application changes.20 confirmed defects and559 action/check records unchanged;public-data mapping now69 rows. Remaining full audit and deduplicated complete journey inventory still open.

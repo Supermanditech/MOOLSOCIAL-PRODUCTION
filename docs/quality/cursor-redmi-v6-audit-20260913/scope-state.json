@@ -30,7 +30,7 @@
     },
     "physicalCaptures": 936,
     "evidenceRows": 938,
-    "publicDataRows": 65,
+    "publicDataRows": 69,
     "confirmedDistinctDefects": 20,
     "countsAreExhaustiveDenominator": false
   },
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 133
+  "latestAuditRound": 134
 }
