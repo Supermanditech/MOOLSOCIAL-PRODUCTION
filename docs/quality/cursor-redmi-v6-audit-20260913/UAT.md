@@ -1620,3 +1620,8 @@ Captures836-846: Shop rail Chat opens shared inbox after transition; Unread show
 ## Round 118 - physical Shop Chat search
 
 Captures847-859. Eight pass records: inline search open, unmatchedzzzz, keyboard Search, settled Clear search CTA, positive Metro, suffix X clear, empty-search close icon, Android Back to Scheduled Buy. Original unread1/pin preserved; no conversation opened or message sent. Capture852 is keyboard transition; tap at prior CTA position then missed after layout settled. Capture853 retains query and is not a failed Clear action; corrected visible CTA tap at854 works. CHAT-INBOX-A08 search branches and A09 query reset now have scoped physical evidence. Totals859 captures,861 evidence rows,529 journey records,429 passing records,17 defects. Other shared menus/conditional actions and full semantic inventory remain pending.
+
+
+## Round 119 - physical archive/settings navigation and data ownership
+
+Captures860-871. Six navigation passes: More menu, empty archive, Back to Chat, settings entry/scroll, Back to inbox, Back to Scheduled Buy. One settings/disclosure observation; no state changed. Original four inbox entries/unread1/pin and Buy Saved1/empty cart retained. CHAT-INBOX-A03 Settings and Archived entries qualified; Refresh/Open Feed and menu dismissal remain pending. Archive toolbar Back, populated open/restore, undo and session reset remain unverified; empty CTA only qualified. Settings controls viewed are not passed as changed or service-enforced. PD-064/065 map archive/session settings and authoritative privacy/call boundaries. Totals871 captures,873 evidence rows,536 journey records,435 passing,16 device observations,65 public-data rows,17 defects. Full audit still open.
