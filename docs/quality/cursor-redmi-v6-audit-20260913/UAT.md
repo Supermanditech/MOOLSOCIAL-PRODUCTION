@@ -1067,10 +1067,10 @@ Source hashes bind the following index to the inspected files:
 | SRC-0464 | buy_v2_views.dart:14769 | _BuyV2AddressChoice | onSelected | ADDR-003 Work Edit; isolated edit/save ADDR-ROUND57-02 and deletion AUDIT-ROUND40-06/07; other original addresses preserved |
 | SRC-0465 | buy_v2_views.dart:15010 | _BuyV2AddressRequestFormState | onTap | device_pass ADDR-ROUND137-01 Share request opens Android chooser966 and Cancel967; fixture link only; recipient binding expiry actual receipt and sending not qualified |
 | SRC-0466 | buy_v2_views.dart:15017 | _BuyV2AddressRequestFormState | onTap | pending exact request-address Copy action; provider-issued recipient binding and expiry not qualified |
-| SRC-0467 | buy_v2_views.dart:15027 | _BuyV2AddressRequestFormState | onPressed | ADDR-006 manual entry capture120 and validation ADDR-007 through010; recipient prefill variations pending |
+| SRC-0467 | buy_v2_views.dart:15027 | _BuyV2AddressRequestFormState | onPressed | ADDR-006 manual entry120 and validation007-010; named recipient transfer with keyboard now ADDR-ROUND138-01/02 captures970-973; process-death and remaining input variants unverified |
 | SRC-0468 | buy_v2_views.dart:15278 | _BuyV2AddAddressFormState | onSelected | Other place creation AUDIT-ROUND40-04 and ADDR-ROUND57-01; other kind chips not individually inferred |
 | SRC-0469 | buy_v2_views.dart:15346 | _BuyV2AddAddressFormState | onPressed | ADDR-007 through009 required-field validation; isolated create AUDIT-ROUND40-04 and edit ADDR-ROUND57-02; other validations pending |
-| SRC-0470 | buy_v2_views.dart:15393 | _AddressFormHeader | onPressed | ADDR-004 edit Close and ADDR-010 partial Close; request-header X now ADDR-ROUND137-02 capture968; keyboard/filled recipient variants separate |
+| SRC-0470 | buy_v2_views.dart:15393 | _AddressFormHeader | onPressed | ADDR-004 edit Close and ADDR-010 partial Close; request X968 and named request keyboard-open X974-975 qualified; other parent contexts separate |
 | SRC-0471 | buy_v2_views.dart:15426 | _ReturnAffordance | onTap | pointer return forwarder; each parent destination separately indexed; no blanket pass |
 | SRC-0472 | buy_v2_views.dart:15468 | _ReturnAffordance | onTap | unverified semantic return activation; pointer/Android Back not equivalent |
 | SRC-0473 | buy_v2_views.dart:15650 | _DecisionActionRow | onTap | unverified semantic decision-row activation; each parent decision separately indexed |
@@ -1782,3 +1782,10 @@ Delivery selector963 -> Request an address964 -> Share965 preparing -> Android c
 One initial session-source lookup incorrectly used ui_v2/buy/buy_v2_session.dart and failed. Bounded search recovered actual features/buy/buy_v2_session.dart under standing read-recovery authority;no product edits or conclusions from missing file.
 
 Eight new captures;three scoped device passes;20 defects unchanged.570 action/check records,461 device passes,968 physical captures. Full audit remains open.
+
+
+## Round138 - named request manual-entry transfer and cancellation
+
+Redmi969-975. Entered isolated unsaved AuditRecipient970 while keyboard visible. Add it myself971 transfers name into recipient field. Android Back972 returns underlying request;settled973 retains name and focused keyboard with readable controls. This is nested-form return, not a keyboard-only dismissal claim. Request X974 and settled975 dismiss keyboard and retain original Home/Work only,Work selected. No address saved,clipboard change,request creation or message. Transition frames972/974 do not establish clipping failures.
+
+Three scoped device passes;SRC0467/0470 reconciled.573 action/check rows,464 device passes,20 confirmed defects,975 physical captures. Full audit and unique complete journey denominator remain incomplete. Device at original address selector975.
