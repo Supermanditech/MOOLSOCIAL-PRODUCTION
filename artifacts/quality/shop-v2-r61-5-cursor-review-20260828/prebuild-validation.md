@@ -1,0 +1,3 @@
+# Prebuild validation
+
+Passed for a582ea950e056ff49c69ac0553984f2a2903cc18 with source manifest 8512355AD08E1CC45731B7D8B97772AE9CE45360811D1FF68D9F496E28CF64E8. Build authorization remains single-use and CursorUiReview-only.

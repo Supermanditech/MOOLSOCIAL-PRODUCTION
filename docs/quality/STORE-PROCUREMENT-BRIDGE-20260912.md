@@ -1,0 +1,517 @@
+# Retailer Store procurement integration bridge
+
+Founder standing authority; parent 35b97857f3635c01aa283635fda32ad43c608a1e.
+Reuse this clean isolated checkout on a new branch; the previous child branch,
+repair branch and original Codex/Cursor branches remain retained and untouched.
+
+MVP-required integration outcome: retailer Restock/Group Buying/Buy Direct must use
+the exact authenticated account, approved Store and originating operation, with
+independent durable Buy state and truthful supplier/offer eligibility. Ordinary
+consumer Shop remains separate. No new screen, backend grant or payment authority.
+
+Exact functional scope: procurement state reused in existing work_services.dart
+and focused existing Work tests; existing
+journey_router.dart entry; work_workspace_dashboard_screen.dart; Work model/session
+only where required for durable operation and exact split-order references; existing
+work_workspace_layout_safety_test.dart and work_store_atomic_operations_test.dart.
+Reuse BuyV2ProcurementContext, BuyV2Session and existing scoped preference store.
+Never synthesize buyer approval or supplier eligibility from a display name.
+
+Qualification: account/Store/operation changes and late responses; durable origin
+and commerce-before-draft relaunch; retained cart/search/product; exact order IDs;
+normal/200% Store and unchanged Shop; full analysis, connected tests, actual captures.
+Backend authoritative enforcement and external provider acceptance stay pending.
+No APK or final admission until the entire integration is qualified.
+
+## In-progress verification checkpoint
+
+The founder's standing authorization admits the exact Buy screen startup owner
+inside this integration child only. Its original Cursor branch remains untouched.
+The primary claim was moved only for `apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart`;
+the existing ticket-bound checker now admits twelve exact owners. Registry 4605
+records the synchronous restoration notification exposed by scoped embedding.
+No general gate behavior or assertions were relaxed.
+
+Implemented draft: separate Store procurement controller and encrypted origin
+bookmark; retained inactive operation on deliberate return; account/Store guards;
+failed-read/write preservation; scoped preference store; explicit tracking order
+entry; entry-view capture; post-frame Buy initial restoration with mounted guard.
+
+Verified on the current draft:
+- 15 focused controller/bookmark checks passed.
+- Complete work_store_atomic_operations_test.dart: 229 passed, zero failures.
+- Embedded DASH10 restock search/cart/Back: 2 passed at normal and 320x568/200%.
+- Separate actual Flutter capture run: 2 passed, new versioned evidence under
+  `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-procurement-bridge-20260912-scoped-v1/`.
+- Inspected normal cleared catalogue and 200% empty recovery captures only;
+  do not infer approval of all captures.
+
+Earlier failed runs remain failures: seven DASH10 stock checks passed while two
+legacy unscoped Restock fixtures failed; scoped replay then exposed synchronous
+restoreCommerce notifications during widget construction. These were not counted
+as qualification passes. Full analysis initially found one redundant test import,
+which was removed before the fresh analysis replay.
+
+Remaining before sealing this child: remove the consumer "Shopping for home?"
+promotion from scoped Store procurement (visually reproduced); complete exact
+purchase/origin tracking and relaunch coverage, including switching procurement
+purposes without abandoning an earlier operation; strengthen retained product/cart
+restart coverage; ordinary Buy and connected shared regression replay. The 200%
+capture includes a fixture alert notice and needs a quiet-state visual replay.
+Backend grants and provider authority are still unavailable, not simulated as
+production success. This is an uncommitted implementation checkpoint, not a
+qualified integration baseline, APK or device closure.
+
+## Subsequent scoped replay
+
+The same branch-bound owner list now includes the existing Buy catalogue owner
+(thirteen total), solely to hide the consumer home-shopping promotion when
+isStoreProcurement is true. Consumer Shop/Wholesale promotion behavior is retained.
+The existing first-party Buy promotion test passed. Scoped DASH10 passed twice
+again with the absence assertion and new restart assertions for retained cart
+quantity, search, origin scope and stock-statement return destination.
+
+Supply-purpose cycling now retains a Store visit identifier while purpose remains
+part of each distinct Buy storage namespace. A new controller test proves all
+purpose searches and scopes survive cycling and controller recreation.
+
+Explicit tracking route initialization also notified its embedding parent during
+mounting; defer that initialization alongside commerce restoration. All six
+DASH07 active tracking revalidation cases now pass (normal and 200%, removed order,
+changed purchase identity and changed retail destination). Tracking opens only in
+the authenticated Store purchase session and revalidates the exact linked order.
+
+Capture v2 passed two tests but is draft evidence, not final source qualification:
+the explicit-entry timing correction was made before polling its terminal result.
+Retain these captures and make a fresh versioned capture after source stabilizes.
+Do not reuse any earlier failed runs as passing qualification evidence.
+
+Still required: scoped tracking fixture coverage, final connected tests/full
+analysis/quiet-state visual replay, child seal and all final integration checks.
+The current branch remains uncommitted and is not ready for APK or admission.
+
+Full Buy screen regression replay after the explicit-entry timing correction:
+238 passed, zero failures (buy_v2_screen_test.dart). This includes ordinary Shop,
+Wholesale, Cart, checkout, tracking, provider storefronts and shared Chat returns.
+It does not replace scoped Store tracking or live-backend qualification.
+Fresh origin readback still equals Codex 2a860f9f9fd793d4f366c5952f4f8eb05326f58b,
+Cursor 4d5ae49543cc5e88eecda2a48e948cbd18500a4d and repair
+fb300e169e1f3bdf84052d9cc05a6d311aa51132; both source tips remain ancestors of HEAD.
+
+The full atomic file now passes 230 checks. Scoped tracking uncovered a temporary
+catalogue restoration state being mistaken for Back; do not arm tracking return
+until the scoped order has actually been restored. Both scoped tracking scales
+pass after that correction, preserving consumer selection and invalidating the
+old session when Store changes. A combined regex test invocation was rejected by
+Windows batch interpretation of its pipe before tests started; run separate plain
+name filters instead. That rejected invocation provides no qualification evidence.
+
+## Local correction qualification
+
+Final connected Store replays: DASH07 18 passed; DASH10 9 passed. The scoped
+tracking test now uses the isolated commerce-response fixture, preserves the
+consumer order selection, verifies exact order and Store identity, returns to the
+purchase list and retires the scoped session when Store changes. Earlier legacy
+revalidation checks remain in place. The atomic suite passes 230 tests; the Buy
+screen suite passes 238 tests. Counts overlap where focused replays are cited.
+No failed invocation is included in these passing counts.
+
+Fresh full Flutter analysis: zero issues. Existing regression-memory check passes
+4576 records with 2518 applicable using the existing supported EvidenceArchiveRoot
+parameter and retained MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904 directory. The
+initial invocation without that archive failed on historical evidence, not a
+missing product source; no evidence or registry records were removed.
+
+Fresh scoped-v3 capture run: both scales pass. Inspected normal cleared catalogue
+and 200% recovery; the Store consumer promotion is absent and the recovery control
+is visible without the fixture alert toast. Captures are under the same external
+audit root with folder store-procurement-bridge-20260912-scoped-v3. Historical v1/v2
+captures remain preserved. Only those inspected views have visual-review evidence.
+
+This qualifies the bounded frontend correction locally, not backend enforcement,
+OPPO/Redmi testing, or final integration. Default production procurement fails
+closed without a configured authoritative commerce adapter; host fixtures supply
+test grants only. Final integration admission, combined qualification, source
+handoff and APK build remain required. Shared cold-start and external-provider
+limitations must remain explicit in that baseline handoff.
+
+Final admission identity binding: founder standing authority permits this primary
+task /root to act only for integration lane, work store-buy-final-20260912, ticket
+UAW-INTEGRATION-STORE-BUY-FINAL-20260912 and its exact fresh integration worktree.
+Only the task-prefix comparison is bound; recorded claims, branch, governance-tag
+start, automatic two-parent merge, complete ancestry, clean managed worktrees,
+approved-tip remote equality and integration-close checks remain unchanged.
+The sealed functional correction remains 2de2f09fef0791b72a826ca75c54a09f544ba425;
+this mechanical admission commit changes no app/test source.
+
+The fresh target at c2a65ac51ed58174754b9b07f2223583c48500b3 retains its historical
+policy unchanged; today's integration_start validation rejected that older schema.
+Use the already-existing integration_admission_authorize phase from this sealed
+source lane, bounded to this ticket/root and exact final target. It verifies the
+qualified 2de2f09f apps tree is unchanged, atomic source history, fresh source remote,
+all clean managed worktrees, the target's exact governance-tag HEAD/branch and no
+existing target remote. It authorizes only one automatic no-FF admission. Subsequent
+integration_verify/close run the merged current checks with no exemptions from
+ancestry, tree equality, merge count or source preservation. No historical baseline
+policy was migrated, copied into the target or bypassed by source edits there.
+
+## REG4606 combined qualification corrections (not sealed)
+
+Automatic candidate fe6cb7028beaadedd50b857c83fbe1ffb4c86a82 is preserved,
+not qualified: eight-file combined run exited 1, 1829 passed / 79 skipped /
+14 failed. Nine procurement fixtures still use the former consumer session;
+two Files transitions duplicate the live navigation OverlayPortal during a Hero
+flight; three Chat cases expose the public product-link host mismatch and an
+absent-brand expectation. Full log is retained outside this worktree at
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-buy-final-20260912-combined-v1.log`.
+
+Standing founder authority admits only three additional existing primary-owned
+files to this exact correction boundary: chat_entry_context.dart,
+mool_global_navigation_v2.dart, and global_contextual_chat_shell_test.dart.
+Registry generation is 4577. No general ownership or integration rule changed.
+
+Implemented: Chat accepts validated HTTPS first-party product listing links for
+current moolsocial.com and retained moolsocial.app, rejecting unrelated routes,
+ambiguous duplicate parameters, credentials, fragments and nonstandard ports.
+Tests retain populated supplier/product facts and represent absent brand/variant
+as null. First replay 73/1 retained; corrected full Chat replay 74/0 passed.
+Navigation Hero uses an inert visual launcher during flight, not a second live
+portal. All ten REG4551 Files/Back checks pass, including both previously failing
+cases. Logs: store-buy-reg4606-chat-v1.log, store-buy-reg4606-chat-v2.log and
+store-buy-reg4606-files-v1.log in that same external evidence directory.
+
+Still pending: nine scoped procurement fixture corrections, connected navigation
+and full combined regressions, visual checks, clean seal and fresh admission.
+These local passes do not qualify integration, a new APK or device behavior.
+
+Nine procurement fixture cases are now corrected with explicit Store context and
+host-only commerce responses. Filter/cart ownership assertions additionally prove
+the consumer session is unchanged. Full analysis passes with zero issues;
+regression-memory gate passes 4577 entries / 2518 applicable. Full Work layout
+replay is running as session 11118, log store-buy-reg4606-work-v1.log; retain and
+poll this process rather than restarting it. No pass is claimed until exit.
+Fresh origin readback still matches both original input tips and the previously
+sealed child tip 7fe3d230; these correction drafts are not yet committed.
+
+Work replay completed exit 0: 812 passed / 79 skipped / zero failures. All nine
+original fixture failures are resolved in that run. This is not a new full
+integration qualification. Cursor's additional source concern was reproduced
+with a scope-specific host adapter: a Buy Direct purchase is not found after
+the latest browsing operation changes to Restock. Test `DASH07 tracking uses
+purchase purpose after browsing Restock` fails on the expected tracking screen,
+log store-buy-tracking-purpose-reproduction-v1.log. The purchase model lacks its
+original procurement context and the dashboard opens the latest bookmark purpose.
+Required follow-up: bind exact purchase context, validate account/Store identity,
+restore the purchase's purpose/operation, test purpose switching and relaunch.
+Do not infer context for legacy records or treat missing authority as success.
+
+REG4607 correction: WorkspacePurchaseRecord now optionally carries the trusted
+original BuyV2ProcurementContext; legacy records remain renderable but cannot
+claim scoped tracking without that context. The controller accepts an exact
+context only for the current account/Store and requested purpose, persists that
+operation, and rejects invalid identities without mutation. Dashboard tracking
+uses the selected purchase context and revalidates it against the current record.
+The live backend purchase adapter must supply this context; host fixtures do not
+qualify that pending external integration.
+
+Fresh qualification: 233 atomic tests pass, including exact-context relaunch and
+foreign identity/purpose rejection. All 20 DASH07 checks pass, including Buy
+Direct and Group Bulk Buying after switching to Restock and recreating the
+controller. Logs store-buy-reg4607-atomic-v1.log and store-buy-reg4607-dash07-v2.log
+are retained in the external evidence directory. The predecessor correction-v1
+log records 19 passes before expanded coverage. Full eight-file combined replay
+now runs as session 40048, log store-buy-reg4607-combined-v2.log. It is not yet
+complete. Do not restart it or claim final qualification from partial output.
+
+### Disposition of the 79 historical skips
+
+All are in work_workspace_layout_safety_test.dart, unchanged by this correction:
+- 11 Workspace overnight capture variants gated by MOOL_CAPTURE_STORE_VIEW_V2.
+- 23 tests in the existing `local Store 1-40 review evidence` group, disabled
+  since commit 0ac4ca52. This comprises 17 historical layout/action assertions
+  and six founder captures. Examples require the former command-centre/Today
+  canvas, 60-pixel rail spacing and retired Grow wording. They are not current
+  visual authority and are not counted as passed. Historical files remain intact.
+- 20 live Store captures gated by MOOL_CAPTURE_WORK_STORE_LIVE_V1.
+- 25 other founder captures gated by MOOL_CAPTURE_WORK_STORE_1_40 (the six
+  inside the disabled group are counted only in that group, not twice).
+
+Current behavior is exercised by active Store View first-tap/Back cases, DASH02
+exact search/update/Back, DASH07 purchase tracking, DASH10 scoped restock/cart,
+Store coverage ordering/visibility separation, and Group Bulk payment-truth
+checks. Specific historical business guarantees must remain covered by these
+current tests, not inferred from a skipped capture. Actual current Flutter
+captures still need review before sealing. No physical-device or backend pass
+is implied by this skip inventory.
+
+Post-REG4607 full analysis again passed with zero issues (14 seconds), evidence
+store-buy-reg4607-analysis-v2.log. The combined process remains session 40048;
+do not start another copy. The source correction is still unsealed pending that
+result and current visual review. Final admission must use a fresh successor
+target and exact new qualified source; do not amend/reset/reuse failed fe6cb702.
+
+Full eight-file combined replay completed: session 40048 exit 0, 1849 passed,
+79 documented skips, zero failures, 8m16s. This includes both newly added
+cross-purpose tracking cases and three controller safety/relaunch tests, the
+corrected original failures, Buy session/screen, Chat, journey and C20E tests.
+Evidence: store-buy-reg4607-combined-v2.log. Final integration remains pending;
+the failed predecessor is not retroactively qualified by this source-child run.
+
+Fresh actual Flutter visual replay: both DASH10 restock tests passed with
+MOOL_CAPTURE_STORE_VIEW_V2 and unique folder store-buy-reg4607-visual-v1.
+All 13 generated PNGs were inspected: normal/200% catalogue, retained search,
+keyboard, empty-result recovery and revealed recovery action. Content scrolls
+within the enlarged viewport; the existing Store header and single navigation
+owner remain, with no duplicate consumer promotion. These captures exercise
+host fixtures, not a physical keyboard or live supplier authority. External
+log: store-buy-reg4607-visual-v1.log. Historical images were not overwritten.
+A premature directory read before capture completion found no directory; the
+same original test process was awaited to exit 0 without restart. A documentation
+patch with stale context was rejected without modification, then reapplied
+against the exact read-back tail. No source/test attempt was affected.
+
+## Fresh successor admission pin
+
+Qualified correction commit: 0a1c0e5aed5e6e840ac740cc6ac947bab8da79cf,
+clean, pushed and remote-equal; handoff gate passed. Bind the existing exact
+admission to `store-buy-final-v2-20260912`, ticket
+`UAW-INTEGRATION-STORE-BUY-FINAL-V2-20260912`, branch
+`integration/moolsocial/store-buy-final-v2-20260912`, fresh worktree
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v2-20260912`.
+The checker still requires the qualified apps tree unchanged, clean exact source
+remote, unchanged governance-tag target, all managed worktrees clean, no target
+remote and one automatic no-FF admission. Only exact pins change. Old failed
+candidate fe6cb702 and both original branches remain untouched; no source edits
+or general rule changes are included in this mechanical admission update.
+
+## REG4608 exact native composition and successor qualification
+
+Preserved successor d7ffaf6756122d97cb5e4c804a21eaf119ef74fb has parents
+c2a65ac51ed58174754b9b07f2223583c48500b3 and
+f2de6c3d58d3f8a02565506d3badd84d7cbb78e6. Both original source tips remain
+ancestors. Combined session 20104 completed exit 0: 1849 passed, 79 documented
+skips, zero failures, 9m18s. Analysis log reports zero issues. Evidence:
+`C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/store-buy-final-v2-combined-20260912.log`
+and `store-buy-final-v2-analysis-20260912.log` in the same directory.
+
+Integration verification and approved-commit coverage passed, but the UI lock
+rejected the merged native owner because its accessibility projection recognizes
+only Cursor's original checkout. No Android source or approved reference changed.
+Canonical combined MainActivity SHA-256:
+8a4bf4853c24176662fa9dafc8dced9da3a929903c60438eeaa7731e511460c4.
+Its single unchanged accessibility block SHA-256:
+c6f995759d350cd64efc4dbfe9b38653fd15ee7a5401b20cc3db52ab1f1ac3ac.
+Removing only that block yields the already accepted PDF native hash:
+f28c19b40a0bcd8f660cc33bbb4683ec03057327b69695a3abf7cb09d0b0e4a4.
+
+Standing founder authority admits check-approved-ui-locks.ps1 only to this
+existing correction ticket. Its exact combined projection requires both pinned
+source ancestors, the exact native owner, whole-file/block/projected hashes,
+and the correction or fresh v3 integration root/branch pair. Existing Cursor
+checks and immutable manifests are unchanged. Nine extracted-function fixtures
+pass: correction, successor and original Cursor positive cases; wrong branch,
+unrelated root, modified bytes, missing bridge, missing source ancestor and
+wrong owner reject. Identity mocks qualify verifier logic, not a real integration.
+Actual complete UI-lock check in the correction worktree passed, session 47418,
+exit 0. No APK was built. Fresh v3 admission and final release checks remain.
+
+## REG4609 exact combined review release boundary
+
+V3 d174a64016baebf09b10e2d70365f52746267cbf is preserved clean and unpushed.
+It passed integration_verify, exact automatic tree, UI locks and approved commit
+coverage. All 211 Codex and 221 Cursor commits since common f94cfd are included,
+zero omitted. Pinned source/repair remote heads still match.
+
+Release probes found 18 backend-boundary findings, six data-egress findings
+and the old two-transition Buy brand assertion. Backend/contracts match f94cfd
+exactly. Sensitive Buy session/scanner/storage/views/Chat-copy owners match
+pinned Cursor exactly. Existing review classifiers were restricted to older
+Cursor snapshots, so V3 cannot use them or impersonate that branch.
+
+Standing authority admits five existing verifier owners only to this correction:
+check-buy-protected-baseline.ps1, check-buy-backend-contract-boundary.ps1,
+check-buy-data-egress-boundary.ps1, check-brand-integrity.ps1 and
+check-windows-powershell-compatibility.ps1. Their optional
+IntegratedReviewSourceCommit accepts only
+0a1c0e5aed5e6e840ac740cc6ac947bab8da79cf in this exact correction lane or fresh
+store-buy-final-v4-20260912 integration root/branch. It requires that source and
+both original tips as ancestors, identical committed and working apps/backend/
+contracts, unchanged f94cfd backend/contracts and no untracked boundary owners.
+The original defaults and Redmi boundaries remain intact; conflicting arguments
+reject. This is review qualification, never production promotion or live backend
+acceptance. The brand check retains structural assertions and binds the corrected
+Codex Chat owner rather than pretending it is unchanged from the common baseline.
+
+Actual correction-worktree checks passed, session 68553 exit 0: exact protected
+Buy review source (51 files), backend boundary (31 native /139 backend /14
+contract files), data egress and App brand. Twelve extracted-function fixtures
+passed: correction/v4 positives; wrong source/branch/root; missing qualified,
+Codex or Cursor ancestor; committed or working source drift; backend drift;
+untracked source. Mocked Git facts test rejection logic, not real admission.
+Windows PowerShell compatibility session 83905 exited 0: backend/data-egress
+and their self-tests, UI locks and protected Buy passed; historical protected
+Social rejection was correctly classified as an expected business boundary,
+not falsely called a protected-Social baseline pass.
+
+The data-egress result label was then corrected from inherited Redmi wording
+to integrated when the integrated argument is used; behavior is unchanged.
+Native and coordination destination pins now name only fresh v4. Recheck those
+final mechanical edits before sealing. No application source change, APK,
+installation, live backend action or original-branch mutation occurred.
+
+## Independent review and pre-APK contract correction — REG4610/REG4611
+
+Founder requested independent original/modified checker assessment, not implicit
+release approval. The external `store-buy-v4-checker-independent-review-20260912.md`
+under `C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905` records all 18
+backend, six egress and one brand findings, exact locations, exclusion behavior
+and remaining impacts. Original a21ff6f4 checks failed 18/6/1 on the same V4
+application; 0d8cbbaa and f6cb6eda integrated-review invocations passed. Only
+PSScriptRoot was rebound in memory for the diagnostic replay, no conditions.
+Source identity proves provenance, not safety. Real persistence/sharing/clipboard
+operations remain distinct from false-positive scanner labels. Live payment,
+address-request authority, privacy retention and backend enforcement are not
+qualified by review fixtures. No release-promotion claim is made.
+
+V4 pre-APK cycle 1 completed with 2471 passed, 83 skipped, three failed; cycle 2
+and analysis were not run by that fail-fast batch. Preserve its original log.
+The three failures were obsolete assertions in two historical Buy tests:
+linked products now retain their exact unavailable recovery with Retry/return,
+and Cart explicitly labels the monetary amount Subtotal. Only those two test
+owners were added to the existing correction boundary; product code unchanged.
+The corrected router test asserts Retry and return without substituted product;
+the count tests retain exact product/pack/item quantities and monetary values.
+Both full files passed 15/15, session3793, external
+`store-buy-reg4611-focused-v1.log`. Session66615 completed exit 0: both full
+44-file cycles passed 2474 tests, skipped 83 and failed zero, followed by full
+Flutter analysis with zero issues (75.1 seconds). Logs are
+`store-buy-reg4611-preapk-44-cycle1.log`, `store-buy-reg4611-preapk-44-cycle2.log`
+and `store-buy-reg4611-analysis.log` in the same external evidence directory.
+Skips are the previously documented 79 plus two explicitly tagged protected
+reference comparisons and two opt-in Work captures. These are not passes or
+device evidence. Runtime lib/backend/contracts remain unchanged from 0d8cbbaa.
+
+REG4610 forwards the already-existing optional EvidenceArchiveRoot through the
+two build callers, preserving defaults and every validation. AST inspection
+confirmed both optional parameters and exact unmodified forwarding; both scripts
+parse, and git diff --check passes. The real regression-memory gate passes with
+the validated archive (4582 records, implementation phase). No evidence deletion,
+fabrication, new exception mechanism, APK build or device action occurred.
+
+## Exact successor admission pins
+
+Tested correction fa7a99941de93c07e22dabf55d30f568ad5a826b is clean and pushed
+with fresh exact remote equality; handoff passed. Four existing verifier owners
+now pin that exact tested source and only fresh final-v5 destination instead of
+the previous source/final-v4 identity. No predicate, exclusion or application
+behavior was added or removed. Session68335 exited 0: protected Buy review,
+backend/data-egress review, App brand, UI locks and diff checks passed. Explicit
+negative probes reject the old 0a1c0e5 source and unqualified f6cb6eda candidate.
+This is candidate admission provenance only; the independent review limitations
+above still apply. V4 is retained without rewriting or promotion.
+
+## REG4612 Help Chat identity correction and explicit ownership authorization
+
+V5 is preserved locally and unqualified at
+1a33cbc36beed5d6615acb7d7b10a24d4c7789bf, parents
+c2a65ac51ed58174754b9b07f2223583c48500b3 and
+0c4f89ddb7385bab98eb5923e30a53467f06aa98. Its tree exactly equals
+the sealed correction. The exact candidate 44-file cycle passed 2474,
+skipped 83 and failed zero, exit 0; external evidence
+store-buy-final-v5-cycle1-20260912.jsonl SHA256
+18AB183B27E2030B7F5AA7953C5991BAF8C8D285917917292A83CDFF195E07B8.
+
+The two previously unqualified Help tests were run separately on V5.
+Both reached Chat but failed the generic Conversation text expectation,
+at buy_v2_shop_chat_test.dart lines 924 and 990. Their later assertions did
+not complete. Original failed evidence is preserved externally as
+store-buy-final-v5-help-chat-20260912.jsonl SHA256
+A396B0FAD031E8C506D70790B14325977455F6C7E7A668D413383D0F6C0ABD9E.
+Existing global_contextual_chat_shell_test.dart requires the supplier heading
+and explicitly rejects Conversation. Exact fixture partners are Marwar Foods
+Distribution and Sardarpura Health Pharmacy. No runtime defect is inferred
+solely from this contradictory text contract.
+
+After the unchanged ownership gate rejected this test outside the primary
+claim, the user explicitly approved the two assertion corrections and then
+directed Desktop to take ownership of this one file. Transfer its exact claim
+from the Cursor task to /root in this correction lane only, with the matching
+literal continuation owner entry. Cursor's worktree remains untouched.
+No security exception, exclusion, unrelated owner or validation predicate is
+changed. Preserve every composer, draft, routing and Back assertion.
+
+Correction to the earlier skip summary: emitted 83 skips comprise 79 Work
+layout cases, two optional C24G Work captures, and two optional Buy address/
+payment sheet captures. Protected-reference tag exclusions are additional
+excluded coverage, not the latter two skips. Individual replacement mapping
+and current rendered review remain incomplete; none counts as a pass.
+
+Resume invocation mistakes remain disclosed: task_start probes rejected
+owner/base mismatches; the correct resumed handoff phase passed. Read-only
+Chat searches initially used nonexistent paths, then located actual owners.
+No rejected probe was converted to a pass through assertion or gate weakening.
+
+REG4612 focused v1 exited 1: Medicine Help passed including exact Care return;
+supplier-order Help passed the new heading check but failed at line 934 because
+chat-suggested-prompts exists. Original further assertion is unchanged. Evidence:
+store-buy-reg4612-help-chat-v1.jsonl in the external audit directory. Register
+the finding before diagnosis; accepted prompt behavior remains to be established.
+
+Diagnosis: ChatCommerceContext generated product-enquiry prompts from placed
+order price/delivery fields. Preserve the existing order Help no-prompts
+assertion by limiting these generated suggestions to non-order contexts.
+Product-enquiry prompts and loaded Assist prompts remain unchanged. Add a
+focused contrast case for supplier/pharmacy orders versus product enquiries,
+then replay the original journeys without further assertion changes.
+
+Focused v2 passed all 3 selected tests; connected v1 passed both complete files,
+101 tests with zero skips/failures, exit 0. Connected JSON log SHA256
+16EDD59782C107ED66F771AEC6032C4B2E36B72BCEC5F869B46ACAE7567404B2.
+Full analysis v1 found two unnecessary non-null operators in the new contrast
+test; remove only those operators, retaining the test expectations. Preserve
+store-buy-reg4612-analysis-v1.log, then rerun analysis and the affected tests.
+
+Final exact test file replay passed 27/27 with zero skips/failures, exit 0:
+store-buy-reg4612-final-file-v1.jsonl SHA256
+AA77F6E5F93E02B0D740086D076B3E9A9EDF7CAD01C5B656496BA48DC787FF83.
+Full analysis v2 exited 0, zero issues (6.8 seconds):
+store-buy-reg4612-analysis-v2.log SHA256
+2CF9014B01BA03508317D95AF70FB50ACA462B53FB97C111D762A9FF2C50813F.
+The earlier connected 101-test pass remains runtime evidence: the only later
+test changes removed two redundant non-null operators. The final 27-test file
+replay covers their exact resulting bytes. No candidate qualification is
+inferred; a fresh admitted successor still needs candidate checks and visuals.
+
+## REG4613 preserved commit-sequencing incident
+
+Tested REG4612 correction was committed as
+32b71ee408eb914f60092aa538ce20798342ac2c after the pre_commit check
+rejected an unstaged set. The orchestrated next command still staged and
+committed it. This was a sequencing error, not a successful pre_commit.
+Preserve the commit and rejected result; no history rewrite. It was not pushed
+at discovery. Stage exact future changes first, inspect the standalone
+pre_commit result before commit, and validate ownership/memory/handoff before
+any push. Connected tests and analysis above remain evidence for source
+behavior but cannot retroactively establish that missing gate timing.
+
+## User-authorized subject recovery and fresh V6 admission pins
+
+The user authorized recovery while preserving originals. Original commits
+32b71ee408eb914f60092aa538ce20798342ac2c and
+8ac9b3b935eb94c7e5eef30bb9e6b6049374309b remain at
+refs/archive/store-buy-reg4612-original-correction-20260912 and
+refs/archive/store-buy-reg4613-original-tip-20260912.
+Only their subjects changed to the required ui(work-id) prefix; the second
+parent reference changed to its reworded predecessor. Author/committer metadata
+and exact file trees are preserved. Replacements are
+10fb79b4469203371edf888e7d4b8aacb3546581 and
+01ff991a850d0bdef6480c28c49ecf6cac2dce46. The unchanged handoff gate passes.
+No force-push or published-history rewrite occurred.
+
+The four existing admission owners now pin tested correction
+10fb79b4469203371edf888e7d4b8aacb3546581 and the single fresh V6 destination,
+preserving local unqualified V5. Only exact source/destination identity
+literals change; no predicate, content hash exception, owner permission,
+exclusion or security assertion is broadened. Original checker versions
+remain in predecessor commits. V6 still requires exact candidate qualification;
+prior source evidence does not substitute for that work.

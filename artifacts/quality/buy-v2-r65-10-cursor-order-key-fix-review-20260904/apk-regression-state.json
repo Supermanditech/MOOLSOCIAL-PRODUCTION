@@ -1,0 +1,30 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "build_passed",
+  "buildAuthorization": "consumed_passed",
+  "preBuildValidation": {"state": "passed", "evidence": "artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/prebuild-validation.md"},
+  "candidate": {"id": "UAW-BUY-V2-R65.10-CURSOR-ORDER-KEY-FIX-20260904", "versionName": "1.0.0-r65.10", "versionCode": "2026090326", "buildMode": "debug", "gateProfile": "uaw_cursor_ui_review_debug", "branch": "work/cursor-ui/buy-mvp-ticket14-v1-20260902", "head": "42a7029e4841ff1ce8723d41dff5b974651280a6"},
+  "source": {"manifestPath": "artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/source-manifest.txt", "manifestSha256": "203393B7826F45ADF5B689F27110132D3FBDA5E894399C4565C981520909B584", "fileCount": 34},
+  "requiredRuntimeDefines": {"MOOLSOCIAL_UI_REVIEW_ONLY": "true", "MOOLSOCIAL_DEVICE_REVIEW": "true", "MOOLSOCIAL_USE_EMULATORS": "true", "MOOLSOCIAL_CANDIDATE_ID": "UAW-BUY-V2-R65.10-CURSOR-ORDER-KEY-FIX-20260904"},
+  "promotion": {"state": "forbidden_non_promotable"},
+  "preBuildGates": [
+    {"id": "branch-head", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/prebuild-validation.md"]},
+    {"id": "source-manifest", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/source-manifest.txt"]},
+    {"id": "format-analysis", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/local-validation.md"]},
+    {"id": "focused-tests", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/local-validation.md"]},
+    {"id": "positive-release-gates", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/prebuild-validation.md"]},
+    {"id": "protected-boundary-disposition", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/candidate-contract.md"]},
+    {"id": "rejected-candidate-preserved", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-9-cursor-payment-brand-copy-review-20260904/redmi-review-06.xml"]},
+    {"id": "startup-config-regression-registered", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/prebuild-validation.md"]},
+    {"id": "buy-regression-1", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/local-validation.md"]},
+    {"id": "buy-regression-2", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/local-validation.md"]},
+    {"id": "clean-state-regression", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/local-validation.md"]},
+    {"id": "wrapper-self-test", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/prebuild-validation.md"]},
+    {"id": "package-isolation", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/candidate-contract.md"]}
+  ],
+  "premiumMotionPolicy": {"state": "audited_for_r65_10", "policy": "config/buy-premium-motion-policy.json", "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md", "candidateContract": "artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/candidate-contract.md", "disposition": "artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/motion-disposition.md", "applied": [], "reused": ["approved_buy_finite_event_driven_motion", "static_reduced_motion"], "dependencyHeld": ["shared_chat_motion", "shared_shell_motion"], "inapplicable": ["perpetual_decorative_loops"]},
+  "buildResult": {"state": "passed", "wrapper": "scripts/build-buy-device-review.ps1", "apkPath": "artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/uaw-buy-v2-r65.10-cursor-order-key-fix-20260904-device-review-debug.apk", "apkBytes": 208715009, "apkSha256": "E2A84F2CA0F547FDB7B34AC93EFC7DD0B233A5E4830011FFA1B1C7D9B36D90EA", "head": "42a7029e4841ff1ce8723d41dff5b974651280a6", "sourceFingerprint": "203393B7826F45ADF5B689F27110132D3FBDA5E894399C4565C981520909B584"},
+  "installResult": {"state": "passed_checksum_matched", "device": "Redmi TG8HCYTGGQT885OF", "package": "com.moolsocial.app.cursorreview", "versionName": "1.0.0-r65.10-cursorreview", "versionCode": "2026090326", "installedBytes": 208715009, "installedSha256": "E2A84F2CA0F547FDB7B34AC93EFC7DD0B233A5E4830011FFA1B1C7D9B36D90EA", "evidence": "artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/install-result.json"},
+  "qualificationResult": {"state": "redmi_passed_awaiting_founder_review", "evidence": "artifacts/quality/buy-v2-r65-10-cursor-order-key-fix-review-20260904/device-review.md"}
+}
