@@ -30,7 +30,7 @@
     },
     "physicalCaptures": 650,
     "evidenceRows": 652,
-    "publicDataRows": 58,
+    "publicDataRows": 59,
     "confirmedDistinctDefects": 16,
     "countsAreExhaustiveDenominator": false
   },
@@ -89,7 +89,7 @@
     }
   ],
   "nextWork": [
-    "Continue residual reconciliation after first260 action rows;preserve conditional limits",
+    "Residual-ledger pass through407 rows complete;derive missing actions from source and retain per-case limits",
     "Saved-address process-death persistence remains unqualified; edit/save and task resume qualified round57",
     "Remaining filter/Store/product/cart/order branches from source inventory",
     "Complete public-data field reconciliation and final evidence handoff"
@@ -107,5 +107,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 64
+  "latestAuditRound": 65
 }

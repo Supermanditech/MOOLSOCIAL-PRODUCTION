@@ -436,3 +436,9 @@ Physical captures631-644 reviewed. Added only isolated Wholesale tomatoes10kg2pa
 Physical captures645-650 reviewed. Original savedwheat279/count1. Searchzzsavednomatch64 shows generic editing no-match646;confirm647 correctly shows No matching saved products and explains records still saved. Clear search and filters648 restores exact wheat/count1 with emptyquery. AndroidBack649 goes modulechooser,not catalogue;Shop reentry650 retains Saved/Scheduled and original item. Three narrow device passes and one navigation observation;no process-death claim,no new defect/closure. No original saved item,cart,address or draft mutation.
 
 Five residual notes reconciled against round32/33/43/58/64. Residual rows196-260 reviewed;later reconciliation remains open.650 physical captures;652 evidence rows;407 actions;58 public mappings;16 defects. Source/action/data completeness and final handoff still incomplete.
+
+## Round 65 - Residual ledger review and delivery-control data contract
+
+Reviewed remaining residual rows261-407,completing this pass over the current incremental ledger. Reconciled11 stale notes with later evidence;no original disposition or observation upgraded. This does not establish source-inventory completeness. Added PD-059 for Keep/Hide/Minimize/arrival sound:customer intent,per-order widget state,provider status ownership,foreground operation,timeout/failure behavior and lifecycle limits. Source read anchors screen685-818,1306-1371,1584-1604,2790-2831. Actual arrival audio and runtime identity isolation remain unqualified;no new device action or defect.
+
+650 physical captures;652 evidence rows;407 action rows;59 public-data mappings;16 defects. Next:source-derived missing action inventory and remaining real device cases,including lifecycle,Store categories/paging,Offers controls and address/GST validation. Provider/fixture blockers remain explicit. No product/policy/APK changes;final handoff incomplete.
