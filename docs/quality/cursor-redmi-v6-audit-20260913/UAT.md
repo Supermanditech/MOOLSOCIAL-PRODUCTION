@@ -510,3 +510,7 @@ Expanded B-008 into MEDIA-ROUND75-01 through08:gallery/count;pinch/pan/reset/red
 675 naturally expired Offers;Refresh676 restored fixture grid. Original font1.0 read;set2.0/read2.0.677 was transition only;settled678 shows readable order card and stacked controls. Track679 correct MS-NEW-09 with last-known/live-unavailable copy readable. Android Back;restore1.0/read1.0;680 Orders12active2delivered retained. No cart/address/order mutation or live transaction. Four narrow passes;lower tracking and other orders at200 remain pending.
 
 452 actions;359 device passes;680 captures;682 evidence rows;62 mappings;16 confirmed defects. No full-module qualification claim.
+
+## Round 77 - supplier publication requirements reconciliation
+
+PD-041 strengthened from buy_v2_content_contracts.dart590-648:HTTPS host without userinfo/fragment;asset/semantic labels;workspace revision Store canonical-product and exact-SKU binding;procurement supplier workspace match when grant exists;video poster metadata and nonempty transcript;deduplicated asset IDs capped10. Existing format/size requirements retained. These supplied-metadata checks do not prove bytes were inspected or backend publication enforced. No new device pass or defect. All counts unchanged;full audit remains incomplete.
