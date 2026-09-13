@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 605,
+    "recordedActionRows": 608,
     "dispositions": {
       "device_observation": 19,
-      "device_pass": 493,
+      "device_pass": 496,
       "blocked_provider": 27,
       "device_failure": 24,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 1091,
-    "evidenceRows": 1093,
+    "physicalCaptures": 1102,
+    "evidenceRows": 1104,
     "publicDataRows": 70,
     "confirmedDistinctDefects": 22,
     "countsAreExhaustiveDenominator": false
@@ -89,13 +89,13 @@
     }
   ],
   "nextWork": [
-    "UAT round158 catalogue table updated by159: CAT-P03 apply/restore evidenced with D022 residual;next CAT-P04 Wholesale/Bulk pointer retention and CAT-P09 Wholesale category picker, then CAT-P02 boundaries",
+    "Round160 completed Wholesale/Bulk pointer module-return and Wholesale category search/clear/X/select/restore cases; next CAT-P02 parent-specific pager boundaries; retain semantics/process-death/provider gaps",
     "Reconcile remaining product/cart/orders/shared callback families and conditional/provider descendants into stable named cases; no exhaustive denominator claim yet",
     "Saved-address process-death persistence and remaining accessibility/keyboard/recovery dimensions require exact device evidence",
     "Complete public-data field and publication lifecycle reconciliation and final evidence handoff"
   ],
   "preservation": {
-    "cart": "1091 Scheduled Any-area catalogue restored supplier000001;original wheat Saved1;emptycart;no delivery-address edits",
+    "cart": "1102 original Scheduled Shop wheat Saved1 emptycart;1101 Wholesale Best prices restored; no cart/saved/address mutations",
     "savedShop": "original wheat count1 retained650;Saved/Scheduled active after module reentry",
     "addresses": "Original Home/Work retained; settings selection Home then Work restored986; no add/edit/delete; Paytm retained",
     "noNewApk": true,
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 159
+  "latestAuditRound": 160
 }
