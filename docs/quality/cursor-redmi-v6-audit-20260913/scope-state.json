@@ -13,11 +13,11 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 461,
+    "recordedActionRows": 468,
     "dispositions": {
       "device_observation": 14,
-      "device_pass": 367,
-      "blocked_provider": 21,
+      "device_pass": 370,
+      "blocked_provider": 25,
       "device_failure": 19,
       "excluded_authorization": 1,
       "source_unreachable": 4,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 708,
-    "evidenceRows": 710,
+    "physicalCaptures": 713,
+    "evidenceRows": 715,
     "publicDataRows": 62,
     "confirmedDistinctDefects": 17,
     "countsAreExhaustiveDenominator": false
@@ -107,5 +107,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 81
+  "latestAuditRound": 82
 }

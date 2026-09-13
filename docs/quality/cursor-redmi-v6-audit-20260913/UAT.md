@@ -535,3 +535,12 @@ D017 linked to Buy InputChip6158-6175 and shared theme174-185 navy selected back
 Revalidated clean HEAD cc9e4b07899b7e3b9ac0003dc3cb5a3276cfe382 and implementation gate exit0. Previous combined tool output was truncated; existing capture700 was recovered and visually reviewed without overwriting it. Live701 confirmed Orders retained. Opened MS-NEW-09; original font read1.0 then set2.0. Lower tracking702-703 shows wrapping delivery details and readable timeline/action controls. Items704 retains order identity and pack; Android Back705 retains tracking scroll. Manage706 and Cancel choice707 show readable identity and blank reason with Submit disabled. No request submitted. Android Back dismissed; font restored and read1.0;708 confirms retained tracking, alerts ON and normal footer. Invoice below the captured200-percent scroll and reason menu remain unqualified by this round.
 
 Four narrow device passes; no new confirmed defect. 461 action rows,367 device passes,708 recorded captures,710 evidence rows,62 mappings,17 distinct confirmed defects. Source/action inventory and full audit remain incomplete. No product change, new APK, message, payment, order mutation or OPPO action.
+
+
+## Round 82 - cancellation reasons and conditional resolution inventory
+
+Implementation gate passed before this continuation. 709 reopened Manage at normal text;Cancel selected then font2.0.710 empty reason;711 four readable reasons;712 selected Delivery time does not work fully wraps and Submit enables. Submit was not pressed. Android Back dismissed;original font restored/read1.0;713 retained tracking and packing state. Three narrow device passes. No request, order change or new defect.
+
+Read resolution source11946-12265 and reconciled original RESOLUTION001-012. Added four explicit B006 conditional descendants:positive item quantities;empty-item submission guard;type/refresh selection reset;accepted/rejected/busy/failure outcomes. Source evidence is not device qualification. Existing normal-text reason selection and unavailable delivered branches remain preserved. Dropdown Back, remaining reason selections and reopen draft state still require coverage.
+
+468 action rows;370 device passes;713 captures;715 evidence rows;62 public-data rows;17 distinct confirmed defects. Full source/action inventory and audit remain incomplete.
