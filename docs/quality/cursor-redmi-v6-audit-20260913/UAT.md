@@ -2048,3 +2048,34 @@ CART-ROUND165-01 and CHECKOUT-ROUND165-01 are narrow passes.617 action/check rec
 Gate terminal0; clean digest verified before evidence writes.1135-1136 temporary notebook6 one pack210;1137 Payment offers;1138 reverse Coupons tab displays no eligible Shop coupon;1139 footer Return to Cart unchanged210/no selection.1140 exact cart Coupons entry;1141 toolbar Back unchanged basket. No coupon/payment offer selected or payment action performed.
 1142 checkout original Work;1143 Home pointer selection correct342003;1144 Work restored correct342005;1145 Work Edit opens matching original fields;1146 X returns exact checkout Work selection. No address field edits/save/delete.1147 cart retained210;1148 catalogue;remove only notebook and module reentry1149 restores original Scheduled wheat Saved1 emptycart. Original Home/Work and Paytm retained;no real transaction.
 Four narrow passes COUPON-ROUND166-01/02 and CHECKOUT-ROUND166-01/02; no new defect.621 action/check records;507 passes;22 defects;1149 physical captures;1151 evidence rows;71 public-data mappings. Selected-benefit replacement/removal, multi-destination coupons, checkout address draft/save/keyboard/provider/relaunch, Payment/Confirm Back and busy guard remain separate. Next orders/shared-screen inventory and remaining reachable cases;full audit incomplete.
+
+
+## Round167 - Orders, tracking, resolution and collection reconciliation
+Gate terminal0; clean worktree digest. No device action/new capture this round. Reviewed SRC0365-0410, earlier recovery/invoice and order-card rows, relevant supplemental caller inventory, and 115 matching order/delivery/resolution journey records. The following 21 named groups expose distinct remaining paths; they are not new passes or an exhaustive state-combination denominator.
+
+| Group | Controls / binding | Evidence and remaining cases |
+|---|---|---|
+| ORDER-P01 Orders entry/return | SRC0365;shared profile | Profile Open orders/Back round111; Orders Account return is conditional and not inferred from generic Back |
+| ORDER-P02 Tabs and query retention | SRC0366-67 | Delivered/query round23; each remaining tab, empty/result/search combination and relaunch require own evidence |
+| ORDER-P03 Card entry/status | SRC0513-16 | Tracking and delivered entries recorded; card-body hit target, nonstandard/unowned and every status not blanket qualified |
+| ORDER-P04 Orders unavailable Retry | SRC0370 | Provider failure state absent; populated history does not prove Retry recovery |
+| ORDER-P05 Browse promotions | SRC0371-73 | Exact Orders Shop/Wholesale promotion controls need evidence; Medicine boundary may be recorded without expanding Care descendants |
+| ORDER-P06 Items and product return | SRC0368-69 | Historical product/Back recorded; visible Order breadcrumb and withdrawn item recovery unqualified |
+| ORDER-P07 Delivery-context sheet | SRC0374-76/0393 | Address entry/manage future addresses round25; exact Close X and sheet Help require reconciliation; source order identity must persist |
+| ORDER-P08 Tracking return | SRC0388;SUP0165 | Named order Back round155; visible Orders/Help breadcrumb is distinct; Assist alias renders tracking but does not qualify every origin |
+| ORDER-P09 Live tracking refresh | SRC0382-83/0389 | B005 location/refresh/error states remain provider limited; last-known UI is not current tracking; D003 freshness disclosure remains |
+| ORDER-P10 Restore hidden delivery | SRC0390;SUP0163 | Bottom-rail reopen differs from tracking Restore button; selected order and retained keep/sound/visibility require exact branch evidence |
+| ORDER-P11 Tracking alert controls | SRC0391-92 | Exact tracking switch and restore-error Retry not implied by settings toggle; OS denied and lifecycle states separate |
+| ORDER-P12 Tracking Items/Help/Reorder | SRC0394-95;SUP0155/0164 | Items and order-bound Help/delivered Reorder subsets recorded; no message/order placed; shared Chat draft/return must remain bound |
+| ORDER-P13 Manage order entry | SRC0396 | RESOLUTION entry/cancel recorded; eligible returned/delivered branches B006 remain; not all resolutions complete |
+| ORDER-P14 Invoice callers | SRC0397/0515/0266-67;SUP0251 | Historical consumer invoice recorded; Wholesale B009, positive confirmation B011, unavailable-dialog Close/Refresh remain distinct; D003 invoice disclosure retained |
+| ORDER-P15 After-delivery support | SRC0398 | Exact support continuation differs from tracking Help; destination/order identity/return needs device evidence |
+| ORDER-P16 Resolution type/reason/reset | SRC0401/0403-04/0410 | Cancel types/reasons/dismissal rounds82/83; positive eligible item selection/reset and return/refund reasons B006 unqualified |
+| ORDER-P17 Resolution items/quantity | SRC0402/0407-09 | B006 checkbox, decrement/increment/eligible maximum need eligible purchased-item fixture; disabled item UI not a pass |
+| ORDER-P18 Resolution retry/support/submit | SRC0399-0400/0405-06;SUP0254-55 | Unavailable retry observed; exact support buttons and sheet return pending; accepted/rejected/busy outcome unavailable; actual request submission excluded |
+| ORDER-P19 Delivery exceptions | SRC0377-80 | B012 missing adapter/slots/proof; Retry/slot/confirm/dispute unqualified; real rescheduling/dispute excluded |
+| ORDER-P20 Balance payment | SRC0381 | B013 due/pending/action-required recovery absent; live money actions excluded; no payment result claimed |
+| ORDER-P21 Collection order and scanner | SRC0384-87;SUP0098/0252-53 | Round68 authenticated/ready/challenge state blocked; return, scan/camera close-reopen, detection/manual/error/Help need exact collection state; no scanner pass inferred |
+
+Scanner distinction: SCANNER-ROUND74-01 is specifically the public product-scanner entry (Workspace callers); it explicitly keeps authenticated collection separate. SUP0098/0252 identify a conditional collection-camera caller at views11090-11095. Therefore the former source_unreachable record cannot close or remove collection scanner descendants. No current device pass or global unreachability claim is made. SOURCE-ASSIST-001 concerns the unused legacy Assist implementation; live order Help is shared Chat and remains in scope.
+Counts unchanged621 action/check records;507 passes;22 defects;1149 physical captures;1151 evidence rows;71 data mappings. Next reachable exact controls: ORDER-P06 Items breadcrumb, ORDER-P07 context X/Help, ORDER-P08 tracking visible return, ORDER-P15/18 support entry without sending. Shared Chat/account/addresses and mini-cart inventory still remain. Full audit incomplete;no implementation/APK.
