@@ -2952,6 +2952,17 @@ void main() {
     );
     await tester.tap(find.byKey(const Key('work-store-orders')));
     await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
+    final sales = find.text('Sales').hitTestable();
+    final salesPosition = tester.getRect(sales);
+    final selectedOrder = work.currentWorkspaceOrderId;
+    work.workspaceSalesToday += 100;
+    work.dismissMessages();
+    await tester.pumpAndSettle();
+    expect(tester.getRect(sales), salesPosition);
+    expect(work.currentWorkspaceOrderId, selectedOrder);
+    await tester.tap(find.byKey(const Key('work-store-stock')));
+    await tester.pumpAndSettle();
     final group = find.byKey(const Key('work-shortcut-groupBuying'));
     await reveal(tester, group);
     final position = tester.getRect(group);
