@@ -103,3 +103,10 @@ Status: open. Severity: minor visual/content usability defect. Redmi TG8HCYTGGQT
 Reproduction: Wholesale Fresh tomatoes1/10kg580 product407;scroll408-410. Product details repeats Brand not provided/variant/pack/policy;Product and pack information repeats product/pack/unit price;Highlights repeats variant/unit price/policy;Specifications repeats brand/pack/variant;Description repeats title/variant/pack/unit price. Customer must scroll through repeated information before ratings/reviews. This is actual default content,not distinct technical specifications.
 Expected: preserve useful supplier-specific information while suppressing identical summary-only highlights/specifications/generated description in Wholesale as in Shop. Keep the price/MOQ/pack decision accessible;do not remove genuinely distinct supplier facts.
 Source corroboration: buy_v2_views.dart3877-3910 suppresses identical content only when destination is Shop (`!shop` admits all Wholesale duplicates). This is a frontend deduplication gap. Physical scope verified for this Wholesale listing;other products/Bulk require separate qualification. No implementation.
+
+
+## RV6-D012 - Store listing count is labelled available despite non-orderable products
+Status: open. Severity: minor customer-copy inconsistency. Redmi TG8HCYTGGQT885OF;UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+Reproduction: closed Pet Family Store423;View all428. Header says Retailer - 4 available products in green while all four cards say Store closed and expose information instead of Add. Count describes listed products,not current orderability. Closed state and purchase restriction remain correctly enforced.
+Expected: use neutral listing count or distinguish listed from currently orderable products;do not label total listings available when current facts reject ordering.
+Source: buy_v2_catalogue.dart6916 interpolates products.length with literal available products,without per-product orderability. No implementation;other unavailable/mixed inventories require follow-up qualification.
