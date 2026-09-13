@@ -609,7 +609,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0006 | buy_v2_catalogue.dart:554 | _OffersCategoryControl | onTap | forwarder to SRC-0001/0002; same category entry, not additional journey |
 | SRC-0007 | buy_v2_catalogue.dart:633 | _PublishedOfferPromotionState | onTap | device_pass OFFERS-ROUND99-02/03; promotion text opens matching product and Back retains promotion |
 | SRC-0008 | buy_v2_catalogue.dart:679 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-ROUND67-01/02; Previous and first boundary |
-| SRC-0009 | buy_v2_catalogue.dart:685 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-002 and ROUND67-01; Next; final boundary remains unverified |
+| SRC-0009 | buy_v2_catalogue.dart:685 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-002/ROUND67-01 Next and ROUND149-01 final loaded promotion disabled/stable; original paneer46 restored; other pages/provider/accessibility not inferred |
 | SRC-0010 | buy_v2_catalogue.dart:703 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-003/004 and ROUND69-02/03; View offer and Back |
 | SRC-0011 | buy_v2_catalogue.dart:764 | _LiveOffersState | onPressed | blocked_provider; live source Retry/loading/offline recovery not qualified by fixture refresh |
 | SRC-0012 | buy_v2_catalogue.dart:823 | _OffersAvailabilityState | onPressed | blocked_provider; unavailable catalogue retryCommerce recovery not qualified by fixture refresh |
@@ -1867,3 +1867,9 @@ Tap on pager Any area label1024 did nothing. Source1343 renders areaLabel as Tex
 ## Round 148 - Offers footer area action
 
 Source431 enables showAreaControl for paged Offers;1141 passes onArea into optional button1370. Wholesale summary Any area is not this action. Physical Offers footer button1028 opened Shopping area1029;X returned same Offers cards/footer scroll1030. Five captures retained;1027 attempted scrollbar drag did not move content and is not footer evidence;ordinary upward content swipe yielded1028. OFFERS-ROUND148-01 qualifies exact entry/cancel only. No location change or new defect;20 remain. Current device1030 Offers first page footer;cart empty and original Shop state unchanged. CAT-P02 footer location entry is now qualified for Offers;other pager boundaries retain their own limitations.
+
+## Round 149 - Final loaded promotion boundary
+
+Six captures1031-1036 qualify OFFERS-ROUND149-01 and CAT-P01 default seeded final boundary. Starting paneer46, individual Next yielded manufacturer paneer then mustard51. Capture1033 filename says final but its enabled Next proves it was not final. Twenty sequential Next taps reached manufacturer ghee96 with disabled Next1034. Another exact tap left it unchanged1035. Twenty-one Previous taps restored paneer46/92/200g1036. Intermediate offer contents are not individually qualified from traversal. No purchase, save or data deletion;20 defects remain. Current Offers top has original paneer selection restored; scroll moved from footer to top for this check.
+
+Execution note: the implementation gate returned a live session11334; one bounded read-only source extraction ran before its terminal result was collected. The same session then completed successfully before device actions. No gate output was inferred and no process restarted. Future dependent reads/actions must await terminal success.
