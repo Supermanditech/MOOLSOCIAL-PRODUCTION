@@ -400,3 +400,9 @@ Counts598 physical captures;600 evidence rows;381 action rows;58 public-data map
 Physical captures599-608 reviewed. Canonical milk1L66 opened from monthly Scheduled. Selecting2x1L shows128/64perL and correct supplier602;selected option603;repeat tap leaves state unchanged604. Add then switch display back1L:display66/Add606 while cart preserves one2x1L128 Family Dairy and Bake607. Removed isolated line;empty monthly view and Saved1 restored608. Four narrow device passes;no new defect/closure. Wholesale/paged/unavailable variants and supplier-media association remain unqualified. Four old remaining notes reconciled to round12/20/23/58 evidence without broadening claims.
 
 608 physical captures;610 evidence rows;385 action rows;58 public-data mappings;16 defects. Complete inventory and final handoff remain unfinished. No product/policy/APK changes.
+
+## Round 59 - Wholesale filter differences and no-match recovery
+
+Captures609-616 reviewed. Wholesale omits Pack size610, matching views13577 destination condition. Trade price bands2000/5000/10000 visible612. First band applied: visible first-page products all <=2000 at611;not full-pagination proof. Artifact611 was initially named empty from an unconfirmed expectation;it contains populated results and is NOT empty-result evidence. Clearing filter then searching zzredminomatch59 gives readable0products with keyboard613 and confirmed Wholesale state614. Refresh615 retains query/empty state;not provider completion proof. Clear query/confirm restores unfiltered Wholesale616,emptycart,Saved0. Four device passes and one observation;no new defect/closure.
+
+616 physical captures;618 evidence rows;390 action rows;58 public-data mappings;16 defects. Full source/action/public-data completeness remains open;other trade price bands and provider pagination not qualified. No product/policy/APK changes.
