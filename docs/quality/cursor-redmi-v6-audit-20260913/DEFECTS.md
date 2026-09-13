@@ -110,3 +110,9 @@ Status: open. Severity: minor customer-copy inconsistency. Redmi TG8HCYTGGQT885O
 Reproduction: closed Pet Family Store423;View all428. Header says Retailer - 4 available products in green while all four cards say Store closed and expose information instead of Add. Count describes listed products,not current orderability. Closed state and purchase restriction remain correctly enforced.
 Expected: use neutral listing count or distinguish listed from currently orderable products;do not label total listings available when current facts reject ordering.
 Source: buy_v2_catalogue.dart6916 interpolates products.length with literal available products,without per-product orderability. No implementation;other unavailable/mixed inventories require follow-up qualification.
+
+## RV6-D013 - Store conversation expands without any additional content
+Status: open. Severity: minor empty-action/spacing defect. Redmi TG8HCYTGGQT885OF;UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+Reproduction: Pet Family Store431 Ask opens correct conversation432. Expand Store conversation433 reveals only a divider and blank spacing, with no extra facts or destination. AndroidBack434 restores exact Store. No message sent;automatic draft retained unsent.
+Expected: expose expansion only when additional facts or an applicable product action exist;otherwise retain a compact static context summary. Do not invent missing facts.
+Source corroboration: chat_thread_screen.dart _ChatCommerceContextCard near1966-2055 always constructs ExpansionTile with divider/spacing;fact rows depend on decisionFacts and View product depends on productAppRoute. Store-only context has neither. Shared Chat presentation owner;Buy supplies Store context. No implementation.
