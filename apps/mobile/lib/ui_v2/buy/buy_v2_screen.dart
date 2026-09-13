@@ -358,6 +358,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   bool _miniCartParked = false;
   final _parkedCartNavigationScrollController = ScrollController();
   final _rootProductScrollController = ScrollController();
+  final _relatedProductScrollOrigins = <(String, double)>[];
+  String? _observedRootProductId;
   final _landscapeCatalogueKey = GlobalKey<NestedScrollViewState>();
   final _landscapeCatalogueOffsets = <String, (double, double)>{};
   String? _landscapeCatalogueIdentity;
@@ -412,6 +414,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       widget.session.orders.map((order) => MapEntry(order.id, order.status)),
     );
     _quickTrackerNavigationSequence = widget.session.navigationMotionSequence;
+    _observedRootProductId = widget.session.view == BuyV2View.product
+        ? widget.session.selectedProductId
+        : null;
     widget.session.addListener(_sessionChanged);
   }
 
@@ -436,6 +441,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _quickTrackerMinimized = true;
     }
     if (oldWidget.session != widget.session) {
+      _relatedProductScrollOrigins.clear();
+      _observedRootProductId = widget.session.view == BuyV2View.product
+          ? widget.session.selectedProductId
+          : null;
       oldWidget.session.removeListener(_sessionChanged);
       widget.session.addListener(_sessionChanged);
       restoreState = true;
@@ -568,6 +577,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _retainedStoreEmptyCartSequence = session.navigationMotionSequence;
     }
     if (!widget.session.procurementScopeCurrent) {
+      _relatedProductScrollOrigins.clear();
+      _observedRootProductId = null;
       _resetArrivalSound();
       _noticeTimer?.cancel();
       _cartAcknowledgementTimer?.cancel();
@@ -599,13 +610,36 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     if (_quickTrackerNavigationSequence !=
         widget.session.navigationMotionSequence) {
       final session = widget.session;
+      final previousProductId = _observedRootProductId;
+      final nextProductId = session.view == BuyV2View.product
+          ? session.selectedProductId
+          : null;
+      double? relatedReturnOffset;
+      if (_storeProductRouteDepth == 0 && nextProductId != null) {
+        if (session.navigationMotionDirection == BuyV2NavigationMotionDirection.forward) {
+          if (previousProductId != null && previousProductId != nextProductId &&
+              session.canReturnToComparedProduct &&
+              _rootProductScrollController.positions.length == 1) {
+            _relatedProductScrollOrigins.add((previousProductId,
+              _rootProductScrollController.position.pixels));
+          } else if (!session.canReturnToComparedProduct) {
+            _relatedProductScrollOrigins.clear();
+          }
+        } else if (previousProductId != null && previousProductId != nextProductId &&
+            _relatedProductScrollOrigins.isNotEmpty &&
+            _relatedProductScrollOrigins.last.$1 == nextProductId) {
+          relatedReturnOffset = _relatedProductScrollOrigins.removeLast().$2;
+        }
+      }
+      _observedRootProductId = nextProductId;
       if (_storeProductRouteDepth == 0 &&
           session.view == BuyV2View.product &&
-          session.navigationMotionDirection ==
-              BuyV2NavigationMotionDirection.forward) {
+          (session.navigationMotionDirection ==
+              BuyV2NavigationMotionDirection.forward || relatedReturnOffset != null)) {
         final sequence = session.navigationMotionSequence;
-        // Fresh product entry starts with the buying decision. Back from Cart
-        // or a nested Store visit retains its own existing scroll restoration.
+        // New details start at the buying decision; related-product Back
+        // restores the specific previous visit, including repeated products.
+        // Cart and nested Store keep their separate restoration paths.
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted &&
               identical(widget.session, session) &&
@@ -613,7 +647,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
               session.view == BuyV2View.product &&
               _storeProductRouteDepth == 0 &&
               _rootProductScrollController.positions.length == 1) {
-            _rootProductScrollController.jumpTo(0);
+            final position = _rootProductScrollController.position;
+            position.jumpTo((relatedReturnOffset ?? 0).clamp(
+              position.minScrollExtent, position.maxScrollExtent));
           }
         });
       }

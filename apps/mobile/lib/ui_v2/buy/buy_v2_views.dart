@@ -3272,13 +3272,19 @@ class _ProductContinuationCard extends StatelessWidget {
         container: true,
         button: true,
         label: 'View ${product.title} product details',
-        onTap: () => session.openProduct(product.id),
+        onTap: () => session.openProduct(
+          product.id,
+          preserveComparisonOrigin: true,
+        ),
         child: ExcludeSemantics(
           child: Material(
             color: BuyV2Colors.canvas,
             borderRadius: BorderRadius.circular(13),
             child: InkWell(
-              onTap: () => session.openProduct(product.id),
+              onTap: () => session.openProduct(
+          product.id,
+          preserveComparisonOrigin: true,
+        ),
               borderRadius: BorderRadius.circular(13),
               child: Padding(
                 padding: const EdgeInsets.all(6),

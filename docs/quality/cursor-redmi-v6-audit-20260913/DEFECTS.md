@@ -79,7 +79,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Admission9af7e19f79d61cabc5a96ba3be252ec242f2dcbc adds only global_security_v2.dart and its existing test; claim33. Evidence in UAT.md.
 
 ## RV6-D007 - Related-product Back skips the preceding product detail
-- Status: open; confirmed device navigation defect. Severity: moderate.
+- Status: open; implemented and locally qualified; successor Redmi acceptance pending. Severity: moderate.
 - Reproduction: Saved Shop wheat atta2 > product details > scroll to You may also like > related wheat from Sardarpura Supermart > Android Back.
 - Actual: Back returns directly to Saved Shop instead of the preceding Mool Market product detail and its position. Customer must reopen the original product and find the previous information again.
 - Expected: exploring a related offer preserves the preceding product-detail context for Back; leaving the original product then returns to its Saved/catalogue origin.
@@ -87,6 +87,9 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Source correlation: buy_v2_views.dart3289/3295 related card calls session.openProduct without preserveComparisonOrigin. buy_v2_session.dart8318-8355 only pushes prior selected product when that flag is true;closeProduct8488-8506 restores the root product return after an empty origin stack. Source explains the observed shortcut;no implementation or test modification performed.
 - Ownership: Buy product continuation navigation/session. Future correction must preserve full previous product context and existing cart/order/Store return paths;this audit does not implement it.
 
+- Local correction (2026-09-14): both touch and accessibility continuation actions preserve product history. Buy root retains scroll offsets per nested visit, including returning through a repeated product, and restores them only for matching Back navigation. Existing Cart/Store restoration paths remain separate; session/scope replacement clears local offset history.
+- Local evidence: strengthened test first reproduced catalogue shortcut, then exposed original-scroll reset after history-only correction. Full correction passes Saved wheat and search entry, two related visits, Android Back through both preceding details, exact scroll offsets and final Saved/query origin. Connected product-continuity/partner-catalogue suites102passed/0failures; final390x844 D007 cases2passed. Eight Flutter captures reviewed across default host and phone; analysis zero issues. Counts overlap, not104 unique tests. No physical Redmi closure.
+- Source owners: buy_v2_views.dart and buy_v2_screen.dart. Existing buy_v2_product_continuity_test.dart admitted at877656e54eab174f3c4dc698da23799553d8023a; claim34. Full evidence and hashes in UAT.md. Original281-283 remains pending successor APK verification.
 
 ## RV6-D008 - Wholesale buyer label runs into the business name
 - Status: open; confirmed Redmi visual defect. Severity: minor.

@@ -2277,3 +2277,26 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | --- | --- |
 | rv6-d006-android-back-buy.png | 967EB8350DFFD5C2098134F8BDB4742977A309C767E0B47DFC014132F8284EC8 |
 | rv6-d006-cancelled-security.png | 832A5496B3DEA606A50D3C3D048C78D31526A94A403D75314F4E9D83319FBACF |
+
+## RV6-D007 local qualification - 2026-09-14
+
+- Scope: original281-283 related-product Back from Saved; full prior product context/position before final catalogue return. No broad audit or device action.
+- Admission877656e54eab174f3c4dc698da23799553d8023a, parented0233761e825e22a4d6e14c7d0f0e0073f9ea25. Only apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart transferred from inherited root claim; source owners already admitted. Claim34. Prior normalized checker reconstructs SHA2562C6140F619B4C8147628C34319EA456CFF8A472EEFABCE8F4C4EA3ADC75B7A51. Gates passed; admission pushed clean/live-equal. Session source untouched.
+- Changes: apps/mobile/lib/ui_v2/buy/buy_v2_views.dart enables existing preserveComparisonOrigin for both continuation touch/semantics callbacks. apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart retains per-visit product scroll offsets, restores matching related Back positions with session/sequence/root-depth guards and clears local state on session replacement or invalid procurement scope. Fresh forward details still start at top. Cart/nested Store restoration remains separate.
+- Test strengthened the existing continuity expectation, which previously asserted the buggy immediate catalogue return. Initial run96093 failed with selectedProductId null; history-only source fix run18181 returned product but failed original offset0 versus1049. Full correction run48248 passed. Saved/search cases then both passed (15512 terminal0); this includes revisiting an earlier product, Back through both preceding details and their exact offsets, saved flag/bookmark and final root/query.
+- Connected source-qualified run: flutter test --no-pub test/ui_v2/buy/buy_v2_product_continuity_test.dart test/ui_v2/buy/buy_v2_partner_catalogue_test.dart --reporter expanded;102passed/0failures,20641 terminal0/97d74b. Exact log connected-regression.log retained below. Includes comparison, cart and Store continuation, variant, paginated and D002 regressions. The two D007 cases in this combined run used default800x600 host size.
+- Final test-only viewport adjustment390x844: two D007 Saved/search cases passed with actual Flutter captures (65279 terminal0/2db595). Source unchanged since102-pass connected run; counts overlap, not104 distinct tests. Analysis of exact three Dart owners: zero issues,85774 terminal0/1eadde. No unrelated formatter changes intended; edited test block reformatted.
+- Eight actual Flutter captures reviewed (four default host, four phone). Restored lower product content, related rail and Saved marker match the per-visit context; product IDs/offsets additionally asserted. Only D007 navigation/context is visually qualified, not incidental catalogue copy/media. Tests invoke Android Back via handlePopRoute; physical Redmi281-283 remains pending checksum-bound successor APK. No device closure, new APK or child implementation.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d007-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| phone/rv6-d007-original-return-saved-false.png | 4AB0127C93424CC5C7C17D285FA30672E4DA01B87F5D066CF135F4BD786321DA |
+| phone/rv6-d007-original-return-saved-true.png | 7575CC4A8716E6B26F316B505C93C11AB0453EF0B621F65547FD6D42DAFA2B3F |
+| phone/rv6-d007-related-return-saved-false.png | 1D513C8434884AF85061D77020D7331420DA2BC82CA1E4B44C969675E7A11059 |
+| phone/rv6-d007-related-return-saved-true.png | 1BC098ED07607819436DF01F7B5078DDA6DC3B126C2E0B875625C20EC22A42C5 |
+| rv6-d007-original-return-saved-false.png | 5F09B82AADDEA7CA7E6177155FAC9B40CF86ACF343D0F753A9771A02D03C0412 |
+| rv6-d007-original-return-saved-true.png | D72F5FC28907E36FC9F300A14AC6D7A7724E7DE7E4D4DF2079DD7CDD45DA6ED3 |
+| rv6-d007-related-return-saved-false.png | C1D57CFCF13623A32109E4D95C54A4480D871D23F70A925430748717222BD07E |
+| rv6-d007-related-return-saved-true.png | C9E18C67CBF6693996664E4678EBF3EDFC3549F65388BD704384F3F4B89F58FF |
+| connected-regression.log | 69EE91A18656DA3DCEC0FDBC262BEBDA19AF17458D18D1E28445D7780098ABE3 |
