@@ -1615,3 +1615,8 @@ Source apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart SHA256 E9BCB
 ## Round 117 - physical Shop Chat filters and return
 
 Captures836-846: Shop rail Chat opens shared inbox after transition; Unread shows Fresh Basket unread1, People empty state, Clear search restores All, Business shows Metro Wholesale, Orders Fresh Basket, Support two support threads, All restores four. Toolbar Back restores Scheduled Shop/Saved1/empty basket. Nine device-pass action records plus one wording observation: no-query People filter recovery says Clear search but works. No conversation opened, marked read, archived, pinned, messaged or otherwise modified. CHAT-INBOX-A12 all six visible filter chips and A09 no-query filter reset qualified for this fixture; search-query reset, other filters/data and menu actions remain pending. Totals846 captures,848 evidence rows,521 journey records,421 passing records,15 device observations,17 defects. Full audit remains incomplete.
+
+
+## Round 118 - physical Shop Chat search
+
+Captures847-859. Eight pass records: inline search open, unmatchedzzzz, keyboard Search, settled Clear search CTA, positive Metro, suffix X clear, empty-search close icon, Android Back to Scheduled Buy. Original unread1/pin preserved; no conversation opened or message sent. Capture852 is keyboard transition; tap at prior CTA position then missed after layout settled. Capture853 retains query and is not a failed Clear action; corrected visible CTA tap at854 works. CHAT-INBOX-A08 search branches and A09 query reset now have scoped physical evidence. Totals859 captures,861 evidence rows,529 journey records,429 passing records,17 defects. Other shared menus/conditional actions and full semantic inventory remain pending.
