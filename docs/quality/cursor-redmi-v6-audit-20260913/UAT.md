@@ -504,3 +504,9 @@ Library-wide references show public Buy only declares scannerLauncher at buy_v2_
 Expanded B-008 into MEDIA-ROUND75-01 through08:gallery/count;pinch/pan/reset/reduced motion;video play/pause/replay;mute;seek;transcript/dismiss;Retry;variant/gallery shrink and background pause. Exact source pointers retained. Each remains blocked_test_data because supplier mediaAssets are absent in the current cohort;illustrations are not substitutes for decoding/playback/variant binding tests. No new defect, asset injection or device action.
 
 448 action rows;19 blocked_test_data rows include parent/descendant coverage and are not19 unique defects. Other counts unchanged;full audit incomplete.
+
+## Round 76 - expired Offers recovery and Orders large text
+
+675 naturally expired Offers;Refresh676 restored fixture grid. Original font1.0 read;set2.0/read2.0.677 was transition only;settled678 shows readable order card and stacked controls. Track679 correct MS-NEW-09 with last-known/live-unavailable copy readable. Android Back;restore1.0/read1.0;680 Orders12active2delivered retained. No cart/address/order mutation or live transaction. Four narrow passes;lower tracking and other orders at200 remain pending.
+
+452 actions;359 device passes;680 captures;682 evidence rows;62 mappings;16 confirmed defects. No full-module qualification claim.
