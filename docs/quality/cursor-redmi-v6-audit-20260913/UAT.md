@@ -544,3 +544,12 @@ Implementation gate passed before this continuation. 709 reopened Manage at norm
 Read resolution source11946-12265 and reconciled original RESOLUTION001-012. Added four explicit B006 conditional descendants:positive item quantities;empty-item submission guard;type/refresh selection reset;accepted/rejected/busy/failure outcomes. Source evidence is not device qualification. Existing normal-text reason selection and unavailable delivered branches remain preserved. Dropdown Back, remaining reason selections and reopen draft state still require coverage.
 
 468 action rows;370 device passes;713 captures;715 evidence rows;62 public-data rows;17 distinct confirmed defects. Full source/action inventory and audit remain incomplete.
+
+
+## Round 83 - complete local cancellation selection gaps
+
+Implementation gate passed. Reopen714 clears prior choice;Cancel715 starts empty reason with disabled Submit. Open dropdown716;Android Back717 closes dropdown only and retains empty form. Ordered by mistake718 and Need to change items719 select correctly and enable Submit. Android Back720 dismisses without request;packing tracking retained. Font unchanged1.0;no request or user-data mutation.
+
+Four narrow passes. Together with144(change address) and712(delivery time),all four reason selections are now observed. Reconciled five older remaining notes without changing original evidence or claiming all variants at200percent. Real submission,provider outcomes and process death remain unqualified. No new defect.
+
+472 action rows;374 device passes;720 captures;722 evidence rows;62 public-data mappings;17 distinct confirmed defects. Full audit and source inventory remain incomplete.
