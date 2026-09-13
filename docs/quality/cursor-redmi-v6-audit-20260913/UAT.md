@@ -941,7 +941,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0338 | buy_v2_views.dart:7565 | _CheckoutCollectionDetails | onTap | collection review Payment Change; exact control unverified |
 | SRC-0339 | buy_v2_views.dart:7602 | _CheckoutAddressStage | onSelected | device_pass COLLECTION-ROUND18-06 switch Delivery; resolution-disabled state unverified |
 | SRC-0340 | buy_v2_views.dart:7610 | _CheckoutAddressStage | onSelected | Collect at store chip distinct from Store entry COLLECTION-ROUND18-02; exact chip unverified |
-| SRC-0341 | buy_v2_views.dart:7665 | _CheckoutAddressStage | onPressed | checkout Add another address exact entry requires address-evidence reconciliation |
+| SRC-0341 | buy_v2_views.dart:7665 | _CheckoutAddressStage | onPressed | device_pass CHECKOUT-ROUND135-03 Add another address and empty form X944-945; populated draft/validation separate |
 | SRC-0342 | buy_v2_views.dart:7698 | _CheckoutAddressChoice | onTap | address choice Semantics action; screen-reader unverified |
 | SRC-0343 | buy_v2_views.dart:7711 | _CheckoutAddressChoice | onTap | checkout address pointer selection; selected Work observed but exact switch action requires reconciliation |
 | SRC-0344 | buy_v2_views.dart:7748 | _CheckoutAddressChoice | onPressed | checkout address Edit exact button; address-sheet Edit not automatically equivalent |
@@ -950,7 +950,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0347 | buy_v2_views.dart:7951 | _CheckoutPaymentStage | onChanged | procurement PO reference conditional field; workspace procurement scope; public consumer pass not inferred |
 | SRC-0348 | buy_v2_views.dart:8139 | _CheckoutPaymentStateRow | onPressed | cancel payment action/status-needs-checking requires real attempt state; provider qualification excluded |
 | SRC-0349 | buy_v2_views.dart:8232 | _CheckoutConfirmStage | onTap | device_pass GST-ROUND95 flow capture787 Change address; provider delivery recalculation unverified |
-| SRC-0350 | buy_v2_views.dart:8293 | _CheckoutConfirmStage | onTap | confirm Payment Change exact control unverified; Back to Payment not equivalent |
+| SRC-0350 | buy_v2_views.dart:8293 | _CheckoutConfirmStage | onTap | device_pass CHECKOUT-ROUND135-04 Confirm Payment Change947-948 retains Paytm; Back route observation949 remains open |
 | SRC-0351 | buy_v2_views.dart:8433 | _CheckoutPrimaryActionBar | onPressed | primary action button forwarder SRC-0335; no additional journey |
 | SRC-0352 | buy_v2_views.dart:8669 | _CheckoutPriceChangeReview | onPressed | accept updated prices requires exact changed quote; B-004/provider-dependent unverified |
 | SRC-0353 | buy_v2_views.dart:8729 | _CheckoutPromiseChangeReview | onPressed | accept updated delivery times requires changed promise; B-004/provider-dependent unverified |
@@ -1047,7 +1047,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0444 | buy_v2_views.dart:13858 | _BuyV2FilterToolAction | onTap | forwarder to filter tool action; RECENT-ROUND45-01 expansion is not every tool destination |
 | SRC-0445 | buy_v2_views.dart:13922 | _BuyV2FilterOption | onTap | unverified accessibility semantics activation; pointer filters separately indexed SRC0426-0442 |
 | SRC-0446 | buy_v2_views.dart:13935 | _BuyV2FilterOption | onTap | pointer forwarder to filter choice; scoped filter evidence only; all option values not inferred |
-| SRC-0447 | buy_v2_views.dart:14062 | showBuyV2PaymentSheet | onPressed | pending exact payment sheet X closure; selection/Android Back do not prove X |
+| SRC-0447 | buy_v2_views.dart:14062 | showBuyV2PaymentSheet | onPressed | device_pass SETTINGS-ROUND136-01 exact payment sheet X957-958 returns Shopping settings with Paytm unchanged |
 | SRC-0448 | buy_v2_views.dart:14094 | showBuyV2PaymentSheet | onTap | CHECKOUT-004 Paytm choice device pass capture087; other runtime payment choices unverified |
 | SRC-0449 | buy_v2_views.dart:14139 | _BuyV2PaymentChoice | onTap | unverified accessibility semantics activation for payment choices |
 | SRC-0450 | buy_v2_views.dart:14153 | _BuyV2PaymentChoice | onTap | pointer forwarder to payment choice SRC0448; Paytm only directly qualified |
@@ -1055,7 +1055,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0452 | buy_v2_views.dart:14345 | showBuyV2PrescriptionSheet | onTap | Medicine saved prescription approval outside scoped Shop; no approval performed |
 | SRC-0453 | buy_v2_views.dart:14355 | showBuyV2PrescriptionSheet | onTap | Medicine saved prescription approval outside scoped Shop; no approval performed |
 | SRC-0454 | buy_v2_views.dart:14362 | showBuyV2PrescriptionSheet | onTap | Medicine prescription attachment outside scoped Shop; no attachment performed |
-| SRC-0455 | buy_v2_views.dart:14481 | showBuyV2AddressSheet | onPressed | pending exact address selector X; nested Android Back evidence is distinct |
+| SRC-0455 | buy_v2_views.dart:14481 | showBuyV2AddressSheet | onPressed | device_pass SETTINGS-ROUND136-02 exact address selector X959-960 returns Shopping settings with Work retained |
 | SRC-0456 | buy_v2_views.dart:14530 | showBuyV2AddressSheet | onTap | AUDIT-ROUND40-08 and ADDR-ROUND57-04 restore original Work selection; other entries not inferred |
 | SRC-0457 | buy_v2_views.dart:14549 | showBuyV2AddressSheet | onPressed | AUDIT-ROUND40-06 isolated address removal cancellation captures458-460; originals preserved |
 | SRC-0458 | buy_v2_views.dart:14557 | showBuyV2AddressSheet | onPressed | AUDIT-ROUND40-07 and ADDR-ROUND57-04 isolated test-address removal; originals preserved |
@@ -1764,3 +1764,10 @@ Physical captures937-951. Settings Back937 retains four original inbox threads/p
 Payment946 retains Paytm. Confirm order947 -> Payment Change948 opens the existing full payment step, not a closeable sheet. Android Back949 goes to Address following stepper order. Recorded observation pending contract reconciliation: this is not a claimed return-to-Confirm pass or a confirmed new defect. Older payment-sheet X inventory remains separate until exact caller reconciliation. Address header Cart950 retains wheat1/279;minus951 removes only isolated item and restores original Scheduled Shop Saved1 emptycart. GST remained off;Home/Work and Paytm unchanged;no delivery check/order/payment submission.
 
 Five device pass records and one observation added.565 action/check rows,456 device passes,20 distinct defects,951 physical captures. Remaining complete unique journey denominator and full audit remain open.
+
+
+## Round136 - exact payment and address sheet closure reconciliation
+
+Caller readback establishes catalogue4434/4443 opens address/payment sheets from Shopping settings; checkout uses different full stages. Captures952-956 navigate Sort/filter -> Shopping tools -> Shopping settings;955 is transition only,956 settled. Payment preference957 -> exact X958 retains Paytm and Shopping settings. Delivery addresses959 -> exact X960 retains Work and settings. No preferences or customer records changed;device remains at Shopping settings960.
+
+SRC0341/0350 updated to round135 evidence;SRC0447/0455 now qualified against exact X controls rather than earlier Android Back or payment selection. Collection change controls, runtime/semantic choices, no-address recovery and other parent callers retain distinct qualification. No new defect. Current20 defects;two new device pass records. Full inventory remains incomplete.
