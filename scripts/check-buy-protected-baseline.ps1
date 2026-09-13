@@ -350,8 +350,8 @@ function Test-IntegratedStoreBuyReviewSource {
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
       'work/codex-ui/store-procurement-bridge-20260912'
     }
-    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v7-20260913' {
-      'integration/moolsocial/store-buy-final-v7-20260913'
+    'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v8-20260913' {
+      'integration/moolsocial/store-buy-final-v8-20260913'
     }
     default { $null }
   }
