@@ -412,3 +412,9 @@ Captures609-616 reviewed. Wholesale omits Pack size610, matching views13577 dest
 Physical captures617-625 reviewed. Original unfiltered Wholesale617. Applied5000 after explicit option read619:620 result434700000 and visible six prices below cap. Next page621 shows41-80 and six visible prices936/4200/2460/3650/2200/2790;reopened filter retains5000 at622. Applied10000 resets first page623,count494000000;reopen624 retains10000. Clear/Apply625 restores unfiltered first page,no badge,Saved0. No cart/address/saved mutations. Four narrow device passes;no new defect or closure. Full pagination, exact-price boundary, process-death persistence and authoritative offer revision remain unqualified.
 
 625 physical captures;627 evidence rows;394 action rows;58 public-data mappings;16 distinct defects. Complete action/data inventory and final handoff remain unfinished. No product/policy/APK changes.
+
+## Round 61 - Help Android Back and Wholesale origin
+
+Physical captures626-630 reviewed. Wholesale tools opens Settings;lower scroll627. Help628 shows combined Shop/Wholesale orders. AndroidBack with keyboard hidden dismisses Help to identical Settings scroll629. SecondBack returns original Wholesale first page630,no filter badge,Saved0. Two narrow device passes;two stale Help pending notes reconciled. No new defect/closure;no data mutations, messages, transactions, force-stop or process-death qualification.
+
+630 physical captures;632 evidence rows;396 action rows;58 public-data mappings;16 defects. Audit remains incomplete. Source read failed once under platform-default cp1252;bounded UTF-8 retry succeeded under standing read-recovery authority;no source mutation.
