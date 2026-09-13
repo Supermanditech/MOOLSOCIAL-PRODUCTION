@@ -1814,3 +1814,32 @@ Catalogue inventory reconciliation resumed with SRC-0001 through SRC-0024: the e
 ## Round 142 - Area short-query submission and cancellation
 
 Captures 987-993 qualify AREA-ROUND142-01. Settings Back returned Scheduled Shop. In Shopping area, the initial attempted IME tap changed J to Je and showed provider-unavailable feedback; capture990 is not proof of a one-character submission. Deleting one character and issuing Android Enter produced J, dismissed the keyboard, and left no stale error in settled capture992. X returned to unchanged Scheduled Shop with saved1 and empty cart993. No area applied, no new defect. Exact source1602-1622 clears error on edit and guards lookup at two characters. A bounded UTF-8 retry recovered the source read after the default Windows decoder rejected it. Positive location-provider recovery and the explicit two-character submit branch remain unqualified. Total distinct defects20.
+
+
+## Round 143 - Catalogue pending-action reconciliation
+
+Reviewed all 136 original catalogue SRC rows in bounded pages, retaining distinctions between pointer actions, wrapper aliases, semantics, alternate mounts and provider conditions. Capture994 shows area reopened with empty query and regional draft selected; no selection was applied. It is supporting evidence, not another passed journey. No new defect or JOURNEYS row. Device remains on the area selector; original saved addresses and empty cart preserved.
+
+The following 17 work groups are concrete follow-ups from this catalogue inventory. They are neither defect counts nor an exhaustive unique-journey denominator. Each must first be reconciled against older evidence, then physically tested where still missing. A group containing multiple controls must not be closed from one representative tap.
+
+| Group | SRC references | Exact follow-up |
+| --- | --- | --- |
+| CAT-P01 | 0009 | Offers promotion final Next boundary |
+| CAT-P02 | 0013-0016 | Parent-specific pager boundaries and footer area entry; retain prior Offers/Shop/Wholesale passes |
+| CAT-P03 | 0026-0027 | Any area and seed-area selection; establish original applied area before changes and restore it; seed results do not qualify national coverage |
+| CAT-P04 | 0028-0031 | Sale-selector horizontal gesture and Wholesale/Bulk pointer retention; semantics separate |
+| CAT-P05 | 0032-0033 | Conditional shopping-intent clear and account-origin return; establish reachable public entry or classify blocker |
+| CAT-P06 | 0034 | Search Store result entry, associated-product resolution and Back |
+| CAT-P07 | 0036-0037 | Recent and recommended suggestion exact query/result/return; preserve history |
+| CAT-P08 | 0038 | Search all scope broadening, retained query and eligibility boundary |
+| CAT-P09 | 0040-0047 | Shop category choice plus Wholesale picker entry/clear/close; existing Shop query passes retained |
+| CAT-P10 | 0051 | Track active order from tools and return to exact originating catalogue |
+| CAT-P11 | 0078 | Store sheet X, distinct from Android Back |
+| CAT-P12 | 0085-0087 | Store category X and All products selection; selected category return |
+| CAT-P13 | 0088 | Full Store catalogue X, distinct from Android Back |
+| CAT-P14 | 0091 | Store search keyboard submission and retained query/results |
+| CAT-P15 | 0102 | Saved settings-row Remove using isolated additional saved item; preserve original saved item |
+| CAT-P16 | 0105 | Non-Saved empty-product-grid Show all recovery, if reachable |
+| CAT-P17 | 0134 | Exact quantity Edit sheet; reconcile earlier edit evidence, quantity/limits and return context |
+
+Separate qualification dimensions remain open: screen-reader activation (0030/0043/0049/0083/0097/0100/0131/0133), parent-specific enlarged text and relaunch, live revisions/disabled states, resolved location and provider Retry (0011/0012/0017/0018/0020/0021/0022/0025/0059/0060/0063/0072/0074/0075/0076/0077/0103/0104/0106/0130/0135), and conditional alternate catalogue mounts (0001/0093/0113-0116/0121-0128/0136). These cannot be declared passed through ordinary paged fixtures. History clear remains preservation-excluded (0035/0070/0123). Medicine-only and workspace-only controls remain outside the public Buy boundary as annotated individually. Wrapper aliases retain caller evidence, not additional journey counts. Other source families and shared descendants still require reconciliation; this section is not a final handoff.

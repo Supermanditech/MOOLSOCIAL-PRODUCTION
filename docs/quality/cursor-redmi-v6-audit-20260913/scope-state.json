@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 993,
-    "evidenceRows": 995,
+    "physicalCaptures": 994,
+    "evidenceRows": 996,
     "publicDataRows": 69,
     "confirmedDistinctDefects": 20,
     "countsAreExhaustiveDenominator": false
@@ -89,7 +89,7 @@
     }
   ],
   "nextWork": [
-    "Continue source-derived missing controls;delivery exception and balance-payment cards inventoried round66;other source families incomplete",
+    "UAT round143 CAT-P01..17 catalogue follow-ups: reconcile older evidence then test missing exact controls; preserve separate semantics/provider/alternate-mount limitations",
     "Saved-address process-death persistence remains unqualified; edit/save and task resume qualified round57",
     "Remaining filter/Store/product/cart/order branches from source inventory",
     "Complete public-data field reconciliation and final evidence handoff"
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 142
+  "latestAuditRound": 143
 }
