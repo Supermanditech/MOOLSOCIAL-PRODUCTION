@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 396,
+    "recordedActionRows": 403,
     "dispositions": {
       "device_observation": 11,
-      "device_pass": 331,
+      "device_pass": 338,
       "blocked_provider": 13,
       "device_failure": 18,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 630,
-    "evidenceRows": 632,
+    "physicalCaptures": 644,
+    "evidenceRows": 646,
     "publicDataRows": 58,
     "confirmedDistinctDefects": 16,
     "countsAreExhaustiveDenominator": false
@@ -89,14 +89,14 @@
     }
   ],
   "nextWork": [
-    "Continue residual reconciliation after first130 action rows; preserve original observations and conditional limits",
+    "Continue residual reconciliation after first195 action rows;preserve conditional limits",
     "Saved-address process-death persistence remains unqualified; edit/save and task resume qualified round57",
     "Remaining filter/Store/product/cart/order branches from source inventory",
     "Complete public-data field reconciliation and final evidence handoff"
   ],
   "preservation": {
-    "cart": "empty after isolated variant cleanup608",
-    "savedShop": "original wheat count1 retained580",
+    "cart": "empty after isolated mixed-cart cleanup644",
+    "savedShop": "original wheat count1 retained644",
     "addresses": "Original Home/Work retained;isolated round57 address removed;Work selected598",
     "noNewApk": true,
     "noProductEdits": true
@@ -107,5 +107,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 62
+  "latestAuditRound": 63
 }

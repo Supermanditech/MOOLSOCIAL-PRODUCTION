@@ -424,3 +424,9 @@ Physical captures626-630 reviewed. Wholesale tools opens Settings;lower scroll62
 Reconciled nine early remaining notes against later recorded Store/cart/quantity/order/Help evidence. Original observations and dispositions unchanged. Distinguish multi-product reordered cart quantities from historical line identity:round25 does not qualify historical identity. Mixed two-nonempty carts,Wholesale upper quantity bounds,Store-origin restoration,group controls,process-death and provider truth remain unqualified. Verified57 referenced artifact files against EVIDENCE.csv hashes;zero missing/mismatches. No new device actions,captures,passes,defects or closures.
 
 Counts unchanged630 physical captures;632 evidence rows;396 action rows;58 public mappings;16 defects. First130 early residual notes reviewed in bounded pages;later residual reconciliation and complete source-derived action inventory still open.
+
+## Round 63 - Two nonempty carts and scoped removal
+
+Physical captures631-644 reviewed. Added only isolated Wholesale tomatoes10kg2packs1160 then Shop wheat5kg1pack279;combined1439. Each cart shows exact own line635/636. Trade increment3 makes1740 and combined2019;Shop remains1/279 at637. Shop Address review638 carries1/279;Back/trade639 retained3/1740. Trade Address review640 carries3/1740. Original Work selection unchanged. Scoped clear641 discloses3Wholesale removed and1other retained;AndroidBack642 preservesboth. ConfirmingWholesale removal643 leavesShop1/279. Removed testShopline644;emptycart,Saved1,ScheduledShop restored. Seven narrow device passes;no new defects/closures. No payment,order placement,messages,address edits or product changes. Process-death/account switching/provider authority remain unqualified.
+
+644 physical captures;646 evidence rows;403 action rows;58 public mappings;16 defects. Three old pending notes reconciled. Residual notes131-195 read;complete source inventory and final handoff still open.
