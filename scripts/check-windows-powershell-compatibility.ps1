@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-  [string]$RepositoryRoot
+  [string]$RepositoryRoot,
+  [string]$RedmiReviewSourceCommit = '',
+  [string]$IntegratedReviewSourceCommit = ''
 )
 
 $ErrorActionPreference = "Stop"
@@ -78,16 +80,29 @@ function Invoke-LegacyGate {
   throw "$Label failed under Windows PowerShell 5.1: $text"
 }
 
+$reviewArguments = if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
+  if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+    throw 'Choose one review source boundary, not both.'
+  }
+  @('-IntegratedReviewSourceCommit', $IntegratedReviewSourceCommit)
+} elseif ([string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
+  @()
+} else {
+  @('-RedmiReviewSourceCommit', $RedmiReviewSourceCommit)
+}
+
 Invoke-LegacyGate `
   -Label 'backend boundary' `
-  -Script 'scripts\check-buy-backend-contract-boundary.ps1'
+  -Script 'scripts\check-buy-backend-contract-boundary.ps1' `
+  -Arguments $reviewArguments
 Invoke-LegacyGate `
   -Label 'backend boundary self-test' `
   -Script 'scripts\check-buy-backend-contract-boundary.ps1' `
   -Arguments @('-SelfTest')
 Invoke-LegacyGate `
   -Label 'data-egress boundary' `
-  -Script 'scripts\check-buy-data-egress-boundary.ps1'
+  -Script 'scripts\check-buy-data-egress-boundary.ps1' `
+  -Arguments $reviewArguments
 Invoke-LegacyGate `
   -Label 'data-egress boundary self-test' `
   -Script 'scripts\check-buy-data-egress-boundary.ps1' `
@@ -103,6 +118,7 @@ Invoke-LegacyGate `
 Invoke-LegacyGate `
   -Label 'protected Buy baseline' `
   -Script 'scripts\check-buy-protected-baseline.ps1' `
+  -Arguments $reviewArguments `
   -AllowedBusinessFailure 'Protected Buy (inventory|runtime tree) changed'
 
 Write-Output (

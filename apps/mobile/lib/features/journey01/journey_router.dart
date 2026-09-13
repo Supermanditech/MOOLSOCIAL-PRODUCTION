@@ -1,4 +1,4 @@
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -9,6 +9,7 @@ import '../book/screens/doctor_screens.dart';
 import '../book/screens/salon_screens.dart';
 import '../book/screens/task_screens.dart';
 import '../buy/buy_session.dart';
+import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_v2_models.dart';
 import '../buy/buy_v2_session.dart';
 import '../buy/screens/buy_basket_screen.dart';
@@ -29,6 +30,8 @@ import '../captain/screens/captain_trip_screens.dart';
 import '../chat/chat_models.dart';
 import '../chat/chat_session.dart';
 import '../chat/screens/chat_inbox_screen.dart';
+import '../chat/screens/chat_people_directory.dart';
+import '../chat/screens/chat_notification_settings_screen.dart';
 import '../chat/screens/chat_thread_screen.dart';
 import '../creator/creator_models.dart';
 import '../creator/creator_session.dart';
@@ -40,6 +43,7 @@ import '../eat/eat_session.dart';
 import '../eat/screens/eat_basket_screen.dart';
 import '../eat/screens/eat_completed_screen.dart';
 import '../eat/screens/eat_home_screen.dart';
+import '../eat/screens/eat_invoice_screen.dart';
 import '../eat/screens/eat_order_screen.dart';
 import '../eat/screens/eat_review_screen.dart';
 import '../eat/screens/eat_table_confirmation_screen.dart';
@@ -85,10 +89,19 @@ import '../retailer/screens/retailer_sales_book_screen.dart';
 import '../retailer/screens/retailer_wholesale_catalog_screens.dart';
 import '../retailer/screens/retailer_wholesale_fulfilment_screens.dart';
 import '../work/screens/work_earn_screens.dart';
-import '../work/screens/work_onboarding_screens.dart';
+import '../work/screens/work_onboarding_screens.dart'
+    hide WorkWorkspaceContactScreen;
+import '../work/screens/work_workspace_contact_screen.dart';
+import '../work/screens/work_workspace_dashboard_screen.dart';
+import '../work/work_models.dart';
 import '../work/work_session.dart';
 import '../../ui_v2/launch/launch_interruption_guard.dart';
 import '../../ui_v2/launch/launch_presentation_gate.dart';
+import '../../ui_v2/profile/global_personal_profile_v2.dart';
+import '../../ui_v2/profile/global_privacy_preferences_v2.dart';
+import '../../ui_v2/profile/global_profile_panel_v2.dart';
+import '../../ui_v2/profile/global_help_support_v2.dart';
+import '../../ui_v2/profile/global_security_v2.dart';
 import '../../ui_v2/screens/screen01_app_splash/app_splash_screen_v2.dart';
 import '../../ui_v2/screens/screen02_first_setup/first_setup_screen_v2.dart';
 import '../../ui_v2/screens/screen03_login/login_screen_v2.dart';
@@ -104,7 +117,117 @@ import '../../ui_v2/universal/mool_global_navigation_v2.dart';
 import '../../ui_v2/universal/mvp_action_choice_root_v2.dart';
 import '../../ui_v2/universal/personal_mool_root_v2.dart';
 import 'journey_session.dart';
+import 'journey_services.dart';
 import 'screens/universal_shell.dart';
+
+final class _WorkspacePublicBuyCommerceAdapter implements BuyV2CommerceAdapter {
+  const _WorkspacePublicBuyCommerceAdapter(this.product);
+
+  final BuyV2Product product;
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async => BuyV2CommerceSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    products: [product],
+    paymentMethods: const {'UPI'},
+  );
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async => const BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.unavailable,
+    customerMessage:
+        'Ordering is unavailable until the Store catalogue is synchronized. Your Cart is unchanged.',
+  );
+
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) async => const BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.unavailable,
+    customerMessage: 'Payment status is unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async => const BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: 'Order updates are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: true,
+        enabled: false,
+        customerMessage: '',
+      );
+
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({
+    required bool enabled,
+  }) async => const BuyV2OrderAlertsResult(
+    available: false,
+    enabled: false,
+    customerMessage: 'Order alerts are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async => const BuyV2MutationResult(
+    accepted: false,
+    customerMessage: 'Reviews are unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) async => const BuyV2MutationResult(
+    accepted: false,
+    customerMessage: 'Product reporting is unavailable right now.',
+  );
+
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async => const BuyV2AddressRequestResult(
+    customerMessage: 'Address requests are unavailable right now.',
+  );
+}
+
+final class _WorkspacePublicBuySession extends BuyV2Session {
+  _WorkspacePublicBuySession({
+    required super.core,
+    required BuyV2CommerceAdapter commerceAdapter,
+  }) : super(commerceAdapter: commerceAdapter, reviewDataEnabled: false);
+
+  VoidCallback? directProductExit;
+
+  @override
+  void goBack() {
+    if (view == BuyV2View.product && directProductExit != null) {
+      directProductExit!();
+      return;
+    }
+    super.goBack();
+  }
+}
+
+bool journeyRouteRequiresAuthentication(
+  Uri uri, {
+  required bool allowGuestReady,
+}) {
+  if (allowGuestReady) return false;
+  return uri.path.startsWith('/app/chat') ||
+      (uri.path == '/app/social' && uri.queryParameters['sub'] == 'create');
+}
 
 GoRouter createJourneyRouter(
   JourneySession session,
@@ -124,9 +247,45 @@ GoRouter createJourneyRouter(
   required LaunchPresentationGate launchPresentationGate,
   required LaunchInterruptionGuard launchInterruptionGuard,
   String initialLocation = '/boot',
+  bool uiReviewOnly = false,
   bool legacyPresentationForTestsOnly = false,
 }) {
   final buyV2Session = BuyV2Session(core: buySession);
+  _WorkspacePublicBuySession? workspacePublicBuySession;
+  String? workspacePublicBuySignature;
+  Future<void>? workspacePublicBuyRestore;
+  BuyV2Session resolveWorkspacePublicBuySession(String productId) {
+    final product = workSession.workspaceCatalogueItems
+        .where((item) => item.id == productId && item.published)
+        .firstOrNull;
+    if (product == null) return buyV2Session;
+    final signature = [
+      product.id,
+      product.sellingPrice,
+      product.stock,
+      product.deliveryPromise,
+      product.publicListing,
+      workSession.activeWorkspace?.name ?? workSession.workName,
+    ].join('|');
+    if (workspacePublicBuySession != null &&
+        workspacePublicBuySignature == signature) {
+      return workspacePublicBuySession!;
+    }
+    workspacePublicBuySession?.dispose();
+    final publicProduct = product.toBuyPublicProduct(
+      storeName: workSession.activeWorkspace?.name ?? workSession.workName,
+      confirmedOn: 'Updated by Store',
+    );
+    final next = _WorkspacePublicBuySession(
+      core: buySession,
+      commerceAdapter: _WorkspacePublicBuyCommerceAdapter(publicProduct),
+    );
+    workspacePublicBuySession = next;
+    workspacePublicBuySignature = signature;
+    workspacePublicBuyRestore = next.restoreCommerce();
+    return next;
+  }
+
   late final GoRouter router;
   VoidCallback buyExit(BuildContext context, GoRouterState state) => () {
     if (context.canPop()) {
@@ -137,8 +296,17 @@ GoRouter createJourneyRouter(
       session.buyExitRoute(requestedRoute: state.uri.queryParameters['return']),
     );
   };
+  VoidCallback careMedicineExit(BuildContext context) => () {
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    router.go('/app/book/doctor');
+  };
   VoidCallback openMoolFromBuy(BuildContext context) =>
       () => context.push('/app/mool?from=buy');
+  VoidCallback openMoolFromCare(BuildContext context) =>
+      () => context.push('/app/mool?from=book');
   void rememberBuyDestination(BuyV2Destination destination) {
     final location = '/app/buy?sub=${destination.name}';
     session.confirmReadyRoute(location);
@@ -157,14 +325,16 @@ GoRouter createJourneyRouter(
       launchPresentationGate,
       launchInterruptionGuard,
     ]),
-    redirect: (context, state) {
+    redirect: (context, state) async {
       final location = state.uri.path;
+      final careMedicineRedirect = _careMedicineRedirect(state.uri);
+      if (careMedicineRedirect != null) return careMedicineRedirect;
       final protected = location.startsWith('/app/');
       final returnLocation = state.uri.toString();
-      final authenticatedRoute =
-          location.startsWith('/app/chat') ||
-          (location == '/app/social' &&
-              state.uri.queryParameters['sub'] == 'create');
+      final authenticatedRoute = journeyRouteRequiresAuthentication(
+        state.uri,
+        allowGuestReady: session.allowGuestReady,
+      );
 
       if (protected &&
           session.isReady &&
@@ -200,6 +370,11 @@ GoRouter createJourneyRouter(
           return location == '/verify' ? null : '/verify';
         case JourneyStage.ready:
           if (!protected) return session.readyRoute();
+          if (await workSession.recoverPendingProof(
+            accountReady: session.isAuthenticated || uiReviewOnly,
+          )) {
+            return '/app/work/workspace/proof';
+          }
           final containment = legacyPresentationForTestsOnly
               ? null
               : legacyRouteContainmentFor(state.uri);
@@ -229,9 +404,22 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/sign-in',
-        builder: (context, state) => legacyPresentationForTestsOnly
-            ? LoginScreenV2(session: session)
-            : LoginScreenV5(session: session),
+        builder: (context, state) {
+          final signIn = legacyPresentationForTestsOnly
+              ? LoginScreenV2(session: session)
+              : LoginScreenV5(session: session);
+          if (!session.canCancelSignIn) return signIn;
+          return PopScope<Object?>(
+            key: const Key('sign-in-route-recovery'),
+            canPop: false,
+            onPopInvokedWithResult: (didPop, _) {
+              if (!didPop && session.canCancelSignIn) {
+                session.cancelSignIn();
+              }
+            },
+            child: signIn,
+          );
+        },
       ),
       GoRoute(
         path: '/verify',
@@ -269,22 +457,50 @@ GoRouter createJourneyRouter(
                 state.uri.queryParameters['sub'] ??
                 state.uri.queryParameters['context'],
           );
+          final workspaceProductId =
+              state.uri.queryParameters['workspaceProduct'];
+          final routedBuySession = workspaceProductId == null
+              ? buyV2Session
+              : resolveWorkspacePublicBuySession(workspaceProductId);
+          if (routedBuySession case final _WorkspacePublicBuySession session) {
+            session.directProductExit = buyExit(context, state);
+          }
+          Widget buildBuyScreen() => BuyV2Screen(
+            key: ValueKey(
+              workspaceProductId == null
+                  ? 'buy-main'
+                  : 'workspace-public-buy-$workspaceProductId',
+            ),
+            session: routedBuySession,
+            accountIdentity: session.accountIdentity,
+            accountAuthenticated: session.isAuthenticated,
+            initialDestination: destination,
+            initialOffersActive: state.uri.queryParameters['sub'] == 'offers',
+            initialView: view,
+            initialCartScope: cartScope,
+            productId: state.uri.queryParameters['product'],
+            orderId: state.uri.queryParameters['order'],
+            recoveryKind: _buyV2Recovery(state.uri.queryParameters['recovery']),
+            onExit: buyExit(context, state),
+            onOpenMool: openMoolFromBuy(context),
+            onDestinationChanged: rememberBuyDestination,
+          );
           return moolMainDestinationPage(
             state: state,
-            child: BuyV2Screen(
-              session: buyV2Session,
-              initialDestination: destination,
-              initialView: view,
-              initialCartScope: cartScope,
-              productId: state.uri.queryParameters['product'],
-              orderId: state.uri.queryParameters['order'],
-              recoveryKind: _buyV2Recovery(
-                state.uri.queryParameters['recovery'],
-              ),
-              onExit: buyExit(context, state),
-              onOpenMool: openMoolFromBuy(context),
-              onDestinationChanged: rememberBuyDestination,
-            ),
+            child: workspaceProductId == null
+                ? buildBuyScreen()
+                : FutureBuilder<void>(
+                    future: workspacePublicBuyRestore,
+                    builder: (context, snapshot) {
+                      if (snapshot.connectionState != ConnectionState.done) {
+                        return const ColoredBox(
+                          color: Color(0xFFF8FAFF),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      return buildBuyScreen();
+                    },
+                  ),
           );
         },
       ),
@@ -294,19 +510,9 @@ GoRouter createJourneyRouter(
             ? BuyCatalogScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
-                onExit: buyExit(context, state),
-                onOpenMool: openMoolFromBuy(context),
-                onDestinationChanged: rememberBuyDestination,
-              ),
-      ),
-      GoRoute(
-        path: '/app/buy/medicine',
-        builder: (context, state) => legacyPresentationForTestsOnly
-            ? BuyMedicineScreen(session: buySession)
-            : BuyV2Screen(
-                session: buyV2Session,
-                initialDestination: BuyV2Destination.medicine,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
                 onDestinationChanged: rememberBuyDestination,
@@ -321,6 +527,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.product,
                 productId: state.pathParameters['productId'],
@@ -335,6 +543,8 @@ GoRouter createJourneyRouter(
             ? BuyBasketScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: _buyV2Destination(
                   state.uri.queryParameters['scope'],
                 ),
@@ -353,6 +563,8 @@ GoRouter createJourneyRouter(
             ? BuyReviewScreen(session: buySession)
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.shop,
                 initialView: BuyV2View.checkout,
                 onExit: buyExit(context, state),
@@ -369,6 +581,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
@@ -386,6 +600,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.tracking,
                 orderId: state.pathParameters['orderId'],
@@ -403,6 +619,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -418,6 +636,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 onExit: buyExit(context, state),
                 onOpenMool: openMoolFromBuy(context),
@@ -433,6 +653,8 @@ GoRouter createJourneyRouter(
               )
             : BuyV2Screen(
                 session: buyV2Session,
+                accountIdentity: session.accountIdentity,
+                accountAuthenticated: session.isAuthenticated,
                 initialDestination: BuyV2Destination.orders,
                 initialView: BuyV2View.assist,
                 orderId: state.pathParameters['orderId'],
@@ -475,6 +697,13 @@ GoRouter createJourneyRouter(
         ),
       ),
       GoRoute(
+        path: '/app/eat/order/:orderId/invoice',
+        builder: (context, state) => EatInvoiceScreen(
+          session: eatSession,
+          orderId: state.pathParameters['orderId'] ?? '',
+        ),
+      ),
+      GoRoute(
         path: '/app/eat/table',
         builder: (context, state) => EatTableScreen(session: eatSession),
       ),
@@ -508,9 +737,22 @@ GoRouter createJourneyRouter(
             child: ChatInboxScreen(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
+              socialSession: sharedSession,
+              authenticated: session.isAuthenticated,
+              onAuthenticationRequired: () => session.beginSignIn(
+                returnLocation: state.uri.toString(),
+                cancelLocation:
+                    state.uri.queryParameters['return'] ?? '/app/social',
+              ),
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
+              initialRecipientQuery: state.uri.queryParameters['recipient'],
+              initialSection: switch (state.uri.queryParameters['section']) {
+                'people' => ChatHomeSection.people,
+                'discover' => ChatHomeSection.discover,
+                _ => ChatHomeSection.chats,
+              },
               returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
             ),
           );
@@ -525,9 +767,22 @@ GoRouter createJourneyRouter(
             child: ChatInboxScreen(
               key: ValueKey('chat-inbox-${filter?.name ?? 'all'}'),
               session: chatSession,
+              socialSession: sharedSession,
+              authenticated: session.isAuthenticated,
+              onAuthenticationRequired: () => session.beginSignIn(
+                returnLocation: state.uri.toString(),
+                cancelLocation:
+                    state.uri.queryParameters['return'] ?? '/app/social',
+              ),
               initialFilter: filter,
               initialTargetUserId: state.uri.queryParameters['start'],
               initialMessageDraft: state.uri.queryParameters['draft'],
+              initialRecipientQuery: state.uri.queryParameters['recipient'],
+              initialSection: switch (state.uri.queryParameters['section']) {
+                'people' => ChatHomeSection.people,
+                'discover' => ChatHomeSection.discover,
+                _ => ChatHomeSection.chats,
+              },
               returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
             ),
           );
@@ -540,6 +795,20 @@ GoRouter createJourneyRouter(
           threadId: state.pathParameters['threadId'] ?? 'home-basket',
           initialMessageDraft: state.uri.queryParameters['draft'],
           returnRoute: state.uri.queryParameters['return'] ?? '/app/social',
+          returnDirectToOrigin:
+              state.uri.queryParameters['directReturn'] == 'true',
+        ),
+      ),
+      GoRoute(
+        path: '/app/chat/notifications',
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: ChatNotificationSettingsScreen(
+            session: chatSession,
+            originReturnRoute:
+                state.uri.queryParameters['return'] ?? '/app/social',
+            previewOnly: state.uri.queryParameters['preview'] == 'true',
+          ),
         ),
       ),
       GoRoute(
@@ -576,6 +845,31 @@ GoRouter createJourneyRouter(
         builder: (context, state) => BookHomeScreen(
           session: bookSession,
           initialIntent: state.uri.queryParameters['intent'],
+        ),
+      ),
+      GoRoute(
+        path: '/app/book/medicine',
+        pageBuilder: (context, state) => moolMainDestinationPage(
+          state: state,
+          child: legacyPresentationForTestsOnly
+              ? BuyMedicineScreen(session: buySession)
+              : BuyV2Screen(
+                  session: buyV2Session,
+                  accountIdentity: session.accountIdentity,
+                  accountAuthenticated: session.isAuthenticated,
+                  initialDestination: BuyV2Destination.medicine,
+                  initialView: _buyV2View(state.uri.queryParameters['view']),
+                  initialCartScope: BuyV2CartScope.medicine,
+                  productId: state.uri.queryParameters['product'],
+                  orderId: state.uri.queryParameters['order'],
+                  recoveryKind: _buyV2Recovery(
+                    state.uri.queryParameters['recovery'],
+                  ),
+                  onExit: careMedicineExit(context),
+                  onOpenMool: openMoolFromCare(context),
+                  onDestinationChanged: (_) =>
+                      session.confirmReadyRoute(state.uri.toString()),
+                ),
         ),
       ),
       GoRoute(
@@ -1325,13 +1619,26 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/identity',
+        builder: (context, state) => GlobalPersonalProfileV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
+        ),
+      ),
+      GoRoute(
+        path: '/app/account/identity/name',
         builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 158),
+            GlobalPersonalProfileNameEditorV2(session: session),
       ),
       GoRoute(
         path: '/app/ask',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 159),
+        builder: (context, state) => GlobalHelpSupportV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
+        ),
       ),
       GoRoute(
         path: '/app/files',
@@ -1340,8 +1647,12 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/security',
-        builder: (context, state) =>
-            SharedHubScreen(session: sharedSession, screen: 161),
+        builder: (context, state) => GlobalSecurityV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
+        ),
       ),
       GoRoute(
         path: '/app/account/workspaces',
@@ -1350,10 +1661,11 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/account/workspaces/preferences',
-        builder: (context, state) => SharedHubScreen(
-          session: sharedSession,
-          screen: 165,
-          initialItemId: state.uri.queryParameters['item'],
+        builder: (context, state) => GlobalPrivacyPreferencesV2(
+          session: session,
+          surfaceTone: state.uri.queryParameters['surface'] == 'social'
+              ? GlobalProfileSurfaceTone.socialDark
+              : GlobalProfileSurfaceTone.light,
         ),
       ),
       GoRoute(
@@ -1380,11 +1692,20 @@ GoRouter createJourneyRouter(
         },
       ),
       GoRoute(
+        path: '/app/work/home',
+        redirect: (context, state) => '/app/work/earn',
+      ),
+      GoRoute(
         path: '/app/work/earn',
         pageBuilder: (context, state) => moolMainDestinationPage(
           state: state,
           child: WorkEarnScreen(session: workSession),
         ),
+      ),
+      GoRoute(
+        path: '/app/work/filters',
+        builder: (context, state) =>
+            WorkOpportunityFilterScreen(session: workSession),
       ),
       GoRoute(
         path: '/app/work/opportunity/:opportunityId',
@@ -1396,12 +1717,26 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/my-work',
-        builder: (context, state) => MyWorkScreen(session: workSession),
+        redirect: (context, state) => workSession.hasVerifiedWorkspace
+            ? '/app/work/workspace/dashboard'
+            : '/app/work/workspace/choose?entry=workspaces',
       ),
       GoRoute(
         path: '/app/work/workspace/choose',
         builder: (context, state) =>
             WorkChooseActivityScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/workspace/requirements',
+        builder: (context, state) =>
+            WorkDocumentRequirementsScreen(session: workSession),
+      ),
+      GoRoute(
+        path: '/app/work/workspace/contact',
+        builder: (context, state) => WorkWorkspaceContactScreen(
+          session: workSession,
+          accountSnapshot: _workAccountSnapshot(session),
+        ),
       ),
       GoRoute(
         path: '/app/work/workspace/proof',
@@ -1410,12 +1745,22 @@ GoRouter createJourneyRouter(
       ),
       GoRoute(
         path: '/app/work/status',
-        builder: (context, state) =>
-            WorkVerificationStatusScreen(session: workSession),
+        redirect: (context, state) => '/app/work/workspace/proof',
       ),
       GoRoute(
         path: '/app/work/ready',
-        builder: (context, state) => WorkspaceReadyScreen(session: workSession),
+        redirect: (context, state) => '/app/work/workspace/dashboard',
+      ),
+      GoRoute(
+        path: '/app/work/workspace/dashboard',
+        builder: (context, state) => WorkWorkspaceDashboardScreen(
+          session: workSession,
+          initialSection: state.uri.queryParameters['section'],
+          procurementSession: buyV2Session,
+          useStoreProcurement: true,
+          accountIdentity: session.accountIdentity,
+          accountAuthenticated: session.isAuthenticated,
+        ),
       ),
       GoRoute(
         path: '/app/work/retailer/setup',
@@ -1426,6 +1771,7 @@ GoRouter createJourneyRouter(
         redirect: (context, state) {
           if (legacyPresentationForTestsOnly) return null;
           final section = state.pathParameters['section'] ?? 'social';
+          if (section == 'work') return '/app/work/earn';
           final actionChoiceRoot = personalMvpActionChoiceRoots[section];
           if (actionChoiceRoot == null || actionChoiceRoot.actions.isEmpty) {
             return null;
@@ -1475,6 +1821,22 @@ GoRouter createJourneyRouter(
                 },
                 onOpenChat: () =>
                     context.push('/app/chat/inbox?return=/app/mool'),
+                onSignOut: () async {
+                  final signedOut = await session.signOut();
+                  if (!context.mounted) return;
+                  if (signedOut || !session.isAuthenticated) {
+                    context.go('/sign-in');
+                  } else {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          session.errorMessage ??
+                              'Sign-out could not be completed. Please try again.',
+                        ),
+                      ),
+                    );
+                  }
+                },
                 areaLabel: session.currentAreaLabel ?? session.manualArea,
               ),
             );
@@ -1530,10 +1892,15 @@ GoRouter createJourneyRouter(
                 initialSubAction: state.uri.queryParameters['sub'],
                 initialState:
                     state.uri.queryParameters['state'] ??
-                    state.uri.queryParameters['mode'],
+                    state.uri.queryParameters['mode'] ??
+                    (section == 'social' &&
+                            state.uri.queryParameters['sub'] == 'create'
+                        ? 'home'
+                        : null),
                 initialItem: state.uri.queryParameters['item'],
                 initialAction: state.uri.queryParameters['action'],
                 initialChoice: state.uri.queryParameters['choice'],
+                enableCreateReviewPreview: uiReviewOnly,
                 onOpenMool: () => context.push('/app/mool?from=social'),
                 onOpenMainAction: (action) => openMoolConnectedRoute(
                   context,
@@ -1558,6 +1925,58 @@ GoRouter createJourneyRouter(
   return router;
 }
 
+WorkAccountSnapshot _workAccountSnapshot(JourneySession session) {
+  final identity = session.accountIdentity;
+  final methods = identity?.signInMethods ?? const <String>[];
+  final providerLabel = session.socialAuthProvider == null
+      ? methods
+                .where(
+                  (method) => !const {
+                    'phone',
+                    'mobile',
+                    'email',
+                  }.contains(method.toLowerCase()),
+                )
+                .firstOrNull ??
+            ''
+      : switch (session.socialAuthProvider!) {
+          SocialAuthProvider.google => 'Google',
+          SocialAuthProvider.youtube => 'YouTube',
+          SocialAuthProvider.x => 'X',
+          SocialAuthProvider.facebook => 'Facebook',
+          SocialAuthProvider.instagram => 'Instagram',
+          SocialAuthProvider.apple => 'Apple',
+        };
+  final email =
+      identity?.emailAddress?.trim() ?? session.emailAddress?.trim() ?? '';
+  final mobile =
+      identity?.phoneNumber?.trim() ?? session.phoneNumber?.trim() ?? '';
+  final providerAccount = identity?.providerAccountLabel?.trim();
+  return WorkAccountSnapshot(
+    displayName:
+        identity?.displayName?.trim() ??
+        session.profileDisplayName?.trim() ??
+        '',
+    email: email,
+    mobile: mobile,
+    providerLabel: providerLabel,
+    providerAccount: providerAccount?.isNotEmpty == true
+        ? providerAccount!
+        : email.isNotEmpty
+        ? email
+        : mobile,
+    emailConfirmed:
+        email.isNotEmpty &&
+        session.isAuthenticated &&
+        methods.any((method) => method.toLowerCase() == 'email') &&
+        session.emailAddress?.trim().toLowerCase() == email.toLowerCase(),
+    mobileConfirmed:
+        mobile.isNotEmpty &&
+        session.isAuthenticated &&
+        methods.any((method) => method.toLowerCase() == 'phone'),
+  );
+}
+
 ChatThreadType? _chatFilter(String? value) => switch (value) {
   'people' => ChatThreadType.people,
   'business' || 'business-chat' => ChatThreadType.business,
@@ -1565,6 +1984,32 @@ ChatThreadType? _chatFilter(String? value) => switch (value) {
   'support' => ChatThreadType.support,
   _ => null,
 };
+
+String? _careMedicineRedirect(Uri uri) {
+  if (uri.path == '/app/book/medicine') return null;
+  final medicineValues = const {'medicine', 'rx'};
+  final isLegacyPath = uri.path == '/app/buy/medicine';
+  final isMedicineScopedBuy =
+      uri.path == '/app/buy' &&
+      medicineValues.any(
+        (value) =>
+            uri.queryParameters['sub'] == value ||
+            (uri.queryParameters['sub'] == null &&
+                uri.queryParameters['view'] == value) ||
+            uri.queryParameters['context'] == value ||
+            uri.queryParameters['scope'] == value,
+      );
+  if (!isLegacyPath && !isMedicineScopedBuy) return null;
+
+  final query = Map<String, String>.from(uri.queryParameters);
+  for (final key in const ['sub', 'view', 'context', 'scope']) {
+    if (medicineValues.contains(query[key])) query.remove(key);
+  }
+  return Uri(
+    path: '/app/book/medicine',
+    queryParameters: query.isEmpty ? null : query,
+  ).toString();
+}
 
 BuyV2Destination _buyV2Destination(String? value) => switch (value) {
   'wholesale' || 'business' => BuyV2Destination.wholesale,
@@ -1579,7 +2024,8 @@ BuyV2View _buyV2View(String? value) => switch (value) {
   'review' || 'checkout' => BuyV2View.checkout,
   'confirmation' || 'confirmed' => BuyV2View.confirmation,
   'tracking' => BuyV2View.tracking,
-  'assist' || 'chat' => BuyV2View.assist,
+  'items' || 'order-items' => BuyV2View.orderItems,
+  'assist' || 'chat' => BuyV2View.catalogue,
   'recovery' => BuyV2View.recovery,
   _ => BuyV2View.catalogue,
 };
