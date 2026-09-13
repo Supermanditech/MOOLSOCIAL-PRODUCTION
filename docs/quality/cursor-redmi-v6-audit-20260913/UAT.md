@@ -617,7 +617,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0014 | buy_v2_catalogue.dart:1356 | _CataloguePageControls | onPressed | forwarded Next; CAT-002, WHOLESALE-ROUND60-02, OFFERS-ROUND70-02; final boundaries not inferred |
 | SRC-0015 | buy_v2_catalogue.dart:1362 | _CataloguePageControls | onPressed | forwarded Refresh; OFFERS-ROUND67-06 observation only; live revisions unqualified |
 | SRC-0016 | buy_v2_catalogue.dart:1370 | _CataloguePageControls | onPressed | forwarded footer area entry; header AREA-001 does not qualify exact footer tap; pending device check |
-| SRC-0017 | buy_v2_catalogue.dart:1456 | _CataloguePageNotice | onPressed | conditional page notice action; provider-error/retry context unverified |
+| SRC-0017 | buy_v2_catalogue.dart:1456 | _CataloguePageNotice | onPressed | OFFERS-ROUND106-01 changed/expired notice Refresh restores review listings; other notice/provider-error branches remain unverified |
 | SRC-0018 | buy_v2_catalogue.dart:1574 | showBuyV2CatalogueArea | onPressed | AREA-003 query Retry and AREA-ROUND100-04 current-location Retry UI; positive recovery B-001 |
 | SRC-0019 | buy_v2_catalogue.dart:1589 | showBuyV2CatalogueArea | onPressed | device_pass AREA-ROUND100-05; X closes failure sheet and retains Offers |
 | SRC-0020 | buy_v2_catalogue.dart:1602 | showBuyV2CatalogueArea | onChanged | AREA-002 query input; lookup success B-001; debounce/race/80-char boundary unverified |
@@ -640,14 +640,14 @@ Source hashes bind the following index to the inspected files:
 | SRC-0037 | buy_v2_catalogue.dart:2844 | _SearchReadyState | onTap | recommended search suggestion; exact suggestion/result/Back pending device check |
 | SRC-0038 | buy_v2_catalogue.dart:2954 | _SearchProductResults | onPressed | broadenProductSearchScope Search all action; query/scope retention and eligibility boundary pending device check |
 | SRC-0039 | buy_v2_catalogue.dart:3072 | _CatalogueToolbar | onTap | Saved toolbar forwarder; SAVED-ROUND15-01 and ROUND17-02/05 qualify Shop/Wholesale entries; not additional journey |
-| SRC-0040 | buy_v2_catalogue.dart:3152 | _CatalogueCategoryPickerButton | onTap | category picker entry; requires category-sheet mapping; source identified but exact device evidence not yet reconciled |
+| SRC-0040 | buy_v2_catalogue.dart:3152 | _CatalogueCategoryPickerButton | onTap | device_pass CATEGORY-ROUND106-01 Shop header picker opens; Wholesale separate |
 | SRC-0041 | buy_v2_catalogue.dart:3215 | _CatalogueOwnedFeature | onTap | Shop/Wholesale return sale selector before this handler; feature filter handler belongs other destinations (Medicine/orders), not public Shop feature toggle |
-| SRC-0042 | buy_v2_catalogue.dart:3433 | _CatalogueCategorySheetState | onPressed | category picker X; exact Shop/Wholesale close action pending evidence reconciliation; Offers close is different widget |
+| SRC-0042 | buy_v2_catalogue.dart:3433 | _CatalogueCategorySheetState | onPressed | device_pass CATEGORY-ROUND106-05 Shop picker X hides keyboard and restores catalogue; Wholesale separate |
 | SRC-0043 | buy_v2_catalogue.dart:3469 | _CatalogueCategorySheetState | onTap | category search Semantics tap/focus; screen-reader activation unverified |
-| SRC-0044 | buy_v2_catalogue.dart:3476 | _CatalogueCategorySheetState | onChanged | category query change/filter; exact Shop/Wholesale query and empty state pending device evidence |
-| SRC-0045 | buy_v2_catalogue.dart:3518 | _CatalogueCategorySheetState | onPressed | category query suffix Clear; distinct from empty-state CTA; pending device check |
+| SRC-0044 | buy_v2_catalogue.dart:3476 | _CatalogueCategorySheetState | onChanged | device_pass CATEGORY-ROUND106-01/03 unmatched zzzz and matched dairy; other queries/large-text states separate |
+| SRC-0045 | buy_v2_catalogue.dart:3518 | _CatalogueCategorySheetState | onPressed | device_pass CATEGORY-ROUND106-04 suffix X clears dairy and restores choices |
 | SRC-0046 | buy_v2_catalogue.dart:3628 | _CatalogueCategorySheetState | onTap | category choice closes sheet then awaits route completion before selection; Store category evidence does not automatically qualify Shop picker; pending reconciliation |
-| SRC-0047 | buy_v2_catalogue.dart:3916 | _CatalogueCategoryClearButton | onPressed | empty category search Clear CTA forwarder; exact empty-state recovery pending device check |
+| SRC-0047 | buy_v2_catalogue.dart:3916 | _CatalogueCategoryClearButton | onPressed | device_pass CATEGORY-ROUND106-02 empty-state Clear restores choices; distinct suffix clear also tested |
 | SRC-0048 | buy_v2_catalogue.dart:4006 | _CompactCatalogueAction | onTap | Saved compact action forwarder to chrome; SRC-0039 evidence applies at caller; not additional action |
 | SRC-0049 | buy_v2_catalogue.dart:4052 | _CatalogueChromeActionState | onTap | chrome Semantics activation; same caller action but screen-reader path unverified |
 | SRC-0050 | buy_v2_catalogue.dart:4100 | _CatalogueChromeActionState | onTap | chrome pointer activation forwarder; caller-specific evidence applies, not one extra journey per wrapper |
@@ -1542,3 +1542,7 @@ SRC-0093 through0136 reconciled. All 136 original catalogue callback references 
 ## Round 105 - Buy shell navigation and tracker controls
 
 All 32 original buy_v2_screen.dart callbacks reconciled to specific entries, existing TRACK/AREA/ACCOUNT/Offers evidence or explicit pending states. Profile-context shortcuts are not qualified by rail taps. Tracker minimize, Hide, reopen and body targets remain distinct; enabled sound UI is not actual arrival playback. Semantics, raw drag and compact mini-cart paths are not pointer/floating rail passes. Care Doctor/Salon belong Book outside public Shop/Wholesale. No device actions or extra passes. Original index now 311 classified and 216 unclassified; classifications include pending and blocked controls. Full semantic/shared inventory and device qualification remain incomplete.
+
+## Round 106 - physical category search and expired Offers recovery
+
+Captures810-819 reviewed. Fresh resume showed Offers changed/expired notice; Refresh offers restored paneer promotion and product grid. This qualifies review-data recovery only, not a live publisher revision. Shop picker opened; zzzz produced readable no-match/Clear above keyboard; empty-state Clear restored choices; dairy filtered to Dairy and bakery; suffix X restored choices; sheet X closed keyboard and retained Scheduled catalogue, Saved1 and empty basket. 818 is transitional; settled819 establishes return. Six device passes, no new defect, no category applied or user item changed. Totals819 captures,821 evidence rows,505 action rows,406 device passes,17 defects. Source index count unchanged; updated existing pending mappings.
