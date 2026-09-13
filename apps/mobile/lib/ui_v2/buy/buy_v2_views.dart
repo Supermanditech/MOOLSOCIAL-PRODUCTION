@@ -8740,7 +8740,71 @@ class BuyV2ConfirmationView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final address = session.selectedAddressOrNull;
+    final purchaseId = session.confirmedPurchaseId;
+    final orders = session.confirmedOrders;
+    final hasConfirmedPurchase =
+        session.checkoutSubmissionState ==
+            BuyV2CheckoutSubmissionState.confirmed &&
+        purchaseId != null &&
+        purchaseId.trim().isNotEmpty &&
+        session.confirmedProductCount > 0 &&
+        orders.isNotEmpty &&
+        orders.every(
+          (order) =>
+              order.id.trim().isNotEmpty && order.purchaseId == purchaseId,
+        );
+    if (!hasConfirmedPurchase) {
+      return ListView(
+        key: const ValueKey('buy-confirmation'),
+        padding: const EdgeInsets.fromLTRB(12, 16, 12, 24),
+        children: [
+          const Icon(
+            Icons.receipt_long_outlined,
+            color: BuyV2Colors.navy,
+            size: 36,
+          ),
+          const SizedBox(height: 12),
+          Text('Order confirmation unavailable', style: context.buyTitle),
+          const SizedBox(height: 8),
+          Text(
+            'This link does not confirm an order. Check Orders for an existing purchase before trying again.',
+            style: context.buyBody,
+          ),
+          const SizedBox(height: 16),
+          ConstrainedBox(
+            constraints: const BoxConstraints(
+              minHeight: BuyV2Metrics.minimumTap,
+            ),
+            child: FilledButton(
+              key: const ValueKey('buy-confirmation-view-orders'),
+              onPressed: session.openOrders,
+              child: const Text('View orders'),
+            ),
+          ),
+          const SizedBox(height: 4),
+          TextButton(
+            key: const ValueKey('buy-confirmation-continue-shopping'),
+            onPressed: () => session.openDestination(BuyV2Destination.shop),
+            child: const Text('Continue shopping'),
+          ),
+        ],
+      );
+    }
+    final deliveryAddresses = orders.map((order) {
+      final recipient = order.recipient?.trim();
+      final address = order.addressLine?.trim();
+      return recipient == null ||
+              recipient.isEmpty ||
+              address == null ||
+              address.isEmpty
+          ? null
+          : '$recipient · $address';
+    }).toSet();
+    final deliveryAddressLabel = deliveryAddresses.contains(null)
+        ? 'Delivery address unavailable'
+        : deliveryAddresses.length == 1
+        ? 'Delivering to ${deliveryAddresses.single}'
+        : 'View order details for each delivery address';
     return ListView(
       key: const ValueKey('buy-confirmation'),
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
@@ -8791,9 +8855,7 @@ class BuyV2ConfirmationView extends StatelessWidget {
               ],
               const SizedBox(height: 3),
               Text(
-                address == null
-                    ? 'Delivery address unavailable'
-                    : 'Delivering to ${address.recipient} · ${address.shortLine}',
+                deliveryAddressLabel,
                 textAlign: TextAlign.center,
                 style: context.buyMeta,
               ),

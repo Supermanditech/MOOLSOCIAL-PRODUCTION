@@ -28,20 +28,78 @@ import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 
 class _InvoiceRecoverySession extends BuyV2Session {
   _InvoiceRecoverySession({this.missingConfirmation = false})
-    : super(core: BuySession());
+    : super(core: BuySession()) {
+    if (missingConfirmation) {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.confirmed;
+    }
+  }
 
   final bool missingConfirmation;
   int refreshCalls = 0;
 
+  // Invoice recovery fixtures represent an accepted purchase with missing
+  // invoice data, not an unsubmitted confirmation link.
   @override
-  List<BuyV2Order> get confirmedOrders =>
-      missingConfirmation ? [orders.first] : super.confirmedOrders;
+  String? get confirmedPurchaseId => missingConfirmation
+      ? 'invoice-recovery-purchase'
+      : super.confirmedPurchaseId;
+
+  @override
+  int get confirmedProductCount =>
+      missingConfirmation ? 1 : super.confirmedProductCount;
+
+  @override
+  List<BuyV2Order> get confirmedOrders {
+    if (!missingConfirmation) return super.confirmedOrders;
+    final order = orders.first;
+    return [
+      BuyV2Order(
+        id: order.id,
+        destination: order.destination,
+        title: order.title,
+        itemSummary: order.itemSummary,
+        total: order.total,
+        partner: order.partner,
+        partnerType: order.partnerType,
+        promise: order.promise,
+        destinationLabel: order.destinationLabel,
+        progress: order.progress,
+        status: order.status,
+        purchaseId: 'invoice-recovery-purchase',
+        recipient: 'Confirmed recipient',
+        addressLine: 'Confirmed order address',
+      ),
+    ];
+  }
 
   @override
   Future<void> retryCommerce() async {
     refreshCalls++;
     await super.retryCommerce();
   }
+}
+
+class _D009InvalidConfirmationSession extends _InvoiceRecoverySession {
+  _D009InvalidConfirmationSession(this.failure)
+    : super(missingConfirmation: true) {
+    if (failure == 'unconfirmed') {
+      checkoutSubmissionState = BuyV2CheckoutSubmissionState.idle;
+    }
+  }
+  final String failure;
+  @override
+  String? get confirmedPurchaseId => switch (failure) {
+    'missing reference' => null,
+    'blank reference' => ' ',
+    'mismatched purchase' => 'different-purchase',
+    _ => super.confirmedPurchaseId,
+  };
+  @override
+  List<BuyV2Order> get confirmedOrders =>
+      failure == 'empty orders' ? [] : super.confirmedOrders;
+  @override
+  int get confirmedProductCount =>
+      failure == 'no products' ? 0 : super.confirmedProductCount;
 }
 
 class _R5ScreenArrivalSound implements BuyV2DeliveryArrivalSound {
@@ -6525,6 +6583,156 @@ void main() {
       findsOneWidget,
     );
   });
+
+  for (final failure in [
+    'missing reference',
+    'blank reference',
+    'mismatched purchase',
+    'empty orders',
+    'unconfirmed',
+    'no products',
+  ]) {
+    testWidgets('RV6 D009 rejects inconsistent confirmation $failure', (
+      tester,
+    ) async {
+      final session = _D009InvalidConfirmationSession(failure);
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          home: Scaffold(body: BuyV2ConfirmationView(session: session)),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Order placed'), findsNothing);
+      expect(find.text('Order confirmation unavailable'), findsOneWidget);
+      expect(find.textContaining('Delivering to '), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  testWidgets('RV6 D009 accepted confirmation uses recorded delivery address', (
+    tester,
+  ) async {
+    final session = _InvoiceRecoverySession(missingConfirmation: true);
+    final savedAddress = session.selectedAddressOrNull;
+    expect(savedAddress, isNotNull);
+    expect(savedAddress!.recipient, isNot('Confirmed recipient'));
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: Scaffold(body: BuyV2ConfirmationView(session: session)),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Order placed'), findsOneWidget);
+    expect(
+      find.text('Delivering to Confirmed recipient · Confirmed order address'),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Delivering to ${savedAddress.recipient}'),
+      findsNothing,
+    );
+    expect(session.selectedAddressOrNull, same(savedAddress));
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scale in [1.0, 2.0]) {
+    for (final hasCart in [false, true]) {
+      for (final ordersAction in [false, true]) {
+        testWidgets(
+          'RV6 D009 unsubmitted confirmation text $scale cart $hasCart orders $ordersAction',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = const Size(320, 568);
+            addTearDown(tester.view.reset);
+            final session = BuyV2Session(core: BuySession());
+            if (hasCart) {
+              expect(
+                session.addProduct(session.visibleProducts.first.id),
+                isTrue,
+              );
+            }
+            final retainedCart = session.cartLines
+                .map((line) => (line.product.id, line.quantity))
+                .toList();
+            final retainedOrders = session.orders
+                .map((order) => order.id)
+                .toList();
+            final address = session.selectedAddressOrNull;
+            await tester.pumpWidget(
+              MaterialApp(
+                theme: MoolTheme.light(),
+                builder: (context, child) => MediaQuery(
+                  data: MediaQuery.of(context).copyWith(
+                    textScaler: TextScaler.linear(scale),
+                    disableAnimations: true,
+                  ),
+                  child: r66VisualCaptureRoot(child!),
+                ),
+                home: BuyV2Screen(
+                  session: session,
+                  initialView: BuyV2View.confirmation,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            expect(find.text('Order placed'), findsNothing);
+            expect(
+              find.byKey(const ValueKey('buy-confirmation-success')),
+              findsNothing,
+            );
+            expect(find.text('Your deliveries'), findsNothing);
+            expect(find.text('Order confirmation unavailable'), findsOneWidget);
+            expect(find.textContaining('Delivering to '), findsNothing);
+            expect(session.confirmedPurchaseId, isNull);
+            expect(session.confirmedOrders, isEmpty);
+            expect(tester.takeException(), isNull);
+            if (!hasCart && !ordersAction) {
+              await captureR66Visual(
+                tester,
+                'rv6-d009-unsubmitted-text-$scale',
+              );
+            }
+            final action = find.byKey(
+              ValueKey(
+                ordersAction
+                    ? 'buy-confirmation-view-orders'
+                    : 'buy-confirmation-continue-shopping',
+              ),
+            );
+            await tester.scrollUntilVisible(
+              action,
+              140,
+              scrollable: scrollableWithin(
+                const ValueKey('buy-confirmation'),
+              ).first,
+            );
+            await tester.tap(action);
+            await tester.pumpAndSettle();
+            expect(
+              session.destination,
+              ordersAction ? BuyV2Destination.orders : BuyV2Destination.shop,
+            );
+            expect(session.view, BuyV2View.catalogue);
+            expect(
+              session.cartLines
+                  .map((line) => (line.product.id, line.quantity))
+                  .toList(),
+              retainedCart,
+            );
+            expect(
+              session.orders.map((order) => order.id).toList(),
+              retainedOrders,
+            );
+            expect(session.selectedAddressOrNull, same(address));
+            expect(session.confirmedPurchaseId, isNull);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
 
   testWidgets(
     'order confirmation preserves family identifiers then opens Orders',
