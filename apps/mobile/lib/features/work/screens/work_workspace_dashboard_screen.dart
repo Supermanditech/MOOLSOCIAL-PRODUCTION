@@ -1152,7 +1152,9 @@ class _WorkWorkspaceDashboardScreenState
       bottomAction: bottomAction,
       body: _StoreFirstTapAccess(
         keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
-        enabled: _view == _WorkspaceControlView.operation,
+        enabled:
+            _view == _WorkspaceControlView.operation &&
+            _operation != _WorkspaceOperation.orders,
         active: _view == _WorkspaceControlView.procurement
             ? (_trackedPurchase == null ? 'restock' : 'sourcing')
             : _operation.name,
@@ -10843,7 +10845,7 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       return Column(
         children: [
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: SizedBox(
               width: double.infinity,
               child: SegmentedButton<bool>(
