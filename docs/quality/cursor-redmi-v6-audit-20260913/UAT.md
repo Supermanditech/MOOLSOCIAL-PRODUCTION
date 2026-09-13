@@ -1255,13 +1255,13 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0018 | buy_v2_catalogue.dart:2599 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0019 | buy_v2_catalogue.dart:2694 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0020 | buy_v2_catalogue.dart:3077 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0021 | buy_v2_catalogue.dart:3470 | onFocus | framework-event candidate; unclassified |
-| SUPSRC-0022 | buy_v2_catalogue.dart:3471 | onSetText | framework-event candidate; unclassified |
+| SUPSRC-0021 | buy_v2_catalogue.dart:3470 | onFocus | Category-search semantic focus; direct accessibility activation pending; pointer category round106 is separate |
+| SUPSRC-0022 | buy_v2_catalogue.dart:3471 | onSetText | Category-search semantic SetText; accessibility value/edit behaviour pending |
 | SUPSRC-0023 | buy_v2_catalogue.dart:3557 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0024 | buy_v2_catalogue.dart:3801 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0025 | buy_v2_catalogue.dart:3842 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0026 | buy_v2_catalogue.dart:3895 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0027 | buy_v2_catalogue.dart:4101 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0027 | buy_v2_catalogue.dart:4101 | onHighlightChanged | Pressed-state highlight animation hook; no independent destination; cancellation/reduced-motion visual behaviour not blanket-qualified |
 | SUPSRC-0028 | buy_v2_catalogue.dart:4221 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0029 | buy_v2_catalogue.dart:4234 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0030 | buy_v2_catalogue.dart:4331 | onOpenSavedProducts | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1270,7 +1270,7 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0033 | buy_v2_catalogue.dart:4345 | onOpenRecentlyViewed | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0034 | buy_v2_catalogue.dart:4350 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0035 | buy_v2_catalogue.dart:4351 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0036 | buy_v2_catalogue.dart:4914 | onTapOutside | framework-event candidate; unclassified |
+| SUPSRC-0036 | buy_v2_catalogue.dart:4914 | onTapOutside | Help search tap-outside unfocus; exact pointer-outside keyboard check pending |
 | SUPSRC-0037 | buy_v2_catalogue.dart:5241 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0038 | buy_v2_catalogue.dart:5242 | onSeeProducts | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0039 | buy_v2_catalogue.dart:5244 | onAddToCart | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1299,7 +1299,7 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0062 | buy_v2_catalogue.dart:6595 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0063 | buy_v2_catalogue.dart:6607 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0064 | buy_v2_catalogue.dart:6731 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0065 | buy_v2_catalogue.dart:6799 | onTapOutside | framework-event candidate; unclassified |
+| SUPSRC-0065 | buy_v2_catalogue.dart:6799 | onTapOutside | Store search tap-outside unfocus; exact pointer-outside keyboard check pending |
 | SUPSRC-0066 | buy_v2_catalogue.dart:6881 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0067 | buy_v2_catalogue.dart:6883 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0068 | buy_v2_catalogue.dart:6949 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1318,7 +1318,7 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0081 | buy_v2_catalogue.dart:8792 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0082 | buy_v2_catalogue.dart:9193 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0083 | buy_v2_catalogue.dart:9215 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0084 | buy_v2_catalogue.dart:10043 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0084 | buy_v2_catalogue.dart:10043 | onHighlightChanged | Pressed-state highlight hook; no separate navigation; parent action coverage retained |
 | SUPSRC-0085 | buy_v2_catalogue.dart:10420 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0086 | buy_v2_catalogue.dart:10422 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0087 | buy_v2_catalogue.dart:10423 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1329,9 +1329,9 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0092 | buy_v2_design.dart:233 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0093 | buy_v2_design.dart:354 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0094 | buy_v2_design.dart:359 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0095 | buy_v2_design.dart:1591 | onPointerDown | framework-event candidate; unclassified |
-| SUPSRC-0096 | buy_v2_design.dart:1594 | onPointerUp | framework-event candidate; unclassified |
-| SUPSRC-0097 | buy_v2_design.dart:1595 | onPointerCancel | framework-event candidate; unclassified |
+| SUPSRC-0095 | buy_v2_design.dart:1591 | onPointerDown | Press feedback pointer-down; no independent journey; multi-pointer/cancel visual behaviour pending |
+| SUPSRC-0096 | buy_v2_design.dart:1594 | onPointerUp | Press feedback pointer-up; no independent journey; parent action controls remain scoped |
+| SUPSRC-0097 | buy_v2_design.dart:1595 | onPointerCancel | Press feedback pointer-cancel; cancellation visual behaviour pending |
 | SUPSRC-0098 | buy_v2_scanner.dart:150 | onDetect | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0099 | buy_v2_scanner.dart:733 | onDetect | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0100 | buy_v2_scanner.dart:757 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1350,16 +1350,16 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0113 | buy_v2_scanner.dart:1002 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0114 | buy_v2_screen.dart:966 | onOpenRoute | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0115 | buy_v2_screen.dart:992 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0116 | buy_v2_screen.dart:1010 | onPopInvokedWithResult | framework-event candidate; unclassified |
+| SUPSRC-0116 | buy_v2_screen.dart:1010 | onPopInvokedWithResult | Root Back dispatch covers navigation/search/session branches; individual Back evidence retained; Mool overlay and root-exit branches require reconciliation |
 | SUPSRC-0117 | buy_v2_screen.dart:1071 | onOpenChanged | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0118 | buy_v2_screen.dart:1073 | onLocation | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0119 | buy_v2_screen.dart:1076 | onAccount | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0120 | buy_v2_screen.dart:1138 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0121 | buy_v2_screen.dart:1153 | onParkingChanged | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0122 | buy_v2_screen.dart:1161 | onPositionChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0123 | buy_v2_screen.dart:1495 | onPointerDown | framework-event candidate; unclassified |
-| SUPSRC-0124 | buy_v2_screen.dart:1499 | onPointerUp | framework-event candidate; unclassified |
-| SUPSRC-0125 | buy_v2_screen.dart:1500 | onPointerCancel | framework-event candidate; unclassified |
+| SUPSRC-0123 | buy_v2_screen.dart:1495 | onPointerDown | Quick tracker pointer-down pauses collapse timer; held/multi-pointer timer interaction pending |
+| SUPSRC-0124 | buy_v2_screen.dart:1499 | onPointerUp | Quick tracker pointer-release handler; timer resumption exact physical state pending |
+| SUPSRC-0125 | buy_v2_screen.dart:1500 | onPointerCancel | Quick tracker pointer-cancel handler; interruption and timer behaviour pending |
 | SUPSRC-0126 | buy_v2_screen.dart:1584 | onMinimizedChanged | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0127 | buy_v2_screen.dart:1586 | onHiddenChanged | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0128 | buy_v2_screen.dart:1596 | onSoundChanged | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1377,14 +1377,14 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0140 | buy_v2_screen.dart:2083 | onOpenStoreCart | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0141 | buy_v2_screen.dart:2086 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0142 | buy_v2_screen.dart:2157 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0143 | buy_v2_screen.dart:2178 | onPopInvokedWithResult | framework-event candidate; unclassified |
+| SUPSRC-0143 | buy_v2_screen.dart:2178 | onPopInvokedWithResult | Embedded Store product/cart Back dispatch; Store/cart defect and retention evidence remain separate; conditional navigation/compared-product states pending |
 | SUPSRC-0144 | buy_v2_screen.dart:2222 | onProductReturn | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0145 | buy_v2_screen.dart:2243 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0146 | buy_v2_screen.dart:2247 | onAskSeller | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0147 | buy_v2_screen.dart:2249 | onVisitComparisonProduct | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0148 | buy_v2_screen.dart:2259 | onOpenPartnerCatalogue | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0149 | buy_v2_screen.dart:2275 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0150 | buy_v2_screen.dart:2408 | onPopInvokedWithResult | framework-event candidate; unclassified |
+| SUPSRC-0150 | buy_v2_screen.dart:2408 | onPopInvokedWithResult | Chat return PopScope dispatcher; CHAT-005 and shared Chat rounds117-119 scoped Back evidence; each source context not blanket-passed |
 | SUPSRC-0151 | buy_v2_screen.dart:2422 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0152 | buy_v2_screen.dart:2463 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0153 | buy_v2_screen.dart:2489 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1402,8 +1402,8 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0165 | buy_v2_screen.dart:2579 | onRestoreDeliveryStatus | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0166 | buy_v2_screen.dart:2581 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0167 | buy_v2_screen.dart:2593 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0168 | buy_v2_screen.dart:2886 | onEnd | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0169 | buy_v2_screen.dart:2943 | onEnd | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0168 | buy_v2_screen.dart:2886 | onEnd | Animation-end cart avoidance scheduling; not separate tap/destination; overlap visual coverage must stay parent-specific |
+| SUPSRC-0169 | buy_v2_screen.dart:2943 | onEnd | Navigation animation-end cart avoidance scheduling; not separate tap/destination; no universal fitment claim |
 | SUPSRC-0170 | buy_v2_shop_chat.dart:624 | onBack | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0171 | buy_v2_shop_chat.dart:626 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0172 | buy_v2_shop_chat.dart:627 | onOpenAll | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1494,7 +1494,7 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0257 | buy_v2_views.dart:14531 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0258 | buy_v2_views.dart:14536 | onDelete | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0259 | buy_v2_views.dart:14875 | onSubmit | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0260 | buy_v2_views.dart:15170 | onFocusChange | framework-event candidate; unclassified |
+| SUPSRC-0260 | buy_v2_views.dart:15170 | onFocusChange | Address focus reveal hook; ADDR form keyboard evidence retained; every field and accessibility focus path still needs explicit reconciliation |
 | SUPSRC-0261 | buy_v2_views.dart:15766 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0262 | buy_v2_views.dart:15767 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0263 | buy_v2_views.dart:15768 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1503,9 +1503,9 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0266 | buy_v2_views.dart:15973 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0267 | buy_v2_views.dart:17024 | onSelect | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0268 | buy_v2_views.dart:17029 | onRemove | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0269 | buy_v2_views.dart:19701 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0270 | buy_v2_views.dart:19780 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0271 | buy_v2_views.dart:20024 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0269 | buy_v2_views.dart:19701 | onHighlightChanged | Legacy Assist pressed highlight only; parent reachability pending |
+| SUPSRC-0270 | buy_v2_views.dart:19780 | onHighlightChanged | Legacy Assist channel pressed highlight only; parent reachability pending |
+| SUPSRC-0271 | buy_v2_views.dart:20024 | onHighlightChanged | ShareChoice highlight visual feedback only; Share/Copy actions separately pending; no extra journey |
 
 ## Round 97 - media callback reconciliation
 
@@ -1625,3 +1625,29 @@ Captures847-859. Eight pass records: inline search open, unmatchedzzzz, keyboard
 ## Round 119 - physical archive/settings navigation and data ownership
 
 Captures860-871. Six navigation passes: More menu, empty archive, Back to Chat, settings entry/scroll, Back to inbox, Back to Scheduled Buy. One settings/disclosure observation; no state changed. Original four inbox entries/unread1/pin and Buy Saved1/empty cart retained. CHAT-INBOX-A03 Settings and Archived entries qualified; Refresh/Open Feed and menu dismissal remain pending. Archive toolbar Back, populated open/restore, undo and session reset remain unverified; empty CTA only qualified. Settings controls viewed are not passed as changed or service-enforced. PD-064/065 map archive/session settings and authoritative privacy/call boundaries. Totals871 captures,873 evidence rows,536 journey records,435 passing,16 device observations,65 public-data rows,17 defects. Full audit still open.
+
+
+## Round 120 - framework callback reconciliation
+
+Twenty-one supplemental references classified as specific accessibility/keyboard/timer/Back checks or non-independent animation handlers. No pointer pass substituted for semantic activation. Quick tracker held-pointer/cancel timing and address focus reveal remain pending. Original527 triage does not include completion of these supplemental states. No physical action, capture, pass or defect added.
+
+
+## Round 121 - shared settings action inventory
+
+Source apps/mobile/lib/features/chat/screens/chat_settings_screen.dart SHA256 B357D1E4B798730B23B10E3BF85FE9FAAB5DAB0F92A45AE14B13053A84A578A9. Sixteen callback references grouped below. Grouping is not device qualification; round119 proves navigation and disclosures only.
+
+| Group | Source lines | Action | Qualification gap |
+| --- | --- | --- | --- |
+| CHAT-SETTINGS-A01 | 197 | Pause/resume composers | Pending reversible state and draft-preservation check; no send |
+| CHAT-SETTINGS-A02 | 221;251 | Voice/video availability | Disabled on device866; service-backed enablement blocked; calls excluded |
+| CHAT-SETTINGS-A03 | 291 | Review before send | Toggle effect and cancel-only confirmation pending; actual send excluded |
+| CHAT-SETTINGS-A04 | 313 | Hide previews | Pending enable/inbox preview masking/restore; preserve unread and pin |
+| CHAT-SETTINGS-A05 | 335 | Suggested prompts | Pending display toggle/restore in eligible existing context; no prompt submission |
+| CHAT-SETTINGS-A06 | 352 | Notifications and quiet hours | Nested route/return and device-vs-service settings pending |
+| CHAT-SETTINGS-A07 | 379;113 | Who can message permission sheet | Open/cancel pending; authoritative update unqualified; no assumed success |
+| CHAT-SETTINGS-A08 | 393 | Allow message requests | Service-backed update unqualified; confirmed current state must be retained on error |
+| CHAT-SETTINGS-A09 | 412 | Review message requests | Entry/empty/return pending; accept/decline provider descendants not qualified |
+| CHAT-SETTINGS-A10 | 427 | Group invitations | Shared boundary/return pending; real joining or invitations excluded |
+| CHAT-SETTINGS-A11 | 442 | Blocked accounts | Entry/empty/return pending; real unblock excluded from this audit |
+| CHAT-SETTINGS-A12 | 463;488 | Share last seen/read receipts | Two independent service-backed privacy fields; unchanged observed; actual updates unqualified |
+| CHAT-SETTINGS-A13 | 695 | Settings row forwarder | No additional user journey; parent routes06/07/09/10/11 retain own checks |
