@@ -103459,6 +103459,27 @@
     "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
     "apps/mobile/build/r66-7-prebuild-20260909/R66-UAT-023-R667-FEATURED-RETURN-001.md"
   ]
-}
+},
+{
+  "id": "REG-20260914-4614-STORE-RESTOCK-NATIVE-BACK",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "build",
+    "device",
+    "evidence"
+  ],
+  "mistake": "V12 OPPO Restock search, clear, Bulk and native Back displayed a Flutter inherited-widget descendant assertion despite passing host regressions.",
+  "rootCause": "Confirmed related lifecycle omission: native Back retained shared search focus while bookmark storage was pending; a failing focus assertion now passes after releasing focus before awaiting storage. The original device assertion stack remains unavailable, so exact successor OPPO replay is still required. Passing host tests do not resolve device qualification.",
+  "prevention": "Require exact-candidate full-app Store navigation replay at every RuntimeUiReview build, reject skipped or incomplete terminal results, preserve failures, and withhold qualification until exact installed OPPO journeys and retained data are verified. Never suppress the framework assertion or substitute source-branch/host passes for device proof.",
+  "gates": [
+    "scripts/build-buy-device-review.ps1",
+    "scripts/test-public-auth-sideload-build-controls.ps1"
+  ],
+  "evidence": [
+    "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
   ]
+}
+]
 }

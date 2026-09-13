@@ -6,6 +6,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/chat/chat_services.dart';
 import 'package:go_router/go_router.dart';
@@ -27,6 +29,7 @@ import 'package:moolsocial/features/work/scan_and_pick_contract.dart';
 import 'package:moolsocial/features/work/widgets/work_widgets.dart';
 import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
 import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 // Host-only authoritative-response fixtures. These never qualify live grants.
 class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
@@ -718,6 +721,7 @@ void main() {
     Widget Function(Widget child)? wrapper,
     WorkProcurementController Function()? procurementFactory,
     bool dashboardAccountAuthenticated = true,
+    bool uiReviewOnly = false,
     BuyV2CustomerStateStore? consumerStateStore,
   }) async {
     tester.view.devicePixelRatio = 1;
@@ -755,6 +759,7 @@ void main() {
       workSession: work,
       chatSession: chat,
       initialLocation: route,
+      uiReviewOnly: uiReviewOnly,
     );
     if (procurementFactory != null) {
       final core = BuySession();
@@ -17270,6 +17275,149 @@ void main() {
     await captureStoreView(tester, 'stock-five-thousand-products');
   });
 
+  // The APK wrapper requires the exact review-runtime test name below. Normal
+  // builds instead verify that the review seed is unavailable; no test is skipped.
+  const storeReviewRuntime =
+      bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+  if (!storeReviewRuntime) {
+    test('STOREBACK01 non-review runtime refuses the review Store', () {
+      final work = WorkSession(contactDraftStore: _ContactDraftFixtureStore())
+        ..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      expect(work.canLoadStoreReviewSeed, isFalse);
+      expect(work.loadStoreReviewSeed(1000), isFalse);
+    });
+  } else {
+    testWidgets('STOREBACK01 full app Restock Bulk native Back lifecycle', (
+      tester,
+    ) async {
+      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(
+        () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+      );
+      const storageChannel = MethodChannel(
+        'plugins.it_nomads.com/flutter_secure_storage',
+      );
+      final stored = <String, String>{};
+      var delayBookmarkWrites = false;
+      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        storageChannel,
+        (call) async {
+          final arguments = Map<String, dynamic>.from(call.arguments as Map);
+          final key = arguments['key'] as String?;
+          switch (call.method) {
+            case 'read':
+              return stored[key];
+            case 'write':
+              if (delayBookmarkWrites) {
+                await Future<void>.delayed(const Duration(milliseconds: 250));
+              }
+              stored[key!] = arguments['value'] as String;
+              return null;
+            case 'delete':
+              stored.remove(key);
+              return null;
+            case 'readAll':
+              return stored;
+            default:
+              return null;
+          }
+        },
+      );
+      addTearDown(
+        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          storageChannel,
+          null,
+        ),
+      );
+      final work = WorkSession(contactDraftStore: _ContactDraftFixtureStore())
+        ..seedVerifiedWorkspace()
+        ..retailerSetupSaved = true
+        ..reviewStage = WorkReviewStage.live
+        ..workspaceStoreState = WorkspaceStoreState.open;
+      expect(work.loadStoreReviewSeed(1000), isTrue);
+      await mount(tester, route: '/app/buy', work: work, uiReviewOnly: true);
+      final router = GoRouter.of(tester.element(find.byType(BuyV2Screen)));
+      unawaited(router.push('/app/work/workspace/dashboard'));
+      await tester.pumpAndSettle();
+      String? retainedProductId;
+      int? retainedQuantity;
+      for (final delay in [0, 1, 16, 50, 150, 650]) {
+        for (var repeat = 0; repeat < 3; repeat++) {
+          await tester.tap(find.text('Restock'));
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(const Key('work-store-procurement-screen')),
+            findsOneWidget,
+          );
+          final buy = tester
+              .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+              .session;
+          if (retainedProductId == null) {
+            final product = buy.visibleProducts.first;
+            retainedProductId = product.id;
+            final add = find.byKey(ValueKey('buy-add-${product.id}'));
+            await tester.ensureVisible(add);
+            await tester.tap(add);
+            await tester.pumpAndSettle();
+            retainedQuantity = buy.quantityFor(product.id);
+            expect(retainedQuantity, greaterThan(0));
+          }
+          expect(buy.quantityFor(retainedProductId), retainedQuantity);
+          final opener = find.byKey(const Key('work-dashboard-search'));
+          if (opener.evaluate().isNotEmpty) {
+            await tester.tap(opener);
+            await tester.pumpAndSettle();
+          }
+          final search = find.byKey(const Key('work-dashboard-search-field'));
+          await tester.tap(search);
+          await tester.enterText(search, 'zzqav12');
+          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+          await tester.pumpAndSettle();
+          tester.testTextInput.hide();
+          tester.view.viewInsets = const FakeViewPadding();
+          await tester.pump(Duration(milliseconds: delay));
+          await tester.tap(
+            find.byKey(const Key('work-dashboard-search-clear')),
+          );
+          await tester.pump(Duration(milliseconds: delay));
+          await tester.tap(find.text('Bulk'));
+          await tester.pump(Duration(milliseconds: delay));
+          expect(tester.takeException(), isNull, reason: 'Bulk $delay/$repeat');
+          final searchFocus = tester.widget<TextField>(search).focusNode!;
+          expect(searchFocus.hasFocus, isTrue);
+          delayBookmarkWrites = true;
+          await tester.binding.handlePopRoute();
+          await tester.pump();
+          expect(
+            searchFocus.hasFocus,
+            isFalse,
+            reason:
+                'Back must release search focus before native storage completes.',
+          );
+          for (var frame = 0; frame < 20; frame++) {
+            await tester.pump(const Duration(milliseconds: 16));
+          }
+          await tester.pumpAndSettle();
+          delayBookmarkWrites = false;
+          expect(tester.takeException(), isNull, reason: 'Back $delay/$repeat');
+          expect(buy.quantityFor(retainedProductId), retainedQuantity);
+          expect(
+            find.byKey(const Key('work-store-procurement-screen')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const Key('work-workspace-dashboard')),
+            findsOneWidget,
+          );
+        }
+      }
+    });
+  }
+
   for (final (scale, viewport) in [
     (1.0, const Size(412, 915)),
     (2.0, const Size(320, 568)),
@@ -17468,7 +17616,8 @@ void main() {
       expect(
         tester.widget<TextField>(search).controller!.text,
         buy.query,
-        reason: 'The shared search field must show the newly opened stock product.',
+        reason:
+            'The shared search field must show the newly opened stock product.',
       );
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
       expect(buy.selectedFilter, 'nearby');
@@ -17516,7 +17665,8 @@ void main() {
       expect(
         tester.widget<TextField>(search).controller!.text,
         isEmpty,
-        reason: 'Clearing Restock search must also clear the visible shared field.',
+        reason:
+            'Clearing Restock search must also clear the visible shared field.',
       );
       await captureStoreView(tester, 'restock-cleared-catalogue-$scale');
       expect(
@@ -17552,6 +17702,23 @@ void main() {
         expect(buy.quantityFor(cartProduct.id), cartQuantity);
         expect(tester.takeException(), isNull);
       }
+      // OPPO: search recovery, then Bulk and Android Back must detach the
+      // catalogue without leaving inherited-widget dependents behind.
+      await tester.tap(search);
+      await tester.enterText(search, 'zzqav12');
+      tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+      await tester.pumpAndSettle();
+      // Android keyboard dismissal does not necessarily relinquish focus.
+      tester.view.viewInsets = FakeViewPadding.zero;
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('work-dashboard-search-clear')));
+      await tester.pumpAndSettle();
+      expect(tester.widget<TextField>(search).controller!.text, isEmpty);
+      final bulkTab = find.text('Bulk');
+      expect(bulkTab.hitTestable(), findsOneWidget);
+      await tester.tap(bulkTab);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
       expect(

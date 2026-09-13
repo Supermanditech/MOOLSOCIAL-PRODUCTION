@@ -541,3 +541,70 @@ Updated the affected Restock tests to target the founder-approved shared Store h
 ### Approved Restock shortcut-route test adaptation
 
 S09 DF04 now asserts the founder-removed duplicate shortcut row stays absent in Restock and Cart, then follows visible Back to Dashboard and View statement. The original filter, product quantity, consumer query/cart isolation and final return assertions remain. The focused test passed; original failure and restock-shortcut-route-v1.log are preserved under task outputs/store-latest-apk-qualification-20260913. Four payment fixtures remain pending one-file test ownership authorization; a proposed fixture patch is preserved outside the repository and has not been applied or tested. No APK has been built.
+
+### REG4614 — intermittent V12 OPPO Restock navigation assertion (open)
+
+The founder requested mandatory successor regression gates after V12's real
+OPPO search / keyboard dismissal / clear / Bulk / native Back journey displayed
+Flutter framework.dart:6417, InheritedElement.notifyClients descendant assertion.
+V12 c6cfc1693f1f229a3eaf79b158b2e5eb4fb65dd2 and its installed APK SHA256
+D1485492B31E6656A5CF1D1EDFCA5FD50ACDB3E15A7A28E20576618B12B1E332 remain
+preserved and unqualified. Runtime cause is unconfirmed. Later successful
+replays do not resolve or erase the original failure.
+
+Source changes add an actual MoolSocialApp review-runtime test covering six
+keyboard/Back delays, three repetitions each, and retained Store cart quantity.
+The RuntimeUiReview APK wrapper executes that exact test against candidate
+runtime defines immediately before building; missing, skipped, stale, failed or
+incomplete terminal evidence rejects the build. Normal-runtime tests explicitly
+verify that the labelled review Store cannot be loaded. Host tests are not OPPO
+or backend evidence. Device qualification enforcement is still pending.
+
+For the official in-memory async preferences test fixture, the already-locked
+shared_preferences_platform_interface 2.4.2 is now a direct dev dependency.
+No dependency version or content hash changed. Exactly pubspec.yaml and
+pubspec.lock were added to the Codex primary claim and this continuation's
+permitted owners for that test dependency. No Cursor claim was removed and no
+security assertion or review exception was broadened. The original admission
+failure and subsequent admission log are retained separately.
+
+Evidence lives in the current Codex task outputs/store-latest-apk-qualification-20260913:
+v12-return-settled.png (original failure), v13-retained-cart-full-app-reproduction.log,
+v13-normal-runtime-navigation-gate.log, v13-review-runtime-navigation-gate.jsonl,
+v13-analysis.log, v13-navigation-gate-negative-cases.log, and both admission logs.
+The seven isolated build-gate fixture cases passed. The full wrapper self-test
+has not passed on this source checkout: existing archive/checkout prerequisites
+stopped its two attempts before the new cases. It remains required on the fresh
+admitted successor. No corrected runtime, new candidate or APK is claimed here.
+
+The same APK gate now exposes `-Phase DeviceQualification` (default remains
+`PreBuild`). Every new Codex runtime candidate must register all eleven Store
+post-build gates, including search/Bulk/native Back, retained-cart/relaunch,
+Flutter-error-free replay and final Dashboard. Pending is allowed before build;
+qualification requires every post-build gate passed with nonempty evidence
+objects `{path, sha256}`. `oppoQualification` binds `deviceSerial`, `package`,
+`apkPath` and `apkSha256`. The device phase also reads the connected OPPO APK
+hash/version and requires clean Git plus fresh origin equality. It does not
+turn review fixtures into backend/payment acceptance. This phase is mandatory
+before the baseline/device handoff, using the same candidate arguments plus
+`-AdbPath` for the installed Android SDK ADB executable.
+
+The exact existing APK gate file was added to this continuation and primary
+claim solely to implement the founder-requested device gate. The two earlier
+pubspec entries remain the only dependency-file additions. Fourteen isolated
+host/device gate cases passed in v13-host-device-gate-negative-cases-v2.log.
+The earlier unsuffixed log is INVALID: its extraction command failed yet printed
+a success line; both the tool error and invalid result are retained. Full
+candidate wrapper qualification and real device replay remain outstanding.
+
+REG4614 focused correction: the shared search FocusNode remained focused after
+native Back while bookmark storage was pending. `v13-back-focus-lifecycle-before.log`
+reproduces that omission (expected false, actual true). `_leaveProcurement` now
+releases search focus before awaiting storage or detaching the field, consistent
+with the other Store exits. The unchanged failing focus assertion passes in
+`v13-back-focus-lifecycle-after.log` across all eighteen timing cases; retained
+cart quantities remain equal. DASH10 1.0 and 320x568/200% both pass in
+`v13-focus-dash10-regression.log`. This is a confirmed lifecycle correction;
+it does not supply the missing original device stack or independently prove
+that the intermittent V12 assertion is eliminated. Exact successor OPPO replay
+remains mandatory before qualification.

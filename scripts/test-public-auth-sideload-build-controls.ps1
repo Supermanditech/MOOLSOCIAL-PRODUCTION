@@ -967,6 +967,94 @@ Assert-SideloadControl (
   -not [bool]$ticket.authority.commitPushMergeAuthorized
 ) 'FIX11 ticket authority is missing or broader than one local APK/install.'
 
+$navigationAst = [Management.Automation.Language.Parser]::ParseInput(
+  $wrapper, [ref]$null, [ref]$null
+)
+$navigationBlocks = @($navigationAst.FindAll({
+  param($node)
+  $node -is [Management.Automation.Language.IfStatementAst] -and
+  $node.Extent.Text.StartsWith("if (`$RuntimeProfile -ceq 'RuntimeUiReview')") -and
+  $node.Extent.Text.Contains("'store-navigation-replay.jsonl'")
+}, $true))
+Assert-SideloadControl ($navigationBlocks.Count -eq 1) `
+  'The mandatory Store successor navigation replay is missing or duplicated.'
+$navigationProbe = [scriptblock]::Create($navigationBlocks[0].Extent.Text)
+& {
+  $RuntimeProfile = 'RuntimeUiReview'
+  $runtimeDefineFile = 'exact-candidate-defines.json'
+  function flutter {
+    if ($args -notcontains $runtimeDefineFile -or
+        $args -notcontains '--dart-define-from-file') {
+      throw 'Replay did not use the exact candidate runtime defines.'
+    }
+    $global:LASTEXITCODE = if ($case -ceq 'process-failed') { 1 } else { 0 }
+    $name = if ($case -ceq 'wrong-test') { 'Unrelated test' } else {
+      'STOREBACK01 full app Restock Bulk native Back lifecycle'
+    }
+    @{type='testStart'; test=@{id=1;name=$name}} | ConvertTo-Json -Compress
+    @{type='testDone';testID=1;result='success';skipped=($case -ceq 'skipped')} |
+      ConvertTo-Json -Compress
+    if ($case -cne 'missing-terminal') {
+      @{type='done';success=$true} | ConvertTo-Json -Compress
+    }
+    if ($case -ceq 'duplicate-terminal') {
+      @{type='done';success=$true} | ConvertTo-Json -Compress
+    }
+  }
+  foreach ($case in @('passed','process-failed','wrong-test','skipped',
+      'missing-terminal','duplicate-terminal','stale-evidence')) {
+    $artifactRoot = Join-Path ([IO.Path]::GetTempPath()) (
+      'moolsocial-store-navigation-probe-' + [guid]::NewGuid().ToString('N')
+    )
+    [void][IO.Directory]::CreateDirectory($artifactRoot)
+    if ($case -ceq 'stale-evidence') {
+      [IO.File]::WriteAllText((Join-Path $artifactRoot 'store-navigation-replay.jsonl'), '{}')
+    }
+    $rejected = $false
+    try { & $navigationProbe } catch { $rejected = $true }
+    Assert-SideloadControl ($rejected -eq ($case -cne 'passed')) `
+      "Store navigation successor gate fixture '$case' had the wrong outcome."
+  }
+}
+
+$deviceProbeStart = $apkGate.IndexOf('$storeDeviceGateIds = @(')
+$deviceProbeEnd = $apkGate.IndexOf('Write-Output (', $deviceProbeStart)
+Assert-SideloadControl ($deviceProbeStart -ge 0 -and $deviceProbeEnd -gt $deviceProbeStart) `
+  'Store OPPO device qualification gate is missing.'
+$deviceProbe = [scriptblock]::Create($apkGate.Substring(
+  $deviceProbeStart, $deviceProbeEnd - $deviceProbeStart
+))
+& {
+  function Assert-Gate([bool]$Condition, [string]$Message) {
+    if (-not $Condition) { throw $Message }
+  }
+  $gateProfile = 'uaw_runtime_ui_review_debug'
+  foreach ($case in @('prebuild-pending', 'missing', 'duplicated', 'invalid',
+      'device-pending', 'device-failed', 'device-no-evidence')) {
+    $Phase = if ($case.StartsWith('device-')) { 'DeviceQualification' } else { 'PreBuild' }
+    $ids = @('apk-package-version-signer-sha256','oppo-installed-apk-identity',
+      'oppo-orders-selected-filter','oppo-profile-authentication-state',
+      'oppo-security-return-with-retained-restock','oppo-restock-labelled-catalogue-and-return',
+      'oppo-restock-search-bulk-native-back','oppo-retained-cart-and-relaunch',
+      'oppo-flutter-error-free-replay','oppo-dashboard-final','final-clean-and-live-remote')
+    $entries = @($ids | ForEach-Object {
+      [pscustomobject]@{id=$_;state='pending';evidence=@()}
+    })
+    switch ($case) {
+      'missing' { $entries = @($entries | Select-Object -Skip 1) }
+      'duplicated' { $entries += $entries[0] }
+      'invalid' { $entries[0].state = 'waived' }
+      'device-failed' { $entries[0].state = 'failed' }
+      'device-no-evidence' { $entries | ForEach-Object { $_.state = 'passed' } }
+    }
+    $state = [pscustomobject]@{postBuildGates=$entries}
+    $rejected = $false
+    try { & $deviceProbe } catch { $rejected = $true }
+    Assert-SideloadControl ($rejected -eq ($case -cne 'prebuild-pending')) `
+      "Store OPPO qualification fixture '$case' had the wrong outcome."
+  }
+}
+
 Write-Output (
   'Public-auth sideload build controls passed: PlayQualification=false; ' +
   'releaseProfile=true; oneSideload=true; privateActionsSeparate=true.'

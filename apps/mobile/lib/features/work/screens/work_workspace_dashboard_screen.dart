@@ -1985,6 +1985,8 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _leaveProcurement() async {
+    // Release the shared field before awaiting native storage or detaching it.
+    _searchFocus.unfocus();
     final controller = _storeProcurement;
     if (controller != null && !await controller.leave()) {
       if (mounted) {

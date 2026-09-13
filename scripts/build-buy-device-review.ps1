@@ -618,6 +618,40 @@ try {
     -RepositoryRoot $repositoryRoot `
     -Invocation {
       & $lockedDependencyReleasePreflight
+      if ($RuntimeProfile -ceq 'RuntimeUiReview') {
+        # Execute against this candidate and its actual runtime defines. A
+        # source-branch result cannot replace the successor's navigation replay.
+        $navigationLog = Join-Path $artifactRoot 'store-navigation-replay.jsonl'
+        if (Test-Path -LiteralPath $navigationLog) {
+          throw 'Store navigation evidence already exists; preserve it and use a new candidate artifact directory.'
+        }
+        & flutter test --no-pub --reporter json `
+          --dart-define-from-file $runtimeDefineFile `
+          test/work_workspace_layout_safety_test.dart `
+          --plain-name 'STOREBACK01 full app Restock Bulk native Back lifecycle' `
+          1> $navigationLog
+        if ($LASTEXITCODE -ne 0) {
+          throw "Exact-candidate Store navigation replay failed: $navigationLog"
+        }
+        $navigationEvents = @(Get-Content -LiteralPath $navigationLog |
+          ForEach-Object { $_ | ConvertFrom-Json })
+        $navigationDone = @($navigationEvents | Where-Object { $_.type -ceq 'done' })
+        $navigationTests = @($navigationEvents | Where-Object {
+          $_.type -ceq 'testStart' -and
+          $_.test.name -ceq 'STOREBACK01 full app Restock Bulk native Back lifecycle'
+        })
+        $navigationEnds = @($navigationEvents | Where-Object {
+          $_.type -ceq 'testDone' -and $navigationTests.Count -eq 1 -and
+          $_.testID -eq $navigationTests[0].test.id
+        })
+        if ($navigationDone.Count -ne 1 -or
+            $navigationDone[0].success -ne $true -or
+            $navigationTests.Count -ne 1 -or $navigationEnds.Count -ne 1 -or
+            $navigationEnds[0].result -cne 'success' -or
+            $navigationEnds[0].skipped -ne $false) {
+          throw 'Store navigation replay has missing, skipped or unsuccessful terminal evidence.'
+        }
+      }
       & flutter @buildArguments
     }
   if ($flutterExit -ne 0) {

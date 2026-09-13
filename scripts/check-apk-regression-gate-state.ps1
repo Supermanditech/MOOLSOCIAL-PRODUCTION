@@ -20,7 +20,12 @@ param(
   [string]$SourceFingerprint,
 
   [Parameter(Mandatory)]
-  [string[]]$RuntimeDefine
+  [string[]]$RuntimeDefine,
+
+  [ValidateSet('PreBuild', 'DeviceQualification')]
+  [string]$Phase = 'PreBuild',
+
+  [string]$AdbPath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -510,6 +515,79 @@ $allowedDefineNames = @(
 foreach ($defineName in $actualNames) {
   Assert-Gate -Condition ($allowedDefineNames -ccontains $defineName) `
     -Message "runtime define '$defineName' is not allowed in device review."
+}
+
+$storeDeviceGateIds = @(
+  'apk-package-version-signer-sha256',
+  'oppo-installed-apk-identity',
+  'oppo-orders-selected-filter',
+  'oppo-profile-authentication-state',
+  'oppo-security-return-with-retained-restock',
+  'oppo-restock-labelled-catalogue-and-return',
+  'oppo-restock-search-bulk-native-back',
+  'oppo-retained-cart-and-relaunch',
+  'oppo-flutter-error-free-replay',
+  'oppo-dashboard-final',
+  'final-clean-and-live-remote'
+)
+if ($gateProfile -ceq 'uaw_runtime_ui_review_debug') {
+  foreach ($id in $storeDeviceGateIds) {
+    $deviceGateEntries = @($state.postBuildGates | Where-Object { $_.id -ceq $id })
+    Assert-Gate ($deviceGateEntries.Count -eq 1) "Required Store device gate '$id' is missing or duplicated."
+    Assert-Gate ([string]$deviceGateEntries[0].state -cin @('pending', 'passed', 'failed')) `
+      "Store device gate '$id' has an invalid state."
+  }
+}
+if ($Phase -ceq 'DeviceQualification') {
+  Assert-Gate ($gateProfile -ceq 'uaw_runtime_ui_review_debug') `
+    'This device qualification applies only to the Codex Store review runtime.'
+  foreach ($gate in @($state.postBuildGates)) {
+    Assert-Gate ([string]$gate.state -ceq 'passed') "Device gate '$($gate.id)' is not passed."
+    Assert-Gate (@($gate.evidence).Count -gt 0) "Device gate '$($gate.id)' has no evidence."
+    foreach ($evidence in @($gate.evidence)) {
+      # Device evidence includes a hash, not merely a narrative path to a file.
+      $path = [IO.Path]::GetFullPath((Join-Path $repositoryRoot ([string]$evidence.path)))
+      Assert-Gate ($path.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) `
+        'Device evidence escaped the candidate repository.'
+      Assert-Gate (Test-Path -LiteralPath $path -PathType Leaf) 'Device evidence is missing.'
+      Assert-Gate ((Get-Item -LiteralPath $path).Length -gt 0) 'Device evidence is empty.'
+      Assert-Gate ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ceq [string]$evidence.sha256) `
+        'Device evidence hash does not match.'
+    }
+  }
+  $qualification = $state.oppoQualification
+  Assert-Gate ([string]$qualification.deviceSerial -ceq '2b3e0f71') 'Qualification must target the owned OPPO.'
+  Assert-Gate ([string]$qualification.package -ceq 'com.moolsocial.app.runtime') 'Wrong installed package.'
+  $apkPath = [IO.Path]::GetFullPath((Join-Path $repositoryRoot ([string]$qualification.apkPath)))
+  Assert-Gate ($apkPath.StartsWith($repositoryPrefix, [StringComparison]::OrdinalIgnoreCase)) `
+    'APK escaped the candidate repository.'
+  Assert-Gate (Test-Path -LiteralPath $apkPath -PathType Leaf) 'Qualified APK is missing.'
+  $apkHash = (Get-FileHash -LiteralPath $apkPath -Algorithm SHA256).Hash
+  Assert-Gate ($apkHash -ceq [string]$qualification.apkSha256) 'Qualified APK hash differs.'
+  Assert-Gate (Test-Path -LiteralPath $AdbPath -PathType Leaf) 'ADB is required for fresh OPPO verification.'
+  $deviceState = & $AdbPath -s 2b3e0f71 get-state
+  Assert-Gate ($LASTEXITCODE -eq 0 -and $deviceState -ceq 'device') 'OPPO is not authorized and connected.'
+  $installed = @(& $AdbPath -s 2b3e0f71 shell pm path com.moolsocial.app.runtime)
+  Assert-Gate ($LASTEXITCODE -eq 0 -and $installed.Count -eq 1 -and
+    $installed[0] -cmatch '^package:(/data/app/[A-Za-z0-9_~./=+-]+/base\.apk)$') `
+    'Cannot identify the installed OPPO base APK.'
+  $installedPath = $Matches[1]
+  $installedHash = & $AdbPath -s 2b3e0f71 shell sha256sum $installedPath
+  Assert-Gate ($LASTEXITCODE -eq 0 -and
+    ([string]$installedHash).StartsWith($apkHash, [StringComparison]::OrdinalIgnoreCase)) `
+    'Installed OPPO APK differs from the qualified artifact.'
+  $packageInfo = (& $AdbPath -s 2b3e0f71 shell dumpsys package com.moolsocial.app.runtime) -join "`n"
+  Assert-Gate ($LASTEXITCODE -eq 0 -and
+    $packageInfo -match ('versionCode=' + [regex]::Escape($BuildNumber) + '\b') -and
+    $packageInfo -match ('versionName=' + [regex]::Escape($BuildName + '-runtime') + '(?:\s|$)')) `
+    'Installed OPPO version differs from the candidate.'
+  $dirty = @(git -C $repositoryRoot status --porcelain --untracked-files=normal)
+  Assert-Gate ($LASTEXITCODE -eq 0 -and $dirty.Count -eq 0) 'Candidate Git state is not clean.'
+  $live = @(git -C $repositoryRoot ls-remote --exit-code origin "refs/heads/$branch")
+  Assert-Gate ($LASTEXITCODE -eq 0 -and $live.Count -eq 1 -and
+    ($live[0] -split '\s+')[0] -ceq $head) 'Live remote differs from the candidate.'
+  Write-Output "Store OPPO device qualification passed: candidate=$CandidateId; apk=$apkHash."
+  return
 }
 
 Write-Output (

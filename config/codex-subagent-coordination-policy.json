@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4584,
-    "sha256": "A2991B9301030325D1D8073D252CCBBE2B8190E099223A0F509A2AAFA9A82A64"
+    "entryCount": 4585,
+    "sha256": "9CF1DA26A9261C4A3C9F696C87F62A523356ADCDDA881AE292B072E1C6DACCAA"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -34,6 +34,9 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "scripts/check-apk-regression-gate-state.ps1",
+        "apps/mobile/pubspec.yaml",
+        "apps/mobile/pubspec.lock",
         "apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart",
         "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md",
         "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",

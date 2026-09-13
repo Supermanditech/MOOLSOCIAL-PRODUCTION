@@ -64,6 +64,7 @@ dependencies:
   flutter_svg: ^2.3.0
 
 dev_dependencies:
+  shared_preferences_platform_interface: 2.4.2
   integration_test:
     sdk: flutter
   flutter_test:
