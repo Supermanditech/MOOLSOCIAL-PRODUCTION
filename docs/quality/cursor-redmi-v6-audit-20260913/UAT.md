@@ -893,7 +893,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0290 | buy_v2_views.dart:3155 | _ProductOfferDecisionPanel | onPressed | unclassified |
 | SRC-0291 | buy_v2_views.dart:3289 | _ProductContinuationCard | onTap | unclassified |
 | SRC-0292 | buy_v2_views.dart:3295 | _ProductContinuationCard | onTap | unclassified |
-| SRC-0293 | buy_v2_views.dart:3553 | _BuyV2ZoomableMediaState | onTap | unclassified |
+| SRC-0293 | buy_v2_views.dart:3553 | _BuyV2ZoomableMediaState | onTap | blocked_test_data B-008; MEDIA-ROUND75-02 reset zoom, including reduced motion; actual supplier image absent |
 | SRC-0294 | buy_v2_views.dart:3868 | _ProductContentSections | onPressed | unclassified |
 | SRC-0295 | buy_v2_views.dart:4118 | _ProductBenefitsPreview | onPressed | unclassified |
 | SRC-0296 | buy_v2_views.dart:4286 | _MarketplaceTrustPanel | onPressed | unclassified |
@@ -1477,8 +1477,8 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0240 | buy_v2_views.dart:2875 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0241 | buy_v2_views.dart:2876 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0242 | buy_v2_views.dart:2877 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0243 | buy_v2_views.dart:3529 | onInteractionEnd | framework-event candidate; unclassified |
-| SUPSRC-0244 | buy_v2_views.dart:3679 | onPageChanged | framework-event candidate; unclassified |
+| SUPSRC-0243 | buy_v2_views.dart:3529 | onInteractionEnd | B-008 / MEDIA-ROUND75-02; automatic reset at scale <=1.01, same zoom journey; no additional device pass |
+| SUPSRC-0244 | buy_v2_views.dart:3679 | onPageChanged | B-008 / MEDIA-ROUND75-01 and 08; gallery paging and active-media selection; no additional device pass |
 | SUPSRC-0245 | buy_v2_views.dart:4824 | onPopInvokedWithResult | Eligible review descendant B003 round91; device unverified |
 | SUPSRC-0246 | buy_v2_views.dart:4920 | onFocus | Eligible review descendant B003 round91; device unverified |
 | SUPSRC-0247 | buy_v2_views.dart:4921 | onSetText | Eligible review descendant B003 round91; device unverified |
@@ -1506,3 +1506,7 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0269 | buy_v2_views.dart:19701 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0270 | buy_v2_views.dart:19780 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0271 | buy_v2_views.dart:20024 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+
+## Round 97 - media callback reconciliation
+
+Source-only inspection of buy_v2_views.dart lines 3461-3705 binds SRC-0293 and SUPSRC-0243/0244 to the existing eight B-008 media descendants. Zoom allows scale 1 to 2.5, enables panning only above 1.01, exposes Reset while zoomed and honors disabled animations during reset. Gallery paging is enabled only with multiple media and passes active-page state to the media builder. These are source behaviors, not device-qualified results. Actual supplier image/video assets remain absent; no illustration-based pass substitutes for supplier decoding, fit, paging or playback. No new defect, device capture or distinct journey is added. Original callback inventory now has 143 classified and 384 unclassified references; supplemental references are aliases/conditional controls, not a unique-journey denominator.
