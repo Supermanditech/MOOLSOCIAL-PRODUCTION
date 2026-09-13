@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 597,
+    "recordedActionRows": 598,
     "dispositions": {
       "device_observation": 19,
-      "device_pass": 486,
+      "device_pass": 487,
       "blocked_provider": 27,
       "device_failure": 23,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 1054,
-    "evidenceRows": 1056,
+    "physicalCaptures": 1065,
+    "evidenceRows": 1067,
     "publicDataRows": 70,
     "confirmedDistinctDefects": 21,
     "countsAreExhaustiveDenominator": false
@@ -95,7 +95,7 @@
     "Complete public-data field reconciliation and final evidence handoff"
   ],
   "preservation": {
-    "cart": "Empty retained1054; Scheduled and original Saved1 retained; active query cleared without history clearing",
+    "cart": "Empty retained1065; Scheduled and original wheat Saved1;temporary notebook6 unsaved via settings; no original items removed",
     "savedShop": "original wheat count1 retained650;Saved/Scheduled active after module reentry",
     "addresses": "Original Home/Work retained; settings selection Home then Work restored986; no add/edit/delete; Paytm retained",
     "noNewApk": true,
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 153
+  "latestAuditRound": 154
 }
