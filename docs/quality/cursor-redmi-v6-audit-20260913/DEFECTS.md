@@ -154,3 +154,8 @@ Reproduction: Scheduled Shop -> search milk -> keyboard Search after settled que
 
 ### RV6-D018 recovery clarification
 Capture904 after explicitly reopening the search field restores range41-80 and milk1184. The search pager state is retained internally: the confirmed failure is wrong Back destination and visible loss of browsing position until an extra search tap, not irreversible cursor/data loss. Clearing query905 and Done906/settled907 restores ordinary Scheduled Shop, Saved1 and empty cart. Correct the return surface; do not reset or replace preserved search state unnecessarily.
+
+
+## RV6-D019 - Minimized delivery rail retains collapse chevron instead of delivery identity
+Status: open. Severity: minor visual/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+From Scheduled Shop908 with bike9+ rail, open delivery909 (12 deliveries;MS-NEW-09). Tap panel Minimize chevron643,1162. Panel closes910;settled911 retains only downward collapse chevron in rail, with bike/count absent. Tap rail reopens912 same order. Repeat Minimize913 shows same result. Reopen914 then Hide915 restores bike9+ correctly. Expected: minimized status remains identifiable as deliveries with the appropriate icon/count and show affordance. Actual functional reopen works; no claim of lost order data or inaccessible tracking. Source screen1381-1423 chooses collapse icon only when expanded; screen1584 and2766-2768 bind Minimize to expanded=false. Exact cause of stale displayed state is unproven; no implementation. Hide restores observed initial rail appearance; sound off and Keep off unchanged.
