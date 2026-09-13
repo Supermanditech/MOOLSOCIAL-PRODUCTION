@@ -866,37 +866,37 @@ Source hashes bind the following index to the inspected files:
 | SRC-0263 | buy_v2_shop_chat.dart:4398 | _ShopChatInfoViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
 | SRC-0264 | buy_v2_shop_chat.dart:4472 | _ShopChatInfoAction | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
 | SRC-0265 | buy_v2_shop_chat.dart:4541 | _ShopChatInfoCard | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
-| SRC-0266 | buy_v2_views.dart:68 | _openOrderInvoice | onPressed | unclassified |
-| SRC-0267 | buy_v2_views.dart:78 | _openOrderInvoice | onPressed | unclassified |
-| SRC-0268 | buy_v2_views.dart:593 | BuyV2ProductView | onPressed | unclassified |
-| SRC-0269 | buy_v2_views.dart:620 | BuyV2ProductView | onTap | unclassified |
-| SRC-0270 | buy_v2_views.dart:952 | BuyV2ProductView | onTap | unclassified |
-| SRC-0271 | buy_v2_views.dart:1440 | _ProductQuickActions | onPressed | unclassified |
-| SRC-0272 | buy_v2_views.dart:1445 | _ProductQuickActions | onPressed | unclassified |
-| SRC-0273 | buy_v2_views.dart:1452 | _ProductQuickActions | onPressed | unclassified |
-| SRC-0274 | buy_v2_views.dart:1465 | _ProductQuickActions | onPressed | unclassified |
-| SRC-0275 | buy_v2_views.dart:1491 | _ProductQuickActions | onPressed | unclassified |
-| SRC-0276 | buy_v2_views.dart:1520 | _ProductQuickActionButton | onTap | unclassified |
-| SRC-0277 | buy_v2_views.dart:1523 | _ProductQuickActionButton | onTap | unclassified |
-| SRC-0278 | buy_v2_views.dart:1879 | _ProductComparisonSheetState | onPressed | unclassified |
-| SRC-0279 | buy_v2_views.dart:1948 | _ProductComparisonSheetState | onPressed | unclassified |
-| SRC-0280 | buy_v2_views.dart:1956 | _ProductComparisonSheetState | onPressed | unclassified |
-| SRC-0281 | buy_v2_views.dart:2137 | _ProductVariantOption | onTap | unclassified |
-| SRC-0282 | buy_v2_views.dart:2153 | _ProductVariantOption | onTap | unclassified |
-| SRC-0283 | buy_v2_views.dart:2250 | _WholesaleVerificationCard | onPressed | unclassified |
-| SRC-0284 | buy_v2_views.dart:2489 | _WholesaleTradeDecisionPanelState | onPressed | unclassified |
-| SRC-0285 | buy_v2_views.dart:2502 | _WholesaleTradeDecisionPanelState | onPressed | unclassified |
-| SRC-0286 | buy_v2_views.dart:2751 | _WholesaleTradeSignalCard | onPressed | unclassified |
-| SRC-0287 | buy_v2_views.dart:2851 | _WholesaleTradeActionDock | onPressed | unclassified |
-| SRC-0288 | buy_v2_views.dart:2861 | _WholesaleTradeActionDock | onPressed | unclassified |
-| SRC-0289 | buy_v2_views.dart:3143 | _ProductOfferDecisionPanel | onPressed | unclassified |
-| SRC-0290 | buy_v2_views.dart:3155 | _ProductOfferDecisionPanel | onPressed | unclassified |
-| SRC-0291 | buy_v2_views.dart:3289 | _ProductContinuationCard | onTap | unclassified |
-| SRC-0292 | buy_v2_views.dart:3295 | _ProductContinuationCard | onTap | unclassified |
+| SRC-0266 | buy_v2_views.dart:68 | _openOrderInvoice | onPressed | invoice unavailable dialog Back; exact failure-dialog target requires device evidence; successful invoice does not qualify |
+| SRC-0267 | buy_v2_views.dart:78 | _openOrderInvoice | onPressed | invoice unavailable Refresh orders; provider recovery unverified |
+| SRC-0268 | buy_v2_views.dart:593 | BuyV2ProductView | onPressed | device_pass STORE-001 and COLLECTION-ROUND18-01 Visit store; supplier counterpart separate |
+| SRC-0269 | buy_v2_views.dart:620 | BuyV2ProductView | onTap | product visible return control; Android Back evidence not automatically equivalent; compared-product return B-002 |
+| SRC-0270 | buy_v2_views.dart:952 | BuyV2ProductView | onTap | Medicine-specific supplier decision row; outside public Shop/Wholesale |
+| SRC-0271 | buy_v2_views.dart:1440 | _ProductQuickActions | onPressed | product-page Save action exact button needs reconciliation; catalogue bookmark pass not equivalent |
+| SRC-0272 | buy_v2_views.dart:1445 | _ProductQuickActions | onPressed | device_pass SHARE-001 native chooser and SHARE-002 Cancel; recipient open/provider delivery not qualified |
+| SRC-0273 | buy_v2_views.dart:1452 | _ProductQuickActions | onPressed | CMP-001 comparison entry with missing matches B-002; populated results and cart remain unverified |
+| SRC-0274 | buy_v2_views.dart:1465 | _ProductQuickActions | onPressed | device_pass CHAT-001 Ask seller entry; no real message sent; shared Chat descendants separate |
+| SRC-0275 | buy_v2_views.dart:1491 | _ProductQuickActions | onPressed | quick-action button forwarder to Save/Share/Compare/Ask; not additional journey |
+| SRC-0276 | buy_v2_views.dart:1520 | _ProductQuickActionButton | onTap | quick-action Semantics activation; screen-reader unverified |
+| SRC-0277 | buy_v2_views.dart:1523 | _ProductQuickActionButton | onTap | quick-action InkWell forwarder; caller-specific evidence applies |
+| SRC-0278 | buy_v2_views.dart:1879 | _ProductComparisonSheetState | onPressed | device_pass CMP-002 Refresh empty comparison; populated/stale/provider revision B-002 remains |
+| SRC-0279 | buy_v2_views.dart:1948 | _ProductComparisonSheetState | onPressed | blocked_test_data B-002 comparison Previous; multi-page matching suppliers absent |
+| SRC-0280 | buy_v2_views.dart:1956 | _ProductComparisonSheetState | onPressed | blocked_test_data B-002 More suppliers; pagination and identity retention unverified |
+| SRC-0281 | buy_v2_views.dart:2137 | _ProductVariantOption | onTap | variant Semantics select; screen-reader unverified |
+| SRC-0282 | buy_v2_views.dart:2153 | _ProductVariantOption | onTap | device_pass VARIANT-ROUND22-03 and ROUND58-01/02/03 milk variants; unavailable/stale variants unverified |
+| SRC-0283 | buy_v2_views.dart:2250 | _WholesaleVerificationCard | onPressed | conditional Open business profile; exact public Wholesale entry/return and auth boundary unverified |
+| SRC-0284 | buy_v2_views.dart:2489 | _WholesaleTradeDecisionPanelState | onPressed | Wholesale Check availability refresh facts/local signal; provider success and failure branches unverified |
+| SRC-0285 | buy_v2_views.dart:2502 | _WholesaleTradeDecisionPanelState | onPressed | Wholesale unavailable Change product exact control unverified; Back not equivalent |
+| SRC-0286 | buy_v2_views.dart:2751 | _WholesaleTradeSignalCard | onPressed | local insight Retry provider path unverified; no fixture claim of real local insight |
+| SRC-0287 | buy_v2_views.dart:2851 | _WholesaleTradeActionDock | onPressed | Verify business unverified-business dock; profile/auth route boundary not yet device-qualified |
+| SRC-0288 | buy_v2_views.dart:2861 | _WholesaleTradeActionDock | onPressed | Wholesale dock Check availability; distinct from panel retry; provider branches unverified |
+| SRC-0289 | buy_v2_views.dart:3143 | _ProductOfferDecisionPanel | onPressed | consumer offer Check availability refresh; provider outcome unverified |
+| SRC-0290 | buy_v2_views.dart:3155 | _ProductOfferDecisionPanel | onPressed | consumer unavailable Change product exact target unverified |
+| SRC-0291 | buy_v2_views.dart:3289 | _ProductContinuationCard | onTap | continuation product Semantics activation; screen-reader unverified |
+| SRC-0292 | buy_v2_views.dart:3295 | _ProductContinuationCard | onTap | related/continuation product pointer entry; VARIANT-ROUND22-02 and RV6-D007 return defect retain separate outcomes |
 | SRC-0293 | buy_v2_views.dart:3553 | _BuyV2ZoomableMediaState | onTap | blocked_test_data B-008; MEDIA-ROUND75-02 reset zoom, including reduced motion; actual supplier image absent |
-| SRC-0294 | buy_v2_views.dart:3868 | _ProductContentSections | onPressed | unclassified |
-| SRC-0295 | buy_v2_views.dart:4118 | _ProductBenefitsPreview | onPressed | unclassified |
-| SRC-0296 | buy_v2_views.dart:4286 | _MarketplaceTrustPanel | onPressed | unclassified |
+| SRC-0294 | buy_v2_views.dart:3868 | _ProductContentSections | onPressed | product content Retry provider error path unverified |
+| SRC-0295 | buy_v2_views.dart:4118 | _ProductBenefitsPreview | onPressed | product benefits Retry provider error path unverified |
+| SRC-0296 | buy_v2_views.dart:4286 | _MarketplaceTrustPanel | onPressed | marketplace trust Retry provider error path unverified; source claims do not establish trust authority |
 | SRC-0297 | buy_v2_views.dart:4453 | _ProductReviewsPanel | onPressed | REVIEW-001; existing-review Edit branch B003 unqualified |
 | SRC-0298 | buy_v2_views.dart:4464 | _ProductReviewsPanel | onPressed | REPORT-001; reported/disabled and reconnect branches provider-unqualified |
 | SRC-0299 | buy_v2_views.dart:4559 | _showProductReviewSheet | onPressed | REVIEW-002; positive eligibility/loading outcome B003 unqualified |
@@ -909,8 +909,8 @@ Source hashes bind the following index to the inspected files:
 | SRC-0306 | buy_v2_views.dart:5195 | _ProductReportSheetState | onTap | REPORT-002..005; all four reason selections verified; busy branch unqualified |
 | SRC-0307 | buy_v2_views.dart:5283 | _ProductReportSheetState | onPressed | REPORT-006; busy-disabled Cancel unqualified |
 | SRC-0308 | buy_v2_views.dart:5295 | _ProductReportSheetState | onPressed | Report submission excluded; busy/rejection/accepted/duplicate states provider-unqualified |
-| SRC-0309 | buy_v2_views.dart:5364 | _AddressSelectionRequired | onPressed | unclassified |
-| SRC-0310 | buy_v2_views.dart:5421 | _MissingOrderSelection | onPressed | unclassified |
+| SRC-0309 | buy_v2_views.dart:5364 | _AddressSelectionRequired | onPressed | missing-address recovery Choose address; originals Home/Work preserved; no-address branch unverified |
+| SRC-0310 | buy_v2_views.dart:5421 | _MissingOrderSelection | onPressed | missing-order recovery View orders; RV6-D010 recovery context requires exact button reconciliation |
 | SRC-0311 | buy_v2_views.dart:5569 | _BuyV2CartViewState | onPressed | CART-ROUND12-05/06; MIXED-ROUND63-05/06; empty-disabled and resolution shortcut unqualified |
 | SRC-0312 | buy_v2_views.dart:5630 | _BuyV2CartViewState | onPressed | STORE-009 Continue browsing; D002 last-item removal context failure remains open |
 | SRC-0313 | buy_v2_views.dart:5677 | _BuyV2CartViewState | onPressed | Browse more products callback; exact nonempty-cart control needs device evidence reconciliation |
@@ -1546,3 +1546,7 @@ All 32 original buy_v2_screen.dart callbacks reconciled to specific entries, exi
 ## Round 106 - physical category search and expired Offers recovery
 
 Captures810-819 reviewed. Fresh resume showed Offers changed/expired notice; Refresh offers restored paneer promotion and product grid. This qualifies review-data recovery only, not a live publisher revision. Shop picker opened; zzzz produced readable no-match/Clear above keyboard; empty-state Clear restored choices; dairy filtered to Dairy and bakery; suffix X restored choices; sheet X closed keyboard and retained Scheduled catalogue, Saved1 and empty basket. 818 is transitional; settled819 establishes return. Six device passes, no new defect, no category applied or user item changed. Totals819 captures,821 evidence rows,505 action rows,406 device passes,17 defects. Source index count unchanged; updated existing pending mappings.
+
+## Round 107 - product actions and conditional recovery
+
+32 previously unclassified product/invoice/recovery callbacks linked to existing Share, Compare, Store, Chat and milk-variant evidence or explicit pending/provider states. Native share chooser is not recipient delivery; empty comparison Refresh is not populated comparison; catalogue Save is not product-action Save; Android Back is not a visible Change product control. Conditional business verification and content/benefits/trust Retry remain unverified. No new device action, pass or defect. Original index311 to343 classified,184 unclassified; remaining count is source references, not user journeys.
