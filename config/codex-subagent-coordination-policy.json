@@ -373,7 +373,8 @@
         "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart",
         "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
       ]
     }
   ],
