@@ -628,20 +628,20 @@ Source hashes bind the following index to the inspected files:
 | SRC-0025 | buy_v2_catalogue.dart:1699 | showBuyV2CatalogueArea | onTap | blocked_provider B-001; selecting resolved provider area including rejection feedback unverified |
 | SRC-0026 | buy_v2_catalogue.dart:1723 | showBuyV2CatalogueArea | onTap | Any area choice remains pending device check and retained context verification |
 | SRC-0027 | buy_v2_catalogue.dart:1735 | showBuyV2CatalogueArea | onTap | seed area choice remains pending device check; not proof of national provider coverage |
-| SRC-0028 | buy_v2_catalogue.dart:1943 | _CatalogueSaleTypeSelector | onHorizontalDragEnd | unclassified |
-| SRC-0029 | buy_v2_catalogue.dart:2014 | _CatalogueSaleTypeSelector | onTap | unclassified |
-| SRC-0030 | buy_v2_catalogue.dart:2062 | _CatalogueSaleSegment | onTap | unclassified |
-| SRC-0031 | buy_v2_catalogue.dart:2066 | _CatalogueSaleSegment | onTap | unclassified |
-| SRC-0032 | buy_v2_catalogue.dart:2263 | BuyV2ShoppingIntentBar | onPressed | unclassified |
-| SRC-0033 | buy_v2_catalogue.dart:2347 | _CatalogueAccountReturn | onTap | unclassified |
-| SRC-0034 | buy_v2_catalogue.dart:2631 | _CatalogueStoreMatchesState | onTap | unclassified |
-| SRC-0035 | buy_v2_catalogue.dart:2768 | _SearchReadyState | onPressed | unclassified |
-| SRC-0036 | buy_v2_catalogue.dart:2785 | _SearchReadyState | onTap | unclassified |
-| SRC-0037 | buy_v2_catalogue.dart:2844 | _SearchReadyState | onTap | unclassified |
-| SRC-0038 | buy_v2_catalogue.dart:2954 | _SearchProductResults | onPressed | unclassified |
-| SRC-0039 | buy_v2_catalogue.dart:3072 | _CatalogueToolbar | onTap | unclassified |
-| SRC-0040 | buy_v2_catalogue.dart:3152 | _CatalogueCategoryPickerButton | onTap | unclassified |
-| SRC-0041 | buy_v2_catalogue.dart:3215 | _CatalogueOwnedFeature | onTap | unclassified |
+| SRC-0028 | buy_v2_catalogue.dart:1943 | _CatalogueSaleTypeSelector | onHorizontalDragEnd | horizontal sale-mode gesture (velocity threshold 80); distinct from product-lane swipe CAT-003; exact gesture pending device verification |
+| SRC-0029 | buy_v2_catalogue.dart:2014 | _CatalogueSaleTypeSelector | onTap | sale-mode pointer selection; SAVED-ROUND16-01/04 and VARIANT-ROUND22-01 cover Shop Quick/Scheduled; Wholesale/Bulk and retained contexts need separate evidence |
+| SRC-0030 | buy_v2_catalogue.dart:2062 | _CatalogueSaleSegment | onTap | Semantics onTap for same sale-mode action; screen-reader activation unverified; not extra pointer pass |
+| SRC-0031 | buy_v2_catalogue.dart:2066 | _CatalogueSaleSegment | onTap | InkWell forwarder to SRC-0029; same physical sale-mode tap |
+| SRC-0032 | buy_v2_catalogue.dart:2263 | BuyV2ShoppingIntentBar | onPressed | clear shopping intent conditional control; reconcile monthly/group intent evidence before qualification; currently unverified |
+| SRC-0033 | buy_v2_catalogue.dart:2347 | _CatalogueAccountReturn | onTap | returnToAccount conditional control; account-origin return and retained state unverified |
+| SRC-0034 | buy_v2_catalogue.dart:2631 | _CatalogueStoreMatchesState | onTap | store search result entry enabled only when associated product resolves; exact search-store tap and null-product state unverified |
+| SRC-0035 | buy_v2_catalogue.dart:2768 | _SearchReadyState | onPressed | Clear recent searches; excluded from destructive testing to preserve original history; not device pass |
+| SRC-0036 | buy_v2_catalogue.dart:2785 | _SearchReadyState | onTap | recent-search replay; exact suggestion identity/result/Back pending device evidence reconciliation |
+| SRC-0037 | buy_v2_catalogue.dart:2844 | _SearchReadyState | onTap | recommended search suggestion; exact suggestion/result/Back pending device check |
+| SRC-0038 | buy_v2_catalogue.dart:2954 | _SearchProductResults | onPressed | broadenProductSearchScope Search all action; query/scope retention and eligibility boundary pending device check |
+| SRC-0039 | buy_v2_catalogue.dart:3072 | _CatalogueToolbar | onTap | Saved toolbar forwarder; SAVED-ROUND15-01 and ROUND17-02/05 qualify Shop/Wholesale entries; not additional journey |
+| SRC-0040 | buy_v2_catalogue.dart:3152 | _CatalogueCategoryPickerButton | onTap | category picker entry; requires category-sheet mapping; source identified but exact device evidence not yet reconciled |
+| SRC-0041 | buy_v2_catalogue.dart:3215 | _CatalogueOwnedFeature | onTap | Shop/Wholesale return sale selector before this handler; feature filter handler belongs other destinations (Medicine/orders), not public Shop feature toggle |
 | SRC-0042 | buy_v2_catalogue.dart:3433 | _CatalogueCategorySheetState | onPressed | unclassified |
 | SRC-0043 | buy_v2_catalogue.dart:3469 | _CatalogueCategorySheetState | onTap | unclassified |
 | SRC-0044 | buy_v2_catalogue.dart:3476 | _CatalogueCategorySheetState | onChanged | unclassified |
@@ -1522,3 +1522,7 @@ Captures 795-802 reviewed on Redmi. 796 and 800 are transition frames; settled 7
 ## Round 100 - area scope controls and current-location failure
 
 Captures 803-809 reviewed. Offers header area opens sheet; National delivery and In this area draft chips switch correctly. Use current location yields visible Area search unavailable plus Try again (B-001); Retry retains usable failure sheet. X returns to unchanged paneer promotion/grid and empty basket. No area selected, permission change, successful lookup, transaction or implementation. Four UI passes and one blocked-provider check added; no new defect. SRC-0013 through0027 reconciled with exact conditional/forwarded controls; footer area is not passed from header entry evidence. Totals: 809 captures, 811 evidence rows, 499 action rows, 400 device passes, 17 defects. Original source index: 170 classified, 357 unclassified; not a unique-journey denominator.
+
+## Round 101 - sale-mode and search action reconciliation
+
+Source-only review of catalogue callbacks SRC-0028 through0041 distinguishes sale-selector swipe from product-card lane scrolling, Semantics activation from pointer taps, and forwarding callbacks from unique actions. Existing Shop Quick/Scheduled and Saved entry evidence is linked; wholesale modes, exact search-store entry, recent/suggested query actions, Search all, account return and intent dismissal remain explicitly unverified until their own evidence is reconciled. Clear recent searches remains excluded to preserve original history. Shop/Wholesale never reach the alternate owned-feature filter handler because they return the sale selector first. No new device pass, capture or defect. Original source index now 184 classified and 343 unclassified; classification includes pending actions and does not mean tested. Unique journey denominator remains incomplete.
