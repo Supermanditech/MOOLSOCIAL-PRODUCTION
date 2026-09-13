@@ -492,3 +492,9 @@ Original font_scale1.0 read before change;set2.0/readback2.0. Captures671-672 sh
 ACCESS-ROUND72-02 source explanation: buy_v2_design.dart2044-2081 measures illustration-label words using current text scale and returns BuyV2ProductPhotoUnavailable when width or remaining height cannot fit. Lines2112-2126 expose product-specific unavailable semantics and crossed-image icon. This is consistent with671-672 and restored674;no evidence here of real supplier-photo failure. Observation retained, no new defect. Real supplier media and screen-reader output remain unverified. Initial catalogue read had a Python syntax error before any read/write;corrected bounded design-file read completed.
 
 No device actions or product edits;all counters unchanged. Full audit remains active.
+
+## Round 74 - public scanner reachability
+
+Library-wide references show public Buy only declares scannerLauncher at buy_v2_screen.dart284/312;actual showBuyV2ProductScanner calls occur in Workspace dashboard11278/21635. SCANNER-ROUND74-01 lists unreachable public descendants explicitly;no Workspace navigation or product change. This is not a confirmed customer failure without a promised public entry. Collection camera remains separately authentication-blocked.
+
+440 action rows;other counts unchanged. Source inventory and full audit remain incomplete.
