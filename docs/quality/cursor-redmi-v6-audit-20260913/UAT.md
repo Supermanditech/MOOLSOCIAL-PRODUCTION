@@ -376,3 +376,9 @@ Totals: 559 physical captures, 561 evidence rows including PDF/render, 365 actio
 Captures 560-570 inspected on Redmi. Empty Add gives 21 packs/Rs5145. Wheat increased from2 to3 and oil decreased from2 to1 yields 21packs/Rs4589. Re-Add restores only missing oil, preserves wheat3, and yields22packs/Rs5424. A further Add leaves this unchanged; cart verifies12products, wheat3/Rs837 and oil2/Rs1670. Confirmed removal clears only the isolated22Shopitems. Saved1 remains; original addresses untouched. Five device action passes; no new defect or closure.
 
 570 physical captures;572 evidence rows including PDF/render;370 action rows;58 data mappings;16 distinct defects. Complete action/data inventory remains unfinished. Partial basket failure requires an appropriate unavailable/revision fixture; host logic is not device qualification. No new APK or product changes.
+
+## Round 55 - Remaining price caps and filter cancellation
+
+Physical captures571-580 reviewed. On the finite six-product monthly Scheduled set: cap250 returns notebooks210/milk66/eggs89; cap500 adds wheat279 and excludes oil835/ghee625; cap1000 restores all6. Clear without Apply then close X retains cap1000 on reopen. Clear then swipe dismissal also retains cap1000 on reopen. Clear plus Apply removes filter badge and restores original six-product monthly view. Cart remains empty;Saved1. Six narrow device passes; no new defect or closure. No inference about equality boundary or provider pagination.
+
+Six older remaining notes reconciled to explicit round54/55 evidence; historical actions/evidence preserved. 580 physical captures;582 evidence rows;376 action rows;58 public-data mappings;16 defects. Source/action completeness reconciliation and other reachable pending cases remain open. No product/policy/APK changes.
