@@ -969,28 +969,28 @@ Source hashes bind the following index to the inspected files:
 | SRC-0366 | buy_v2_views.dart:9490 | BuyV2OrdersView | onTap | device_pass ORDER-010 and ORDER-ROUND23-02 Delivered tab/query retention; other tabs require own evidence |
 | SRC-0367 | buy_v2_views.dart:9636 | _OrdersTabButton | onTap | Orders tab pointer forwarder to SRC-0366; not additional journey |
 | SRC-0368 | buy_v2_views.dart:9683 | BuyV2OrderItemsView | onTap | Items visible Order breadcrumb exact target unverified; ORDER-007 Android Back is distinct |
-| SRC-0369 | buy_v2_views.dart:9727 | BuyV2OrderItemsView | onTap | unclassified |
-| SRC-0370 | buy_v2_views.dart:9845 | _OrdersAvailabilityState | onPressed | unclassified |
-| SRC-0371 | buy_v2_views.dart:9915 | _OrdersContinuationRail | onTap | unclassified |
-| SRC-0372 | buy_v2_views.dart:9924 | _OrdersContinuationRail | onTap | unclassified |
-| SRC-0373 | buy_v2_views.dart:9933 | _OrdersContinuationRail | onTap | unclassified |
-| SRC-0374 | buy_v2_views.dart:10066 | _showBuyV2OrderDeliveryContextSheet | onPressed | unclassified |
-| SRC-0375 | buy_v2_views.dart:10177 | _showBuyV2OrderDeliveryContextSheet | onTap | unclassified |
-| SRC-0376 | buy_v2_views.dart:10189 | _showBuyV2OrderDeliveryContextSheet | onTap | unclassified |
-| SRC-0377 | buy_v2_views.dart:10251 | _DeliveryExceptionCard | onPressed | unclassified |
-| SRC-0378 | buy_v2_views.dart:10329 | _DeliveryExceptionCard | onSelected | unclassified |
-| SRC-0379 | buy_v2_views.dart:10344 | _DeliveryExceptionCard | onPressed | unclassified |
-| SRC-0380 | buy_v2_views.dart:10358 | _DeliveryExceptionCard | onPressed | unclassified |
-| SRC-0381 | buy_v2_views.dart:10493 | _BalancePaymentCard | onPressed | unclassified |
-| SRC-0382 | buy_v2_views.dart:10643 | _BuyV2LiveDeliveryPanelState | onPressed | unclassified |
-| SRC-0383 | buy_v2_views.dart:10746 | _BuyV2LiveDeliveryPanelState | onPressed | unclassified |
-| SRC-0384 | buy_v2_views.dart:10995 | _BuyV2CollectionOrderViewState | onTap | unclassified |
-| SRC-0385 | buy_v2_views.dart:11117 | _BuyV2CollectionOrderViewState | onPressed | unclassified |
-| SRC-0386 | buy_v2_views.dart:11138 | _BuyV2CollectionOrderViewState | onPressed | unclassified |
-| SRC-0387 | buy_v2_views.dart:11232 | _BuyV2CollectionOrderViewState | onPressed | unclassified |
-| SRC-0388 | buy_v2_views.dart:11294 | BuyV2TrackingView | onTap | unclassified |
-| SRC-0389 | buy_v2_views.dart:11312 | BuyV2TrackingView | onPressed | unclassified |
-| SRC-0390 | buy_v2_views.dart:11425 | BuyV2TrackingView | onPressed | unclassified |
+| SRC-0369 | buy_v2_views.dart:9727 | BuyV2OrderItemsView | onTap | device_pass ORDER-005/006 and ORDER-ROUND25-02 historical item product/Back; withdrawn product conditional unverified |
+| SRC-0370 | buy_v2_views.dart:9845 | _OrdersAvailabilityState | onPressed | Orders unavailable Retry provider recovery unverified; populated history not equivalent |
+| SRC-0371 | buy_v2_views.dart:9915 | _OrdersContinuationRail | onTap | Orders promotion Shop entry exact target unverified; navigation rail separate |
+| SRC-0372 | buy_v2_views.dart:9924 | _OrdersContinuationRail | onTap | Orders promotion Wholesale entry exact target unverified |
+| SRC-0373 | buy_v2_views.dart:9933 | _OrdersContinuationRail | onTap | Orders Medicine promotion boundary; downstream Care outside public Shop/Wholesale; boundary tap unverified |
+| SRC-0374 | buy_v2_views.dart:10066 | _showBuyV2OrderDeliveryContextSheet | onPressed | order delivery-context Close X exact target requires reconciliation; Back not equivalent |
+| SRC-0375 | buy_v2_views.dart:10177 | _showBuyV2OrderDeliveryContextSheet | onTap | device_pass ORDER-ROUND25-04 Manage future addresses and Back; other order contexts separate |
+| SRC-0376 | buy_v2_views.dart:10189 | _showBuyV2OrderDeliveryContextSheet | onTap | order delivery-context Help exact continuation requires evidence reconciliation; tracking Help is different entry |
+| SRC-0377 | buy_v2_views.dart:10251 | _DeliveryExceptionCard | onPressed | blocked_provider B-012 delivery-exception Retry; adapter absent |
+| SRC-0378 | buy_v2_views.dart:10329 | _DeliveryExceptionCard | onSelected | blocked_provider B-012 reschedule slot choice; available slots absent |
+| SRC-0379 | buy_v2_views.dart:10344 | _DeliveryExceptionCard | onPressed | blocked_provider B-012 confirm new time; no real reschedule authorized |
+| SRC-0380 | buy_v2_views.dart:10358 | _DeliveryExceptionCard | onPressed | blocked_provider B-012 delivery dispute; no real dispute sent |
+| SRC-0381 | buy_v2_views.dart:10493 | _BalancePaymentCard | onPressed | blocked_provider B-013 balance-payment action; provider absent and live money action excluded |
+| SRC-0382 | buy_v2_views.dart:10643 | _BuyV2LiveDeliveryPanelState | onPressed | live delivery error Retry B-005; authoritative location missing; exact UI evidence unverified |
+| SRC-0383 | buy_v2_views.dart:10746 | _BuyV2LiveDeliveryPanelState | onPressed | live delivery Refresh location B-005; successful map/location update unverified |
+| SRC-0384 | buy_v2_views.dart:10995 | _BuyV2CollectionOrderViewState | onTap | blocked_authentication COLLECTION-ROUND68-01 return origin |
+| SRC-0385 | buy_v2_views.dart:11117 | _BuyV2CollectionOrderViewState | onPressed | blocked_authentication COLLECTION-ROUND68-02 scan enabled/disabled |
+| SRC-0386 | buy_v2_views.dart:11138 | _BuyV2CollectionOrderViewState | onPressed | blocked_authentication COLLECTION-ROUND68-03 close camera/reopen |
+| SRC-0387 | buy_v2_views.dart:11232 | _BuyV2CollectionOrderViewState | onPressed | blocked_authentication COLLECTION-ROUND68-06 order Help/return |
+| SRC-0388 | buy_v2_views.dart:11294 | BuyV2TrackingView | onTap | tracking visible Orders/Help return target exact tap requires reconciliation; Android Back not equivalent |
+| SRC-0389 | buy_v2_views.dart:11312 | BuyV2TrackingView | onPressed | ORDER-001 attempted refresh blocked_provider B-005; busy/success unverified |
+| SRC-0390 | buy_v2_views.dart:11425 | BuyV2TrackingView | onPressed | Restore delivery status from tracking exact button unverified; bottom rail reopen TRACK-005 distinct |
 | SRC-0391 | buy_v2_views.dart:11781 | BuyV2TrackingView | onPressed | unclassified |
 | SRC-0392 | buy_v2_views.dart:11787 | BuyV2TrackingView | onChanged | unclassified |
 | SRC-0393 | buy_v2_views.dart:11805 | BuyV2TrackingView | onPressed | unclassified |
@@ -1554,3 +1554,7 @@ Captures810-819 reviewed. Fresh resume showed Offers changed/expired notice; Ref
 ## Round 108 - checkout and recovery source coverage
 
 SRC-0331 through0368 mapped to existing checkout/collection/Orders UI evidence or explicit conditional/provider gaps. Distinct visible Back, Change, radio/option, invoice and recovery actions are not passed from neighboring controls or historical records. Real payment attempt actions remain outside live transaction authority. Price/promise acceptance needs authoritative revised quotes; confirmed-order paths need B-011. No new device pass, capture, implementation or defect. Original source index381 classified,146 unclassified; this is not a completed-journey count. Audit remains open.
+
+## Round 109 - order and collection action reconciliation
+
+SRC-0369 through0390 linked to historical product/future-address evidence and existing collection, live delivery, delivery-exception and balance-payment blockers. Exact visible return/Close/Restore controls remain pending where only Back or rail evidence exists. No messages, rescheduling, disputes or payments performed. No new device pass/capture/defect. Original index403 classified,124 unclassified; classification includes pending and blocked actions and is not a unique journey denominator.
