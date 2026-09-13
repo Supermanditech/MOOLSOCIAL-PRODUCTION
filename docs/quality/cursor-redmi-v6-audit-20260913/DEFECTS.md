@@ -96,3 +96,10 @@ Status: open. Severity: minor navigation inconsistency. Redmi TG8HCYTGGQT885OF;U
 Reproduction: open existing MS-240782 via declared HTTPS /app/buy/order/MS-240782 (371;Orders selected). Open declared /app/buy?view=recovery&recovery=delay,then Return to order372-373. Same order/detail retained,but Shop is selected in bottom rail instead of original Orders.
 Expected: exact return context includes originating destination as well as order ID;tracking should restore original Orders selection.
 Source: buy_v2_screen.dart527-529 overwrites destination with initialDestination before openRecovery;session11548-11560 records that replaced destination in origin. Generic recovery link defaults to Shop in journey_router. Conditional Help and other origin contexts need separate checks. No order/data mutation or implementation.
+
+
+## RV6-D011 - Wholesale product repeats summary data across several content sections
+Status: open. Severity: minor visual/content usability defect. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+Reproduction: Wholesale Fresh tomatoes1/10kg580 product407;scroll408-410. Product details repeats Brand not provided/variant/pack/policy;Product and pack information repeats product/pack/unit price;Highlights repeats variant/unit price/policy;Specifications repeats brand/pack/variant;Description repeats title/variant/pack/unit price. Customer must scroll through repeated information before ratings/reviews. This is actual default content,not distinct technical specifications.
+Expected: preserve useful supplier-specific information while suppressing identical summary-only highlights/specifications/generated description in Wholesale as in Shop. Keep the price/MOQ/pack decision accessible;do not remove genuinely distinct supplier facts.
+Source corroboration: buy_v2_views.dart3877-3910 suppresses identical content only when destination is Shop (`!shop` admits all Wholesale duplicates). This is a frontend deduplication gap. Physical scope verified for this Wholesale listing;other products/Bulk require separate qualification. No implementation.
