@@ -5874,7 +5874,8 @@ class _BuyV2CartViewState extends State<BuyV2CartView> {
       ),
     );
     final viewport = MediaQuery.sizeOf(context);
-    if (viewport.width > viewport.height && viewport.height <= 480) {
+    if (viewport.height <= 480 &&
+        (session.isStoreProcurement || viewport.width > viewport.height)) {
       return ListView(
         controller: _scrollController,
         key: PageStorageKey('buy-cart-${session.cartScope.name}'),
@@ -6617,19 +6618,21 @@ class _BuyV2GstInvoiceSheetState extends State<_BuyV2GstInvoiceSheet> {
   }
 }
 
-String _commercialPaymentTermTitle(BuyV2CommercialPaymentTerm term) =>
-    switch (term.kind) {
-      BuyV2CommercialPaymentTermKind.retailAdvance ||
-      BuyV2CommercialPaymentTermKind.wholesaleAdvance => 'Full advance',
-      BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch =>
-        'Booking amount · balance before dispatch',
-      BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
-        'Booking amount · balance at delivery',
-      BuyV2CommercialPaymentTermKind.supplierCredit =>
-        'Supplier credit · ${term.netDays} days',
-      BuyV2CommercialPaymentTermKind.regulatedCredit =>
-        '${term.financierName} credit · ${term.netDays} days',
-    };
+String _commercialPaymentTermTitle(
+  BuyV2CommercialPaymentTerm term,
+) => switch (term.kind) {
+  BuyV2CommercialPaymentTermKind.retailAdvance ||
+  BuyV2CommercialPaymentTermKind.wholesaleAdvance => 'Full advance',
+  BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch =>
+    'Booking amount · balance before dispatch',
+  BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
+    '${term.advancePercent == null ? 'Booking amount' : '${term.advancePercent}% advance'} · balance at delivery',
+  BuyV2CommercialPaymentTermKind.paymentOnDelivery => 'Payment at delivery',
+  BuyV2CommercialPaymentTermKind.supplierCredit =>
+    '${term.advancePercent == null || term.advancePercent == 0 ? 'Supplier credit' : '${term.advancePercent}% advance + credit'} · ${term.netDays} days',
+  BuyV2CommercialPaymentTermKind.regulatedCredit =>
+    '${term.financierName} credit · ${term.netDays} days',
+};
 
 String _commercialPaymentTermDetail(BuyV2CommercialPaymentTerm term) {
   final amounts = term.balanceDue == 0
@@ -6873,7 +6876,9 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
           Text('Payment terms', style: context.buyTitle.copyWith(fontSize: 16)),
           const SizedBox(height: 2),
           Text(
-            'Retail is paid in full. Wholesale terms are published by each supplier.',
+            session.isStoreProcurement
+                ? 'Available from this supplier for your Store.'
+                : 'Retail is paid in full. Wholesale terms are published by each supplier.',
             style: context.buyMeta.copyWith(fontSize: 8.5),
           ),
           const SizedBox(height: 8),
@@ -6914,10 +6919,12 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
               ],
             ),
           ],
-          if (session.commercialPaymentTermsMessage case final message?) ...[
+          if ((!session.isStoreProcurement ||
+                  session.checkoutPaymentTermsReviewRequired) &&
+              session.commercialPaymentTermsMessage != null) ...[
             const SizedBox(height: 6),
             Text(
-              message,
+              session.commercialPaymentTermsMessage!,
               key: const ValueKey('buy-checkout-payment-terms-message'),
               style: context.buyMeta.copyWith(
                 color: BuyV2Colors.orange,
@@ -6929,6 +6936,20 @@ class _CheckoutCommercialPaymentTerms extends StatelessWidget {
       ),
     );
   }
+}
+
+String _storePaymentChoiceLabel(BuyV2CommercialPaymentTerm term) {
+  if (term.balanceDue == 0) return 'Pay in full';
+  if (term.amountDueNow == 0 && term.netDays == null) return 'Pay on delivery';
+  if (term.amountDueNow == 0) {
+    return 'Pay within ${term.netDays} days of delivery';
+  }
+  final deposit = term.advancePercent == null
+      ? '${buyV2Money(term.amountDueNow)} to confirm'
+      : '${term.advancePercent}% to confirm';
+  return term.netDays == null
+      ? '$deposit · balance on delivery'
+      : '$deposit · balance within ${term.netDays} days of delivery';
 }
 
 class _CommercialPaymentTermGroup extends StatelessWidget {
@@ -6944,6 +6965,87 @@ class _CommercialPaymentTermGroup extends StatelessWidget {
   Widget build(BuildContext context) {
     final terms = session.commercialPaymentTermsFor(group.key);
     final selected = session.selectedCommercialPaymentTermFor(group.key);
+    if (session.isStoreProcurement) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(group.partner, style: context.buyBody),
+          const SizedBox(height: 6),
+          if (terms.isEmpty)
+            Text(
+              'No payment arrangement is available for this purchase.',
+              key: ValueKey('buy-payment-terms-empty-${group.key}'),
+              style: context.buyMeta,
+            )
+          else
+            DropdownButtonFormField<String>(
+              key: ValueKey(
+                'store-payment-selector-${group.key}-${selected?.id}',
+              ),
+              initialValue: selected?.id,
+              isExpanded: true,
+              menuMaxHeight: 280,
+              itemHeight: null,
+              decoration: const InputDecoration(
+                labelText: 'Payment arrangement',
+                border: OutlineInputBorder(),
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+              hint: const Text('Choose an arrangement'),
+              items: [
+                for (final term in terms)
+                  DropdownMenuItem(
+                    value: term.id,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      child: Text(
+                        _storePaymentChoiceLabel(term),
+                        style: context.buyBody,
+                      ),
+                    ),
+                  ),
+              ],
+              onChanged: (id) {
+                final term = terms.where((term) => term.id == id).firstOrNull;
+                if (term != null) session.chooseCommercialPaymentTerm(term);
+              },
+            ),
+          if (selected != null) ...[
+            const SizedBox(height: 6),
+            Text(
+              _commercialPaymentTermDetail(selected),
+              style: context.buyMeta,
+            ),
+          ],
+          if (!terms.any(
+            (term) =>
+                term.kind == BuyV2CommercialPaymentTermKind.supplierCredit,
+          )) ...[
+            const SizedBox(height: 8),
+            Material(
+              type: MaterialType.transparency,
+              child: ExpansionTile(
+                key: ValueKey('store-payment-flexibility-info-${group.key}'),
+                tilePadding: EdgeInsets.zero,
+                title: Text(
+                  'More payment flexibility over time',
+                  style: context.buyBody,
+                ),
+                children: [
+                  Text(
+                    'Completing purchases and paying this supplier on time may help you qualify for more flexible payment terms. Your supplier decides which options to offer.',
+                    style: context.buyMeta,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -7764,37 +7866,76 @@ class _CheckoutAddressChoice extends StatelessWidget {
 List<(String, IconData, String)> _buyV2CustomerPaymentChoices(
   BuyV2Session session,
 ) =>
-    [
-          (
-            'PhonePe',
-            Icons.phone_android_rounded,
-            'Secure payment collected by MoolSocial',
-          ),
-          (
-            'Paytm',
-            Icons.account_balance_wallet_rounded,
-            'Secure payment collected by MoolSocial',
-          ),
-          (
-            'Pine Labs',
-            Icons.credit_card_rounded,
-            'Secure card or UPI collection by MoolSocial',
-          ),
-          if (!session.collectionCheckoutSelected &&
-              session.cashOnDeliveryEligibleForCheckout)
-            (
-              'Cash on Delivery',
-              Icons.payments_outlined,
-              'Pay when this eligible Shop order arrives',
-            ),
-          if (!session.collectionCheckoutSelected &&
-              session.purchaseOrderEligibleForCheckout)
-            (
-              'Purchase order',
-              Icons.receipt_long_outlined,
-              'Available for this eligible Wholesale or Bulk purchase',
-            ),
-        ]
+    (session.isStoreProcurement
+            ? <(String, IconData, String)>[
+                (
+                  'UPI',
+                  Icons.phone_android_rounded,
+                  'Pay using an eligible UPI app. Bank limits apply.',
+                ),
+                (
+                  'Cheque',
+                  Icons.receipt_long_outlined,
+                  'Payment remains pending until the cheque clears.',
+                ),
+                (
+                  'Bank transfer',
+                  Icons.account_balance_outlined,
+                  'Use the verified bank instructions for this purchase.',
+                ),
+                (
+                  'NEFT',
+                  Icons.account_balance_outlined,
+                  'Transfer with the purchase reference; confirmation follows reconciliation.',
+                ),
+                (
+                  'RTGS',
+                  Icons.account_balance_outlined,
+                  'Available subject to bank amount limits and supplier acceptance.',
+                ),
+                (
+                  'Cash',
+                  Icons.payments_outlined,
+                  'Payment requires a confirmed supplier receipt.',
+                ),
+                if (session.purchaseOrderEligibleForCheckout)
+                  (
+                    'Purchase order',
+                    Icons.receipt_long_outlined,
+                    'Submit the purchase order under the supplier’s agreed terms.',
+                  ),
+              ]
+            : [
+                (
+                  'PhonePe',
+                  Icons.phone_android_rounded,
+                  'Secure payment collected by MoolSocial',
+                ),
+                (
+                  'Paytm',
+                  Icons.account_balance_wallet_rounded,
+                  'Secure payment collected by MoolSocial',
+                ),
+                (
+                  'Pine Labs',
+                  Icons.credit_card_rounded,
+                  'Secure card or UPI collection by MoolSocial',
+                ),
+                if (!session.collectionCheckoutSelected &&
+                    session.cashOnDeliveryEligibleForCheckout)
+                  (
+                    'Cash on Delivery',
+                    Icons.payments_outlined,
+                    'Pay when this eligible Shop order arrives',
+                  ),
+                if (!session.collectionCheckoutSelected &&
+                    session.purchaseOrderEligibleForCheckout)
+                  (
+                    'Purchase order',
+                    Icons.receipt_long_outlined,
+                    'Available for this eligible Wholesale or Bulk purchase',
+                  ),
+              ])
         .where((choice) => session.availablePaymentMethods.contains(choice.$1))
         .toList(growable: false);
 
@@ -7855,7 +7996,12 @@ class _CheckoutPaymentStage extends StatelessWidget {
       children: [
         Text('Payment', style: context.buyTitle.copyWith(fontSize: 21)),
         const SizedBox(height: 3),
-        Text('Choose how you want to pay MoolSocial.', style: context.buyMeta),
+        Text(
+          session.isStoreProcurement
+              ? 'Choose a method accepted by your supplier.'
+              : 'Choose how you want to pay MoolSocial.',
+          style: context.buyMeta,
+        ),
         const SizedBox(height: 10),
         Container(
           key: const ValueKey('buy-checkout-payment-summary'),
@@ -7868,26 +8014,35 @@ class _CheckoutPaymentStage extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Amount to MoolSocial', style: context.buyMeta),
+              Text(
+                session.isStoreProcurement
+                    ? (session.checkoutPaymentTermsReviewRequired
+                          ? 'Order total · select supplier terms at review'
+                          : 'Amount due now')
+                    : 'Amount to MoolSocial',
+                style: context.buyMeta,
+              ),
               const SizedBox(height: 1),
               Text(
                 buyV2Money(session.checkoutAmountDueNow),
                 style: context.buyTitle.copyWith(fontSize: 25),
               ),
               const SizedBox(height: 7),
-              _CheckoutPaymentFact(
-                label: 'Provider charge',
-                value: session.checkoutQuotedPaymentCharge > 0
-                    ? buyV2Money(session.checkoutQuotedPaymentCharge)
-                    : 'No extra provider charge',
-              ),
-              _CheckoutPaymentFact(
-                label: 'Payment offer',
-                value: paymentOffer == null
-                    ? 'No offer selected'
-                    : '${paymentOffer.title} · ${_cartBenefitSponsorLabel(paymentOffer)}\n'
-                          '${_paymentOfferStatus(session, paymentOffer)}',
-              ),
+              if (!session.isStoreProcurement)
+                _CheckoutPaymentFact(
+                  label: 'Provider charge',
+                  value: session.checkoutQuotedPaymentCharge > 0
+                      ? buyV2Money(session.checkoutQuotedPaymentCharge)
+                      : 'No extra provider charge',
+                ),
+              if (!session.isStoreProcurement)
+                _CheckoutPaymentFact(
+                  label: 'Payment offer',
+                  value: paymentOffer == null
+                      ? 'No offer selected'
+                      : '${paymentOffer.title} · ${_cartBenefitSponsorLabel(paymentOffer)}\n'
+                            '${_paymentOfferStatus(session, paymentOffer)}',
+                ),
             ],
           ),
         ),
@@ -8281,14 +8436,16 @@ class _CheckoutConfirmStage extends StatelessWidget {
           key: const ValueKey('buy-checkout-confirm-payment'),
           icon: Icons.account_balance_wallet_outlined,
           title: 'Payment · ${session.selectedPayment}',
-          detail: switch (session.selectedPayment) {
-            'Purchase order' =>
-              'Amount · ${buyV2Money(session.checkoutAmountDueNow)}\nPurchase order · ${session.purchaseOrderReference.trim()}',
-            'Cash on Delivery' =>
-              'Amount due on delivery · ${buyV2Money(session.checkoutAmountDueNow)}',
-            _ =>
-              'Amount to MoolSocial · ${buyV2Money(session.checkoutAmountDueNow)}\nYour order is placed after payment is confirmed.',
-          },
+          detail: session.isStoreProcurement
+              ? 'Due now · ${buyV2Money(session.checkoutAmountDueNow)}\nBalance · ${buyV2Money(session.checkoutBalanceDue)}\nSupplier acceptance and payment confirmation remain separate.'
+              : switch (session.selectedPayment) {
+                  'Purchase order' =>
+                    'Amount · ${buyV2Money(session.checkoutAmountDueNow)}\nPurchase order · ${session.purchaseOrderReference.trim()}',
+                  'Cash on Delivery' =>
+                    'Amount due on delivery · ${buyV2Money(session.checkoutAmountDueNow)}',
+                  _ =>
+                    'Amount to MoolSocial · ${buyV2Money(session.checkoutAmountDueNow)}\nYour order is placed after payment is confirmed.',
+                },
           action: 'Change',
           onTap: () => session.showCheckoutStep(BuyV2CheckoutStep.payment),
         ),
@@ -8855,8 +9012,16 @@ class BuyV2ConfirmationView extends StatelessWidget {
         const SizedBox(height: 4),
         TextButton(
           key: const ValueKey('buy-confirmation-continue-shopping'),
-          onPressed: () => session.openDestination(BuyV2Destination.shop),
-          child: const Text('Continue shopping'),
+          onPressed: () => session.openDestination(
+            session.isStoreProcurement
+                ? BuyV2Destination.wholesale
+                : BuyV2Destination.shop,
+          ),
+          child: Text(
+            session.isStoreProcurement
+                ? 'Continue restocking'
+                : 'Continue shopping',
+          ),
         ),
       ],
     );
@@ -9906,14 +10071,15 @@ class _OrdersContinuationRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cards = [
-      BuyV2PromotionCard(
-        key: const ValueKey('buy-promotion-orders-shop'),
-        title: 'Continue shopping',
-        detail: 'Browse retail products in Shop',
-        icon: Icons.shopping_bag_outlined,
-        sequenceIndex: 0,
-        onTap: () => session.openDestination(BuyV2Destination.shop),
-      ),
+      if (!session.isStoreProcurement)
+        BuyV2PromotionCard(
+          key: const ValueKey('buy-promotion-orders-shop'),
+          title: 'Continue shopping',
+          detail: 'Browse retail products in Shop',
+          icon: Icons.shopping_bag_outlined,
+          sequenceIndex: 0,
+          onTap: () => session.openDestination(BuyV2Destination.shop),
+        ),
       BuyV2PromotionCard(
         key: const ValueKey('buy-promotion-orders-wholesale'),
         title: 'Restock a business',
@@ -9923,15 +10089,16 @@ class _OrdersContinuationRail extends StatelessWidget {
         sequenceIndex: 1,
         onTap: () => session.openDestination(BuyV2Destination.wholesale),
       ),
-      BuyV2PromotionCard(
-        key: const ValueKey('buy-promotion-orders-medicine'),
-        title: 'Medicine and wellness',
-        detail: 'Browse the licensed pharmacy catalogue',
-        icon: Icons.local_pharmacy_outlined,
-        accent: BuyV2Colors.royal,
-        sequenceIndex: 2,
-        onTap: () => session.openDestination(BuyV2Destination.medicine),
-      ),
+      if (!session.isStoreProcurement)
+        BuyV2PromotionCard(
+          key: const ValueKey('buy-promotion-orders-medicine'),
+          title: 'Medicine and wellness',
+          detail: 'Browse the licensed pharmacy catalogue',
+          icon: Icons.local_pharmacy_outlined,
+          accent: BuyV2Colors.royal,
+          sequenceIndex: 2,
+          onTap: () => session.openDestination(BuyV2Destination.medicine),
+        ),
     ];
     return SizedBox(
       key: const ValueKey('buy-orders-promotions'),
@@ -15187,6 +15354,7 @@ class _BuyV2AddAddressFormState extends State<_BuyV2AddAddressForm> {
                 }
                 element.visitChildren(revealEditable);
               }
+
               fieldContext.visitChildElements(revealEditable);
             });
           },
@@ -16268,7 +16436,9 @@ class _CartScopeBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scopes = session.cartScope == BuyV2CartScope.medicine
+    final scopes = session.isStoreProcurement
+        ? const [BuyV2CartScope.wholesale]
+        : session.cartScope == BuyV2CartScope.medicine
         ? const [BuyV2CartScope.medicine]
         : const [
             BuyV2CartScope.all,
@@ -16278,7 +16448,11 @@ class _CartScopeBar extends StatelessWidget {
     final entries = scopes
         .map((scope) {
           final selected = session.cartScope == scope;
-          final label = scope == BuyV2CartScope.all ? 'Subtotal' : scope.label;
+          final label = session.isStoreProcurement
+              ? 'Wholesale / Bulk'
+              : scope == BuyV2CartScope.all
+              ? 'Subtotal'
+              : scope.label;
           final text = scope == BuyV2CartScope.all
               ? session.procurementPricesUnavailableFor()
                     ? 'Price pending'

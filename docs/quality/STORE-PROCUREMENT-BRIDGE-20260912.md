@@ -515,3 +515,14 @@ literals change; no predicate, content hash exception, owner permission,
 exclusion or security assertion is broadened. Original checker versions
 remain in predecessor commits. V6 still requires exact candidate qualification;
 prior source evidence does not substitute for that work.
+
+
+## Founder-approved Restock local review checkpoint — 2026-09-13
+
+Founder requested a clean Git checkpoint and confirmed all screens presented so far as approved before restarting review from Dashboard. This records visual acceptance only for the presented states, including the revised supplier payment selector and Orders Sales/Purchases tabs; it does not qualify unseen journeys, providers or devices.
+
+The founder explicitly authorized moving only buy_v2_content_contracts.dart and buy_v2_session.dart into the Codex claim and adding those two exact owners to this lane allowlist. The previously authorized buy_v2_views.dart entry remains. Original ownership/checker versions, modified versions, per-file patches and hashes are preserved outside the repository in outputs/payment-reconciliation-20260913-182327 under the current Codex task. The original gate failures remain preserved. Permission-gate passes are not payment/security acceptance.
+
+Local evidence: payment/Store regressions 244 passed; existing Orders/tracking checks 29 passed before final tab typography adjustment; final normal and 320x568/200% tab checks 2 passed. Earlier selector checks 3 passed and focused analysis reported no issues. The v5 Orders gallery and source hashes are preserved in outputs/orders-tabs-review-v5. Earlier rejected captures remain preserved. The initial new tab test assumed a connected purchase-history fixture; its failure is retained and the test now explicitly checks the actual unavailable-service state. Compact captures exposed wrapping and a font override, corrected by inheriting application typography and fitting both labels while retaining text scaling.
+
+Remaining qualification: real supplier offer/payment authority and purchase-history service are not connected; unavailable authority remains blocked. New Orders-to-purchase-tracking return needs a dedicated populated-record test and device verification. No live order, payment, message, deployment or device update occurred in this local revision. Cursor worktree and Redmi remain separate. This source checkpoint is not an APK/integration or production-release qualification.

@@ -35,6 +35,8 @@
       "role": "primary",
       "owners": [
         "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md",
+        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
+        "apps/mobile/lib/features/buy/buy_v2_session.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
@@ -348,11 +350,9 @@
       "owners": [
         "apps/mobile/lib/features/buy/buy_v2_cart_contracts.dart",
         "apps/mobile/lib/features/buy/buy_v2_catalogue_data.dart",
-        "apps/mobile/lib/features/buy/buy_v2_content_contracts.dart",
         "apps/mobile/lib/features/buy/buy_v2_models.dart",
         "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
         "apps/mobile/lib/features/buy/buy_v2_search_relevance.dart",
-        "apps/mobile/lib/features/buy/buy_v2_session.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_form_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_address_sheet_motion.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_category_sheet_policy.dart",

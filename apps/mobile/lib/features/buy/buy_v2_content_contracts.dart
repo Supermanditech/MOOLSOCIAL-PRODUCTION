@@ -1260,6 +1260,7 @@ enum BuyV2CommercialPaymentTermKind {
   wholesaleAdvance,
   bookingBalanceBeforeDispatch,
   bookingBalanceOnDelivery,
+  paymentOnDelivery,
   supplierCredit,
   regulatedCredit,
 }
@@ -1278,6 +1279,9 @@ class BuyV2CommercialPaymentTerm {
     required this.balanceDueLabel,
     required this.sourceId,
     this.supplierIsMicroOrSmall = false,
+    this.advancePercent,
+    this.upiTransactionLimit,
+    this.acceptedPaymentMethods = const {},
     this.netDays,
     this.financierName,
     this.annualPercentageRate,
@@ -1295,6 +1299,11 @@ class BuyV2CommercialPaymentTerm {
   final String balanceDueLabel;
   final String sourceId;
   final bool supplierIsMicroOrSmall;
+  final int? advancePercent;
+
+  /// Current bank/provider-approved limit in the same units as amountDueNow.
+  final int? upiTransactionLimit;
+  final Set<String> acceptedPaymentMethods;
   final int? netDays;
   final String? financierName;
   final double? annualPercentageRate;

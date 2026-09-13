@@ -101,6 +101,7 @@ class WorkProcurementController extends ChangeNotifier {
       customerStateStore: stateStore,
       reviewDataEnabled: false,
       commerceAdapter: review,
+      commercialPaymentTermsAdapter: review,
       cataloguePageSource: review,
       initialCatalogueRegionId: review == null ? null : 'jodhpur',
     );
@@ -270,8 +271,40 @@ class WorkProcurementController extends ChangeNotifier {
 /// Explicit review-build responses for the existing synthetic Store only.
 /// They exercise the normal eligibility contract, never real purchasing authority.
 /// No transport, payment, order creation or recipient action is available.
+/// Supplier-published arrangements are either public or granted to an exact buyer Store.
+/// This is an access filter, not a credit score or an automatic approval.
+class WorkSupplierPaymentAccess {
+  WorkSupplierPaymentAccess({
+    required this.supplierId,
+    required Set<String> publicTermIds,
+    Map<(String, String), Set<String>> storeTermIds = const {},
+  }) : publicTermIds = Set.unmodifiable(publicTermIds),
+       storeTermIds = Map.unmodifiable({
+         for (final entry in storeTermIds.entries)
+           entry.key: Set<String>.unmodifiable(entry.value),
+       });
+  final String supplierId;
+  final Set<String> publicTermIds;
+  final Map<(String, String), Set<String>> storeTermIds;
+
+  bool permits(
+    String termId, {
+    required String supplier,
+    required String account,
+    required String store,
+  }) =>
+      supplier == supplierId &&
+      account.isNotEmpty &&
+      store.isNotEmpty &&
+      (publicTermIds.contains(termId) ||
+          storeTermIds[(account, store)]?.contains(termId) == true);
+}
+
 class _StoreReviewProcurementCatalogue
-    implements BuyV2CommerceAdapter, BuyV2CataloguePageSource {
+    implements
+        BuyV2CommerceAdapter,
+        BuyV2CataloguePageSource,
+        BuyV2CommercialPaymentTermsAdapter {
   _StoreReviewProcurementCatalogue(this.context, {required this.current});
   final BuyV2ProcurementContext context;
   final bool Function() current;
@@ -388,15 +421,117 @@ class _StoreReviewProcurementCatalogue
     return BuyV2CommerceSnapshot(
       state: BuyV2CommerceLoadState.ready,
       products: page.items,
+      paymentMethods: BuyV2Session.storePaymentMethods,
+      selectedAddressId: 'test-store-delivery',
+      addresses: const [
+        BuyV2Address(
+          id: 'test-store-delivery',
+          kind: BuyV2AddressKind.work,
+          label: 'TEST Store delivery',
+          recipient: 'TEST Store receiving team',
+          phone: '9000000001',
+          line: 'TEST delivery address',
+          area: 'Jodhpur',
+          pinCode: '342001',
+          landmark: 'TEST location',
+        ),
+      ],
       businessVerified: true,
       businessVerificationState: BuyV2BusinessVerificationState.verified,
-      customerMessage: _notice,
       procurementBuyerGrant: BuyV2ProcurementBuyerGrant(
         accountId: context.accountId,
         storeId: context.storeId,
         approved: true,
         validUntil: DateTime.now().add(const Duration(minutes: 15)),
       ),
+    );
+  }
+
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  }) async {
+    _requireCurrent();
+    final terms = <BuyV2CommercialPaymentTerm>[];
+    for (final group in groups) {
+      if (group.destination != BuyV2Destination.wholesale) continue;
+      final total = quotedTotalsByFulfilmentKey[group.key];
+      if (total == null || total <= 0) continue;
+      // The existing test supplier offers full payment or payment at delivery.
+      // No buyer is assigned credit permission by this fixture.
+      final access = WorkSupplierPaymentAccess(
+        supplierId: group.partner,
+        publicTermIds: {'advance', 'delivery'},
+      );
+      void add(
+        String id,
+        BuyV2CommercialPaymentTermKind kind,
+        int percent, {
+        int? days,
+      }) {
+        if (!access.permits(
+          id,
+          supplier: group.partner,
+          account: context.accountId,
+          store: context.storeId,
+        )) {
+          return;
+        }
+        final now = (total * percent + 99) ~/ 100;
+        terms.add(
+          BuyV2CommercialPaymentTerm(
+            id: 'test-${group.key}-$id',
+            fulfilmentKey: group.key,
+            destination: group.destination,
+            supplierName: group.partner,
+            kind: kind,
+            orderTotal: total,
+            amountDueNow: now,
+            balanceDue: total - now,
+            balanceDueLabel: percent == 100
+                ? 'No balance due'
+                : days == null
+                ? 'at confirmed delivery'
+                : 'within $days days of confirmed delivery',
+            sourceId: 'TEST-supplier-payment-terms',
+            advancePercent: percent,
+            acceptedPaymentMethods: BuyV2Session.storePaymentMethods,
+            upiTransactionLimit: 100000,
+            netDays: days,
+            supplierIsMicroOrSmall: true,
+          ),
+        );
+      }
+
+      add('advance', BuyV2CommercialPaymentTermKind.wholesaleAdvance, 100);
+      add('delivery', BuyV2CommercialPaymentTermKind.paymentOnDelivery, 0);
+      for (final percent in [5, 10, 15, 20, 25]) {
+        add(
+          'advance-$percent-delivery',
+          BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery,
+          percent,
+        );
+        add(
+          'advance-$percent-credit-45',
+          BuyV2CommercialPaymentTermKind.supplierCredit,
+          percent,
+          days: 45,
+        );
+      }
+      for (final days in [1, 7, 15, 30, 45]) {
+        add(
+          'credit-$days',
+          BuyV2CommercialPaymentTermKind.supplierCredit,
+          0,
+          days: days,
+        );
+      }
+    }
+    return BuyV2CommercialPaymentTermsSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      terms: terms,
     );
   }
 

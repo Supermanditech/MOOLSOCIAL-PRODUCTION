@@ -865,6 +865,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
     this.publishedOffers = false,
     this.publicationFacts,
     this.controlsAfterProducts = false,
+    this.toolbarBuilder,
   });
 
   final BuyV2Session session;
@@ -878,6 +879,7 @@ class BuyV2PagedProductCatalogue extends StatefulWidget {
   final bool publishedOffers;
   final Widget Function(List<BuyV2PublishedCatalogueOffer>)? publicationFacts;
   final bool controlsAfterProducts;
+  final Widget Function(int? total, bool loading)? toolbarBuilder;
 
   @override
   State<BuyV2PagedProductCatalogue> createState() =>
@@ -1129,6 +1131,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         widget.query.regionId == null;
     final pageControls = _CataloguePageControls(
       scopeKey: widget.scopeKey,
+      compactStore: widget.session.isStoreProcurement,
       noun: widget.publishedOffers ? 'offers' : 'products',
       start: publicationCurrent ? page?.startIndex : null,
       count: products.length,
@@ -1149,7 +1152,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
           : null,
       onRefresh: loading ? null : _pager.refresh,
     );
-    return BuyV2VerticalScrollIndicator(
+    final content = BuyV2VerticalScrollIndicator(
       child: ListView(
         key: ValueKey('buy-paged-scroll-${widget.scopeKey}'),
         controller: _vertical,
@@ -1157,7 +1160,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         padding: const EdgeInsets.only(bottom: 12),
         children: [
           if (widget.header != null) widget.header!,
-          if (!widget.controlsAfterProducts) pageControls,
+          if (!widget.controlsAfterProducts &&
+              !widget.session.isStoreProcurement)
+            pageControls,
           if (loading && !widget.controlsAfterProducts)
             const LinearProgressIndicator(minHeight: 2),
           if (publicationCurrent &&
@@ -1204,6 +1209,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                   textScale: scale,
                   cartQuantityWidth: quantityWidth,
                   denseStore: widget.storeContext,
+                  storeProcurement: widget.session.isStoreProcurement,
                   scrollIndicatorInset: true,
                 );
                 final laneCount = products.length == 1 ? 1 : 2;
@@ -1257,7 +1263,8 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                 );
               },
             ),
-          if (widget.controlsAfterProducts) ...[
+          if (widget.controlsAfterProducts ||
+              widget.session.isStoreProcurement) ...[
             if (loading) const LinearProgressIndicator(minHeight: 2),
             if (!needsArea && publicationCurrent && message != null)
               _CataloguePageNotice(
@@ -1282,6 +1289,16 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         ],
       ),
     );
+    if (widget.toolbarBuilder == null) return content;
+    return Column(
+      children: [
+        widget.toolbarBuilder!(
+          publicationCurrent ? page?.totalCount : null,
+          loading,
+        ),
+        Expanded(child: content),
+      ],
+    );
   }
 }
 
@@ -1304,7 +1321,9 @@ class _CataloguePageControls extends StatelessWidget {
     this.onRefresh,
     this.noun = 'products',
     this.showRange = true,
+    this.compactStore = false,
   });
+  final bool compactStore;
   final String scopeKey;
   final int? start;
   final int count;
@@ -1329,6 +1348,82 @@ class _CataloguePageControls extends StatelessWidget {
         : '${_catalogueCount(start! + 1)}–${_catalogueCount(start! + count)}'
               '${total == null ? '' : ' of ${_catalogueCount(total!)}'}'
               '${noun == 'products' ? '' : ' $noun'}';
+    if (compactStore) {
+      final countLabel = total == null
+          ? (loading ? 'Updating' : 'Catalogue')
+          : _catalogueCount(total!);
+      return Align(
+        alignment: Alignment.centerRight,
+        widthFactor: 1,
+        heightFactor: 1,
+        child: PopupMenuButton<String>(
+          key: ValueKey('store-catalogue-count-$scopeKey'),
+          tooltip: 'Catalogue count and navigation',
+          onSelected: (action) {
+            switch (action) {
+              case 'previous':
+                onPrevious?.call();
+              case 'next':
+                onNext?.call();
+              case 'refresh':
+                onRefresh?.call();
+              case 'area':
+                onArea?.call();
+            }
+          },
+          itemBuilder: (_) => [
+            PopupMenuItem(enabled: false, child: Text(range)),
+            PopupMenuItem(
+              value: 'previous',
+              enabled: onPrevious != null,
+              child: const Text('Previous products'),
+            ),
+            PopupMenuItem(
+              value: 'next',
+              enabled: onNext != null,
+              child: const Text('Next products'),
+            ),
+            PopupMenuItem(
+              value: 'refresh',
+              enabled: onRefresh != null,
+              child: const Text('Refresh catalogue'),
+            ),
+            if (onArea != null)
+              const PopupMenuItem(
+                value: 'area',
+                child: Text('Choose sourcing area'),
+              ),
+          ],
+          child: Container(
+            constraints: const BoxConstraints(minWidth: 64, minHeight: 44),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: BuyV2Colors.navy,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Semantics(
+              label: 'Catalogue products: $countLabel',
+              liveRegion: true,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    loading ? Icons.sync_rounded : Icons.equalizer_rounded,
+                    size: 16,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Pages',
+                    style: context.buyMeta.copyWith(color: Colors.white),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     final rangeStyle = context.buyMeta.copyWith(fontWeight: FontWeight.w800);
     final summary = Semantics(
       liveRegion: true,
@@ -1797,16 +1892,22 @@ class BuyV2CatalogueView extends StatelessWidget {
       );
     }
     final savedOnly = session.showingSavedProducts;
+    final storePaged =
+        session.isStoreProcurement &&
+        session.pagedCatalogueEnabled &&
+        !savedOnly &&
+        !session.showingMonthlyBasketProducts;
     return Column(
       children: [
         if (session.canReturnToAccount)
           _CatalogueAccountReturn(session: session),
-        _CatalogueToolbar(
-          session: session,
-          onVisitProduct: onVisitProduct,
-          savedOnly: savedOnly,
-          onSaved: () => session.showSavedProducts(!savedOnly),
-        ),
+        if (!storePaged)
+          _CatalogueToolbar(
+            session: session,
+            onVisitProduct: onVisitProduct,
+            savedOnly: savedOnly,
+            onSaved: () => session.showSavedProducts(!savedOnly),
+          ),
         Expanded(
           child: _CatalogueMotionOwner(
             key: ValueKey(
@@ -1822,6 +1923,18 @@ class BuyV2CatalogueView extends StatelessWidget {
                     session: session,
                     query: session.catalogueQuery(),
                     scopeKey: 'catalogue-${session.destination.name}',
+                    toolbarBuilder: storePaged
+                        ? (total, loading) => _CatalogueToolbar(
+                            session: session,
+                            savedOnly: savedOnly,
+                            onSaved: () =>
+                                session.showSavedProducts(!savedOnly),
+                            onVisitProduct: onVisitProduct,
+                            productCount: total,
+                            showDigitalCount: true,
+                            updating: loading,
+                          )
+                        : null,
                     controlsAfterProducts:
                         session.destination == BuyV2Destination.shop,
                     header: session.query.trim().isEmpty || onOpenStore == null
@@ -3032,9 +3145,14 @@ class _CatalogueToolbar extends StatelessWidget {
     required this.savedOnly,
     required this.onSaved,
     this.onVisitProduct,
+    this.productCount,
+    this.showDigitalCount = false,
+    this.updating = false,
   });
 
   final BuyV2Session session;
+  final int? productCount;
+  final bool showDigitalCount, updating;
   final bool savedOnly;
   final VoidCallback onSaved;
   final BuyV2ProductVisit? onVisitProduct;
@@ -3071,11 +3189,68 @@ class _CatalogueToolbar extends StatelessWidget {
             active: savedOnly,
             onTap: onSaved,
           );
-          final tools = _CatalogueToolsMenu(
+          final toolsButton = _CatalogueToolsMenu(
             session: session,
             order: order,
             onVisitProduct: onVisitProduct,
           );
+          final tools = !showDigitalCount
+              ? toolsButton
+              : Stack(
+                  children: [
+                    toolsButton,
+                    Positioned(
+                      right: 3,
+                      bottom: 1,
+                      child: IgnorePointer(
+                        child: Semantics(
+                          liveRegion: true,
+                          label:
+                              'Catalogue products: ${productCount ?? 'unavailable'}',
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 3,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: BuyV2Colors.navy,
+                              borderRadius: BorderRadius.circular(5),
+                            ),
+                            child: AnimatedSwitcher(
+                              duration: MediaQuery.disableAnimationsOf(context)
+                                  ? Duration.zero
+                                  : const Duration(milliseconds: 220),
+                              child: Row(
+                                key: ValueKey('$productCount-$updating'),
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    updating
+                                        ? Icons.sync_rounded
+                                        : Icons.equalizer_rounded,
+                                    size: 10,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 2),
+                                  Text(
+                                    productCount == null
+                                        ? '—'
+                                        : _catalogueCount(productCount!),
+                                    style: context.buyMeta.copyWith(
+                                      fontSize: 9,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                );
           return Container(
             key: const ValueKey('buy-catalogue-toolbar'),
             constraints: const BoxConstraints(minHeight: 60),
@@ -8805,6 +8980,7 @@ _resolveCompactProductGridLayout({
   bool savedOnly = false,
   bool denseStore = false,
   bool scrollIndicatorInset = false,
+  bool storeProcurement = false,
   double cartQuantityWidth = 0,
 }) {
   // The founder-approved Shop and Wholesale rhythm keeps three products
@@ -8813,7 +8989,13 @@ _resolveCompactProductGridLayout({
   // The page scroller reserves 8px inside the same viewport. Keep that gutter
   // out of the breakpoint calculation, while card widths use the real space.
   final viewportWidth = constraints.maxWidth + (scrollIndicatorInset ? 8 : 0);
-  final columns = savedOnly
+  final columns = storeProcurement
+      ? (viewportWidth < 340
+            ? 1
+            : viewportWidth < 600
+            ? 2
+            : 3)
+      : savedOnly
       ? viewportWidth >= 320
             ? 2
             : 1

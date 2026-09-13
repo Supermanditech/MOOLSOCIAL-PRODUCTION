@@ -389,6 +389,42 @@ class _CollectionQrFixture extends CustomPainter {
   bool shouldRepaint(_CollectionQrFixture oldDelegate) => false;
 }
 
+class _StorePaymentTermsProbe implements BuyV2CommercialPaymentTermsAdapter {
+  int days = 45, percent = 10, limit = 100000, balanceAdjustment = 0;
+  Set<String> methods = {'UPI'};
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  }) async => BuyV2CommercialPaymentTermsSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    terms: [
+      for (final group in groups)
+        BuyV2CommercialPaymentTerm(
+          id: 'probe',
+          fulfilmentKey: group.key,
+          destination: group.destination,
+          supplierName: group.partner,
+          kind: BuyV2CommercialPaymentTermKind.supplierCredit,
+          orderTotal: quotedTotalsByFulfilmentKey[group.key]!,
+          amountDueNow:
+              (quotedTotalsByFulfilmentKey[group.key]! * percent + 99) ~/ 100,
+          balanceDue:
+              quotedTotalsByFulfilmentKey[group.key]! -
+              (quotedTotalsByFulfilmentKey[group.key]! * percent + 99) ~/ 100 +
+              balanceAdjustment,
+          balanceDueLabel: 'within $days days of confirmed delivery',
+          sourceId: 'TEST-validation-probe',
+          advancePercent: percent,
+          acceptedPaymentMethods: methods,
+          upiTransactionLimit: limit,
+          netDays: days,
+        ),
+    ],
+  );
+}
+
 void main() {
   test(
     'RESTOCK01 review catalogue uses exact existing Store and refuses external actions',
@@ -436,6 +472,69 @@ void main() {
         BuyV2ProcurementEligibility.eligible,
       );
       expect(session.addProduct(product.id), isTrue);
+      final probe = _StorePaymentTermsProbe();
+      final probeIdentity = ValueNotifier(session.procurementContext);
+      final probeCore = BuySession();
+      final probeSession = BuyV2Session(
+        core: probeCore,
+        procurementIdentity: probeIdentity,
+        customerStateStore: _StorePurchaseState(
+          session.procurementContext!.customerStateOwnerScope,
+        ),
+        commerceAdapter: session.commerceAdapter,
+        commercialPaymentTermsAdapter: probe,
+        reviewDataEnabled: false,
+      );
+      addTearDown(probeIdentity.dispose);
+      addTearDown(probeCore.dispose);
+      addTearDown(probeSession.dispose);
+      await probeSession.restoreCommerce();
+      expect(probeSession.addProduct(product.id), isTrue);
+      probeSession.openCart(scope: BuyV2CartScope.wholesale);
+      expect(probeSession.openCheckout(), isTrue);
+      expect(probeSession.choosePayment('UPI'), isTrue);
+      Future<int> acceptedTerms() async {
+        await probeSession.refreshCommercialPaymentTerms();
+        return probeSession
+            .commercialPaymentTermsFor(
+              probeSession.checkoutFulfilmentGroups.single.key,
+            )
+            .length;
+      }
+
+      for (final days in List.generate(45, (index) => index + 1)) {
+        probe.days = days;
+        expect(await acceptedTerms(), 1, reason: 'supplier credit $days days');
+      }
+      for (final days in [0, 46]) {
+        probe.days = days;
+        expect(await acceptedTerms(), 0);
+      }
+      probe.days = 45;
+      for (final percent in [5, 10, 15, 20, 25]) {
+        probe.percent = percent;
+        expect(await acceptedTerms(), 1);
+      }
+      probe.percent = 30;
+      expect(await acceptedTerms(), 0);
+      probe.percent = 10;
+      final due = (probeSession.checkoutPayableTotal * 10 + 99) ~/ 100;
+      probe.limit = due - 1;
+      expect(await acceptedTerms(), 0);
+      probe.limit = due;
+      expect(await acceptedTerms(), 1);
+      probe.limit = 100000;
+      probe.balanceAdjustment = 1;
+      expect(await acceptedTerms(), 0);
+      probe.balanceAdjustment = 0;
+      probe.methods = {'Cheque'};
+      expect(await acceptedTerms(), 0);
+      expect(probeSession.choosePayment('Cheque'), isTrue);
+      expect(await acceptedTerms(), 1);
+      expect(probeSession.choosePayment('PhonePe'), isFalse);
+      probe.methods = {'RTGS'};
+      expect(probeSession.choosePayment('RTGS'), isTrue);
+      expect(await acceptedTerms(), 0, reason: 'Advance is below RTGS minimum');
       expect(
         (await session.commerceAdapter.createAddressRequest()).available,
         isFalse,
@@ -14162,8 +14261,13 @@ void main() {
             bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
         expect(
           find.byKey(const Key('store-restock-review-notice')),
-          enabled ? findsOneWidget : findsNothing,
+          findsNothing,
         );
+        expect(
+          find.byKey(const Key('work-dashboard-inline-search-band')),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('work-dashboard-scan')), findsOneWidget);
         expect(controller.usesReviewCatalogue, enabled);
         expect(
           controller.session!.procurementUnavailableMessage,
@@ -14177,6 +14281,227 @@ void main() {
           );
         }
         expect(tester.takeException(), isNull);
+        if (enabled) {
+          final semantics = tester.ensureSemantics();
+          try {
+            final product = controller.session!.visibleProducts.first;
+            final add = find.byKey(ValueKey('buy-add-${product.id}'));
+            expect(add, findsOneWidget);
+            await tester.ensureVisible(add);
+            await tester.pumpAndSettle();
+            await tester.tap(add);
+            await tester.pumpAndSettle();
+            expect(
+              controller.session!.quantityFor(product.id),
+              product.minimumOrder,
+            );
+            final edit = find.byKey(
+              ValueKey('buy-grid-edit-quantity-${product.id}'),
+            );
+            expect(edit, findsOneWidget);
+            await tester.ensureVisible(edit);
+            await tester.pumpAndSettle();
+            final decrease = find.bySemanticsLabel(
+              'Decrease ${product.title} quantity from ${product.minimumOrder}',
+            );
+            final increase = find.bySemanticsLabel(
+              'Increase ${product.title} quantity from ${product.minimumOrder}',
+            );
+            expect(
+              tester.getCenter(decrease).dy,
+              tester.getCenter(increase).dy,
+            );
+            expect(
+              (tester.getCenter(edit).dy - tester.getCenter(increase).dy).abs(),
+              lessThan(2),
+            );
+            expect(tester.takeException(), isNull);
+          } finally {
+            semantics.dispose();
+          }
+        }
+        for (final list in tester.widgetList<ListView>(find.byType(ListView))) {
+          final key = list.key;
+          if (key is ValueKey<String> &&
+              key.value.startsWith('buy-paged-') &&
+              list.controller?.hasClients == true) {
+            list.controller!.jumpTo(0);
+          }
+        }
+        await tester.pumpAndSettle();
+        await tester.pump(const Duration(seconds: 5));
+        await captureStoreView(
+          tester,
+          'restock-layout-${compact ? 'compact' : 'normal'}',
+        );
+        if (enabled) {
+          await tester.tap(find.byKey(const ValueKey('buy-category-picker')));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-categories-${compact ? 'compact' : 'normal'}',
+          );
+          await tester.tap(find.byKey(const ValueKey('buy-category-close')));
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-filters-${compact ? 'compact' : 'normal'}',
+          );
+          await tester.tap(
+            find.byKey(const ValueKey('buy-discovery-refinement-close')),
+          );
+          await tester.pumpAndSettle();
+          controller.session!.chooseWholesaleSaleType(
+            BuyV2WholesaleSaleType.bulk,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-bulk-${compact ? 'compact' : 'normal'}',
+          );
+          controller.session!.chooseWholesaleSaleType(
+            BuyV2WholesaleSaleType.wholesale,
+          );
+          await tester.pumpAndSettle();
+          expect(
+            controller.session!.openProduct(
+              controller.session!.cartLines.first.product.id,
+            ),
+            isTrue,
+          );
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-product-${compact ? 'compact' : 'normal'}',
+          );
+          controller.session!.closeProduct();
+          await tester.pumpAndSettle();
+          controller.session!.openCart(scope: BuyV2CartScope.wholesale);
+          await tester.pumpAndSettle();
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: 'Embedded Store cart must fit before search opens',
+          );
+          expect(find.text('Shop'), findsNothing);
+          expect(find.text('Wholesale / Bulk'), findsOneWidget);
+          await captureStoreView(
+            tester,
+            'restock-cart-${compact ? 'compact' : 'normal'}',
+          );
+          final purchase = controller.session!;
+          expect(purchase.openCheckout(), isTrue);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-address-${compact ? 'compact' : 'normal'}',
+          );
+          expect(purchase.continueCheckoutFromAddress(), isTrue);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-payment-${compact ? 'compact' : 'normal'}',
+          );
+          expect(purchase.choosePayment('UPI'), isTrue);
+          await purchase.refreshCommercialPaymentTerms();
+          await tester.pumpAndSettle();
+          final group = purchase.checkoutFulfilmentGroups.single;
+          final terms = purchase.commercialPaymentTermsFor(group.key);
+          expect(
+            terms.map((term) => term.advancePercent).toSet(),
+            equals({0, 100}),
+          );
+          expect(terms.where((term) => term.netDays != null), isEmpty);
+          final advance = terms.firstWhere(
+            (term) =>
+                term.kind == BuyV2CommercialPaymentTermKind.paymentOnDelivery,
+          );
+          expect(purchase.chooseCommercialPaymentTerm(advance), isTrue);
+          expect(
+            purchase.checkoutAmountDueNow + purchase.checkoutBalanceDue,
+            purchase.checkoutPayableTotal,
+          );
+          expect(purchase.continueCheckoutFromPayment(), isTrue);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-review-${compact ? 'compact' : 'normal'}',
+          );
+          final termTile = find.byKey(
+            ValueKey('store-payment-selector-${group.key}-${advance.id}'),
+          );
+          await tester.ensureVisible(
+            find.byKey(const ValueKey('buy-checkout-payment-terms')),
+          );
+          await tester.pumpAndSettle();
+          await captureStoreView(
+            tester,
+            'restock-terms-${compact ? 'compact' : 'normal'}',
+          );
+          await tester.ensureVisible(termTile);
+          await tester.tap(termTile);
+          await tester.pumpAndSettle();
+          await captureStoreView(
+            tester,
+            'restock-selector-open-${compact ? 'compact' : 'normal'}',
+          );
+          await tester.tap(find.text('Pay in full').last);
+          await tester.pumpAndSettle();
+          expect(purchase.checkoutAmountDueNow, purchase.checkoutPayableTotal);
+          expect(purchase.chooseCommercialPaymentTerm(advance), isTrue);
+          await tester.pumpAndSettle();
+          expect(tester.takeException(), isNull);
+
+          final originalOrders = purchase.orders
+              .map((order) => order.id)
+              .toList();
+          expect(await purchase.submitOrder(), isFalse);
+          await tester.pumpAndSettle();
+          expect(
+            purchase.orders.map((order) => order.id).toList(),
+            originalOrders,
+          );
+          expect(tester.takeException(), isNull);
+          await captureStoreView(
+            tester,
+            'restock-supplier-unavailable-${compact ? 'compact' : 'normal'}',
+          );
+          controller.session!.openOrders();
+          await tester.pumpAndSettle();
+          await captureStoreView(
+            tester,
+            'restock-orders-${compact ? 'compact' : 'normal'}',
+          );
+          expect(
+            find.byKey(const ValueKey('buy-promotion-orders-shop')),
+            findsNothing,
+          );
+          expect(
+            find.byKey(const ValueKey('buy-promotion-orders-medicine')),
+            findsNothing,
+          );
+          expect(tester.takeException(), isNull);
+          await tester.tap(find.byKey(const Key('work-dashboard-search')));
+          await tester.pumpAndSettle();
+          await tester.enterText(
+            find.byKey(const Key('work-dashboard-search-field')),
+            'sunflower',
+          );
+          await tester.pumpAndSettle();
+          expect(controller.session!.view, BuyV2View.catalogue);
+          expect(controller.session!.destination, BuyV2Destination.wholesale);
+          expect(controller.session!.query, 'sunflower');
+          expect(tester.takeException(), isNull);
+        }
       },
     );
   }
@@ -14241,6 +14566,54 @@ void main() {
         expect(tester.takeException(), isNull);
       },
     );
+  }
+
+  for (final compact in [false, true]) {
+    testWidgets('ORDERTABS Sales and Purchases stay separate $compact', (
+      tester,
+    ) async {
+      final work = liveStore();
+      seedIncomingOrder(work, stage: 'Preparing');
+      final salesIds = work.visibleWorkspaceOrders
+          .map((order) => order.id)
+          .toList();
+      final purchaseIds = work.workspacePurchases
+          .map((order) => order.shipmentId)
+          .toList();
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard?section=dashboard',
+        work: work,
+        viewport: compact ? const Size(320, 568) : const Size(360, 800),
+        textScale: compact ? 2 : 1.4,
+      );
+      await tester.tap(find.byKey(const Key('work-store-orders')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      await captureStoreView(
+        tester,
+        'orders-sales-${compact ? 'compact' : 'normal'}',
+      );
+      await tester.tap(find.text('Purchases').hitTestable());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsNothing);
+      expect(find.text('Purchase updates unavailable'), findsOneWidget);
+      expect(work.visibleWorkspaceOrders.map((order) => order.id), salesIds);
+      expect(
+        work.workspacePurchases.map((order) => order.shipmentId),
+        purchaseIds,
+      );
+      await captureStoreView(
+        tester,
+        'orders-purchases-${compact ? 'compact' : 'normal'}',
+      );
+      await tester.tap(find.text('Sales').hitTestable());
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-orders-destination')), findsOneWidget);
+      expect(find.text('Purchase updates unavailable'), findsNothing);
+      expect(work.visibleWorkspaceOrders.map((order) => order.id), salesIds);
+      expect(tester.takeException(), isNull);
+    });
   }
 
   testWidgets('leaving an operation clears its action error', (tester) async {

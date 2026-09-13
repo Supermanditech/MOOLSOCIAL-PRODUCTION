@@ -486,7 +486,9 @@ class _WorkWorkspaceDashboardScreenState
   _WorkspaceOperation? _operationReturnOperation;
   ({String? workspaceId, String? orderId})? _counterOrderOrigin;
   Timer? _procurementRevealTimer;
+  bool _ordersPurchases = false;
   bool _procurementReady = false;
+  bool _procurementSearchOpen = false;
   _WorkspaceOperation? _procurementReturnOperation;
   String? _procurementProductId;
   WorkspacePurchaseRecord? _trackedPurchase;
@@ -973,7 +975,8 @@ class _WorkWorkspaceDashboardScreenState
         _view == _WorkspaceControlView.dashboard ||
         _view == _WorkspaceControlView.search ||
         _view == _WorkspaceControlView.alerts ||
-        _view == _WorkspaceControlView.operation;
+        _view == _WorkspaceControlView.operation ||
+        _view == _WorkspaceControlView.procurement;
 
     final saleOpen =
         _view == _WorkspaceControlView.operation &&
@@ -997,48 +1000,33 @@ class _WorkWorkspaceDashboardScreenState
         )..layout(
           maxWidth:
               (MediaQuery.sizeOf(context).width -
-                      (procurementOpen
-                          ? 72 + MediaQuery.paddingOf(context).horizontal
-                          : 127) -
-                      (!procurementOpen && hasHeaderBack ? 47 : 0))
+                      127 -
+                      (hasHeaderBack ? 47 : 0))
                   .clamp(64.0, double.infinity),
         );
     final storeHeaderHeight =
         47 + (namePainter.height + 8).clamp(44.0, double.infinity);
-    final procurementHeaderHeight = (namePainter.height + 16).clamp(
-      48.0,
-      double.infinity,
-    );
     namePainter.dispose();
     return WorkPageScaffold(
       session: session,
       title: title,
       subtitle: subtitle,
-      headerHeight: procurementOpen
-          ? procurementHeaderHeight
-          : storeRootSurface
-          ? storeHeaderHeight
-          : 88,
-      headerTitle: procurementOpen
-          ? Text(
-              workspace.name,
-              key: const Key('work-procurement-store-name'),
-              softWrap: true,
-              overflow: TextOverflow.clip,
-              textScaler: MediaQuery.textScalerOf(context),
-              style: Theme.of(context).textTheme.titleLarge!.copyWith(
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-              ),
-            )
-          : storeRootSurface
+      headerHeight: storeRootSurface ? storeHeaderHeight : 88,
+      headerTitle: storeRootSurface
           ? _WorkspaceDashboardHeader(
               session: session,
               workspace: workspace,
               profile: profile,
-              searchOpen: _view == _WorkspaceControlView.search || saleOpen,
-              keepSearchUtilities: saleOpen,
-              searchHint: saleOpen ? 'Search products' : 'Search your store',
+              searchOpen:
+                  _view == _WorkspaceControlView.search ||
+                  saleOpen ||
+                  (procurementOpen && _procurementSearchOpen),
+              keepSearchUtilities: saleOpen || procurementOpen,
+              searchHint: procurementOpen
+                  ? 'Search wholesale or bulk'
+                  : saleOpen
+                  ? 'Search products'
+                  : 'Search your store',
               searchController: saleOpen
                   ? _saleSearchController
                   : _searchController,
@@ -1051,8 +1039,28 @@ class _WorkWorkspaceDashboardScreenState
                   : _reviewedOrder != null
                   ? _closeOrderDetails
                   : null,
-              onSearch: saleOpen ? _searchFocus.requestFocus : _showSearch,
-              onSearchChanged: saleOpen
+              onSearch: procurementOpen
+                  ? () {
+                      if (_activeProcurement.view != BuyV2View.catalogue ||
+                          _activeProcurement.destination !=
+                              BuyV2Destination.wholesale) {
+                        _activeProcurement.openDestination(
+                          BuyV2Destination.wholesale,
+                        );
+                      }
+                      _searchController.text = _activeProcurement.query;
+                      setState(() => _procurementSearchOpen = true);
+                      _searchFocus.requestFocus();
+                    }
+                  : saleOpen
+                  ? _searchFocus.requestFocus
+                  : _showSearch,
+              onSearchChanged: procurementOpen
+                  ? (query) {
+                      _activeProcurement.updateQuery(query);
+                      setState(() {});
+                    }
+                  : saleOpen
                   ? (_) => setState(() {})
                   : (query) {
                       if (_searchScroll.hasClients) _searchScroll.jumpTo(0);
@@ -1060,6 +1068,27 @@ class _WorkWorkspaceDashboardScreenState
                     },
               onCloseSearch: saleOpen ? _searchFocus.unfocus : _finishSearch,
               onScan: () {
+                if (procurementOpen) {
+                  final purchase = _activeProcurement;
+                  unawaited(
+                    showBuyV2ProductScanner(context).then((code) {
+                      if (!mounted ||
+                          code == null ||
+                          _activeProcurement != purchase ||
+                          _view != _WorkspaceControlView.procurement) {
+                        return;
+                      }
+                      if (purchase.view != BuyV2View.catalogue ||
+                          purchase.destination != BuyV2Destination.wholesale) {
+                        purchase.openDestination(BuyV2Destination.wholesale);
+                      }
+                      _searchController.text = code;
+                      purchase.updateQuery(code);
+                      setState(() => _procurementSearchOpen = true);
+                    }),
+                  );
+                  return;
+                }
                 if (saleOpen) {
                   unawaited(_counterKey.currentState?._scanProduct());
                   return;
@@ -1123,9 +1152,7 @@ class _WorkWorkspaceDashboardScreenState
       bottomAction: bottomAction,
       body: _StoreFirstTapAccess(
         keyboardVisible: MediaQuery.viewInsetsOf(context).bottom > 0,
-        enabled:
-            _view == _WorkspaceControlView.operation ||
-            _view == _WorkspaceControlView.procurement,
+        enabled: _view == _WorkspaceControlView.operation,
         active: _view == _WorkspaceControlView.procurement
             ? (_trackedPurchase == null ? 'restock' : 'sourcing')
             : _operation.name,
@@ -1302,31 +1329,17 @@ class _WorkWorkspaceDashboardScreenState
                 onExit: _leaveProcurement,
                 onDestinationChanged: _handleProcurementDestinationChanged,
               );
-              if (_storeProcurement?.usesReviewCatalogue != true) {
-                return surface;
-              }
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Material(
-                    color: Colors.white,
-                    child: Padding(
-                      padding: EdgeInsets.all(12),
-                      child: Text(
-                        'Test catalogue · No real orders, payments or messages',
-                        key: Key('store-restock-review-notice'),
-                      ),
-                    ),
-                  ),
-                  Expanded(child: surface),
-                ],
-              );
+              return surface;
             },
           ),
           _WorkspaceControlView.operation when _focusedFinance != null =>
             _StoreFinanceSurface(session: session, focus: _focusedFinance),
           _WorkspaceControlView.operation => _WorkspaceOperationSurface(
             operation: _operation,
+            ordersPurchases: _ordersPurchases,
+            onOrdersTabChanged: (value) => setState(() {
+              _ordersPurchases = value;
+            }),
             focusedOrderId: _focusedOrderId,
             focusedCustomerId: _focusedCustomerId,
             session: session,
@@ -1724,6 +1737,9 @@ class _WorkWorkspaceDashboardScreenState
       _releaseDirectFilter();
     }
     setState(() {
+      if (operation == _WorkspaceOperation.orders && focusedOrderId != null) {
+        _ordersPurchases = false;
+      }
       _focusedOrderId = focusedOrderId;
       _focusedCustomerId = focusedCustomerId;
       _focusedFinance = focusedFinance;
@@ -1849,6 +1865,11 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _showPurchaseTracking(String shipmentId) async {
+    final returnOperation =
+        _view == _WorkspaceControlView.operation &&
+            _operation == _WorkspaceOperation.orders
+        ? _WorkspaceOperation.orders
+        : _WorkspaceOperation.sourcing;
     final purchase = session.workspacePurchases
         .where((record) => record.shipmentId == shipmentId)
         .firstOrNull;
@@ -1873,7 +1894,7 @@ class _WorkWorkspaceDashboardScreenState
       final opened = await controller.open(
         purpose: context.purpose,
         exactContext: context,
-        returnTo: _WorkspaceOperation.sourcing.name,
+        returnTo: returnOperation.name,
       );
       if (!mounted) return;
       if (!opened) {
@@ -1898,7 +1919,7 @@ class _WorkWorkspaceDashboardScreenState
       return;
     }
     setState(() {
-      _procurementReturnOperation = _WorkspaceOperation.sourcing;
+      _procurementReturnOperation = returnOperation;
       _procurementProductId = null;
       _procurementReady = true;
       _view = _WorkspaceControlView.procurement;
@@ -2042,6 +2063,7 @@ class _WorkWorkspaceDashboardScreenState
 
   Future<void> _leaveOperation() async {
     if ((_operation == _WorkspaceOperation.sourcing ||
+            (_operation == _WorkspaceOperation.orders && _ordersPurchases) ||
             _operation == _WorkspaceOperation.statement) &&
         session.focusedWorkspacePurchaseId != null) {
       session.clearWorkspacePurchaseSelection();
@@ -2546,7 +2568,9 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
       builder: (context, constraints) {
         // Buy hides its own footer while typing. Keep the same subtree through
         // every inset change; only move its unneeded footer outside the clip.
-        final crop = keyboardVisible ? 0.0 : navigationHeight;
+        final crop = widget.session.isStoreProcurement || keyboardVisible
+            ? 0.0
+            : navigationHeight;
         final height = constraints.maxHeight + crop;
         return Stack(
           key: const Key('work-store-procurement-screen'),
@@ -2561,11 +2585,17 @@ class _StoreProcurementSurfaceState extends State<_StoreProcurementSurface> {
                     height: height,
                     child: MediaQuery(
                       data: media.copyWith(
-                        size: Size(media.size.width, media.size.height + crop),
+                        size: Size(
+                          media.size.width,
+                          session.isStoreProcurement
+                              ? height
+                              : media.size.height + crop,
+                        ),
                       ),
                       child: BuyV2Screen(
                         key: const ValueKey('work-store-procurement-buy-host'),
                         session: session,
+                        embeddedStore: session.isStoreProcurement,
                         accountIdentity: accountIdentity,
                         accountAuthenticated: accountAuthenticated,
                         initialDestination: _initialDestination,
@@ -2956,7 +2986,7 @@ class _WorkspaceDashboardHeader extends StatelessWidget {
                                             fit: BoxFit.scaleDown,
                                             alignment: Alignment.centerLeft,
                                             child: Text(
-                                              'Search your store',
+                                              searchHint,
                                               maxLines: 1,
                                               style: const TextStyle(
                                                 color: MoolColors.muted,
@@ -10565,6 +10595,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
     required this.saleQuery,
     required this.requirementDraft,
     required this.stockStatementBookmark,
+    required this.ordersPurchases,
+    required this.onOrdersTabChanged,
     required this.onOpenStore,
     required this.onOpenOperation,
     required this.onOpenRoute,
@@ -10582,6 +10614,8 @@ class _WorkspaceOperationSurface extends StatelessWidget {
   final String saleQuery;
   final Map<String, String> requirementDraft;
   final _StockStatementBookmark stockStatementBookmark;
+  final bool ordersPurchases;
+  final ValueChanged<bool> onOrdersTabChanged;
   final VoidCallback onOpenStore;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final ValueChanged<String> onOpenRoute;
@@ -10806,12 +10840,52 @@ class _WorkspaceOperationSurface extends StatelessWidget {
       );
     }
     if (operation == _WorkspaceOperation.orders) {
-      return _OrdersDestinationSurface(
-        session: session,
-        orderId: focusedOrderId,
-        onOpenCollection: onOpenStore,
-        onCreateOrder: () => onOpenOperation(_WorkspaceOperation.counterOrder),
-        onOpenDelivery: () => onOpenOperation(_WorkspaceOperation.delivery),
+      return Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<bool>(
+                key: const Key('work-orders-tabs'),
+                style: SegmentedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 8,
+                  ),
+                  textStyle: Theme.of(context).textTheme.labelLarge!.copyWith(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                segments: const [
+                  ButtonSegment(value: false, label: Text('Sales')),
+                  ButtonSegment(value: true, label: Text('Purchases')),
+                ],
+                selected: {ordersPurchases},
+                showSelectedIcon: false,
+                onSelectionChanged: (selection) =>
+                    onOrdersTabChanged(selection.single),
+              ),
+            ),
+          ),
+          Expanded(
+            child: ordersPurchases
+                ? _StorePurchasesSurface(
+                    session: session,
+                    onTrackPurchase: onTrackPurchase,
+                  )
+                : _OrdersDestinationSurface(
+                    session: session,
+                    orderId: focusedOrderId,
+                    onOpenCollection: onOpenStore,
+                    onCreateOrder: () =>
+                        onOpenOperation(_WorkspaceOperation.counterOrder),
+                    onOpenDelivery: () =>
+                        onOpenOperation(_WorkspaceOperation.delivery),
+                  ),
+          ),
+        ],
       );
     }
     if (operation == _WorkspaceOperation.counterOrder) {

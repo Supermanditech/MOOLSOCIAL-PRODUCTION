@@ -274,6 +274,7 @@ class BuyV2Screen extends StatefulWidget {
     required this.session,
     this.accountIdentity,
     this.accountAuthenticated = false,
+    this.embeddedStore = false,
     this.initialDestination = BuyV2Destination.shop,
     this.initialOffersActive = false,
     this.initialView = BuyV2View.catalogue,
@@ -300,6 +301,7 @@ class BuyV2Screen extends StatefulWidget {
   final BuyV2Session session;
   final AuthenticatedAccountIdentity? accountIdentity;
   final bool accountAuthenticated;
+  final bool embeddedStore;
   final BuyV2Destination initialDestination;
   final bool initialOffersActive;
   final BuyV2View initialView;
@@ -1045,7 +1047,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                 ),
               ),
               child: SafeArea(
-                bottom: true,
+                top: !widget.embeddedStore,
+                bottom: !widget.embeddedStore,
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(
@@ -1062,7 +1065,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                         child: _buildScreenLayout(
                           scrollHeader: shortLandscapeCatalogue,
                           header: [
-                            if (session.view == BuyV2View.catalogue)
+                            if (session.view == BuyV2View.catalogue &&
+                                !widget.embeddedStore)
                               _BuySearchBand(
                                 session: session,
                                 offersActive: _offersActive,
@@ -1179,7 +1183,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            bottomNavigationBar: keyboardVisible
+            bottomNavigationBar: keyboardVisible || widget.embeddedStore
                 ? null
                 : _buildDestinationNavigation(
                     session,
@@ -1352,7 +1356,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           _quickTrackerMinimized ||
           _quickTrackerHidden ||
           _quickTrackerKept ||
-        _deliveryPickerOpen ||
+          _deliveryPickerOpen ||
           _quickTrackerPointers.isNotEmpty) {
         return;
       }
@@ -1544,7 +1548,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                           TextButton.icon(
                             key: const ValueKey('buy-delivery-picker-toggle'),
                             onPressed: () {
-                              update(() => _deliveryPickerOpen = !_deliveryPickerOpen);
+                              update(
+                                () =>
+                                    _deliveryPickerOpen = !_deliveryPickerOpen,
+                              );
                               _scheduleQuickTrackerCollapse(update);
                             },
                             icon: const Icon(Icons.list_alt_outlined),
@@ -1574,7 +1581,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                         ],
                         _BuyQuickDeliveryStatusBar(
                           order: order,
-                          arrivalSummary: buyV2OrderArrivalSummary(widget.session, order),
+                          arrivalSummary: buyV2OrderArrivalSummary(
+                            widget.session,
+                            order,
+                          ),
                           artwork: _deliveryArtwork(order),
                           minimized: false,
                           kept: _quickTrackerKept,

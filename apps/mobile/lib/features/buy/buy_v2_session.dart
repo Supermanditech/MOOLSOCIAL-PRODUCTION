@@ -3606,6 +3606,19 @@ class BuyV2Session extends ChangeNotifier {
     'Purchase order',
   };
 
+  static const Set<String> storePaymentMethods = {
+    'UPI',
+    'Cheque',
+    'Bank transfer',
+    'NEFT',
+    'RTGS',
+    'Cash',
+    'Purchase order',
+  };
+
+  Set<String> get supportedPaymentMethods =>
+      isStoreProcurement ? storePaymentMethods : paymentMethods;
+
   BuyV2CommerceLoadState commerceLoadState = BuyV2CommerceLoadState.ready;
   BuyV2CheckoutSubmissionState checkoutSubmissionState =
       BuyV2CheckoutSubmissionState.idle;
@@ -3929,8 +3942,12 @@ class BuyV2Session extends ChangeNotifier {
     _persistCustomerState();
   }
 
-  void _discardSubmittedReviewDraft(String productId, int rating,
-      String comment, String? ownerScope) {
+  void _discardSubmittedReviewDraft(
+    String productId,
+    int rating,
+    String comment,
+    String? ownerScope,
+  ) {
     if (ownerScope != reviewDraftOwnerScope) return;
     final draft = productReviewDraft(productId);
     if (draft?.rating != rating || draft?.comment.trim() != comment.trim()) return;
@@ -4793,7 +4810,11 @@ class BuyV2Session extends ChangeNotifier {
       _reviewableProductIds
         ..clear()
         ..addAll(snapshot.reviewableProductIds);
-      availablePaymentMethods = Set.unmodifiable(snapshot.paymentMethods);
+      availablePaymentMethods = Set.unmodifiable(
+        isStoreProcurement
+            ? snapshot.paymentMethods.where(supportedPaymentMethods.contains)
+            : snapshot.paymentMethods,
+      );
       _selectedAddressId = snapshot.selectedAddressId;
       if (_selectedAddressId != null &&
           !_addresses.any((address) => address.id == _selectedAddressId)) {
@@ -5561,7 +5582,9 @@ class BuyV2Session extends ChangeNotifier {
     _ensureReviewDraftOwner();
     _reviewDrafts
       ..clear()
-      ..addEntries(snapshot.reviewDrafts.entries.where((entry) => entry.value.valid));
+      ..addEntries(
+        snapshot.reviewDrafts.entries.where((entry) => entry.value.valid),
+      );
     final validSavedKeys = _knownCatalogueProducts.map(_buyV2SavedKey).toSet();
     _savedKeys
       ..clear()
@@ -5575,7 +5598,7 @@ class BuyV2Session extends ChangeNotifier {
       ..addAll(snapshot.deliveryInstructionIds);
     final storedPayment = snapshot.selectedPayment;
     if (storedPayment != null &&
-        paymentMethods.contains(storedPayment) &&
+        supportedPaymentMethods.contains(storedPayment) &&
         availablePaymentMethods.contains(storedPayment)) {
       selectedPayment = storedPayment;
     }
@@ -7041,7 +7064,7 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool get checkoutPaymentTermsReviewRequired {
-    if (!commercialPaymentTermsEnabled) return false;
+    if (!commercialPaymentTermsEnabled) return isStoreProcurement;
     if (commercialPaymentTermsLoadState != BuyV2CommerceLoadState.ready) {
       return true;
     }
@@ -7196,6 +7219,44 @@ class BuyV2Session extends ChangeNotifier {
         term.balanceDueLabel.trim().isEmpty) {
       return false;
     }
+    if (isStoreProcurement) {
+      if (group.destination != BuyV2Destination.wholesale ||
+          term.kind == BuyV2CommercialPaymentTermKind.regulatedCredit ||
+          term.kind == BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch ||
+          (term.kind != BuyV2CommercialPaymentTermKind.supplierCredit && term.netDays != null) ||
+          !term.acceptedPaymentMethods.contains(selectedPayment) ||
+          term.acceptedPaymentMethods.any(
+            (method) => !storePaymentMethods.contains(method),
+          ) ||
+          (term.netDays != null && (term.netDays! < 1 || term.netDays! > 45))) {
+        return false;
+      }
+      if (selectedPayment == 'UPI' &&
+          term.amountDueNow > 0 &&
+          (term.upiTransactionLimit == null ||
+              term.upiTransactionLimit! <= 0 ||
+              term.amountDueNow > term.upiTransactionLimit!)) {
+        return false;
+      }
+      if (selectedPayment == 'RTGS' &&
+          term.amountDueNow > 0 &&
+          term.amountDueNow < 200000) {
+        return false;
+      }
+      final percent = term.advancePercent;
+      if (term.kind ==
+              BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery ||
+          (term.kind == BuyV2CommercialPaymentTermKind.supplierCredit &&
+              term.amountDueNow > 0)) {
+        if (!const {5, 10, 15, 20, 25}.contains(percent) ||
+            term.amountDueNow != (expectedTotal * percent! + 99) ~/ 100) {
+          return false;
+        }
+      } else if (percent != null &&
+          percent != (term.amountDueNow == expectedTotal ? 100 : 0)) {
+        return false;
+      }
+    }
     if (group.destination != BuyV2Destination.wholesale) {
       return term.kind == BuyV2CommercialPaymentTermKind.retailAdvance &&
           term.amountDueNow == expectedTotal &&
@@ -7208,6 +7269,11 @@ class BuyV2Session extends ChangeNotifier {
       BuyV2CommercialPaymentTermKind.bookingBalanceBeforeDispatch ||
       BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
         term.amountDueNow > 0 && term.balanceDue > 0,
+      BuyV2CommercialPaymentTermKind.paymentOnDelivery =>
+        isStoreProcurement &&
+            term.amountDueNow == 0 &&
+            term.balanceDue == expectedTotal &&
+            term.netDays == null,
       BuyV2CommercialPaymentTermKind.supplierCredit =>
         term.netDays != null &&
             term.netDays! >= 1 &&
@@ -7249,6 +7315,8 @@ class BuyV2Session extends ChangeNotifier {
           'Booking amount with balance before dispatch',
         BuyV2CommercialPaymentTermKind.bookingBalanceOnDelivery =>
           'Booking amount with balance at delivery',
+        BuyV2CommercialPaymentTermKind.paymentOnDelivery =>
+          'Payment at delivery',
         BuyV2CommercialPaymentTermKind.supplierCredit => 'Supplier credit',
         BuyV2CommercialPaymentTermKind.regulatedCredit =>
           'Financial partner credit',
@@ -9645,7 +9713,12 @@ class BuyV2Session extends ChangeNotifier {
       comment: cleanComment,
       updatedLabel: 'Added just now',
     );
-    _discardSubmittedReviewDraft(productId, rating, comment, reviewDraftOwnerScope);
+    _discardSubmittedReviewDraft(
+      productId,
+      rating,
+      comment,
+      reviewDraftOwnerScope,
+    );
     notice = 'Your review was added.';
     notifyListeners();
     return true;
@@ -9718,7 +9791,12 @@ class BuyV2Session extends ChangeNotifier {
           comment: cleanComment,
           updatedLabel: 'Added just now',
         );
-        _discardSubmittedReviewDraft(productId, rating, comment, draftOwnerScope);
+        _discardSubmittedReviewDraft(
+          productId,
+          rating,
+          comment,
+          draftOwnerScope,
+        );
       }
       notice = result.customerMessage;
       return result.accepted;
@@ -10541,7 +10619,7 @@ class BuyV2Session extends ChangeNotifier {
         const {'Cash on Delivery', 'Purchase order'}.contains(value)) {
       return false;
     }
-    if (!paymentMethods.contains(value) ||
+    if (!supportedPaymentMethods.contains(value) ||
         !availablePaymentMethods.contains(value)) {
       notice = 'This payment method is not available.';
       notifyListeners();
@@ -10591,6 +10669,11 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   bool confirmOrder() {
+    if (isStoreProcurement && checkoutPaymentTermsReviewRequired) {
+      notice = 'Supplier payment terms must be confirmed before ordering.';
+      notifyListeners();
+      return false;
+    }
     if (!_allowProcurementLines(checkoutLines)) return false;
     if (checkoutBusy || checkoutRequiresResolution) return false;
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
@@ -10686,6 +10769,11 @@ class BuyV2Session extends ChangeNotifier {
   }
 
   Future<bool> submitOrder() {
+    if (isStoreProcurement && !commercialPaymentTermsEnabled) {
+      notice = 'Supplier payment terms are unavailable. Your cart is retained.';
+      notifyListeners();
+      return Future<bool>.value(false);
+    }
     if (_holdCheckoutForCustomerRecovery()) return Future<bool>.value(false);
     if (collectionCheckoutSelected || collectionCheckout?.unresolved == true) {
       return submitCollectionPurchase();
@@ -11086,7 +11174,7 @@ class BuyV2Session extends ChangeNotifier {
   bool _validBankTransferAction(BuyV2OrderPlacementResult placement) {
     final instructions = placement.bankTransferInstructions;
     final reference = placement.paymentReference?.trim();
-    return selectedPayment == 'Bank transfer' &&
+    return const {'Bank transfer', 'NEFT', 'RTGS'}.contains(selectedPayment) &&
         instructions != null &&
         instructions.beneficiaryName.trim().isNotEmpty &&
         instructions.bankName.trim().isNotEmpty &&
@@ -11100,7 +11188,7 @@ class BuyV2Session extends ChangeNotifier {
 
   bool markBankTransferSent() {
     if (checkoutBusy ||
-        selectedPayment != 'Bank transfer' ||
+        !const {'Bank transfer', 'NEFT', 'RTGS'}.contains(selectedPayment) ||
         checkoutSubmissionState !=
             BuyV2CheckoutSubmissionState.paymentActionRequired ||
         _bankTransferInstructions == null ||

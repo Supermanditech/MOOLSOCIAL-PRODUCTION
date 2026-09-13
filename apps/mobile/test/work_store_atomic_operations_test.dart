@@ -495,6 +495,72 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  test(
+    'Supplier payment access is specific to supplier, account and Store',
+    () {
+      final access = WorkSupplierPaymentAccess(
+        supplierId: 'supplier-A',
+        publicTermIds: {'full-payment'},
+        storeTermIds: {
+          ('account-A', 'store-A'): {'credit-30'},
+        },
+      );
+      expect(
+        access.permits(
+          'full-payment',
+          supplier: 'supplier-A',
+          account: 'account-B',
+          store: 'store-B',
+        ),
+        isTrue,
+      );
+      expect(
+        access.permits(
+          'credit-30',
+          supplier: 'supplier-A',
+          account: 'account-A',
+          store: 'store-A',
+        ),
+        isTrue,
+      );
+      expect(
+        access.permits(
+          'credit-30',
+          supplier: 'supplier-A',
+          account: 'account-B',
+          store: 'store-A',
+        ),
+        isFalse,
+      );
+      expect(
+        access.permits(
+          'credit-30',
+          supplier: 'supplier-A',
+          account: 'account-A',
+          store: 'store-B',
+        ),
+        isFalse,
+      );
+      expect(
+        access.permits(
+          'full-payment',
+          supplier: 'supplier-B',
+          account: 'account-A',
+          store: 'store-A',
+        ),
+        isFalse,
+      );
+      expect(
+        access.permits(
+          'credit-45',
+          supplier: 'supplier-A',
+          account: 'account-A',
+          store: 'store-A',
+        ),
+        isFalse,
+      );
+    },
+  );
   group('Store procurement controller', () {
     late String account, store;
     late _ProcurementBookmarks bookmarks;
