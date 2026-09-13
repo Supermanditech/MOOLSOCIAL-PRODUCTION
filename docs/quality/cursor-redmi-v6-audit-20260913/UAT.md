@@ -1043,51 +1043,51 @@ Source hashes bind the following index to the inspected files:
 | SRC-0440 | buy_v2_views.dart:13693 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-012; ROUND55-04..06; ROUND93-01 empty-draft Clear disabled; other combinations unqualified |
 | SRC-0441 | buy_v2_views.dart:13711 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-003/006/008/009/011/012 and ROUND55/59/60 Apply; stale-scope disabled state unqualified |
 | SRC-0442 | buy_v2_views.dart:13792 | _DiscoveryChoice | onTap | Reusable choice dispatch; counted through parent sort/price/pack/brand controls, not another journey |
-| SRC-0443 | buy_v2_views.dart:13849 | _BuyV2FilterToolAction | onTap | unclassified |
-| SRC-0444 | buy_v2_views.dart:13858 | _BuyV2FilterToolAction | onTap | unclassified |
-| SRC-0445 | buy_v2_views.dart:13922 | _BuyV2FilterOption | onTap | unclassified |
-| SRC-0446 | buy_v2_views.dart:13935 | _BuyV2FilterOption | onTap | unclassified |
-| SRC-0447 | buy_v2_views.dart:14062 | showBuyV2PaymentSheet | onPressed | unclassified |
-| SRC-0448 | buy_v2_views.dart:14094 | showBuyV2PaymentSheet | onTap | unclassified |
-| SRC-0449 | buy_v2_views.dart:14139 | _BuyV2PaymentChoice | onTap | unclassified |
-| SRC-0450 | buy_v2_views.dart:14153 | _BuyV2PaymentChoice | onTap | unclassified |
-| SRC-0451 | buy_v2_views.dart:14288 | showBuyV2PrescriptionSheet | onPressed | unclassified |
-| SRC-0452 | buy_v2_views.dart:14345 | showBuyV2PrescriptionSheet | onTap | unclassified |
-| SRC-0453 | buy_v2_views.dart:14355 | showBuyV2PrescriptionSheet | onTap | unclassified |
-| SRC-0454 | buy_v2_views.dart:14362 | showBuyV2PrescriptionSheet | onTap | unclassified |
-| SRC-0455 | buy_v2_views.dart:14481 | showBuyV2AddressSheet | onPressed | unclassified |
-| SRC-0456 | buy_v2_views.dart:14530 | showBuyV2AddressSheet | onTap | unclassified |
-| SRC-0457 | buy_v2_views.dart:14549 | showBuyV2AddressSheet | onPressed | unclassified |
-| SRC-0458 | buy_v2_views.dart:14557 | showBuyV2AddressSheet | onPressed | unclassified |
-| SRC-0459 | buy_v2_views.dart:14577 | showBuyV2AddressSheet | onPressed | unclassified |
-| SRC-0460 | buy_v2_views.dart:14589 | showBuyV2AddressSheet | onPressed | unclassified |
-| SRC-0461 | buy_v2_views.dart:14653 | _BuyV2AddressChoice | onTap | unclassified |
-| SRC-0462 | buy_v2_views.dart:14657 | _BuyV2AddressChoice | onTap | unclassified |
-| SRC-0463 | buy_v2_views.dart:14764 | _BuyV2AddressChoice | onTap | unclassified |
-| SRC-0464 | buy_v2_views.dart:14769 | _BuyV2AddressChoice | onSelected | unclassified |
-| SRC-0465 | buy_v2_views.dart:15010 | _BuyV2AddressRequestFormState | onTap | unclassified |
-| SRC-0466 | buy_v2_views.dart:15017 | _BuyV2AddressRequestFormState | onTap | unclassified |
-| SRC-0467 | buy_v2_views.dart:15027 | _BuyV2AddressRequestFormState | onPressed | unclassified |
-| SRC-0468 | buy_v2_views.dart:15278 | _BuyV2AddAddressFormState | onSelected | unclassified |
-| SRC-0469 | buy_v2_views.dart:15346 | _BuyV2AddAddressFormState | onPressed | unclassified |
-| SRC-0470 | buy_v2_views.dart:15393 | _AddressFormHeader | onPressed | unclassified |
-| SRC-0471 | buy_v2_views.dart:15426 | _ReturnAffordance | onTap | unclassified |
-| SRC-0472 | buy_v2_views.dart:15468 | _ReturnAffordance | onTap | unclassified |
-| SRC-0473 | buy_v2_views.dart:15650 | _DecisionActionRow | onTap | unclassified |
-| SRC-0474 | buy_v2_views.dart:15656 | _DecisionActionRow | onTap | unclassified |
-| SRC-0475 | buy_v2_views.dart:15780 | _ProductOwnedActionPanel | onTap | unclassified |
-| SRC-0476 | buy_v2_views.dart:15788 | _ProductOwnedActionPanel | onPressed | unclassified |
-| SRC-0477 | buy_v2_views.dart:15982 | _ProductPurchaseActionRow | onTap | unclassified |
-| SRC-0478 | buy_v2_views.dart:15986 | _ProductPurchaseActionRow | onPressed | unclassified |
-| SRC-0479 | buy_v2_views.dart:16141 | _QuantityEditorState | onChanged | unclassified |
-| SRC-0480 | buy_v2_views.dart:16144 | _QuantityEditorState | onSubmitted | unclassified |
-| SRC-0481 | buy_v2_views.dart:16149 | _QuantityEditorState | onPressed | unclassified |
-| SRC-0482 | buy_v2_views.dart:16152 | _QuantityEditorState | onPressed | unclassified |
-| SRC-0483 | buy_v2_views.dart:16214 | _CompactProductStepper | onPressed | unclassified |
-| SRC-0484 | buy_v2_views.dart:16225 | _CompactProductStepper | onPressed | unclassified |
-| SRC-0485 | buy_v2_views.dart:16253 | _CompactProductStepper | onPressed | unclassified |
-| SRC-0486 | buy_v2_views.dart:16360 | _CartScopeBar | onTap | unclassified |
-| SRC-0487 | buy_v2_views.dart:16594 | _CartBenefitPanel | onTap | unclassified |
+| SRC-0443 | buy_v2_views.dart:13849 | _BuyV2FilterToolAction | onTap | unverified accessibility semantics activation; tool destinations separately indexed SRC0051-0056 |
+| SRC-0444 | buy_v2_views.dart:13858 | _BuyV2FilterToolAction | onTap | forwarder to filter tool action; RECENT-ROUND45-01 expansion is not every tool destination |
+| SRC-0445 | buy_v2_views.dart:13922 | _BuyV2FilterOption | onTap | unverified accessibility semantics activation; pointer filters separately indexed SRC0426-0442 |
+| SRC-0446 | buy_v2_views.dart:13935 | _BuyV2FilterOption | onTap | pointer forwarder to filter choice; scoped filter evidence only; all option values not inferred |
+| SRC-0447 | buy_v2_views.dart:14062 | showBuyV2PaymentSheet | onPressed | pending exact payment sheet X closure; selection/Android Back do not prove X |
+| SRC-0448 | buy_v2_views.dart:14094 | showBuyV2PaymentSheet | onTap | CHECKOUT-004 Paytm choice device pass capture087; other runtime payment choices unverified |
+| SRC-0449 | buy_v2_views.dart:14139 | _BuyV2PaymentChoice | onTap | unverified accessibility semantics activation for payment choices |
+| SRC-0450 | buy_v2_views.dart:14153 | _BuyV2PaymentChoice | onTap | pointer forwarder to payment choice SRC0448; Paytm only directly qualified |
+| SRC-0451 | buy_v2_views.dart:14288 | showBuyV2PrescriptionSheet | onPressed | Medicine prescription boundary BOUNDARY-ROUND36-01; downstream prescription sheet outside public Shop audit |
+| SRC-0452 | buy_v2_views.dart:14345 | showBuyV2PrescriptionSheet | onTap | Medicine saved prescription approval outside scoped Shop; no approval performed |
+| SRC-0453 | buy_v2_views.dart:14355 | showBuyV2PrescriptionSheet | onTap | Medicine saved prescription approval outside scoped Shop; no approval performed |
+| SRC-0454 | buy_v2_views.dart:14362 | showBuyV2PrescriptionSheet | onTap | Medicine prescription attachment outside scoped Shop; no attachment performed |
+| SRC-0455 | buy_v2_views.dart:14481 | showBuyV2AddressSheet | onPressed | pending exact address selector X; nested Android Back evidence is distinct |
+| SRC-0456 | buy_v2_views.dart:14530 | showBuyV2AddressSheet | onTap | AUDIT-ROUND40-08 and ADDR-ROUND57-04 restore original Work selection; other entries not inferred |
+| SRC-0457 | buy_v2_views.dart:14549 | showBuyV2AddressSheet | onPressed | AUDIT-ROUND40-06 isolated address removal cancellation captures458-460; originals preserved |
+| SRC-0458 | buy_v2_views.dart:14557 | showBuyV2AddressSheet | onPressed | AUDIT-ROUND40-07 and ADDR-ROUND57-04 isolated test-address removal; originals preserved |
+| SRC-0459 | buy_v2_views.dart:14577 | showBuyV2AddressSheet | onPressed | ADDR-005 request sheet capture119; recipient/provider completion remains blocked |
+| SRC-0460 | buy_v2_views.dart:14589 | showBuyV2AddressSheet | onPressed | AUDIT-ROUND40-04 and ADDR-ROUND57-01 isolated Other place creation; other address types conditional |
+| SRC-0461 | buy_v2_views.dart:14653 | _BuyV2AddressChoice | onTap | unverified accessibility semantics activation for address selection |
+| SRC-0462 | buy_v2_views.dart:14657 | _BuyV2AddressChoice | onTap | pointer forwarder to address choice SRC0456; scoped Work restoration evidence |
+| SRC-0463 | buy_v2_views.dart:14764 | _BuyV2AddressChoice | onTap | unverified semantic menu activation; pointer Work menu ADDR-002 is distinct |
+| SRC-0464 | buy_v2_views.dart:14769 | _BuyV2AddressChoice | onSelected | ADDR-003 Work Edit; isolated edit/save ADDR-ROUND57-02 and deletion AUDIT-ROUND40-06/07; other original addresses preserved |
+| SRC-0465 | buy_v2_views.dart:15010 | _BuyV2AddressRequestFormState | onTap | pending exact request-address Share action; ADDR-005 sheet entry is not share completion; real recipient messaging excluded |
+| SRC-0466 | buy_v2_views.dart:15017 | _BuyV2AddressRequestFormState | onTap | pending exact request-address Copy action; provider-issued recipient binding and expiry not qualified |
+| SRC-0467 | buy_v2_views.dart:15027 | _BuyV2AddressRequestFormState | onPressed | ADDR-006 manual entry capture120 and validation ADDR-007 through010; recipient prefill variations pending |
+| SRC-0468 | buy_v2_views.dart:15278 | _BuyV2AddAddressFormState | onSelected | Other place creation AUDIT-ROUND40-04 and ADDR-ROUND57-01; other kind chips not individually inferred |
+| SRC-0469 | buy_v2_views.dart:15346 | _BuyV2AddAddressFormState | onPressed | ADDR-007 through009 required-field validation; isolated create AUDIT-ROUND40-04 and edit ADDR-ROUND57-02; other validations pending |
+| SRC-0470 | buy_v2_views.dart:15393 | _AddressFormHeader | onPressed | ADDR-004 edit Close and ADDR-010 partial form Close; request-header Close variant pending |
+| SRC-0471 | buy_v2_views.dart:15426 | _ReturnAffordance | onTap | pointer return forwarder; each parent destination separately indexed; no blanket pass |
+| SRC-0472 | buy_v2_views.dart:15468 | _ReturnAffordance | onTap | unverified semantic return activation; pointer/Android Back not equivalent |
+| SRC-0473 | buy_v2_views.dart:15650 | _DecisionActionRow | onTap | unverified semantic decision-row activation; each parent decision separately indexed |
+| SRC-0474 | buy_v2_views.dart:15656 | _DecisionActionRow | onTap | pointer decision-row forwarder; conditional product recovery paths remain separately pending |
+| SRC-0475 | buy_v2_views.dart:15780 | _ProductOwnedActionPanel | onTap | outer gesture Add forwarding; exact owned-panel variant not inferred from another Add control |
+| SRC-0476 | buy_v2_views.dart:15788 | _ProductOwnedActionPanel | onPressed | owned-panel button Add forwarding; distinguish conditional product panel from purchase-row Add; mapping pending |
+| SRC-0477 | buy_v2_views.dart:15982 | _ProductPurchaseActionRow | onTap | outer gesture purchase Add forwarding; exact hit target not independently verified |
+| SRC-0478 | buy_v2_views.dart:15986 | _ProductPurchaseActionRow | onPressed | QTY-ROUND27-01 consumer product Add and QTY-ROUND33-01 Wholesale Add; stale offers remain conditional |
+| SRC-0479 | buy_v2_views.dart:16141 | _QuantityEditorState | onChanged | QTY-ROUND33-02 invalid-to-valid correction; error clearing timing before submission not separately captured |
+| SRC-0480 | buy_v2_views.dart:16144 | _QuantityEditorState | onSubmitted | QTY-ROUND27-05 keyboard Enter saves3; ROUND27-07 zero rejected; ROUND33-02 Wholesale3 accepted |
+| SRC-0481 | buy_v2_views.dart:16149 | _QuantityEditorState | onPressed | pending exact Update quantity button; keyboard Enter coverage does not prove button action |
+| SRC-0482 | buy_v2_views.dart:16152 | _QuantityEditorState | onPressed | QTY-ROUND27-04 Cancel invalid editor preserves original count; unsaved Back separately ROUND27-06 |
+| SRC-0483 | buy_v2_views.dart:16214 | _CompactProductStepper | onPressed | QTY-ROUND27-08 decrement to zero and QTY-ROUND33-04 minimum removal; consumer/Wholesale exact records retained |
+| SRC-0484 | buy_v2_views.dart:16225 | _CompactProductStepper | onPressed | QTY-ROUND27-01 editor entry and QTY-ROUND33-01 Wholesale minimum editor; other placements not inferred |
+| SRC-0485 | buy_v2_views.dart:16253 | _CompactProductStepper | onPressed | pending exact compact product plus; BULKCART-002 cart increase is a different placement |
+| SRC-0486 | buy_v2_views.dart:16360 | _CartScopeBar | onTap | QTY-ROUND33-03 All carts scope visibility; exact scope-chip switching remains pending |
+| SRC-0487 | buy_v2_views.dart:16594 | _CartBenefitPanel | onTap | pending exact coupon benefit panel CTA; other coupon entry evidence must be reconciled |
 | SRC-0488 | buy_v2_views.dart:16614 | _CartBenefitPanel | onTap | unclassified |
 | SRC-0489 | buy_v2_views.dart:16677 | _CartBenefitEntry | onTap | unclassified |
 | SRC-0490 | buy_v2_views.dart:16916 | _CartBenefitsPageState | onPressed | unclassified |
@@ -1567,3 +1567,13 @@ SRC-0391 through0410 matched to recorded Items/Address/Help/Reorder/Invoice and 
 ## Round 111 - shared profile Orders return on Redmi
 
 Captures820-823: fresh Scheduled Shop; header account opens shared global profile panel; Open orders opens Active Orders (12 active/2 delivered); Android Back restores Scheduled catalogue, Saved1 and empty basket. One device-pass journey, no new defect. BuyV2AccountView remains a separately mounted view in source and its callbacks are not passed by this shared profile test. Original index remains423 classified/104 unclassified. Totals823 captures,825 evidence rows,506 journey records,407 device-pass records,17 distinct defects. Full semantic inventory remains incomplete. Read recovery: an attempted rg path apps/mobile/lib/routing did not exist; no product mutation or conclusion relied on that missing path.
+
+
+## Round 112 - payment and address action reconciliation
+
+Twenty original callbacks classified using exact existing evidence or explicit pending semantics/Close states. Isolated address creation, cancellation, removal and Work restoration retain their original evidence; user addresses remain preserved. Paytm selection does not qualify every payment choice or Close. Prescription operations retain the Medicine scope boundary. No new physical capture, pass or defect. Original index443 classified/84 unclassified; classification includes unverified actions and is not a completed journey count.
+
+
+## Round 113 - address forms and product quantity reconciliation
+
+Twenty-five callbacks mapped to specific existing device records or explicit pending actions. Keyboard Enter does not qualify Update quantity; cart plus does not qualify product plus; pointer activation does not qualify semantic activation. Original index468 classified/59 unclassified, with no new device pass or defect. Bounded read recovery: an over-broad journey projection truncated; exact QTY-ROUND27/33 IDs were re-read successfully before classification. No omitted output was treated as evidence.
