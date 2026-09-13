@@ -89,10 +89,10 @@
     }
   ],
   "nextWork": [
-    "UAT round143 CAT-P01..17 catalogue follow-ups: reconcile older evidence then test missing exact controls; preserve separate semantics/provider/alternate-mount limitations",
-    "Saved-address process-death persistence remains unqualified; edit/save and task resume qualified round57",
-    "Remaining filter/Store/product/cart/order branches from source inventory",
-    "Complete public-data field reconciliation and final evidence handoff"
+    "UAT round158 reconciled catalogue table: prioritize CAT-P03 Any area/seed apply and restoration; CAT-P04 Wholesale/Bulk pointer retention; CAT-P09 Wholesale category picker; then CAT-P02 parent-specific boundaries",
+    "Reconcile remaining product/cart/orders/shared callback families and conditional/provider descendants into stable named cases; no exhaustive denominator claim yet",
+    "Saved-address process-death persistence and remaining accessibility/keyboard/recovery dimensions require exact device evidence",
+    "Complete public-data field and publication lifecycle reconciliation and final evidence handoff"
   ],
   "preservation": {
     "cart": "1079 original Scheduled catalogue restored after Monthly intent cleared;Saved1 wheat;emptycart;no basket added",
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 157
+  "latestAuditRound": 158
 }

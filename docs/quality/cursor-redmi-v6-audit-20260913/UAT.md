@@ -1920,3 +1920,30 @@ Totals21 defects;1079 captures;1081 evidence rows;601 action/check records;490 d
 Implementation gate terminal0. Physical1080 query Mool shows Store results1-40; tap000001 opens matching Store1081, Android Back1082 restores exact results and keyboard. Next1083 range41-80;tap000041 opens matching Store1084;Back1085 retains41-80 and query. Clear only active query then Done1086 restores original Scheduled Shop Saved1 emptycart. No store collection, Add, message, original-history deletion or account action. CAT-P06 normal preview-product entry qualified; null preview branch still unverified. This is not D018 product-search Back and does not close it.
 Account-return reconciliation: screen1076 header calls _openBuyProfile958-970/global profile panel, not legacy session.openAccount. Buy-local call search for .openAccount yielded no match(exit1 normal search result); this limited search is not proof of global unreachability. session9489-9499 requires account-child origin. SRC-0033 remains alternate-entry unverified instead of assuming sign-in fixes it.
 Totals21 defects;1086 captures;1088 evidence rows;603 action/check records;492 device passes. Full inventory remains incomplete; no product changes.
+
+
+## Round158 - Remaining catalogue work reconciled through round157
+No device action, product edit or new defect. Implementation gate terminal0. Verified603 JOURNEYS rows with603 distinct record IDs; this proves ID uniqueness, not distinct semantic journeys. Source inventory has527 SRC and271 SUPSRC records. The first SUP-prefix query matched0 because rows use SUPSRC; corrected exact-prefix read gives271, no omission claim based on the first query. Callback totals are not a pending-work denominator.
+
+| Follow-up group | Latest exact evidence | Remaining qualification |
+|---|---|---|
+| CAT-P01 Offers promotion final Next | round1491031-1036 final disabled Next and original restoration | Accessible/changed-provider states remain separate |
+| CAT-P02 Parent pagers/footer area | Offers footer148;Store search145;Store matches157;earlier Shop/Wholesale records retained | Reconcile each parent's first/final/retry boundary; no blanket pager completion |
+| CAT-P03 Any area/seed selection | Selector cancellation and short-query checks141-142 | Explicit Any area and seed-area apply/restore still pending; provider national coverage blocked |
+| CAT-P04 Sale selector | Shop gesture146;Wholesale gesture147;Monthly Scheduled156 | Exact Wholesale/Bulk pointer retention still pending; semantics and relaunch separate |
+| CAT-P05 Intent/account return | Monthly banner clear156 | Other intents and alternate legacy account-origin entry unverified; global profile is different |
+| CAT-P06 Store search entry | round157 first/later page Store identity and Back | Null preview-product and provider stale/revision cases unverified |
+| CAT-P07 Search suggestions | round152 recent/recommended query;keyboard/Back/mode return | Provider authority, accessibility and process death unverified |
+| CAT-P08 Search all | round153 source branch classification | Not mounted in installed nonempty paged search; alternate finite variant unverified |
+| CAT-P09 Category picker | Shop Monthly category156;Store categories144-145;earlier Shop search retained | Wholesale picker exact entry/clear/close pending; do not substitute Store picker passes |
+| CAT-P10 Track tool | round155 named MS-NEW-09;Orders then Shop Back | Open tools sheet is not restored; observed labelled Orders route recorded;live/other order states blocked or unverified |
+| CAT-P11 Store X | round144 Store X returns product | Context-specific/provider variants remain separate |
+| CAT-P12 Store category X/All | rounds144-145 dismiss and all reset with query | Accessibility/provider changes separate |
+| CAT-P13 Full Store X | round144 full-catalogue X returns Store | Other origins and process death separate |
+| CAT-P14 Store keyboard submit | round144 wheat Enter,round145 retained page | Alternate IME/accessibility/provider separate |
+| CAT-P15 Saved settings Remove | round154 isolated notebook removed;original wheat retained | Process death/account sync unavailable or unverified |
+| CAT-P16 Non-Saved empty recovery | round156 Monthly Meat/seafood empty Clear filters recovery | Other refinements/text sizes separate; not globally unreachable |
+| CAT-P17 Grid quantity Edit | round150 update/cancel/remove;round151 D021 | D021 open;limit/relaunch/provider/semantics cases separate |
+
+Next reachable catalogue priorities: CAT-P03 applied-area restoration, CAT-P04 Wholesale/Bulk pointer retention, CAT-P09 Wholesale picker, then parent-specific pager boundaries. Completed default paths above must not be repeated solely to increase counters. Reconcile the broader product/cart/orders/shared-screen callback families and provider/conditional descendants into stable named cases before claiming an exact full-module denominator. Fields/publication mapping and remaining accessibility/process-death qualification remain required; this table does not shrink scope or declare groups fully complete.
+Counts unchanged21 defects;603 action/check records;492 passes;1086 captures;1088 evidence rows;70 public-data rows. Full audit open.
