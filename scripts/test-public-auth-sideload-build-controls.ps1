@@ -493,13 +493,26 @@ Assert-SideloadControl (
   -not $aabWrapper.Contains('check-full-social-founder-dev-readiness.ps1')
 ) 'Google-only or full-social founder Dev readiness does not fail closed.'
 
+# Each native exit-code read must immediately follow its named native command.
+# STOREBACK01 adds a fifth native invocation; PowerShell gates must still use $?.
+$nativeExitCheckPatterns = @(
+  '\$branch = git -C \$repositoryRoot branch --show-current\s+if \(\$LASTEXITCODE',
+  '\$accessToken = \(& \$gcloudSource auth print-access-token --quiet\)\.Trim\(\)\s+if \(\$LASTEXITCODE',
+  '& flutter pub get --enforce-lockfile\s+if \(\$LASTEXITCODE',
+  '& flutter test --no-pub --reporter json `\r?\n\s+--dart-define-from-file \$runtimeDefineFile `\r?\n\s+test/work_workspace_layout_safety_test\.dart `\r?\n\s+--plain-name ''STOREBACK01 full app Restock Bulk native Back lifecycle'' `\r?\n\s+1> \$navigationLog\s+if \(\$LASTEXITCODE',
+  '\$head = git -C \$repositoryRoot rev-parse HEAD\s+if \(\$LASTEXITCODE'
+)
+$nativeExitChecksBound = @($nativeExitCheckPatterns | Where-Object {
+  [regex]::Matches($wrapper, $_).Count -ne 1
+}).Count -eq 0
 Assert-SideloadControl (
   $prepare.Contains('$googleReadinessPassed = $?') -and
   $prepare.Contains('if (-not $googleReadinessPassed)') -and
   -not $prepare.Contains('$LASTEXITCODE') -and
   $wrapper.Contains('$googleReadinessPassed = $?') -and
   $wrapper.Contains('$apkMachineGatePassed = $?') -and
-  @([regex]::Matches($wrapper, '\$LASTEXITCODE')).Count -eq 4
+  $nativeExitChecksBound -and
+  @([regex]::Matches($wrapper, '\$LASTEXITCODE')).Count -eq $nativeExitCheckPatterns.Count
 ) 'PowerShell-to-PowerShell gates still depend on native LASTEXITCODE state.'
 
 Assert-SideloadControl (
