@@ -3059,7 +3059,8 @@ void main() {
         findsOneWidget,
       );
       expect(buy.selectedFilter, 'freight');
-      expect(tester.widget<TextButton>(restock).onPressed, isNull);
+      expect(restock, findsNothing);
+      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
       await captureStoreView(tester, 'r665-df04-restock');
       final product = buy.visibleProducts.first;
       expect(buy.addProduct(product.id), isTrue);
@@ -3069,8 +3070,12 @@ void main() {
       expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
       await tester.binding.handlePopRoute();
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsOneWidget);
-      final statement = find.byKey(const Key('work-shortcut-statement'));
+      expect(find.byKey(const Key('work-first-tap-shortcuts')), findsNothing);
+      expect(buy.view, BuyV2View.catalogue);
+      await tester.tap(find.byKey(const Key('work-back')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      final statement = find.byKey(const Key('work-pulse-sales'));
       await reveal(tester, statement);
       await tester.tap(statement);
       await tester.pumpAndSettle();

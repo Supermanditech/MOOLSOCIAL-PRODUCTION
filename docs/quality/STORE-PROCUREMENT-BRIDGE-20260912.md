@@ -536,3 +536,8 @@ The exact 906fd10d source cycle finished with 2,511 passes, 83 skips and 10 fail
 ### Restock shared-header and compact-cart correction
 
 Updated the affected Restock tests to target the founder-approved shared Store header/search rather than removed duplicate Buy controls, retaining query, cart, filter, Back and consumer-isolation checks. This exposed and corrected missing visible Back, clamped Store-name text scaling, and a compact cart parked in the hidden Buy footer. The embedded Store now reserves a visible compact-cart area above the Store rail, without restoring Buy navigation. Header measurement includes the actual 58px status control, and a new assertion rejects Store-name clipping. All nine focused tests passed, including DASH10 320x568/200%, with captures under restock-header-correction-20260913-v7 outside the repository. Logs, prior failures and analysis are in task outputs/store-latest-apk-qualification-20260913. Full source/candidate qualification, S09 shortcut-route adaptation and four payment-fixture failures remain pending; no APK/device action occurred.
+
+
+### Approved Restock shortcut-route test adaptation
+
+S09 DF04 now asserts the founder-removed duplicate shortcut row stays absent in Restock and Cart, then follows visible Back to Dashboard and View statement. The original filter, product quantity, consumer query/cart isolation and final return assertions remain. The focused test passed; original failure and restock-shortcut-route-v1.log are preserved under task outputs/store-latest-apk-qualification-20260913. Four payment fixtures remain pending one-file test ownership authorization; a proposed fixture patch is preserved outside the repository and has not been applied or tested. No APK has been built.
