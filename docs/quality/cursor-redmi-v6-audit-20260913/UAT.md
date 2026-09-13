@@ -669,30 +669,30 @@ Source hashes bind the following index to the inspected files:
 | SRC-0066 | buy_v2_catalogue.dart:4545 | _BuyV2ShoppingSettingsSheetState | onTap | device_pass SETTINGS-ROUND50-03 sign-in prerequisite and lower-scroll return; authenticated security unavailable |
 | SRC-0067 | buy_v2_catalogue.dart:4556 | _BuyV2ShoppingSettingsSheetState | onTap | device_pass SETTINGS-ROUND50-04 Help entry; descendants retain independent coverage |
 | SRC-0068 | buy_v2_catalogue.dart:4605 | _ShoppingSettingsRow | onTap | ShoppingSettingsRow forwards provided onTap; reconcile parent row, not separate user journey |
-| SRC-0069 | buy_v2_catalogue.dart:4682 | _confirmClearBuyV2RecentlyViewed | onPressed | unclassified |
-| SRC-0070 | buy_v2_catalogue.dart:4687 | _confirmClearBuyV2RecentlyViewed | onPressed | unclassified |
-| SRC-0071 | buy_v2_catalogue.dart:4844 | _BuyV2ShoppingHelpSheetState | onPressed | unclassified |
-| SRC-0072 | buy_v2_catalogue.dart:4913 | _BuyV2ShoppingHelpSheetState | onChanged | unclassified |
-| SRC-0073 | buy_v2_catalogue.dart:4926 | _BuyV2ShoppingHelpSheetState | onPressed | unclassified |
-| SRC-0074 | buy_v2_catalogue.dart:4965 | _BuyV2ShoppingHelpSheetState | onTap | unclassified |
-| SRC-0075 | buy_v2_catalogue.dart:5104 | showBuyV2ShoppingAlerts | onPressed | unclassified |
-| SRC-0076 | buy_v2_catalogue.dart:5138 | showBuyV2ShoppingAlerts | onTap | unclassified |
-| SRC-0077 | buy_v2_catalogue.dart:5534 | showBuyV2PartnerCatalogue | onTap | unclassified |
-| SRC-0078 | buy_v2_catalogue.dart:5611 | showBuyV2PartnerCatalogue | onPressed | unclassified |
-| SRC-0079 | buy_v2_catalogue.dart:5729 | showBuyV2PartnerCatalogue | onTap | unclassified |
-| SRC-0080 | buy_v2_catalogue.dart:6070 | _PublicStoreTruthPanelState | onPressed | unclassified |
-| SRC-0081 | buy_v2_catalogue.dart:6099 | _PublicStoreTruthPanelState | onTap | unclassified |
-| SRC-0082 | buy_v2_catalogue.dart:6190 | _PublicStoreTruthPanelState | onTap | unclassified |
-| SRC-0083 | buy_v2_catalogue.dart:6422 | BuyV2StoreCartBar | onTap | unclassified |
-| SRC-0084 | buy_v2_catalogue.dart:6434 | BuyV2StoreCartBar | onTap | unclassified |
-| SRC-0085 | buy_v2_catalogue.dart:6683 | _PagedFullStoreCatalogueState | onPressed | unclassified |
-| SRC-0086 | buy_v2_catalogue.dart:6692 | _PagedFullStoreCatalogueState | onTap | unclassified |
-| SRC-0087 | buy_v2_catalogue.dart:6701 | _PagedFullStoreCatalogueState | onTap | unclassified |
-| SRC-0088 | buy_v2_catalogue.dart:6762 | _PagedFullStoreCatalogueState | onPressed | unclassified |
-| SRC-0089 | buy_v2_catalogue.dart:6792 | _PagedFullStoreCatalogueState | onPressed | unclassified |
-| SRC-0090 | buy_v2_catalogue.dart:6797 | _PagedFullStoreCatalogueState | onChanged | unclassified |
-| SRC-0091 | buy_v2_catalogue.dart:6798 | _PagedFullStoreCatalogueState | onSubmitted | unclassified |
-| SRC-0092 | buy_v2_catalogue.dart:6816 | _PagedFullStoreCatalogueState | onTap | unclassified |
+| SRC-0069 | buy_v2_catalogue.dart:4682 | _confirmClearBuyV2RecentlyViewed | onPressed | device_pass RECENT-ROUND46-01 Keep retains history |
+| SRC-0070 | buy_v2_catalogue.dart:4687 | _confirmClearBuyV2RecentlyViewed | onPressed | blocked_test_data RECENT-ROUND46-02; confirmation clears both destinations; original history preserved, no Clear pass |
+| SRC-0071 | buy_v2_catalogue.dart:4844 | _BuyV2ShoppingHelpSheetState | onPressed | device_pass HELP-ROUND52-04 X restores lower settings scroll |
+| SRC-0072 | buy_v2_catalogue.dart:4913 | _BuyV2ShoppingHelpSheetState | onChanged | device_pass HELP-ROUND51-01/02/03 and ROUND52-01/02 query ID/product/seller/no-match; late data/empty account unverified |
+| SRC-0073 | buy_v2_catalogue.dart:4926 | _BuyV2ShoppingHelpSheetState | onPressed | device_pass HELP-ROUND51-04 and ROUND52-03 Clear restores orders; keyboard Back separately recorded |
+| SRC-0074 | buy_v2_catalogue.dart:4965 | _BuyV2ShoppingHelpSheetState | onTap | device_pass HELP-ROUND51-01/03 Shop/Wholesale order and exact query return; canOpenOrders false and visiting disable unverified |
+| SRC-0075 | buy_v2_catalogue.dart:5104 | showBuyV2ShoppingAlerts | onPressed | blocked_provider live shopping-alert Retry/busy recovery unverified; fixture list not recovery evidence |
+| SRC-0076 | buy_v2_catalogue.dart:5138 | showBuyV2ShoppingAlerts | onTap | ALERT-ROUND48-02/03/04 destinations and Back pass; ROUND48-05 RV6-D016 remains; missing router conditional unverified |
+| SRC-0077 | buy_v2_catalogue.dart:5534 | showBuyV2PartnerCatalogue | onTap | STORE-002/009 browse all pass; availability heading RV6-D012 remains; separate disabled condition unverified |
+| SRC-0078 | buy_v2_catalogue.dart:5611 | showBuyV2PartnerCatalogue | onPressed | Store sheet X exact control remains pending reconciliation; Android Back STORE-ROUND37-05 is not X evidence |
+| SRC-0079 | buy_v2_catalogue.dart:5729 | showBuyV2PartnerCatalogue | onTap | device_pass STORE-ROUND39-01/03/04 other Store navigation and return; horizontal position retained |
+| SRC-0080 | buy_v2_catalogue.dart:6070 | _PublicStoreTruthPanelState | onPressed | device_pass COLLECTION-ROUND18-02 entry; downstream sign-in boundary ROUND18-05 and ROUND68 remain blocked |
+| SRC-0081 | buy_v2_catalogue.dart:6099 | _PublicStoreTruthPanelState | onTap | device_pass STORE-ROUND37-03 collapse/expand Store header; live fulfilment truth unqualified |
+| SRC-0082 | buy_v2_catalogue.dart:6190 | _PublicStoreTruthPanelState | onTap | device_pass STORE-ROUND38-01/03 Store-only Chat and Back; shared Chat expansion RV6-D013 remains |
+| SRC-0083 | buy_v2_catalogue.dart:6422 | BuyV2StoreCartBar | onTap | Store cart Semantics tap shares pointer action; screen-reader activation unverified |
+| SRC-0084 | buy_v2_catalogue.dart:6434 | BuyV2StoreCartBar | onTap | device_pass STORE-008 basket rail opens; return/last-item RV6-D002 remains |
+| SRC-0085 | buy_v2_catalogue.dart:6683 | _PagedFullStoreCatalogueState | onPressed | Store categories X exact control unverified; category selection and Back do not prove X |
+| SRC-0086 | buy_v2_catalogue.dart:6692 | _PagedFullStoreCatalogueState | onTap | All products category choice exact control remains pending device check |
+| SRC-0087 | buy_v2_catalogue.dart:6701 | _PagedFullStoreCatalogueState | onTap | device_pass STORE-005 Fruits and STORE-ROUND85-02 Oil/ghee; all category values not inferred |
+| SRC-0088 | buy_v2_catalogue.dart:6762 | _PagedFullStoreCatalogueState | onPressed | Full Store catalogue Close X exact control pending; STORE-ROUND85-05 verifies Android Back only |
+| SRC-0089 | buy_v2_catalogue.dart:6792 | _PagedFullStoreCatalogueState | onPressed | device_pass STORE-006 clear unmatched search; selected category preserved in recorded scenario |
+| SRC-0090 | buy_v2_catalogue.dart:6797 | _PagedFullStoreCatalogueState | onChanged | STORE-003 query executed with RV6-D001 empty recovery; not an overall search pass |
+| SRC-0091 | buy_v2_catalogue.dart:6798 | _PagedFullStoreCatalogueState | onSubmitted | Store search keyboard Submit unfocus exact action unverified; other keyboard dismissal not equivalent |
+| SRC-0092 | buy_v2_catalogue.dart:6816 | _PagedFullStoreCatalogueState | onTap | device_pass STORE-004 and STORE-ROUND85-02 category entry; forwards to Store-specific sheet |
 | SRC-0093 | buy_v2_catalogue.dart:6928 | _showBuyV2FullStoreCatalogue | onPressed | unclassified |
 | SRC-0094 | buy_v2_catalogue.dart:7032 | _RelatedStoreCard | onTap | unclassified |
 | SRC-0095 | buy_v2_catalogue.dart:7206 | _BuyV2InfoSheetHeader | onPressed | unclassified |
@@ -1530,3 +1530,7 @@ Source-only review of catalogue callbacks SRC-0028 through0041 distinguishes sal
 ## Round 102 - category, tools and settings reconciliation
 
 Source-only reconciliation of SRC-0042 through0068 links existing Settings rounds47/49/50 and tool-entry rounds45/46/54 to the actual callbacks. No repeat device passes added. Category search suffix Clear, empty-state Clear, picker X/choice, accessibility Semantics activation, active-order tool destination, settings unavailable/busy and zero-history states remain explicit gaps. Medicine prescriptions are outside public Shop/Wholesale. Shared chrome and row callbacks are forwarding references, not extra journeys. Original source index now 211 classified, 316 unclassified. Device totals remain 809 captures, 499 action rows, 400 device passes, 17 defects; unique journey inventory remains incomplete.
+
+## Round 103 - Help, history, alerts and Store control reconciliation
+
+SRC-0069 through0092 mapped to exact existing Help, Recently viewed, Alerts, Store and collection evidence. Known defects remain failures; Back does not qualify distinct X buttons; category selection does not qualify All products; keyboard dismissal does not qualify Submit. Clear history preserves the existing blocked disposition. Live alert recovery and authenticated collection remain unqualified. No new capture, device pass or defect. Original source index now 235 classified and 292 unclassified. Classification includes explicit pending/blocked controls, not completed journeys. Audit totals unchanged.
