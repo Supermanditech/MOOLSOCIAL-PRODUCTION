@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 621,
+    "recordedActionRows": 626,
     "dispositions": {
       "device_observation": 20,
-      "device_pass": 507,
+      "device_pass": 512,
       "blocked_provider": 27,
       "device_failure": 24,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 1149,
-    "evidenceRows": 1151,
+    "physicalCaptures": 1164,
+    "evidenceRows": 1166,
     "publicDataRows": 71,
     "confirmedDistinctDefects": 22,
     "countsAreExhaustiveDenominator": false
@@ -89,18 +89,19 @@
     }
   ],
   "nextWork": [
-    "Round167 UAT organizes 21 order/tracking/resolution/collection groups. Next exact Items breadcrumb, delivery-context X/Help, tracking visible return and support entry without sending; shared Chat/account/address/mini-cart inventory remains.",
+    "Round168 qualified exact order card body, Items breadcrumb, delivery-context X/Help and tracking visible Orders return. Continue remaining tracking controls and shared Chat/account/address/mini-cart inventory and reachable cases.",
     "Reconcile remaining product/cart/orders/shared callback families and conditional/provider descendants into stable named cases; no exhaustive denominator claim yet",
     "Saved-address process-death persistence and remaining accessibility/keyboard/recovery dimensions require exact device evidence",
     "Complete public-data field and publication lifecycle reconciliation and final evidence handoff"
   ],
   "preservation": {
-    "cart": "1149 isolated notebook removed;original Scheduled wheat Saved1 emptycart;1146 Work selected and original address fields unchanged",
+    "cart": "1164 original Scheduled Shop Saved1 emptycart restored; no cart changes in round168",
     "savedShop": "original wheat count1 retained650;Saved/Scheduled active after module reentry",
     "addresses": "Home temporarily selected1143;Work restored1144;Work Edit inspected without field changes then X1146;original Home/Work retained",
     "noNewApk": true,
     "noProductEdits": true,
-    "chatPreviews": "Original OFF restored; four original inbox snippets, pin and unread1 retained883; Buy Scheduled Saved1 emptycart884"
+    "chatPreviews": "Original OFF restored; four original inbox snippets, pin and unread1 retained883; Buy Scheduled Saved1 emptycart884",
+    "orderChat": "1160 exact MS-NEW-09 draft retained unsent;1161 returned to tracking;no message sent"
   },
   "limitations": [
     "Backend/authentication/provider/payment qualification excluded",
@@ -108,5 +109,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 167
+  "latestAuditRound": 168
 }

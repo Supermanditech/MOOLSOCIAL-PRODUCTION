@@ -2079,3 +2079,12 @@ Gate terminal0; clean worktree digest. No device action/new capture this round. 
 
 Scanner distinction: SCANNER-ROUND74-01 is specifically the public product-scanner entry (Workspace callers); it explicitly keeps authenticated collection separate. SUP0098/0252 identify a conditional collection-camera caller at views11090-11095. Therefore the former source_unreachable record cannot close or remove collection scanner descendants. No current device pass or global unreachability claim is made. SOURCE-ASSIST-001 concerns the unused legacy Assist implementation; live order Help is shared Chat and remains in scope.
 Counts unchanged621 action/check records;507 passes;22 defects;1149 physical captures;1151 evidence rows;71 data mappings. Next reachable exact controls: ORDER-P06 Items breadcrumb, ORDER-P07 context X/Help, ORDER-P08 tracking visible return, ORDER-P15/18 support entry without sending. Shared Chat/account/addresses and mini-cart inventory still remain. Full audit incomplete;no implementation/APK.
+
+
+## Round168 - exact order entry and return controls
+
+Physical Redmi captures1150-1164; ORDER-ROUND168-01 through05. Five narrow device passes, no new distinct defect. The order card body opened MS-NEW-09; Items breadcrumb returned to its lower tracking scroll. Delivery context identified Shop/MS-NEW-09 and X retained tracking. Its Help action opened Shree Balaji Fresh with MS-NEW-09 attached and the existing unsent draft; visible Back returned to tracking. The tracking screen's visible Orders button returned to Active12/Delivered2 with the same first order. Shop Scheduled, original Saved1 and empty cart restored1164. No message, order, payment, address or alert setting changed.
+
+Capture1156 had a view-output truncation, recovered by exact file verification and separate view under standing bounded recovery authority. Capture1159 shows the navigation transition; only settled1160 proves the Chat destination. No transition was counted as a defect.
+
+This supplies narrow additional evidence for ORDER-P03, P06, P07 and P08. It does not qualify every alternate state within those groups. Provider-bound descendants, filtered/alternate return contexts, tracking alert/restore controls and shared Chat/account/address/mini-cart inventory remain. Totals:22 distinct defects;626 action/check records;512 device passes;1164 physical captures. Records are not unique taps or end-to-end journeys; full semantic denominator remains incomplete.
