@@ -1724,3 +1724,10 @@ Source chat_notification_settings_screen.dart lines29-60 binds load/save/device 
 The previous oversized notification-source read returned no usable contents; recovered using only the first80 lines under standing bounded-read authorization. No conclusions rely on the truncated output.
 
 Register now has555 action/check rows,449 device passes and19 distinct defects;929 physical captures. These are not deduplicated complete journey counts. No new defect confirmed this round. Full action inventory and field-level reconciliation remain open; no implementation or new APK.
+
+
+## Round133 - audience cancellation and group invitation destination
+
+Physical Redmi930-936. Who can message you931/settled932 clips the No new conversations explanation above Android navigation; upward swipe933 cannot reveal remaining text. Registered RV6-D020 before continuing. Font scale readback1.0; source chat_settings_screen.dart529 confirms complete text. Source85-125 shows null selection returns without _savePrivacy. Android Back934 preserves Everyone and settings position. Group invitations935 empty state fits; Android Back936 preserves settings position. No service mutation, real invitation or group membership change. Populated invitation decisions explicitly blocked by absent isolated fixture.
+
+Two device passes,one failure,one conditional blocked row added. Totals559 action/check rows,451 device passes,20 distinct defects,936 physical captures. Complete deduplicated journey denominator remains unreconciled. Current device at settings privacy section936; original preferences retained. No implementation or APK.
