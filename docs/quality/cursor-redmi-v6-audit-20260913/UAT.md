@@ -780,7 +780,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0177 | buy_v2_screen.dart:2671 | _BuyQuickDeliveryStatusBar | onTap | minimized tracker body open; expanded TRACK-009 does not prove exact minimized target; unverified |
 | SRC-0178 | buy_v2_screen.dart:2701 | _BuyQuickDeliveryStatusBar | onPressed | minimized tracker expand arrow exact target unverified; general rail reopen not equivalent |
 | SRC-0179 | buy_v2_screen.dart:2741 | _BuyQuickDeliveryStatusBar | onTap | device_pass TRACK-009 selected tracker body; live detail B-005 remains |
-| SRC-0180 | buy_v2_screen.dart:2767 | _BuyQuickDeliveryStatusBar | onPressed | expanded tracker Minimize arrow exact target unverified; Hide is distinct |
+| SRC-0180 | buy_v2_screen.dart:2767 | _BuyQuickDeliveryStatusBar | onPressed | device_failure RV6-D019 round131 captures909-913 exact Minimize arrow retains wrong compact chevron; Hide distinct; no implementation |
 | SRC-0181 | buy_v2_screen.dart:2793 | _BuyQuickDeliveryStatusBar | onPressed | device_pass TRACK-007 Keep; unkeep/auto-collapse combinations unverified |
 | SRC-0182 | buy_v2_screen.dart:2820 | _BuyQuickDeliveryStatusBar | onPressed | TRACK-008 enable UI pass only; actual arrival playback/preparing/failure and disable unverified |
 | SRC-0183 | buy_v2_screen.dart:2836 | _BuyQuickDeliveryStatusBar | onPressed | device_pass TRACK-004 Hide and TRACK-005 restore; multi-order permutations unverified |
@@ -961,8 +961,8 @@ Source hashes bind the following index to the inspected files:
 | SRC-0358 | buy_v2_views.dart:9302 | BuyV2RecoveryView | onPressed | checkout issue Remove from Cart B-010; ordinary cart removal not equivalent |
 | SRC-0359 | buy_v2_views.dart:9309 | BuyV2RecoveryView | onPressed | checkout issue View product B-010; exact affected SKU absent |
 | SRC-0360 | buy_v2_views.dart:9314 | BuyV2RecoveryView | onPressed | product issue return checkout B-010; exact revision recovery unverified |
-| SRC-0361 | buy_v2_views.dart:9322 | BuyV2RecoveryView | onPressed | address-resolution Change address conditional; exact failure/retry/destination path unverified |
-| SRC-0362 | buy_v2_views.dart:9335 | BuyV2RecoveryView | onPressed | address-resolution return checkout conditional unverified |
+| SRC-0361 | buy_v2_views.dart:9322 | BuyV2RecoveryView | onPressed | device_pass INVENTORY-ROUND28-10 captures384-387 exact Change address and chooser cancellation; warm declared-link UI only; actual serviceability and changed-address revalidation unverified |
+| SRC-0362 | buy_v2_views.dart:9335 | BuyV2RecoveryView | onPressed | device_pass INVENTORY-ROUND28-11 captures388-391 Return to Checkout and cart retention; warm declared-link UI only; provider-generated recovery remains unverified |
 | SRC-0363 | buy_v2_views.dart:9344 | BuyV2RecoveryView | onPressed | general recovery primary return; RV6-D010 context remains; exact scenario mapping required |
 | SRC-0364 | buy_v2_views.dart:9353 | BuyV2RecoveryView | onPressed | recovery Get help exact order binding conditional unverified |
 | SRC-0365 | buy_v2_views.dart:9429 | BuyV2OrdersView | onTap | Orders Account return conditional unverified; regular Orders Back not equivalent |
@@ -1796,3 +1796,10 @@ Three scoped device passes;SRC0467/0470 reconciled.573 action/check rows,464 dev
 Redmi976-982. Open unsaved Add address976;enter isolated AuditType recipient and dismiss keyboard977. Select Work978,Third party979,Other place980,Home981. Each selection visibly changes correctly and preserves entered recipient. X982 cancels form;only original Home/Work remain with Work selected. No address saved or backend write. These passes cover pointer chip selection and same-form text retention, not per-kind save validation, persistence or serviceability. SRC0468 updated accordingly.
 
 Five device passes added;578 action/check rows,469 device passes,20 confirmed defects,982 physical captures. Full audit and unique journey denominator remain incomplete. Device at original address selector982.
+
+
+## Round140 - stale recovery and tracker inventory reconciliation
+
+Re-read JOURNEYS INVENTORY-ROUND28-10/11 and exact source views9322/9335;re-inspected captures385/386/387/389. They prove exact address-recovery Change address/chooser cancellation and Return to Checkout for the warm declared-link scenario with retained Work and basket. Updated SRC0361/0362;retain explicit unqualified actual serviceability failure,changed-address validation and provider-generated recovery. Do not add duplicate pass rows for this reconciliation.
+
+SRC0180 corrected from unverified to existing RV6-D019 round131 exact Minimize failure;other compact tracker targets and timer conditions remain separate. Three stale inventory labels resolved;no device actions,new captures,new defects or implementation this round. Counts remain578 action/check rows,469 passes,20 defects. Full unique journey denominator and audit remain incomplete.
