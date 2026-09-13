@@ -2401,3 +2401,44 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | qualified/rv6-d012-closed-store-count-text-2.0.png | 2D80835979AE8424A56AF15078EBE9E06AEAC9F0D06E7AE5775880451874420D |
 | rv6-d012-closed-store-count-text-1.0.png | 4B28FD5851D38FC689B1B60E81A44A6B5DF1B8254F05AB62CCA3B98D2F97D9E6 |
 | store-regression.log | 5200D4A005D0CC0406F39E4A20F4E7EABFFF73E15C5F6BE9142B70DB9DDECFEA |
+
+## RV6-D013 local qualification - 2026-09-14
+
+- Scope: original431-434 Pet Family Store Ask opened a Store-only conversation whose expansion exposed no facts/action. Start4194ea5985bc95ddd228f25011ccf198dda38926 after D012 clean/live-equal handoff. Exact Chat presentation owner admitted separately at da9555f36919292a19f74ee1bff162a5730dec27 under founder's limited standing admission authorization; claim36, registry4584. No new policy/checker change in this implementation slice.
+- Changed source owners: apps/mobile/lib/features/chat/screens/chat_thread_screen.dart and apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart. Tests: apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart and apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart. All four are admitted owners. No auth/router/backend/provider implementation changed.
+- Context card now uses a static ListTile only when decisionFacts is empty and productAppRoute is unavailable. Same identity/icon/subtitle, no tap callback, expansion arrow, empty divider or padding-only expansion. Existing facts and applicable View product actions retain the original ExpansionTile and children. No missing commercial facts invented; drafts remain unsent.
+- Initial Store-only expected-static assertion reproduced the original ExpansionTile before correction (64493 terminal1/33602c). An earlier test placement compilation error was corrected by moving the new block after the existing local readyJourney helper. A Wholesale setup tap initially missed its target; the final test uses the product's vertical Scrollable and asserts hit-testability. No error handler suppression or weakened assertions remains.
+- Required connected-return finding: the new real-MoolSocialApp check returned to the product without its Store overlay, from both normal Buy-root setup and direct product entry, using both Android Back and visible Chat Back. The existing custom-router Store return test alone had not exposed it. A500ms diagnostic wait did not fix it. Traces confirmed _openStoreQuestion/_openStoreQuestionRoute ran and the route stack changed from RouteMatch+ImperativeRouteMatch to RouteMatch, but the awaited push continuation did not run within the verified return interval. Do not infer an unproven underlying router/library cause. Original Buy source bytes were preserved as buy-screen-before-return-trace.dart (SHA256 B38511612A9EF26E749FBE547F8ED7CA2DFB16DC8C71C4F7C118E86F45FD371F); all temporary source traces were removed and byte restoration verified before correction. Truncated earlier output was not treated as a pass; bounded log reads supplied the evidence recorded here.
+- Minimal Buy-owned return correction: observe this Buy route becoming visible after being covered by the Store enquiry; restore its pending Store anchor after the frame. Existing push completion also uses the same one-shot restoration. Bind the request to a generation, session and account identity; reject stale/different account or procurement scope, consume only the matching pending anchor, and avoid duplicate Store overlays. This is an explicit D013 connected-return qualification dependency, not a claim that the empty-card change caused the navigation failure. D014's separate warm-order-link/modal failure remains unimplemented/unqualified.
+- Final focused matrix:8 cases at390x844,100/200% text, Shop s-dog-food and Wholesale w-notebook, normal and direct-link entry. Each tests the static card/no expansion, exact Store identity, unchanged unsent draft, visible Chat Back, repeated enquiry, Android Back, exact Store restoration, empty retained cart and one further Back to the original product. Eight passed (64451 terminal0/0b4c40), final-focused.log. An additional account-context fixture test rejects and consumes an old Store return after authentication-context change, including when the old context flag is restored. No real authentication action occurs in that fixture.
+- Connected final source regression: flutter test --no-pub test/ui_v2/buy/buy_v2_shop_chat_test.dart test/ui_v2/buy/buy_v2_screen_test.dart --reporter expanded;328passed/0failures,80786 terminal0/aa2a37, connected-regression.log. Includes all9 new cases, existing nonempty product/order context and facts, Cart-origin Store Chat return, Buy navigation and previous relevant correction checks. Focused8 overlap328; do not add counts. Analysis of the four Dart owners: zero issues,6770 terminal0/5f6765,analysis.log. Diff check passed; unrelated formatter changes restored, previous tests preserved.
+- Eight actual Flutter captures in qualified/ reviewed: static Shop/Wholesale cards and the correct restored Store at100/200%. Identity remains readable in the card; no empty expansion control; corresponding Store/Ask/product context restored. These captures qualify D013 presentation and return destination only, not unrelated Chat chrome, supplier claims/media or backend behavior. Captures preceded only the final rejected-account-anchor cleanup; connected328 replayed that final guard as well. No visual layout changed after the captures.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d013-local-20260914. Diagnostic/preliminary images and logs retained separately; qualified/ is the reviewed visual set. No APK/build/install/device action or device closure. Original431-434 and directly affected Store enquiry return still require successor Redmi qualification. No broad audit or child implementation; frozen514 passed records/1177 artifacts preserved.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | 4EAFEFE91FBD66446B14C0CB34A422D4FA58F70DD3AE4569E43C6423E0AE43B9 |
+| buy-screen-before-return-trace.dart | B38511612A9EF26E749FBE547F8ED7CA2DFB16DC8C71C4F7C118E86F45FD371F |
+| connected-regression.log | 714BE2D466C0BBAF6BD5D87C848416DC8BE5494C71790BC7A2CF2DF7AB75AF7C |
+| final-focused.log | 94A6B35BA327CEC6C522EC9573F7D09B54F2DFF676D14C5A2848E175C2126679 |
+| qualified/rv6-d013-static-context-s-dog-food-text-1.0.png | 88E7BD4EAB0EEF06770B87069D2F7A120CB40EA1D2FD4EB0AF20DD81E086F86E |
+| qualified/rv6-d013-static-context-s-dog-food-text-2.0.png | FCA9B923E45B439A737DE9FC691A250E10EDA8ADA6A8419C66F0E875977E832E |
+| qualified/rv6-d013-static-context-w-notebook-text-1.0.png | 331994766DE3D29B7F1165436FC8E404A654F9E5384BB5DE440A3778A082596B |
+| qualified/rv6-d013-static-context-w-notebook-text-2.0.png | 63255276B482ED0900CE133F046686D481289A5D86CDA2116CE654AD3D598C38 |
+| qualified/rv6-d013-store-return-s-dog-food-text-1.0.png | C2469070C31BC66BD71B6E3BF24BC6EC816932EF4D4C9DDF47683EAC123FCD1A |
+| qualified/rv6-d013-store-return-s-dog-food-text-2.0.png | 8DFFB8A64D9DF1181C6565E4CD6FA885B93867275AFDB53A25FB2B6A2BC4E578 |
+| qualified/rv6-d013-store-return-w-notebook-text-1.0.png | FE4B26B1984A1DC45156DD32BC60123463435DADF1F3AE0BEEF963AC5C141CC7 |
+| qualified/rv6-d013-store-return-w-notebook-text-2.0.png | 0AAD42149C3EDFD752DEDD7ED62972E4BC2ACA31C83C7431614C7AAAEC53E7DE |
+| return-content-back.log | BAB2795F5BFB51E921D195C5158C5EC61B7DADA5B486D5BE8E8E1F90EA878720 |
+| return-diagnostic/rv6-d013-return-diagnostic-s-dog-food-text-1.0.png | E3AA45D33D04C28695B45207B23B05572EC80484DED319B19F9B270A4DCFA4D6 |
+| return-diagnostic/rv6-d013-static-context-s-dog-food-text-1.0.png | 88E7BD4EAB0EEF06770B87069D2F7A120CB40EA1D2FD4EB0AF20DD81E086F86E |
+| return-diagnostic.log | 440753BAD1DEF712B2A9AC40C1E9DAE2A2AAE39B2DBA262CABC057037C613A42 |
+| return-entry-trace.log | BAB2795F5BFB51E921D195C5158C5EC61B7DADA5B486D5BE8E8E1F90EA878720 |
+| return-root.log | BCC315F7B9BBBED4088CE8ED4E4A27859E64796F724D03FC0120F88A5A65064C |
+| return-trace.log | 25175D9A79FDBABFAB336F15297E274DAF235DCA34E2A47444345F182FC2DC04 |
+| return-visibility-fallback.log | 507CD7BADF52E62D69C064EEC329A680DB6738234C10A01EF6A45195F3429032 |
+| return-wait.log | 826411DA99ABF5A1C8C9F23D44A9AF20E34504E31B32CA5219AA8C03362BF66C |
+| route-matches.log | 93625CC54BEE9E2214F4A1973B901F52EB8F21F48986A8D3DE3378F3EE5B24E0 |
+| rv6-d013-static-context-s-dog-food-text-1.0.png | 88E7BD4EAB0EEF06770B87069D2F7A120CB40EA1D2FD4EB0AF20DD81E086F86E |
+| rv6-d013-static-context-s-dog-food-text-2.0.png | FCA9B923E45B439A737DE9FC691A250E10EDA8ADA6A8419C66F0E875977E832E |
+| rv6-d013-static-context-w-notebook-text-1.0.png | 331994766DE3D29B7F1165436FC8E404A654F9E5384BB5DE440A3778A082596B |

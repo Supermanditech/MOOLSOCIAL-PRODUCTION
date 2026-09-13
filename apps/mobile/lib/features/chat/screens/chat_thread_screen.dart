@@ -1975,6 +1975,29 @@ class _ChatCommerceContextCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final facts = commerceContext.decisionFacts;
+    final leading = CircleAvatar(
+      backgroundColor: MoolColors.navy.withValues(alpha: .08),
+      foregroundColor: MoolColors.navy,
+      child: Icon(
+        commerceContext.isOrderConversation
+            ? Icons.receipt_long_outlined
+            : Icons.inventory_2_outlined,
+      ),
+    );
+    final title = Text(
+      commerceContext.contextLabel,
+      style: const TextStyle(
+        color: MoolColors.navy,
+        fontWeight: FontWeight.w900,
+      ),
+    );
+    final subtitle = Text(
+      commerceContext.productTitle ??
+          commerceContext.orderId ??
+          commerceContext.title,
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
     return Material(
       key: const Key('chat-commerce-context-card'),
       color: Colors.white,
@@ -1983,79 +2006,66 @@ class _ChatCommerceContextCard extends StatelessWidget {
         side: BorderSide(color: MoolColors.navy.withValues(alpha: .10)),
       ),
       clipBehavior: Clip.antiAlias,
-      child: ExpansionTile(
-        key: const Key('chat-commerce-context-expand'),
-        leading: CircleAvatar(
-          backgroundColor: MoolColors.navy.withValues(alpha: .08),
-          foregroundColor: MoolColors.navy,
-          child: Icon(
-            commerceContext.isOrderConversation
-                ? Icons.receipt_long_outlined
-                : Icons.inventory_2_outlined,
-          ),
-        ),
-        title: Text(
-          commerceContext.contextLabel,
-          style: const TextStyle(
-            color: MoolColors.navy,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        subtitle: Text(
-          commerceContext.productTitle ??
-              commerceContext.orderId ??
-              commerceContext.title,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-        ),
-        childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
-        children: [
-          const Divider(height: 1),
-          const SizedBox(height: MoolSpacing.sm),
-          for (final fact in facts)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 7),
-              child: Row(
-                key: Key('chat-commerce-fact-${_factKey(fact.label)}'),
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
-                    width: 108,
-                    child: Text(
-                      fact.label,
-                      style: const TextStyle(
-                        color: MoolColors.muted,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
+      child: facts.isEmpty && commerceContext.productAppRoute == null
+          ? ListTile(
+              key: const Key('chat-commerce-context-summary'),
+              leading: leading,
+              title: title,
+              subtitle: subtitle,
+            )
+          : ExpansionTile(
+              key: const Key('chat-commerce-context-expand'),
+              leading: leading,
+              title: title,
+              subtitle: subtitle,
+              childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              children: [
+                const Divider(height: 1),
+                const SizedBox(height: MoolSpacing.sm),
+                for (final fact in facts)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 7),
+                    child: Row(
+                      key: Key('chat-commerce-fact-${_factKey(fact.label)}'),
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 108,
+                          child: Text(
+                            fact.label,
+                            style: const TextStyle(
+                              color: MoolColors.muted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: Text(
+                            fact.value,
+                            style: const TextStyle(
+                              color: MoolColors.navy,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  Expanded(
-                    child: Text(
-                      fact.value,
-                      style: const TextStyle(
-                        color: MoolColors.navy,
-                        fontWeight: FontWeight.w700,
-                      ),
+                if (commerceContext.productAppRoute != null) ...[
+                  const SizedBox(height: MoolSpacing.xs),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      key: const Key('chat-commerce-open-product'),
+                      onPressed: onOpenProduct,
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('View product'),
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
-          if (commerceContext.productAppRoute != null) ...[
-            const SizedBox(height: MoolSpacing.xs),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                key: const Key('chat-commerce-open-product'),
-                onPressed: onOpenProduct,
-                icon: const Icon(Icons.open_in_new_rounded),
-                label: const Text('View product'),
-              ),
-            ),
-          ],
-        ],
-      ),
     );
   }
 }

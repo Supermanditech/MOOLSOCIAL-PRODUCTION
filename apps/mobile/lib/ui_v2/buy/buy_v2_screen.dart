@@ -367,6 +367,10 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   final Map<BuyV2Destination, BuyV2Product> _storeBrowseAnchors = {};
   int _storeProductRouteDepth = 0;
   int _partnerCatalogueDepth = 0;
+  ({BuyV2Session session, String productId, Object account, int generation})?
+  _storeQuestionReturn;
+  int _storeQuestionGeneration = 0;
+  bool _storeQuestionWasCovered = false;
   BuyV2View? _observedStoreSessionView;
   int? _retainedStoreEmptyCartSequence;
   int _storeNavigationGeneration = 0;
@@ -421,6 +425,26 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final isCurrent = ModalRoute.of(context)?.isCurrent ?? true;
+    final pending = _storeQuestionReturn;
+    if (pending == null) return;
+    if (!isCurrent) {
+      _storeQuestionWasCovered = true;
+      return;
+    }
+    if (!_storeQuestionWasCovered) return;
+    _storeQuestionWasCovered = false;
+    // Buy can become visible before the Chat push Future completes.
+    // Restore only this request, on the same account and Buy session.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || ModalRoute.of(context)?.isCurrent == false) return;
+      _restoreStoreQuestion(pending.generation);
+    });
+  }
+
+  @override
   void didUpdateWidget(covariant BuyV2Screen oldWidget) {
     super.didUpdateWidget(oldWidget);
     var restoreState = false;
@@ -441,6 +465,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _quickTrackerMinimized = true;
     }
     if (oldWidget.session != widget.session) {
+      _storeQuestionReturn = null;
+      _storeQuestionWasCovered = false;
       _relatedProductScrollOrigins.clear();
       _observedRootProductId = widget.session.view == BuyV2View.product
           ? widget.session.selectedProductId
@@ -2092,23 +2118,51 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   Future<void> _openStoreQuestionRoute(BuyV2Product product) async {
+    final session = widget.session;
+    final generation = ++_storeQuestionGeneration;
+    _storeQuestionReturn = (
+      session: session,
+      productId: product.id,
+      account: _arrivalIdentity,
+      generation: generation,
+    );
+    _storeQuestionWasCovered = false;
     try {
       await context.push(
         const BuyV2ChatRouteAdapter().storeQuestionLocationFor(anchor: product),
       );
     } on ArgumentError {
-      widget.session.clearStoreReturnAnchor();
-      widget.session.showNotice(
+      if (!mounted ||
+          _storeQuestionReturn?.generation != generation ||
+          widget.session != session ||
+          _storeQuestionReturn?.account != _arrivalIdentity) {
+        return;
+      }
+      _storeQuestionReturn = null;
+      _storeQuestionWasCovered = false;
+      session.clearStoreReturnAnchor();
+      session.showNotice(
         'Store Chat is unavailable right now. Your products are unchanged.',
       );
       return;
     }
-    if (!mounted) return;
-    final anchorId = widget.session.takeStoreReturnAnchor(
-      routeProductId: product.id,
+    _restoreStoreQuestion(generation);
+  }
+
+  void _restoreStoreQuestion(int generation) {
+    final pending = _storeQuestionReturn;
+    if (!mounted || pending == null || pending.generation != generation) return;
+    _storeQuestionReturn = null;
+    _storeQuestionWasCovered = false;
+    final session = pending.session;
+    final anchorId = session.takeStoreReturnAnchor(
+      routeProductId: pending.productId,
     );
-    if (anchorId == null) return;
-    final anchor = widget.session.findProduct(anchorId);
+    if (anchorId == null || widget.session != session ||
+        pending.account != _arrivalIdentity || !session.procurementScopeCurrent) {
+      return;
+    }
+    final anchor = session.findProduct(anchorId);
     if (anchor != null) _openPartnerCatalogue(anchor);
   }
 

@@ -9404,6 +9404,73 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('RV6 D013 Store return rejects a changed account context', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final session = BuyV2Session(core: BuySession());
+    final authenticated = ValueNotifier(true);
+    addTearDown(session.dispose);
+    addTearDown(authenticated.dispose);
+    final router = GoRouter(
+      initialLocation: '/buy',
+      routes: [
+        GoRoute(
+          path: '/buy',
+          builder: (context, state) => ValueListenableBuilder<bool>(
+            valueListenable: authenticated,
+            builder: (context, value, _) =>
+                BuyV2Screen(session: session, accountAuthenticated: value),
+          ),
+        ),
+        GoRoute(
+          path: '/app/chat/thread/:threadId',
+          builder: (context, state) => const Scaffold(
+            key: ValueKey('d013-context-chat'),
+            body: Text('Conversation'),
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MaterialApp.router(theme: MoolTheme.light(), routerConfig: router),
+    );
+    await tester.pumpAndSettle();
+    expect(session.openProduct('s-eggs'), isTrue);
+    await tester.pumpAndSettle();
+    final storeAction = find.byKey(
+      const ValueKey('buy-shop-seller-action-s-eggs'),
+    );
+    await tester.scrollUntilVisible(
+      storeAction,
+      220,
+      scrollable: scrollableWithin(const PageStorageKey('buy-product-s-eggs')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(storeAction);
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-public-store-ask')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('d013-context-chat')), findsOneWidget);
+    authenticated.value = false;
+    await tester.pumpAndSettle();
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+    final storeSheet = find.byKey(
+      const ValueKey('buy-shop-seller-sheet-s-eggs'),
+    );
+    expect(storeSheet, findsNothing);
+    expect(session.takeStoreReturnAnchor(routeProductId: 's-eggs'), isNull);
+    authenticated.value = true;
+    await tester.pumpAndSettle();
+    expect(storeSheet, findsNothing);
+    expect(session.cartLines, isEmpty);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Android Back from store Chat restores the Cart-origin store', (
     tester,
   ) async {

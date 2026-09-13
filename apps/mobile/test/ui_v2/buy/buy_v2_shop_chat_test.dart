@@ -919,6 +919,164 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final id in ['s-dog-food', 'w-notebook']) {
+    for (final scale in [1.0, 2.0]) {
+      for (final linkedEntry in [false, true]) {
+        testWidgets(
+          'RV6 D013 Store context stays static $id text $scale linked $linkedEntry',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = const Size(390, 844);
+            addTearDown(tester.view.reset);
+            tester.platformDispatcher.textScaleFactorTestValue = scale;
+            addTearDown(
+              tester.platformDispatcher.clearTextScaleFactorTestValue,
+            );
+            final journey = await readyJourney();
+            final chat = ChatSession();
+            addTearDown(journey.dispose);
+            addTearDown(chat.dispose);
+            final shop = id.startsWith('s-');
+            final destination = shop ? 'shop' : 'wholesale';
+            final location =
+                '/app/buy?sub=$destination${linkedEntry ? '&view=product&product=$id' : ''}';
+            await tester.pumpWidget(
+              r66VisualCaptureRoot(
+                MoolSocialApp(
+                  session: journey,
+                  chatSession: chat,
+                  initialLocation: location,
+                ),
+              ),
+            );
+            await tester.pumpAndSettle();
+            final buy = tester
+                .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+                .session;
+            if (!linkedEntry) {
+              expect(buy.openProduct(id), isTrue);
+              await tester.pumpAndSettle();
+            }
+            final store = find.byKey(
+              ValueKey(
+                '${shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-$id',
+              ),
+            );
+            final productScroll = find
+                .descendant(
+                  of: find.byKey(PageStorageKey('buy-product-$id')),
+                  matching: find.byWidgetPredicate(
+                    (widget) =>
+                        widget is Scrollable &&
+                        widget.axisDirection == AxisDirection.down,
+                  ),
+                )
+                .first;
+            await tester.scrollUntilVisible(
+              store,
+              180,
+              scrollable: productScroll,
+            );
+            await Scrollable.ensureVisible(
+              tester.element(store),
+              alignment: .5,
+            );
+            await tester.pumpAndSettle();
+            expect(store.hitTestable(), findsOneWidget);
+            await tester.tap(store);
+            await tester.pumpAndSettle();
+            final prefix = shop ? 'buy-shop-seller' : 'buy-wholesale-supplier';
+            final storeSheet = find.byKey(ValueKey('$prefix-sheet-$id'));
+            expect(storeSheet, findsOneWidget);
+            String? retainedDraft;
+            for (final androidBack in [false, true]) {
+              final ask = find.byKey(const ValueKey('buy-public-store-ask'));
+              await tester.ensureVisible(ask);
+              expect(ask.hitTestable(), findsOneWidget);
+              await tester.tap(ask);
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(const Key('chat-thread-screen')),
+                findsOneWidget,
+              );
+              expect(storeSheet, findsNothing);
+              final card = find.byKey(const Key('chat-commerce-context-card'));
+              expect(card, findsOneWidget);
+              expect(
+                find.byKey(const Key('chat-commerce-context-expand')),
+                findsNothing,
+              );
+              final summary = find.byKey(
+                const Key('chat-commerce-context-summary'),
+              );
+              expect(summary, findsOneWidget);
+              expect(tester.widget<ListTile>(summary).onTap, isNull);
+              expect(tester.widget<ListTile>(summary).trailing, isNull);
+              expect(
+                find.descendant(of: card, matching: find.byType(Divider)),
+                findsNothing,
+              );
+              expect(find.text('Store conversation'), findsOneWidget);
+              expect(
+                find.descendant(
+                  of: card,
+                  matching: find.text(buy.product(id).seller),
+                ),
+                findsOneWidget,
+              );
+              final draftField = find.byKey(const Key('chat-message-field'));
+              final draft = tester
+                  .widget<TextField>(draftField)
+                  .controller!
+                  .text;
+              expect(draft, contains('I have a question for'));
+              if (retainedDraft != null) expect(draft, retainedDraft);
+              retainedDraft = draft;
+              final height = tester.getSize(card).height;
+              await tester.tap(find.text('Store conversation'));
+              await tester.pumpAndSettle();
+              expect(tester.getSize(card).height, height);
+              expect(
+                tester.widget<TextField>(draftField).controller!.text,
+                draft,
+              );
+              expect(tester.takeException(), isNull);
+              if (!linkedEntry && !androidBack) {
+                await captureR66Visual(
+                  tester,
+                  'rv6-d013-static-context-$id-text-$scale',
+                );
+              }
+              if (androidBack) {
+                await tester.binding.handlePopRoute();
+              } else {
+                await tester.tap(find.byKey(const Key('chat-back')));
+              }
+              await tester.pumpAndSettle();
+              expect(find.byKey(const Key('chat-thread-screen')), findsNothing);
+              expect(storeSheet, findsOneWidget);
+              expect(buy.selectedProductId, id);
+              expect(buy.cartLines, isEmpty);
+              expect(tester.takeException(), isNull);
+              if (!linkedEntry && androidBack) {
+                await captureR66Visual(
+                  tester,
+                  'rv6-d013-store-return-$id-text-$scale',
+                );
+              }
+            }
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(storeSheet, findsNothing);
+            expect(buy.view, BuyV2View.product);
+            expect(buy.selectedProductId, id);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
+
   testWidgets('product and order-items Chat return to their exact subtap', (
     tester,
   ) async {
