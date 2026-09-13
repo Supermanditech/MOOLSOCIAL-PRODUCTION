@@ -1139,3 +1139,12 @@ Broad type-name search produced truncated output;recovered with exact constructo
 Classified71 legacy/contextual widget callback candidates as not mounted by the public Buy route. This does not exclude shared Chat: inbox/thread controls and connected destinations remain required, with original CHAT/ORDERHELP/Store-chat evidence retained. No host/source result promoted to device pass. Shared Chat candidate indexing and semantic reconciliation remain unfinished.
 
 93 of527 lexical candidates now classified (scanner15,video7,contextual chat71);434 remain unclassified. These are source occurrences,not unique journeys or missing device tests. All defect/device/data counts unchanged;full audit open.
+
+
+## Round 90 - Report sheet Close and Android Back on Redmi
+
+- Fresh physical capture 739 re-established the Store Oil and ghee page 1-40 of 238 before any tap. Opened Refined sunflower oil 3 (740), scrolled to product reviews (741), opened Report issue (742).
+- Close icon dismissed the unselected report sheet and restored the same product position (743). Reopened (744), then Android Back also dismissed only the sheet and restored that position (745). Two device passes; no new defect. No report was sent and no cart/address/order data was changed.
+- Source read: buy_v2_views.dart 5083-5319. Reason selection clears rejection; submit disables while busy; accepted response closes; rejection stays with session notice. These submission outcomes are source inventory only, not device passes. Existing REPORT-001 through REPORT-006 cover opening, all four reasons and Cancel. Selected-reason alternate dismissal, barrier/drag, enlarged-text and submission descendants remain unqualified. REVIEW-001 through REVIEW-003 only qualify ineligible review/recheck/Back, not eligible review submission.
+- Seven new reviewed captures, 745 physical captures total; 747 evidence rows; 481 action rows including 383 device passes. Seventeen distinct confirmed defects unchanged. The unique-journey denominator remains incomplete.
+- Read/recovery disclosure: combined policy output truncated; no product mutation followed; existing coordination gate was rerun and exited 0. First evidence-append command had a parse-time unmatched parenthesis and exited 1 before execution; corrected bounded append completed under standing recovery authorization. No policy/checker changes.
