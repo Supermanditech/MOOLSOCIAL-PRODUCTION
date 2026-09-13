@@ -2475,3 +2475,46 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | qualified/rv6-d014-w-notebook-full-MS-240782-text-1.0.png | 127F05F7711394A931E2E82ABFE87F0497F97AF93325A69AEE7F8BEC5A7188E6 |
 | qualified/rv6-d014-w-notebook-full-MS-240782-text-2.0.png | CB60B177147AAAC4B4512072E5A74427E840046C4E954DBC84A8793FD90F4E2F |
 | route-completion-fix.log | D75FF63DF2B852FB56E5CC0652314E8D753517D706712B37484F75FE79262F7E |
+
+## RV6-D015 local qualification - 2026-09-14
+
+- Scope: original483-490 Recently Viewed closed Adult dog food and unavailable Daily care shampoo incorrectly offered Add without sheet-local recovery. Start da26e9ff88616262c6677b0cb7903fd952b42656; D014 committed/pushed, clean and live remote-equal at previous boundary. Existing36-owner implementation gate passed (1ec3d8,terminal0). No new owner admission or policy/checker change.
+- Source owner: apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart. Recently Viewed rows now use the existing buyV2ResolveProductOfferDecision, matching catalogue orderability. Non-orderable rows show its closure/unavailability detail in neutral styling and a Details control opening the exact product. Available rows retain Add/Added. Session.addProduct remains authoritative and unchanged; rejected additions now show the actual notice in a visible modal above the sheet, with Close and View product recovery. No bypass of Store closure, availability, procurement or account requirements.
+- Test owner: apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart. Six new cases exercise real Shopping tools -> Recently Viewed -> Details/product -> Android Back with the recorded two Shop products and a ready Wholesale notebook whose business verification rejects Add. At320x568,100/200% text and48px bottom safe area: no blocked Add, exact explanation, action above system navigation, dialog Close/retry/View product, exact history/product/address and unchanged Cart. Previous test bodies preserved; formatter changes outside the new block were discarded without discarding user work. Local entry uses the normal catalogue tools; original SavedShop setup and physical taps483-490 remain for the authorized successor Redmi round.
+- Initial existing Recently Viewed suite29passed (42085 terminal0/1ca02e). Initial new-test failures were setup taps beneath the sheet footer and an assertion expecting the word unavailable instead of the shared decision's actual cannot be added to Cart wording. Corrected scrolling/settling/hit-test preconditions and exact expected explanation, without weakening the product constraints. focused-first.log and focused-visible.log preserve those failures; focused-recovery.log then6passed (95346 terminal0/18fb1e).
+- First actual Flutter capture run6passed (40459 terminal0/6d159d). Visual review found the new default dialog heading consumed too much space at200%. Changed only that dialog to titleMedium and explicit scrolling, preserving text scaling. Final6cases pass (79010 terminal0/91d2e1), including an assertion that the final explanation line is reachable above the actions. Final12captures reviewed: six row action views, three200% initial scroll views, two dialog views and the200% dialog end. The six final row images are hash-identical to their already inspected preliminary counterparts; final dialog and scroll-start images were inspected directly. At200% the existing history list requires vertical scrolling; first and action positions are retained, not claimed simultaneously visible. Unavailable supplier media remains an explicit placeholder, not verified media delivery.
+- Connected regression before the two-line dialog fit refinement: flutter test --no-pub test/ui_v2/buy/buy_v2_screen_test.dart test/ui_v2/buy/buy_v2_recently_viewed_test.dart --reporter expanded;339passed/0failures (96591 terminal0/fc2d20). Final affected verification after refinement: six focused cases above plus29existing Recently Viewed cases (26066 terminal0/9cadba); analysis of both Dart owners zero issues (c2e8d0 terminal0). Counts overlap and must not be added as unique coverage. Final test-only formatting is semantic-preserving. Full all22 combined regression remains required before APK.
+- No APK/build/install/device action or closure. D015 remains open pending complete checksum-bound successor Redmi verification of483-490 and directly affected recovery; no host-to-device qualification claim. Frozen514 passes/1177 artifacts unchanged. No backend, broad audit, OPPO, integration or child implementation.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d015-local-20260914. The historical directory named qualified is preliminary; final is the reviewed final visual set. All retained logs and captures are hashed below.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | 122C3D65116017DAC91FE3E87D0A1D3B2826807479E3277D1286AE63A571610D |
+| connected-regression.log | D2822D437FBE58D6AC4EC11F31A88FE9A8FCE81FC581EA018CDF2805E46071EC |
+| existing-recent-regression.log | E6A07E9FD95C90480AE5914E3637B60C4F51DEA82B771A6FBA74A55F08B2EBBF |
+| final/rv6-d015-s-dog-food-row-start-text-2.0.png | A20AF03479A55B416432CA84AA4D6116B2E3E76026262A114FF9F94C70D5CE4F |
+| final/rv6-d015-s-dog-food-row-text-1.0.png | 973C3536F15F1FA600379C35194B0971C349C730F531AC420DFE287ABF52AE8F |
+| final/rv6-d015-s-dog-food-row-text-2.0.png | 0E5CA8E6BE67F87C9D9BDE626C0A34CFE3617B65B7306EC60DFE034B7372E2E7 |
+| final/rv6-d015-s-shampoo-row-start-text-2.0.png | CA39532BF40948A3BF992EC3574FA75E8A6D91FFE23FEDA5F5FB941EA1E9BE02 |
+| final/rv6-d015-s-shampoo-row-text-1.0.png | 4D3999F64CC168DBB29F813EE04F8514AFFF263D1A6EE977158594EF1CC9A940 |
+| final/rv6-d015-s-shampoo-row-text-2.0.png | A1B3499DA748FBCAEE720EDC48341EC0A041740DC91D762F9144CEBDD17E6ECC |
+| final/rv6-d015-w-notebook-rejection-end-text-2.0.png | 14051B0CEE27C5D3A1225E25B5C4CCBA7E1AE2AC20A07C8B053092C7179AA81F |
+| final/rv6-d015-w-notebook-rejection-text-1.0.png | 2AFB48FB6F7BAE40DB5291C2C577B7A9EED3AC811EA246CBE6F0B85793B5DB91 |
+| final/rv6-d015-w-notebook-rejection-text-2.0.png | 14051B0CEE27C5D3A1225E25B5C4CCBA7E1AE2AC20A07C8B053092C7179AA81F |
+| final/rv6-d015-w-notebook-row-start-text-2.0.png | FAB7A2BCC7545FA33C4263FC2166C966738813F81284F9B3B005C2C554B76910 |
+| final/rv6-d015-w-notebook-row-text-1.0.png | 59ECCF8D064F0F8A6894F50FFC0490EB129B0D25F09196BEAE2774D135AF97F2 |
+| final/rv6-d015-w-notebook-row-text-2.0.png | E88AE70A28AD9AF4A0BAB5FF2CC9F6D3915EB0AA18B50C6BD83560D9D1B466B4 |
+| final-focused.log | 2FED576D2280748A9F2CD407612707C864D4556E267737EA8DE4442187A66F65 |
+| final-recent-regression.log | A386178C771A72728E73E0D40EBB3F3AED7C854CFF7DB55BA15ACC36F6514A6D |
+| focused-first.log | F230FE947CFDEFE58451084A2A1AF03CADCA6CD7E5934FE3D2731E5BEA227477 |
+| focused-recovery.log | E7D67DDC878B82781C132256315425D7CB77312FCBA2390F221CA1970D82A9D3 |
+| focused-visible.log | CD7A1B7608FD97563E1D241EEAB13E0D7B9E2B3D07714789E1F27098D058F7D6 |
+| qualified/rv6-d015-s-dog-food-row-text-1.0.png | 973C3536F15F1FA600379C35194B0971C349C730F531AC420DFE287ABF52AE8F |
+| qualified/rv6-d015-s-dog-food-row-text-2.0.png | 0E5CA8E6BE67F87C9D9BDE626C0A34CFE3617B65B7306EC60DFE034B7372E2E7 |
+| qualified/rv6-d015-s-shampoo-row-text-1.0.png | 4D3999F64CC168DBB29F813EE04F8514AFFF263D1A6EE977158594EF1CC9A940 |
+| qualified/rv6-d015-s-shampoo-row-text-2.0.png | A1B3499DA748FBCAEE720EDC48341EC0A041740DC91D762F9144CEBDD17E6ECC |
+| qualified/rv6-d015-w-notebook-rejection-text-1.0.png | 94F92F494C7E3B88D76CB80B5B46E21D1A32A521A294D2D4A3D866AB725B3D4B |
+| qualified/rv6-d015-w-notebook-rejection-text-2.0.png | 1F8B164222E48FC7BCAB2710F0E6C7700E266056828F2AA396BC64504EF18B53 |
+| qualified/rv6-d015-w-notebook-row-text-1.0.png | 59ECCF8D064F0F8A6894F50FFC0490EB129B0D25F09196BEAE2774D135AF97F2 |
+| qualified/rv6-d015-w-notebook-row-text-2.0.png | E88AE70A28AD9AF4A0BAB5FF2CC9F6D3915EB0AA18B50C6BD83560D9D1B466B4 |
+| visual-focused.log | A0E31B0F627B54614CB033A447022649C43CF5B8A4146FD63F7B417DBF67B1E6 |

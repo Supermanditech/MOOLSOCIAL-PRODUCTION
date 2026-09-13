@@ -7352,6 +7352,38 @@ class _RecentlyViewedProductsSheet extends StatelessWidget {
   final ValueChanged<String> onOpenProduct;
   final VoidCallback onClear;
 
+  Future<void> _addProduct(BuildContext context, BuyV2Product product) async {
+    if (session.addProduct(product.id)) return;
+    final message =
+        session.notice ??
+        'Open product details to review the requirements before adding to Cart.';
+    final openProduct = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        key: ValueKey('buy-recently-viewed-rejection-${product.id}'),
+        title: const Text('Could not add to Cart'),
+        titleTextStyle: Theme.of(dialogContext).textTheme.titleMedium,
+        scrollable: true,
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Close'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('View product'),
+          ),
+        ],
+      ),
+    );
+    if (openProduct == true &&
+        context.mounted &&
+        session.procurementScopeCurrent) {
+      onOpenProduct(product.id);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final sheetHeight = (MediaQuery.sizeOf(context).height * .58)
@@ -7439,7 +7471,9 @@ class _RecentlyViewedProductsSheet extends StatelessWidget {
                                     product: product,
                                     facts: session.productFactsFor(product),
                                     onOpen: () => onOpenProduct(product.id),
-                                    onAdd: () => session.addProduct(product.id),
+                                    onAdd: () => unawaited(
+                                      _addProduct(context, product),
+                                    ),
                                     quantity: session.quantityFor(product.id),
                                   );
                                 },
@@ -7516,131 +7550,156 @@ class _RecentlyViewedProductInfoRow extends StatelessWidget {
   final int quantity;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-    container: true,
-    explicitChildNodes: true,
-    child: Material(
-      color: Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(16),
-        side: const BorderSide(color: BuyV2Colors.line),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final details = Semantics(
-              button: true,
-              label: 'Open ${product.title}, ${product.pack}',
-              onTap: onOpen,
-              excludeSemantics: true,
-              child: InkWell(
-                key: ValueKey(
-                  'buy-settings-recently-viewed-product-${product.id}',
-                ),
-                onTap: onOpen,
-                borderRadius: BorderRadius.circular(12),
-                child: Row(
-                  children: [
-                    SizedBox.square(
-                      dimension: 48,
-                      child: BuyV2ProductPackshot(
-                        product: product,
-                        borderRadius: 12,
-                        animateFirstFrame: false,
-                      ),
-                    ),
-                    const SizedBox(width: 9),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            product.title,
-                            style: const TextStyle(
-                              color: BuyV2Colors.ink,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${product.pack} · ${buyV2Money(facts.price)}',
-                            style: context.buyMeta,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            buyV2BuyerDeliveryPromise(facts),
-                            style: context.buyMeta.copyWith(
-                              color: BuyV2Colors.green,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-            final add = ConstrainedBox(
-              constraints: const BoxConstraints(
-                minWidth: 76,
-                minHeight: BuyV2Metrics.minimumTap,
-              ),
-              child: Semantics(
+  Widget build(BuildContext context) {
+    final decision = buyV2ResolveProductOfferDecision(
+      product: product,
+      facts: facts,
+    );
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      child: Material(
+        color: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: const BorderSide(color: BuyV2Colors.line),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 7, 8, 7),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final details = Semantics(
                 button: true,
-                label: quantity > 0
-                    ? '${product.title} is in Cart'
-                    : 'Add ${product.title} to cart',
-                child: FilledButton.tonalIcon(
-                  key: ValueKey('buy-recently-viewed-add-${product.id}'),
-                  onPressed: onAdd,
-                  icon: Icon(
-                    quantity > 0
-                        ? Icons.check_rounded
-                        : Icons.add_shopping_cart_rounded,
-                    size: 17,
+                label: 'Open ${product.title}, ${product.pack}',
+                onTap: onOpen,
+                excludeSemantics: true,
+                child: InkWell(
+                  key: ValueKey(
+                    'buy-settings-recently-viewed-product-${product.id}',
                   ),
-                  label: Text(quantity > 0 ? 'Added' : 'Add'),
-                  style: FilledButton.styleFrom(
-                    minimumSize: const Size(76, BuyV2Metrics.minimumTap),
-                    padding: const EdgeInsets.symmetric(horizontal: 9),
-                    textStyle: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w900,
+                  onTap: onOpen,
+                  borderRadius: BorderRadius.circular(12),
+                  child: Row(
+                    children: [
+                      SizedBox.square(
+                        dimension: 48,
+                        child: BuyV2ProductPackshot(
+                          product: product,
+                          borderRadius: 12,
+                          animateFirstFrame: false,
+                        ),
+                      ),
+                      const SizedBox(width: 9),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              product.title,
+                              style: const TextStyle(
+                                color: BuyV2Colors.ink,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${product.pack} · ${buyV2Money(facts.price)}',
+                              style: context.buyMeta,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              decision.canAdd
+                                  ? buyV2BuyerDeliveryPromise(facts)
+                                  : decision.detail,
+                              key: ValueKey(
+                                'buy-recently-viewed-availability-${product.id}',
+                              ),
+                              style: context.buyMeta.copyWith(
+                                color: decision.canAdd
+                                    ? BuyV2Colors.green
+                                    : BuyV2Colors.muted,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+              final add = ConstrainedBox(
+                constraints: const BoxConstraints(
+                  minWidth: 76,
+                  minHeight: BuyV2Metrics.minimumTap,
+                ),
+                child: Semantics(
+                  button: true,
+                  label: !decision.canAdd
+                      ? 'Review ${product.title}. ${decision.statusLabel}'
+                      : quantity > 0
+                      ? '${product.title} is in Cart'
+                      : 'Add ${product.title} to cart',
+                  child: FilledButton.tonalIcon(
+                    key: ValueKey(
+                      decision.canAdd
+                          ? 'buy-recently-viewed-add-${product.id}'
+                          : 'buy-recently-viewed-review-${product.id}',
+                    ),
+                    onPressed: decision.canAdd ? onAdd : onOpen,
+                    icon: Icon(
+                      !decision.canAdd
+                          ? Icons.info_outline_rounded
+                          : quantity > 0
+                          ? Icons.check_rounded
+                          : Icons.add_shopping_cart_rounded,
+                      size: 17,
+                    ),
+                    label: Text(
+                      !decision.canAdd
+                          ? 'Details'
+                          : quantity > 0
+                          ? 'Added'
+                          : 'Add',
+                    ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(76, BuyV2Metrics.minimumTap),
+                      padding: const EdgeInsets.symmetric(horizontal: 9),
+                      textStyle: Theme.of(context).textTheme.labelLarge
+                          ?.copyWith(fontSize: 10, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
-              ),
-            );
-            // Keep purchase facts readable beside the image. Move the action
-            // below them when narrow or enlarged text needs the row width.
-            if (constraints.maxWidth /
-                    MediaQuery.textScalerOf(context).scale(1) <
-                330) {
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
+              );
+              // Keep purchase facts readable beside the image. Move the action
+              // below them when narrow or enlarged text needs the row width.
+              if (constraints.maxWidth /
+                      MediaQuery.textScalerOf(context).scale(1) <
+                  330) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    details,
+                    const SizedBox(height: 4),
+                    Align(alignment: Alignment.centerRight, child: add),
+                  ],
+                );
+              }
+              return Row(
                 children: [
-                  details,
-                  const SizedBox(height: 4),
-                  Align(alignment: Alignment.centerRight, child: add),
+                  Expanded(child: details),
+                  const SizedBox(width: 7),
+                  add,
                 ],
               );
-            }
-            return Row(
-              children: [
-                Expanded(child: details),
-                const SizedBox(width: 7),
-                add,
-              ],
-            );
-          },
+            },
+          ),
         ),
       ),
-    ),
-  );
+    );
+  }
 }
 
 class _SavedProductsEmptyState extends StatelessWidget {

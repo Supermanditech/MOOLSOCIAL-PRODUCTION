@@ -9405,6 +9405,179 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    for (final id in ['s-dog-food', 's-shampoo', 'w-notebook']) {
+      testWidgets('RV6 D015 recent availability and recovery $id text $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(320, 568);
+        addTearDown(tester.view.reset);
+        final session = BuyV2Session(core: BuySession());
+        addTearDown(session.dispose);
+        final destination = id.startsWith('w-')
+            ? BuyV2Destination.wholesale
+            : BuyV2Destination.shop;
+        session.openDestination(destination);
+        expect(session.openProduct(id), isTrue);
+        session.goBack();
+        final history = session
+            .recentlyViewedProductsFor(destination)
+            .map((p) => p.id)
+            .toList();
+        final address = session.selectedAddress.id;
+        if (id == 'w-notebook') session.businessVerified = false;
+        await tester.pumpWidget(
+          app(
+            session,
+            initialDestination: destination,
+            textScale: scale,
+            safePadding: const EdgeInsets.only(bottom: 48),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+        await tester.pumpAndSettle();
+        final filterScroll = find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final tools = find.byKey(const ValueKey('buy-refine-section-tools'));
+        await tester.scrollUntilVisible(tools, 160, scrollable: filterScroll);
+        await tester.pumpAndSettle();
+        final toolsTitle = find.descendant(
+          of: tools,
+          matching: find.text('Shopping tools'),
+        );
+        await Scrollable.ensureVisible(
+          tester.element(toolsTitle),
+          alignment: .5,
+        );
+        await tester.pumpAndSettle();
+        expect(toolsTitle.hitTestable(), findsOneWidget);
+        await tester.tap(toolsTitle);
+        await tester.pumpAndSettle();
+        final recent = find.byKey(const ValueKey('buy-recently-viewed-button'));
+        await tester.scrollUntilVisible(recent, 100, scrollable: filterScroll);
+        await tester.pumpAndSettle();
+        await Scrollable.ensureVisible(tester.element(recent), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(recent.hitTestable(), findsOneWidget);
+        await tester.tap(recent);
+        await tester.pumpAndSettle();
+        final sheet = find.byKey(
+          const ValueKey('buy-recently-viewed-info-sheet'),
+        );
+        expect(sheet, findsOneWidget);
+        final scroll = find
+            .descendant(of: sheet, matching: find.byType(Scrollable))
+            .last;
+        final action = find.byKey(
+          ValueKey(
+            id == 'w-notebook'
+                ? 'buy-recently-viewed-add-$id'
+                : 'buy-recently-viewed-review-$id',
+          ),
+        );
+        if (scale == 2.0) {
+          await captureR66Visual(tester, 'rv6-d015-$id-row-start-text-$scale');
+        }
+        await tester.scrollUntilVisible(action, 100, scrollable: scroll);
+        await tester.pumpAndSettle();
+        expect(action.hitTestable(), findsOneWidget);
+        expect(tester.getRect(action).bottom, lessThanOrEqualTo(520));
+        if (id != 'w-notebook') {
+          expect(
+            find.byKey(ValueKey('buy-recently-viewed-add-$id')),
+            findsNothing,
+          );
+          final availability = tester.widget<Text>(
+            find.byKey(ValueKey('buy-recently-viewed-availability-$id')),
+          );
+          expect(
+            availability.data,
+            contains(id == 's-dog-food' ? 'closed' : 'cannot be added to Cart'),
+          );
+        }
+        await captureR66Visual(tester, 'rv6-d015-$id-row-text-$scale');
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(id), 0);
+        if (id == 'w-notebook') {
+          final dialog = find.byKey(
+            ValueKey('buy-recently-viewed-rejection-$id'),
+          );
+          expect(dialog, findsOneWidget);
+          expect(
+            find.descendant(
+              of: dialog,
+              matching: find.text(
+                'Complete your business profile to place a wholesale order.',
+              ),
+            ),
+            findsOneWidget,
+          );
+          await captureR66Visual(tester, 'rv6-d015-$id-rejection-text-$scale');
+          final explanation = find.descendant(
+            of: dialog,
+            matching: find.text(
+              'Complete your business profile to place a wholesale order.',
+            ),
+          );
+          await Scrollable.ensureVisible(
+            tester.element(explanation),
+            alignment: 1,
+          );
+          await tester.pumpAndSettle();
+          final close = find.descendant(
+            of: dialog,
+            matching: find.text('Close'),
+          );
+          expect(
+            tester.getRect(explanation).bottom,
+            lessThanOrEqualTo(tester.getRect(close).top),
+          );
+          if (scale == 2.0) {
+            await captureR66Visual(
+              tester,
+              'rv6-d015-$id-rejection-end-text-$scale',
+            );
+          }
+          await tester.tap(
+            find.descendant(of: dialog, matching: find.text('Close')),
+          );
+          await tester.pumpAndSettle();
+          expect(sheet, findsOneWidget);
+          await tester.tap(action);
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.descendant(of: dialog, matching: find.text('View product')),
+          );
+          await tester.pumpAndSettle();
+        }
+        expect(session.selectedProductId, id);
+        expect(session.view, BuyV2View.product);
+        expect(sheet.hitTestable(), findsNothing);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(sheet, findsOneWidget);
+        expect(
+          session.recentlyViewedProductsFor(destination).map((p) => p.id),
+          history,
+        );
+        expect(session.quantityFor(id), 0);
+        expect(session.selectedAddress.id, address);
+        expect(tester.takeException(), isNull);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(sheet, findsNothing);
+        expect(session.destination, destination);
+      });
+    }
+  }
+
   final d014Cases = [
     for (final id in ['s-dog-food', 'w-notebook'])
       for (final overlay in ['store', 'other-open', 'other-return', 'full'])
