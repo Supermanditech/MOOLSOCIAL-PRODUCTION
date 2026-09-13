@@ -911,26 +911,26 @@ Source hashes bind the following index to the inspected files:
 | SRC-0308 | buy_v2_views.dart:5295 | _ProductReportSheetState | onPressed | Report submission excluded; busy/rejection/accepted/duplicate states provider-unqualified |
 | SRC-0309 | buy_v2_views.dart:5364 | _AddressSelectionRequired | onPressed | unclassified |
 | SRC-0310 | buy_v2_views.dart:5421 | _MissingOrderSelection | onPressed | unclassified |
-| SRC-0311 | buy_v2_views.dart:5569 | _BuyV2CartViewState | onPressed | unclassified |
-| SRC-0312 | buy_v2_views.dart:5630 | _BuyV2CartViewState | onPressed | unclassified |
-| SRC-0313 | buy_v2_views.dart:5677 | _BuyV2CartViewState | onPressed | unclassified |
-| SRC-0314 | buy_v2_views.dart:5730 | _BuyV2CartViewState | onPressed | unclassified |
-| SRC-0315 | buy_v2_views.dart:5811 | _BuyV2CartViewState | onPressed | unclassified |
-| SRC-0316 | buy_v2_views.dart:6008 | _confirmBuyV2CartClear | onPressed | unclassified |
-| SRC-0317 | buy_v2_views.dart:6016 | _confirmBuyV2CartClear | onPressed | unclassified |
-| SRC-0318 | buy_v2_views.dart:6084 | _GstInvoiceCard | onTap | unclassified |
-| SRC-0319 | buy_v2_views.dart:6089 | _GstInvoiceCard | onTap | unclassified |
-| SRC-0320 | buy_v2_views.dart:6133 | _GstInvoiceCard | onChanged | unclassified |
-| SRC-0321 | buy_v2_views.dart:6163 | _GstInvoiceCard | onSelected | unclassified |
-| SRC-0322 | buy_v2_views.dart:6215 | _GstInvoiceCard | onPressed | unclassified |
-| SRC-0323 | buy_v2_views.dart:6255 | _GstInvoiceCard | onPressed | unclassified |
-| SRC-0324 | buy_v2_views.dart:6283 | _confirmRemoveGstProfile | onPressed | unclassified |
-| SRC-0325 | buy_v2_views.dart:6288 | _confirmRemoveGstProfile | onPressed | unclassified |
-| SRC-0326 | buy_v2_views.dart:6463 | _BuyV2GstInvoiceSheetState | onSubmitted | unclassified |
-| SRC-0327 | buy_v2_views.dart:6488 | _BuyV2GstInvoiceSheetState | onSubmitted | unclassified |
-| SRC-0328 | buy_v2_views.dart:6514 | _BuyV2GstInvoiceSheetState | onSubmitted | unclassified |
-| SRC-0329 | buy_v2_views.dart:6530 | _BuyV2GstInvoiceSheetState | onChanged | unclassified |
-| SRC-0330 | buy_v2_views.dart:6592 | _BuyV2GstInvoiceSheetState | onPressed | unclassified |
+| SRC-0311 | buy_v2_views.dart:5569 | _BuyV2CartViewState | onPressed | CART-ROUND12-05/06; MIXED-ROUND63-05/06; empty-disabled and resolution shortcut unqualified |
+| SRC-0312 | buy_v2_views.dart:5630 | _BuyV2CartViewState | onPressed | STORE-009 Continue browsing; D002 last-item removal context failure remains open |
+| SRC-0313 | buy_v2_views.dart:5677 | _BuyV2CartViewState | onPressed | Browse more products callback; exact nonempty-cart control needs device evidence reconciliation |
+| SRC-0314 | buy_v2_views.dart:5730 | _BuyV2CartViewState | onPressed | CART-ROUND12-04 empty Wholesale Browse; all/Shop variants not separately inferred |
+| SRC-0315 | buy_v2_views.dart:5811 | _BuyV2CartViewState | onPressed | MIXED-ROUND63-03/04 Review and Back; no-address continuation/pricing recovery conditional gaps |
+| SRC-0316 | buy_v2_views.dart:6008 | _confirmBuyV2CartClear | onPressed | CART-ROUND12-05 Keep Cart; MIXED-ROUND63-05 AndroidBack cancellation |
+| SRC-0317 | buy_v2_views.dart:6016 | _confirmBuyV2CartClear | onPressed | CART-ROUND12-06 Empty; MIXED-ROUND63-06 scoped Wholesale removal; async scope changes unqualified |
+| SRC-0318 | buy_v2_views.dart:6084 | _GstInvoiceCard | onTap | GST request accessibility callback; screen-reader activation unqualified; pointer SRC-0319 same business action |
+| SRC-0319 | buy_v2_views.dart:6089 | _GstInvoiceCard | onTap | GST-001 on; GST-ROUND79-04 off; destination/lifecycle variations unqualified |
+| SRC-0320 | buy_v2_views.dart:6133 | _GstInvoiceCard | onChanged | IgnorePointer Switch decorative callback; parent SRC-0319 performs toggle; not separate tap journey |
+| SRC-0321 | buy_v2_views.dart:6163 | _GstInvoiceCard | onSelected | Saved-profile selection/multiple profiles unqualified; auto-selected chip RV6-D017 observed GST-ROUND79-02 |
+| SRC-0322 | buy_v2_views.dart:6215 | _GstInvoiceCard | onPressed | GST-002 Add; existing-profile Edit remains unqualified |
+| SRC-0323 | buy_v2_views.dart:6255 | _GstInvoiceCard | onPressed | Restore-failure Retry conditional; failure fixture and restore outcome unqualified |
+| SRC-0324 | buy_v2_views.dart:6283 | _confirmRemoveGstProfile | onPressed | Remove-profile Keep dialog action unqualified |
+| SRC-0325 | buy_v2_views.dart:6288 | _confirmRemoveGstProfile | onPressed | GST-ROUND79-03 isolated Remove; multi-profile/cross-destination handling unqualified |
+| SRC-0326 | buy_v2_views.dart:6463 | _BuyV2GstInvoiceSheetState | onSubmitted | Legal-name keyboard Next focus transfer unqualified |
+| SRC-0327 | buy_v2_views.dart:6488 | _BuyV2GstInvoiceSheetState | onSubmitted | GSTIN keyboard Next focus transfer unqualified |
+| SRC-0328 | buy_v2_views.dart:6514 | _BuyV2GstInvoiceSheetState | onSubmitted | Billing-address keyboard Done unfocus unqualified |
+| SRC-0329 | buy_v2_views.dart:6530 | _BuyV2GstInvoiceSheetState | onChanged | GST-ROUND79-01 save with temporary reuse on; toggle off/restore lifecycle unqualified |
+| SRC-0330 | buy_v2_views.dart:6592 | _BuyV2GstInvoiceSheetState | onPressed | GST-003..005 invalid forms; GST-ROUND79-01 local save; full boundaries/busy/failure unqualified |
 | SRC-0331 | buy_v2_views.dart:6706 | _CheckoutQuoteCard | onPressed | unclassified |
 | SRC-0332 | buy_v2_views.dart:6857 | _CheckoutCommercialPaymentTerms | onPressed | unclassified |
 | SRC-0333 | buy_v2_views.dart:6969 | _CommercialPaymentTermGroup | onChanged | unclassified |
@@ -1192,3 +1192,16 @@ These are draft-selection resets followed by Apply/reopen, not proof of replacin
 Nineteen reviewed captures added: 767 physical captures, 769 evidence rows, 486 action rows including 388 device passes; 17 distinct confirmed defects unchanged. Cart untouched, original Saved1 visible766; no review/report/message/order/payment and no product/source implementation. Device remains on default Scheduled Shop refinement sheet767. Full source/action inventory and field mapping remain incomplete.
 
 Evidence edit recovery: first UAT update rejected an incorrect table-field-count assertion before writing; bounded row read confirmed five split fields; corrected operation under standing recovery authorization. Historical rows preserved except the four explicit reconciliation cells.
+
+
+## Round 94 - Cart and GST source-to-device reconciliation
+
+Read views.dart 5526-6058 and 6059-6646 in bounded source ranges and matched existing cart, Store, GST and mixed-cart rows. Reconciled SRC-0311..0330: twenty candidates, total142 classified /385 unclassified of527 lexical candidates. No new physical result or defect this source-only round. Round93 totals remain current.
+
+The initial lexical index misses InputChip.onDeleted at views.dart6166. Supplemental action SUP-GST-DELETE-01 is explicitly recorded here: open Remove GST details dialog from saved-profile chip; confirm isolated deletion qualified GST-ROUND79-03 (693-694), Keep remains unqualified, disabled delete when busy/persistence unavailable remains unqualified. This is a supplemental candidate, not a new defect or another completed journey. General completeness must include other callback APIs missed by the initial regex.
+
+Exact outstanding cart checks include nonempty Browse more products reconciliation; all/Shop empty Browse variants; empty-cart disabled trash; no-selected-address continuation from Review; resolution-required clear shortcut; changes while clear confirmation is open; account/process-death and pending-price recovery. Existing scoped mixed-cart removal passes do not qualify these descendants.
+
+Exact outstanding GST checks include saved-profile explicit selection and multiple profiles; edit/reuse; Keep cancellation; name/GSTIN/billing keyboard Next/Done; remember toggle off; validation boundary and whitespace/case behavior; restore Retry failure and busy controls; failed-save retention; account/destination/process-death isolation; enlarged text and screen reader. Existing successful local save does not qualify storage/privacy, issuer validity, invoice issuance or backend behavior. The form performs local format validation before controller.save; no production tax-authority validation is inferred.
+
+The GST switch inner callback is IgnorePointer decoration; its parent handles physical toggle and separate Semantics handles accessible activation. These are recorded as one business action with distinct unqualified accessibility coverage, not fabricated separate passes. Cart confirm captures the scope before the sheet and clears that scope after confirmation; no claim about concurrent changes without device evidence.
