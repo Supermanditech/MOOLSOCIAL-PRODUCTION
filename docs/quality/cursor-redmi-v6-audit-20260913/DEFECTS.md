@@ -89,3 +89,10 @@ Reproduction: with empty cart and no order submitted,deliver declared HTTPS inte
 Expected: require authoritative confirmed purchase identity and nonempty accepted orders before any success claim;otherwise show unavailable/recovery or return safely without inventing success or using an unrelated saved address.
 Source: journey_router.dart2025 maps confirmation query;buy_v2_screen.dart544-546 directly sets initialView;buy_v2_views.dart8739-8804 unconditionally renders success/confirmed totals and selectedAddress. Normal completion path session11231-11261 is separate and was not invoked by this test.
 Impact: a stale/shared/malformed link can tell a customer an order was placed despite no purchase. Real payment/account backend behavior remains unqualified. Do not fix during this audit. Evidence358 retained. View order details opens existing Active orders with unchanged12active/2delivered359. Reopening link then Continue shopping returns Shop/empty cart360. No new order/payment created by tested navigation.
+
+
+## RV6-D010 - Recovery return changes selected destination while retaining order detail
+Status: open. Severity: minor navigation inconsistency. Redmi TG8HCYTGGQT885OF;UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+Reproduction: open existing MS-240782 via declared HTTPS /app/buy/order/MS-240782 (371;Orders selected). Open declared /app/buy?view=recovery&recovery=delay,then Return to order372-373. Same order/detail retained,but Shop is selected in bottom rail instead of original Orders.
+Expected: exact return context includes originating destination as well as order ID;tracking should restore original Orders selection.
+Source: buy_v2_screen.dart527-529 overwrites destination with initialDestination before openRecovery;session11548-11560 records that replaced destination in origin. Generic recovery link defaults to Shop in journey_router. Conditional Help and other origin contexts need separate checks. No order/data mutation or implementation.
