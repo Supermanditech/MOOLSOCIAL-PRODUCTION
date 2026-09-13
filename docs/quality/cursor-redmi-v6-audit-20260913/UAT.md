@@ -560,3 +560,10 @@ Four narrow passes. Together with144(change address) and712(delivery time),all f
 Read all75 notes containing pending in three bounded pages, then compared relevant Bulk/filter/Store/coupon/GST/address/order/security evidence rows. Reconciled12 original remaining notes against later captures. No original result, disposition or capture changed;no new device pass. Kept checkout-specific new-address propagation separate from shared settings-editor checks;kept positive return eligibility and provider outcomes unqualified. Corrected draft wording to distinguish cancelled invoice save135 from exported PDF480 before sealing.
 
 This removes stale blanket pending descriptions without declaring whole journeys complete. Counts unchanged:472 actions,374 device passes,720 captures,722 evidence rows,62 mappings,17 distinct confirmed defects. Remaining priority:source-derived full action inventory;Store/category and terminal pagination;conditional data/provider gaps;remaining validation and lifecycle coverage. Full audit remains incomplete.
+
+
+## Round 85 - Store pagination category and return
+
+Implementation gate passed.721 is transition after Shop tap;722 settled Scheduled catalogue Saved1. Product723 opens from card;Visit724 and Browse725 reach full Mool Market000001 catalogue. Next726 displays41-80. Categories727;Oil728 resets1-40 of238. Five sequential Next actions reach final201-238 in729;intermediate pages not individually captured. Disabled Next730 leaves final page unchanged. Upper-row horizontal swipe731 reveals further products, so initial six visible cards are not all page contents. Android Back732 restores preview;Browse733 retains Oil category,final page and upper-row scroll. No cart/order/data mutation.
+
+Five narrow passes;no new defect.477 action rows;379 device passes;733 captures;735 evidence rows;62 mappings;17 distinct defects. Other categories,final-page Previous,horizontal endpoints and process relaunch remain unqualified. Full audit/source inventory incomplete.
