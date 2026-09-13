@@ -36,7 +36,6 @@
       "owners": [
         "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md",
         "apps/mobile/test/ui_v2/buy/buy_v2_router_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_pack_count_test.dart",
         "scripts/build-buy-device-review.ps1",
         "scripts/test-public-auth-sideload-build-controls.ps1",
@@ -169,7 +168,6 @@
         "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
         "apps/mobile/lib/features/shared/screens/shared_screens.dart",
         "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
         "artifacts/quality/codex-oppo-r66-5-review-20260907/candidate-contract.md",
         "artifacts/quality/codex-oppo-r66-6-review-20260908/candidate-contract.md",
@@ -360,7 +358,18 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart",
+        "apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart"
       ]
     }
   ],
