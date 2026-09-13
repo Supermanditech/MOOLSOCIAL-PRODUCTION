@@ -734,7 +734,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0131 | buy_v2_catalogue.dart:11136 | _QuantityStepperTargets | onTap | quantity +/- Semantics forwarder; screen-reader unverified |
 | SRC-0132 | buy_v2_catalogue.dart:11139 | _QuantityStepperTargets | onPressed | quantity +/- pointer forwarder; CART-ROUND98-01 and MONTHLY-ROUND54-02 cover recorded quantities; limits/revision remain separate |
 | SRC-0133 | buy_v2_catalogue.dart:11165 | _QuantityStepperTargets | onTap | quantity Edit Semantics forwarder; screen-reader unverified |
-| SRC-0134 | buy_v2_catalogue.dart:11168 | _QuantityStepperTargets | onPressed | quantity Edit pointer control; exact edit-sheet evidence requires reconciliation; not passed from +/- taps |
+| SRC-0134 | buy_v2_catalogue.dart:11168 | _QuantityStepperTargets | onPressed | device_pass QTY-ROUND150-01/02 exact Shop grid quantity editor Update2 and Cancel3; original basket restored; other placements/revision/accessibility unqualified |
 | SRC-0135 | buy_v2_catalogue.dart:11230 | _ProductSaveButton | onTap | compact save bookmark branch; SAVED-ROUND16-02/03 save/remove; stale/error states not inferred |
 | SRC-0136 | buy_v2_catalogue.dart:11283 | _ProductSaveButton | onPressed | alternate IconButton save branch; compact bookmark evidence not automatically equivalent; conditional unverified |
 | SRC-0137 | buy_v2_design.dart:2489 | _BuyV2PromotionCardState | onTap | unverified promotion semantics activation; pointer destination evidence remains parent-specific |
@@ -1873,3 +1873,9 @@ Source431 enables showAreaControl for paged Offers;1141 passes onArea into optio
 Six captures1031-1036 qualify OFFERS-ROUND149-01 and CAT-P01 default seeded final boundary. Starting paneer46, individual Next yielded manufacturer paneer then mustard51. Capture1033 filename says final but its enabled Next proves it was not final. Twenty sequential Next taps reached manufacturer ghee96 with disabled Next1034. Another exact tap left it unchanged1035. Twenty-one Previous taps restored paneer46/92/200g1036. Intermediate offer contents are not individually qualified from traversal. No purchase, save or data deletion;20 defects remain. Current Offers top has original paneer selection restored; scroll moved from footer to top for this check.
 
 Execution note: the implementation gate returned a live session11334; one bounded read-only source extraction ran before its terminal result was collected. The same session then completed successfully before device actions. No gate output was inferred and no process restarted. Future dependent reads/actions must await terminal success.
+
+## Round 150 - Catalogue quantity editor exact entry
+
+Earlier QTY-ROUND27 covers product editor and ROUND115 cart-line editor; neither was substituted for grid target11168. Physical captures1037-1043 qualify exact grid opening, Update2/558, Cancel unsaved3 retaining2/558, and removal of isolated basket via two minus taps. Original Scheduled Shop saved wheat1 retained;empty cart restored1043. CAT-P17 default Shop pointer entry/update/cancel now qualified. Seven captures, two pass rows and one observation.
+
+Observation QTY-ROUND150-03: grid cards remain taller after basket removal1043 than initial1037. No additional confirmed defect yet; assess stable state/reentry and layout contract before deciding whether this is customer-facing wasted space. Keep observation open. Distinct confirmed defects20. Provider quantity revision, other SKU limits, accessibility and relaunch remain unqualified.
