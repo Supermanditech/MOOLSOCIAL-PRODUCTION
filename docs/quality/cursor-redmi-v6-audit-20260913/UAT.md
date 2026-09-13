@@ -795,77 +795,77 @@ Source hashes bind the following index to the inspected files:
 | SRC-0192 | buy_v2_screen.dart:3457 | _BuyMiniCartBarState | onTap | unclassified |
 | SRC-0193 | buy_v2_screen.dart:3563 | _BuyMiniCartBarState | onTap | unclassified |
 | SRC-0194 | buy_v2_screen.dart:3591 | _BuyMiniCartBarState | onTap | unclassified |
-| SRC-0195 | buy_v2_shop_chat.dart:611 | BuyV2ShopChatViewState | onPressed | unclassified |
-| SRC-0196 | buy_v2_shop_chat.dart:625 | BuyV2ShopChatViewState | onSelected | unclassified |
-| SRC-0197 | buy_v2_shop_chat.dart:687 | BuyV2ShopChatViewState | onChanged | unclassified |
-| SRC-0198 | buy_v2_shop_chat.dart:696 | BuyV2ShopChatViewState | onSelected | unclassified |
-| SRC-0199 | buy_v2_shop_chat.dart:784 | BuyV2ShopChatViewState | onTap | unclassified |
-| SRC-0200 | buy_v2_shop_chat.dart:807 | BuyV2ShopChatViewState | onPressed | unclassified |
-| SRC-0201 | buy_v2_shop_chat.dart:1076 | _ShopChatHeader | onPressed | unclassified |
-| SRC-0202 | buy_v2_shop_chat.dart:1152 | _ShopChatHeader | onPressed | unclassified |
-| SRC-0203 | buy_v2_shop_chat.dart:1183 | _ShopChatNavigationForwardBar | onTap | unclassified |
-| SRC-0204 | buy_v2_shop_chat.dart:1244 | _ShopChatSearch | onChanged | unclassified |
-| SRC-0205 | buy_v2_shop_chat.dart:1256 | _ShopChatSearch | onPressed | unclassified |
-| SRC-0206 | buy_v2_shop_chat.dart:1310 | _ShopChatFilters | onSelected | unclassified |
-| SRC-0207 | buy_v2_shop_chat.dart:1465 | _ShopChatEntryTile | onTap | unclassified |
-| SRC-0208 | buy_v2_shop_chat.dart:1478 | _ShopChatEntryTile | onTap | unclassified |
-| SRC-0209 | buy_v2_shop_chat.dart:1659 | _ShopChatLoadRecoveryState | onPressed | unclassified |
-| SRC-0210 | buy_v2_shop_chat.dart:1776 | _ShopChatEmptyState | onPressed | unclassified |
-| SRC-0211 | buy_v2_shop_chat.dart:1841 | _ShopChatNewConversationView | onPressed | unclassified |
-| SRC-0212 | buy_v2_shop_chat.dart:1985 | _ShopChatNewConversationView | onTap | unclassified |
-| SRC-0213 | buy_v2_shop_chat.dart:2053 | _ShopChatNewConversationEmptyState | onPressed | unclassified |
-| SRC-0214 | buy_v2_shop_chat.dart:2185 | _ShopChatConversationViewState | onPressed | unclassified |
-| SRC-0215 | buy_v2_shop_chat.dart:2282 | _ShopChatConversationViewState | onChanged | unclassified |
-| SRC-0216 | buy_v2_shop_chat.dart:2305 | _ShopChatConversationViewState | onTap | unclassified |
-| SRC-0217 | buy_v2_shop_chat.dart:2334 | _ShopChatConversationViewState | onTap | unclassified |
-| SRC-0218 | buy_v2_shop_chat.dart:2344 | _ShopChatConversationViewState | onLongPress | unclassified |
-| SRC-0219 | buy_v2_shop_chat.dart:2360 | _ShopChatConversationViewState | onSelected | unclassified |
-| SRC-0220 | buy_v2_shop_chat.dart:2382 | _ShopChatConversationViewState | onSelected | unclassified |
-| SRC-0221 | buy_v2_shop_chat.dart:2397 | _ShopChatConversationViewState | onChanged | unclassified |
-| SRC-0222 | buy_v2_shop_chat.dart:2745 | _ShopChatThreadHeader | onPressed | unclassified |
-| SRC-0223 | buy_v2_shop_chat.dart:2751 | _ShopChatThreadHeader | onTap | unclassified |
-| SRC-0224 | buy_v2_shop_chat.dart:2791 | _ShopChatThreadHeader | onPressed | unclassified |
-| SRC-0225 | buy_v2_shop_chat.dart:2800 | _ShopChatThreadHeader | onPressed | unclassified |
-| SRC-0226 | buy_v2_shop_chat.dart:2808 | _ShopChatThreadHeader | onPressed | unclassified |
-| SRC-0227 | buy_v2_shop_chat.dart:2847 | _ShopChatSelectionHeader | onPressed | unclassified |
-| SRC-0228 | buy_v2_shop_chat.dart:2860 | _ShopChatSelectionHeader | onPressed | unclassified |
-| SRC-0229 | buy_v2_shop_chat.dart:2867 | _ShopChatSelectionHeader | onPressed | unclassified |
-| SRC-0230 | buy_v2_shop_chat.dart:2874 | _ShopChatSelectionHeader | onPressed | unclassified |
-| SRC-0231 | buy_v2_shop_chat.dart:2881 | _ShopChatSelectionHeader | onPressed | unclassified |
-| SRC-0232 | buy_v2_shop_chat.dart:2924 | _ShopChatInlineThreadMenu | onTap | unclassified |
-| SRC-0233 | buy_v2_shop_chat.dart:2931 | _ShopChatInlineThreadMenu | onTap | unclassified |
-| SRC-0234 | buy_v2_shop_chat.dart:2938 | _ShopChatInlineThreadMenu | onTap | unclassified |
-| SRC-0235 | buy_v2_shop_chat.dart:2945 | _ShopChatInlineThreadMenu | onTap | unclassified |
-| SRC-0236 | buy_v2_shop_chat.dart:2981 | _ShopChatInlineMenuAction | onTap | unclassified |
-| SRC-0237 | buy_v2_shop_chat.dart:3034 | _ShopChatMessageSearch | onChanged | unclassified |
-| SRC-0238 | buy_v2_shop_chat.dart:3042 | _ShopChatMessageSearch | onPressed | unclassified |
-| SRC-0239 | buy_v2_shop_chat.dart:3107 | _ShopChatCommerceContext | onTap | unclassified |
-| SRC-0240 | buy_v2_shop_chat.dart:3320 | _ShopChatQuickReplies | onPressed | unclassified |
-| SRC-0241 | buy_v2_shop_chat.dart:3426 | _ShopChatComposer | onPressed | unclassified |
-| SRC-0242 | buy_v2_shop_chat.dart:3452 | _ShopChatComposer | onPressed | unclassified |
-| SRC-0243 | buy_v2_shop_chat.dart:3464 | _ShopChatComposer | onChanged | unclassified |
-| SRC-0244 | buy_v2_shop_chat.dart:3465 | _ShopChatComposer | onTap | unclassified |
-| SRC-0245 | buy_v2_shop_chat.dart:3485 | _ShopChatComposer | onPressed | unclassified |
-| SRC-0246 | buy_v2_shop_chat.dart:3492 | _ShopChatComposer | onPressed | unclassified |
-| SRC-0247 | buy_v2_shop_chat.dart:3521 | _ShopChatComposer | onPressed | unclassified |
-| SRC-0248 | buy_v2_shop_chat.dart:3572 | _ShopChatComposerIcon | onPressed | unclassified |
-| SRC-0249 | buy_v2_shop_chat.dart:3642 | _ShopChatReplyPreview | onPressed | unclassified |
-| SRC-0250 | buy_v2_shop_chat.dart:3715 | _ShopChatMessageBubble | onPressed | unclassified |
-| SRC-0251 | buy_v2_shop_chat.dart:3735 | _ShopChatMessageBubble | onTap | unclassified |
-| SRC-0252 | buy_v2_shop_chat.dart:3736 | _ShopChatMessageBubble | onLongPress | unclassified |
-| SRC-0253 | buy_v2_shop_chat.dart:3757 | _ShopChatMessageBubble | onTap | unclassified |
-| SRC-0254 | buy_v2_shop_chat.dart:3758 | _ShopChatMessageBubble | onLongPress | unclassified |
-| SRC-0255 | buy_v2_shop_chat.dart:3866 | _ShopChatMessageForwardButton | onPressed | unclassified |
-| SRC-0256 | buy_v2_shop_chat.dart:4031 | _ShopChatInlineAttachmentTray | onTap | unclassified |
-| SRC-0257 | buy_v2_shop_chat.dart:4035 | _ShopChatInlineAttachmentTray | onTap | unclassified |
-| SRC-0258 | buy_v2_shop_chat.dart:4259 | _ShopChatInfoViewState | onPressed | unclassified |
-| SRC-0259 | buy_v2_shop_chat.dart:4337 | _ShopChatInfoViewState | onTap | unclassified |
-| SRC-0260 | buy_v2_shop_chat.dart:4351 | _ShopChatInfoViewState | onTap | unclassified |
-| SRC-0261 | buy_v2_shop_chat.dart:4369 | _ShopChatInfoViewState | onTap | unclassified |
-| SRC-0262 | buy_v2_shop_chat.dart:4385 | _ShopChatInfoViewState | onTap | unclassified |
-| SRC-0263 | buy_v2_shop_chat.dart:4398 | _ShopChatInfoViewState | onTap | unclassified |
-| SRC-0264 | buy_v2_shop_chat.dart:4472 | _ShopChatInfoAction | onPressed | unclassified |
-| SRC-0265 | buy_v2_shop_chat.dart:4541 | _ShopChatInfoCard | onTap | unclassified |
+| SRC-0195 | buy_v2_shop_chat.dart:611 | BuyV2ShopChatViewState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0196 | buy_v2_shop_chat.dart:625 | BuyV2ShopChatViewState | onSelected | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0197 | buy_v2_shop_chat.dart:687 | BuyV2ShopChatViewState | onChanged | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0198 | buy_v2_shop_chat.dart:696 | BuyV2ShopChatViewState | onSelected | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0199 | buy_v2_shop_chat.dart:784 | BuyV2ShopChatViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0200 | buy_v2_shop_chat.dart:807 | BuyV2ShopChatViewState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0201 | buy_v2_shop_chat.dart:1076 | _ShopChatHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0202 | buy_v2_shop_chat.dart:1152 | _ShopChatHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0203 | buy_v2_shop_chat.dart:1183 | _ShopChatNavigationForwardBar | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0204 | buy_v2_shop_chat.dart:1244 | _ShopChatSearch | onChanged | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0205 | buy_v2_shop_chat.dart:1256 | _ShopChatSearch | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0206 | buy_v2_shop_chat.dart:1310 | _ShopChatFilters | onSelected | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0207 | buy_v2_shop_chat.dart:1465 | _ShopChatEntryTile | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0208 | buy_v2_shop_chat.dart:1478 | _ShopChatEntryTile | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0209 | buy_v2_shop_chat.dart:1659 | _ShopChatLoadRecoveryState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0210 | buy_v2_shop_chat.dart:1776 | _ShopChatEmptyState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0211 | buy_v2_shop_chat.dart:1841 | _ShopChatNewConversationView | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0212 | buy_v2_shop_chat.dart:1985 | _ShopChatNewConversationView | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0213 | buy_v2_shop_chat.dart:2053 | _ShopChatNewConversationEmptyState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0214 | buy_v2_shop_chat.dart:2185 | _ShopChatConversationViewState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0215 | buy_v2_shop_chat.dart:2282 | _ShopChatConversationViewState | onChanged | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0216 | buy_v2_shop_chat.dart:2305 | _ShopChatConversationViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0217 | buy_v2_shop_chat.dart:2334 | _ShopChatConversationViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0218 | buy_v2_shop_chat.dart:2344 | _ShopChatConversationViewState | onLongPress | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0219 | buy_v2_shop_chat.dart:2360 | _ShopChatConversationViewState | onSelected | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0220 | buy_v2_shop_chat.dart:2382 | _ShopChatConversationViewState | onSelected | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0221 | buy_v2_shop_chat.dart:2397 | _ShopChatConversationViewState | onChanged | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0222 | buy_v2_shop_chat.dart:2745 | _ShopChatThreadHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0223 | buy_v2_shop_chat.dart:2751 | _ShopChatThreadHeader | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0224 | buy_v2_shop_chat.dart:2791 | _ShopChatThreadHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0225 | buy_v2_shop_chat.dart:2800 | _ShopChatThreadHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0226 | buy_v2_shop_chat.dart:2808 | _ShopChatThreadHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0227 | buy_v2_shop_chat.dart:2847 | _ShopChatSelectionHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0228 | buy_v2_shop_chat.dart:2860 | _ShopChatSelectionHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0229 | buy_v2_shop_chat.dart:2867 | _ShopChatSelectionHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0230 | buy_v2_shop_chat.dart:2874 | _ShopChatSelectionHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0231 | buy_v2_shop_chat.dart:2881 | _ShopChatSelectionHeader | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0232 | buy_v2_shop_chat.dart:2924 | _ShopChatInlineThreadMenu | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0233 | buy_v2_shop_chat.dart:2931 | _ShopChatInlineThreadMenu | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0234 | buy_v2_shop_chat.dart:2938 | _ShopChatInlineThreadMenu | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0235 | buy_v2_shop_chat.dart:2945 | _ShopChatInlineThreadMenu | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0236 | buy_v2_shop_chat.dart:2981 | _ShopChatInlineMenuAction | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0237 | buy_v2_shop_chat.dart:3034 | _ShopChatMessageSearch | onChanged | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0238 | buy_v2_shop_chat.dart:3042 | _ShopChatMessageSearch | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0239 | buy_v2_shop_chat.dart:3107 | _ShopChatCommerceContext | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0240 | buy_v2_shop_chat.dart:3320 | _ShopChatQuickReplies | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0241 | buy_v2_shop_chat.dart:3426 | _ShopChatComposer | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0242 | buy_v2_shop_chat.dart:3452 | _ShopChatComposer | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0243 | buy_v2_shop_chat.dart:3464 | _ShopChatComposer | onChanged | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0244 | buy_v2_shop_chat.dart:3465 | _ShopChatComposer | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0245 | buy_v2_shop_chat.dart:3485 | _ShopChatComposer | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0246 | buy_v2_shop_chat.dart:3492 | _ShopChatComposer | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0247 | buy_v2_shop_chat.dart:3521 | _ShopChatComposer | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0248 | buy_v2_shop_chat.dart:3572 | _ShopChatComposerIcon | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0249 | buy_v2_shop_chat.dart:3642 | _ShopChatReplyPreview | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0250 | buy_v2_shop_chat.dart:3715 | _ShopChatMessageBubble | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0251 | buy_v2_shop_chat.dart:3735 | _ShopChatMessageBubble | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0252 | buy_v2_shop_chat.dart:3736 | _ShopChatMessageBubble | onLongPress | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0253 | buy_v2_shop_chat.dart:3757 | _ShopChatMessageBubble | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0254 | buy_v2_shop_chat.dart:3758 | _ShopChatMessageBubble | onLongPress | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0255 | buy_v2_shop_chat.dart:3866 | _ShopChatMessageForwardButton | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0256 | buy_v2_shop_chat.dart:4031 | _ShopChatInlineAttachmentTray | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0257 | buy_v2_shop_chat.dart:4035 | _ShopChatInlineAttachmentTray | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0258 | buy_v2_shop_chat.dart:4259 | _ShopChatInfoViewState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0259 | buy_v2_shop_chat.dart:4337 | _ShopChatInfoViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0260 | buy_v2_shop_chat.dart:4351 | _ShopChatInfoViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0261 | buy_v2_shop_chat.dart:4369 | _ShopChatInfoViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0262 | buy_v2_shop_chat.dart:4385 | _ShopChatInfoViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0263 | buy_v2_shop_chat.dart:4398 | _ShopChatInfoViewState | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0264 | buy_v2_shop_chat.dart:4472 | _ShopChatInfoAction | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
+| SRC-0265 | buy_v2_shop_chat.dart:4541 | _ShopChatInfoCard | onTap | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
 | SRC-0266 | buy_v2_views.dart:68 | _openOrderInvoice | onPressed | unclassified |
 | SRC-0267 | buy_v2_views.dart:78 | _openOrderInvoice | onPressed | unclassified |
 | SRC-0268 | buy_v2_views.dart:593 | BuyV2ProductView | onPressed | unclassified |
@@ -1130,3 +1130,12 @@ Source hashes bind the following index to the inspected files:
 | SRC-0527 | buy_v2_views.dart:20023 | _ShareChoiceState | onTap | unclassified |
 
 Next: reconcile candidate groups against public route wiring and existing JOURNEYS evidence. Shared destinations outside this directory also remain part of the audit; this index does not exclude them. All existing defect/device/data counts unchanged.
+
+
+## Round 89 - public Buy Chat route reconciliation
+
+Broad type-name search produced truncated output;recovered with exact constructor search and literal router/screen reads under standing bounded-read recovery authority. No device action or product change. Only external BuyV2ShopChatView constructor found is social_v2_consumer.dart1143 in contextualChatOpen. Public Buy screen2370-2390 instead pushes BuyV2ChatRouteAdapter;adapter46 targets /app/chat/inbox and supplier help/product/store targets shared /app/chat/thread. journey_router.dart762-800 mounts ChatInboxScreen and ChatThreadScreen with return/draft bindings.
+
+Classified71 legacy/contextual widget callback candidates as not mounted by the public Buy route. This does not exclude shared Chat: inbox/thread controls and connected destinations remain required, with original CHAT/ORDERHELP/Store-chat evidence retained. No host/source result promoted to device pass. Shared Chat candidate indexing and semantic reconciliation remain unfinished.
+
+93 of527 lexical candidates now classified (scanner15,video7,contextual chat71);434 remain unclassified. These are source occurrences,not unique journeys or missing device tests. All defect/device/data counts unchanged;full audit open.
