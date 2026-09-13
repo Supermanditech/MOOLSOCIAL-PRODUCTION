@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 614,
+    "recordedActionRows": 617,
     "dispositions": {
-      "device_observation": 19,
-      "device_pass": 501,
+      "device_observation": 20,
+      "device_pass": 503,
       "blocked_provider": 27,
       "device_failure": 24,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 1123,
-    "evidenceRows": 1125,
+    "physicalCaptures": 1134,
+    "evidenceRows": 1136,
     "publicDataRows": 71,
     "confirmedDistinctDefects": 22,
     "countsAreExhaustiveDenominator": false
@@ -89,13 +89,13 @@
     }
   ],
   "nextWork": [
-    "Round164 UAT organizes 30 cart/checkout groups. Next reachable: CART-P04 nonempty Browse more;CHECK-P02 visible Back;CHECK-P06 checkout Select/Edit;CART-P15 reverse benefit kind. Orders/shared/address/mini-cart reconciliation remains.",
+    "Next CHECK-P06 exact checkout address Select/Edit and CART-P15 reverse benefit kind;remaining Payment/Confirm visible Back and busy guard separate. Orders/shared/address/mini-cart inventory remains.",
     "Reconcile remaining product/cart/orders/shared callback families and conditional/provider descendants into stable named cases; no exhaustive denominator claim yet",
     "Saved-address process-death persistence and remaining accessibility/keyboard/recovery dimensions require exact device evidence",
     "Complete public-data field and publication lifecycle reconciliation and final evidence handoff"
   ],
   "preservation": {
-    "cart": "1123 original Scheduled Shop wheat Saved1 emptycart;no cart/saved/address/business profile changes",
+    "cart": "1133 isolated notebook removed;1134 original Scheduled wheat Saved1 emptycart and compact layout restored;Work address unchanged",
     "savedShop": "original wheat count1 retained650;Saved/Scheduled active after module reentry",
     "addresses": "Original Home/Work retained; settings selection Home then Work restored986; no add/edit/delete; Paytm retained",
     "noNewApk": true,
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 164
+  "latestAuditRound": 165
 }

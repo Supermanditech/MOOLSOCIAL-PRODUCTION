@@ -913,7 +913,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0310 | buy_v2_views.dart:5421 | _MissingOrderSelection | onPressed | missing-order recovery View orders; RV6-D010 recovery context requires exact button reconciliation |
 | SRC-0311 | buy_v2_views.dart:5569 | _BuyV2CartViewState | onPressed | CART-ROUND12-05/06; MIXED-ROUND63-05/06; empty-disabled and resolution shortcut unqualified |
 | SRC-0312 | buy_v2_views.dart:5630 | _BuyV2CartViewState | onPressed | STORE-009 Continue browsing; D002 last-item removal context failure remains open |
-| SRC-0313 | buy_v2_views.dart:5677 | _BuyV2CartViewState | onPressed | Browse more products callback; exact nonempty-cart control needs device evidence reconciliation |
+| SRC-0313 | buy_v2_views.dart:5677 | _BuyV2CartViewState | onPressed | device_pass CART-ROUND165-01 exact nonempty Shop Browse more and retained notebook210; Offers/Wholesale/aggregate parents unqualified |
 | SRC-0314 | buy_v2_views.dart:5730 | _BuyV2CartViewState | onPressed | CART-ROUND12-04 empty Wholesale Browse; all/Shop variants not separately inferred |
 | SRC-0315 | buy_v2_views.dart:5811 | _BuyV2CartViewState | onPressed | MIXED-ROUND63-03/04 Review and Back; no-address continuation/pricing recovery conditional gaps |
 | SRC-0316 | buy_v2_views.dart:6008 | _confirmBuyV2CartClear | onPressed | CART-ROUND12-05 Keep Cart; MIXED-ROUND63-05 AndroidBack cancellation |
@@ -934,7 +934,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0331 | buy_v2_views.dart:6706 | _CheckoutQuoteCard | onPressed | checkout quote Retry B-004; authoritative quote absent; exact Retry UI not qualified from Check delivery |
 | SRC-0332 | buy_v2_views.dart:6857 | _CheckoutCommercialPaymentTerms | onPressed | commercial payment terms Retry provider dependency unverified |
 | SRC-0333 | buy_v2_views.dart:6969 | _CommercialPaymentTermGroup | onChanged | commercial term radio selection requires authoritative terms; provider/fixture state absent, unverified |
-| SRC-0334 | buy_v2_views.dart:7068 | BuyV2CheckoutView | onTap | visible checkout Back and busy notice; Android Back CHECKOUT-007/008/009 does not prove exact target or busy guard |
+| SRC-0334 | buy_v2_views.dart:7068 | BuyV2CheckoutView | onTap | device_pass CHECKOUT-ROUND165-01 visible Cart return from Address stage; Payment/Confirm origins and busy guard not inferred |
 | SRC-0335 | buy_v2_views.dart:7154 | BuyV2CheckoutView | onPressed | primary action forwarding; CHECKOUT-003/005 next/review and CHECKOUT-006 delivery boundary; real submission excluded |
 | SRC-0336 | buy_v2_views.dart:7490 | _CheckoutCollectionDetails | onTap | collection Store option selection; COLLECTION-ROUND18 entry not proof of multi-Store choice; conditional unverified |
 | SRC-0337 | buy_v2_views.dart:7508 | _CheckoutCollectionDetails | onTap | collection review Store Change to address step; exact control unverified |
@@ -2036,3 +2036,9 @@ The following 30 action groups organize cart/checkout follow-up. They are neithe
 | CHECK-P14 Saved-address reminder | SRC0511 | Exact account/cart/checkout parent Edit/return paths need reconciliation; general address editing cannot qualify every parent |
 
 Counts unchanged:614 action/check records;501 passes;22 defects;1123 physical captures;1125 evidence rows;71 public-data mappings. Next reachable priorities: CART-P04 nonempty Browse more; CHECK-P02 visible Back; CHECK-P06 checkout Select/Edit; CART-P15 reverse benefit kind. Orders/shared-screen and remaining address/mini-cart inventory follow. Full audit remains incomplete; no implementation or APK.
+
+
+## Round165 - Nonempty Browse more and visible checkout Back
+Gate terminal0; clean status digest verified before evidence edits.1124 isolated notebook6 pack6 quantity1/210 added from original Scheduled Shop.1125 cart Browse more;1126 same Shop quantity;1127 reopened cart. Continue browsing names prior Store000041 despite cart item000001. Initial rapid tap on reentry1127 remained cart;not classified failure. Settled tap1128 opens correctly named Store000041;X1129 restores unchanged cart. Source2493-2498 uses per-destination prior browsing anchor;2540-2543 binds label and callback to same anchor. Retained as CART-ROUND165-02 observation,not a defect based solely on different item seller. No order identity/price mutation observed;stale unavailable or cross-account anchors remain unqualified.
+1130 Review opens Address with original Work selected;visible Cart button1131 restores notebook1/210.1132 Browse more then notebook minus1133 removes only test item;known D021 extra tile height reobserved,not duplicated. Wholesale/Shop reentry1134 restores original compact Scheduled catalogue Saved1 wheat and emptycart. No address/payment/saved changes or order submission.
+CART-ROUND165-01 and CHECKOUT-ROUND165-01 are narrow passes.617 action/check records;503 passes;20 device observations;22 distinct defects;1134 captures;1136 evidence rows. Exact Payment/Confirm Back and busy guards remain; checkout Select/Edit and reverse benefit kind next. Full audit open.
