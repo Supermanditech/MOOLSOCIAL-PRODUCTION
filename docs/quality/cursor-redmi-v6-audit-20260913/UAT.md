@@ -613,21 +613,21 @@ Source hashes bind the following index to the inspected files:
 | SRC-0010 | buy_v2_catalogue.dart:703 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-003/004 and ROUND69-02/03; View offer and Back |
 | SRC-0011 | buy_v2_catalogue.dart:764 | _LiveOffersState | onPressed | blocked_provider; live source Retry/loading/offline recovery not qualified by fixture refresh |
 | SRC-0012 | buy_v2_catalogue.dart:823 | _OffersAvailabilityState | onPressed | blocked_provider; unavailable catalogue retryCommerce recovery not qualified by fixture refresh |
-| SRC-0013 | buy_v2_catalogue.dart:1350 | _CataloguePageControls | onPressed | unclassified |
-| SRC-0014 | buy_v2_catalogue.dart:1356 | _CataloguePageControls | onPressed | unclassified |
-| SRC-0015 | buy_v2_catalogue.dart:1362 | _CataloguePageControls | onPressed | unclassified |
-| SRC-0016 | buy_v2_catalogue.dart:1370 | _CataloguePageControls | onPressed | unclassified |
-| SRC-0017 | buy_v2_catalogue.dart:1456 | _CataloguePageNotice | onPressed | unclassified |
-| SRC-0018 | buy_v2_catalogue.dart:1574 | showBuyV2CatalogueArea | onPressed | unclassified |
-| SRC-0019 | buy_v2_catalogue.dart:1589 | showBuyV2CatalogueArea | onPressed | unclassified |
-| SRC-0020 | buy_v2_catalogue.dart:1602 | showBuyV2CatalogueArea | onChanged | unclassified |
-| SRC-0021 | buy_v2_catalogue.dart:1621 | showBuyV2CatalogueArea | onSubmitted | unclassified |
-| SRC-0022 | buy_v2_catalogue.dart:1629 | showBuyV2CatalogueArea | onPressed | unclassified |
-| SRC-0023 | buy_v2_catalogue.dart:1642 | showBuyV2CatalogueArea | onSelected | unclassified |
-| SRC-0024 | buy_v2_catalogue.dart:1647 | showBuyV2CatalogueArea | onSelected | unclassified |
-| SRC-0025 | buy_v2_catalogue.dart:1699 | showBuyV2CatalogueArea | onTap | unclassified |
-| SRC-0026 | buy_v2_catalogue.dart:1723 | showBuyV2CatalogueArea | onTap | unclassified |
-| SRC-0027 | buy_v2_catalogue.dart:1735 | showBuyV2CatalogueArea | onTap | unclassified |
+| SRC-0013 | buy_v2_catalogue.dart:1350 | _CataloguePageControls | onPressed | forwarded Previous; OFFERS-ROUND70-03 covers Offers; other parent contexts require own evidence |
+| SRC-0014 | buy_v2_catalogue.dart:1356 | _CataloguePageControls | onPressed | forwarded Next; CAT-002, WHOLESALE-ROUND60-02, OFFERS-ROUND70-02; final boundaries not inferred |
+| SRC-0015 | buy_v2_catalogue.dart:1362 | _CataloguePageControls | onPressed | forwarded Refresh; OFFERS-ROUND67-06 observation only; live revisions unqualified |
+| SRC-0016 | buy_v2_catalogue.dart:1370 | _CataloguePageControls | onPressed | forwarded footer area entry; header AREA-001 does not qualify exact footer tap; pending device check |
+| SRC-0017 | buy_v2_catalogue.dart:1456 | _CataloguePageNotice | onPressed | conditional page notice action; provider-error/retry context unverified |
+| SRC-0018 | buy_v2_catalogue.dart:1574 | showBuyV2CatalogueArea | onPressed | AREA-003 query Retry and AREA-ROUND100-04 current-location Retry UI; positive recovery B-001 |
+| SRC-0019 | buy_v2_catalogue.dart:1589 | showBuyV2CatalogueArea | onPressed | device_pass AREA-ROUND100-05; X closes failure sheet and retains Offers |
+| SRC-0020 | buy_v2_catalogue.dart:1602 | showBuyV2CatalogueArea | onChanged | AREA-002 query input; lookup success B-001; debounce/race/80-char boundary unverified |
+| SRC-0021 | buy_v2_catalogue.dart:1621 | showBuyV2CatalogueArea | onSubmitted | keyboard submit callback; exact submission and fewer-than-two-character behavior pending device check |
+| SRC-0022 | buy_v2_catalogue.dart:1629 | showBuyV2CatalogueArea | onPressed | blocked_provider B-001 AREA-ROUND100-03; current location yields visible unavailable message; no success/permission branch pass |
+| SRC-0023 | buy_v2_catalogue.dart:1642 | showBuyV2CatalogueArea | onSelected | device_pass AREA-ROUND100-02; regional draft chip; applied serviceability not inferred |
+| SRC-0024 | buy_v2_catalogue.dart:1647 | showBuyV2CatalogueArea | onSelected | device_pass AREA-ROUND100-01; national draft chip; applied serviceability not inferred |
+| SRC-0025 | buy_v2_catalogue.dart:1699 | showBuyV2CatalogueArea | onTap | blocked_provider B-001; selecting resolved provider area including rejection feedback unverified |
+| SRC-0026 | buy_v2_catalogue.dart:1723 | showBuyV2CatalogueArea | onTap | Any area choice remains pending device check and retained context verification |
+| SRC-0027 | buy_v2_catalogue.dart:1735 | showBuyV2CatalogueArea | onTap | seed area choice remains pending device check; not proof of national provider coverage |
 | SRC-0028 | buy_v2_catalogue.dart:1943 | _CatalogueSaleTypeSelector | onHorizontalDragEnd | unclassified |
 | SRC-0029 | buy_v2_catalogue.dart:2014 | _CatalogueSaleTypeSelector | onTap | unclassified |
 | SRC-0030 | buy_v2_catalogue.dart:2062 | _CatalogueSaleSegment | onTap | unclassified |
@@ -1518,3 +1518,7 @@ Captures 790-794 physically reviewed. Empty Scheduled Shop basket was seeded wit
 ## Round 99 - Offers controls and direct promotion entry
 
 Captures 795-802 reviewed on Redmi. 796 and 800 are transition frames; settled 797 and 801 establish the destinations, not failures. Close categories retains All categories and paneer promotion; tapping promotion title opens paneer46 INR92/200g; Android Back restores same promotion/grid. Empty basket remains unchanged. Three device checks added. SRC-0001 through0012 reconciled to actual source branches, forwarding, existing checks and explicit gaps. Finite/live branch, final Next boundary and provider Retry are not passed. Original source references now 155 classified, 372 unclassified; these are not unique journey counts. Totals: 802 captures, 804 evidence rows, 494 action rows, 396 device passes, 17 defects. Initial source read failed on default Windows encoding before any write; bounded UTF-8 read succeeded under standing parser-recovery authority.
+
+## Round 100 - area scope controls and current-location failure
+
+Captures 803-809 reviewed. Offers header area opens sheet; National delivery and In this area draft chips switch correctly. Use current location yields visible Area search unavailable plus Try again (B-001); Retry retains usable failure sheet. X returns to unchanged paneer promotion/grid and empty basket. No area selected, permission change, successful lookup, transaction or implementation. Four UI passes and one blocked-provider check added; no new defect. SRC-0013 through0027 reconciled with exact conditional/forwarded controls; footer area is not passed from header entry evidence. Totals: 809 captures, 811 evidence rows, 499 action rows, 400 device passes, 17 defects. Original source index: 170 classified, 357 unclassified; not a unique-journey denominator.
