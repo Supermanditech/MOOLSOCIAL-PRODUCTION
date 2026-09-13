@@ -514,3 +514,7 @@ Expanded B-008 into MEDIA-ROUND75-01 through08:gallery/count;pinch/pan/reset/red
 ## Round 77 - supplier publication requirements reconciliation
 
 PD-041 strengthened from buy_v2_content_contracts.dart590-648:HTTPS host without userinfo/fragment;asset/semantic labels;workspace revision Store canonical-product and exact-SKU binding;procurement supplier workspace match when grant exists;video poster metadata and nonempty transcript;deduplicated asset IDs capped10. Existing format/size requirements retained. These supplied-metadata checks do not prove bytes were inspected or backend publication enforced. No new device pass or defect. All counts unchanged;full audit remains incomplete.
+
+## Round 78 - GST coverage reconciliation
+
+Reconciled CHECKOUT-005 and007 residuals with091-097 and later177. Empty/short identifier checks are covered;valid details, checksum/state-code cases, reuse/remove and lifecycle remain unqualified. Existing host fixture located in buy_v2_gst_session_continuity_test.dart22-24 provides a local-only test profile;its existence is not a Redmi or tax-authority pass. Initial shell wildcard path search was invalid;bounded rg -g search recovered without mutation. No device actions;no new defect;counts unchanged. Next physical GST checks must preserve original data and avoid checkout submission.
