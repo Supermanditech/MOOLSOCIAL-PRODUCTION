@@ -608,3 +608,5 @@ cart quantities remain equal. DASH10 1.0 and 320x568/200% both pass in
 it does not supply the missing original device stack or independently prove
 that the intermittent V12 assertion is eliminated. Exact successor OPPO replay
 remains mandatory before qualification.
+
+Successor admission now pins tested source 38f70547d0f41b8feda7a0040d3e119465ca2c69 and the fresh integration/moolsocial/store-buy-final-v13-20260914 destination. Only exact source/path/branch/ticket identity literals change; existing review exclusions and their unresolved production limitations remain. V12 remains preserved and unqualified. Candidate tests and OPPO qualification remain required.

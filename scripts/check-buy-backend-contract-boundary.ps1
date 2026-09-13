@@ -162,7 +162,7 @@ function Get-MobileBoundaryViolations {
           '9D347031148DC2B45EFBF7BF991A3D265DBCE6CC95663ECDF3C4214AC522344B',
           '37A962868CB925A4D962D923B6C6DDED1F5DAEC5047FE5563666AB43AAAE53AA'
         ) -or (
-          $IntegratedReviewSourceCommit -ceq '2dbabb356dee467170774763941a2203a7ec0cb7' -and
+          $IntegratedReviewSourceCommit -ceq '38f70547d0f41b8feda7a0040d3e119465ca2c69' -and
           $soundSourceHash -ceq 'AF14A9355A47233DD25802F7741E6AFB065BCFF8F03CCDB298F67BF871C23466'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
