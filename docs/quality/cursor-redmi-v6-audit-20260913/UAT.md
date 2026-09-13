@@ -616,7 +616,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0013 | buy_v2_catalogue.dart:1350 | _CataloguePageControls | onPressed | forwarded Previous; OFFERS-ROUND70-03 covers Offers; other parent contexts require own evidence |
 | SRC-0014 | buy_v2_catalogue.dart:1356 | _CataloguePageControls | onPressed | forwarded Next; CAT-002, WHOLESALE-ROUND60-02, OFFERS-ROUND70-02; final boundaries not inferred |
 | SRC-0015 | buy_v2_catalogue.dart:1362 | _CataloguePageControls | onPressed | forwarded Refresh; OFFERS-ROUND67-06 observation only; live revisions unqualified |
-| SRC-0016 | buy_v2_catalogue.dart:1370 | _CataloguePageControls | onPressed | optional location IconButton when onArea nonnull; Any area summary text is not this action (round147 source1343/1365-1371 and capture1024); actual icon caller/mount remains pending |
+| SRC-0016 | buy_v2_catalogue.dart:1370 | _CataloguePageControls | onPressed | device_pass OFFERS-ROUND148-01; exact Offers footer location button opens area and X retains page/scroll; source431 enables showAreaControl; other parents and provider selection not inferred |
 | SRC-0017 | buy_v2_catalogue.dart:1456 | _CataloguePageNotice | onPressed | OFFERS-ROUND106-01 changed/expired notice Refresh restores review listings; other notice/provider-error branches remain unverified |
 | SRC-0018 | buy_v2_catalogue.dart:1574 | showBuyV2CatalogueArea | onPressed | AREA-003 query Retry and AREA-ROUND100-04 current-location Retry UI; positive recovery B-001 |
 | SRC-0019 | buy_v2_catalogue.dart:1589 | showBuyV2CatalogueArea | onPressed | device_pass AREA-ROUND100-05; X closes failure sheet and retains Offers |
@@ -1863,3 +1863,7 @@ Captures1016-1020 retain Store exit through original wheat product and Shop, the
 Captures1021-1025 qualify WHOLESALE-ROUND147-01: left swipe selects Bulk and rice25kg cards, right swipe restores Wholesale cards and saved0. Return to Shop preserves Scheduled, original wheat saved1 and empty cart. No new defect;20 remain. No purchase or data deletion. CAT-P04 now has Shop and Wholesale/Bulk gesture evidence; pointer taps and other dimensions retain their own status.
 
 Tap on pager Any area label1024 did nothing. Source1343 renders areaLabel as Text; the optional onArea IconButton1365-1371 is distinct and not visible in this pager. Therefore this tap is neither a defect nor proof of SRC0016. Resolve the optional caller/mount before further device testing of that control. Current device1025 is original Scheduled Shop.
+
+## Round 148 - Offers footer area action
+
+Source431 enables showAreaControl for paged Offers;1141 passes onArea into optional button1370. Wholesale summary Any area is not this action. Physical Offers footer button1028 opened Shopping area1029;X returned same Offers cards/footer scroll1030. Five captures retained;1027 attempted scrollbar drag did not move content and is not footer evidence;ordinary upward content swipe yielded1028. OFFERS-ROUND148-01 qualifies exact entry/cancel only. No location change or new defect;20 remain. Current device1030 Offers first page footer;cart empty and original Shop state unchanged. CAT-P02 footer location entry is now qualified for Offers;other pager boundaries retain their own limitations.
