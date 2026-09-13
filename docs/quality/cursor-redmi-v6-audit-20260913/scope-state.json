@@ -89,7 +89,7 @@
     }
   ],
   "nextWork": [
-    "Continue cart/checkout/orders/shared named-case reconciliation and reachable conditional cases;PROD-P08 verification actions explicitly B014 test-data blocked;PROD-P09 availability provider conditions remain unqualified.",
+    "Round164 UAT organizes 30 cart/checkout groups. Next reachable: CART-P04 nonempty Browse more;CHECK-P02 visible Back;CHECK-P06 checkout Select/Edit;CART-P15 reverse benefit kind. Orders/shared/address/mini-cart reconciliation remains.",
     "Reconcile remaining product/cart/orders/shared callback families and conditional/provider descendants into stable named cases; no exhaustive denominator claim yet",
     "Saved-address process-death persistence and remaining accessibility/keyboard/recovery dimensions require exact device evidence",
     "Complete public-data field and publication lifecycle reconciliation and final evidence handoff"
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 163
+  "latestAuditRound": 164
 }

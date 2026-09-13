@@ -1086,7 +1086,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0483 | buy_v2_views.dart:16214 | _CompactProductStepper | onPressed | QTY-ROUND27-08 decrement to zero and QTY-ROUND33-04 minimum removal; consumer/Wholesale exact records retained |
 | SRC-0484 | buy_v2_views.dart:16225 | _CompactProductStepper | onPressed | QTY-ROUND27-01 editor entry and QTY-ROUND33-01 Wholesale minimum editor; other placements not inferred |
 | SRC-0485 | buy_v2_views.dart:16253 | _CompactProductStepper | onPressed | QTY-ROUND115-04 product compact plus2 to3; total837 retained on Back |
-| SRC-0486 | buy_v2_views.dart:16360 | _CartScopeBar | onTap | QTY-ROUND33-03 All carts scope visibility; exact scope-chip switching remains pending |
+| SRC-0486 | buy_v2_views.dart:16360 | _CartScopeBar | onTap | device_pass CART-ROUND12-03 empty Wholesale scope; MIXED-ROUND63-01 both nonempty Shop/Wholesale/combined scope quantities and subtotals; process-death/account switching/provider context remain |
 | SRC-0487 | buy_v2_views.dart:16594 | _CartBenefitPanel | onTap | pending exact coupon benefit panel CTA; other coupon entry evidence must be reconciled |
 | SRC-0488 | buy_v2_views.dart:16614 | _CartBenefitPanel | onTap | COUPON-003 Payment offers entry capture082; no actual payment qualification |
 | SRC-0489 | buy_v2_views.dart:16677 | _CartBenefitEntry | onTap | benefit entry pointer forwarder to SRC0487/0488; no additional journey |
@@ -1995,3 +1995,44 @@ SRC0276 quick-action Semantics is not a separate pointer journey and remains unt
 Gate terminal0; clean evidence state verified.1119 tomato1 Wholesale10kg/580 MOQ2 shows Add to Cart;1120 decision panel shows order details and no unverified-business card.1121 Visit supplier opens Mool Market000001 Manufacturer catalogue;1122 X returns same tomato product and scroll. AndroidBack then Shop1123 restores original Scheduled Saved1 emptycart. No cart/saved/address/business profile mutations. PRODUCT-ROUND163-01 passed; no new defect.
 Source views902/2846 requires !businessVerified for Open business profile/Verify business; both push /app/work/workspace/choose. Session1993-2007 review/nonreview initialization differs;4787-4791 snapshot combines verified enum OR legacy boolean. Source output had a non-ASCII display glyph; relevant source conditions were reread with ascii escaping before mapping. No encoding defect inferred. PRODUCT-ROUND163-02 and B014 explicitly retain untested pending/rejected/unavailable action/return cases. PD071 records purchasing-business authority, binding, revision, conflict and revocation requirements without claiming runtime qualification. Availability retry/provider-error controls remain separate PROD-P09 gaps.
 614 action/check records;501 passes;22 blocked_test_data rows;22 distinct defects;1123 physical captures;1125 evidence rows;71 public-data rows. Next cart/checkout/order semantic reconciliation and remaining reachable conditional cases; full audit incomplete.
+
+
+## Round164 - Cart and checkout named-case reconciliation
+Gate terminal0; clean worktree digest verified. No device mutation or new capture this round. Reviewed SRC0311-0364 and SRC0475-0512 plus matching supplemental callbacks against JOURNEYS.csv. SRC0486's pending scope-switch note was obsolete: CART-ROUND12-03 and MIXED-ROUND63-01 already establish empty and populated scope switching. Linked existing evidence without adding a pass or repeating the test. COUPON004 establishes retained selections on return, but its recorded action does not identify every toolbar/footer return target; those are still distinct.
+
+The following 30 action groups organize cart/checkout follow-up. They are neither 30 new journeys nor an exhaustive state-combination denominator. Each row retains normal/error/return/retention/accessibility descendants; confirmed defects remain open and provider-dependent states are not passed. Address editor subfields, payment chooser shared actions, mini-cart controls and other supplemental handlers still require their own reconciliation.
+
+| Group | Controls / binding | Evidence and remaining case |
+|---|---|---|
+| CART-P01 Entry and Store identity | SUP0046/0054-56/0060-61/0069/0140-41/0149 | Store/root/nested product cart callbacks differ; D002 remains; reconcile exact entry/return identity per parent |
+| CART-P02 Mini-cart parking | SUP0121 | Drag, park, restore and overlap require exact device evidence; normal cart entry does not qualify |
+| CART-P03 Scope tabs | SRC0486 | Empty scope round12 and both nonempty round63 passed; account switch/relaunch/provider revision separate |
+| CART-P04 Empty/browse continuations | SRC0312-14;SUP0161-62 | Store Continue browsing and empty Wholesale Browse recorded; nonempty Browse more, Offers return and stale Store anchor pending |
+| CART-P05 Clear cart | SRC0311/0316-17 | Keep/Empty and mixed scoped removal rounds12/63; empty-disabled/late scope change and resolution shortcut pending |
+| CART-P06 Line product navigation | SRC0506-07 | Round115 exact product and Back; Semantics and alternate origins unqualified |
+| CART-P07 Line quantity/removal | SRC0508-10;0479-85 | Qty editor/update/cancel/keyboard/minimum/remove checks recorded; error-clear timing, exact limits, stale offers and entry variants remain |
+| CART-P08 Product/grid quantity guards | SRC0475-78;SUP0085/0088-90 | Product Add rounds27/33; grid Edit round150; D021 remains; beforeCartChange rejection and alternate hit targets unverified |
+| CART-P09 Recommendations | SRC0501-02 | Tissues Add and product/Back round12; other eligibility/revision states separate; prescription outside Shop |
+| CART-P10 Instructions and tips | SRC0503-05 | Leave-at-door/none round11; other instructions/destinations pending; tip enabled-path not reached and not a positive pass |
+| CART-P11 GST enable/profile chooser | SRC0318-23 | Toggle on/off and Add recorded; D017 selected chip remains; multiple profile choice/Edit/restore Retry unqualified; decorative switch not separate action |
+| CART-P12 GST form lifecycle | SRC0326-30 | Required fields/short GSTIN/local save and keyboard Next/Done/reuse toggles recorded; full validation, save without reuse, restore/busy/failure unqualified |
+| CART-P13 GST profile removal | SRC0324-25 | Isolated Remove round79; Keep dialog/multiple profiles/cross-destination and lifecycle unqualified |
+| CART-P14 Benefit entry and return | SRC0487-90/0493 | Coupons001/payment003 and retained selections004; exact coupon entry variants, toolbar Back and completion CTA require target-specific evidence |
+| CART-P15 Benefit destination/kind | SRC0491-97 | Payment kind entry003; reverse Coupons tab and each eligible destination switch unqualified; wrappers not extra journeys |
+| CART-P16 Benefit select/remove/retry | SRC0498-500;SUP0267-68 | Supplier coupon and PhonePe selected; low-value ineligible state; removal/replacement/reverse kind/source isolation/expiry/provider Retry unqualified |
+| CHECK-P01 Cart-to-checkout | SRC0315/0512 | Review/Back round63; no-address and pricing-recovery branches separate; forwarding cards not extra passes |
+| CHECK-P02 Visible Back and busy guard | SRC0334 | Android Back checks do not establish visible Back or busy guard; exact control pending |
+| CHECK-P03 Primary step progression | SRC0335/0351 | Address/payment/review and delivery boundary recorded; real submission excluded; busy/double tap/provider failure separate |
+| CHECK-P04 Delivery/collection mode | SRC0339-40 | Delivery chip round18 passed; exact Collect chip and resolution-disabled behavior pending |
+| CHECK-P05 Collection selection/change | SRC0336-38 | Store entry is not multi-Store selector or review Change Store/Payment; require exact collection context and retained identity |
+| CHECK-P06 Address selection/edit | SRC0341-44;SUP0249-50 | Add another address empty form X round135; selected Work is not switch evidence; checkout-specific Select/Edit and busy/missing states pending |
+| CHECK-P07 Payment choices/reference | SRC0345-48 | Review Paytm selection recorded; runtime locked choice/cancel attempt provider-dependent; procurement PO reference belongs separate workspace purpose |
+| CHECK-P08 Confirm Change actions | SRC0349-50 | Address Change round95 and Payment Change round135; recalculation/provider and return observation949 remain separate |
+| CHECK-P09 Quote retry and change | SRC0331/0352-53 | B004 authoritative quote and changed price/promise acceptance absent; Check delivery does not qualify Retry or accepted revision |
+| CHECK-P10 Commercial terms | SRC0332-33 | Provider Retry and term radios require authoritative eligible terms; no fixture pass substituted |
+| CHECK-P11 Valid confirmation | SRC0354-56 | B011 confirmed purchase single/multiple orders, invoice and Continue shopping; D009 false empty confirmation remains |
+| CHECK-P12 Affected-item recovery | SRC0357-60 | B010 exact cart SKU revision needed for Retry/remove/view/return; ordinary product removal is not this recovery |
+| CHECK-P13 Address/general recovery | SRC0361-64;SRC0309-10 | Declared-link Change address/return rounds28 recorded; true provider serviceability, missing-address, general context and Help binding incomplete; D010 remains |
+| CHECK-P14 Saved-address reminder | SRC0511 | Exact account/cart/checkout parent Edit/return paths need reconciliation; general address editing cannot qualify every parent |
+
+Counts unchanged:614 action/check records;501 passes;22 defects;1123 physical captures;1125 evidence rows;71 public-data mappings. Next reachable priorities: CART-P04 nonempty Browse more; CHECK-P02 visible Back; CHECK-P06 checkout Select/Edit; CART-P15 reverse benefit kind. Orders/shared-screen and remaining address/mini-cart inventory follow. Full audit remains incomplete; no implementation or APK.
