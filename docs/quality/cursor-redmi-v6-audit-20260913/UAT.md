@@ -931,44 +931,44 @@ Source hashes bind the following index to the inspected files:
 | SRC-0328 | buy_v2_views.dart:6514 | _BuyV2GstInvoiceSheetState | onSubmitted | GST-ROUND95-04 Billing keyboard Done unfocus passed; form retained without saving |
 | SRC-0329 | buy_v2_views.dart:6530 | _BuyV2GstInvoiceSheetState | onChanged | GST-ROUND79-01 temporary reuse on save; ROUND95-01 toggle off passed; save-off/restore lifecycle unqualified |
 | SRC-0330 | buy_v2_views.dart:6592 | _BuyV2GstInvoiceSheetState | onPressed | GST-003..005 invalid forms; GST-ROUND79-01 local save; full boundaries/busy/failure unqualified |
-| SRC-0331 | buy_v2_views.dart:6706 | _CheckoutQuoteCard | onPressed | unclassified |
-| SRC-0332 | buy_v2_views.dart:6857 | _CheckoutCommercialPaymentTerms | onPressed | unclassified |
-| SRC-0333 | buy_v2_views.dart:6969 | _CommercialPaymentTermGroup | onChanged | unclassified |
-| SRC-0334 | buy_v2_views.dart:7068 | BuyV2CheckoutView | onTap | unclassified |
-| SRC-0335 | buy_v2_views.dart:7154 | BuyV2CheckoutView | onPressed | unclassified |
-| SRC-0336 | buy_v2_views.dart:7490 | _CheckoutCollectionDetails | onTap | unclassified |
-| SRC-0337 | buy_v2_views.dart:7508 | _CheckoutCollectionDetails | onTap | unclassified |
-| SRC-0338 | buy_v2_views.dart:7565 | _CheckoutCollectionDetails | onTap | unclassified |
-| SRC-0339 | buy_v2_views.dart:7602 | _CheckoutAddressStage | onSelected | unclassified |
-| SRC-0340 | buy_v2_views.dart:7610 | _CheckoutAddressStage | onSelected | unclassified |
-| SRC-0341 | buy_v2_views.dart:7665 | _CheckoutAddressStage | onPressed | unclassified |
-| SRC-0342 | buy_v2_views.dart:7698 | _CheckoutAddressChoice | onTap | unclassified |
-| SRC-0343 | buy_v2_views.dart:7711 | _CheckoutAddressChoice | onTap | unclassified |
-| SRC-0344 | buy_v2_views.dart:7748 | _CheckoutAddressChoice | onPressed | unclassified |
-| SRC-0345 | buy_v2_views.dart:7840 | _CheckoutPaymentStage | onTap | unclassified |
-| SRC-0346 | buy_v2_views.dart:7921 | _CheckoutPaymentStage | onTap | unclassified |
-| SRC-0347 | buy_v2_views.dart:7951 | _CheckoutPaymentStage | onChanged | unclassified |
-| SRC-0348 | buy_v2_views.dart:8139 | _CheckoutPaymentStateRow | onPressed | unclassified |
-| SRC-0349 | buy_v2_views.dart:8232 | _CheckoutConfirmStage | onTap | unclassified |
-| SRC-0350 | buy_v2_views.dart:8293 | _CheckoutConfirmStage | onTap | unclassified |
-| SRC-0351 | buy_v2_views.dart:8433 | _CheckoutPrimaryActionBar | onPressed | unclassified |
-| SRC-0352 | buy_v2_views.dart:8669 | _CheckoutPriceChangeReview | onPressed | unclassified |
-| SRC-0353 | buy_v2_views.dart:8729 | _CheckoutPromiseChangeReview | onPressed | unclassified |
-| SRC-0354 | buy_v2_views.dart:8845 | BuyV2ConfirmationView | onPressed | unclassified |
-| SRC-0355 | buy_v2_views.dart:8858 | BuyV2ConfirmationView | onPressed | unclassified |
-| SRC-0356 | buy_v2_views.dart:9016 | _PlacedOrderCard | onPressed | unclassified |
-| SRC-0357 | buy_v2_views.dart:9292 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0358 | buy_v2_views.dart:9302 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0359 | buy_v2_views.dart:9309 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0360 | buy_v2_views.dart:9314 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0361 | buy_v2_views.dart:9322 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0362 | buy_v2_views.dart:9335 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0363 | buy_v2_views.dart:9344 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0364 | buy_v2_views.dart:9353 | BuyV2RecoveryView | onPressed | unclassified |
-| SRC-0365 | buy_v2_views.dart:9429 | BuyV2OrdersView | onTap | unclassified |
-| SRC-0366 | buy_v2_views.dart:9490 | BuyV2OrdersView | onTap | unclassified |
-| SRC-0367 | buy_v2_views.dart:9636 | _OrdersTabButton | onTap | unclassified |
-| SRC-0368 | buy_v2_views.dart:9683 | BuyV2OrderItemsView | onTap | unclassified |
+| SRC-0331 | buy_v2_views.dart:6706 | _CheckoutQuoteCard | onPressed | checkout quote Retry B-004; authoritative quote absent; exact Retry UI not qualified from Check delivery |
+| SRC-0332 | buy_v2_views.dart:6857 | _CheckoutCommercialPaymentTerms | onPressed | commercial payment terms Retry provider dependency unverified |
+| SRC-0333 | buy_v2_views.dart:6969 | _CommercialPaymentTermGroup | onChanged | commercial term radio selection requires authoritative terms; provider/fixture state absent, unverified |
+| SRC-0334 | buy_v2_views.dart:7068 | BuyV2CheckoutView | onTap | visible checkout Back and busy notice; Android Back CHECKOUT-007/008/009 does not prove exact target or busy guard |
+| SRC-0335 | buy_v2_views.dart:7154 | BuyV2CheckoutView | onPressed | primary action forwarding; CHECKOUT-003/005 next/review and CHECKOUT-006 delivery boundary; real submission excluded |
+| SRC-0336 | buy_v2_views.dart:7490 | _CheckoutCollectionDetails | onTap | collection Store option selection; COLLECTION-ROUND18 entry not proof of multi-Store choice; conditional unverified |
+| SRC-0337 | buy_v2_views.dart:7508 | _CheckoutCollectionDetails | onTap | collection review Store Change to address step; exact control unverified |
+| SRC-0338 | buy_v2_views.dart:7565 | _CheckoutCollectionDetails | onTap | collection review Payment Change; exact control unverified |
+| SRC-0339 | buy_v2_views.dart:7602 | _CheckoutAddressStage | onSelected | device_pass COLLECTION-ROUND18-06 switch Delivery; resolution-disabled state unverified |
+| SRC-0340 | buy_v2_views.dart:7610 | _CheckoutAddressStage | onSelected | Collect at store chip distinct from Store entry COLLECTION-ROUND18-02; exact chip unverified |
+| SRC-0341 | buy_v2_views.dart:7665 | _CheckoutAddressStage | onPressed | checkout Add another address exact entry requires address-evidence reconciliation |
+| SRC-0342 | buy_v2_views.dart:7698 | _CheckoutAddressChoice | onTap | address choice Semantics action; screen-reader unverified |
+| SRC-0343 | buy_v2_views.dart:7711 | _CheckoutAddressChoice | onTap | checkout address pointer selection; selected Work observed but exact switch action requires reconciliation |
+| SRC-0344 | buy_v2_views.dart:7748 | _CheckoutAddressChoice | onPressed | checkout address Edit exact button; address-sheet Edit not automatically equivalent |
+| SRC-0345 | buy_v2_views.dart:7840 | _CheckoutPaymentStage | onTap | review-data payment choice CHECKOUT-004 Paytm; live provider selection not inferred |
+| SRC-0346 | buy_v2_views.dart:7921 | _CheckoutPaymentStage | onTap | runtime payment choice/locked notice conditional unverified; review choice separate SRC-0345 |
+| SRC-0347 | buy_v2_views.dart:7951 | _CheckoutPaymentStage | onChanged | procurement PO reference conditional field; workspace procurement scope; public consumer pass not inferred |
+| SRC-0348 | buy_v2_views.dart:8139 | _CheckoutPaymentStateRow | onPressed | cancel payment action/status-needs-checking requires real attempt state; provider qualification excluded |
+| SRC-0349 | buy_v2_views.dart:8232 | _CheckoutConfirmStage | onTap | device_pass GST-ROUND95 flow capture787 Change address; provider delivery recalculation unverified |
+| SRC-0350 | buy_v2_views.dart:8293 | _CheckoutConfirmStage | onTap | confirm Payment Change exact control unverified; Back to Payment not equivalent |
+| SRC-0351 | buy_v2_views.dart:8433 | _CheckoutPrimaryActionBar | onPressed | primary action button forwarder SRC-0335; no additional journey |
+| SRC-0352 | buy_v2_views.dart:8669 | _CheckoutPriceChangeReview | onPressed | accept updated prices requires exact changed quote; B-004/provider-dependent unverified |
+| SRC-0353 | buy_v2_views.dart:8729 | _CheckoutPromiseChangeReview | onPressed | accept updated delivery times requires changed promise; B-004/provider-dependent unverified |
+| SRC-0354 | buy_v2_views.dart:8845 | BuyV2ConfirmationView | onPressed | confirmation single/multiple order-details branch; positive purchase fixture B-011; RV6-D009 false confirmation remains |
+| SRC-0355 | buy_v2_views.dart:8858 | BuyV2ConfirmationView | onPressed | confirmation Continue shopping exact control requires prior recovery evidence reconciliation; no positive order claim |
+| SRC-0356 | buy_v2_views.dart:9016 | _PlacedOrderCard | onPressed | placed-order invoice needs confirmed order B-011; historical invoice not equivalent |
+| SRC-0357 | buy_v2_views.dart:9292 | BuyV2RecoveryView | onPressed | checkout issue Retry availability B-010; provider revision fixture missing |
+| SRC-0358 | buy_v2_views.dart:9302 | BuyV2RecoveryView | onPressed | checkout issue Remove from Cart B-010; ordinary cart removal not equivalent |
+| SRC-0359 | buy_v2_views.dart:9309 | BuyV2RecoveryView | onPressed | checkout issue View product B-010; exact affected SKU absent |
+| SRC-0360 | buy_v2_views.dart:9314 | BuyV2RecoveryView | onPressed | product issue return checkout B-010; exact revision recovery unverified |
+| SRC-0361 | buy_v2_views.dart:9322 | BuyV2RecoveryView | onPressed | address-resolution Change address conditional; exact failure/retry/destination path unverified |
+| SRC-0362 | buy_v2_views.dart:9335 | BuyV2RecoveryView | onPressed | address-resolution return checkout conditional unverified |
+| SRC-0363 | buy_v2_views.dart:9344 | BuyV2RecoveryView | onPressed | general recovery primary return; RV6-D010 context remains; exact scenario mapping required |
+| SRC-0364 | buy_v2_views.dart:9353 | BuyV2RecoveryView | onPressed | recovery Get help exact order binding conditional unverified |
+| SRC-0365 | buy_v2_views.dart:9429 | BuyV2OrdersView | onTap | Orders Account return conditional unverified; regular Orders Back not equivalent |
+| SRC-0366 | buy_v2_views.dart:9490 | BuyV2OrdersView | onTap | device_pass ORDER-010 and ORDER-ROUND23-02 Delivered tab/query retention; other tabs require own evidence |
+| SRC-0367 | buy_v2_views.dart:9636 | _OrdersTabButton | onTap | Orders tab pointer forwarder to SRC-0366; not additional journey |
+| SRC-0368 | buy_v2_views.dart:9683 | BuyV2OrderItemsView | onTap | Items visible Order breadcrumb exact target unverified; ORDER-007 Android Back is distinct |
 | SRC-0369 | buy_v2_views.dart:9727 | BuyV2OrderItemsView | onTap | unclassified |
 | SRC-0370 | buy_v2_views.dart:9845 | _OrdersAvailabilityState | onPressed | unclassified |
 | SRC-0371 | buy_v2_views.dart:9915 | _OrdersContinuationRail | onTap | unclassified |
@@ -1550,3 +1550,7 @@ Captures810-819 reviewed. Fresh resume showed Offers changed/expired notice; Ref
 ## Round 107 - product actions and conditional recovery
 
 32 previously unclassified product/invoice/recovery callbacks linked to existing Share, Compare, Store, Chat and milk-variant evidence or explicit pending/provider states. Native share chooser is not recipient delivery; empty comparison Refresh is not populated comparison; catalogue Save is not product-action Save; Android Back is not a visible Change product control. Conditional business verification and content/benefits/trust Retry remain unverified. No new device action, pass or defect. Original index311 to343 classified,184 unclassified; remaining count is source references, not user journeys.
+
+## Round 108 - checkout and recovery source coverage
+
+SRC-0331 through0368 mapped to existing checkout/collection/Orders UI evidence or explicit conditional/provider gaps. Distinct visible Back, Change, radio/option, invoice and recovery actions are not passed from neighboring controls or historical records. Real payment attempt actions remain outside live transaction authority. Price/promise acceptance needs authoritative revised quotes; confirmed-order paths need B-011. No new device pass, capture, implementation or defect. Original source index381 classified,146 unclassified; this is not a completed-journey count. Audit remains open.
