@@ -2338,3 +2338,20 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | rv6-d009-unsubmitted-text-1.0.png | 818A2D94831E3FC9828B3C663DA0475FAFE8E51A1AB6DDCC7D87A8684594A573 |
 | rv6-d009-unsubmitted-text-2.0.png | D3A8CDCC6AC3FE0A5CB677C9B2200129BD223A8699432C6E1FC31087F9C81EEB |
 | screen-regression.log | FF59F96A810E1D708A9671D956F0B97B4A688B153296042415DC657733B15213 |
+
+## RV6-D010 local qualification - 2026-09-14
+
+- Scope: original371-373 order MS-240782 -> generic delivery-delay recovery -> Return to order incorrectly selected Shop. Start e29194eb14d0d90ebf37eff329705e8ee4ec2381; prior D009 clean/live-equal and handoff passed. Source/test already owned; no ownership/checker/policy changes.
+- Change: apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart no longer writes initialDestination before session.openRecovery in _applyInitialState. Existing recovery origin records the current destination/view/order/query, which its existing restore logic already handles. All other initial route branches unchanged. No shared session/router/Help/Chat/backend source changes; no new route parameters.
+- Regression reproduced wrong destination before fix:3e62b2 terminal1, expected Orders, actual Shop. Initial test compiler used nonexistent delay enum (d2e9c0 terminal1), corrected to existing deliveryDelay. Focused capture run5017 passed button/Back but failed two Help expectations (d98a72 terminal1): the test incorrectly expected GlobalHelpSupportV2. Inspection showed this action opens Shop Chat; without a router it honestly reports unavailable. Corrected test setup/assertions to verify that fallback preserves order; added separate GoRouter-bound Chat destination and Android Back tests.
+- Nine D010 cases:360x800 at100/200% for warm tracking->recovery->button, Android Back, and no-router Help fallback; two routed Help/Back cases assert exact order/sub=orders/view=tracking return URI and retained order; cold screen entry preserves existing Wholesale query/destination. Cart/order IDs retained and no exceptions. Router Help uses an inert conversation destination to test the navigation boundary, not actual Chat/provider behavior. No messages sent. All9 passed after correction (86377 terminal0/e1f195).
+- Final-source connected suite: flutter test --no-pub test/ui_v2/buy/buy_v2_screen_test.dart --reporter expanded;266passed/0failures,83422 terminal0/4cf045, screen-regression.log. One redundant test non-null assertion flagged by analysis (94393 terminal1/30bfaf) was removed; no application code or expected value changed. Final focused9passed,78009 terminal0/d593c9, final-focused.log. Counts overlap266. Final analysis of exact two Dart owners zero issues (0727aa terminal0). Diff check passed. Test formatting limited to new D010 block; existing tests preserved.
+- Two actual Flutter captures from successful button cases reviewed: original MS-240782, Orders heading and selected Orders rail at100/200%. The earlier capture run's Help-test failures are not presented as passes; the two button captures remain valid evidence of unchanged final source. No incidental order copy/provider/live status claim qualified. Actual Android HTTPS delivery371-373 remains for checksum-bound Redmi successor APK.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d010-local-20260914. No APK/device action/closure, child implementation or broad audit. Frozen514 passes/1177 artifacts untouched.
+
+| Artifact | SHA256 |
+| --- | --- |
+| final-focused.log | D155195DC60169B2E0A09A1E2421868AE6C8D6FFE17CB89378806C8235A3564A |
+| rv6-d010-orders-return-text-1.0.png | 55A9CB81A2751236A0058E41BD97660A422E78C66CC1384992656E0501C38A6C |
+| rv6-d010-orders-return-text-2.0.png | 6D5ADA0F4E5D0D9F526A6B0B79FD929A4D1C17BF8D0AFAC78EB21D5CE0B692EA |
+| screen-regression.log | C70AA788E35A6BDB8073A5945683211893BDC7A52FA0F03FAEB9C8D75FEB2073 |

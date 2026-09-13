@@ -111,6 +111,7 @@ Impact: a stale/shared/malformed link can tell a customer an order was placed de
 
 
 ## RV6-D010 - Recovery return changes selected destination while retaining order detail
+- Local implementation qualified 2026-09-14: recovery entry no longer overwrites the current session destination with generic route defaults before capturing return context. Nine tests cover Orders action/Android Back, unavailable Help fallback, routed Shop Chat Help/Back and retained Wholesale origin. Full screen suite266passed/0failures; final focused9passed (overlapping), analysis zero issues; two Flutter return captures reviewed. Original Redmi371-373 remains pending successor-APK verification; status stays open.
 Status: open. Severity: minor navigation inconsistency. Redmi TG8HCYTGGQT885OF;UAW-CURSOR-REDMI-V6-REVIEW-20260913.
 Reproduction: open existing MS-240782 via declared HTTPS /app/buy/order/MS-240782 (371;Orders selected). Open declared /app/buy?view=recovery&recovery=delay,then Return to order372-373. Same order/detail retained,but Shop is selected in bottom rail instead of original Orders.
 Expected: exact return context includes originating destination as well as order ID;tracking should restore original Orders selection.

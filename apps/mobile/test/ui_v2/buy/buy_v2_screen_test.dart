@@ -8254,6 +8254,175 @@ void main() {
     },
   );
 
+  for (final scale in [1.0, 2.0]) {
+    for (final exit in ['button', 'back', 'help']) {
+      testWidgets(
+        'RV6 D010 recovery preserves Orders context text $scale via $exit',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(360, 800);
+          addTearDown(tester.view.reset);
+          final session = BuyV2Session(core: BuySession());
+          Widget route(bool recovery) => MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+                disableAnimations: true,
+              ),
+              child: r66VisualCaptureRoot(child!),
+            ),
+            home: BuyV2Screen(
+              session: session,
+              initialView: recovery ? BuyV2View.recovery : BuyV2View.tracking,
+              orderId: recovery ? null : 'MS-240782',
+              recoveryKind: recovery ? BuyV2RecoveryKind.deliveryDelay : null,
+            ),
+          );
+          await tester.pumpWidget(route(false));
+          await tester.pumpAndSettle();
+          expect(session.destination, BuyV2Destination.orders);
+          final order = session.selectedOrder;
+          final orders = session.orders.map((item) => item.id).toList();
+          await tester.pumpWidget(route(true));
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.recovery);
+          if (exit == 'back') {
+            await tester.binding.handlePopRoute();
+          } else {
+            final action = exit == 'help'
+                ? find.text('Get help')
+                : find.byKey(const ValueKey('buy-recovery-primary'));
+            await tester.scrollUntilVisible(action, 140);
+            await tester.tap(action);
+          }
+          await tester.pumpAndSettle();
+          if (exit == 'help') {
+            // This MaterialApp has no Chat router: the existing honest fallback
+            // must still leave the exact originating order selected.
+            expect(session.notice, contains('Shop Chat is unavailable'));
+          }
+          expect(session.view, BuyV2View.tracking);
+          expect(session.destination, BuyV2Destination.orders);
+          expect(session.selectedOrder, same(order));
+          expect(session.selectedOrder.id, 'MS-240782');
+          expect(session.orders.map((item) => item.id).toList(), orders);
+          expect(session.cartLines, isEmpty);
+          expect(tester.takeException(), isNull);
+          if (exit == 'button') {
+            await captureR66Visual(
+              tester,
+              'rv6-d010-orders-return-text-$scale',
+            );
+          }
+        },
+      );
+    }
+  }
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'RV6 D010 routed Help Back retains recovery order text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final session = BuyV2Session(core: BuySession());
+        Uri? helpUri;
+        final router = GoRouter(
+          initialLocation: '/app/buy?view=tracking&order=MS-240782',
+          routes: [
+            GoRoute(
+              path: '/app/buy',
+              builder: (context, state) {
+                final recovery =
+                    state.uri.queryParameters['view'] == 'recovery';
+                return BuyV2Screen(
+                  session: session,
+                  initialView: recovery
+                      ? BuyV2View.recovery
+                      : BuyV2View.tracking,
+                  orderId: recovery ? null : state.uri.queryParameters['order'],
+                  recoveryKind: recovery
+                      ? BuyV2RecoveryKind.deliveryDelay
+                      : null,
+                );
+              },
+            ),
+            GoRoute(
+              path: '/app/chat/thread/:threadId',
+              builder: (context, state) {
+                helpUri = state.uri;
+                return const Scaffold(
+                  key: ValueKey('d010-help-route'),
+                  body: Text('Conversation'),
+                );
+              },
+            ),
+          ],
+        );
+        addTearDown(router.dispose);
+        await tester.pumpWidget(
+          MaterialApp.router(
+            theme: MoolTheme.light(),
+            routerConfig: router,
+            builder: (context, child) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(scale),
+                disableAnimations: true,
+              ),
+              child: child!,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final order = session.selectedOrder;
+        router.go('/app/buy?view=recovery&recovery=delay');
+        await tester.pumpAndSettle();
+        await tester.scrollUntilVisible(find.text('Get help'), 140);
+        await tester.tap(find.text('Get help'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const ValueKey('d010-help-route')), findsOneWidget);
+        final returnUri = Uri.parse(helpUri!.queryParameters['return']!);
+        expect(returnUri.queryParameters['sub'], 'orders');
+        expect(returnUri.queryParameters['order'], 'MS-240782');
+        expect(returnUri.queryParameters['view'], 'tracking');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.tracking);
+        expect(session.destination, BuyV2Destination.orders);
+        expect(session.selectedOrder, same(order));
+        expect(session.cartLines, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  testWidgets('RV6 D010 cold recovery retains existing Wholesale origin', (
+    tester,
+  ) async {
+    final session = BuyV2Session(core: BuySession());
+    session.openDestination(BuyV2Destination.wholesale);
+    session.updateQuery('rice');
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        home: BuyV2Screen(
+          session: session,
+          initialView: BuyV2View.recovery,
+          recoveryKind: BuyV2RecoveryKind.deliveryDelay,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const ValueKey('buy-recovery-primary')));
+    await tester.pumpAndSettle();
+    expect(session.destination, BuyV2Destination.wholesale);
+    expect(session.view, BuyV2View.catalogue);
+    expect(session.query, 'rice');
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('all six recovery states fit and return without an extra page', (
     tester,
   ) async {

@@ -537,7 +537,8 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
         if (anchor != null) _openPartnerCatalogue(anchor);
       });
     } else if (recoveryKind != null) {
-      widget.session.destination = widget.initialDestination;
+      // Recovery must snapshot the current journey before any route defaults
+      // can replace its destination (a generic recovery link defaults to Shop).
       widget.session.openRecovery(recoveryKind);
     } else if (productId != null) {
       unawaited(widget.session.openLinkedProduct(productId));
