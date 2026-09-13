@@ -430,3 +430,9 @@ Counts unchanged630 physical captures;632 evidence rows;396 action rows;58 publi
 Physical captures631-644 reviewed. Added only isolated Wholesale tomatoes10kg2packs1160 then Shop wheat5kg1pack279;combined1439. Each cart shows exact own line635/636. Trade increment3 makes1740 and combined2019;Shop remains1/279 at637. Shop Address review638 carries1/279;Back/trade639 retained3/1740. Trade Address review640 carries3/1740. Original Work selection unchanged. Scoped clear641 discloses3Wholesale removed and1other retained;AndroidBack642 preservesboth. ConfirmingWholesale removal643 leavesShop1/279. Removed testShopline644;emptycart,Saved1,ScheduledShop restored. Seven narrow device passes;no new defects/closures. No payment,order placement,messages,address edits or product changes. Process-death/account switching/provider authority remain unqualified.
 
 644 physical captures;646 evidence rows;403 action rows;58 public mappings;16 defects. Three old pending notes reconciled. Residual notes131-195 read;complete source inventory and final handoff still open.
+
+## Round 64 - Saved no-match recovery and module return
+
+Physical captures645-650 reviewed. Original savedwheat279/count1. Searchzzsavednomatch64 shows generic editing no-match646;confirm647 correctly shows No matching saved products and explains records still saved. Clear search and filters648 restores exact wheat/count1 with emptyquery. AndroidBack649 goes modulechooser,not catalogue;Shop reentry650 retains Saved/Scheduled and original item. Three narrow device passes and one navigation observation;no process-death claim,no new defect/closure. No original saved item,cart,address or draft mutation.
+
+Five residual notes reconciled against round32/33/43/58/64. Residual rows196-260 reviewed;later reconciliation remains open.650 physical captures;652 evidence rows;407 actions;58 public mappings;16 defects. Source/action/data completeness and final handoff still incomplete.
