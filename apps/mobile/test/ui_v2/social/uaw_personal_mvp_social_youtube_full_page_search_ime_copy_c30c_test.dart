@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/creator/creator_session.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
+import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/retailer/retailer_session.dart';
 import 'package:moolsocial/features/shared/shared_session.dart';
+import 'package:moolsocial/features/shared/youtube_public_catalogue_repository.dart';
+import 'package:moolsocial/features/shared/youtube_public_search_state_repository.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_consumer.dart';
 import 'package:moolsocial/ui_v2/social/social_v2_youtube_public_runtime.dart';
 
@@ -59,6 +62,13 @@ void main() {
       await tester.pump();
 
       await tester.enterText(input, '  India news  ');
+      await tester.pump();
+      expect(
+        find.byKey(const Key('screen04-youtube-search-draft-ready')),
+        findsOneWidget,
+      );
+      expect(find.text('Ready to search'), findsOneWidget);
+      expect(find.text('Search now'), findsOneWidget);
       await tester.testTextInput.receiveAction(TextInputAction.search);
       await tester.pump();
 
@@ -164,6 +174,187 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets(
+    'RT-04B-01 process death restores Search query results and scroll',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      var now = DateTime.utc(2026, 8, 25, 6);
+      final persistence = _SearchKeyValueStore();
+      final firstCache = YouTubePublicSearchStateCache(now: () => now);
+      await firstCache.configureDurability(
+        DurableYouTubePublicSearchStateRepository(
+          persistence: persistence,
+          principalBinding: _binding(),
+          now: () => now,
+        ),
+      );
+      final firstOwners = _Owners();
+      addTearDown(firstOwners.dispose);
+      await tester.pumpWidget(
+        _app(
+          firstOwners.consumer(
+            searchStateCache: firstCache,
+            searchLoader: (query) async => List.generate(
+              12,
+              (index) => _video(
+                'persisted${index.toString().padLeft(2, '0')}',
+                'Persisted result $index',
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('screen04-youtube-home-search')));
+      await tester.pumpAndSettle();
+      final input = find.byKey(const Key('screen04-youtube-search-input'));
+      await tester.enterText(input, 'process death query');
+      await tester.testTextInput.receiveAction(TextInputAction.search);
+      await tester.pumpAndSettle();
+      final results = find.byKey(const Key('screen04-youtube-search-results'));
+      await tester.drag(results, const Offset(0, -700));
+      await tester.pump(const Duration(milliseconds: 300));
+      final firstList = tester.widget<ListView>(results);
+      final storedOffset = firstList.controller!.offset;
+      expect(storedOffset, greaterThan(0));
+      await firstCache.settleDurableWrites();
+      await tester.tap(find.textContaining('Persisted result').first);
+      await tester.pump();
+      expect(find.byKey(const Key('screen04-video-watch')), findsOneWidget);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+      await firstCache.settleDurableWrites();
+      now = now.add(const Duration(minutes: 1));
+      final relaunchedCache = YouTubePublicSearchStateCache(now: () => now);
+      expect(
+        await relaunchedCache.configureDurability(
+          DurableYouTubePublicSearchStateRepository(
+            persistence: persistence,
+            principalBinding: _binding(),
+            now: () => now,
+          ),
+        ),
+        YouTubePublicSearchFreshness.fresh,
+      );
+      var unexpectedReloads = 0;
+      final relaunchedOwners = _Owners();
+      addTearDown(relaunchedOwners.dispose);
+      await tester.pumpWidget(
+        _app(
+          relaunchedOwners.consumer(
+            searchStateCache: relaunchedCache,
+            searchLoader: (query) async {
+              unexpectedReloads += 1;
+              return const [];
+            },
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const Key('screen04-youtube-search-surface')),
+        findsOneWidget,
+      );
+      expect(
+        tester.widget<TextField>(input).controller?.text,
+        'process death query',
+      );
+      expect(tester.widget<TextField>(input).autofocus, isFalse);
+      expect(find.textContaining('Persisted result'), findsWidgets);
+      expect(relaunchedCache.snapshot?.results, hasLength(12));
+      final restoredList = tester.widget<ListView>(results);
+      expect(restoredList.controller?.offset, closeTo(storedOffset, 1));
+      expect(unexpectedReloads, 0);
+      expect(find.byKey(const Key('screen04-video-watch')), findsNothing);
+
+      await tester.tap(find.byKey(const Key('screen04-youtube-search-back')));
+      await tester.pumpAndSettle();
+      await relaunchedCache.settleDurableWrites();
+      final afterClear = await DurableYouTubePublicSearchStateRepository(
+        persistence: persistence,
+        principalBinding: _binding(),
+        now: () => now,
+      ).read();
+      expect(afterClear.freshness, YouTubePublicSearchFreshness.missing);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  testWidgets('RT-04B-01 late response cannot cross explicit Search close', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final response = Completer<List<Screen04YouTubePublicVideo>>();
+    final cache = YouTubePublicSearchStateCache();
+    final owners = _Owners();
+    addTearDown(owners.dispose);
+    await tester.pumpWidget(
+      _app(
+        owners.consumer(
+          searchStateCache: cache,
+          searchLoader: (_) => response.future,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('screen04-youtube-home-search')));
+    await tester.pumpAndSettle();
+    final input = find.byKey(const Key('screen04-youtube-search-input'));
+    await tester.enterText(input, 'late response');
+    await tester.testTextInput.receiveAction(TextInputAction.search);
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('screen04-youtube-search-back')));
+    await tester.pump();
+
+    response.complete([_video('late0001', 'Late result')]);
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const Key('screen04-youtube-search-surface')),
+      findsNothing,
+    );
+    expect(find.text('Late result'), findsNothing);
+    expect(cache.snapshot, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  test(
+    'RT-04B-01 authentication boundary clears durable Search state',
+    () async {
+      final repository = _SearchStateRepository();
+      await youtubePublicSearchState.configureDurability(repository);
+      youtubePublicSearchState.replace(
+        submittedQuery: 'private local query',
+        results: [
+          mapScreen04VideoToYouTubePublicCatalogueItem(
+            _video('boundary01', 'Boundary result'),
+          ),
+        ],
+      );
+      await youtubePublicSearchState.settleDurableWrites();
+      final shared = SharedSession();
+      addTearDown(shared.dispose);
+
+      resetSocialV2RetainedStateForAuthenticationBoundary(shared);
+
+      expect(youtubePublicSearchState.snapshot, isNull);
+      await youtubePublicSearchState.settleDurableWrites();
+      youtubePublicSearchState.replace(
+        submittedQuery: 'second account query',
+        results: const [],
+      );
+      await youtubePublicSearchState.settleDurableWrites();
+      expect(repository.writes, 1);
+      expect(repository.clears, 1);
+    },
+  );
+
   test(
     'C30C source removes commentary and reuses the real provider search',
     () {
@@ -173,6 +364,8 @@ void main() {
       final runtime = File(
         'lib/ui_v2/social/social_v2_youtube_public_runtime.dart',
       ).readAsStringSync();
+      final mainSource = File('lib/main.dart').readAsStringSync();
+      final appSource = File('lib/app/moolsocial_app.dart').readAsStringSync();
 
       for (final prohibited in const [
         'Filter loaded videos',
@@ -186,9 +379,61 @@ void main() {
       expect(consumer, contains("hintText: 'Search YouTube'"));
       expect(consumer, contains('class _YouTubeSearchSurface'));
       expect(consumer, contains('widget.youtubeSearchLoader'));
+      expect(
+        consumer,
+        contains('youtubePublicSearchState.clear(detachRepository: true)'),
+      );
+      expect(consumer, contains('_discardDurableYouTubeSearch();'));
       expect(runtime, contains('loadScreen04YouTubePublicSearch('));
-      expect(runtime, contains('client.search(query: submittedQuery)'));
-      expect(runtime, contains('.where(_isEligiblePublicVideo)'));
+      expect(runtime, contains('collectScreen04YouTubeCatalogue('));
+      expect(runtime, contains('query: submittedQuery'));
+      expect(runtime, contains('pageToken: pageToken'));
+      expect(runtime, contains('client.channelDetails('));
+      expect(runtime, contains('isEligible: _isEligiblePublicVideo'));
+      final searchHydration = mainSource.indexOf(
+        'searchFreshness = await youtubePublicSearchState',
+      );
+      final appStart = mainSource.indexOf('runApp(\n    MoolSocialApp(');
+      expect(searchHydration, greaterThan(-1));
+      expect(appStart, greaterThan(searchHydration));
+      expect(
+        mainSource,
+        contains('SecureStorageYouTubePublicSearchKeyValueStore()'),
+      );
+      expect(mainSource, contains('principalBinding: storedBinding'));
+      expect(mainSource, contains('storedBinding.matches(currentBinding)'));
+      final missingReceipt = mainSource.indexOf('if (storedBinding == null)');
+      final currentBinding = mainSource.indexOf(
+        'final currentBinding =',
+        missingReceipt,
+      );
+      expect(missingReceipt, greaterThan(-1));
+      expect(currentBinding, greaterThan(missingReceipt));
+      expect(
+        mainSource.substring(missingReceipt, currentBinding),
+        contains("'youtube_search_state', 'degraded'"),
+      );
+      expect(
+        mainSource,
+        contains('youtubePublicSearchHydrationIsDegraded(searchFreshness)'),
+      );
+      expect(
+        mainSource,
+        isNot(contains("_showReleaseBootstrapFailure('youtube_search_state')")),
+      );
+      expect(
+        mainSource,
+        contains(
+          'onAuthenticatedBoundary: '
+          'bindYouTubeSearchStateToCurrentPrincipal',
+        ),
+      );
+      expect(appSource, contains('this.onAuthenticatedBoundary'));
+      expect(
+        appSource,
+        contains('_queueAuthenticationBoundary(onAuthenticatedBoundary)'),
+      );
+      expect(appSource, contains('_authenticationBoundaryTail.then<void>'));
 
       final homeHeaderStart = consumer.indexOf('class _YouTubeHomeHeader');
       final watchHeaderStart = consumer.indexOf('class _YouTubeWatchHeader');
@@ -227,6 +472,7 @@ class _Owners {
 
   SocialUniversalV2 consumer({
     required Screen04YouTubePublicSearchLoader searchLoader,
+    YouTubePublicSearchStateCache? searchStateCache,
   }) => SocialUniversalV2(
     session: journey,
     creatorSession: creator,
@@ -240,6 +486,7 @@ class _Owners {
     ],
     youtubeShortsLoader: () async => const [],
     youtubeSearchLoader: searchLoader,
+    youtubeSearchStateCache: searchStateCache,
   );
 
   void dispose() {
@@ -247,6 +494,47 @@ class _Owners {
     creator.dispose();
     retailer.dispose();
     shared.dispose();
+  }
+}
+
+final class _SearchKeyValueStore
+    implements YouTubePublicCatalogueKeyValueStore {
+  final Map<String, String> values = {};
+
+  @override
+  Future<String?> readString(String key) async => values[key];
+
+  @override
+  Future<bool> writeString(String key, String value) async {
+    values[key] = value;
+    return true;
+  }
+
+  @override
+  Future<bool> remove(String key) async {
+    values.remove(key);
+    return true;
+  }
+}
+
+final class _SearchStateRepository
+    implements YouTubePublicSearchStateRepository {
+  int writes = 0;
+  int clears = 0;
+
+  @override
+  Future<YouTubePublicSearchRead> read() async => const YouTubePublicSearchRead(
+    freshness: YouTubePublicSearchFreshness.missing,
+  );
+
+  @override
+  Future<void> write(YouTubePublicSearchSnapshot snapshot) async {
+    writes += 1;
+  }
+
+  @override
+  Future<void> clear() async {
+    clears += 1;
   }
 }
 
@@ -268,3 +556,6 @@ Screen04YouTubePublicVideo _video(String id, String title) =>
       hasKnownDeviceRegionExclusion: false,
       hashtags: const ['#News'],
     );
+
+VerifiedPrincipalBinding _binding([String hex = 'a']) =>
+    VerifiedPrincipalBinding.fromStorage('v1:${hex * 64}');
