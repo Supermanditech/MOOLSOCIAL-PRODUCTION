@@ -1950,6 +1950,9 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _restoreProcurement() async {
+    // An explicit dashboard return wins over an older purchase bookmark.
+    // Leave the bookmark intact so Restock can still reopen that purchase.
+    if (widget.initialSection == 'dashboard') return;
     final controller = _storeProcurement;
     if (controller == null) return;
     final restored = await controller.open(
@@ -2132,10 +2135,17 @@ class _WorkWorkspaceDashboardScreenState
         } else if (Uri.tryParse(route)?.path == '/app/account/security') {
           // A pushed Store can differ from the router's displayed base URI.
           // Retain its actual destination when sign-in replaces the stack.
+          final current = GoRouterState.of(context).uri;
+          final returnLocation = _view == _WorkspaceControlView.dashboard
+              ? current.replace(
+                  queryParameters: {
+                    ...current.queryParameters,
+                    'section': 'dashboard',
+                  },
+                )
+              : current;
           context.push(
-            globalSecurityLocationForReturn(
-              GoRouterState.of(context).uri.toString(),
-            ),
+            globalSecurityLocationForReturn(returnLocation.toString()),
           );
         } else {
           context.push(route);

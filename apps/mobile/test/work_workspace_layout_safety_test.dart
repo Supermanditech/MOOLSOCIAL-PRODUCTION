@@ -588,6 +588,7 @@ void main() {
               procurementControllerFactory: procurementFactory,
               accountAuthenticated: dashboardAccountAuthenticated,
               accountIdentity: journey.accountIdentity,
+              initialSection: Uri.parse(route).queryParameters['section'],
             ),
           ),
         ],
@@ -13994,9 +13995,10 @@ void main() {
           ),
           GoRoute(
             path: storeLocation,
-            builder: (_, _) => WorkWorkspaceDashboardScreen(
+            builder: (_, state) => WorkWorkspaceDashboardScreen(
               session: work,
               procurementSession: buy,
+              initialSection: state.uri.queryParameters['section'],
             ),
           ),
           GoRoute(
@@ -14021,7 +14023,10 @@ void main() {
       await tester.ensureVisible(security);
       await tester.tap(security);
       await tester.pumpAndSettle();
-      expect(securityLocation?.queryParameters['return'], storeLocation);
+      expect(
+        securityLocation?.queryParameters['return'],
+        '$storeLocation?section=dashboard',
+      );
       // Completing authentication uses go(), replacing the pushed Store stack.
       router.go(securityLocation.toString());
       await tester.pumpAndSettle();
@@ -14032,6 +14037,68 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final explicitDashboard in [false, true]) {
+    testWidgets(
+      'FVC006 saved Restock survives explicit dashboard return $explicitDashboard',
+      (tester) async {
+        final work = liveStore();
+        final saved = WorkProcurementBookmark(
+          context: BuyV2ProcurementContext(
+            accountId: 'fixture-purchaser',
+            storeId: work.activeWorkspace!.id,
+            purpose: BuyV2ProcurementPurpose.restock,
+            originOperationId: 'retained-security-purchase',
+          ),
+          returnTo: 'dashboard',
+        );
+        final bookmarks = _StorePurchaseBookmarks()..value = saved;
+        final controller = WorkProcurementController(
+          currentAccountId: () => 'fixture-purchaser',
+          currentStoreId: () => work.activeWorkspace?.id,
+          storeApproved: () => work.activeWorkspace?.verified == true,
+          bookmarks: bookmarks,
+          stateStoreFactory: _StorePurchaseState.new,
+          sessionFactory: (identity, state) {
+            final core = BuySession();
+            addTearDown(core.dispose);
+            return BuyV2Session(
+              core: core,
+              procurementIdentity: identity,
+              customerStateStore: state,
+              commerceAdapter: _StorePurchaseCommerce(identity.value!),
+              reviewDataEnabled: false,
+            );
+          },
+        );
+        await mount(
+          tester,
+          route:
+              '/app/work/workspace/dashboard${explicitDashboard ? '?section=dashboard' : ''}',
+          work: work,
+          procurementFactory: () => controller,
+        );
+        expect(
+          find.byKey(const Key('work-store-activity-deck')),
+          explicitDashboard ? findsOneWidget : findsNothing,
+        );
+        expect(bookmarks.value!.toJson(), saved.toJson());
+        if (explicitDashboard) {
+          expect(controller.session, isNull);
+          expect(
+            await controller.open(
+              purpose: BuyV2ProcurementPurpose.restock,
+              returnTo: 'dashboard',
+            ),
+            isTrue,
+          );
+        }
+        expect(controller.bookmark!.context, saved.context);
+        expect(bookmarks.value!.active, isTrue);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('leaving an operation clears its action error', (tester) async {
     final work = liveStore();
