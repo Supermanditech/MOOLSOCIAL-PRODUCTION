@@ -46,3 +46,7 @@ journey_router257-287 resolves only a published workspace product and creates _W
 
 ### B-006 Wholesale extension (round 23)
 Delivered Wholesale PO-240728 exposes three purchased items (rice, oil and notebooks), all disabled with eligibility unavailable in Return (314-315). This extends the existing delivered-item resolution prerequisite to Wholesale. No request submitted; replacement/refund were not repeated in this round. Positive resolution remains unqualified.
+
+
+## B-009 - Wholesale invoice lines unavailable
+PO-240728 Invoice shows item details missing (318). Refresh returns the retained Wholesale/Delivered list (319);reopening remains unavailable (320). _openOrderInvoice in buy_v2_views.dart31-88 gates invoice entry on nonempty order.lines and calls retryCommerce under owner/procurement guards. Positive historical Wholesale invoice contents and successful refresh are unqualified. Return eligibility product rows do not establish invoice-line availability. No invoice fabricated or order/payment changed;source/test-data prerequisite,not a confirmed renderer defect.
