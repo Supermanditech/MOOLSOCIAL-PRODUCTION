@@ -869,9 +869,9 @@ Source hashes bind the following index to the inspected files:
 | SRC-0266 | buy_v2_views.dart:68 | _openOrderInvoice | onPressed | invoice unavailable dialog Back; exact failure-dialog target requires device evidence; successful invoice does not qualify |
 | SRC-0267 | buy_v2_views.dart:78 | _openOrderInvoice | onPressed | invoice unavailable Refresh orders; provider recovery unverified |
 | SRC-0268 | buy_v2_views.dart:593 | BuyV2ProductView | onPressed | device_pass STORE-001 and COLLECTION-ROUND18-01 Visit store; supplier counterpart separate |
-| SRC-0269 | buy_v2_views.dart:620 | BuyV2ProductView | onTap | product visible return control; Android Back evidence not automatically equivalent; compared-product return B-002 |
+| SRC-0269 | buy_v2_views.dart:620 | BuyV2ProductView | onTap | device_pass PRODUCT-ROUND162-02 visible Shop return from Scheduled first-page notebook; other parents/compared-product B002 and Semantics unqualified |
 | SRC-0270 | buy_v2_views.dart:952 | BuyV2ProductView | onTap | Medicine-specific supplier decision row; outside public Shop/Wholesale |
-| SRC-0271 | buy_v2_views.dart:1440 | _ProductQuickActions | onPressed | product-page Save action exact button needs reconciliation; catalogue bookmark pass not equivalent |
+| SRC-0271 | buy_v2_views.dart:1440 | _ProductQuickActions | onPressed | device_pass PRODUCT-ROUND162-01 exact product Save/unsave; catalogue count/marker and reopen verified; original wheat retained; process death/account sync/accessibility unqualified |
 | SRC-0272 | buy_v2_views.dart:1445 | _ProductQuickActions | onPressed | device_pass SHARE-001 native chooser and SHARE-002 Cancel; recipient open/provider delivery not qualified |
 | SRC-0273 | buy_v2_views.dart:1452 | _ProductQuickActions | onPressed | CMP-001 comparison entry with missing matches B-002; populated results and cart remain unverified |
 | SRC-0274 | buy_v2_views.dart:1465 | _ProductQuickActions | onPressed | device_pass CHAT-001 Ask seller entry; no real message sent; shared Chat descendants separate |
@@ -1964,3 +1964,28 @@ Three narrow action/check passes WHOLESALE-ROUND160-01..03; no new defect. Seman
 Gate terminal0; clean evidence tree verified.1103 Shop footer;1104 tap disabled Previous retains same initial products;1105 Refresh returns to top with original wheat Saved1.1106 Wholesale initial1-40 Previous unchanged;1107 Refresh retains same review products and Wholesale mode.1108 original Scheduled Shop Saved1 emptycart restored. No cart/saved/address changes or external transactions.
 Two parent-specific checks PAGER-ROUND161-01/02 pass at the review-data UI boundary only. No claim that Refresh fetched an authoritative revision or exercised network failure. Final cursor, stale response, provider failure, other parent contexts and accessibility remain unqualified. No new defect.610 action/check records;498 passes;1108 captures;1110 evidence rows;22 distinct defects.
 Next: reconcile product/cart/order/shared callback families into named remaining cases; preserve parent-specific final-page/provider gaps explicitly rather than attempting millions of Next taps or treating a first-page check as final-page coverage. Full audit remains open.
+
+
+## Round162 - Product quick-action save and remaining product case groups
+Gate terminal0. Source inventory reviewed SRC0266-0316 against recorded journey actions. Catalogue save tests did not evidence product quick-action Save.1109-1111 exact notebook6 product and Save;1112 Saved toast/marker;Android Back1113 catalogue count2 with notebook and original wheat bookmarks.1114 product reopened;1115 Saved retained;1116 same quick action removes only notebook.1117 visible Shop return tapped;1118 original Scheduled catalogue Saved1 wheat, emptycart. No cart/address edits or real messages. Two narrow passes PRODUCT-ROUND162-01/02; no new defect.612 action/check records;500 passes;1118 physical captures;1120 evidence rows;22 distinct defects.
+
+These are 14 named product action groups reconciled from SRC0268-0308, not 14 completed end-to-end journeys. Lower shared purchase/stepper descendants and supplemental callbacks remain separately inventoried; no exhaustive product/module denominator is claimed.
+
+| Group | Action and callback coverage | Evidence or next required case |
+|---|---|---|
+| PROD-P01 Return | SRC0269 visible return | Round162 Shop pointer passed; Store/search/Wholesale/compared parents and Semantics remain |
+| PROD-P02 Visit store/supplier | SRC0268; SRC0270 Medicine excluded | STORE-001/COLLECTION-ROUND18-01 entry recorded; supplier counterpart and context variants need reconciliation |
+| PROD-P03 Save | SRC0271;0275/0277 wrappers | Round162 exact quick-action save/unsave and reopen passed; sync/process-death/accessibility separate |
+| PROD-P04 Share | SRC0272 | SHARE-001/002 chooser/cancel; recipient deep-link and provider delivery unresolved |
+| PROD-P05 Compare | SRC0273/0278-0280 | CMP001/002 empty/refresh; B002 populated matches, page controls, offer identity, Add and return blocked |
+| PROD-P06 Ask seller | SRC0274 | CHAT-001 entry; all shared Chat descendants remain separate; no message sent |
+| PROD-P07 Variants | SRC0281/0282 | Round22/58 pointer cases; stale/unavailable branches and Semantics unverified |
+| PROD-P08 Business verification | SRC0283/0287 | Open business profile and Verify business exact public Wholesale entry/return/auth boundary unverified; inspect current rendered conditions before claiming unreachable |
+| PROD-P09 Availability decisions | SRC0284-0286/0288-0290 | Panel/dock Check availability, local insight Retry, unavailable Change product are distinct; provider success/failure branches unverified |
+| PROD-P10 Related products | SRC0291/0292 | Pointer entry recorded; D007 return failure remains; Semantics and context variants separate |
+| PROD-P11 Media | SRC0293 | B008 actual supplier bytes and media descendants blocked; round75 fixture zoom is not provider qualification |
+| PROD-P12 Content and trust retry | SRC0294-0296 | Product content, benefits and trust each have provider-error Retry; missing error states unverified, source trust text is not authoritative proof |
+| PROD-P13 Reviews | SRC0297/0299-0305 | REVIEW entry/ineligible handling recorded; B003 existing/eligible editor rating/comment/validation/draft/close/save outcome unqualified |
+| PROD-P14 Report issue | SRC0298/0306-0308 | REPORT reasons/cancel recorded; busy/duplicate/rejection/accepted branches unqualified; actual submission excluded |
+
+SRC0276 quick-action Semantics is not a separate pointer journey and remains untested with screen reader. SRC0266-0267 invoice error actions belong order recovery; SRC0309-0310 missing address/order actions belong recovery. Next reconcile cart/checkout/orders/shared groups and physically inspect PROD-P08/P09 reachable branches. Do not rerun default save solely to inflate coverage. Full audit remains incomplete.
