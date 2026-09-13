@@ -1,0 +1,36 @@
+{
+  "candidate": "UAW-CODEX-OPPO-R66.1-REVIEW-20260905",
+  "sourceHead": "06f320339d52305f3339ded985550d0bd9ad7446",
+  "serial": "2b3e0f71",
+  "model": "CPH2375",
+  "package": "com.moolsocial.app.runtime",
+  "versionCode": "2026090501",
+  "versionName": "1.0.0-r66.1-runtime",
+  "previousVersionCode": "2026090404",
+  "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CODEX-work-opportunity-route-contract-v1-20260905\\artifacts\\device\\codex-oppo-r66-1-review-20260905\\uaw-codex-oppo-r66.1-review-20260905-device-review-debug.apk",
+  "sha256": "8946FC59898A5BF3F81B84A6E3329F55E2DBE0BB174A04F955983898993F4F45",
+  "installedSha256": "8946FC59898A5BF3F81B84A6E3329F55E2DBE0BB174A04F955983898993F4F45",
+  "checksumEqual": true,
+  "install": "passed",
+  "launch": "passed",
+  "startedUtc": "2026-09-05T08:20:34.7111089Z",
+  "completedUtc": "2026-09-05T08:20:55.3197055Z",
+  "founderReview": "pending",
+  "productionQualification": "not_claimed",
+  "redmiAction": "none",
+  "productionPackageAction": "none",
+  "visibleSurface": "Earn Today, reached through Mool > Work",
+  "startupScreenshot": {
+    "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/codex-oppo-r66-1/oppo-work.png",
+    "sha256": "86CB5520657F6AD8C3F23453A0054D693371401BA988D6FA706AECF0924B3EC0"
+  },
+  "startupXml": {
+    "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-POST-UI-AUDIT-20260905/codex-oppo-r66-1/oppo-work.xml",
+    "sha256": "130F16C31085DA72D07B833642C48E1992B632813D32BB064B4B4080A1BE96F7"
+  },
+  "scope": "Install, package/version/checksum and visible first-frame/navigation smoke only. Full OPPO journey testing and founder approval remain pending.",
+  "reviewObservations": [
+    "Existing workspace support strip and brief card description use ellipsis in this frame; retained for founder feedback, not redesigned during installation.",
+    "Monthly payment row renders within its bounded columns."
+  ]
+}

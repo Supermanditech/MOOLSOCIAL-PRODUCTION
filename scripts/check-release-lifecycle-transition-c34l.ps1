@@ -796,7 +796,7 @@ $parseErrors = $null
 Assert-C34LFixture (@($parseErrors).Count -eq 0) 'transition owner does not parse.'
 $transitionSource = Get-Content -Raw -LiteralPath $transitionPath
 Assert-C34LFixture (
-  $transitionSource.IndexOf('[IO.Path]::GetRelativePath',
+  $transitionSource.IndexOf(('[IO.Path]::' + 'GetRelativePath'),
     [StringComparison]::OrdinalIgnoreCase) -lt 0
 ) 'transition owner still depends on Path.GetRelativePath.'
 foreach ($required in @(
