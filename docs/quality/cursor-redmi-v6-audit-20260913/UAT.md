@@ -897,18 +897,18 @@ Source hashes bind the following index to the inspected files:
 | SRC-0294 | buy_v2_views.dart:3868 | _ProductContentSections | onPressed | unclassified |
 | SRC-0295 | buy_v2_views.dart:4118 | _ProductBenefitsPreview | onPressed | unclassified |
 | SRC-0296 | buy_v2_views.dart:4286 | _MarketplaceTrustPanel | onPressed | unclassified |
-| SRC-0297 | buy_v2_views.dart:4453 | _ProductReviewsPanel | onPressed | unclassified |
-| SRC-0298 | buy_v2_views.dart:4464 | _ProductReviewsPanel | onPressed | unclassified |
-| SRC-0299 | buy_v2_views.dart:4559 | _showProductReviewSheet | onPressed | unclassified |
-| SRC-0300 | buy_v2_views.dart:4656 | _ProductFeedbackSheetHeader | onPressed | unclassified |
-| SRC-0301 | buy_v2_views.dart:4885 | _ProductReviewSheetState | onPressed | unclassified |
-| SRC-0302 | buy_v2_views.dart:4919 | _ProductReviewSheetState | onTap | unclassified |
-| SRC-0303 | buy_v2_views.dart:4947 | _ProductReviewSheetState | onChanged | unclassified |
-| SRC-0304 | buy_v2_views.dart:5039 | _ProductReviewSheetState | onPressed | unclassified |
-| SRC-0305 | buy_v2_views.dart:5053 | _ProductReviewSheetState | onPressed | unclassified |
-| SRC-0306 | buy_v2_views.dart:5195 | _ProductReportSheetState | onTap | unclassified |
-| SRC-0307 | buy_v2_views.dart:5283 | _ProductReportSheetState | onPressed | unclassified |
-| SRC-0308 | buy_v2_views.dart:5295 | _ProductReportSheetState | onPressed | unclassified |
+| SRC-0297 | buy_v2_views.dart:4453 | _ProductReviewsPanel | onPressed | REVIEW-001; existing-review Edit branch B003 unqualified |
+| SRC-0298 | buy_v2_views.dart:4464 | _ProductReviewsPanel | onPressed | REPORT-001; reported/disabled and reconnect branches provider-unqualified |
+| SRC-0299 | buy_v2_views.dart:4559 | _showProductReviewSheet | onPressed | REVIEW-002; positive eligibility/loading outcome B003 unqualified |
+| SRC-0300 | buy_v2_views.dart:4656 | _ProductFeedbackSheetHeader | onPressed | REPORT-ROUND90-01; REVIEW-ROUND91-01; eligible editor Close B003 unqualified |
+| SRC-0301 | buy_v2_views.dart:4885 | _ProductReviewSheetState | onPressed | B003 eligible rating 1-5 selection/replacement unqualified |
+| SRC-0302 | buy_v2_views.dart:4919 | _ProductReviewSheetState | onTap | B003 eligible comment focus/keyboard unqualified |
+| SRC-0303 | buy_v2_views.dart:4947 | _ProductReviewSheetState | onChanged | B003 eligible comment validation and draft updates unqualified |
+| SRC-0304 | buy_v2_views.dart:5039 | _ProductReviewSheetState | onPressed | B003 eligible editor Cancel and retained draft unqualified |
+| SRC-0305 | buy_v2_views.dart:5053 | _ProductReviewSheetState | onPressed | B003 eligible Save validation/busy/rejected/accepted unqualified |
+| SRC-0306 | buy_v2_views.dart:5195 | _ProductReportSheetState | onTap | REPORT-002..005; all four reason selections verified; busy branch unqualified |
+| SRC-0307 | buy_v2_views.dart:5283 | _ProductReportSheetState | onPressed | REPORT-006; busy-disabled Cancel unqualified |
+| SRC-0308 | buy_v2_views.dart:5295 | _ProductReportSheetState | onPressed | Report submission excluded; busy/rejection/accepted/duplicate states provider-unqualified |
 | SRC-0309 | buy_v2_views.dart:5364 | _AddressSelectionRequired | onPressed | unclassified |
 | SRC-0310 | buy_v2_views.dart:5421 | _MissingOrderSelection | onPressed | unclassified |
 | SRC-0311 | buy_v2_views.dart:5569 | _BuyV2CartViewState | onPressed | unclassified |
@@ -1148,3 +1148,23 @@ Classified71 legacy/contextual widget callback candidates as not mounted by the 
 - Source read: buy_v2_views.dart 5083-5319. Reason selection clears rejection; submit disables while busy; accepted response closes; rejection stays with session notice. These submission outcomes are source inventory only, not device passes. Existing REPORT-001 through REPORT-006 cover opening, all four reasons and Cancel. Selected-reason alternate dismissal, barrier/drag, enlarged-text and submission descendants remain unqualified. REVIEW-001 through REVIEW-003 only qualify ineligible review/recheck/Back, not eligible review submission.
 - Seven new reviewed captures, 745 physical captures total; 747 evidence rows; 481 action rows including 383 device passes. Seventeen distinct confirmed defects unchanged. The unique-journey denominator remains incomplete.
 - Read/recovery disclosure: combined policy output truncated; no product mutation followed; existing coordination gate was rerun and exited 0. First evidence-append command had a parse-time unmatched parenthesis and exited 1 before execution; corrected bounded append completed under standing recovery authorization. No policy/checker changes.
+
+
+## Round 91 - Review conditional inventory and eligibility Close
+
+Physical Redmi captures 746-748 show the current product, the no-eligible-purchase sheet and Close returning to the same product position. One device pass; no review/report sent, no new defect. Totals: 748 physical captures, 750 evidence rows, 482 action rows including 384 device passes; 17 distinct confirmed defects unchanged.
+
+Read buy_v2_views.dart 4363-4612 and 4733-5082 alongside prior report-form read. Reconciled SRC-0297 through SRC-0308 (12 candidates) against REVIEW-001..003, REPORT-001..006 and rounds90-91. Source candidate reconciliation is now 105 classified / 422 unclassified out of 527 lexical occurrences. These are not unique journeys or device-pass counts.
+
+Explicit conditional descendants under existing B003 (not newly discovered defects):
+- Eligible editor opening and Edit of an existing review; correct product/existing rating/comment.
+- Each rating 1-5, replacement rating and rating-only invalid form.
+- Comment focus, keyboard-first Back, second Back, field scroll and accessibility input.
+- Empty/whitespace comment rejection; 500-character limit including grapheme input; valid rating plus comment enabling Save.
+- Cancel/Close/barrier/drag and reopen retaining the correct product/account draft.
+- Failed eligibility refresh after editor opens retaining draft; submission eligibility revalidation.
+- Busy submission prevents duplicate action; rejected response retains editable draft and notice; accepted response closes and updates public review.
+- Account/product switching, relaunch and stale asynchronous response must not cross draft ownership.
+- 200-percent text, keyboard and reduced-motion/screen-reader behavior of the eligible form.
+
+All above remain device-unverified because the tested SKU has no eligible purchase and real submissions are excluded. Source shows a rating/comment draft owner scope and validation but does not prove backend authority or runtime outcomes. Report accepted/failed/busy/Reported states are likewise unqualified; only normal opening, four reasons, Cancel, unselected Close and Android Back have device evidence. Public-panel reconnect fallback remains untested. This inventory does not convert source behavior to device passes or declare the full audit complete.
