@@ -991,26 +991,26 @@ Source hashes bind the following index to the inspected files:
 | SRC-0388 | buy_v2_views.dart:11294 | BuyV2TrackingView | onTap | tracking visible Orders/Help return target exact tap requires reconciliation; Android Back not equivalent |
 | SRC-0389 | buy_v2_views.dart:11312 | BuyV2TrackingView | onPressed | ORDER-001 attempted refresh blocked_provider B-005; busy/success unverified |
 | SRC-0390 | buy_v2_views.dart:11425 | BuyV2TrackingView | onPressed | Restore delivery status from tracking exact button unverified; bottom rail reopen TRACK-005 distinct |
-| SRC-0391 | buy_v2_views.dart:11781 | BuyV2TrackingView | onPressed | unclassified |
-| SRC-0392 | buy_v2_views.dart:11787 | BuyV2TrackingView | onChanged | unclassified |
-| SRC-0393 | buy_v2_views.dart:11805 | BuyV2TrackingView | onPressed | unclassified |
-| SRC-0394 | buy_v2_views.dart:11815 | BuyV2TrackingView | onPressed | unclassified |
-| SRC-0395 | buy_v2_views.dart:11825 | BuyV2TrackingView | onPressed | unclassified |
-| SRC-0396 | buy_v2_views.dart:11843 | BuyV2TrackingView | onPressed | unclassified |
-| SRC-0397 | buy_v2_views.dart:11863 | BuyV2TrackingView | onPressed | unclassified |
-| SRC-0398 | buy_v2_views.dart:11905 | BuyV2TrackingView | onTap | unclassified |
-| SRC-0399 | buy_v2_views.dart:12086 | _BuyV2OrderResolutionSheetState | onPressed | unclassified |
-| SRC-0400 | buy_v2_views.dart:12097 | _BuyV2OrderResolutionSheetState | onPressed | unclassified |
-| SRC-0401 | buy_v2_views.dart:12108 | _BuyV2OrderResolutionSheetState | onTap | unclassified |
-| SRC-0402 | buy_v2_views.dart:12147 | _BuyV2OrderResolutionSheetState | onChanged | unclassified |
-| SRC-0403 | buy_v2_views.dart:12178 | _BuyV2OrderResolutionSheetState | onPressed | unclassified |
-| SRC-0404 | buy_v2_views.dart:12222 | _BuyV2OrderResolutionSheetState | onChanged | unclassified |
-| SRC-0405 | buy_v2_views.dart:12229 | _BuyV2OrderResolutionSheetState | onPressed | unclassified |
-| SRC-0406 | buy_v2_views.dart:12259 | _BuyV2OrderResolutionSheetState | onPressed | unclassified |
-| SRC-0407 | buy_v2_views.dart:12315 | _OrderResolutionItemTile | onChanged | unclassified |
-| SRC-0408 | buy_v2_views.dart:12367 | _OrderResolutionItemTile | onPressed | unclassified |
-| SRC-0409 | buy_v2_views.dart:12387 | _OrderResolutionItemTile | onPressed | unclassified |
-| SRC-0410 | buy_v2_views.dart:12426 | _OrderResolutionOptionTile | onTap | unclassified |
+| SRC-0391 | buy_v2_views.dart:11781 | BuyV2TrackingView | onPressed | tracking Retry order alerts provider/restore failure unverified |
+| SRC-0392 | buy_v2_views.dart:11787 | BuyV2TrackingView | onChanged | tracking-screen alert switch exact target unverified; settings switch is distinct entry |
+| SRC-0393 | buy_v2_views.dart:11805 | BuyV2TrackingView | onPressed | device_pass ORDER-003 and ORDER-ROUND25-03 order Address entry |
+| SRC-0394 | buy_v2_views.dart:11815 | BuyV2TrackingView | onPressed | device_pass ORDER-004 and ORDER-ROUND25-01 Items entry; historical content limitations preserved |
+| SRC-0395 | buy_v2_views.dart:11825 | BuyV2TrackingView | onPressed | ORDERHELP-001 non-delivered Help and REORDER-001 delivered Reorder; different branches; successful new purchase not inferred |
+| SRC-0396 | buy_v2_views.dart:11843 | BuyV2TrackingView | onPressed | device_pass RESOLUTION-001/006 Manage order; eligible return descendants B-006 |
+| SRC-0397 | buy_v2_views.dart:11863 | BuyV2TrackingView | onPressed | INVOICE-001 Shop view/export evidence; Wholesale ORDER-ROUND24-01 B-009; future actual invoice integrity unqualified |
+| SRC-0398 | buy_v2_views.dart:11905 | BuyV2TrackingView | onTap | after-delivery support continuation exact target needs reconciliation; tracking Help action not equivalent |
+| SRC-0399 | buy_v2_views.dart:12086 | _BuyV2OrderResolutionSheetState | onPressed | provider B-006 resolution Retry; RESOLUTION-011 retains unavailable eligibility, not successful recovery |
+| SRC-0400 | buy_v2_views.dart:12097 | _BuyV2OrderResolutionSheetState | onPressed | unavailable-resolution Contact support exact button unverified; no message authorized |
+| SRC-0401 | buy_v2_views.dart:12108 | _BuyV2OrderResolutionSheetState | onTap | RESOLUTION-002 cancel selected; RESOLUTION-007/008/009 return types blocked eligibility; positive selection reset ROUND82-06 blocked |
+| SRC-0402 | buy_v2_views.dart:12147 | _BuyV2OrderResolutionSheetState | onChanged | blocked_provider RESOLUTION-ROUND82-04 eligible item quantity state absent |
+| SRC-0403 | buy_v2_views.dart:12178 | _BuyV2OrderResolutionSheetState | onPressed | blocked_provider RESOLUTION-ROUND82-06 refresh/reset after positive selection absent |
+| SRC-0404 | buy_v2_views.dart:12222 | _BuyV2OrderResolutionSheetState | onChanged | device_pass RESOLUTION-003/004 and ROUND82/83 cancellation reasons; return/refund reasons positive eligibility unverified |
+| SRC-0405 | buy_v2_views.dart:12229 | _BuyV2OrderResolutionSheetState | onPressed | submission excluded real transaction/request; provider outcomes RESOLUTION-ROUND82-05/07 unverified |
+| SRC-0406 | buy_v2_views.dart:12259 | _BuyV2OrderResolutionSheetState | onPressed | Contact support instead exact button unverified; no message authorized |
+| SRC-0407 | buy_v2_views.dart:12315 | _OrderResolutionItemTile | onChanged | blocked_provider B-006 / RESOLUTION-ROUND82-04 eligible item checkbox; disabled purchased items observed only |
+| SRC-0408 | buy_v2_views.dart:12367 | _OrderResolutionItemTile | onPressed | blocked_provider RESOLUTION-ROUND82-04 selected return quantity decrease unverified |
+| SRC-0409 | buy_v2_views.dart:12387 | _OrderResolutionItemTile | onPressed | blocked_provider RESOLUTION-ROUND82-04 increase/eligible maximum unverified |
+| SRC-0410 | buy_v2_views.dart:12426 | _OrderResolutionOptionTile | onTap | resolution type pointer forwarder SRC-0401; no additional journey |
 | SRC-0411 | buy_v2_views.dart:12535 | _BuyV2AssistViewState | onTap | unclassified |
 | SRC-0412 | buy_v2_views.dart:12633 | _BuyV2AssistViewState | onTap | unclassified |
 | SRC-0413 | buy_v2_views.dart:12782 | _BuyV2AssistViewState | onTap | unclassified |
@@ -1558,3 +1558,7 @@ SRC-0331 through0368 mapped to existing checkout/collection/Orders UI evidence o
 ## Round 109 - order and collection action reconciliation
 
 SRC-0369 through0390 linked to historical product/future-address evidence and existing collection, live delivery, delivery-exception and balance-payment blockers. Exact visible return/Close/Restore controls remain pending where only Back or rail evidence exists. No messages, rescheduling, disputes or payments performed. No new device pass/capture/defect. Original index403 classified,124 unclassified; classification includes pending and blocked actions and is not a unique journey denominator.
+
+## Round 110 - tracking and order resolution controls
+
+SRC-0391 through0410 matched to recorded Items/Address/Help/Reorder/Invoice and cancellation reason checks. Return/replacement/refund eligibility and quantity states retain B-006 and round82 descendants. Real submission not performed; disabled or unavailable controls are not positive qualification. Tracking-specific notification and support buttons remain distinct from settings/chat entry evidence. No new device pass/capture/defect. Original index423 classified,104 unclassified; semantic inventory still open.
