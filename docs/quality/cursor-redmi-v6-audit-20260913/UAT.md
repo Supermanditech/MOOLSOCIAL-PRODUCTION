@@ -1351,57 +1351,57 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0114 | buy_v2_screen.dart:966 | onOpenRoute | Global profile onOpenRoute -> context.push(route); actual child routes must be inventoried; ACCOUNT-ROUND111-01 Orders subset only, not every shared destination |
 | SUPSRC-0115 | buy_v2_screen.dart:992 | onReturn | Stale procurement scope recovery Return -> _exitBuy; authoritative account/Store switch fixture needed; public consumer passes do not qualify procurement recovery |
 | SUPSRC-0116 | buy_v2_screen.dart:1010 | onPopInvokedWithResult | Root Back dispatch covers navigation/search/session branches; individual Back evidence retained; Mool overlay and root-exit branches require reconciliation |
-| SUPSRC-0117 | buy_v2_screen.dart:1071 | onOpenChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0118 | buy_v2_screen.dart:1073 | onLocation | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0119 | buy_v2_screen.dart:1076 | onAccount | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0120 | buy_v2_screen.dart:1138 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0121 | buy_v2_screen.dart:1153 | onParkingChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0122 | buy_v2_screen.dart:1161 | onPositionChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0117 | buy_v2_screen.dart:1071 | onOpenChanged | Search-band open/close state -> _searchOpen; physical round125 open/clear/Done; product Back wrong surface RV6-D018 remains open |
+| SUPSRC-0118 | buy_v2_screen.dart:1073 | onLocation | Location -> catalogue area if paged, address sheet otherwise; two branches, current paged area evidence not nonpaged address-entry proof |
+| SUPSRC-0119 | buy_v2_screen.dart:1076 | onAccount | Account -> _openBuyProfile; shared profile ACCOUNT-ROUND111-01 Orders subset; shared child routes require own inventory |
+| SUPSRC-0120 | buy_v2_screen.dart:1138 | onOpenStore | Dedicated search Store result -> _openPartnerCatalogue; same result action0019, exact origin query/page/Back qualification pending |
+| SUPSRC-0121 | buy_v2_screen.dart:1153 | onParkingChanged | Mini-cart parking callback updates _miniCartParked; parent drag/park action; parked rail/cart return and overlap require exact device evidence |
+| SUPSRC-0122 | buy_v2_screen.dart:1161 | onPositionChanged | Mini-cart position callback saves Offset; framework/gesture state, not separate button; drag bounds/keyboard/rotation acceptance pending |
 | SUPSRC-0123 | buy_v2_screen.dart:1495 | onPointerDown | Quick tracker pointer-down pauses collapse timer; held/multi-pointer timer interaction pending |
 | SUPSRC-0124 | buy_v2_screen.dart:1499 | onPointerUp | Quick tracker pointer-release handler; timer resumption exact physical state pending |
 | SUPSRC-0125 | buy_v2_screen.dart:1500 | onPointerCancel | Quick tracker pointer-cancel handler; interruption and timer behaviour pending |
-| SUPSRC-0126 | buy_v2_screen.dart:1584 | onMinimizedChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0127 | buy_v2_screen.dart:1586 | onHiddenChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0128 | buy_v2_screen.dart:1596 | onSoundChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0129 | buy_v2_screen.dart:1598 | onKeepOnScreen | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0130 | buy_v2_screen.dart:1606 | onOpen | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0131 | buy_v2_screen.dart:1669 | onPositionChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0132 | buy_v2_screen.dart:1754 | onOpenMool | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0133 | buy_v2_screen.dart:1755 | onOpenAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0134 | buy_v2_screen.dart:1756 | onOpenChat | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0135 | buy_v2_screen.dart:1758 | onPreviousLocalAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0136 | buy_v2_screen.dart:1759 | onNextLocalAction | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0137 | buy_v2_screen.dart:2080 | onAskStore | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0138 | buy_v2_screen.dart:2081 | onStoreChanged | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0139 | buy_v2_screen.dart:2082 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0140 | buy_v2_screen.dart:2083 | onOpenStoreCart | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0141 | buy_v2_screen.dart:2086 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0142 | buy_v2_screen.dart:2157 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0126 | buy_v2_screen.dart:1584 | onMinimizedChanged | Tracker Minimize -> _setQuickTrackerExpanded(!value); distinct from Hide; exact minimized/reopen and timeout acceptance pending |
+| SUPSRC-0127 | buy_v2_screen.dart:1586 | onHiddenChanged | Tracker Hide cancels timer, hides/minimizes, unkeeps, closes picker and remembers preferences; TRACK-004 passes Hide subset; restore/persistence contexts separate |
+| SUPSRC-0128 | buy_v2_screen.dart:1596 | onSoundChanged | Tracker sound toggle -> _setArrivalSound; TRACK-008 toggle UI only; real playback, preparation error, arrival event and permission conditions unqualified |
+| SUPSRC-0129 | buy_v2_screen.dart:1598 | onKeepOnScreen | Tracker Keep toggles kept, remembers and reschedules collapse; TRACK-007 toggle subset; long timer/held-pointer and relaunch conditions separate |
+| SUPSRC-0130 | buy_v2_screen.dart:1606 | onOpen | Tracker body Open -> openDeliveryTracking(order.id); TRACK-009 selected order subset; all delivery/split identity cases not blanket-qualified |
+| SUPSRC-0131 | buy_v2_screen.dart:1669 | onPositionChanged | Compact parked-cart position callback is no-op; parent parked cart action; no independent position-persistence promise |
+| SUPSRC-0132 | buy_v2_screen.dart:1754 | onOpenMool | Shared rail Mool -> _openGlobalMool; Buy exit/return boundary must be reconciled; downstream unrelated module excluded |
+| SUPSRC-0133 | buy_v2_screen.dart:1755 | onOpenAction | Shared rail Action -> _openGlobalAction; Buy boundary/return needs evidence; downstream workspace actions excluded |
+| SUPSRC-0134 | buy_v2_screen.dart:1756 | onOpenChat | Shared rail Chat -> _openShopChat; CHAT rounds117-122 inbox navigation subsets; every contextual thread remains separate |
+| SUPSRC-0135 | buy_v2_screen.dart:1758 | onPreviousLocalAction | Shared rail previous local action -> _moveBuyLocal(-1); alternate navigation affordance, not automatically passed by tab taps |
+| SUPSRC-0136 | buy_v2_screen.dart:1759 | onNextLocalAction | Shared rail next local action -> _moveBuyLocal(1); alternate navigation affordance, retained destination and boundaries pending |
+| SUPSRC-0137 | buy_v2_screen.dart:2080 | onAskStore | Partner catalogue Ask -> _openStoreQuestion; alias0048 Store Chat action; preserve selected Store/draft/Back, no message |
+| SUPSRC-0138 | buy_v2_screen.dart:2081 | onStoreChanged | Partner catalogue Store change -> _rememberStoreBrowse; alias0053 callback after Other Store action; identity anchor/late return acceptance separate |
+| SUPSRC-0139 | buy_v2_screen.dart:2082 | onOpenProduct | Partner product -> _openStoreProduct; alias0066 preview/full Store paths; exact parent return retained in per-journey evidence |
+| SUPSRC-0140 | buy_v2_screen.dart:2083 | onOpenStoreCart | Store-specific cart -> _openStoreProduct(store,cartEntry:true); nested identity/Back separate; D002 last-item exit remains open |
+| SUPSRC-0141 | buy_v2_screen.dart:2086 | onOpenCart | Generic partner cart opens scope Shop/Wholesale/Medicine based on product destination; fallback path differs0140; Medicine outside public Shop audit |
+| SUPSRC-0142 | buy_v2_screen.dart:2157 | onReturn | Nested stale procurement Return pops route false; account/Store stale-scope fixture required; no ordinary consumer substitute |
 | SUPSRC-0143 | buy_v2_screen.dart:2178 | onPopInvokedWithResult | Embedded Store product/cart Back dispatch; Store/cart defect and retention evidence remain separate; conditional navigation/compared-product states pending |
-| SUPSRC-0144 | buy_v2_screen.dart:2222 | onProductReturn | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0145 | buy_v2_screen.dart:2243 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0146 | buy_v2_screen.dart:2247 | onAskSeller | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0147 | buy_v2_screen.dart:2249 | onVisitComparisonProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0148 | buy_v2_screen.dart:2259 | onOpenPartnerCatalogue | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0149 | buy_v2_screen.dart:2275 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0144 | buy_v2_screen.dart:2222 | onProductReturn | Nested procurement purchase recovery product Return pops route false; denied/revised offer context and original Store require exact fixture |
+| SUPSRC-0145 | buy_v2_screen.dart:2243 | onReturn | Nested product explicit Return pops false with Back-to-Store label; exact header action distinct from AndroidBack; parent contexts Saved/Recent/Store retained separately |
+| SUPSRC-0146 | buy_v2_screen.dart:2247 | onAskSeller | Nested product Ask seller -> _openProductQuestion; thread/draft/return context separate from root product; no send |
+| SUPSRC-0147 | buy_v2_screen.dart:2249 | onVisitComparisonProduct | Nested comparison visitor opens Store product with Compare suppliers return label; populated comparable-supplier fixture B002 remains blocker |
+| SUPSRC-0148 | buy_v2_screen.dart:2259 | onOpenPartnerCatalogue | Nested product Visit partner -> _openPartnerCatalogue; nested Store identity and Back branch needs exact evidence |
+| SUPSRC-0149 | buy_v2_screen.dart:2275 | onOpenCart | Nested product cart bar opens destination-specific session cart; scope/Back/retained product acceptance distinct from root cart |
 | SUPSRC-0150 | buy_v2_screen.dart:2408 | onPopInvokedWithResult | Chat return PopScope dispatcher; CHAT-005 and shared Chat rounds117-119 scoped Back evidence; each source context not blanket-passed |
-| SUPSRC-0151 | buy_v2_screen.dart:2422 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0152 | buy_v2_screen.dart:2463 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0153 | buy_v2_screen.dart:2489 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0154 | buy_v2_screen.dart:2490 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0155 | buy_v2_screen.dart:2507 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0156 | buy_v2_screen.dart:2522 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0157 | buy_v2_screen.dart:2525 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0158 | buy_v2_screen.dart:2531 | onAskSeller | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0159 | buy_v2_screen.dart:2532 | onVisitComparisonProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0160 | buy_v2_screen.dart:2535 | onOpenPartnerCatalogue | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0161 | buy_v2_screen.dart:2541 | onBrowseStore | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0162 | buy_v2_screen.dart:2544 | onBrowseMore | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0163 | buy_v2_screen.dart:2569 | onRestoreDeliveryStatus | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0164 | buy_v2_screen.dart:2571 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0165 | buy_v2_screen.dart:2579 | onRestoreDeliveryStatus | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0166 | buy_v2_screen.dart:2581 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0167 | buy_v2_screen.dart:2593 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0151 | buy_v2_screen.dart:2422 | onReturn | Procurement scope recovery onReturn forwarded to unavailable-state Back to Store; aliases0115/0142 by parent; authentication/Store-switch qualification pending |
+| SUPSRC-0152 | buy_v2_screen.dart:2463 | onReturn | Procurement purchase recovery Return branches checkout->same-scope cart, product->parent or goBack, other->_exitBuy; each conditional context remains explicit dependency |
+| SUPSRC-0153 | buy_v2_screen.dart:2489 | onRetry | Linked product unavailable Retry -> openLinkedProduct same ID; exact failed-load/recovery fixture and current-offer authority not qualified by normal product entry |
+| SUPSRC-0154 | buy_v2_screen.dart:2490 | onReturn | Linked product unavailable Return -> session.goBack; source recovery branch distinct from general navigation; exact device evidence pending reconciliation |
+| SUPSRC-0155 | buy_v2_screen.dart:2507 | onOpenOrderHelp | Orders list Help -> _openOrderHelpChat; retained existing order Help subsets; actual order identity and unsent draft preservation required, no send |
+| SUPSRC-0156 | buy_v2_screen.dart:2522 | onVisitProduct | Catalogue tools product visitor -> nested _openStoreProduct return label; Saved/Recent round49 subsets, no standalone callback action |
+| SUPSRC-0157 | buy_v2_screen.dart:2525 | onOpenStore | Ordinary catalogue Store result -> _openPartnerCatalogue; alias0013 differs dedicated search0120 origin; exact query/page/Back required |
+| SUPSRC-0158 | buy_v2_screen.dart:2531 | onAskSeller | Root product Ask seller -> _openProductQuestion; product/Store thread identity and return evidence scoped; no real messages |
+| SUPSRC-0159 | buy_v2_screen.dart:2532 | onVisitComparisonProduct | Root Compare visitor -> nested Store product with Compare suppliers label; populated fixture B002 unresolved; root versus nested parent distinct |
+| SUPSRC-0160 | buy_v2_screen.dart:2535 | onOpenPartnerCatalogue | Root product Visit partner -> _openPartnerCatalogue; original Store round evidence only; repeated nested return not blanket-qualified |
+| SUPSRC-0161 | buy_v2_screen.dart:2541 | onBrowseStore | Cart Browse Store enabled only for scoped Store anchor; _openPartnerCatalogue(anchor); stale/cross-scope anchor and exact Back acceptance pending |
+| SUPSRC-0162 | buy_v2_screen.dart:2544 | onBrowseMore | Cart Browse more returns Offers if active else destination from cart scope; Shop/Wholesale/aggregate branches distinct, Medicine outside; exact retained data required |
+| SUPSRC-0163 | buy_v2_screen.dart:2569 | onRestoreDeliveryStatus | Tracking restore-delivery callback -> _deliveryStatusRestore(session); hidden/selected-order preference restoration per physical branch, no live-provider pass |
+| SUPSRC-0164 | buy_v2_screen.dart:2571 | onOpenOrderHelp | Tracking Help -> _openOrderHelpChat; seeded order-specific Help evidence; live service and actual sending excluded |
+| SUPSRC-0165 | buy_v2_screen.dart:2579 | onRestoreDeliveryStatus | Assist view renders same TrackingView with same delivery restore; legacy name is alias, but entry/return context needs separate proof |
+| SUPSRC-0166 | buy_v2_screen.dart:2581 | onOpenOrderHelp | Assist-tracking Help alias0164; no new Help button solely from callback assignment; contextual return unqualified where not tested |
+| SUPSRC-0167 | buy_v2_screen.dart:2593 | onOpenOrderHelp | Recovery Help -> _openOrderHelpChat; recovery identity and original route branch distinct; D010 recovery rail issue remains open |
 | SUPSRC-0168 | buy_v2_screen.dart:2886 | onEnd | Animation-end cart avoidance scheduling; not separate tap/destination; overlap visual coverage must stay parent-specific |
 | SUPSRC-0169 | buy_v2_screen.dart:2943 | onEnd | Navigation animation-end cart avoidance scheduling; not separate tap/destination; no universal fitment claim |
 | SUPSRC-0170 | buy_v2_shop_chat.dart:624 | onBack | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1689,3 +1689,8 @@ Reviewed catalogue source3542-3568,3788-3810,3828-3852,3880-3905,4203-4245,4318-
 ## Round 127 - Remaining catalogue, layout hooks and scanner forwarding
 
 Reconciled 46 supplemental entries0066-0115 excluding already-classified framework hooks0084/0095-0097. Exact source ranges inspected around each callback and scanner test-wrapper declarations770/992. Linked scanner public unreachability to existing SCANNER-ROUND74-01 and original SRC0148-0162 dispositions; no Workspace/device scope expansion. Quantity guard branches, Store return mapping and global-profile child routes remain explicitly unqualified where evidence is missing. Scroll metrics and test wrappers are not unique taps. No physical captures, passes or defects added;18 confirmed defects unchanged. Supplemental entries0001-0116 now have parent/conditional dispositions, not blanket qualification;0117 onward and shared descendant inventory remain incomplete.
+
+
+## Round 128 - Buy root navigation, delivery controls and procurement recovery aliases
+
+Reconciled 46 supplemental entries0117-0167 excluding already-classified pointer/PopScope hooks. Source ranges1060-1083,1125-1176,1570-1618,1660-1677,1743-1764,2068-2098,2148-2164,2210-2282,2414-2430,2453-2472,2480-2600. Recorded precise distinctions among explicit Return/AndroidBack, ordinary versus dedicated search, root versus nested Store, procurement denial states, cart scopes and delivery lifetime. TRACK004/007/008/009 are limited to their observed controls, not playback/provider/timer success. No device pass or defect added. Original public-data and evidence records preserved;18 defects unchanged. Supplemental0001-0169 now classified by parent/condition; remaining legacy Chat and view callbacks plus shared descendants still require reconciliation.
