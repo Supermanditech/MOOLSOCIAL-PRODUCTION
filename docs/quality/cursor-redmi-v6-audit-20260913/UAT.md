@@ -474,3 +474,9 @@ Captures665-670 reviewed. Selected Dairy highlighted665;All categories666 restor
 Execution sequencing note: implementation-gate command yielded session55531; the category-open/capture command ran before its completion was collected. The same gate session was polled to exit0/pass before further actions. This was a sequencing error, not a product pass; subsequent dependent gate actions must await terminal success. No checker changes or bypass were made.
 
 435 action rows;352 device passes;670 physical captures;672 evidence rows;61 public mappings;16 distinct defects. Full audit remains incomplete.
+
+## Round 71 - collection field and authority mapping
+
+PD-062 records exact purchased SKU/line/account/Store bindings, decimal quantity, INR minor amounts, opaque revision, server-time expiry, readiness/payment/matching distinctions, receipt and optional invoice fields. Sources: scan_and_pick_contract.dart195-318;buy_v2_session.dart3184-3294;buy_v2_views.dart10962-11242. These are source requirements, not authenticated-device or backend passes. Offers source383-462 confirms retained published-offers query/category and published promotion fields;terminal page still needs physical coverage. An initial read-only search included nonexistent features/scan_pick;bounded rg --files located features/work/scan_and_pick_contract.dart without mutation.
+
+62 public-data rows;device/actions/defects unchanged from round70. No product edits or device actions. Full enumeration and handoff remain incomplete.
