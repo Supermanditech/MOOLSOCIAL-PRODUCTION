@@ -2355,3 +2355,26 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | rv6-d010-orders-return-text-1.0.png | 55A9CB81A2751236A0058E41BD97660A422E78C66CC1384992656E0501C38A6C |
 | rv6-d010-orders-return-text-2.0.png | 6D5ADA0F4E5D0D9F526A6B0B79FD929A4D1C17BF8D0AFAC78EB21D5CE0B692EA |
 | screen-regression.log | C70AA788E35A6BDB8073A5945683211893BDC7A52FA0F03FAEB9C8D75FEB2073 |
+
+## RV6-D011 local qualification - 2026-09-14
+
+- Scope: original407-410 Wholesale Fresh tomatoes w-tomato repeated summary-only Highlights, Specifications and generated Description. Start6fcb36cbd8e9ae1b42ee7f97c31230633b50f0f1; previous D010 clean/live-equal, handoff passed. Existing source/test ownership only; no policy/coordination/backend/provider changes.
+- Source apps/mobile/lib/ui_v2/buy/buy_v2_views.dart: extend exact summary deduplication to Shop and Wholesale destinations (Bulk uses Wholesale); compare displayed brandLabel as well as raw brand so Brand not provided does not become a redundant specification. Preserve unique values and supplier-specific description. Care condition remains unchanged. Product details, compliance/pack/price, MOQ controls, policy, ratings and reviews retained. Move content top spacing inside the section only when content exists, preserving loading/error card spacing and avoiding an empty section gap.
+- Tests apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:12 cases (Shop/Wholesale/Bulk; default versus distinct supplier fixture;100/200% at360x800). Default Wholesale w-tomato reproduced redundant Brand not provided before fix (cbff95 terminal1). Assert repeated summary absent from extra content; unique highlight, Handling specification and supplier description retained; price/pack information stays available; exact10px compliance-to-trust gap when no content; product and catalogue Back/context/cart preservation. Supplier details are explicit local test fixtures, not live published claims.
+- Initial12 passed (19350 terminal0/43f024); four root captures revealed an extra empty gap left by removed sections. Corrected section spacing and added geometric regression, then12 final capture cases passed (14748 terminal0/0ad809). Four final/ captures reviewed: no redundant cards/gap for default content, complete distinct content at100/200%, price/MOQ/Add control retained. Four root captures retained as superseded spacing evidence. Incidental supplier/trust/delivery data and physical Redmi are not qualified by these visuals.
+- Formatter output initially touched unrelated existing formatting; retained only content-section/source spacer and D011 fixture/test blocks, restoring every other region from unchanged HEAD. Final analysis initially found one missing-brace test style info (aa6fb9 terminal1); corrected Bulk test setup braces. Final analysis of two Dart owners zero issues (9f06ac terminal0). No assertion or product behavior changed by that style fix.
+- Final connected suite: flutter test --no-pub test/ui_v2/buy/buy_v2_screen_test.dart --reporter expanded;278passed/0failures,80776 terminal0/8d9d42, screen-regression.log. Shorter pages can affect related-product scroll returns, so replayed D007 related products from Saved false/true on final source:2passed/0failures,bafe48 terminal0,d007-affected-regression.log. Focused12 overlap278; the two D007 checks are separate. Diff check passed.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d011-local-20260914. No APK/build/install/device action or closure; physical407-410 remains pending successor Redmi APK. No broad audit or child implementation; frozen514 passed records/1177 artifacts preserved.
+
+| Artifact | SHA256 |
+| --- | --- |
+| d007-affected-regression.log | FD3051AF73B929B607342FA20D7EEFB484890A8C35DC9786FBE6DFFE0E3052C4 |
+| final/rv6-d011-wholesale-unique-false-text-1.0.png | F08D7579C5DC48B6BD691D29DE5FFCCF458B9A0F51F07D28A69B7BFD353AE362 |
+| final/rv6-d011-wholesale-unique-false-text-2.0.png | EEF4B34D5F4D5A3454A4B74033CAE4D5BA6C799F7E6C22817F8CB0071E833F11 |
+| final/rv6-d011-wholesale-unique-true-text-1.0.png | 659538C4349D3EAE322FBC4AE8B1D698F0B87D838F30F9479502365DFFD67A9E |
+| final/rv6-d011-wholesale-unique-true-text-2.0.png | 9C5A1F7CF293C1B1823A71E1D0892BEBA5C3B65C9DFAE7D24D6ADF91EE380705 |
+| rv6-d011-wholesale-unique-false-text-1.0.png | FB7B99E16527EE480CEFCFCD4B72DFB7CBDC2C2885F183F5C5E36A20D6C9E6F2 |
+| rv6-d011-wholesale-unique-false-text-2.0.png | 0D680A9C533BCB1371611F0A082042AB4BD2B478F8C21257D9B9E6271587A4F9 |
+| rv6-d011-wholesale-unique-true-text-1.0.png | 2251195C7FBEDC619864656A47083D6F81915F3452F5B74E5776CFAE3AEA9087 |
+| rv6-d011-wholesale-unique-true-text-2.0.png | 161EFB73C2F8CA944BCDDE03B670F7DBD7494A54CD05C90B69BD6C7F45F20D7B |
+| screen-regression.log | 370DC9503D123E6736447C30FB6D93C7E188740CCEDD4491DD1C5D4187123C88 |

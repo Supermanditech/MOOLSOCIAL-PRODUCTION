@@ -102,6 +102,32 @@ class _D009InvalidConfirmationSession extends _InvoiceRecoverySession {
       failure == 'no products' ? 0 : super.confirmedProductCount;
 }
 
+class _D011SupplierDetailsAdapter implements BuyV2ProductContentAdapter {
+  const _D011SupplierDetailsAdapter();
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    final base = const BuyV2CatalogueProductContentAdapter().snapshotFor(
+      product,
+    );
+    return BuyV2ProductContentSnapshot(
+      productId: product.id,
+      state: base.state,
+      sourceId: 'd011-supplier-fixture',
+      media: base.media,
+      highlights: [...base.highlights, 'Graded and sorted before dispatch'],
+      specifications: [
+        ...base.specifications,
+        const BuyV2ProductSpecification(
+          label: 'Handling',
+          value: 'Keep crates ventilated',
+        ),
+      ],
+      description:
+          'Supplier sorts this lot before packing. Keep away from direct heat.',
+    );
+  }
+}
+
 class _R5ScreenArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
   Future<bool> prepare() async => true;
@@ -8422,6 +8448,131 @@ void main() {
     expect(session.query, 'rice');
     expect(tester.takeException(), isNull);
   });
+
+  for (final mode in ['shop', 'wholesale', 'bulk']) {
+    for (final distinct in [false, true]) {
+      for (final scale in [1.0, 2.0]) {
+        testWidgets(
+          'RV6 D011 $mode content preserves unique facts $distinct text $scale',
+          (tester) async {
+            tester.view.devicePixelRatio = 1;
+            tester.view.physicalSize = const Size(360, 800);
+            addTearDown(tester.view.reset);
+            final session = BuyV2Session(
+              core: BuySession(),
+              productContentAdapter: distinct
+                  ? const _D011SupplierDetailsAdapter()
+                  : const BuyV2CatalogueProductContentAdapter(),
+            );
+            final destination = mode == 'shop'
+                ? BuyV2Destination.shop
+                : BuyV2Destination.wholesale;
+            await tester.pumpWidget(
+              app(
+                session,
+                initialDestination: destination,
+                textScale: scale,
+                disableAnimations: true,
+              ),
+            );
+            await tester.pumpAndSettle();
+            if (mode == 'bulk') {
+              session.chooseWholesaleSaleType(BuyV2WholesaleSaleType.bulk);
+            }
+            final product = mode == 'bulk'
+                ? session.visibleProducts.first
+                : session.visibleProducts.firstWhere(
+                    (p) => p.title == 'Fresh tomatoes',
+                  );
+            expect(session.openProduct(product.id), isTrue);
+            await tester.pumpAndSettle();
+            final content = find.byKey(
+              ValueKey('buy-product-content-ready-${product.id}'),
+            );
+            await tester.scrollUntilVisible(
+              content,
+              240,
+              scrollable: scrollableWithin(
+                PageStorageKey('buy-product-${product.id}'),
+              ).first,
+            );
+            await Scrollable.ensureVisible(
+              tester.element(content),
+              alignment: .3,
+            );
+            await tester.pumpAndSettle();
+            Finder inContent(String text) =>
+                find.descendant(of: content, matching: find.text(text));
+            for (final repeated in [
+              product.brandLabel,
+              product.pack,
+              product.variant,
+              product.unitPrice,
+              '${product.title} · ${product.variant}. ${product.pack} at ${product.unitPrice}.',
+            ]) {
+              expect(
+                inContent(repeated),
+                findsNothing,
+                reason: 'Summary-only data must not create repeated sections.',
+              );
+            }
+            if (distinct) {
+              expect(
+                inContent('Graded and sorted before dispatch'),
+                findsOneWidget,
+              );
+              expect(inContent('Keep crates ventilated'), findsOneWidget);
+              expect(
+                inContent(
+                  'Supplier sorts this lot before packing. Keep away from direct heat.',
+                ),
+                findsOneWidget,
+              );
+              expect(inContent('Highlights'), findsOneWidget);
+              expect(inContent('Specifications'), findsOneWidget);
+              expect(inContent('Description'), findsOneWidget);
+            } else {
+              final compliance = find.byKey(
+                ValueKey('buy-product-compliance-${product.id}'),
+              );
+              final trust = find.byKey(
+                ValueKey('buy-marketplace-trust-ready-${product.id}'),
+              );
+              expect(
+                tester.getRect(trust).top - tester.getRect(compliance).bottom,
+                closeTo(10, .1),
+                reason:
+                    'Omitted duplicate content must not leave an extra blank section.',
+              );
+              for (final heading in [
+                'Highlights',
+                'Specifications',
+                'Description',
+              ]) {
+                expect(inContent(heading), findsNothing);
+              }
+            }
+            expect(find.text('Product and pack information'), findsOneWidget);
+            expect(find.text(product.pack), findsWidgets);
+            expect(session.selectedProductId, product.id);
+            expect(tester.takeException(), isNull);
+            if (mode == 'wholesale') {
+              await captureR66Visual(
+                tester,
+                'rv6-d011-wholesale-unique-$distinct-text-$scale',
+              );
+            }
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(session.view, BuyV2View.catalogue);
+            expect(session.destination, destination);
+            expect(session.cartLines, isEmpty);
+            expect(tester.takeException(), isNull);
+          },
+        );
+      }
+    }
+  }
 
   testWidgets('all six recovery states fit and return without an extra page', (
     tester,

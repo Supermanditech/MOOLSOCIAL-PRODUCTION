@@ -1166,7 +1166,6 @@ class BuyV2ProductView extends StatelessWidget {
                     const SizedBox(height: 10),
                     BuyV2ProductCompliancePanel(product: product),
                   ],
-                  const SizedBox(height: 10),
                   _ProductContentSections(
                     session: session,
                     product: product,
@@ -3833,6 +3832,7 @@ class _ProductContentSections extends StatelessWidget {
         key: ValueKey(
           'buy-product-content-${content.state.name}-${product.id}',
         ),
+        margin: const EdgeInsets.only(top: 10),
         padding: const EdgeInsets.all(12),
         decoration: buyV2CardDecoration(
           color: loading ? BuyV2Colors.softBlue : BuyV2Colors.softOrange,
@@ -3867,31 +3867,34 @@ class _ProductContentSections extends StatelessWidget {
       );
     }
 
-    final shop = product.destination == BuyV2Destination.shop;
+    final deduplicateSummary =
+        product.destination == BuyV2Destination.shop ||
+        product.destination == BuyV2Destination.wholesale;
     final summaryValues = {
       product.brand,
+      product.brandLabel,
       product.pack,
       product.variant,
       product.unitPrice,
       if (product.returnPolicy != null) product.returnPolicy!,
     };
     final summarySpecifications = {
-      'brand': product.brand,
+      'brand': product.brandLabel,
       'pack': product.pack,
       'variant': product.variant,
     };
     final highlights = content.highlights
-        .where((value) => !shop || !summaryValues.contains(value))
+        .where((value) => !deduplicateSummary || !summaryValues.contains(value))
         .toList(growable: false);
     final specifications = content.specifications
         .where(
           (value) =>
-              !shop ||
+              !deduplicateSummary ||
               summarySpecifications[value.label.toLowerCase()] != value.value,
         )
         .toList(growable: false);
     final description =
-        shop &&
+        deduplicateSummary &&
             content.description ==
                 '${product.title} · ${product.variant}. ${product.pack} at ${product.unitPrice}.'
         ? null
@@ -3901,6 +3904,10 @@ class _ProductContentSections extends StatelessWidget {
       key: ValueKey('buy-product-content-ready-${product.id}'),
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        if (highlights.isNotEmpty ||
+            specifications.isNotEmpty ||
+            description != null)
+          const SizedBox(height: 10),
         if (highlights.isNotEmpty)
           _ProductContentCard(
             title: 'Highlights',
