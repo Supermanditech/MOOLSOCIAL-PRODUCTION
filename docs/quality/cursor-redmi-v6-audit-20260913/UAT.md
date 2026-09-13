@@ -1562,3 +1562,8 @@ SRC-0369 through0390 linked to historical product/future-address evidence and ex
 ## Round 110 - tracking and order resolution controls
 
 SRC-0391 through0410 matched to recorded Items/Address/Help/Reorder/Invoice and cancellation reason checks. Return/replacement/refund eligibility and quantity states retain B-006 and round82 descendants. Real submission not performed; disabled or unavailable controls are not positive qualification. Tracking-specific notification and support buttons remain distinct from settings/chat entry evidence. No new device pass/capture/defect. Original index423 classified,104 unclassified; semantic inventory still open.
+
+
+## Round 111 - shared profile Orders return on Redmi
+
+Captures820-823: fresh Scheduled Shop; header account opens shared global profile panel; Open orders opens Active Orders (12 active/2 delivered); Android Back restores Scheduled catalogue, Saved1 and empty basket. One device-pass journey, no new defect. BuyV2AccountView remains a separately mounted view in source and its callbacks are not passed by this shared profile test. Original index remains423 classified/104 unclassified. Totals823 captures,825 evidence rows,506 journey records,407 device-pass records,17 distinct defects. Full semantic inventory remains incomplete. Read recovery: an attempted rg path apps/mobile/lib/routing did not exist; no product mutation or conclusion relied on that missing path.
