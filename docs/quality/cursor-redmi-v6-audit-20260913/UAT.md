@@ -518,3 +518,9 @@ PD-041 strengthened from buy_v2_content_contracts.dart590-648:HTTPS host without
 ## Round 78 - GST coverage reconciliation
 
 Reconciled CHECKOUT-005 and007 residuals with091-097 and later177. Empty/short identifier checks are covered;valid details, checksum/state-code cases, reuse/remove and lifecycle remain unqualified. Existing host fixture located in buy_v2_gst_session_continuity_test.dart22-24 provides a local-only test profile;its existence is not a Redmi or tax-authority pass. Initial shell wildcard path search was invalid;bounded rg -g search recovered without mutation. No device actions;no new defect;counts unchanged. Next physical GST checks must preserve original data and avoid checkout submission.
+
+## Round 79 - GST valid-form path and saved-chip defect
+
+681-699 reviewed. Isolated wheat1/279 added;Work/Paytm retained684-686. GST enabled687;form688 blank. Initial injected name689 contained literal percent20;corrected before submission690 to AuditRedmiTest with existing host-fixture identifier and AuditTestAddressJodhpur. Frontend accepted691;settled692 confirms unreadable selected saved-profile chip RV6-D017. Registered before further test actions. Removal693 named exact test profile;694 profile/current details cleared. GST off695. Rapid Back sequence ended at Address696 and is not individual-step evidence;explicit Cart697,remove only wheat;698 transition,699 settled empty/Saved1. No order/payment/message.
+
+457 action rows;363 device passes;699 captures;701 evidence rows;62 mappings;17 confirmed distinct defects. Temporary reuse beyond initial save, multiple profiles, cancellation and lifecycle remain pending. Full audit remains incomplete.
