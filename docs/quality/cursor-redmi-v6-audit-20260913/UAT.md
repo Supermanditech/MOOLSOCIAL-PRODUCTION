@@ -990,9 +990,9 @@ Source hashes bind the following index to the inspected files:
 | SRC-0387 | buy_v2_views.dart:11232 | _BuyV2CollectionOrderViewState | onPressed | blocked_authentication COLLECTION-ROUND68-06 order Help/return |
 | SRC-0388 | buy_v2_views.dart:11294 | BuyV2TrackingView | onTap | tracking visible Orders/Help return target exact tap requires reconciliation; Android Back not equivalent |
 | SRC-0389 | buy_v2_views.dart:11312 | BuyV2TrackingView | onPressed | ORDER-001 attempted refresh blocked_provider B-005; busy/success unverified |
-| SRC-0390 | buy_v2_views.dart:11425 | BuyV2TrackingView | onPressed | Restore delivery status from tracking exact button unverified; bottom rail reopen TRACK-005 distinct |
+| SRC-0390 | buy_v2_views.dart:11425 | BuyV2TrackingView | onPressed | TRACKING-ROUND169-01 exact Show delivery status1166-70 restores compact control;selected MS-NEW-09 confirmed;Hide restored;live/race variants unqualified |
 | SRC-0391 | buy_v2_views.dart:11781 | BuyV2TrackingView | onPressed | tracking Retry order alerts provider/restore failure unverified |
-| SRC-0392 | buy_v2_views.dart:11787 | BuyV2TrackingView | onChanged | tracking-screen alert switch exact target unverified; settings switch is distinct entry |
+| SRC-0392 | buy_v2_views.dart:11787 | BuyV2TrackingView | onChanged | TRACKING-ROUND169-02 exact tracking switch Off1172 then On1173 with label/icon/toast;review memory only;provider persistence and unavailable Retry unqualified |
 | SRC-0393 | buy_v2_views.dart:11805 | BuyV2TrackingView | onPressed | device_pass ORDER-003 and ORDER-ROUND25-03 order Address entry |
 | SRC-0394 | buy_v2_views.dart:11815 | BuyV2TrackingView | onPressed | device_pass ORDER-004 and ORDER-ROUND25-01 Items entry; historical content limitations preserved |
 | SRC-0395 | buy_v2_views.dart:11825 | BuyV2TrackingView | onPressed | ORDERHELP-001 non-delivered Help and REORDER-001 delivered Reorder; different branches; successful new purchase not inferred |
@@ -2088,3 +2088,12 @@ Physical Redmi captures1150-1164; ORDER-ROUND168-01 through05. Five narrow devic
 Capture1156 had a view-output truncation, recovered by exact file verification and separate view under standing bounded recovery authority. Capture1159 shows the navigation transition; only settled1160 proves the Chat destination. No transition was counted as a defect.
 
 This supplies narrow additional evidence for ORDER-P03, P06, P07 and P08. It does not qualify every alternate state within those groups. Provider-bound descendants, filtered/alternate return contexts, tracking alert/restore controls and shared Chat/account/address/mini-cart inventory remain. Totals:22 distinct defects;626 action/check records;512 device passes;1164 physical captures. Records are not unique taps or end-to-end journeys; full semantic denominator remains incomplete.
+
+
+## Round169 - tracking restore and alert controls
+
+Captures1165-1175; TRACKING-ROUND169-01/02:two scoped passes;22 distinct defects unchanged. Exact Show delivery status clears the hidden state and restores a compact reachable control. It does not expand the panel immediately: screen1638-48 explicitly calls the collapsed state. After returning Orders, the bike control opens Deliveries12 with MS-NEW-09, Keep off and sound off. Hide restores the original hidden/compact presentation and the tracking Show button. No additional defect inferred from the compact presentation.
+
+Tracking-screen Order updates was paused1172 and restored On1173;labels,icons and feedback matched. This qualifies the exact tracking entry independently of settings. Review branch only;OS notifications remain off. Actual alert delivery, persisted consent and unavailable-state Retry remain unqualified. Original Shop Scheduled Saved1 emptycart restored1175;orders,addresses,payment and drafts unchanged.
+
+ORDER-P10 and P11 now have these exact control results, not blanket alternate-state qualification. Totals:628 action/check records;514 device passes;1175 physical captures. Blocked58 remains a recorded subset, not an exhaustive pending denominator. Shared Chat/account/address/mini-cart inventory and untested reachable cases remain.
