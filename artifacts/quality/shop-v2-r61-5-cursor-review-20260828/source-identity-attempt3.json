@@ -1,0 +1,13 @@
+{
+  "schema": "shop_source_identity_v1",
+  "attempt": 3,
+  "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
+  "head": "6958d34479f8cab6ae3a24c52035f845a436a0d5",
+  "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt3.txt",
+  "manifestSha256": "AB8B3459934451659A066E481F54297C0FA40E0D482393FA4058E0A9A3E8A2A1",
+  "fileCount": 636,
+  "cursorGoogleServicesTaskDisabled": true,
+  "windowsApkAnalyzerParserFixed": true,
+  "runtimeAndReleaseUnchanged": true,
+  "recordedAt": "2026-08-28T23:21:52.6788503+05:30"
+}
