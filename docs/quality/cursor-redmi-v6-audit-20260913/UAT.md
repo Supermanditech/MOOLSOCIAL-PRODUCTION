@@ -567,3 +567,10 @@ This removes stale blanket pending descriptions without declaring whole journeys
 Implementation gate passed.721 is transition after Shop tap;722 settled Scheduled catalogue Saved1. Product723 opens from card;Visit724 and Browse725 reach full Mool Market000001 catalogue. Next726 displays41-80. Categories727;Oil728 resets1-40 of238. Five sequential Next actions reach final201-238 in729;intermediate pages not individually captured. Disabled Next730 leaves final page unchanged. Upper-row horizontal swipe731 reveals further products, so initial six visible cards are not all page contents. Android Back732 restores preview;Browse733 retains Oil category,final page and upper-row scroll. No cart/order/data mutation.
 
 Five narrow passes;no new defect.477 action rows;379 device passes;733 captures;735 evidence rows;62 mappings;17 distinct defects. Other categories,final-page Previous,horizontal endpoints and process relaunch remain unqualified. Full audit/source inventory incomplete.
+
+
+## Round 86 - catalogue public-data contract
+
+Completed PD063 from exact query/page/source contracts and Pager429-688,plus Store binding and scroll retention. Records backend query/snapshot/cursor obligations,identifiers,optional total,cache bounds,missing/error behavior,query/refresh reset and publication/withdrawal limits. Source checks reject inconsistent pages but do not qualify live provider enforcement. Device725-733 remains narrow fixture navigation evidence. No device action,new defect or implementation in this round.
+
+63 public-data mappings;other counts unchanged. Complete user-journey denominator still unavailable:source/action inventory incomplete. Pending work must not be calculated by subtracting passes from action rows because records include repeated checks,observations and conditional descendants. Full audit remains open.
