@@ -480,3 +480,9 @@ Execution sequencing note: implementation-gate command yielded session55531; the
 PD-062 records exact purchased SKU/line/account/Store bindings, decimal quantity, INR minor amounts, opaque revision, server-time expiry, readiness/payment/matching distinctions, receipt and optional invoice fields. Sources: scan_and_pick_contract.dart195-318;buy_v2_session.dart3184-3294;buy_v2_views.dart10962-11242. These are source requirements, not authenticated-device or backend passes. Offers source383-462 confirms retained published-offers query/category and published promotion fields;terminal page still needs physical coverage. An initial read-only search included nonexistent features/scan_pick;bounded rg --files located features/work/scan_and_pick_contract.dart without mutation.
 
 62 public-data rows;device/actions/defects unchanged from round70. No product edits or device actions. Full enumeration and handoff remain incomplete.
+
+## Round 72 - Redmi Offers at 200 percent text
+
+Original font_scale1.0 read before change;set2.0/readback2.0. Captures671-672 show two-column Offers cards, visible price/delivery/Add fit and wrapped promotion. Category sheet673 wraps visible labels with accessible close icon. Android Back dismissed;restore1.0/readback1.0;674 reviewed. Category illustration fallback icons at200 return to illustrations at1.0: observation ACCESS-ROUND72-02 pending source investigation, not yet confirmed defect. No cart/address/saved edits or transactions.
+
+439 actions;355 device passes;674 captures;676 evidence rows;62 public mappings;16 confirmed defects. This is limited Offers accessibility coverage, not whole-module200 qualification. No process-death claim.
