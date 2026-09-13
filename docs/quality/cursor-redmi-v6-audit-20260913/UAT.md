@@ -1033,14 +1033,14 @@ Source hashes bind the following index to the inspected files:
 | SRC-0430 | buy_v2_views.dart:13376 | showBuyV2FilterSheet | onTap | Medicine-only filter options dispatch; Shop/Wholesale options not mounted by current selector |
 | SRC-0431 | buy_v2_views.dart:13520 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-ROUND55-04 Close after draft Clear; other draft variants unqualified |
 | SRC-0432 | buy_v2_views.dart:13546 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-002..006 sort choices; full ordering across pages unqualified |
-| SRC-0433 | buy_v2_views.dart:13562 | showBuyV2DiscoveryRefinementSheet | onTap | Any-price direct selection not separately qualified; global Clear covered FILTER-012 |
+| SRC-0433 | buy_v2_views.dart:13562 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-ROUND93-02 Any price after draft cap then Apply/reopen; prior-applied cap replacement unqualified |
 | SRC-0434 | buy_v2_views.dart:13570 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-005/006; ROUND55-01..03; ROUND59-02; WHOLESALE-ROUND60-01..04; equality/provider boundary unqualified |
-| SRC-0435 | buy_v2_views.dart:13588 | showBuyV2DiscoveryRefinementSheet | onTap | Any-pack direct selection not separately qualified; global Clear covered FILTER-012 |
+| SRC-0435 | buy_v2_views.dart:13588 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-ROUND93-03 Any pack after draft Standard then Apply/reopen; prior-applied replacement unqualified |
 | SRC-0436 | buy_v2_views.dart:13598 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-008/009 standard/multipack; Wholesale omitted per ROUND59-01 |
 | SRC-0437 | buy_v2_views.dart:13631 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-010 brand unavailable; positive toggle/multiselect requires populated brand fixture |
-| SRC-0438 | buy_v2_views.dart:13648 | showBuyV2DiscoveryRefinementSheet | onChanged | FILTER-011 enable available; direct disable and mixed-availability exclusion unqualified |
+| SRC-0438 | buy_v2_views.dart:13648 | showBuyV2DiscoveryRefinementSheet | onChanged | FILTER-011 enable; ROUND93-04 direct draft disable and Apply/reopen; mixed availability unqualified |
 | SRC-0439 | buy_v2_views.dart:13660 | showBuyV2DiscoveryRefinementSheet | onTap | Tools destinations covered rounds45-61 per FILTER-001; stale-scope rejection unqualified |
-| SRC-0440 | buy_v2_views.dart:13693 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-012 and ROUND55-04..06; disabled-empty Clear and combinations not all qualified |
+| SRC-0440 | buy_v2_views.dart:13693 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-012; ROUND55-04..06; ROUND93-01 empty-draft Clear disabled; other combinations unqualified |
 | SRC-0441 | buy_v2_views.dart:13711 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-003/006/008/009/011/012 and ROUND55/59/60 Apply; stale-scope disabled state unqualified |
 | SRC-0442 | buy_v2_views.dart:13792 | _DiscoveryChoice | onTap | Reusable choice dispatch; counted through parent sort/price/pack/brand controls, not another journey |
 | SRC-0443 | buy_v2_views.dart:13849 | _BuyV2FilterToolAction | onTap | unclassified |
@@ -1179,3 +1179,16 @@ Reconciled SRC-0426..0442 against existing FILTER-001..012 and rounds55/59/60. S
 Remaining directly actionable filter checks identified: Any price after a selected cap; Any pack after Standard/Multipack; direct Available-to-order disable; empty-draft Clear disabled. Positive brand toggle/multiselect requires missing brand data. Full price-ordering/equality/mixed availability and provider pagination need suitable data. Scope-change rejection, preview loading/error/count unavailable, shared tool late callbacks, process-death restoration and all accessibility combinations are not qualified by ordinary Apply tests. Current field mapping and provider ownership remain subject to final reconciliation.
 
 The refinement source resets deliveryFastest to relevance when opening, suppresses pack for Wholesale and handles preview scope release in finally. These are implementation observations, not newly registered defects or device passes. The public Shop/Wholesale selectors, existing evidence and remaining cases above are the next device work; no product changes were made.
+
+
+## Round 93 - Four refinement reset controls on Redmi
+
+Fresh749 established product reviews. Android Back capture750 still displayed the product during transition; not treated as a failed Back. Subsequent capture751 (after an intended scroll) established the Store preview. Close752 returned to originating wheat product; visible Shop Back753 established Scheduled Shop. Navigation setup is not a new pass claim.
+
+754-755: empty refinement Clear visibly disabled and tapping did not change sheet. 756-758: selected cap100 draft then directly selected Any price; preview count restored. 759-762: collapsed price, expanded pack, selected Standard draft then directly Any pack; preview count restored. 763-765: collapsed pack; enabled then directly disabled Available to order. Apply766 and reopen767 preserved Relevance, Any price, Any pack, availability off and disabled Clear. Four device passes; no new defect.
+
+These are draft-selection resets followed by Apply/reopen, not proof of replacing an already-applied non-default filter, complete provider ordering/classification, mixed availability, or process-death persistence. Historical filter qualifications remain unchanged. Source rows433/435/438/440 now reference this exact evidence without broadening the pass.
+
+Nineteen reviewed captures added: 767 physical captures, 769 evidence rows, 486 action rows including 388 device passes; 17 distinct confirmed defects unchanged. Cart untouched, original Saved1 visible766; no review/report/message/order/payment and no product/source implementation. Device remains on default Scheduled Shop refinement sheet767. Full source/action inventory and field mapping remain incomplete.
+
+Evidence edit recovery: first UAT update rejected an incorrect table-field-count assertion before writing; bounded row read confirmed five split fields; corrected operation under standing recovery authorization. Historical rows preserved except the four explicit reconciliation cells.
