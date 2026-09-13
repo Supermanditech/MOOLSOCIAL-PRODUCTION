@@ -1651,3 +1651,12 @@ Source apps/mobile/lib/features/chat/screens/chat_settings_screen.dart SHA256 B3
 | CHAT-SETTINGS-A11 | 442 | Blocked accounts | Entry/empty/return pending; real unblock excluded from this audit |
 | CHAT-SETTINGS-A12 | 463;488 | Share last seen/read receipts | Two independent service-backed privacy fields; unchanged observed; actual updates unqualified |
 | CHAT-SETTINGS-A13 | 695 | Settings row forwarder | No additional user journey; parent routes06/07/09/10/11 retain own checks |
+
+
+## Round 122 - Chat preview masking and restoration on Redmi
+
+Captures 872-884, bound in EVIDENCE.csv to the existing V6 Cursor Review APK. Settings inventory A04 (chat_settings_screen.dart:313) physically exercised. Original Hide message previews was OFF. Enabling it masked all four inbox snippets (878), preserving names, pin and unread count. Restoring OFF produced the shown-feedback state (881-882); inbox snippets and unread1 returned (883). Android Back returned to Scheduled Shop, Saved1 and empty cart (884). No conversation opened, no message sent and no other setting changed. Three scoped device-pass records added; no new defect.
+
+Recovery: the earlier capture881 tool response was truncated. Bounded read recovered the existing PNG without overwrite; fresh882 confirmed current shown-feedback state before any navigation. Device remained authorized. Original preview state restored. No application restart or data clearing.
+
+Totals: 884 physical captures, 886 evidence rows, 539 action records including 438 device passes; 17 distinct confirmed defects unchanged. These are check records, not unique completed end-to-end journeys. Inventory and shared/conditional descendants remain incomplete. Session preview masking is qualified only for this inbox round; provider privacy, account isolation and process-death behaviour are not established.
