@@ -26,6 +26,7 @@ final class _R669ProcurementCommerce implements BuyV2CommerceAdapter {
   BuyV2CommerceSnapshot snapshot;
   Completer<BuyV2CommerceSnapshot>? refreshGate;
   Completer<BuyV2OrderPlacementResult>? placementGate;
+  final placementStarted = Completer<void>();
   Completer<BuyV2OrderPlacementResult>? reconciliationGate;
   final placements = <BuyV2OrderPlacementRequest>[];
   int reconciliations = 0;
@@ -40,6 +41,7 @@ final class _R669ProcurementCommerce implements BuyV2CommerceAdapter {
     BuyV2OrderPlacementRequest request,
   ) {
     placements.add(request);
+    if (!placementStarted.isCompleted) placementStarted.complete();
     return placementGate?.future ?? Future.value(placement);
   }
 
@@ -1813,7 +1815,7 @@ void main() {
       orders: orders,
       businessVerified: true,
       businessVerificationState: BuyV2BusinessVerificationState.verified,
-      paymentMethods: const {'Cash on Delivery', 'PhonePe'},
+      paymentMethods: const {'Cash on Delivery', 'PhonePe', 'UPI'},
       addresses: const [
         BuyV2Address(
           id: 'receiving-store',
@@ -1840,6 +1842,7 @@ void main() {
       })
     >
     scopedSession({
+      bool withPaymentTerms = false,
       BuyV2ProcurementContext? context,
       BuyV2CommerceSnapshot? snapshot,
       BuyV2CustomerStateStore? retainedStore,
@@ -1857,6 +1860,9 @@ void main() {
         procurementIdentity: identity,
         customerStateStore: store,
         commerceAdapter: adapter,
+        commercialPaymentTermsAdapter: withPaymentTerms
+            ? _StoreScopedTermsFixture()
+            : null,
         reviewDataEnabled: false,
         productFactsAdapter: _R669OrderReadyFacts(),
         cataloguePageSource: catalogueSource,
@@ -2960,23 +2966,35 @@ void main() {
       );
     }
 
-    void prepareProcurementPayment(BuyV2Session session) {
+    Future<void> prepareProcurementPayment(BuyV2Session session) async {
       expect(session.addProduct(product.id), isTrue);
       session.openCart(scope: BuyV2CartScope.wholesale);
       expect(session.openCheckout(), isTrue);
-      expect(session.choosePayment('PhonePe'), isTrue);
+      expect(session.choosePayment('UPI'), isTrue);
+      expect(await session.refreshCommercialPaymentTerms(), isFalse);
+      expect(session.commercialPaymentTermsLoadState, BuyV2CommerceLoadState.ready);
+      expect(session.checkoutPaymentTermsReviewRequired, isTrue);
+      for (final group in session.checkoutFulfilmentGroups) {
+        expect(
+          session.chooseCommercialPaymentTerm(
+            session.commercialPaymentTermsFor(group.key).single,
+          ),
+          isTrue,
+        );
+      }
     }
 
     test(
       'payment placement carries exact scope and rejects late account result',
       () async {
-        final fixture = await scopedSession();
+        final fixture = await scopedSession(withPaymentTerms: true);
         final session = fixture.session;
-        prepareProcurementPayment(session);
+        await prepareProcurementPayment(session);
         final quantity = session.quantityFor(product.id);
         final gate = Completer<BuyV2OrderPlacementResult>();
         fixture.adapter.placementGate = gate;
         final pending = session.submitOrder();
+        await fixture.adapter.placementStarted.future.timeout(const Duration(seconds: 5));
         expect(fixture.adapter.placements, hasLength(1));
         expect(
           fixture.adapter.placements.single.procurementContext,
@@ -2998,9 +3016,9 @@ void main() {
     test(
       'payment reconciliation rejects late Store result and retains pending cart',
       () async {
-        final fixture = await scopedSession();
+        final fixture = await scopedSession(withPaymentTerms: true);
         final session = fixture.session;
-        prepareProcurementPayment(session);
+        await prepareProcurementPayment(session);
         expect(await session.submitOrder(), isFalse);
         expect(
           session.checkoutSubmissionState,
@@ -3026,9 +3044,9 @@ void main() {
     test(
       'original purchaser can check an existing payment after supplier revocation',
       () async {
-        final fixture = await scopedSession();
+        final fixture = await scopedSession(withPaymentTerms: true);
         final session = fixture.session;
-        prepareProcurementPayment(session);
+        await prepareProcurementPayment(session);
         expect(await session.submitOrder(), isFalse);
         expect(
           session.checkoutSubmissionState,
@@ -3057,9 +3075,9 @@ void main() {
     test(
       'payment handoff cannot resume after originating operation changes',
       () async {
-        final fixture = await scopedSession();
+        final fixture = await scopedSession(withPaymentTerms: true);
         final session = fixture.session;
-        prepareProcurementPayment(session);
+        await prepareProcurementPayment(session);
         fixture.adapter.placement = BuyV2OrderPlacementResult(
           outcome: BuyV2OrderPlacementOutcome.paymentActionRequired,
           customerMessage: 'Continue to the payment app.',
@@ -10818,4 +10836,34 @@ final class _R669ComparisonSource implements BuyV2ComparisonSource {
   @override
   Future<BuyV2ComparisonPage> load(BuyV2ComparisonPageRequest request) =>
       loader(request);
+}
+
+// Test-only supplier offer. This grants no live payment or credit authority.
+class _StoreScopedTermsFixture implements BuyV2CommercialPaymentTermsAdapter {
+  @override
+  Future<BuyV2CommercialPaymentTermsSnapshot> loadTerms({
+    required List<BuyV2FulfilmentGroup> groups,
+    required String selectedPaymentMethod,
+    required Map<String, int> quotedTotalsByFulfilmentKey,
+  }) async => BuyV2CommercialPaymentTermsSnapshot(
+    state: BuyV2CommerceLoadState.ready,
+    terms: [
+      for (final group in groups)
+        BuyV2CommercialPaymentTerm(
+          id: 'fixture-full-${group.key}',
+          fulfilmentKey: group.key,
+          destination: group.destination,
+          supplierName: group.partner,
+          kind: BuyV2CommercialPaymentTermKind.wholesaleAdvance,
+          orderTotal: quotedTotalsByFulfilmentKey[group.key]!,
+          amountDueNow: quotedTotalsByFulfilmentKey[group.key]!,
+          balanceDue: 0,
+          balanceDueLabel: 'Paid in full after confirmed payment',
+          sourceId: 'fixture-supplier-terms',
+          advancePercent: 100,
+          upiTransactionLimit: 100000,
+          acceptedPaymentMethods: const {'UPI'},
+        ),
+    ],
+  );
 }

@@ -1822,6 +1822,7 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
           'apps/mobile/lib/features/buy/buy_v2_content_contracts.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_session_test.dart',
           'apps/mobile/lib/features/buy/buy_v2_session.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
           'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
