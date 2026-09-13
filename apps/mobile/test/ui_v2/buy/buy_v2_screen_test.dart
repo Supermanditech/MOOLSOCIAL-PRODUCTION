@@ -6931,6 +6931,74 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final width in [320.0, 360.0]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('RV6 D008 buyer identity separation $width text $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(width, 800);
+        addTearDown(tester.view.reset);
+        final session = BuyV2Session(core: BuySession());
+        await tester.pumpWidget(
+          app(session, textScale: scale, disableAnimations: true),
+        );
+        await tester.pumpAndSettle();
+        session.openOrders();
+        session.showOrdersTab(BuyV2OrdersTab.delivered);
+        session.updateQuery('PO-240728');
+        await tester.pumpAndSettle();
+        final order = session.visibleOrders.single;
+        expect(order.buyerType, 'Retailer business');
+        expect(order.buyerName, 'Shree Balaji Retail');
+        final action = find.byKey(const ValueKey('buy-order-primary-PO-240728'));
+        await tester.scrollUntilVisible(
+          action, 160,
+          scrollable: scrollableWithin(const PageStorageKey('buy-orders')).first,
+        );
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        final buyer = find.text(order.buyerName!);
+        await tester.scrollUntilVisible(
+          buyer, 160,
+          scrollable: scrollableWithin(const PageStorageKey('buy-tracking-PO-240728')).first,
+        );
+        await Scrollable.ensureVisible(tester.element(buyer), alignment: .5);
+        await tester.pumpAndSettle();
+        final label = find.text(order.buyerType!);
+        final labelRect = tester.getRect(label);
+        final valueRect = tester.getRect(buyer);
+        if (scale == 1) {
+          expect(valueRect.left - labelRect.right, greaterThanOrEqualTo(8),
+            reason: 'The buyer label and business name need an explicit visible gap.');
+        } else {
+          expect(valueRect.top - labelRect.bottom, greaterThanOrEqualTo(3),
+            reason: 'Enlarged text must keep the label above the complete business name.');
+        }
+        for (final field in [label, buyer]) {
+          final paragraph = tester.renderObject<RenderParagraph>(field);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final rect = tester.getRect(field);
+          expect(rect.left, greaterThanOrEqualTo(0));
+          expect(rect.right, lessThanOrEqualTo(width));
+          expect(rect.top, greaterThanOrEqualTo(0));
+          expect(rect.bottom, lessThanOrEqualTo(800));
+        }
+        expect(tester.takeException(), isNull);
+        await captureR66Visual(tester, 'rv6-d008-buyer-$width-text-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.destination, BuyV2Destination.orders);
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.ordersTab, BuyV2OrdersTab.delivered);
+        expect(session.query, 'PO-240728');
+        expect(session.visibleOrders.single, same(order));
+        expect(session.cartLines, isEmpty);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+
   testWidgets('delivered Orders expose non-mutating order inspection', (
     tester,
   ) async {

@@ -2300,3 +2300,22 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | rv6-d007-related-return-saved-false.png | C1D57CFCF13623A32109E4D95C54A4480D871D23F70A925430748717222BD07E |
 | rv6-d007-related-return-saved-true.png | C9E18C67CBF6693996664E4678EBF3EDFC3549F65388BD704384F3F4B89F58FF |
 | connected-regression.log | 69EE91A18656DA3DCEC0FDBC262BEBDA19AF17458D18D1E28445D7780098ABE3 |
+
+## RV6-D008 local qualification - 2026-09-14
+
+- Scope: recorded Wholesale delivered order PO-240728, capture312; separate Retailer business label from Shree Balaji Retail without changing buyer/order data. No broad audit or device action.
+- Admission6104c9cc83d3407a142490e3fd4ac23c2b7cfec3, parent e604579b1f102573766bcaee8bcbf772f9cf96bd. Exactly existing apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart added to Cursor claim35; views source already owned. Normalized prior checker reconstructs SHA256C271B89B203E90D8276D408CA5A0AE897223E6936C43A5D2DA6AC0133F77772E. Initial new-file admission correctly rejected because owner did not exist (757fe7 terminal1); revised to existing screen test, without relaxing the rule. Pre-commit, implementation and handoff passed; pushed/live remote equal. No other lane or forbidden owner expanded.
+- Product change: one SizedBox(width:8) between the fixed-width label and Expanded value in _DecisionRow. Existing large-text stack stays unchanged. This shared row is also exercised by the connected screen suite; no data/session/provider contract changed.
+- Focused regression: real rendered Wholesale delivered order; tap View order; verify exact buyer type/name, normal-text horizontal gap or enlarged-text vertical separation, unclipped text within viewport, and Android Back retaining delivered tab/query/order and empty cart. 320x800 and360x800 at100/200% text. Before correction normal-text cases reproduced gap0 (32251 terminal1/a0d201); enlarged-text cases already passed. Initial test compiler error used nonexistent cartItemCount (86a3d1 terminal1), corrected to existing cartLines contract.
+- Four focused cases passed with actual Flutter capture (84970 terminal0/f65a67). All four reviewed: clear buyer boundary at100%; stacked complete buyer name at200%. Captures show scrolled order content at200%; offscreen adjoining content is not claimed as another defect. Only D008 affected layout is visually qualified, not incidental order claims or provider data.
+- A formatter touched unrelated existing test formatting. During its removal, an explicit UTF-8 omission caused a test-file write error (452bac terminal1). Recovered the exact HEAD test content plus only the D008 block using explicit UTF-8; verified removing that block yields original HEAD content exactly (045686 terminal0). No user edits lost. Final regression below ran after recovery. Product source unchanged from reviewed captures; test behavior unchanged.
+- Final connected run: flutter test --no-pub test/ui_v2/buy/buy_v2_screen_test.dart --reporter expanded. 242passed/0failures, session56148 terminal0/2bdadc. Includes D008 four cases, order/invoice recovery, checkout, shared decision layouts, Store and Buy navigation. Focused four overlap this total. Final analysis of views and screen test: zero issues,97680 terminal0/157934. Diff check passed.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d008-local-20260914. Local checks do not establish physical Redmi closure. Capture312 reproduction remains pending checksum-bound successor APK; no APK/build/install/device/child implementation performed. Frozen514 passes/1177 evidence artifacts preserved.
+
+| Artifact | SHA256 |
+| --- | --- |
+| rv6-d008-buyer-320.0-text-1.0.png | B6360C16265C917F2BCD1F127410F7CCFEB358E87E695796C3491032C9BFCB34 |
+| rv6-d008-buyer-320.0-text-2.0.png | 1DE583AD901DE72F0E0375FDD3867FE6D5B9A53939851D30E6F9CD596EFB59C5 |
+| rv6-d008-buyer-360.0-text-1.0.png | FEDAE8779E2ACF15738FADF33A005048E56FDD54D9299BA3F25D3F6F6EC47D4D |
+| rv6-d008-buyer-360.0-text-2.0.png | C6A4EAE6EE9B679AD2B99CD3B4282496D2078D6EE8D4EFFCBD779FC7652BB3C6 |
+| screen-regression.log | B2F4293F790A6829AC7FEA5DE183A5155E1B8E4F6F821833F6FC92C278DDECEB |

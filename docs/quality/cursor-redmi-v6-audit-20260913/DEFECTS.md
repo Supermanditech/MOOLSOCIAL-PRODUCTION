@@ -92,6 +92,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Source owners: buy_v2_views.dart and buy_v2_screen.dart. Existing buy_v2_product_continuity_test.dart admitted at877656e54eab174f3c4dc698da23799553d8023a; claim34. Full evidence and hashes in UAT.md. Original281-283 remains pending successor APK verification.
 
 ## RV6-D008 - Wholesale buyer label runs into the business name
+- Local implementation qualified 2026-09-14: _DecisionRow now reserves an explicit 8px gap between its normal-text label and value; existing enlarged-text stacked layout preserved. Four 320/360px at 100/200% text regressions pass for PO-240728, including complete buyer identity, View order and Android Back/query retention. Full Buy screen suite242passed/0failures; analysis zero issues; four actual Flutter captures reviewed. See UAT D008 section for hashes and limitations. Original device capture312 requires successor-APK Redmi verification; ticket remains open.
 - Status: open; confirmed Redmi visual defect. Severity: minor.
 - Journey: Orders > search Wholesale > Delivered > PO-240728 View order.
 - Actual: Delivery details renders Retailer business immediately against Shree Balaji Retail,with no clear gap at the label/value boundary. Normal font_scale1.0,720x1600 Redmi. Other details remain legible;no identity/data corruption claimed.

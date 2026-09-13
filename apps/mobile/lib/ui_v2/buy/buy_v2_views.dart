@@ -15568,6 +15568,7 @@ class _DecisionRow extends StatelessWidget {
             width: 72,
             child: Text(label, style: context.buyMeta.copyWith(fontSize: 8)),
           ),
+          const SizedBox(width: 8),
           Expanded(
             child: Text(
               value,
