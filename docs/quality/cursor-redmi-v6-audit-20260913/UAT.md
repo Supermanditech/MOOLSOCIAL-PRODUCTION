@@ -553,3 +553,10 @@ Implementation gate passed. Reopen714 clears prior choice;Cancel715 starts empty
 Four narrow passes. Together with144(change address) and712(delivery time),all four reason selections are now observed. Reconciled five older remaining notes without changing original evidence or claiming all variants at200percent. Real submission,provider outcomes and process death remain unqualified. No new defect.
 
 472 action rows;374 device passes;720 captures;722 evidence rows;62 public-data mappings;17 distinct confirmed defects. Full audit and source inventory remain incomplete.
+
+
+## Round 84 - reconcile superseded coverage notes
+
+Read all75 notes containing pending in three bounded pages, then compared relevant Bulk/filter/Store/coupon/GST/address/order/security evidence rows. Reconciled12 original remaining notes against later captures. No original result, disposition or capture changed;no new device pass. Kept checkout-specific new-address propagation separate from shared settings-editor checks;kept positive return eligibility and provider outcomes unqualified. Corrected draft wording to distinguish cancelled invoice save135 from exported PDF480 before sealing.
+
+This removes stale blanket pending descriptions without declaring whole journeys complete. Counts unchanged:472 actions,374 device passes,720 captures,722 evidence rows,62 mappings,17 distinct confirmed defects. Remaining priority:source-derived full action inventory;Store/category and terminal pagination;conditional data/provider gaps;remaining validation and lifecycle coverage. Full audit remains incomplete.
