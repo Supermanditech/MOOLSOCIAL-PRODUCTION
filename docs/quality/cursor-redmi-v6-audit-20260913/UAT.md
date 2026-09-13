@@ -763,38 +763,38 @@ Source hashes bind the following index to the inspected files:
 | SRC-0160 | buy_v2_scanner.dart:1031 | _ScannerActionPanel | onPressed | source_unreachable for public Buy; SCANNER-ROUND74-01; Workspace callers excluded |
 | SRC-0161 | buy_v2_scanner.dart:1061 | _ScannerActionPanel | onPressed | source_unreachable for public Buy; SCANNER-ROUND74-01; Workspace callers excluded |
 | SRC-0162 | buy_v2_scanner.dart:1200 | _ScannerControl | onTap | source_unreachable for public Buy; SCANNER-ROUND74-01; Workspace callers excluded |
-| SRC-0163 | buy_v2_screen.dart:861 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0164 | buy_v2_screen.dart:878 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0165 | buy_v2_screen.dart:896 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0166 | buy_v2_screen.dart:923 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0167 | buy_v2_screen.dart:954 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0168 | buy_v2_screen.dart:1402 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0169 | buy_v2_screen.dart:1532 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0170 | buy_v2_screen.dart:1546 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0171 | buy_v2_screen.dart:1571 | _BuyV2ScreenState | onTap | unclassified |
-| SRC-0172 | buy_v2_screen.dart:1777 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0173 | buy_v2_screen.dart:1784 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0174 | buy_v2_screen.dart:1791 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0175 | buy_v2_screen.dart:1840 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0176 | buy_v2_screen.dart:1857 | _BuyV2ScreenState | onPressed | unclassified |
-| SRC-0177 | buy_v2_screen.dart:2671 | _BuyQuickDeliveryStatusBar | onTap | unclassified |
-| SRC-0178 | buy_v2_screen.dart:2701 | _BuyQuickDeliveryStatusBar | onPressed | unclassified |
-| SRC-0179 | buy_v2_screen.dart:2741 | _BuyQuickDeliveryStatusBar | onTap | unclassified |
-| SRC-0180 | buy_v2_screen.dart:2767 | _BuyQuickDeliveryStatusBar | onPressed | unclassified |
-| SRC-0181 | buy_v2_screen.dart:2793 | _BuyQuickDeliveryStatusBar | onPressed | unclassified |
-| SRC-0182 | buy_v2_screen.dart:2820 | _BuyQuickDeliveryStatusBar | onPressed | unclassified |
-| SRC-0183 | buy_v2_screen.dart:2836 | _BuyQuickDeliveryStatusBar | onPressed | unclassified |
-| SRC-0184 | buy_v2_screen.dart:3130 | _BuySearchBand | onChanged | unclassified |
-| SRC-0185 | buy_v2_screen.dart:3173 | _BuySearchBand | onSubmitted | unclassified |
-| SRC-0186 | buy_v2_screen.dart:3182 | _BuySearchBand | onTap | unclassified |
-| SRC-0187 | buy_v2_screen.dart:3227 | _BuySearchBand | onPressed | unclassified |
-| SRC-0188 | buy_v2_screen.dart:3245 | _BuySearchBand | onPressed | unclassified |
-| SRC-0189 | buy_v2_screen.dart:3278 | _BuySearchBand | onPressed | unclassified |
-| SRC-0190 | buy_v2_screen.dart:3291 | _BuySearchBand | onPressed | unclassified |
-| SRC-0191 | buy_v2_screen.dart:3443 | _BuyMiniCartBarState | onTap | unclassified |
-| SRC-0192 | buy_v2_screen.dart:3457 | _BuyMiniCartBarState | onTap | unclassified |
-| SRC-0193 | buy_v2_screen.dart:3563 | _BuyMiniCartBarState | onTap | unclassified |
-| SRC-0194 | buy_v2_screen.dart:3591 | _BuyMiniCartBarState | onTap | unclassified |
+| SRC-0163 | buy_v2_screen.dart:861 | _BuyV2ScreenState | onPressed | profile-context Offers shortcut; rail OFFERS-001 is different entry; exact profile action unverified |
+| SRC-0164 | buy_v2_screen.dart:878 | _BuyV2ScreenState | onPressed | profile-context Orders shortcut; exact profile entry/return unverified |
+| SRC-0165 | buy_v2_screen.dart:896 | _BuyV2ScreenState | onPressed | profile-context active Shop orders shortcut; exact conditional entry unverified |
+| SRC-0166 | buy_v2_screen.dart:923 | _BuyV2ScreenState | onPressed | profile-context destination Cart shortcut; ordinary basket tap not equivalent; unverified |
+| SRC-0167 | buy_v2_screen.dart:954 | _BuyV2ScreenState | onPressed | profile-context discovery shortcut; exact account-origin catalogue/return unverified |
+| SRC-0168 | buy_v2_screen.dart:1402 | _BuyV2ScreenState | onPressed | delivery rail expansion TRACK-001/005/006; multi-state minimized controls need own evidence |
+| SRC-0169 | buy_v2_screen.dart:1532 | _BuyV2ScreenState | onPressed | blocked_provider delivery refresh; real refreshed tracking B-005; exact button and busy state unverified |
+| SRC-0170 | buy_v2_screen.dart:1546 | _BuyV2ScreenState | onPressed | device_pass TRACK-002 delivery list opens; close toggle exact check pending |
+| SRC-0171 | buy_v2_screen.dart:1571 | _BuyV2ScreenState | onTap | device_pass TRACK-003 selects MS-NEW-09; other order/split identities require own checks |
+| SRC-0172 | buy_v2_screen.dart:1777 | _BuyV2ScreenState | onPressed | device_pass WHOLESALE-001 rail entry; retained context separate |
+| SRC-0173 | buy_v2_screen.dart:1784 | _BuyV2ScreenState | onPressed | Orders navigation entry; exact existing Orders evidence needs reconciliation; not inferred from profile shortcut |
+| SRC-0174 | buy_v2_screen.dart:1791 | _BuyV2ScreenState | onPressed | device_pass OFFERS-001 and round99 entry; rail not alert destination RV6-D016 |
+| SRC-0175 | buy_v2_screen.dart:1840 | _BuyV2ScreenState | onPressed | Care Doctor connected route belongs Book; outside public Shop/Wholesale |
+| SRC-0176 | buy_v2_screen.dart:1857 | _BuyV2ScreenState | onPressed | Care Salon connected route belongs Book; outside public Shop/Wholesale |
+| SRC-0177 | buy_v2_screen.dart:2671 | _BuyQuickDeliveryStatusBar | onTap | minimized tracker body open; expanded TRACK-009 does not prove exact minimized target; unverified |
+| SRC-0178 | buy_v2_screen.dart:2701 | _BuyQuickDeliveryStatusBar | onPressed | minimized tracker expand arrow exact target unverified; general rail reopen not equivalent |
+| SRC-0179 | buy_v2_screen.dart:2741 | _BuyQuickDeliveryStatusBar | onTap | device_pass TRACK-009 selected tracker body; live detail B-005 remains |
+| SRC-0180 | buy_v2_screen.dart:2767 | _BuyQuickDeliveryStatusBar | onPressed | expanded tracker Minimize arrow exact target unverified; Hide is distinct |
+| SRC-0181 | buy_v2_screen.dart:2793 | _BuyQuickDeliveryStatusBar | onPressed | device_pass TRACK-007 Keep; unkeep/auto-collapse combinations unverified |
+| SRC-0182 | buy_v2_screen.dart:2820 | _BuyQuickDeliveryStatusBar | onPressed | TRACK-008 enable UI pass only; actual arrival playback/preparing/failure and disable unverified |
+| SRC-0183 | buy_v2_screen.dart:2836 | _BuyQuickDeliveryStatusBar | onPressed | device_pass TRACK-004 Hide and TRACK-005 restore; multi-order permutations unverified |
+| SRC-0184 | buy_v2_screen.dart:3130 | _BuySearchBand | onChanged | OFFERS-006 and SAVED-ROUND64-01 query typing; long-query/late result variations unverified |
+| SRC-0185 | buy_v2_screen.dart:3173 | _BuySearchBand | onSubmitted | keyboard Search submission distinct from Finish button; exact existing submission evidence requires reconciliation |
+| SRC-0186 | buy_v2_screen.dart:3182 | _BuySearchBand | onTap | search open evidenced OFFERS-006/SAVED-ROUND64-01; no result-service qualification |
+| SRC-0187 | buy_v2_screen.dart:3227 | _BuySearchBand | onPressed | device_pass OFFERS-007 clear; per-mode retention and pending response races unverified |
+| SRC-0188 | buy_v2_screen.dart:3245 | _BuySearchBand | onPressed | device_pass OFFERS-007 Finish; nonempty submission variants unverified |
+| SRC-0189 | buy_v2_screen.dart:3278 | _BuySearchBand | onPressed | device_pass AREA-001 and AREA-ROUND100 entry; lookup B-001 remains |
+| SRC-0190 | buy_v2_screen.dart:3291 | _BuySearchBand | onPressed | device_pass ACCOUNT-001 Buy profile icon; authenticated actions retain own blockers |
+| SRC-0191 | buy_v2_screen.dart:3443 | _BuyMiniCartBarState | onTap | compact mini-cart Semantics target; screen-reader unverified |
+| SRC-0192 | buy_v2_screen.dart:3457 | _BuyMiniCartBarState | onTap | compact mini-cart pointer target; floating rail evidence does not prove compact branch; unverified |
+| SRC-0193 | buy_v2_screen.dart:3563 | _BuyMiniCartBarState | onTap | floating mini-cart Semantics activation; screen-reader unverified; raw drag callbacks need supplemental reconciliation |
+| SRC-0194 | buy_v2_screen.dart:3591 | _BuyMiniCartBarState | onTap | device_pass CART-ROUND98-01 basket entry; drag/edge/alternate quantity contexts remain separate |
 | SRC-0195 | buy_v2_shop_chat.dart:611 | BuyV2ShopChatViewState | onPressed | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
 | SRC-0196 | buy_v2_shop_chat.dart:625 | BuyV2ShopChatViewState | onSelected | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
 | SRC-0197 | buy_v2_shop_chat.dart:687 | BuyV2ShopChatViewState | onChanged | not mounted by public Buy; shared Chat route replacement retained in audit; round89 |
@@ -1538,3 +1538,7 @@ SRC-0069 through0092 mapped to exact existing Help, Recently viewed, Alerts, Sto
 ## Round 104 - remaining catalogue callbacks
 
 SRC-0093 through0136 reconciled. All 136 original catalogue callback references now have evidence or explicit conditional/pending disposition; this does not close all catalogue journeys. Source1818-1844 selects paged catalogue except Saved/monthly; source8043-8047 requires no Saved/query/category/intent for promotion rails. Alternate promotion, featured and history rails are not assumed exercised by ordinary paged grid or tools sheets. Saved, monthly and recent-sheet evidence linked without duplicate passes. Screen-reader activation, stale offers, quantity edit, alternate controls and provider recovery remain unverified. No device action or source change. Original full index now 279 classified, 248 unclassified; supplemental/shared inventory remains separate. Prior round103 pre-commit observation ordering error is retained: commit/push proceeded before collecting terminal gate output; subsequent poll confirmed exit0 and handoff passed. No claim that ordering was correct.
+
+## Round 105 - Buy shell navigation and tracker controls
+
+All 32 original buy_v2_screen.dart callbacks reconciled to specific entries, existing TRACK/AREA/ACCOUNT/Offers evidence or explicit pending states. Profile-context shortcuts are not qualified by rail taps. Tracker minimize, Hide, reopen and body targets remain distinct; enabled sound UI is not actual arrival playback. Semantics, raw drag and compact mini-cart paths are not pointer/floating rail passes. Care Doctor/Salon belong Book outside public Shop/Wholesale. No device actions or extra passes. Original index now 311 classified and 216 unclassified; classifications include pending and blocked controls. Full semantic/shared inventory and device qualification remain incomplete.
