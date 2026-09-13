@@ -601,18 +601,18 @@ Source hashes bind the following index to the inspected files:
 
 | Candidate | Source:line | Enclosing declaration | Callback | Reconciliation |
 |---|---|---|---|---|
-| SRC-0001 | buy_v2_catalogue.dart:320 | _BuyV2OffersViewState | onTap | unclassified |
-| SRC-0002 | buy_v2_catalogue.dart:436 | _PagedPublishedOffersViewState | onTap | unclassified |
-| SRC-0003 | buy_v2_catalogue.dart:493 | _chooseOffersCategory | onPressed | unclassified |
-| SRC-0004 | buy_v2_catalogue.dart:502 | _chooseOffersCategory | onTap | unclassified |
-| SRC-0005 | buy_v2_catalogue.dart:509 | _chooseOffersCategory | onTap | unclassified |
-| SRC-0006 | buy_v2_catalogue.dart:554 | _OffersCategoryControl | onTap | unclassified |
-| SRC-0007 | buy_v2_catalogue.dart:633 | _PublishedOfferPromotionState | onTap | unclassified |
-| SRC-0008 | buy_v2_catalogue.dart:679 | _PublishedOfferPromotionState | onPressed | unclassified |
-| SRC-0009 | buy_v2_catalogue.dart:685 | _PublishedOfferPromotionState | onPressed | unclassified |
-| SRC-0010 | buy_v2_catalogue.dart:703 | _PublishedOfferPromotionState | onPressed | unclassified |
-| SRC-0011 | buy_v2_catalogue.dart:764 | _LiveOffersState | onPressed | unclassified |
-| SRC-0012 | buy_v2_catalogue.dart:823 | _OffersAvailabilityState | onPressed | unclassified |
+| SRC-0001 | buy_v2_catalogue.dart:320 | _BuyV2OffersViewState | onTap | alternate finite/live-source category branch; not qualified by paged review captures; conditional source path unverified |
+| SRC-0002 | buy_v2_catalogue.dart:436 | _PagedPublishedOffersViewState | onTap | device_pass OFFERS-005 and ROUND69-01; paged category entry |
+| SRC-0003 | buy_v2_catalogue.dart:493 | _chooseOffersCategory | onPressed | device_pass OFFERS-ROUND99-01; Close categories retains selection/promotion |
+| SRC-0004 | buy_v2_catalogue.dart:502 | _chooseOffersCategory | onTap | device_pass OFFERS-008 and ROUND70-01; All categories |
+| SRC-0005 | buy_v2_catalogue.dart:509 | _chooseOffersCategory | onTap | device_pass OFFERS-005 and ROUND69-01 for Ground spices and Dairy; other category values not inferred |
+| SRC-0006 | buy_v2_catalogue.dart:554 | _OffersCategoryControl | onTap | forwarder to SRC-0001/0002; same category entry, not additional journey |
+| SRC-0007 | buy_v2_catalogue.dart:633 | _PublishedOfferPromotionState | onTap | device_pass OFFERS-ROUND99-02/03; promotion text opens matching product and Back retains promotion |
+| SRC-0008 | buy_v2_catalogue.dart:679 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-ROUND67-01/02; Previous and first boundary |
+| SRC-0009 | buy_v2_catalogue.dart:685 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-002 and ROUND67-01; Next; final boundary remains unverified |
+| SRC-0010 | buy_v2_catalogue.dart:703 | _PublishedOfferPromotionState | onPressed | device_pass OFFERS-003/004 and ROUND69-02/03; View offer and Back |
+| SRC-0011 | buy_v2_catalogue.dart:764 | _LiveOffersState | onPressed | blocked_provider; live source Retry/loading/offline recovery not qualified by fixture refresh |
+| SRC-0012 | buy_v2_catalogue.dart:823 | _OffersAvailabilityState | onPressed | blocked_provider; unavailable catalogue retryCommerce recovery not qualified by fixture refresh |
 | SRC-0013 | buy_v2_catalogue.dart:1350 | _CataloguePageControls | onPressed | unclassified |
 | SRC-0014 | buy_v2_catalogue.dart:1356 | _CataloguePageControls | onPressed | unclassified |
 | SRC-0015 | buy_v2_catalogue.dart:1362 | _CataloguePageControls | onPressed | unclassified |
@@ -1514,3 +1514,7 @@ Source-only inspection of buy_v2_views.dart lines 3461-3705 binds SRC-0293 and S
 ## Round 98 - nonempty cart Browse more on Redmi
 
 Captures 790-794 physically reviewed. Empty Scheduled Shop basket was seeded with one wheat item INR279. Cart Browse more products returned to Scheduled catalogue with quantity and subtotal retained. Removed only that isolated item afterward; basket empty and saved count 1 retained. CART-ROUND98-01 qualifies the Shop nonempty Browse more control (SRC-0313); Wholesale/all-cart variants, Android Back and relaunch are not inferred. No new defect, order, message or implementation. Totals: 794 physical captures, 796 evidence rows, 491 action rows, 393 device passes, 17 distinct defects. Inventory remains incomplete.
+
+## Round 99 - Offers controls and direct promotion entry
+
+Captures 795-802 reviewed on Redmi. 796 and 800 are transition frames; settled 797 and 801 establish the destinations, not failures. Close categories retains All categories and paneer promotion; tapping promotion title opens paneer46 INR92/200g; Android Back restores same promotion/grid. Empty basket remains unchanged. Three device checks added. SRC-0001 through0012 reconciled to actual source branches, forwarding, existing checks and explicit gaps. Finite/live branch, final Next boundary and provider Retry are not passed. Original source references now 155 classified, 372 unclassified; these are not unique journey counts. Totals: 802 captures, 804 evidence rows, 494 action rows, 396 device passes, 17 defects. Initial source read failed on default Windows encoding before any write; bounded UTF-8 read succeeded under standing parser-recovery authority.
