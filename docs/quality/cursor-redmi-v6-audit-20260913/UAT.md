@@ -2143,3 +2143,71 @@ Capture directory: `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6
 | `rv6-d002-s-eggs-text-2.0-empty-store.png` | `26D9152DA239BDB9827D9AC76C1173B1CDD40061D63158EBC9544CF6E1861969` |
 | `rv6-d002-w-notebook-text-1.0-empty-store.png` | `82F9127394E62EC9B68107854F9EC1CC858EF5EFC56FEF5E0B02123E504FE244` |
 | `rv6-d002-w-notebook-text-2.0-empty-store.png` | `29DA324DCAF3C7D4A97848EB2941395299DBF547811A6F317A2528CA865A48AC` |
+
+
+## RV6-D003 local qualification - 14 September 2026
+
+- Complete recorded scope: original Order Help/Chat freshness loss (112/147), invoice/PDF occurrence (480), and Shopping alerts occurrence (510-511). All remain open for scoped Redmi acceptance; no device closure is claimed.
+- Dependency/admission: `3b0fd2fcdbcc444ead93590f7992e6ccb8d9b384`, parent `55877c20437bdc34c1a90de19904381e94014cde` (sealed D002). The founder-authorized minimal admission added eleven exact owners, transferring only two inherited root claims in this worktree. Implementation/pre-commit/handoff passed; unclaimed session and direct control-file claims still rejected; clean live remote equality verified before source work. No other worktree was changed.
+- Implementation: shared presentation formatter preserves recorded/updating/updated/unavailable freshness. Existing tracking delegates with its same session inputs. Order Help passes that same summary to both Chat metadata and the unsent draft; Shop Chat thread/context uses session freshness, with conservative recorded defaults when unknown. Shopping delivery alerts retain the tracking qualifier and the review adapter no longer invents Updated recently. Both screen and PDF invoice output mark estimates historical, preserve a provided original window, explicitly disclose missing recorded time for relative estimates, and do not misrepresent Delivered/Completed/missing text as an original estimate. No new timestamps, backend events, provider authority, native bridge or session state were invented.
+- Final combined local regression: **64 passed, zero failures**, terminal exit 0, covering the five suites below. This supersedes earlier intermediate results; counts overlap and must not be added. Final analysis of all thirteen changed Dart owners: zero issues, terminal exit 0. `git diff --check` passed. No broad physical audit was resumed.
+- Suites: `buy_v2_shop_chat_test.dart`, `buy_v2_invoice_downloader_test.dart`, `buy_v2_invoice_regulatory_context_test.dart`, `buy_v2_shopping_alerts_test.dart`, `buy_v2_live_delivery_tracking_test.dart` under `apps/mobile/test/ui_v2/buy/`.
+- Focused coverage includes unknown/loading/ready/offline/unavailable/updating estimates; shared Chat metadata/draft/order-return identity; historical missing-time/status/known-window cases; invoice channel payload identity and amounts; actual on-screen invoices at 100%/200%; failed-refresh delivery alert consistency and four viewport/text layouts; full tracking -> Help -> expanded context -> swipe to final fact -> one Android Back to the same order at 100%/200%. Tests use fixtures and mocked channels only; no actual message, transaction, Android PDF save or provider refresh was executed.
+- Visual review: twelve current relevant captures reviewed: four delivery-alert layouts plus eight corrected invoice/Chat captures in `corrected-visuals`. Text wraps, freshness qualification is readable, and the final Chat fact remains reachable at enlarged text. Other captured alert rows are retained supporting artifacts, not additional visual qualification. Four initial invoice images exposed a status-as-estimate formatting error; the correction and regression are in this slice, and those images remain superseded evidence. Initial Chat captures are superseded by the corrected set. Existing 514 passed physical records/1177 artifacts remain frozen.
+- Remaining qualification: build/install is deferred until all22 are locally qualified. Original Redmi reproductions, actual saved PDF output, real provider estimate timestamps and authenticated updates remain unverified. Missing recorded-time disclosure is a frontend fallback, not backend completion or a reconstructed promise time.
+- Execution/recovery record: initial invoice display tests asserted before the lazy Delivery section was reached; alert selectors also matched the covered tracking surface. Those eight failed checks were corrected to scroll to the section and match the exact alert row; the later 19-check run passed. A normal-text Help setup tap was obscured by the bottom rail and was corrected with centered scroll plus hit-test assertion. Visual review found the Delivered duplicate and prompted the historical fallback correction. A non-capture 200% test using cross-ancestor `ensureVisible` failed the one-Back return, although keyboard was closed/current route permitted pop. Replacing that setup with actual bounded swipes in the Chat message list preserved the same one-Back assertion and passed isolated and combined runs. No shared Chat/navigation source was changed to accommodate it. Temporary diagnostics were removed. One earlier test-output chunk was truncated; terminal state and failing cases were recovered through the same process handle and exact reruns; it is not qualification evidence. A guarded test edit failed before write due to a formatted anchor mismatch and was reapplied only after bounded source readback. Unrelated formatter-only source changes were removed.
+- Status: complete local correction, pending Git seal/readback and later Redmi qualification. D004-D022 are still pending implementation. No new APK.
+
+Changed source/test owners (implementation commit is the commit containing this section):
+- `apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_design.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart`
+- `apps/mobile/lib/ui_v2/buy/buy_v2_views.dart`
+- `apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart`
+- `apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart`
+- `apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart`
+- `apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart`
+
+Final log identity:
+- `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d003-local-20260914/final-v3-connected-regression.log` SHA256 `72CE482A2E7768290C400608DBB4073C900C1FB66A1EC44A1187D64589819944`
+- `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d003-local-20260914/final-analysis.log` SHA256 `8CABE84C2E219A3C20DF8FFD6485BAA2CBABA940EF133D53C92C7BDAFFB4ACC1`
+
+Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d003-local-20260914`:
+
+| Capture | Disposition | SHA256 |
+|---|---|---|
+| `corrected-visuals/rv6-d003-chat-context-last-text-1.0.png` | reviewed current | `D8EA966BF74E2F2D55C6E3A5CD157B6BB447B044730284D9A907EC16BD85FF8D` |
+| `corrected-visuals/rv6-d003-chat-context-last-text-2.0.png` | reviewed current | `D71BE0D4F29EE2B69CCB6D66111C8289C15739DE9B4EF040B105B657C119B693` |
+| `corrected-visuals/rv6-d003-chat-context-text-1.0.png` | reviewed current | `D8EA966BF74E2F2D55C6E3A5CD157B6BB447B044730284D9A907EC16BD85FF8D` |
+| `corrected-visuals/rv6-d003-chat-context-text-2.0.png` | reviewed current | `2997D801B3CEB36D17C7EE543273AE61516E9E01F02FE32977E73629DD18C401` |
+| `corrected-visuals/rv6-d003-invoice-shop-text-1.0-v2.png` | reviewed current | `D75331EC78D340374D976BDC252DA2273236EDFE0B2B6DC91A865531A734045D` |
+| `corrected-visuals/rv6-d003-invoice-shop-text-2.0-v2.png` | reviewed current | `B6E83307A755F4B7A34AEC6F3943DA39F63C920376E3094DFE498DCE12C7CA42` |
+| `corrected-visuals/rv6-d003-invoice-wholesale-text-1.0-v2.png` | reviewed current | `4C72D50D0E8B4D49EC3FF85EFFB8A9995F3C1AFBF684431EE31361F993914949` |
+| `corrected-visuals/rv6-d003-invoice-wholesale-text-2.0-v2.png` | reviewed current | `73A77B0D901428FB8F49ECB6F3D49EEB421C015543E06D19E78E7FA67C08118C` |
+| `r5-alert-delivery-320x700-1.0.png` | reviewed current | `2E04C4FFD3E0804FBC9DDCF0C1FDD02A430325AEA9AFAF8F06C5C6D035BC6FD1` |
+| `r5-alert-delivery-320x700-2.0.png` | reviewed current | `57BE45C19778A4F873336282F91630DE36D23719009AED4CC0E41B4C52DD854A` |
+| `r5-alert-delivery-640x360-1.0.png` | reviewed current | `3E23D3225FFC58E392326BED93B396D9934F55796C6C971799049836D4334D94` |
+| `r5-alert-delivery-640x360-2.0.png` | reviewed current | `9D112336E08A31C0E99E7AD2198A9A9EED5ADA9F225681F3528BD5FBBC2DE924` |
+| `r5-alert-offer-320x700-1.0.png` | supporting, not separately visually qualified | `2E04C4FFD3E0804FBC9DDCF0C1FDD02A430325AEA9AFAF8F06C5C6D035BC6FD1` |
+| `r5-alert-offer-320x700-2.0.png` | supporting, not separately visually qualified | `9E04E0C61137187292D052A360C0CA90A2D893FB5E603FBE4BF5F12CBC6387F9` |
+| `r5-alert-offer-640x360-1.0.png` | supporting, not separately visually qualified | `C298A8AA252D5427B3169053E18768D424A38622ACE51890D324F72809802D33` |
+| `r5-alert-offer-640x360-2.0.png` | supporting, not separately visually qualified | `6C0A921BBE001BA62D7533F8ACDA531347E77D3A805511B01A7CA3C6E0338926` |
+| `r5-alert-priceDrop-320x700-1.0.png` | supporting, not separately visually qualified | `2E04C4FFD3E0804FBC9DDCF0C1FDD02A430325AEA9AFAF8F06C5C6D035BC6FD1` |
+| `r5-alert-priceDrop-320x700-2.0.png` | supporting, not separately visually qualified | `9E04E0C61137187292D052A360C0CA90A2D893FB5E603FBE4BF5F12CBC6387F9` |
+| `r5-alert-priceDrop-640x360-1.0.png` | supporting, not separately visually qualified | `C298A8AA252D5427B3169053E18768D424A38622ACE51890D324F72809802D33` |
+| `r5-alert-priceDrop-640x360-2.0.png` | supporting, not separately visually qualified | `6C0A921BBE001BA62D7533F8ACDA531347E77D3A805511B01A7CA3C6E0338926` |
+| `r5-alert-returnUpdate-320x700-1.0.png` | supporting, not separately visually qualified | `2E04C4FFD3E0804FBC9DDCF0C1FDD02A430325AEA9AFAF8F06C5C6D035BC6FD1` |
+| `r5-alert-returnUpdate-320x700-2.0.png` | supporting, not separately visually qualified | `9E04E0C61137187292D052A360C0CA90A2D893FB5E603FBE4BF5F12CBC6387F9` |
+| `r5-alert-returnUpdate-640x360-1.0.png` | supporting, not separately visually qualified | `C298A8AA252D5427B3169053E18768D424A38622ACE51890D324F72809802D33` |
+| `r5-alert-returnUpdate-640x360-2.0.png` | supporting, not separately visually qualified | `4FAE6A778F1E6316E6602E6D8C62A48C73CD208E295651D5341C43EFAE306FF6` |
+| `rv6-d003-chat-context-text-1.0.png` | superseded | `D8EA966BF74E2F2D55C6E3A5CD157B6BB447B044730284D9A907EC16BD85FF8D` |
+| `rv6-d003-chat-context-text-2.0.png` | superseded | `2997D801B3CEB36D17C7EE543273AE61516E9E01F02FE32977E73629DD18C401` |
+| `rv6-d003-invoice-shop-text-1.0.png` | superseded | `757FAA229A6188D4087A038905E0B1D2221BF4CE6CF4737AFF74DE10AC178E04` |
+| `rv6-d003-invoice-shop-text-2.0.png` | superseded | `CB3ED581446413A8AD688DA4FEA5BEDB8584102771C2FAA4EEE1557BD85480F1` |
+| `rv6-d003-invoice-wholesale-text-1.0.png` | superseded | `0BB3CE37376679E65E235FEAF7730450E88CEF58893D3B15D2C0C19035798CCE` |
+| `rv6-d003-invoice-wholesale-text-2.0.png` | superseded | `8D4C7E1F2F0E180BBDCB5B9BDF48FA960471F3FA631C3FECD5E1000902F711D2` |

@@ -118,7 +118,7 @@ final class BuyV2UiReviewShoppingAlertsAdapter
             kind: BuyV2ShoppingAlertKind.delivery,
             title: 'Delivery update',
             detail: '${activeOrder.title} · ${activeOrder.promise}',
-            updatedLabel: 'Updated recently',
+            updatedLabel: 'Recorded order estimate',
             destination: BuyV2Destination.orders,
             orderId: activeOrder.id,
           ),

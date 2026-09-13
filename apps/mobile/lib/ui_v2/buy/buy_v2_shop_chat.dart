@@ -318,7 +318,16 @@ class BuyV2SessionShopChatProvisioningSource
               order.destination == BuyV2Destination.shop ||
               order.destination == BuyV2Destination.wholesale,
         )
-        .map(BuyV2ShopChatThreadFactory.fromOrder)
+        .map(
+          (order) => BuyV2ShopChatThreadFactory.fromOrder(
+            order,
+            deliverySummary: buyV2OrderEstimateSummary(
+              order,
+              refreshState: session.orderRefreshState(order.id),
+              refreshing: session.orderRefreshBusy(order.id),
+            ),
+          ),
+        )
         .toList(growable: false);
     return [
       ...orderThreads,
@@ -397,7 +406,11 @@ class BuyV2SessionShopChatProvisioningSource
 }
 
 abstract final class BuyV2ShopChatThreadFactory {
-  static BuyV2ShopChatThread fromOrder(BuyV2Order order) {
+  static BuyV2ShopChatThread fromOrder(
+    BuyV2Order order, {
+    String? deliverySummary,
+  }) {
+    final estimate = deliverySummary ?? buyV2OrderEstimateSummary(order);
     final delivered = order.status == BuyV2OrderStatus.delivered;
     return BuyV2ShopChatThread(
       id: 'order-${order.id}',
@@ -405,14 +418,14 @@ abstract final class BuyV2ShopChatThreadFactory {
       participantKind: BuyV2ShopChatParticipantKind.orderSupport,
       title: 'Order ${order.id}',
       subtitle: '${order.partner} · ${order.status.customerLabel}',
-      detail: order.promise,
+      detail: estimate,
       icon: delivered
           ? Icons.inventory_2_outlined
           : Icons.local_shipping_outlined,
       accent: delivered ? BuyV2Colors.green : BuyV2Colors.navy,
       commerceTarget: BuyV2ShopChatCommerceTarget.orders,
       contextTitle: 'Order ${order.id}',
-      contextDetail: '${order.status.customerLabel} · ${order.promise}',
+      contextDetail: '${order.status.customerLabel} · $estimate',
       quickReplies: const ['Where is my order?', 'Help with this order'],
     );
   }

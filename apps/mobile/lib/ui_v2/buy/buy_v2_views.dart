@@ -446,26 +446,12 @@ String buyV2OrderArrivalSummary(
   BuyV2Session session,
   BuyV2Order order, {
   bool revised = false,
-}) {
-  final summary = revised
-      ? order.updatedDeliveryEstimate ?? buyV2OrderPromiseSummary(order)
-      : buyV2OrderPromiseSummary(order);
-  if (order.status == BuyV2OrderStatus.delivered) {
-    return revised ? 'Recorded revised estimate · $summary' : summary;
-  }
-  final kind = revised ? 'revised estimate' : 'estimate';
-  if (session.orderRefreshBusy(order.id)) {
-    return 'Updating · last recorded $kind · $summary';
-  }
-  final state = session.orderRefreshState(order.id);
-  if (state == BuyV2CommerceLoadState.ready) {
-    return 'Updated $kind · $summary';
-  }
-  if (state != null && state != BuyV2CommerceLoadState.loading) {
-    return 'Last recorded $kind (update unavailable) · $summary';
-  }
-  return 'Last recorded $kind · $summary';
-}
+}) => buyV2OrderEstimateSummary(
+  order,
+  refreshState: session.orderRefreshState(order.id),
+  refreshing: session.orderRefreshBusy(order.id),
+  revised: revised,
+);
 
 String _orderDeliveryPartnerLabel(BuyV2Order order) {
   final name = order.deliveryPartnerName?.trim();

@@ -10,9 +10,137 @@ import 'package:moolsocial/features/chat/chat_session.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_chat_route_adapter.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_shop_chat.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
+import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  const freshnessOrder = BuyV2Order(
+    id: 'RV6-D003',
+    destination: BuyV2Destination.shop,
+    title: 'Shop order',
+    itemSummary: 'One pack',
+    total: 100,
+    partner: 'Store A',
+    partnerType: 'Retailer',
+    promise: 'Delivery in12min',
+    destinationLabel: 'Home',
+    progress: .3,
+    status: BuyV2OrderStatus.confirmed,
+  );
+  for (final entry in <(BuyV2CommerceLoadState?, String)>[
+    (null, 'Last recorded estimate'),
+    (BuyV2CommerceLoadState.loading, 'Last recorded estimate'),
+    (BuyV2CommerceLoadState.ready, 'Updated estimate'),
+    (
+      BuyV2CommerceLoadState.offline,
+      'Last recorded estimate (update unavailable)',
+    ),
+    (
+      BuyV2CommerceLoadState.unavailable,
+      'Last recorded estimate (update unavailable)',
+    ),
+  ]) {
+    test('RV6 D003 Chat preserves estimate freshness ${entry.$1}', () {
+      final summary = buyV2OrderEstimateSummary(
+        freshnessOrder,
+        refreshState: entry.$1,
+      );
+      expect(summary, startsWith(entry.$2));
+      final uri = Uri.parse(
+        const BuyV2ChatRouteAdapter().orderHelpLocationFor(
+          order: freshnessOrder,
+          deliverySummary: summary,
+        ),
+      );
+      expect(uri.queryParameters['delivery'], summary);
+      expect(uri.queryParameters['draft'], contains('Delivery: $summary'));
+      expect(uri.queryParameters['orderId'], freshnessOrder.id);
+      expect(uri.queryParameters['return'], contains('order=RV6-D003'));
+      final thread = BuyV2ShopChatThreadFactory.fromOrder(
+        freshnessOrder,
+        deliverySummary: summary,
+      );
+      expect(thread.detail, summary);
+      expect(thread.contextDetail, contains(summary));
+    });
+  }
+  test(
+    'RV6 D003 missing refresh evidence stays recorded and refresh stays pending',
+    () {
+      final uri = Uri.parse(
+        const BuyV2ChatRouteAdapter().orderHelpLocationFor(
+          order: freshnessOrder,
+        ),
+      );
+      expect(
+        uri.queryParameters['delivery'],
+        startsWith('Last recorded estimate'),
+      );
+      expect(
+        BuyV2ShopChatThreadFactory.fromOrder(freshnessOrder).detail,
+        startsWith('Last recorded estimate'),
+      );
+      expect(
+        buyV2OrderEstimateSummary(
+          freshnessOrder,
+          refreshState: BuyV2CommerceLoadState.ready,
+          refreshing: true,
+        ),
+        startsWith('Updating · last recorded estimate'),
+      );
+      expect(
+        buyV2HistoricalOrderEstimate(freshnessOrder),
+        contains('recorded time unavailable'),
+      );
+      expect(
+        buyV2HistoricalOrderEstimate(freshnessOrder),
+        contains('not a live countdown'),
+      );
+    },
+  );
+
+  test(
+    'RV6 D003 historical estimate preserves known window and discloses missing estimate',
+    () {
+      BuyV2Order historical(String promise, {String? window}) => BuyV2Order(
+        id: 'RV6-D003-history',
+        destination: BuyV2Destination.shop,
+        title: 'Order',
+        itemSummary: 'One pack',
+        total: 100,
+        partner: 'Store A',
+        partnerType: 'Retailer',
+        promise: promise,
+        promisedByLabel: window,
+        destinationLabel: 'Home',
+        progress: 1,
+        status: BuyV2OrderStatus.delivered,
+      );
+      for (final value in ['', 'Delivered', 'Completed']) {
+        expect(
+          buyV2HistoricalOrderEstimate(historical(value)),
+          'Original delivery estimate unavailable',
+        );
+        expect(
+          buyV2OrderEstimateSummary(historical(value)),
+          'Original delivery estimate unavailable',
+        );
+      }
+      expect(
+        buyV2HistoricalOrderEstimate(
+          historical(
+            'Delivery in 12 min',
+            window: '14 September 2026, 18:00-18:30',
+          ),
+        ),
+        'Original promised window: 14 September 2026, 18:00-18:30',
+      );
+    },
+  );
 
   Future<JourneySession> readyJourney() async {
     final session = JourneySession(
@@ -30,31 +158,34 @@ void main() {
     return session;
   }
 
-  test('Order Help omits shopping prompts while product enquiries retain them', () {
-    for (final kind in ['supplier-order', 'care-pharmacy-order']) {
-      final order = ChatCommerceContext.fromUri(
+  test(
+    'Order Help omits shopping prompts while product enquiries retain them',
+    () {
+      for (final kind in ['supplier-order', 'care-pharmacy-order']) {
+        final order = ChatCommerceContext.fromUri(
+          Uri.parse(
+            '/app/chat/thread/supplier?context=$kind&orderId=order-1'
+            '&supplier=Supplier&productTitle=Product&price=10&orderTotal=20'
+            '&delivery=Tomorrow',
+          ),
+        );
+        expect(order, isNotNull);
+        expect(order.suggestedPrompts, isEmpty);
+      }
+      final product = ChatCommerceContext.fromUri(
         Uri.parse(
-          '/app/chat/thread/supplier?context=$kind&orderId=order-1'
-          '&supplier=Supplier&productTitle=Product&price=10&orderTotal=20'
-          '&delivery=Tomorrow',
+          '/app/chat/thread/supplier?context=product&supplier=Supplier'
+          '&productTitle=Product&price=10&delivery=Tomorrow',
         ),
       );
-      expect(order, isNotNull);
-      expect(order.suggestedPrompts, isEmpty);
-    }
-    final product = ChatCommerceContext.fromUri(
-      Uri.parse(
-        '/app/chat/thread/supplier?context=product&supplier=Supplier'
-        '&productTitle=Product&price=10&delivery=Tomorrow',
-      ),
-    );
-    expect(product, isNotNull);
-    expect(product.suggestedPrompts, [
-      'Is this product available?',
-      'Please confirm the price.',
-      'When can this be delivered?',
-    ]);
-  });
+      expect(product, isNotNull);
+      expect(product.suggestedPrompts, [
+        'Is this product available?',
+        'Please confirm the price.',
+        'When can this be delivered?',
+      ]);
+    },
+  );
 
   test('Buy Chat adapter preserves context without a second Chat shell', () {
     const adapter = BuyV2ChatRouteAdapter();
@@ -917,68 +1048,116 @@ void main() {
     },
   );
 
-  testWidgets(
-    'order Help stays in one supplier conversation with one composer',
-    (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(390, 844);
-      addTearDown(tester.view.reset);
-      final journey = await readyJourney();
-      final chat = ChatSession();
-      addTearDown(journey.dispose);
-      addTearDown(chat.dispose);
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'order Help stays in one supplier conversation with one composer text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final journey = await readyJourney();
+        final chat = ChatSession();
+        addTearDown(journey.dispose);
+        addTearDown(chat.dispose);
 
-      await tester.pumpWidget(
-        MoolSocialApp(
-          session: journey,
-          chatSession: chat,
-          initialLocation: '/app/buy?sub=orders&view=tracking&order=PO-240783',
-        ),
-      );
-      await tester.pumpAndSettle();
+        await tester.pumpWidget(
+          r66VisualCaptureRoot(
+            MoolSocialApp(
+              session: journey,
+              chatSession: chat,
+              initialLocation:
+                  '/app/buy?sub=orders&view=tracking&order=PO-240783',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
 
-      final help = find.byKey(const ValueKey('buy-tracking-help'));
-      await tester.scrollUntilVisible(
-        help,
-        220,
-        scrollable: find.byType(Scrollable).last,
-      );
-      await tester.tap(help);
-      await tester.pumpAndSettle();
+        final buy = tester
+            .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+            .session;
+        await buy.refreshOrder('PO-240783');
+        await tester.pumpAndSettle();
+        expect(
+          buy.orderRefreshState('PO-240783'),
+          BuyV2CommerceLoadState.unavailable,
+        );
+        final help = find.byKey(const ValueKey('buy-tracking-help'));
+        await tester.scrollUntilVisible(
+          help,
+          220,
+          scrollable: find.byType(Scrollable).last,
+        );
+        await Scrollable.ensureVisible(tester.element(help), alignment: .5);
+        await tester.pumpAndSettle();
+        expect(help.hitTestable(), findsOneWidget);
+        await tester.tap(help);
+        await tester.pumpAndSettle();
 
-      expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
-      expect(find.text('MoolSocial Assist'), findsNothing);
-      expect(
-        tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
-        'Marwar Foods Distribution',
-      );
-      expect(find.text('Conversation'), findsNothing);
-      expect(find.text('Metro Wholesale Partner'), findsNothing);
-      expect(find.text('Your bulk quote is ready to review.'), findsNothing);
-      expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
-      expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
-      expect(find.text('Search conversations'), findsNothing);
-      expect(find.byKey(const Key('chat-suggested-prompts')), findsNothing);
-      expect(find.byType(TextField), findsOneWidget);
-      final orderDraft = tester
-          .widget<TextField>(find.byKey(const Key('chat-message-field')))
-          .controller
-          ?.text;
-      expect(orderDraft, contains('Help with order PO-240783'));
-      expect(orderDraft, contains('Marwar Foods Distribution'));
-      expect(orderDraft, contains('Items:'));
+        expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+        expect(find.text('MoolSocial Assist'), findsNothing);
+        expect(
+          tester.widget<Text>(find.byKey(const Key('chat-page-title'))).data,
+          'Marwar Foods Distribution',
+        );
+        expect(find.text('Conversation'), findsNothing);
+        expect(find.text('Metro Wholesale Partner'), findsNothing);
+        expect(find.text('Your bulk quote is ready to review.'), findsNothing);
+        expect(find.byKey(const PageStorageKey('buy-assist')), findsNothing);
+        expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
+        expect(find.text('Search conversations'), findsNothing);
+        expect(find.byKey(const Key('chat-suggested-prompts')), findsNothing);
+        expect(find.byType(TextField), findsOneWidget);
+        final orderDraft = tester
+            .widget<TextField>(find.byKey(const Key('chat-message-field')))
+            .controller
+            ?.text;
+        expect(orderDraft, contains('Help with order PO-240783'));
+        expect(orderDraft, contains('Marwar Foods Distribution'));
+        expect(orderDraft, contains('Items:'));
+        expect(
+          orderDraft,
+          contains('Last recorded estimate (update unavailable)'),
+        );
+        final expand = find.byKey(const Key('chat-commerce-context-expand'));
+        await tester.ensureVisible(expand);
+        await tester.tap(expand);
+        await tester.pumpAndSettle();
+        expect(
+          find.textContaining('Last recorded estimate (update unavailable)'),
+          findsWidgets,
+        );
+        await captureR66Visual(tester, 'rv6-d003-chat-context-text-$scale');
+        final lastFact = find.text('Booking amount with balance at delivery');
+        expect(lastFact, findsOneWidget);
+        final messageList = find.byKey(const Key('chat-message-list'));
+        for (
+          var swipe = 0;
+          swipe < 12 && lastFact.hitTestable().evaluate().isEmpty;
+          swipe++
+        ) {
+          await tester.drag(messageList, const Offset(0, -180));
+          await tester.pumpAndSettle();
+        }
+        expect(lastFact.hitTestable(), findsOneWidget);
+        await captureR66Visual(
+          tester,
+          'rv6-d003-chat-context-last-text-$scale',
+        );
 
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(find.byKey(const Key('chat-thread-screen')), findsNothing);
-      expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
-      expect(
-        find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
-        findsOneWidget,
-      );
-      expect(tester.takeException(), isNull);
-    },
-  );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('chat-thread-screen')), findsNothing);
+        expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
+        expect(
+          find.byKey(const PageStorageKey('buy-tracking-PO-240783')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   testWidgets('Medicine order Help stays on Care and returns to Care', (
     tester,

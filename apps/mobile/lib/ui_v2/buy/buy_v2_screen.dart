@@ -1983,7 +1983,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     try {
       context.push(
         order.collection == null
-            ? const BuyV2ChatRouteAdapter().orderHelpLocationFor(order: order)
+            ? const BuyV2ChatRouteAdapter().orderHelpLocationFor(
+                order: order,
+                deliverySummary: buyV2OrderArrivalSummary(
+                  widget.session,
+                  order,
+                ),
+              )
             : const BuyV2ChatRouteAdapter().orderHelpLocationFor(
                 orderId: order.id,
               ),

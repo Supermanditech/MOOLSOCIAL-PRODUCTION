@@ -4665,7 +4665,7 @@ String _shoppingAlertDetail(BuyV2ShoppingAlert alert, BuyV2Session session) {
     return alert.detail;
   }
   return '${alert.detail.substring(0, alert.detail.length - order.promise.length)}'
-      '${buyV2OrderPromiseSummary(order)}';
+      '${buyV2OrderArrivalSummary(session, order)}';
 }
 
 Future<void> _confirmClearBuyV2RecentlyViewed(

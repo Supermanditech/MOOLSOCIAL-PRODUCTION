@@ -697,6 +697,51 @@ String buyV2OrderPromiseSummary(BuyV2Order order) {
       : summary;
 }
 
+/// A stored estimate is never a current countdown without a qualified refresh.
+String buyV2OrderEstimateSummary(
+  BuyV2Order order, {
+  BuyV2CommerceLoadState? refreshState,
+  bool refreshing = false,
+  bool revised = false,
+}) {
+  final summary = revised
+      ? order.updatedDeliveryEstimate ?? buyV2OrderPromiseSummary(order)
+      : buyV2OrderPromiseSummary(order);
+  if (order.status == BuyV2OrderStatus.delivered) {
+    if (!revised &&
+        const ['', 'delivered', 'completed'].contains(order.promise.trim().toLowerCase())) {
+      return buyV2HistoricalOrderEstimate(order);
+    }
+    return revised ? 'Recorded revised estimate · $summary' : summary;
+  }
+  final kind = revised ? 'revised estimate' : 'estimate';
+  if (refreshing) return 'Updating · last recorded $kind · $summary';
+  if (refreshState == BuyV2CommerceLoadState.ready) {
+    return 'Updated $kind · $summary';
+  }
+  if (refreshState != null && refreshState != BuyV2CommerceLoadState.loading) {
+    return 'Last recorded $kind (update unavailable) · $summary';
+  }
+  return 'Last recorded $kind · $summary';
+}
+
+/// Invoices are historical documents, not live delivery-tracking surfaces.
+/// Do not infer a timestamp from the download time or a relative promise.
+String buyV2HistoricalOrderEstimate(BuyV2Order order) {
+  final promisedWindow = order.promisedByLabel?.trim();
+  if (promisedWindow != null && promisedWindow.isNotEmpty) {
+    return 'Original promised window: $promisedWindow';
+  }
+  final recorded = order.promise.trim();
+  if (recorded.isEmpty ||
+      recorded.toLowerCase() == 'delivered' ||
+      recorded.toLowerCase() == 'completed') {
+    return 'Original delivery estimate unavailable';
+  }
+  return 'Original estimate (recorded time unavailable; not a live countdown): '
+      '$recorded';
+}
+
 String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
     switch (destination) {
       BuyV2Destination.shop ||

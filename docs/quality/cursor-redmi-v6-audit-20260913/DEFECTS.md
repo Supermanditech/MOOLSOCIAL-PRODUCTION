@@ -30,7 +30,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 
 ## RV6-D003 — Order Chat presents a stale delivery promise without its unavailable qualifier
 
-- Status: open; confirmed device information-consistency defect. Severity: moderate.
+- Status: open; locally implemented and qualified across all three recorded occurrences, pending successor APK and Redmi acceptance. Severity: moderate.
 - Journey: open MS-NEW-09 tracking; Refresh produces Order updates unavailable and last recorded estimate/update unavailable (112); open Help; expand Order conversation context (146–147).
 - Actual: Chat context labels Delivery as Delivery in12min with no last-known or unavailable qualifier. Tracking for the same order explicitly says the update is unavailable. Order and purchase identity remain correct.
 - Expected: all current order-support surfaces preserve the estimate freshness/unavailability state; an unconfirmed stored relative promise must not appear as an unqualified current countdown.
@@ -38,6 +38,8 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Evidence:112-tracking-refresh and147-order-chat-context; exact installed V6 review APK and Redmi as recorded. Fixture order MS-NEW-09; this finding concerns cross-surface freshness handling rather than whether fixture ETA is live.
 - Source correlation: apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart near108 maps delivery to order.promise; near339 also formats the raw promise. buy_v2_shop_chat.dart fromOrder near408/415 likewise uses order.promise. Runtime Chat context is observed directly; no implementation or isolated regression added.
 - Ownership: Buy-to-shared-Chat metadata/freshness contract; coordinate shared consumer rendering if needed in the later implementation scope. Backend live estimates remain separately unqualified.
+
+- Local correction: shared freshness-preserving Chat/tracking/alert summaries and historical invoice/PDF disclosure; 64 connected checks passed, final analysis zero issues, twelve relevant Flutter captures reviewed. All exact owners, test/log hashes, visual limitations and intermediate failures are recorded in UAT.md under RV6-D003 local qualification. Original 112/147, 480 and 510-511 device acceptance and real provider timestamps remain pending; no local result closes this ticket.
 
 ## RV6-D004 - Display-name validation sentence is clipped at normal text size
 - Status: open; confirmed device visual defect. Severity: minor.
