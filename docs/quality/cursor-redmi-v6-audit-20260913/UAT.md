@@ -1755,3 +1755,12 @@ Bounded descendant inventory supplement (not a completed journey denominator):
 Source investigations, not confirmed Redmi defects: notification load caches until refresh and fixture updates may be local only; actual permission/persistence/delivery remains unqualified. Requests/blocked list no-gateway paths return false without new error; current empty UI must not be described as authoritative server emptiness. Group invitation body selects empty view directly from list state; load-failure distinction requires a provider-error reproduction. These observations require follow-up evidence, not automatic defect closure or invented failure claims.
 
 No application changes.20 confirmed defects and559 action/check records unchanged;public-data mapping now69 rows. Remaining full audit and deduplicated complete journey inventory still open.
+
+
+## Round135 - Buy checkout dismissal and preserved return
+
+Physical captures937-951. Settings Back937 retains four original inbox threads/pin/unread1;Back938 restores Scheduled Shop Saved1 emptycart. Shopping area header X939-940 returns same catalogue. Isolated wheat1/279 added941 and cart942 opened. Review943 retains original Home/Work with Work selected. Add delivery address944 -> explicit header X945 preserves checkout address step and quantity. This qualifies empty-form X only, not unsaved populated draft dismissal.
+
+Payment946 retains Paytm. Confirm order947 -> Payment Change948 opens the existing full payment step, not a closeable sheet. Android Back949 goes to Address following stepper order. Recorded observation pending contract reconciliation: this is not a claimed return-to-Confirm pass or a confirmed new defect. Older payment-sheet X inventory remains separate until exact caller reconciliation. Address header Cart950 retains wheat1/279;minus951 removes only isolated item and restores original Scheduled Shop Saved1 emptycart. GST remained off;Home/Work and Paytm unchanged;no delivery check/order/payment submission.
+
+Five device pass records and one observation added.565 action/check rows,456 device passes,20 distinct defects,951 physical captures. Remaining complete unique journey denominator and full audit remain open.
