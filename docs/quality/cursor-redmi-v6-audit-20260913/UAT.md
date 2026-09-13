@@ -406,3 +406,9 @@ Physical captures599-608 reviewed. Canonical milk1L66 opened from monthly Schedu
 Captures609-616 reviewed. Wholesale omits Pack size610, matching views13577 destination condition. Trade price bands2000/5000/10000 visible612. First band applied: visible first-page products all <=2000 at611;not full-pagination proof. Artifact611 was initially named empty from an unconfirmed expectation;it contains populated results and is NOT empty-result evidence. Clearing filter then searching zzredminomatch59 gives readable0products with keyboard613 and confirmed Wholesale state614. Refresh615 retains query/empty state;not provider completion proof. Clear query/confirm restores unfiltered Wholesale616,emptycart,Saved0. Four device passes and one observation;no new defect/closure.
 
 616 physical captures;618 evidence rows;390 action rows;58 public-data mappings;16 defects. Full source/action/public-data completeness remains open;other trade price bands and provider pagination not qualified. No product/policy/APK changes.
+
+## Round 60 - Remaining Wholesale price bands and paged sample
+
+Physical captures617-625 reviewed. Original unfiltered Wholesale617. Applied5000 after explicit option read619:620 result434700000 and visible six prices below cap. Next page621 shows41-80 and six visible prices936/4200/2460/3650/2200/2790;reopened filter retains5000 at622. Applied10000 resets first page623,count494000000;reopen624 retains10000. Clear/Apply625 restores unfiltered first page,no badge,Saved0. No cart/address/saved mutations. Four narrow device passes;no new defect or closure. Full pagination, exact-price boundary, process-death persistence and authoritative offer revision remain unqualified.
+
+625 physical captures;627 evidence rows;394 action rows;58 public-data mappings;16 distinct defects. Complete action/data inventory and final handoff remain unfinished. No product/policy/APK changes.
