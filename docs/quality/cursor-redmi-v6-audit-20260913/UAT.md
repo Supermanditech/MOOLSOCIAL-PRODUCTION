@@ -628,7 +628,7 @@ Source hashes bind the following index to the inspected files:
 | SRC-0025 | buy_v2_catalogue.dart:1699 | showBuyV2CatalogueArea | onTap | blocked_provider B-001; selecting resolved provider area including rejection feedback unverified |
 | SRC-0026 | buy_v2_catalogue.dart:1723 | showBuyV2CatalogueArea | onTap | Any area choice remains pending device check and retained context verification |
 | SRC-0027 | buy_v2_catalogue.dart:1735 | showBuyV2CatalogueArea | onTap | seed area choice remains pending device check; not proof of national provider coverage |
-| SRC-0028 | buy_v2_catalogue.dart:1943 | _CatalogueSaleTypeSelector | onHorizontalDragEnd | horizontal sale-mode gesture (velocity threshold 80); distinct from product-lane swipe CAT-003; exact gesture pending device verification |
+| SRC-0028 | buy_v2_catalogue.dart:1943 | _CatalogueSaleTypeSelector | onHorizontalDragEnd | device_pass CAT-ROUND146-01; Shop selector right/left switches Quick/Scheduled and restores saved1 empty cart; velocity boundary and Wholesale/Bulk remain unqualified |
 | SRC-0029 | buy_v2_catalogue.dart:2014 | _CatalogueSaleTypeSelector | onTap | sale-mode pointer selection; SAVED-ROUND16-01/04 and VARIANT-ROUND22-01 cover Shop Quick/Scheduled; Wholesale/Bulk and retained contexts need separate evidence |
 | SRC-0030 | buy_v2_catalogue.dart:2062 | _CatalogueSaleSegment | onTap | Semantics onTap for same sale-mode action; screen-reader activation unverified; not extra pointer pass |
 | SRC-0031 | buy_v2_catalogue.dart:2066 | _CatalogueSaleSegment | onTap | InkWell forwarder to SRC-0029; same physical sale-mode tap |
@@ -1853,3 +1853,7 @@ Capture998 caught opening animation. The following tap, intended for categories 
 ## Round 145 - Store search page return and All products
 
 Nine captures1007-1015 qualify STORE-ROUND145-01..03. Reopening full Store after X retained wheat query. Next displayed41-80 of180; opening wheat SKU1178 and Android Back returned exactly that search page and cards. This Store-context pass does not close Shop-search RV6-D018. Grain selection kept wheat query and reset page1 of60; reopening showed grain selected; All products restored wheat1-40of180. Clearing test query restored original All products1-40of5000. No Add/save/order/message/address mutation; viewing1178 may update recent history. No new defect;20 remain. CAT-P12 default pointer controls now have category X round144 plus All products selection round145; accessibility and live-category changes remain unqualified. CAT-P02 gains Store search Next and product Back evidence, not final-page or other-parent blanket qualification. Current device1015 full Store original query/category restored; original wheat bookmark retained.
+
+## Round 146 - Shop sale-selector gesture
+
+Captures1016-1020 retain Store exit through original wheat product and Shop, then qualify CAT-ROUND146-01. Rightward swipe across selector from180,239 to440,239 over250ms selects Quick and displays Quick catalogue. Reverse swipe restores Scheduled and original wheat bookmark; saved1 and empty cart retained. One connected gesture check, not a pass per frame. No new defect;20 remain. CAT-P04 Shop gesture is qualified; Wholesale/Bulk, threshold boundary, screen-reader and process-death variants remain open. No product implementation or user-data deletion.
