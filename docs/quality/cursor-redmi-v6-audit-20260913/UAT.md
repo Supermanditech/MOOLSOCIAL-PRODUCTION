@@ -1300,56 +1300,56 @@ Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic
 | SUPSRC-0063 | buy_v2_catalogue.dart:6607 | onOpenProduct | Paged Store preview grid forwards product action0049; no independent action |
 | SUPSRC-0064 | buy_v2_catalogue.dart:6731 | onOpenProduct | Full Store paged product entry unfocuses search then forwards product; keyboard+Store query/category/page retention must be qualified in that exact context |
 | SUPSRC-0065 | buy_v2_catalogue.dart:6799 | onTapOutside | Store search tap-outside unfocus; exact pointer-outside keyboard check pending |
-| SUPSRC-0066 | buy_v2_catalogue.dart:6881 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0067 | buy_v2_catalogue.dart:6883 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0068 | buy_v2_catalogue.dart:6949 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0069 | buy_v2_catalogue.dart:6962 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0070 | buy_v2_catalogue.dart:7260 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0071 | buy_v2_catalogue.dart:7304 | onOpen | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0072 | buy_v2_catalogue.dart:7305 | onRemove | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0073 | buy_v2_catalogue.dart:7375 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0074 | buy_v2_catalogue.dart:7424 | onOpen | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0075 | buy_v2_catalogue.dart:7425 | onAdd | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0076 | buy_v2_catalogue.dart:7809 | onAddToCart | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0077 | buy_v2_catalogue.dart:7844 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0078 | buy_v2_catalogue.dart:8520 | onKeep | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0079 | buy_v2_catalogue.dart:8521 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0080 | buy_v2_catalogue.dart:8752 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0081 | buy_v2_catalogue.dart:8792 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0082 | buy_v2_catalogue.dart:9193 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0083 | buy_v2_catalogue.dart:9215 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0066 | buy_v2_catalogue.dart:6881 | onOpenProduct | Full Store paged product forwards openProduct; same actual action0064; exact Store search/page/product Back needs evidence, not ordinary Shop pass |
+| SUPSRC-0067 | buy_v2_catalogue.dart:6883 | onClose | Full Store paged Close -> Navigator.pop; explicit Close versus AndroidBack requires exact evidence reconciliation |
+| SUPSRC-0068 | buy_v2_catalogue.dart:6949 | onOpenProduct | Full Store nonpaged product forwards openProduct; alternate source path to0066; no paged-source pass substitution |
+| SUPSRC-0069 | buy_v2_catalogue.dart:6962 | onOpenCart | Full Store cart bar -> provided onOpenCart or cart sentinel; same parent0046, nested Store identity and return scope retained |
+| SUPSRC-0070 | buy_v2_catalogue.dart:7260 | onClose | Saved header Close forwards0040; no second visible Close at assignment |
+| SUPSRC-0071 | buy_v2_catalogue.dart:7304 | onOpen | Saved row Open -> product.id callback0041; SETTINGS-ROUND49-04 subset qualified; fallback remains conditional |
+| SUPSRC-0072 | buy_v2_catalogue.dart:7305 | onRemove | Saved row Remove -> session.toggleSaved(product.id); isolated removal evidence must be distinguished from catalogue bookmark; original saved item preserved |
+| SUPSRC-0073 | buy_v2_catalogue.dart:7375 | onClose | Recently viewed header Close forwards0042; single header action |
+| SUPSRC-0074 | buy_v2_catalogue.dart:7424 | onOpen | Recently viewed row Open -> product.id callback0043; SETTINGS-ROUND49-05 visitor subset |
+| SUPSRC-0075 | buy_v2_catalogue.dart:7425 | onAdd | Recently viewed row Add -> session.addProduct; RECENT-ROUND53-01 positive subset; RV6-D015 unavailable/closed rejection remains open |
+| SUPSRC-0076 | buy_v2_catalogue.dart:7809 | onAddToCart | Monthly Add basket enabled only monthlyBasketCanAdd; same0039; MONTHLY-ROUND54-01 positive fixture subset, disabled and partial-capacity conditions separate |
+| SUPSRC-0077 | buy_v2_catalogue.dart:7844 | onClose | Monthly header Close forwards0037; exact X versus Back reconciliation pending |
+| SUPSRC-0078 | buy_v2_catalogue.dart:8520 | onKeep | Saved clear confirmation Keep -> false; SAVED-ROUND42-01 passed465-467; no deletion |
+| SUPSRC-0079 | buy_v2_catalogue.dart:8521 | onClear | Saved clear confirmation Clear -> true then clearSavedProducts(destination); isolated Wholesale clear round17 qualified; do not delete original Shop saved data |
+| SUPSRC-0080 | buy_v2_catalogue.dart:8752 | onOpenProduct | Progressive fitted card product callback forwarding; same parent card action, rendering/layout branch distinct |
+| SUPSRC-0081 | buy_v2_catalogue.dart:8792 | onOpenProduct | Progressive lane catalogue product callback forwarding; same parent card action, lane scroll/return acceptance distinct |
+| SUPSRC-0082 | buy_v2_catalogue.dart:9193 | onNotification | Horizontal lane ScrollNotification -> _loadNextPage; automatic loading, not tap; boundary paging/retention and failure/retry are acceptance conditions |
+| SUPSRC-0083 | buy_v2_catalogue.dart:9215 | onOpenProduct | Horizontal lane product card callback forwarding; same0081; source assignment not another journey |
 | SUPSRC-0084 | buy_v2_catalogue.dart:10043 | onHighlightChanged | Pressed-state highlight hook; no separate navigation; parent action coverage retained |
-| SUPSRC-0085 | buy_v2_catalogue.dart:10420 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0086 | buy_v2_catalogue.dart:10422 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0087 | buy_v2_catalogue.dart:10423 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0088 | buy_v2_catalogue.dart:10969 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0089 | buy_v2_catalogue.dart:10975 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0090 | buy_v2_catalogue.dart:10983 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0091 | buy_v2_design.dart:228 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0092 | buy_v2_design.dart:233 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0093 | buy_v2_design.dart:354 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0094 | buy_v2_design.dart:359 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0085 | buy_v2_catalogue.dart:10420 | onEdit | Inline quantity Edit -> showBuyV2QuantityEditor; exact card variant and editor trigger require evidence; cart editor round115 cannot qualify every card |
+| SUPSRC-0086 | buy_v2_catalogue.dart:10422 | onDecrease | Inline quantity decrease -> session.decrease; MOQ-to-zero and last-item return acceptance separate; D002 still open |
+| SUPSRC-0087 | buy_v2_catalogue.dart:10423 | onIncrease | Inline quantity increase -> session.increase; max/availability/pack rules require exact context; no product-detail pass substitution |
+| SUPSRC-0088 | buy_v2_catalogue.dart:10969 | onEdit | Grid quantity Edit carries beforeCartChange guard to editor; unguarded and guarded rejection cases distinct; exact device fixture/evidence pending |
+| SUPSRC-0089 | buy_v2_catalogue.dart:10975 | onDecrease | Grid decrease computes zero at MOQ then awaits beforeCartChange; guard rejection and Store/cart retention must be tested separately |
+| SUPSRC-0090 | buy_v2_catalogue.dart:10983 | onIncrease | Grid increase uses session.increase without guard or guarded setCartQuantity; explicit guard branch unqualified from consumer stepper passes |
+| SUPSRC-0091 | buy_v2_design.dart:228 | onNotification | ScrollMetricsNotification updates vertical indicator only at depth0 vertical; framework layout hook, not independent action; screen-fit verification remains |
+| SUPSRC-0092 | buy_v2_design.dart:233 | onNotification | ScrollNotification duplicates0091 indicator update; not new action; horizontal lane isolation is visual acceptance condition |
+| SUPSRC-0093 | buy_v2_design.dart:354 | onNotification | ScrollNotification schedules cart avoidance layout; framework hook, not independent tap; cart overlap/keyboard/large-text conditions remain |
+| SUPSRC-0094 | buy_v2_design.dart:359 | onNotification | SizeChangedLayoutNotification schedules same cart avoidance0093; no additional journey |
 | SUPSRC-0095 | buy_v2_design.dart:1591 | onPointerDown | Press feedback pointer-down; no independent journey; multi-pointer/cancel visual behaviour pending |
 | SUPSRC-0096 | buy_v2_design.dart:1594 | onPointerUp | Press feedback pointer-up; no independent journey; parent action controls remain scoped |
 | SUPSRC-0097 | buy_v2_design.dart:1595 | onPointerCancel | Press feedback pointer-cancel; cancellation visual behaviour pending |
-| SUPSRC-0098 | buy_v2_scanner.dart:150 | onDetect | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0099 | buy_v2_scanner.dart:733 | onDetect | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0100 | buy_v2_scanner.dart:757 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0101 | buy_v2_scanner.dart:758 | onTorch | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0102 | buy_v2_scanner.dart:759 | onCamera | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0103 | buy_v2_scanner.dart:760 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0104 | buy_v2_scanner.dart:761 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0105 | buy_v2_scanner.dart:788 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0106 | buy_v2_scanner.dart:789 | onTorch | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0107 | buy_v2_scanner.dart:790 | onCamera | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0108 | buy_v2_scanner.dart:791 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0109 | buy_v2_scanner.dart:792 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0110 | buy_v2_scanner.dart:848 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0111 | buy_v2_scanner.dart:849 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0112 | buy_v2_scanner.dart:1001 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0113 | buy_v2_scanner.dart:1002 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0114 | buy_v2_screen.dart:966 | onOpenRoute | custom/forwarded callback candidate; reconcile parent before counting |
-| SUPSRC-0115 | buy_v2_screen.dart:992 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0098 | buy_v2_scanner.dart:150 | onDetect | Collection camera onDetect -> _detect; source_unreachable from public Buy per SCANNER-ROUND74-01; Workspace caller excluded; no physical detection pass |
+| SUPSRC-0099 | buy_v2_scanner.dart:733 | onDetect | Product scanner onDetect trims barcode and invokes _complete unless manualOpen; source_unreachable public Buy per round74; no decoding/permission pass |
+| SUPSRC-0100 | buy_v2_scanner.dart:757 | onClose | Scanner Close -> Navigator.pop; public Buy unreachable round74; distinct Workspace scope excluded |
+| SUPSRC-0101 | buy_v2_scanner.dart:758 | onTorch | Scanner Torch -> _changeCameraControl(torch:true); public Buy unreachable round74; no camera hardware qualification |
+| SUPSRC-0102 | buy_v2_scanner.dart:759 | onCamera | Scanner switch Camera -> _changeCameraControl(torch:false); public Buy unreachable round74; no hardware qualification |
+| SUPSRC-0103 | buy_v2_scanner.dart:760 | onScanNow | Scanner Scan now -> _scanNow; public Buy unreachable round74; no barcode/provider qualification |
+| SUPSRC-0104 | buy_v2_scanner.dart:761 | onEnterCode | Scanner Enter code -> _enterCode; public Buy unreachable round74; manual validation descendants not device-passed |
+| SUPSRC-0105 | buy_v2_scanner.dart:788 | onClose | visibleForTesting overlay wrapper forwards Close0100; test helper, not public route/action |
+| SUPSRC-0106 | buy_v2_scanner.dart:789 | onTorch | visibleForTesting overlay wrapper forwards Torch0101; test helper, not public route/action |
+| SUPSRC-0107 | buy_v2_scanner.dart:790 | onCamera | visibleForTesting overlay wrapper forwards Camera0102; test helper, not public route/action |
+| SUPSRC-0108 | buy_v2_scanner.dart:791 | onScanNow | visibleForTesting overlay wrapper forwards Scan now0103; test helper, not public route/action |
+| SUPSRC-0109 | buy_v2_scanner.dart:792 | onEnterCode | visibleForTesting overlay wrapper forwards Enter code0104; test helper, not public route/action |
+| SUPSRC-0110 | buy_v2_scanner.dart:848 | onScanNow | Scanner panel Scan now forwarder0103; same action; public Buy unreachable round74 |
+| SUPSRC-0111 | buy_v2_scanner.dart:849 | onEnterCode | Scanner panel Enter code forwarder0104; same action; public Buy unreachable round74 |
+| SUPSRC-0112 | buy_v2_scanner.dart:1001 | onScanNow | visibleForTesting action-panel Scan now forwarder; test helper, not public action |
+| SUPSRC-0113 | buy_v2_scanner.dart:1002 | onEnterCode | visibleForTesting action-panel Enter code forwarder; test helper, not public action |
+| SUPSRC-0114 | buy_v2_screen.dart:966 | onOpenRoute | Global profile onOpenRoute -> context.push(route); actual child routes must be inventoried; ACCOUNT-ROUND111-01 Orders subset only, not every shared destination |
+| SUPSRC-0115 | buy_v2_screen.dart:992 | onReturn | Stale procurement scope recovery Return -> _exitBuy; authoritative account/Store switch fixture needed; public consumer passes do not qualify procurement recovery |
 | SUPSRC-0116 | buy_v2_screen.dart:1010 | onPopInvokedWithResult | Root Back dispatch covers navigation/search/session branches; individual Back evidence retained; Mool overlay and root-exit branches require reconciliation |
 | SUPSRC-0117 | buy_v2_screen.dart:1071 | onOpenChanged | custom/forwarded callback candidate; reconcile parent before counting |
 | SUPSRC-0118 | buy_v2_screen.dart:1073 | onLocation | custom/forwarded callback candidate; reconcile parent before counting |
@@ -1684,3 +1684,8 @@ Initial attempt895 unexpectedly produced milke while layout/loading changed; Bac
 ## Round 126 - Category recovery, shopping tools and Store callback reconciliation
 
 Reviewed catalogue source3542-3568,3788-3810,3828-3852,3880-3905,4203-4245,4318-4360,5220-5260,5270-5304,5310-5348,5435-5465,5620-5680,5720-5782,5795-5825,6580-6618,6718-6740. Reconciled40 supplemental entries0023-0064 excluding already-classified framework hooks0027/0036. Category Clear variants, visitor/fallback paths, nested Store cart/Chat context and provider Retry remain explicitly distinguished. Existing device evidence is linked only to the tested subset. No source read counted as device pass. Remaining callback and shared-action reconciliation still prevents a final unique-journey denominator;18 defects unchanged. No application changes.
+
+
+## Round 127 - Remaining catalogue, layout hooks and scanner forwarding
+
+Reconciled 46 supplemental entries0066-0115 excluding already-classified framework hooks0084/0095-0097. Exact source ranges inspected around each callback and scanner test-wrapper declarations770/992. Linked scanner public unreachability to existing SCANNER-ROUND74-01 and original SRC0148-0162 dispositions; no Workspace/device scope expansion. Quantity guard branches, Store return mapping and global-profile child routes remain explicitly unqualified where evidence is missing. Scroll metrics and test wrappers are not unique taps. No physical captures, passes or defects added;18 confirmed defects unchanged. Supplemental entries0001-0116 now have parent/conditional dispositions, not blanket qualification;0117 onward and shared descendant inventory remain incomplete.
