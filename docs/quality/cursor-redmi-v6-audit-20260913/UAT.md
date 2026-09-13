@@ -693,50 +693,50 @@ Source hashes bind the following index to the inspected files:
 | SRC-0090 | buy_v2_catalogue.dart:6797 | _PagedFullStoreCatalogueState | onChanged | STORE-003 query executed with RV6-D001 empty recovery; not an overall search pass |
 | SRC-0091 | buy_v2_catalogue.dart:6798 | _PagedFullStoreCatalogueState | onSubmitted | Store search keyboard Submit unfocus exact action unverified; other keyboard dismissal not equivalent |
 | SRC-0092 | buy_v2_catalogue.dart:6816 | _PagedFullStoreCatalogueState | onTap | device_pass STORE-004 and STORE-ROUND85-02 category entry; forwards to Store-specific sheet |
-| SRC-0093 | buy_v2_catalogue.dart:6928 | _showBuyV2FullStoreCatalogue | onPressed | unclassified |
-| SRC-0094 | buy_v2_catalogue.dart:7032 | _RelatedStoreCard | onTap | unclassified |
-| SRC-0095 | buy_v2_catalogue.dart:7206 | _BuyV2InfoSheetHeader | onPressed | unclassified |
-| SRC-0096 | buy_v2_catalogue.dart:7383 | _RecentlyViewedProductsSheet | onPressed | unclassified |
-| SRC-0097 | buy_v2_catalogue.dart:7519 | _RecentlyViewedProductInfoRow | onTap | unclassified |
-| SRC-0098 | buy_v2_catalogue.dart:7525 | _RecentlyViewedProductInfoRow | onTap | unclassified |
-| SRC-0099 | buy_v2_catalogue.dart:7582 | _RecentlyViewedProductInfoRow | onPressed | unclassified |
-| SRC-0100 | buy_v2_catalogue.dart:7700 | _SavedProductInfoRow | onTap | unclassified |
-| SRC-0101 | buy_v2_catalogue.dart:7704 | _SavedProductInfoRow | onTap | unclassified |
-| SRC-0102 | buy_v2_catalogue.dart:7752 | _SavedProductInfoRow | onPressed | unclassified |
-| SRC-0103 | buy_v2_catalogue.dart:7799 | _HouseholdBasket | onPressed | unclassified |
-| SRC-0104 | buy_v2_catalogue.dart:7809 | _HouseholdBasket | onPressed | unclassified |
-| SRC-0105 | buy_v2_catalogue.dart:8088 | _ProductGrid | onPressed | unclassified |
-| SRC-0106 | buy_v2_catalogue.dart:8308 | BuyV2CatalogueAvailabilityView | onPressed | unclassified |
-| SRC-0107 | buy_v2_catalogue.dart:8322 | BuyV2CatalogueAvailabilityView | onPressed | unclassified |
-| SRC-0108 | buy_v2_catalogue.dart:8369 | _SavedDecisionShelf | onPressed | unclassified |
-| SRC-0109 | buy_v2_catalogue.dart:8478 | _SavedDecisionShelf | onPressed | unclassified |
-| SRC-0110 | buy_v2_catalogue.dart:8611 | _SavedClearDecisionSheet | onPressed | unclassified |
-| SRC-0111 | buy_v2_catalogue.dart:8621 | _SavedClearDecisionSheet | onPressed | unclassified |
-| SRC-0112 | buy_v2_catalogue.dart:8636 | _SavedClearDecisionSheet | onPressed | unclassified |
-| SRC-0113 | buy_v2_catalogue.dart:9250 | _CataloguePromotionRail | onTap | unclassified |
-| SRC-0114 | buy_v2_catalogue.dart:9259 | _CataloguePromotionRail | onTap | unclassified |
-| SRC-0115 | buy_v2_catalogue.dart:9270 | _CataloguePromotionRail | onTap | unclassified |
-| SRC-0116 | buy_v2_catalogue.dart:9282 | _CataloguePromotionRail | onTap | unclassified |
-| SRC-0117 | buy_v2_catalogue.dart:9293 | _CataloguePromotionRail | onTap | unclassified |
-| SRC-0118 | buy_v2_catalogue.dart:9302 | _CataloguePromotionRail | onTap | unclassified |
-| SRC-0119 | buy_v2_catalogue.dart:9434 | _PrescriptionMatchLane | onTap | unclassified |
-| SRC-0120 | buy_v2_catalogue.dart:9444 | _PrescriptionMatchLane | onPressed | unclassified |
-| SRC-0121 | buy_v2_catalogue.dart:9557 | _FeaturedProductRail | onTap | unclassified |
-| SRC-0122 | buy_v2_catalogue.dart:9561 | _FeaturedProductRail | onTap | unclassified |
-| SRC-0123 | buy_v2_catalogue.dart:9673 | _RecentlyViewedRail | onPressed | unclassified |
-| SRC-0124 | buy_v2_catalogue.dart:9792 | _RecentlyViewedCard | onTap | unclassified |
-| SRC-0125 | buy_v2_catalogue.dart:9903 | _CatalogueSectionHeader | onTap | unclassified |
-| SRC-0126 | buy_v2_catalogue.dart:9907 | _CatalogueSectionHeader | onTap | unclassified |
-| SRC-0127 | buy_v2_catalogue.dart:10048 | _FeaturedProductCardState | onTap | unclassified |
-| SRC-0128 | buy_v2_catalogue.dart:10351 | _FeaturedProductAction | onTap | unclassified |
-| SRC-0129 | buy_v2_catalogue.dart:10511 | BuyV2ProductCard | onTap | unclassified |
-| SRC-0130 | buy_v2_catalogue.dart:10814 | BuyV2ProductCard | onTap | unclassified |
-| SRC-0131 | buy_v2_catalogue.dart:11136 | _QuantityStepperTargets | onTap | unclassified |
-| SRC-0132 | buy_v2_catalogue.dart:11139 | _QuantityStepperTargets | onPressed | unclassified |
-| SRC-0133 | buy_v2_catalogue.dart:11165 | _QuantityStepperTargets | onTap | unclassified |
-| SRC-0134 | buy_v2_catalogue.dart:11168 | _QuantityStepperTargets | onPressed | unclassified |
-| SRC-0135 | buy_v2_catalogue.dart:11230 | _ProductSaveButton | onTap | unclassified |
-| SRC-0136 | buy_v2_catalogue.dart:11283 | _ProductSaveButton | onPressed | unclassified |
+| SRC-0093 | buy_v2_catalogue.dart:6928 | _showBuyV2FullStoreCatalogue | onPressed | alternate finite Store catalogue Close; paged catalogue X is SRC-0088; conditional path unverified |
+| SRC-0094 | buy_v2_catalogue.dart:7032 | _RelatedStoreCard | onTap | related Store card forwarder; STORE-ROUND39-03 card body and return evidence applies at caller |
+| SRC-0095 | buy_v2_catalogue.dart:7206 | _BuyV2InfoSheetHeader | onPressed | shared info-sheet Close forwarder; exact caller required; RECENT-ROUND53-02 covers Recently viewed close only |
+| SRC-0096 | buy_v2_catalogue.dart:7383 | _RecentlyViewedProductsSheet | onPressed | device_pass RECENT-ROUND46-01 opens history Clear confirmation and Keep; confirmation Clear remains blocked |
+| SRC-0097 | buy_v2_catalogue.dart:7519 | _RecentlyViewedProductInfoRow | onTap | recent product Semantics activation; screen-reader unverified |
+| SRC-0098 | buy_v2_catalogue.dart:7525 | _RecentlyViewedProductInfoRow | onTap | device_pass RECENT-ROUND45-05 and SETTINGS-ROUND49-05 product and Back |
+| SRC-0099 | buy_v2_catalogue.dart:7582 | _RecentlyViewedProductInfoRow | onPressed | RECENT-ROUND53-01 available Add pass; ROUND45-03/04 unavailable Add RV6-D015 remains |
+| SRC-0100 | buy_v2_catalogue.dart:7700 | _SavedProductInfoRow | onTap | Saved row Semantics activation; screen-reader unverified |
+| SRC-0101 | buy_v2_catalogue.dart:7704 | _SavedProductInfoRow | onTap | device_pass SETTINGS-ROUND49-04 Saved product and return |
+| SRC-0102 | buy_v2_catalogue.dart:7752 | _SavedProductInfoRow | onPressed | Saved settings-row Remove exact control unverified; catalogue bookmark removal does not prove this button |
+| SRC-0103 | buy_v2_catalogue.dart:7799 | _HouseholdBasket | onPressed | device_pass MONTHLY-ROUND46-02 View basket products; empty plan disable unverified |
+| SRC-0104 | buy_v2_catalogue.dart:7809 | _HouseholdBasket | onPressed | device_pass MONTHLY-ROUND54-01/03/04 Add/re-add targets; provider rejection and unavailable plan unverified |
+| SRC-0105 | buy_v2_catalogue.dart:8088 | _ProductGrid | onPressed | SAVED-ROUND17-03/ROUND43-03 Show all and ROUND64-02 no-match recovery; separate non-Saved branch unverified |
+| SRC-0106 | buy_v2_catalogue.dart:8308 | BuyV2CatalogueAvailabilityView | onPressed | blocked_provider catalogue/recovery Retry; real restore failure and positive retry unverified |
+| SRC-0107 | buy_v2_catalogue.dart:8322 | BuyV2CatalogueAvailabilityView | onPressed | workspace procurement Return conditional; outside public consumer journey; no public Buy qualification inferred |
+| SRC-0108 | buy_v2_catalogue.dart:8369 | _SavedDecisionShelf | onPressed | device_pass SAVED-ROUND17-01 and ROUND42 confirmation entry |
+| SRC-0109 | buy_v2_catalogue.dart:8478 | _SavedDecisionShelf | onPressed | Medicine prescription-only Saved action; outside public Shop/Wholesale |
+| SRC-0110 | buy_v2_catalogue.dart:8611 | _SavedClearDecisionSheet | onPressed | device_pass SAVED-ROUND42-02 X keeps saved |
+| SRC-0111 | buy_v2_catalogue.dart:8621 | _SavedClearDecisionSheet | onPressed | device_pass SAVED-ROUND42-01 Keep saved |
+| SRC-0112 | buy_v2_catalogue.dart:8636 | _SavedClearDecisionSheet | onPressed | device_pass SAVED-ROUND17-04 and ROUND43-02 isolated Wholesale clear; original Shop saved preserved |
+| SRC-0113 | buy_v2_catalogue.dart:9250 | _CataloguePromotionRail | onTap | alternate non-paged promotion rail Monthly entry; tools entry does not prove this control; conditional unverified |
+| SRC-0114 | buy_v2_catalogue.dart:9259 | _CataloguePromotionRail | onTap | alternate non-paged businessBuying promotion; not mounted in ordinary paged review catalogue; unverified |
+| SRC-0115 | buy_v2_catalogue.dart:9270 | _CataloguePromotionRail | onTap | alternate non-paged flexibleRestocking promotion; conditional unverified |
+| SRC-0116 | buy_v2_catalogue.dart:9282 | _CataloguePromotionRail | onTap | alternate non-paged homeShopping promotion; omitted for Store procurement; conditional unverified |
+| SRC-0117 | buy_v2_catalogue.dart:9293 | _CataloguePromotionRail | onTap | Medicine prescription promotion; outside public Shop/Wholesale |
+| SRC-0118 | buy_v2_catalogue.dart:9302 | _CataloguePromotionRail | onTap | Medicine OTC promotion; outside public Shop/Wholesale |
+| SRC-0119 | buy_v2_catalogue.dart:9434 | _PrescriptionMatchLane | onTap | Medicine prescription Semantics product entry; outside public Shop/Wholesale |
+| SRC-0120 | buy_v2_catalogue.dart:9444 | _PrescriptionMatchLane | onPressed | Medicine prescription pointer product entry; same destination as SRC-0119; outside public Shop/Wholesale |
+| SRC-0121 | buy_v2_catalogue.dart:9557 | _FeaturedProductRail | onTap | alternate featured rail category Semantics entry; conditional and screen-reader unverified |
+| SRC-0122 | buy_v2_catalogue.dart:9561 | _FeaturedProductRail | onTap | alternate featured rail category pointer entry; not header category entry; conditional unverified |
+| SRC-0123 | buy_v2_catalogue.dart:9673 | _RecentlyViewedRail | onPressed | alternate recently viewed rail Clear affects current destination; original history preserved; no Clear pass |
+| SRC-0124 | buy_v2_catalogue.dart:9792 | _RecentlyViewedCard | onTap | alternate recently viewed rail product entry; separate from recent sheet; conditional unverified |
+| SRC-0125 | buy_v2_catalogue.dart:9903 | _CatalogueSectionHeader | onTap | alternate section header category Semantics action; conditional unverified |
+| SRC-0126 | buy_v2_catalogue.dart:9907 | _CatalogueSectionHeader | onTap | alternate section header category pointer action; conditional unverified |
+| SRC-0127 | buy_v2_catalogue.dart:10048 | _FeaturedProductCardState | onTap | alternate featured card product tap; ordinary grid tap does not qualify this branch |
+| SRC-0128 | buy_v2_catalogue.dart:10351 | _FeaturedProductAction | onTap | alternate featured Add/review-offer action; stale offer and success/failure branches unverified |
+| SRC-0129 | buy_v2_catalogue.dart:10511 | BuyV2ProductCard | onTap | ordinary product grid open; STORE-001/WHOLESALE-003 and saved product journeys; per-context returns retain own status |
+| SRC-0130 | buy_v2_catalogue.dart:10814 | BuyV2ProductCard | onTap | ordinary grid Add/review-offer branch; CART-ROUND98-01 Shop Add and collection/Wholesale seeded checks; stale offer review branch unverified |
+| SRC-0131 | buy_v2_catalogue.dart:11136 | _QuantityStepperTargets | onTap | quantity +/- Semantics forwarder; screen-reader unverified |
+| SRC-0132 | buy_v2_catalogue.dart:11139 | _QuantityStepperTargets | onPressed | quantity +/- pointer forwarder; CART-ROUND98-01 and MONTHLY-ROUND54-02 cover recorded quantities; limits/revision remain separate |
+| SRC-0133 | buy_v2_catalogue.dart:11165 | _QuantityStepperTargets | onTap | quantity Edit Semantics forwarder; screen-reader unverified |
+| SRC-0134 | buy_v2_catalogue.dart:11168 | _QuantityStepperTargets | onPressed | quantity Edit pointer control; exact edit-sheet evidence requires reconciliation; not passed from +/- taps |
+| SRC-0135 | buy_v2_catalogue.dart:11230 | _ProductSaveButton | onTap | compact save bookmark branch; SAVED-ROUND16-02/03 save/remove; stale/error states not inferred |
+| SRC-0136 | buy_v2_catalogue.dart:11283 | _ProductSaveButton | onPressed | alternate IconButton save branch; compact bookmark evidence not automatically equivalent; conditional unverified |
 | SRC-0137 | buy_v2_design.dart:2489 | _BuyV2PromotionCardState | onTap | unclassified |
 | SRC-0138 | buy_v2_design.dart:2510 | _BuyV2PromotionCardState | onTap | unclassified |
 | SRC-0139 | buy_v2_invoice.dart:135 | _BuyV2InvoicePageState | onPressed | unclassified |
@@ -1534,3 +1534,7 @@ Source-only reconciliation of SRC-0042 through0068 links existing Settings round
 ## Round 103 - Help, history, alerts and Store control reconciliation
 
 SRC-0069 through0092 mapped to exact existing Help, Recently viewed, Alerts, Store and collection evidence. Known defects remain failures; Back does not qualify distinct X buttons; category selection does not qualify All products; keyboard dismissal does not qualify Submit. Clear history preserves the existing blocked disposition. Live alert recovery and authenticated collection remain unqualified. No new capture, device pass or defect. Original source index now 235 classified and 292 unclassified. Classification includes explicit pending/blocked controls, not completed journeys. Audit totals unchanged.
+
+## Round 104 - remaining catalogue callbacks
+
+SRC-0093 through0136 reconciled. All 136 original catalogue callback references now have evidence or explicit conditional/pending disposition; this does not close all catalogue journeys. Source1818-1844 selects paged catalogue except Saved/monthly; source8043-8047 requires no Saved/query/category/intent for promotion rails. Alternate promotion, featured and history rails are not assumed exercised by ordinary paged grid or tools sheets. Saved, monthly and recent-sheet evidence linked without duplicate passes. Screen-reader activation, stale offers, quantity edit, alternate controls and provider recovery remain unverified. No device action or source change. Original full index now 279 classified, 248 unclassified; supplemental/shared inventory remains separate. Prior round103 pre-commit observation ordering error is retained: commit/push proceeded before collecting terminal gate output; subsequent poll confirmed exit0 and handoff passed. No claim that ordering was correct.
