@@ -1,0 +1,77 @@
+Resolving dependencies...
+Downloading packages...
+  _fe_analyzer_shared 99.0.0 (105.0.0 available)
+  _flutterfire_internals 1.3.75 (1.3.77 available)
+  analyzer 12.1.0 (14.1.0 available)
+  code_assets 1.2.1 (2.0.0 available)
+  cross_file 0.3.5+4 (0.3.5+5 available)
+  firebase_app_check 0.4.5+2 (0.4.7 available)
+  firebase_app_check_platform_interface 0.4.1+2 (0.4.2+1 available)
+  firebase_app_check_web 0.2.5+2 (0.2.6+1 available)
+  firebase_auth 6.5.6 (6.6.0 available)
+  firebase_auth_platform_interface 9.0.5 (9.0.7 available)
+  firebase_auth_web 6.2.5 (6.2.7 available)
+  firebase_core 4.12.1 (4.14.0 available)
+  firebase_core_platform_interface 8.0.0 (8.1.1 available)
+  firebase_core_web 3.9.1 (3.11.0 available)
+  firebase_crashlytics 5.2.6 (5.3.0 available)
+  firebase_crashlytics_platform_interface 3.8.26 (3.9.0 available)
+  firebase_data_connect 0.3.0+7 (0.3.2 available)
+  flutter_riverpod 3.3.2 (3.4.2 available)
+  flutter_secure_storage 10.3.1 (11.0.0 available)
+  flutter_secure_storage_darwin 0.3.2 (0.4.0 available)
+  go_router 17.3.0 (18.0.0 available)
+  google_sign_in_ios 6.3.0 (6.3.1 available)
+  hooks 2.0.2 (2.2.0 available)
+  intl 0.20.2 (0.20.3 available)
+  jni 1.0.0 (1.0.3 available)
+  jni_flutter 1.0.1 (1.0.2 available)
+  matcher 0.12.19 (0.12.20 available)
+  material_color_utilities 0.13.0 (0.13.1 available)
+  meta 1.18.0 (1.19.0 available)
+  mobile_scanner 7.2.0 (7.4.0 available)
+  native_toolchain_c 0.19.2 (0.19.4 available)
+  objective_c 9.4.1 (9.6.0 available)
+  package_config 2.2.0 (3.0.0 available)
+  permission_handler 12.0.3 (13.0.1 available)
+  permission_handler_android 13.0.1 (14.0.0 available)
+  permission_handler_apple 9.4.10 (9.6.1 available)
+  permission_handler_html 0.1.3+5 (0.1.4+1 available)
+  permission_handler_platform_interface 4.3.0 (4.4.0 available)
+  permission_handler_windows 0.2.1 (0.2.2 available)
+  record_use 0.6.0 (1.1.1 available)
+  riverpod 3.3.2 (3.4.2 available)
+  shared_preferences_android 2.4.27 (2.4.28 available)
+  source_maps 0.10.13 (0.10.14 available)
+  sqlite3 3.4.0 (3.5.2 available)
+  test 1.31.0 (1.31.2 available)
+  test_api 0.7.11 (0.7.13 available)
+  test_core 0.6.17 (0.6.19 available)
+  vector_graphics 1.2.2 (1.2.3 available)
+  vector_graphics_compiler 1.2.6 (1.3.0 available)
+  vector_math 2.2.0 (2.4.2 available)
+  video_player 2.13.0 (2.14.0 available)
+  vm_service 15.2.0 (15.3.0 available)
+Got dependencies!
+52 packages have newer versions incompatible with dependency constraints.
+Try `flutter pub outdated` for more information.
+{"protocolVersion":"0.1.1","runnerVersion":"1.31.0","pid":7016,"type":"start","time":0}
+{"suite":{"id":0,"platform":"vm","path":"C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"},"type":"suite","time":0}
+{"test":{"id":1,"name":"loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart","suiteID":0,"groupIDs":[],"metadata":{"skip":false,"skipReason":null},"line":null,"column":null,"url":null},"type":"testStart","time":1}
+{"count":1,"time":6,"type":"allSuites"}
+{"testID":1,"messageType":"print","message":"Warning: A tag was used that wasn't specified in dart_test.yaml.\n  protected-reference was used in the test \"R58.8.7 responsive Android and iOS candidate captures\"\n","type":"print","time":13176}
+{"testID":1,"result":"success","skipped":false,"hidden":true,"type":"testDone","time":13180}
+{"group":{"id":2,"suiteID":0,"parentID":null,"name":"","metadata":{"skip":false,"skipReason":null},"testCount":6,"line":null,"column":null,"url":null},"type":"group","time":13182}
+{"test":{"id":3,"name":"derived dock owner follows scoped Cart and Checkout without routing","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":121,"column":3,"url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"},"type":"testStart","time":13183}
+{"testID":3,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":13233}
+{"test":{"id":4,"name":"scoped Cart and Checkout retain every established rail action","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":154,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"},"type":"testStart","time":13234}
+{"testID":4,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":17562}
+{"test":{"id":5,"name":"combined scope retains its valid entry vertical","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":193,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"},"type":"testStart","time":17562}
+{"testID":5,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":18130}
+{"test":{"id":6,"name":"compact Mool launcher opens and Back closes the menu without losing Cart","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":214,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"},"type":"testStart","time":18131}
+{"testID":6,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":18576}
+{"test":{"id":7,"name":"320px 140% reduced motion is immediate and semantically exact","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":256,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"},"type":"testStart","time":18577}
+{"testID":7,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":18664}
+{"test":{"id":8,"name":"R58.8.7 responsive Android and iOS candidate captures","suiteID":0,"groupIDs":[2],"metadata":{"skip":false,"skipReason":null},"line":174,"column":5,"url":"package:flutter_test/src/widget_tester.dart","root_line":284,"root_column":3,"root_url":"file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-v2-r61-5-cursor-review-build-20260828/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart"},"type":"testStart","time":18664}
+{"testID":8,"result":"success","skipped":false,"hidden":false,"type":"testDone","time":19745}
+{"success":true,"type":"done","time":19822}

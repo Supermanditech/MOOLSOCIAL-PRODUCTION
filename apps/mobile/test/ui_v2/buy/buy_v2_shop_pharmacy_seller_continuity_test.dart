@@ -5,8 +5,8 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
-import 'package:moolsocial/ui_v2/buy/buy_v2_supplier_sheet_motion.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -105,58 +105,39 @@ void main() {
     expect(session.sellerContinuationsFor(shopOil, limit: 0), isEmpty);
   });
 
-  testWidgets('Shop seller action opens only exact products after reverse', (
+  testWidgets('Shop exposes automatic fulfilment without seller continuation', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(390, 844));
     addTearDown(() => tester.binding.setSurfaceSize(null));
-    final semantics = tester.ensureSemantics();
     final session = productSession('s-oil');
+    final product = session.product('s-oil');
+    final expectedPromise = buyV2BuyerDeliveryPromise(
+      session.productFactsFor(product),
+    );
 
     await tester.pumpWidget(app(session));
     await tester.pumpAndSettle();
-    final action = find.byKey(const ValueKey('buy-shop-seller-action-s-oil'));
-    await revealAction(tester, action);
-    expect(action, findsOneWidget);
-    final semanticAction = find.bySemanticsLabel(
-      'View 4 more products from Ghar Bazaar in the current Shop catalogue',
-    );
-    expect(semanticAction, findsOneWidget);
     expect(
-      tester
-          .getSemantics(semanticAction)
-          .getSemanticsData()
-          .hasAction(SemanticsAction.tap),
-      isTrue,
-    );
-
-    await tester.tap(action);
-    await tester.pumpAndSettle();
-    expect(find.text('More from Ghar Bazaar'), findsOneWidget);
-    expect(find.textContaining('Current Shop catalogue'), findsOneWidget);
-    expect(
-      find.byKey(const ValueKey('buy-shop-seller-product-s-soap')),
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-product-hero-store-s-oil')),
+        matching: find.textContaining(product.seller),
+      ),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('buy-shop-seller-product-s-ghee')),
-      findsOneWidget,
+    expect(find.textContaining(product.brand), findsWidgets);
+    expect(find.text(expectedPromise), findsWidgets);
+    final automatic = find.byKey(
+      const ValueKey('buy-automatic-fulfilment-s-oil'),
     );
+    await revealAction(tester, automatic);
+    expect(automatic, findsOneWidget);
     expect(
-      find.byKey(const ValueKey('buy-shop-seller-product-s-oil')),
+      find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
       findsNothing,
     );
-    expect(find.text('Stone-ground wheat atta'), findsNothing);
-
-    await tester.tap(
-      find.byKey(const ValueKey('buy-shop-seller-product-s-soap')),
-    );
-    await tester.pump();
-    expect(session.selectedProductId, 's-oil');
-    await tester.pumpAndSettle();
-    expect(session.selectedProductId, 's-soap');
-    expect(session.destination, BuyV2Destination.shop);
-    semantics.dispose();
+    expect(find.text('Fulfilment arranged by MoolSocial'), findsOneWidget);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('Medicine pharmacy action keeps prescription and safety facts', (
@@ -172,8 +153,8 @@ void main() {
     );
     await revealAction(tester, action);
     final semanticAction = find.bySemanticsLabel(
-      'View 4 more products from Sardarpura Health Pharmacy in the current '
-      'Medicine catalogue. Not medical advice',
+      'View 4 more products from Sardarpura Health Pharmacy that are '
+      'available now. Not medical advice',
     );
     expect(semanticAction, findsOneWidget);
     expect(
@@ -186,19 +167,24 @@ void main() {
 
     await tester.tap(action);
     await tester.pumpAndSettle();
-    expect(find.text('More from Sardarpura Health Pharmacy'), findsOneWidget);
+    expect(find.text('Sardarpura Health Pharmacy'), findsWidgets);
+    expect(find.text('Store products'), findsOneWidget);
     expect(find.textContaining('Not medical advice'), findsWidgets);
     expect(
-      find.byKey(
-        const ValueKey('buy-medicine-pharmacy-product-m-metformin-500'),
-      ),
+      find.byKey(const ValueKey('buy-product-m-metformin-500')),
       findsOneWidget,
     );
     expect(
-      find.textContaining('Prescription and pharmacist review required'),
-      findsWidgets,
+      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+      findsOneWidget,
     );
-    expect(find.text('Pain relief gel'), findsNothing);
+    expect(
+      find.descendant(
+        of: find.byKey(const ValueKey('buy-horizontal-product-grid')),
+        matching: find.text('Pain relief gel'),
+      ),
+      findsNothing,
+    );
 
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
@@ -208,7 +194,7 @@ void main() {
     semantics.dispose();
   });
 
-  testWidgets('seller sheet is static and usable at 320px 140 percent', (
+  testWidgets('automatic fulfilment is usable at 320px 140 percent', (
     tester,
   ) async {
     await tester.binding.setSurfaceSize(const Size(320, 700));
@@ -217,21 +203,14 @@ void main() {
 
     await tester.pumpWidget(app(session, textScale: 1.4, reducedMotion: true));
     await tester.pumpAndSettle();
-    final action = find.byKey(const ValueKey('buy-shop-seller-action-s-oil'));
-    await revealAction(tester, action);
-    final motion = BuyV2SupplierSheetMotion.resolve(tester.element(action));
-    expect(motion.duration, Duration.zero);
-    expect(motion.reverseDuration, Duration.zero);
-    expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
-
-    await tester.tap(action);
-    await tester.pump();
-    expect(
-      find.byKey(const ValueKey('buy-shop-seller-sheet-s-oil')),
-      findsOneWidget,
+    final automatic = find.byKey(
+      const ValueKey('buy-automatic-fulfilment-s-oil'),
     );
-    await tester.ensureVisible(
-      find.byKey(const ValueKey('buy-shop-seller-product-s-ghee')),
+    await revealAction(tester, automatic);
+    expect(automatic, findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
+      findsNothing,
     );
     await tester.pumpAndSettle();
     expect(tester.binding.transientCallbackCount, 0);
@@ -239,7 +218,7 @@ void main() {
   });
 
   testWidgets(
-    'R58.8.1 seller continuity responsive founder captures',
+    'B01 T02 automatic fulfilment responsive founder captures',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       addTearDown(tester.view.reset);
@@ -304,18 +283,21 @@ void main() {
           ),
         );
         await tester.pumpAndSettle();
-        final action = find.byKey(
-          const ValueKey('buy-shop-seller-action-s-oil'),
+        final automatic = find.byKey(
+          const ValueKey('buy-automatic-fulfilment-s-oil'),
         );
-        await revealAction(tester, action);
-        await tester.tap(action);
-        await tester.pumpAndSettle();
+        await revealAction(tester, automatic);
+        expect(automatic, findsOneWidget);
+        expect(
+          find.byKey(const ValueKey('buy-shop-seller-action-s-oil')),
+          findsNothing,
+        );
         expect(tester.takeException(), isNull);
         await expectLater(
           find.byKey(const ValueKey('buy-v2-screen')),
           matchesGoldenFile(
             'candidate_captures/'
-            'buy-v2-r58-8-1-seller-${viewport.label}.png',
+            'buy-v2-b01-t02-auto-fulfilment-${viewport.label}.png',
           ),
         );
 
