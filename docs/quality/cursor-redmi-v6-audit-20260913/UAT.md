@@ -2378,3 +2378,26 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | rv6-d011-wholesale-unique-true-text-1.0.png | 2251195C7FBEDC619864656A47083D6F81915F3452F5B74E5776CFAE3AEA9087 |
 | rv6-d011-wholesale-unique-true-text-2.0.png | 161EFB73C2F8CA944BCDDE03B670F7DBD7494A54CD05C90B69BD6C7F45F20D7B |
 | screen-regression.log | 370DC9503D123E6736447C30FB6D93C7E188740CCEDD4491DD1C5D4187123C88 |
+
+## RV6-D012 local qualification - 2026-09-14
+
+- Scope: original423/428 closed Pet Family Store View all count claimed4available products while cards rejected ordering. Startb46c582bc747c15576f8349b0c2fd144d452f02b; prior D011 clean/live-equal, handoff passed. Source apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart and test apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart already owned; no owner/governance/backend changes.
+- Full Store header now says count plus product/products listed using neutral muted color, not green availability styling. Product array/count, status, orderability, Add and navigation wiring unchanged. Paged catalogue uses its existing separate identity/search header and did not contain this available-products claim.
+- Six focused cases open actual Product->Pet Family Store->View all at360x800/100and200% text with all-closed, all-open or mixed provider fixtures. Assert exact neutral4products listed, no available-products text, blocked/open cat-food card action as appropriate, no exceptions, and Android Back preserving Store/product/cart context. Initial expected-copy test failed before correction (55e2b0 terminal1).
+- Local dependency found on the required closed-Store setup path: after count correction,200% closed case failed with111px horizontal overflow, five other cases passed (94161 terminal1/c8e2dc). Diagnostic preserved original Flutter error handler and identified existing _PublicStoreTruthPanel status Row at catalogue6261 (31495 terminal1/afd7c8), separate from the count label. It had no width constraint for Closed/next-opening text. Minimal within-owner prerequisite: wrap only that Text in Flexible; preserve wording, opening time, status visibility and availability behavior. Added complete RenderParagraph/no-width-overflow assertion before View all. This is recorded explicitly as D012 affected setup qualification work, not attributed falsely to the count text change, not a broad audit or hidden new feature.
+- Six passed after status wrapping (11023 terminal0/f9287e). Final test version adds pre-View-all status captures; no diagnostic/error suppression remains. Final capture run6passed/0failures,30090 terminal0/7f814d, final-focused.log. Final analysis of two Dart owners zero issues (697601 terminal0). Only D012 fixture/tests formatted; previous tests preserved. Diff check passed.
+- Connected affected suite: flutter test --no-pub test/ui_v2/buy/buy_v2_partner_catalogue_test.dart --reporter expanded;76passed/0failures,66766 terminal0/1b36c1, store-regression.log. Covers full/paged Store catalogues, compact fit, Cart, supplier/brand scoping, collection branches and Back. These76 plus final6 are82distinct local checks; prior six runs overlap.
+- Four qualified/ Flutter captures reviewed: closed status before View all and full listing count at100/200%. Status wraps completely, count remains neutral and closed cards keep information instead of Add. Media placeholders and other incidental card content are not qualified by this count/status review. Earlier root/final captures retained as preliminary evidence; qualified/ is final visual set.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d012-local-20260914. No device/APK/build/install/closure or child implementation. Original423/428 plus affected closed-status setup must pass successor Redmi APK verification. Frozen514 passed records/1177 evidence artifacts preserved.
+
+| Artifact | SHA256 |
+| --- | --- |
+| final/rv6-d012-closed-store-count-text-1.0.png | 4B28FD5851D38FC689B1B60E81A44A6B5DF1B8254F05AB62CCA3B98D2F97D9E6 |
+| final/rv6-d012-closed-store-count-text-2.0.png | 2D80835979AE8424A56AF15078EBE9E06AEAC9F0D06E7AE5775880451874420D |
+| final-focused.log | 9D2109873DE2008D532251847868E3993A1C33024AB94925882DB2C462B4E478 |
+| qualified/rv6-d012-closed-status-text-1.0.png | 691949341142E1E9A907FD0928833FC57889AA1264C511BE5EC088C86ED4BAA6 |
+| qualified/rv6-d012-closed-status-text-2.0.png | 97C61F62E16A840B229DE728345F20A1E751495ACAB415B31610B3C6AFA63671 |
+| qualified/rv6-d012-closed-store-count-text-1.0.png | 4B28FD5851D38FC689B1B60E81A44A6B5DF1B8254F05AB62CCA3B98D2F97D9E6 |
+| qualified/rv6-d012-closed-store-count-text-2.0.png | 2D80835979AE8424A56AF15078EBE9E06AEAC9F0D06E7AE5775880451874420D |
+| rv6-d012-closed-store-count-text-1.0.png | 4B28FD5851D38FC689B1B60E81A44A6B5DF1B8254F05AB62CCA3B98D2F97D9E6 |
+| store-regression.log | 5200D4A005D0CC0406F39E4A20F4E7EABFFF73E15C5F6BE9142B70DB9DDECFEA |

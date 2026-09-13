@@ -6267,11 +6267,13 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
                                   size: 15,
                                 ),
                                 const SizedBox(width: 4),
-                                Text(
-                                  statusLabel,
-                                  style: context.buyMeta.copyWith(
-                                    color: statusColor,
-                                    fontWeight: FontWeight.w900,
+                                Flexible(
+                                  child: Text(
+                                    statusLabel,
+                                    style: context.buyMeta.copyWith(
+                                      color: statusColor,
+                                      fontWeight: FontWeight.w900,
+                                    ),
                                   ),
                                 ),
                               ],
@@ -6915,9 +6917,9 @@ Future<String?> _showBuyV2FullStoreCatalogue(
                                     ),
                                   ),
                                   Text(
-                                    '${_sellerTypeLabel(current.sellerType)} · ${products.length} available products',
+                                    '${_sellerTypeLabel(current.sellerType)} · ${products.length} ${products.length == 1 ? 'product' : 'products'} listed',
                                     style: sheetContext.buyMeta.copyWith(
-                                      color: BuyV2Colors.green,
+                                      color: BuyV2Colors.muted,
                                       fontWeight: FontWeight.w900,
                                     ),
                                   ),

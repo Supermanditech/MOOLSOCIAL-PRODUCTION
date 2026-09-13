@@ -128,6 +128,23 @@ class _D011SupplierDetailsAdapter implements BuyV2ProductContentAdapter {
   }
 }
 
+class _D012StoreFactsAdapter implements BuyV2ProductFactsAdapter {
+  const _D012StoreFactsAdapter(this.mode);
+  final String mode;
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) {
+    final closed =
+        mode == 'closed' || (mode == 'mixed' && product.id == 's-cat-food');
+    return const BuyV2CatalogueProductFactsAdapter()
+        .snapshotFor(product)
+        .copyWith(
+          storeOperatingState: closed
+              ? BuyV2StoreOperatingState.closed
+              : BuyV2StoreOperatingState.open,
+        );
+  }
+}
+
 class _R5ScreenArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
   Future<bool> prepare() async => true;
@@ -9983,6 +10000,109 @@ void main() {
     );
     expect(tester.takeException(), isNull);
   });
+
+  for (final mode in ['closed', 'open', 'mixed']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('RV6 D012 full Store count is listings $mode text $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(360, 800);
+        addTearDown(tester.view.reset);
+        final session = BuyV2Session(
+          core: BuySession(),
+          productFactsAdapter: _D012StoreFactsAdapter(mode),
+        );
+        await tester.pumpWidget(
+          app(session, textScale: scale, disableAnimations: true),
+        );
+        await tester.pumpAndSettle();
+        expect(session.openProduct('s-dog-food'), isTrue);
+        await tester.pumpAndSettle();
+        final storeAction = find.byKey(
+          const ValueKey('buy-shop-seller-action-s-dog-food'),
+        );
+        await tester.scrollUntilVisible(
+          storeAction,
+          180,
+          scrollable: scrollableWithin(
+            const PageStorageKey('buy-product-s-dog-food'),
+          ).first,
+        );
+        await tester.tap(storeAction);
+        await tester.pumpAndSettle();
+        if (mode == 'closed') {
+          final status = find.byKey(const ValueKey('buy-public-store-status'));
+          final statusText = find.descendant(
+            of: status,
+            matching: find.byType(Text),
+          );
+          expect(
+            tester.renderObject<RenderParagraph>(statusText).didExceedMaxLines,
+            isFalse,
+          );
+          expect(
+            tester.getRect(statusText).right,
+            lessThanOrEqualTo(tester.getRect(status).right),
+          );
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(tester, 'rv6-d012-closed-status-text-$scale');
+        }
+        final more = find.byKey(
+          const ValueKey('buy-shop-seller-view-more-s-dog-food'),
+        );
+        await tester.ensureVisible(more);
+        await tester.tap(more);
+        await tester.pumpAndSettle();
+        final full = find.byKey(
+          const ValueKey('buy-shop-seller-full-catalogue-list'),
+        );
+        expect(full, findsOneWidget);
+        final count = find.descendant(
+          of: full,
+          matching: find.text('Retailer · 4 products listed'),
+        );
+        expect(count, findsOneWidget);
+        expect(
+          find.descendant(
+            of: full,
+            matching: find.textContaining('available products'),
+          ),
+          findsNothing,
+        );
+        expect(
+          tester.widget<Text>(count).style!.color,
+          isNot(BuyV2Colors.green),
+        );
+        final blocked = find.descendant(
+          of: full,
+          matching: find.byKey(const ValueKey('buy-review-offer-s-cat-food')),
+        );
+        final add = find.descendant(
+          of: full,
+          matching: find.byKey(const ValueKey('buy-add-s-cat-food')),
+        );
+        expect(blocked, mode == 'open' ? findsNothing : findsOneWidget);
+        expect(add, mode == 'open' ? findsOneWidget : findsNothing);
+        expect(tester.takeException(), isNull);
+        if (mode == 'closed') {
+          await captureR66Visual(
+            tester,
+            'rv6-d012-closed-store-count-text-$scale',
+          );
+        }
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-shop-seller-sheet-s-dog-food')),
+          findsOneWidget,
+        );
+        expect(session.cartLines, isEmpty);
+        expect(session.selectedProductId, 's-dog-food');
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
 
   testWidgets('closed store preserves truth and blocks unavailable Add', (
     tester,

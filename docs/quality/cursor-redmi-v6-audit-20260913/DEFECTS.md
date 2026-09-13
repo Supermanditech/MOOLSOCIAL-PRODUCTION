@@ -127,6 +127,7 @@ Source corroboration: buy_v2_views.dart3877-3910 suppresses identical content on
 
 
 ## RV6-D012 - Store listing count is labelled available despite non-orderable products
+- Local implementation qualified 2026-09-14: full Store count now says products listed in neutral text, with singular/plural wording; product availability/Add restrictions unchanged. Required closed-Store setup at200% exposed a111px status-badge overflow; its label now wraps without truncating status or changing rules. Six closed/open/mixed100/200% cases and76 Store catalogue regressions pass; analysis zero issues; four final Flutter captures reviewed. Original Redmi423/428 and affected closed-status setup remain pending successor-APK qualification; status remains open.
 Status: open. Severity: minor customer-copy inconsistency. Redmi TG8HCYTGGQT885OF;UAW-CURSOR-REDMI-V6-REVIEW-20260913.
 Reproduction: closed Pet Family Store423;View all428. Header says Retailer - 4 available products in green while all four cards say Store closed and expose information instead of Add. Count describes listed products,not current orderability. Closed state and purchase restriction remain correctly enforced.
 Expected: use neutral listing count or distinguish listed from currently orderable products;do not label total listings available when current facts reject ordering.
