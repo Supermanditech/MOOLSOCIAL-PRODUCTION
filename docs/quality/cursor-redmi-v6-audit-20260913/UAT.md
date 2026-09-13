@@ -454,3 +454,9 @@ Enumerated top-level screen/catalogue/views classes and sheet entry points as so
 Physical651-659 reviewed. Nextpromotion652 showsmanufacturer580/10kgMOQ2;Previous653 restoresretail37/500g;firstboundarytap654unchanged. Add655creates1/37;cart656exacttomatoSKU1/500g/MoolMarket000001. Back657restoresOffers andquantity. Removedtestline;658Addrestored/no cart. FooterRefresh659settledtop/firstpromotion;notproviderrevisionpass. Fivepasses andoneobservation;no newdefect/closure. Lastpromotionboundary andcataloguepagecontrols remainunqualified.
 
 659 physicalcaptures;661 evidencerows;421 actionrows;61 publicmappings;16 defects. No originalsaved/addressmutation;cartempty. Completeaudit remainsopen. Founder overnightstatus answered using Git timestampwindow10h24m:68commits throughd2ce7ecb at timeofquery;not duration/performance proof.
+
+## Round 68 - collection-order conditional inventory
+
+Source-only reconciliation of buy_v2_views.dart 10794-11250 expands the earlier capture275 signed-out collection boundary into eight explicit descendants in COLLECTION-ROUND68-01 through 08: return context, scan eligibility, close camera, QR reconciliation, lifecycle/account isolation, order help, purchased lines/receipt, and terminal/status transitions. All eight remain blocked_authentication, not device passes or new confirmed defects. An authorised authenticated non-live collection fixture and provider are needed; no real claim/payment/transaction was performed. Existing COLLECTION-ROUND18-05 remains the parent boundary, so row counts are not distinct defect counts.
+
+429 action rows; 659 physical captures unchanged; 16 distinct confirmed defects unchanged. No product, device, APK or user-data mutation. Complete source-derived enumeration and final handoff remain unfinished.
