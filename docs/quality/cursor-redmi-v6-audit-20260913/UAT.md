@@ -1610,3 +1610,8 @@ Source apps/mobile/lib/features/chat/screens/chat_inbox_screen.dart SHA256 E9BCB
 | CHAT-INBOX-A13 | 1260;1278;1290;1300 | Pin / attention / read / archive | Distinct state changes; original user conversation states preserved; isolate before execution |
 | CHAT-INBOX-A14 | 1403;1409 | Empty state Open Feed / Start conversation | Forwarded boundary actions A07/A04; no extra journey count |
 | CHAT-INBOX-A15 | 662;1492 | Load failure Try again | One provider retry path; unavailable/error fixture not a successful live refresh |
+
+
+## Round 117 - physical Shop Chat filters and return
+
+Captures836-846: Shop rail Chat opens shared inbox after transition; Unread shows Fresh Basket unread1, People empty state, Clear search restores All, Business shows Metro Wholesale, Orders Fresh Basket, Support two support threads, All restores four. Toolbar Back restores Scheduled Shop/Saved1/empty basket. Nine device-pass action records plus one wording observation: no-query People filter recovery says Clear search but works. No conversation opened, marked read, archived, pinned, messaged or otherwise modified. CHAT-INBOX-A12 all six visible filter chips and A09 no-query filter reset qualified for this fixture; search-query reset, other filters/data and menu actions remain pending. Totals846 captures,848 evidence rows,521 journey records,421 passing records,15 device observations,17 defects. Full audit remains incomplete.
