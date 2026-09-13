@@ -1803,3 +1803,10 @@ Five device passes added;578 action/check rows,469 device passes,20 confirmed de
 Re-read JOURNEYS INVENTORY-ROUND28-10/11 and exact source views9322/9335;re-inspected captures385/386/387/389. They prove exact address-recovery Change address/chooser cancellation and Return to Checkout for the warm declared-link scenario with retained Work and basket. Updated SRC0361/0362;retain explicit unqualified actual serviceability failure,changed-address validation and provider-generated recovery. Do not add duplicate pass rows for this reconciliation.
 
 SRC0180 corrected from unverified to existing RV6-D019 round131 exact Minimize failure;other compact tracker targets and timer conditions remain separate. Three stale inventory labels resolved;no device actions,new captures,new defects or implementation this round. Counts remain578 action/check rows,469 passes,20 defects. Full unique journey denominator and audit remain incomplete.
+
+
+## Round 141 - Shopping settings address selection and restoration
+
+Physical Redmi captures 983-986 qualify ADDR-ROUND141-01. From the original Work-selected saved-address sheet, Home selection returned to Shopping settings showing Sardarpura / 342003. Reopening retained Home selected. Selecting Work returned to settings showing Basni / 342005, restoring the original preference. Paytm remained unchanged; no address was added, edited or deleted. This is one connected action check, not four journeys. No new defect; total distinct defects remains 20. Checkout-origin selection and process-death persistence are not qualified by this settings-origin check.
+
+Catalogue inventory reconciliation resumed with SRC-0001 through SRC-0024: the exact footer area tap (SRC-0016), keyboard submit/minimum query case (SRC-0021), and promotion final boundary (SRC-0009) remain concrete pending device checks. Source-only and provider branches remain separate. No exhaustive journey denominator is claimed. Bounded recovery of the prior truncated inventory read used 12-row pages; no unseen output was used as evidence.

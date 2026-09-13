@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 578,
+    "recordedActionRows": 579,
     "dispositions": {
       "device_observation": 18,
-      "device_pass": 469,
+      "device_pass": 470,
       "blocked_provider": 27,
       "device_failure": 22,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 982,
-    "evidenceRows": 984,
+    "physicalCaptures": 986,
+    "evidenceRows": 988,
     "publicDataRows": 69,
     "confirmedDistinctDefects": 20,
     "countsAreExhaustiveDenominator": false
@@ -97,7 +97,7 @@
   "preservation": {
     "cart": "Empty restored951 after isolated wheat1/279;Scheduled Saved1;Work and Paytm retained;GST off",
     "savedShop": "original wheat count1 retained650;Saved/Scheduled active after module reentry",
-    "addresses": "Original Home/Work retained;isolated round57 address removed;Work selected598",
+    "addresses": "Original Home/Work retained; settings selection Home then Work restored986; no add/edit/delete; Paytm retained",
     "noNewApk": true,
     "noProductEdits": true,
     "chatPreviews": "Original OFF restored; four original inbox snippets, pin and unread1 retained883; Buy Scheduled Saved1 emptycart884"
@@ -108,5 +108,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 140
+  "latestAuditRound": 141
 }
