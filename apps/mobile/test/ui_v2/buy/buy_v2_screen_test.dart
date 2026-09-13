@@ -7,6 +7,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moolsocial/app/moolsocial_app.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
@@ -9403,6 +9404,203 @@ void main() {
     expect(find.textContaining('Shree Balaji Fresh'), findsWidgets);
     expect(tester.takeException(), isNull);
   });
+
+  final d014Cases = [
+    for (final id in ['s-dog-food', 'w-notebook'])
+      for (final overlay in ['store', 'other-open', 'other-return', 'full'])
+        for (final scale in [1.0, 2.0])
+          (id: id, overlay: overlay, scale: scale, orderId: 'MS-240782'),
+    for (final scale in [1.0, 2.0])
+      (
+        id: 's-dog-food',
+        overlay: 'full',
+        scale: scale,
+        orderId: 'missing-order',
+      ),
+    (id: 's-dog-food', overlay: 'opening', scale: 1.0, orderId: 'MS-240782'),
+  ];
+  for (final entry in d014Cases) {
+    testWidgets(
+      'RV6 D014 warm order link ${entry.id} ${entry.overlay} ${entry.orderId} text ${entry.scale}',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        tester.platformDispatcher.textScaleFactorTestValue = entry.scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final journey = JourneySession(
+          store: MemoryJourneyStore(
+            snapshot: const JourneySnapshot(
+              languageCode: 'en',
+              areaMode: 'manual',
+              areaLabel: 'Sardarpura',
+              setupComplete: true,
+            ),
+          ),
+          otpGateway: ReviewOtpGateway(signedIn: true),
+        );
+        addTearDown(journey.dispose);
+        await journey.start();
+        final shop = entry.id.startsWith('s-');
+        final destination = shop ? 'shop' : 'wholesale';
+        await tester.pumpWidget(
+          r66VisualCaptureRoot(
+            MoolSocialApp(
+              session: journey,
+              initialLocation: '/app/buy?sub=$destination',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final session = tester
+            .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+            .session;
+        expect(session.addProduct('s-milk'), isTrue);
+        session.toggleSaved('s-milk');
+        final addressId = session.selectedAddress.id;
+        expect(session.openProduct(entry.id), isTrue);
+        await tester.pumpAndSettle();
+        final storeAction = find.byKey(
+          ValueKey(
+            '${shop ? 'buy-shop-seller-action' : 'buy-wholesale-store-action'}-${entry.id}',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          storeAction,
+          220,
+          scrollable: scrollableWithin(
+            PageStorageKey('buy-product-${entry.id}'),
+          ),
+        );
+        await Scrollable.ensureVisible(
+          tester.element(storeAction),
+          alignment: .5,
+        );
+        await tester.pumpAndSettle();
+        expect(storeAction.hitTestable(), findsOneWidget);
+        await tester.tap(storeAction);
+        if (entry.overlay == 'opening') {
+          await tester.pump(const Duration(milliseconds: 16));
+        } else {
+          await tester.pumpAndSettle();
+        }
+        final prefix = shop ? 'buy-shop-seller' : 'buy-wholesale-supplier';
+        final storeSheet = find.byKey(ValueKey('$prefix-sheet-${entry.id}'));
+        expect(storeSheet, findsOneWidget);
+        final visitedStoreIds = <String>{entry.id};
+        if (entry.overlay.startsWith('other-')) {
+          final other = session
+              .otherStorePreviewsFor(session.product(entry.id))
+              .first;
+          visitedStoreIds.add(other.id);
+          final otherCard = find.byKey(
+            ValueKey('$prefix-other-store-${other.id}'),
+          );
+          await tester.scrollUntilVisible(
+            otherCard, 220,
+            scrollable: scrollableWithin(ValueKey('$prefix-sheet-list')),
+          );
+          await tester.ensureVisible(otherCard);
+          await tester.pumpAndSettle();
+          expect(otherCard.hitTestable(), findsOneWidget);
+          await tester.tap(otherCard);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('$prefix-sheet-${other.id}')),
+            findsOneWidget,
+          );
+          if (entry.overlay == 'other-return') {
+            await tester.binding.handlePopRoute();
+            await tester.pumpAndSettle();
+            expect(storeSheet, findsOneWidget);
+          }
+        } else if (entry.overlay == 'full') {
+          final more = find.byKey(ValueKey('$prefix-view-more-${entry.id}'));
+          await tester.ensureVisible(more);
+          await tester.tap(more);
+          await tester.pumpAndSettle();
+          expect(
+            find.byKey(ValueKey('$prefix-full-catalogue-list')),
+            findsOneWidget,
+          );
+        }
+        final savedIds = session
+            .savedProductsFor(BuyV2Destination.shop)
+            .map((p) => p.id)
+            .toList();
+        expect(session.isSaved('s-milk'), isTrue);
+        var linkReplyReceived = false;
+        final linkDelivery = tester.binding.defaultBinaryMessenger
+            .handlePlatformMessage(
+              SystemChannels.navigation.name,
+              SystemChannels.navigation.codec.encodeMethodCall(
+                MethodCall('pushRouteInformation', {
+                  'location':
+                      'https://moolsocial.com/app/buy/order/${entry.orderId}',
+                  'state': null,
+                }),
+              ),
+              (_) => linkReplyReceived = true,
+            );
+        await tester.pumpAndSettle();
+        expect(linkReplyReceived, isTrue);
+        await linkDelivery;
+        expect(tester.takeException(), isNull);
+        expect(find.byType(ErrorWidget), findsNothing);
+        for (final id in visitedStoreIds) {
+          expect(find.byKey(ValueKey('$prefix-sheet-$id')), findsNothing);
+        }
+        expect(
+          find.byKey(ValueKey('$prefix-full-catalogue-list')),
+          findsNothing,
+        );
+        expect(
+          tester.widget<BuyV2Screen>(find.byType(BuyV2Screen)).session,
+          same(session),
+        );
+        final missingOrder = entry.orderId == 'missing-order';
+        if (missingOrder) {
+          expect(find.text('This order could not be found.'), findsOneWidget);
+          expect(find.byKey(const Key('buy-order-tracking')), findsNothing);
+        } else {
+          expect(
+            find.byKey(PageStorageKey('buy-tracking-${entry.orderId}')),
+            findsOneWidget,
+          );
+          expect(session.view, BuyV2View.tracking);
+        }
+        expect(session.quantityFor('s-milk'), 1);
+        expect(
+          session.savedProductsFor(BuyV2Destination.shop).map((p) => p.id),
+          unorderedEquals(savedIds),
+        );
+        expect(session.selectedAddress.id, addressId);
+        if ((shop && entry.overlay == 'other-return') ||
+            missingOrder ||
+            (!shop && entry.overlay == 'full')) {
+          await captureR66Visual(
+            tester,
+            'rv6-d014-${entry.id}-${entry.overlay}-${entry.orderId}-text-${entry.scale}',
+          );
+        }
+        if (missingOrder) {
+          await tester.tap(find.byKey(const ValueKey('moolsocial-family-root-buy-tap')));
+        } else {
+          await tester.binding.handlePopRoute();
+        }
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('buy-v2-screen')), findsOneWidget);
+        expect(find.byType(ErrorWidget), findsNothing);
+        expect(tester.takeException(), isNull);
+        expect(session.quantityFor('s-milk'), 1);
+        expect(
+          session.savedProductsFor(BuyV2Destination.shop).map((p) => p.id),
+          unorderedEquals(savedIds),
+        );
+        expect(session.selectedAddress.id, addressId);
+      },
+    );
+  }
 
   testWidgets('RV6 D013 Store return rejects a changed account context', (
     tester,

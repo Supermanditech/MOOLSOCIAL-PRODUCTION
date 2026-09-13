@@ -5469,6 +5469,7 @@ Future<void> showBuyV2PartnerCatalogue(
     duration: motion.duration ?? Duration.zero,
     reverseDuration: motion.reverseDuration ?? Duration.zero,
   );
+  ModalRoute<String>? sheetRoute;
   try {
     final selectedProductId = await showModalBottomSheet<String>(
       context: context,
@@ -5482,310 +5483,322 @@ Future<void> showBuyV2PartnerCatalogue(
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
       clipBehavior: Clip.antiAlias,
       transitionAnimationController: transitionController,
-      builder: (sheetContext) => AnimatedBuilder(
-        animation: session,
-        builder: (context, _) => FractionallySizedBox(
-          key: ValueKey('$ownerPrefix-route-${current.id}'),
-          heightFactor: 1,
-          child: SafeArea(
-            top: false,
-            child: Column(
-              children: [
-                Expanded(
-                  child: Semantics(
-                    key: ValueKey('$ownerPrefix-sheet-${current.id}'),
-                    container: true,
-                    scopesRoute: true,
-                    namesRoute: true,
-                    explicitChildNodes: true,
-                    label: title,
-                    child: BuyV2VerticalScrollIndicator(
-                      child: ListView(
-                        key: ValueKey('$ownerPrefix-sheet-list'),
-                        padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
-                        children: [
-                          Row(
-                            key: ValueKey('$ownerPrefix-sheet-header'),
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Container(
-                                width: 38,
-                                height: 38,
-                                decoration: BoxDecoration(
-                                  color: BuyV2Colors.softOrange,
-                                  borderRadius: BorderRadius.circular(12),
+      builder: (sheetContext) {
+        sheetRoute = ModalRoute.of<String>(sheetContext);
+        return AnimatedBuilder(
+          animation: session,
+          builder: (context, _) => FractionallySizedBox(
+            key: ValueKey('$ownerPrefix-route-${current.id}'),
+            heightFactor: 1,
+            child: SafeArea(
+              top: false,
+              child: Column(
+                children: [
+                  Expanded(
+                    child: Semantics(
+                      key: ValueKey('$ownerPrefix-sheet-${current.id}'),
+                      container: true,
+                      scopesRoute: true,
+                      namesRoute: true,
+                      explicitChildNodes: true,
+                      label: title,
+                      child: BuyV2VerticalScrollIndicator(
+                        child: ListView(
+                          key: ValueKey('$ownerPrefix-sheet-list'),
+                          padding: const EdgeInsets.fromLTRB(16, 10, 16, 18),
+                          children: [
+                            Row(
+                              key: ValueKey('$ownerPrefix-sheet-header'),
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  width: 38,
+                                  height: 38,
+                                  decoration: BoxDecoration(
+                                    color: BuyV2Colors.softOrange,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Icon(
+                                    brandOnly
+                                        ? Icons.sell_outlined
+                                        : Icons.storefront_outlined,
+                                    color: BuyV2Colors.navy,
+                                    size: 21,
+                                  ),
                                 ),
-                                child: Icon(
-                                  brandOnly
-                                      ? Icons.sell_outlined
-                                      : Icons.storefront_outlined,
-                                  color: BuyV2Colors.navy,
-                                  size: 21,
-                                ),
-                              ),
-                              const SizedBox(width: 9),
-                              Expanded(
-                                child: Material(
-                                  color: Colors.transparent,
-                                  child: InkWell(
-                                    key: canViewAll
-                                        ? ValueKey(
-                                            '$ownerPrefix-view-more-${current.id}',
-                                          )
-                                        : null,
-                                    onTap: canViewAll
-                                        ? () => unawaited(
-                                            openFullStoreCatalogue(
-                                              sheetContext,
-                                            ),
-                                          )
-                                        : null,
-                                    borderRadius: BorderRadius.circular(9),
-                                    child: ConstrainedBox(
-                                      constraints: const BoxConstraints(
-                                        minHeight: BuyV2Metrics.minimumTap,
-                                      ),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            title,
-                                            maxLines: 2,
-                                            overflow: TextOverflow.clip,
-                                            style: sheetContext.buyTitle
-                                                .copyWith(
-                                                  fontSize: 14,
-                                                  height: 1.08,
-                                                ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          if (canViewAll)
-                                            Row(
-                                              key: ValueKey(
-                                                '$ownerPrefix-view-more-visible-${current.id}',
-                                              ),
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                const Icon(
-                                                  Icons.grid_view_rounded,
-                                                  size: 13,
-                                                  color: BuyV2Colors.navy,
-                                                ),
-                                                const SizedBox(width: 4),
-                                                Flexible(
-                                                  child: Text(
-                                                    pagedPartner
-                                                        ? 'Browse all products'
-                                                        : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
-                                                    overflow: TextOverflow.clip,
-                                                    style: sheetContext.buyMeta
-                                                        .copyWith(
-                                                          color:
-                                                              BuyV2Colors.navy,
-                                                          height: 1,
-                                                          fontWeight:
-                                                              FontWeight.w900,
-                                                        ),
-                                                  ),
-                                                ),
-                                              ],
+                                const SizedBox(width: 9),
+                                Expanded(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      key: canViewAll
+                                          ? ValueKey(
+                                              '$ownerPrefix-view-more-${current.id}',
                                             )
-                                          else
+                                          : null,
+                                      onTap: canViewAll
+                                          ? () => unawaited(
+                                              openFullStoreCatalogue(
+                                                sheetContext,
+                                              ),
+                                            )
+                                          : null,
+                                      borderRadius: BorderRadius.circular(9),
+                                      child: ConstrainedBox(
+                                        constraints: const BoxConstraints(
+                                          minHeight: BuyV2Metrics.minimumTap,
+                                        ),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
                                             Text(
-                                              detail,
+                                              title,
                                               maxLines: 2,
                                               overflow: TextOverflow.clip,
-                                              style: sheetContext.buyMeta
-                                                  .copyWith(height: 1.08),
+                                              style: sheetContext.buyTitle
+                                                  .copyWith(
+                                                    fontSize: 14,
+                                                    height: 1.08,
+                                                  ),
                                             ),
-                                        ],
+                                            const SizedBox(height: 2),
+                                            if (canViewAll)
+                                              Row(
+                                                key: ValueKey(
+                                                  '$ownerPrefix-view-more-visible-${current.id}',
+                                                ),
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  const Icon(
+                                                    Icons.grid_view_rounded,
+                                                    size: 13,
+                                                    color: BuyV2Colors.navy,
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Flexible(
+                                                    child: Text(
+                                                      pagedPartner
+                                                          ? 'Browse all products'
+                                                          : '${products.length} ${current.destination == BuyV2Destination.wholesale ? 'packs' : 'products'} · View all',
+                                                      overflow:
+                                                          TextOverflow.clip,
+                                                      style: sheetContext
+                                                          .buyMeta
+                                                          .copyWith(
+                                                            color: BuyV2Colors
+                                                                .navy,
+                                                            height: 1,
+                                                            fontWeight:
+                                                                FontWeight.w900,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            else
+                                              Text(
+                                                detail,
+                                                maxLines: 2,
+                                                overflow: TextOverflow.clip,
+                                                style: sheetContext.buyMeta
+                                                    .copyWith(height: 1.08),
+                                              ),
+                                          ],
+                                        ),
                                       ),
                                     ),
                                   ),
                                 ),
-                              ),
-                              const SizedBox(width: 8),
-                              IconButton.outlined(
-                                key: ValueKey('$ownerPrefix-sheet-close'),
-                                onPressed: () =>
-                                    Navigator.of(sheetContext).pop(),
-                                tooltip: closeTooltip,
-                                style: IconButton.styleFrom(
-                                  minimumSize: const Size.square(
-                                    BuyV2Metrics.minimumTap,
+                                const SizedBox(width: 8),
+                                IconButton.outlined(
+                                  key: ValueKey('$ownerPrefix-sheet-close'),
+                                  onPressed: () =>
+                                      Navigator.of(sheetContext).pop(),
+                                  tooltip: closeTooltip,
+                                  style: IconButton.styleFrom(
+                                    minimumSize: const Size.square(
+                                      BuyV2Metrics.minimumTap,
+                                    ),
+                                    side: const BorderSide(
+                                      color: BuyV2Colors.line,
+                                    ),
                                   ),
-                                  side: const BorderSide(
-                                    color: BuyV2Colors.line,
-                                  ),
+                                  icon: const Icon(Icons.close_rounded),
                                 ),
-                                icon: const Icon(Icons.close_rounded),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 8),
-                          if (publicPartner) ...[
-                            _PublicStoreTruthPanel(
-                              product: current,
-                              facts: session.productFactsFor(current),
-                              now: session.catalogueNow,
-                              trust: storeTrust,
-                              fulfilmentLabels: storeFulfilment,
-                              onOrderForCollection: () {
-                                if (session.beginStoreCollection(current.id)) {
-                                  unawaited(
-                                    openFullStoreCatalogue(sheetContext),
-                                  );
-                                }
-                              },
-                              onAskStore: onAskStore == null
-                                  ? null
-                                  : () => Navigator.of(
-                                      sheetContext,
-                                    ).pop('ask-store:${current.id}'),
+                              ],
                             ),
                             const SizedBox(height: 8),
-                          ],
-                          if (pagedPartner)
-                            _PagedPublicStorePreview(
-                              session: session,
-                              product: current,
-                              onOpenProduct: (product) => unawaited(
-                                openStoreProduct(sheetContext, product),
+                            if (publicPartner) ...[
+                              _PublicStoreTruthPanel(
+                                product: current,
+                                facts: session.productFactsFor(current),
+                                now: session.catalogueNow,
+                                trust: storeTrust,
+                                fulfilmentLabels: storeFulfilment,
+                                onOrderForCollection: () {
+                                  if (session.beginStoreCollection(
+                                    current.id,
+                                  )) {
+                                    unawaited(
+                                      openFullStoreCatalogue(sheetContext),
+                                    );
+                                  }
+                                },
+                                onAskStore: onAskStore == null
+                                    ? null
+                                    : () => Navigator.of(
+                                        sheetContext,
+                                      ).pop('ask-store:${current.id}'),
                               ),
-                            )
-                          else if (previewProducts.isEmpty)
-                            const _PublicStoreNoProductsState()
-                          else
-                            BuyV2ProgressiveProductGrid(
-                              session: session,
-                              products: previewProducts,
-                              storageKey:
-                                  '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
-                              semanticLabel:
-                                  '${brandOnly ? current.brand : current.seller} product catalogue',
-                              laneCount: 1,
-                              storeContext: !brandOnly,
-                              onOpenProduct: (product) => unawaited(
-                                openStoreProduct(sheetContext, product),
+                              const SizedBox(height: 8),
+                            ],
+                            if (pagedPartner)
+                              _PagedPublicStorePreview(
+                                session: session,
+                                product: current,
+                                onOpenProduct: (product) => unawaited(
+                                  openStoreProduct(sheetContext, product),
+                                ),
+                              )
+                            else if (previewProducts.isEmpty)
+                              const _PublicStoreNoProductsState()
+                            else
+                              BuyV2ProgressiveProductGrid(
+                                session: session,
+                                products: previewProducts,
+                                storageKey:
+                                    '$ownerPrefix-catalogue-${brandOnly ? current.brand : current.seller}',
+                                semanticLabel:
+                                    '${brandOnly ? current.brand : current.seller} product catalogue',
+                                laneCount: 1,
+                                storeContext: !brandOnly,
+                                onOpenProduct: (product) => unawaited(
+                                  openStoreProduct(sheetContext, product),
+                                ),
                               ),
-                            ),
-                          if (otherStores.isNotEmpty) ...[
-                            const SizedBox(height: 10),
-                            Text(
-                              'Other stores',
-                              style: sheetContext.buyTitle.copyWith(
-                                fontSize: 11.5,
-                                height: 1.08,
+                            if (otherStores.isNotEmpty) ...[
+                              const SizedBox(height: 10),
+                              Text(
+                                'Other stores',
+                                style: sheetContext.buyTitle.copyWith(
+                                  fontSize: 11.5,
+                                  height: 1.08,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              'Swipe for more relevant stores and delivery options',
-                              style: sheetContext.buyMeta.copyWith(
-                                fontSize: 8.5,
-                                height: 1.08,
+                              const SizedBox(height: 2),
+                              Text(
+                                'Swipe for more relevant stores and delivery options',
+                                style: sheetContext.buyMeta.copyWith(
+                                  fontSize: 8.5,
+                                  height: 1.08,
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 6),
-                            SingleChildScrollView(
-                              key: ValueKey('$ownerPrefix-other-stores'),
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  for (
-                                    var index = 0;
-                                    index < otherStores.length;
-                                    index++
-                                  )
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        right: index == otherStores.length - 1
-                                            ? 0
-                                            : 8,
-                                      ),
-                                      child: BuyV2CinematicCardReveal(
-                                        stateKey:
-                                            '$ownerPrefix-other-store-${otherStores[index].id}-motion',
-                                        delay: Duration(
-                                          milliseconds: index * 90,
+                              const SizedBox(height: 6),
+                              SingleChildScrollView(
+                                key: ValueKey('$ownerPrefix-other-stores'),
+                                scrollDirection: Axis.horizontal,
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    for (
+                                      var index = 0;
+                                      index < otherStores.length;
+                                      index++
+                                    )
+                                      Padding(
+                                        padding: EdgeInsets.only(
+                                          right: index == otherStores.length - 1
+                                              ? 0
+                                              : 8,
                                         ),
-                                        child: _RelatedStoreCard(
-                                          key: ValueKey(
-                                            '$ownerPrefix-other-store-${otherStores[index].id}',
+                                        child: BuyV2CinematicCardReveal(
+                                          stateKey:
+                                              '$ownerPrefix-other-store-${otherStores[index].id}-motion',
+                                          delay: Duration(
+                                            milliseconds: index * 90,
                                           ),
-                                          product: otherStores[index],
-                                          branchAddress:
-                                              otherStores[index].storeId == null
-                                              ? null
-                                              : session
-                                                        .catalogueStore(
-                                                          otherStores[index]
-                                                              .storeId!,
-                                                        )
-                                                        ?.address ??
-                                                    otherStores[index].origin,
-                                          onTap: () {
-                                            onStoreChanged?.call(
-                                              otherStores[index],
-                                            );
-                                            unawaited(
-                                              showBuyV2PartnerCatalogue(
-                                                sheetContext,
-                                                session,
+                                          child: _RelatedStoreCard(
+                                            key: ValueKey(
+                                              '$ownerPrefix-other-store-${otherStores[index].id}',
+                                            ),
+                                            product: otherStores[index],
+                                            branchAddress:
+                                                otherStores[index].storeId ==
+                                                    null
+                                                ? null
+                                                : session
+                                                          .catalogueStore(
+                                                            otherStores[index]
+                                                                .storeId!,
+                                                          )
+                                                          ?.address ??
+                                                      otherStores[index].origin,
+                                            onTap: () {
+                                              onStoreChanged?.call(
                                                 otherStores[index],
-                                                onAskStore: (storeProduct) =>
-                                                    Navigator.of(
-                                                      sheetContext,
-                                                    ).pop(
-                                                      'ask-store:${storeProduct.id}',
-                                                    ),
-                                                onOpenProduct: onOpenProduct,
-                                                onStoreChanged: onStoreChanged,
-                                                onOpenStoreCart:
-                                                    onOpenStoreCart,
-                                                onOpenCart: () => Navigator.of(
+                                              );
+                                              unawaited(
+                                                showBuyV2PartnerCatalogue(
                                                   sheetContext,
-                                                ).pop('cart:'),
-                                              ),
-                                            );
-                                          },
+                                                  session,
+                                                  otherStores[index],
+                                                  onAskStore: (storeProduct) =>
+                                                      Navigator.of(
+                                                        sheetContext,
+                                                      ).pop(
+                                                        'ask-store:${storeProduct.id}',
+                                                      ),
+                                                  onOpenProduct: onOpenProduct,
+                                                  onStoreChanged:
+                                                      onStoreChanged,
+                                                  onOpenStoreCart:
+                                                      onOpenStoreCart,
+                                                  onOpenCart: () =>
+                                                      Navigator.of(
+                                                        sheetContext,
+                                                      ).pop('cart:'),
+                                                ),
+                                              );
+                                            },
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                ],
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                if (session.countForDestination(current.destination) > 0)
-                  BuyV2FiniteIncomingTransition(
-                    key: const ValueKey('buy-store-cart-entrance-motion'),
-                    stateKey: '$ownerPrefix-store-cart-${session.itemCount}',
-                    child: BuyV2StoreCartBar(
-                      session: session,
-                      destination: current.destination,
-                      onOpenCart: onOpenStoreCart == null
-                          ? () => Navigator.of(sheetContext).pop('cart:')
-                          : () => onOpenStoreCart(current),
+                  if (session.countForDestination(current.destination) > 0)
+                    BuyV2FiniteIncomingTransition(
+                      key: const ValueKey('buy-store-cart-entrance-motion'),
+                      stateKey: '$ownerPrefix-store-cart-${session.itemCount}',
+                      child: BuyV2StoreCartBar(
+                        session: session,
+                        destination: current.destination,
+                        onOpenCart: onOpenStoreCart == null
+                            ? () => Navigator.of(sheetContext).pop('cart:')
+                            : () => onOpenStoreCart(current),
+                      ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
-    if (!transitionController.isDismissed) {
-      await transitionController.reverse();
-    }
+    // The Navigator owns dismissal. A platform link can remove this route
+    // without a pop; reversing its animation again can finalize it twice.
+    // Wait for actual overlay removal before disposing our controller or
+    // opening the selected destination.
+    await sheetRoute?.completed;
     if (selectedProductId != null && context.mounted) {
       if (selectedProductId == 'cart:') {
         final openCart = onOpenCart;
