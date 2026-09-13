@@ -453,6 +453,8 @@ class _WorkWorkspaceDashboardScreenState
     extends State<WorkWorkspaceDashboardScreen> {
   WorkSession get session => widget.session;
   WorkProcurementController? _storeProcurement;
+  BuyV2Session? _observedProcurement;
+  String? _observedProcurementQuery;
   BuyV2Session get _activeProcurement =>
       _storeProcurement?.session ?? widget.procurementSession;
   final _workspaceMessengerKey = GlobalKey<ScaffoldMessengerState>();
@@ -519,6 +521,8 @@ class _WorkWorkspaceDashboardScreenState
     _searchController = TextEditingController(
       text: session.workspaceSearchQuery,
     );
+    _storeProcurement?.addListener(_observeProcurementQuery);
+    _observeProcurementQuery();
     final section = switch (widget.initialSection) {
       'orders' => _WorkspaceOperation.orders,
       'sell' => _WorkspaceOperation.counterOrder,
@@ -557,6 +561,8 @@ class _WorkWorkspaceDashboardScreenState
   @override
   void dispose() {
     session.removeListener(_procurementIdentityChanged);
+    _storeProcurement?.removeListener(_observeProcurementQuery);
+    _observedProcurement?.removeListener(_procurementQueryChanged);
     _storeProcurement?.dispose();
     _saleSearchController.dispose();
     _procurementRevealTimer?.cancel();
@@ -565,6 +571,33 @@ class _WorkWorkspaceDashboardScreenState
     _alertsScroll.dispose();
     _searchFocus.dispose();
     super.dispose();
+  }
+
+  void _observeProcurementQuery() {
+    final purchase = _activeProcurement;
+    if (identical(purchase, _observedProcurement)) return;
+    _observedProcurement?.removeListener(_procurementQueryChanged);
+    _observedProcurement = purchase;
+    _observedProcurementQuery = purchase.query;
+    purchase.addListener(_procurementQueryChanged);
+  }
+
+  void _procurementQueryChanged() {
+    final query = _observedProcurement?.query;
+    if (query == _observedProcurementQuery) return;
+    _observedProcurementQuery = query;
+    if (!mounted || _view != _WorkspaceControlView.procurement) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _view != _WorkspaceControlView.procurement) return;
+      final currentQuery = _activeProcurement.query;
+      if (_searchController.text != currentQuery) {
+        _searchController.value = TextEditingValue(
+          text: currentQuery,
+          selection: TextSelection.collapsed(offset: currentQuery.length),
+        );
+      }
+      setState(() {});
+    });
   }
 
   @override
@@ -1835,6 +1868,7 @@ class _WorkWorkspaceDashboardScreenState
     if (searchQuery != null) {
       _activeProcurement.updateQuery(searchQuery.trim());
     }
+    _searchController.text = _activeProcurement.query;
     setState(() {
       _trackedPurchase = null;
       _procurementReturnOperation = returnOperation;
@@ -2012,6 +2046,7 @@ class _WorkWorkspaceDashboardScreenState
       session.addListener(_procurementIdentityChanged);
     }
     _procurementIdentityChanged();
+    _observeProcurementQuery();
   }
 
   Future<void> _restoreProcurement() async {
@@ -2026,6 +2061,7 @@ class _WorkWorkspaceDashboardScreenState
       restoreOnly: true,
     );
     if (!mounted || !restored || !controller.scopeCurrent) return;
+    _searchController.text = _activeProcurement.query;
     setState(() {
       _procurementReturnOperation = _WorkspaceOperation.values
           .where((value) => value.name == controller.bookmark!.returnTo)

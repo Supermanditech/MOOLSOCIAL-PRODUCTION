@@ -17465,6 +17465,11 @@ void main() {
       await tester.tap(secondRestock);
       await tester.pumpAndSettle();
       expect(buy.query, 'Store Brand Daily grocery product 3 4 kg pack');
+      expect(
+        tester.widget<TextField>(search).controller!.text,
+        buy.query,
+        reason: 'The shared search field must show the newly opened stock product.',
+      );
       expect(buy.quantityFor(cartProduct.id), cartQuantity);
       expect(buy.selectedFilter, 'nearby');
       await captureStoreView(tester, 'restock-second-product-search-$scale');
@@ -17508,6 +17513,11 @@ void main() {
         findsNothing,
       );
       expect(tester.takeException(), isNull);
+      expect(
+        tester.widget<TextField>(search).controller!.text,
+        isEmpty,
+        reason: 'Clearing Restock search must also clear the visible shared field.',
+      );
       await captureStoreView(tester, 'restock-cleared-catalogue-$scale');
       expect(
         find.byKey(const ValueKey('buy-promotion-wholesale-shop')),
