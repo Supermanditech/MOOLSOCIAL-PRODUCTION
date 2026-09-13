@@ -1421,7 +1421,9 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-W
         'apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart',
         'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
-        'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart'
+        'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart',
+        'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart'
   )
   Assert-Coordination ($redmiClaim.Count -eq 1 -and $redmiClaim[0].role -ceq 'subagent' -and
     ((@($redmiClaim[0].owners | Sort-Object) -join '|') -ceq (@($redmiEvidenceOwners | Sort-Object) -join '|'))) 'Redmi operational claim changed.'
@@ -2340,61 +2342,61 @@ if ($ProductionLane -ceq 'baseline') {
     $r66OwnerAmendmentPending = $false
     $r665CollectionAdmissionPending = $false
     $r678PersistenceAdmissionPending = $false
-    # BEGIN founder D004 admission 20260914
+    # BEGIN founder D005 admission 20260914
     if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913') {
-      $d004Parent = 'e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa'
-      $d004Controls = @('config/codex-subagent-coordination-policy.json', 'scripts/check-codex-subagent-coordination-policy.ps1')
-      $d004Owners = @(
-        'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',
-        'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart'
+      $d005Parent = '2967bf188ffe6587a9f3e6409584ce3686504f60'
+      $d005Controls = @('config/codex-subagent-coordination-policy.json', 'scripts/check-codex-subagent-coordination-policy.ps1')
+      $d005Owners = @(
+        'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',
+        'apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart'
       )
       Assert-Coordination ($AgentRole -ceq 'subagent' -and $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and
         $ProductionLane -ceq 'cursor_ui' -and $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
-        $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and $branch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') 'D004 admission identity differs.'
-      $d004BeforeText = @(& git -C $root show "${d004Parent}:config/codex-subagent-coordination-policy.json")
-      Assert-Coordination ($LASTEXITCODE -eq 0) 'D004 admission parent policy missing.'
-      $d004Expected = ($d004BeforeText -join "`n") | ConvertFrom-Json
-      $d004ExpectedRoot = @($d004Expected.activeClaims | Where-Object task -ceq '/root')
-      $d004ExpectedClaim = @($d004Expected.activeClaims | Where-Object task -ceq '/root/cursor_redmi_v6_audit_20260913')
-      Assert-Coordination ($d004ExpectedRoot.Count -eq 1 -and $d004ExpectedClaim.Count -eq 1 -and $d004ExpectedClaim[0].owners.Count -eq 27) 'D004 original claims differ.'
-      $d004ExpectedRoot[0].owners = @($d004ExpectedRoot[0].owners | Where-Object { $_ -cnotin $d004Owners })
-      $d004ExpectedClaim[0].owners = @($d004ExpectedClaim[0].owners) + $d004Owners
-      Assert-Coordination (($d004Expected | ConvertTo-Json -Depth 100 -Compress) -ceq ($policy | ConvertTo-Json -Depth 100 -Compress)) 'D004 admission permits only the exact two-owner transfer.'
-      $d004Script = [IO.File]::ReadAllText((Join-Path $root $d004Controls[1])).Replace("`r`n", "`n")
-      $d004PriorLines = @(& git -C $root show "${d004Parent}:scripts/check-codex-subagent-coordination-policy.ps1")
-      Assert-Coordination ($LASTEXITCODE -eq 0) 'D004 prior checker missing.'
-      $d004PriorScript = ($d004PriorLines -join "`n") + "`n"
-      $d004PriorBlock = [regex]::Match($d004PriorScript, '(?ms)^    # BEGIN founder D003 admission 20260914\n.*?^    # END founder D003 admission 20260914\n')
-      Assert-Coordination $d004PriorBlock.Success 'D004 prior admission checkpoint missing.'
-      $d004CurrentBlock = [regex]::Match($d004Script, '(?ms)^    # BEGIN founder D004 admission 20260914\n.*?^    # END founder D004 admission 20260914\n')
-      Assert-Coordination $d004CurrentBlock.Success 'D004 exact admission block missing.'
-      $d004Stripped = $d004Script.Substring(0, $d004CurrentBlock.Index) + $d004PriorBlock.Value + $d004Script.Substring($d004CurrentBlock.Index + $d004CurrentBlock.Length)
-      $d004AddedText = ",`n        'apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart',`n        'apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart'"
-      $d004Stripped = $d004Stripped.Replace($d004AddedText, '')
-      $d004Hasher = [Security.Cryptography.SHA256]::Create()
-      try { $d004OriginalHash = [BitConverter]::ToString($d004Hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($d004Stripped))).Replace('-', '') } finally { $d004Hasher.Dispose() }
-      Assert-Coordination ($d004OriginalHash -ceq 'F0A61705FEE0F03F27034306A814412ED7DB7132739306A3FD2EB5BC01C2B2E2') 'D004 admission changed another existing checker rule.'
-      if ($head -ceq $d004Parent) {
-        $d004Dirty = @(Get-ProductionChangedOwners $head $head)
-        Assert-Coordination ((@($d004Dirty | Sort-Object) -join '|') -ceq (@($d004Controls | Sort-Object) -join '|')) 'D004 admission must contain only its two controls and no product edits.'
+        $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and $branch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') 'D005 admission identity differs.'
+      $d005BeforeText = @(& git -C $root show "${d005Parent}:config/codex-subagent-coordination-policy.json")
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'D005 admission parent policy missing.'
+      $d005Expected = ($d005BeforeText -join "`n") | ConvertFrom-Json
+      $d005ExpectedRoot = @($d005Expected.activeClaims | Where-Object task -ceq '/root')
+      $d005ExpectedClaim = @($d005Expected.activeClaims | Where-Object task -ceq '/root/cursor_redmi_v6_audit_20260913')
+      Assert-Coordination ($d005ExpectedRoot.Count -eq 1 -and $d005ExpectedClaim.Count -eq 1 -and $d005ExpectedClaim[0].owners.Count -eq 29) 'D005 original claims differ.'
+      $d005ExpectedRoot[0].owners = @($d005ExpectedRoot[0].owners | Where-Object { $_ -cnotin $d005Owners })
+      $d005ExpectedClaim[0].owners = @($d005ExpectedClaim[0].owners) + $d005Owners
+      Assert-Coordination (($d005Expected | ConvertTo-Json -Depth 100 -Compress) -ceq ($policy | ConvertTo-Json -Depth 100 -Compress)) 'D005 admission permits only the exact two-owner addition.'
+      $d005Script = [IO.File]::ReadAllText((Join-Path $root $d005Controls[1])).Replace("`r`n", "`n")
+      $d005PriorLines = @(& git -C $root show "${d005Parent}:scripts/check-codex-subagent-coordination-policy.ps1")
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'D005 prior checker missing.'
+      $d005PriorScript = ($d005PriorLines -join "`n") + "`n"
+      $d005PriorBlock = [regex]::Match($d005PriorScript, '(?ms)^    # BEGIN founder D004 admission 20260914\n.*?^    # END founder D004 admission 20260914\n')
+      Assert-Coordination $d005PriorBlock.Success 'D005 prior admission checkpoint missing.'
+      $d005CurrentBlock = [regex]::Match($d005Script, '(?ms)^    # BEGIN founder D005 admission 20260914\n.*?^    # END founder D005 admission 20260914\n')
+      Assert-Coordination $d005CurrentBlock.Success 'D005 exact admission block missing.'
+      $d005Stripped = $d005Script.Substring(0, $d005CurrentBlock.Index) + $d005PriorBlock.Value + $d005Script.Substring($d005CurrentBlock.Index + $d005CurrentBlock.Length)
+      $d005AddedText = ",`n        'apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart',`n        'apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart'"
+      $d005Stripped = $d005Stripped.Replace($d005AddedText, '')
+      $d005Hasher = [Security.Cryptography.SHA256]::Create()
+      try { $d005OriginalHash = [BitConverter]::ToString($d005Hasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($d005Stripped))).Replace('-', '') } finally { $d005Hasher.Dispose() }
+      Assert-Coordination ($d005OriginalHash -ceq '8DBBE73759009EDB7CB03E33275A1082EDCB83A8E95D1532536FC3CFDC824F1A') 'D005 admission changed another existing checker rule.'
+      if ($head -ceq $d005Parent) {
+        $d005Dirty = @(Get-ProductionChangedOwners $head $head)
+        Assert-Coordination ((@($d005Dirty | Sort-Object) -join '|') -ceq (@($d005Controls | Sort-Object) -join '|')) 'D005 admission must contain only its two controls and no product edits.'
       } else {
-        & git -C $root merge-base --is-ancestor $d004Parent $head
-        Assert-Coordination ($LASTEXITCODE -eq 0) 'D004 checkpoint ancestry missing.'
-        $d004Following = @(& git -C $root rev-list --first-parent --reverse "${d004Parent}..$head")
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and $d004Following.Count -gt 0) 'D004 admission commit missing.'
-        $d004Commit = [string]$d004Following[0]
-        $d004Parents = @(& git -C $root show -s --format=%P $d004Commit)
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and $d004Parents.Count -eq 1 -and $d004Parents[0] -ceq $d004Parent) 'D004 admission parent differs.'
-        $d004Subject = @(& git -C $root show -s --format=%s $d004Commit)
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and $d004Subject[0] -ceq 'ui(redmi-v6-audit-20260913): admit D004 profile source and test ownership') 'D004 admission subject differs.'
-        $d004Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $d004Commit)
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($d004Committed | Sort-Object) -join '|') -ceq (@($d004Controls | Sort-Object) -join '|')) 'D004 admission committed unrelated owners.'
-        & git -C $root diff --quiet $d004Commit -- @d004Controls
-        Assert-Coordination ($LASTEXITCODE -eq 0) 'D004 admission controls changed after sealing.'
+        & git -C $root merge-base --is-ancestor $d005Parent $head
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'D005 checkpoint ancestry missing.'
+        $d005Following = @(& git -C $root rev-list --first-parent --reverse "${d005Parent}..$head")
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $d005Following.Count -gt 0) 'D005 admission commit missing.'
+        $d005Commit = [string]$d005Following[0]
+        $d005Parents = @(& git -C $root show -s --format=%P $d005Commit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $d005Parents.Count -eq 1 -and $d005Parents[0] -ceq $d005Parent) 'D005 admission parent differs.'
+        $d005Subject = @(& git -C $root show -s --format=%s $d005Commit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $d005Subject[0] -ceq 'ui(redmi-v6-audit-20260913): admit D005 language source and test ownership') 'D005 admission subject differs.'
+        $d005Committed = @(& git -C $root diff-tree --no-commit-id --name-only -r $d005Commit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($d005Committed | Sort-Object) -join '|') -ceq (@($d005Controls | Sort-Object) -join '|')) 'D005 admission committed unrelated owners.'
+        & git -C $root diff --quiet $d005Commit -- @d005Controls
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'D005 admission controls changed after sealing.'
       }
-      $primaryEvidenceCoordinationOwnerKeys = @($d004Controls | ForEach-Object { $_.ToLowerInvariant() })
+      $primaryEvidenceCoordinationOwnerKeys = @($d005Controls | ForEach-Object { $_.ToLowerInvariant() })
     }
-    # END founder D004 admission 20260914
+    # END founder D005 admission 20260914
     if (
       $ProductionLane -ceq 'cursor_ui' -and
       $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and
