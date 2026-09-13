@@ -370,3 +370,9 @@ Next concrete gaps:monthly repeatedAdd and above/below target quantities with cl
 Physical Redmi captures 552-559 reviewed. Capture 554 is a transition, not the settled result; 555 confirms Recently viewed. Available wheat Add changes to Added (556), retains exactly one 5 kg SKU 2 from Mool Market 000001 at Rs279 in catalogue/cart (557-558). Cart minus removes only this isolated addition and returns to Scheduled Shop with empty cart and original Saved1 (559). Three narrow action passes; no new defect and no defect closure. D015 remains open for unavailable/closed-store Add behavior. Original addresses and saved product were not edited.
 
 Totals: 559 physical captures, 561 evidence rows including PDF/render, 365 action rows, 58 public-data mappings, 16 distinct defects. These are cumulative evidence counts, not an exhaustive coverage denominator. Monthly repeat/quantity tests, other remaining journeys and final field/action reconciliation remain pending. No product code, APK or policy changed.
+
+## Round 54 - Monthly basket target quantities and repeat Add
+
+Captures 560-570 inspected on Redmi. Empty Add gives 21 packs/Rs5145. Wheat increased from2 to3 and oil decreased from2 to1 yields 21packs/Rs4589. Re-Add restores only missing oil, preserves wheat3, and yields22packs/Rs5424. A further Add leaves this unchanged; cart verifies12products, wheat3/Rs837 and oil2/Rs1670. Confirmed removal clears only the isolated22Shopitems. Saved1 remains; original addresses untouched. Five device action passes; no new defect or closure.
+
+570 physical captures;572 evidence rows including PDF/render;370 action rows;58 data mappings;16 distinct defects. Complete action/data inventory remains unfinished. Partial basket failure requires an appropriate unavailable/revision fixture; host logic is not device qualification. No new APK or product changes.
