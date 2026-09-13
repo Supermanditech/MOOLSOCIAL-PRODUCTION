@@ -1190,7 +1190,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
               title: widget.publishedOffers
                   ? 'No matching offers'
                   : 'No matching products',
-              detail: 'Try another search, category or area.',
+              detail: widget.showAreaControl
+                  ? 'Try another search, category or area.'
+                  : 'Try another search or category.',
             ),
           if (products.isNotEmpty)
             _QuantityAwareGridLayout(

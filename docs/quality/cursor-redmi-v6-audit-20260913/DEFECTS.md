@@ -4,7 +4,7 @@ Only findings from installed candidate `UAW-CURSOR-REDMI-V6-REVIEW-20260913`, SH
 
 ## RV6-D001 — Store empty-search recovery recommends an unavailable area control
 
-- Status: open, confirmed device copy/navigation guidance defect. Severity: minor.
+- Status: open, confirmed device copy/navigation guidance defect. Severity: minor. Locally implemented and qualified14September2026;successor-APK Redmi retest pending.
 - Journey: product → Visit store → Browse all products → Search this store → enter `zzzzzz`.
 - Actual: “No matching products. Try another search, category or area.” The Store-specific sheet offers search and categories, but no area selector. Its category sheet contains Store categories only.
 - Expected: recovery guidance should name actions available within this Store scope, such as changing/clearing the search or category. A shopper should not be directed to hunt for a nonexistent area control or leave the selected Store without explanation.
@@ -174,3 +174,8 @@ Reproduction: Scheduled Shop empty cart1037 -> Add wheat2 -> quantity edit/updat
 ## RV6-D022 - Shopping area chooser does not identify the selected area
 Status: open. Severity: minor selection/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
 Reproduction: original Any-area catalogue -> Shopping area1087 -> choose Jaipur ->1088 suppliers change to Mool Market000002;search milk1089 explicitly reports Jaipur. Clear active query and reopen Shopping area1090: Jaipur is an ordinary unmarked row, no active-city summary is shown, and the chooser looks the same as1087 before selection. The In this area chip marks a scope, not the selected city. Expected: identify active city/area (or Any area) in the chooser so a customer can verify the scope before choosing another supplier. Actual selection works; no claim of wrong filtering or lost address. Source catalogue1719-1743 renders ordinary Any area/area ListTiles with no selected indication. Different from provider lookup B001 and earlier address validation clipping. Tap Any area1091 restores original catalogue supplier000001 and saved wheat marker;Saved1 and emptycart preserved. No delivery-address edit, permission change or product implementation.
+
+
+### RV6-D001 local implementation qualification
+
+Area guidance now follows actual showAreaControl availability. Four focused regressions reproduce the old area-absent failure at normal/200% text and pass after correction;full search-recovery suite27passed;analysis zero issues;four actual Flutter component captures reviewed at320x568. See UAT.md RV6-D001 implementation section for owners,admission,results and artifact hashes. Original physical reproduction037-038 must be checked on the later successor APK before closure. This does not add a physical pass or close the defect. Founder authorized implementation of22 findings after the historical audit freeze;all original evidence remains retained.
