@@ -678,20 +678,20 @@ Source hashes bind the following index to the inspected files:
 | SRC-0075 | buy_v2_catalogue.dart:5104 | showBuyV2ShoppingAlerts | onPressed | blocked_provider live shopping-alert Retry/busy recovery unverified; fixture list not recovery evidence |
 | SRC-0076 | buy_v2_catalogue.dart:5138 | showBuyV2ShoppingAlerts | onTap | ALERT-ROUND48-02/03/04 destinations and Back pass; ROUND48-05 RV6-D016 remains; missing router conditional unverified |
 | SRC-0077 | buy_v2_catalogue.dart:5534 | showBuyV2PartnerCatalogue | onTap | STORE-002/009 browse all pass; availability heading RV6-D012 remains; separate disabled condition unverified |
-| SRC-0078 | buy_v2_catalogue.dart:5611 | showBuyV2PartnerCatalogue | onPressed | Store sheet X exact control remains pending reconciliation; Android Back STORE-ROUND37-05 is not X evidence |
+| SRC-0078 | buy_v2_catalogue.dart:5611 | showBuyV2PartnerCatalogue | onPressed | device_pass STORE-ROUND144-01; Store X restores wheat2; provider/accessibility/relaunch not inferred |
 | SRC-0079 | buy_v2_catalogue.dart:5729 | showBuyV2PartnerCatalogue | onTap | device_pass STORE-ROUND39-01/03/04 other Store navigation and return; horizontal position retained |
 | SRC-0080 | buy_v2_catalogue.dart:6070 | _PublicStoreTruthPanelState | onPressed | device_pass COLLECTION-ROUND18-02 entry; downstream sign-in boundary ROUND18-05 and ROUND68 remain blocked |
 | SRC-0081 | buy_v2_catalogue.dart:6099 | _PublicStoreTruthPanelState | onTap | device_pass STORE-ROUND37-03 collapse/expand Store header; live fulfilment truth unqualified |
 | SRC-0082 | buy_v2_catalogue.dart:6190 | _PublicStoreTruthPanelState | onTap | device_pass STORE-ROUND38-01/03 Store-only Chat and Back; shared Chat expansion RV6-D013 remains |
 | SRC-0083 | buy_v2_catalogue.dart:6422 | BuyV2StoreCartBar | onTap | Store cart Semantics tap shares pointer action; screen-reader activation unverified |
 | SRC-0084 | buy_v2_catalogue.dart:6434 | BuyV2StoreCartBar | onTap | device_pass STORE-008 basket rail opens; return/last-item RV6-D002 remains |
-| SRC-0085 | buy_v2_catalogue.dart:6683 | _PagedFullStoreCatalogueState | onPressed | Store categories X exact control unverified; category selection and Back do not prove X |
+| SRC-0085 | buy_v2_catalogue.dart:6683 | _PagedFullStoreCatalogueState | onPressed | device_pass STORE-ROUND144-02; Store category X restores unchanged full catalogue; All products choice separate; provider/accessibility/relaunch not inferred |
 | SRC-0086 | buy_v2_catalogue.dart:6692 | _PagedFullStoreCatalogueState | onTap | All products category choice exact control remains pending device check |
 | SRC-0087 | buy_v2_catalogue.dart:6701 | _PagedFullStoreCatalogueState | onTap | device_pass STORE-005 Fruits and STORE-ROUND85-02 Oil/ghee; all category values not inferred |
-| SRC-0088 | buy_v2_catalogue.dart:6762 | _PagedFullStoreCatalogueState | onPressed | Full Store catalogue Close X exact control pending; STORE-ROUND85-05 verifies Android Back only |
+| SRC-0088 | buy_v2_catalogue.dart:6762 | _PagedFullStoreCatalogueState | onPressed | device_pass STORE-ROUND144-04; full catalogue X restores originating Store; provider/accessibility/relaunch not inferred |
 | SRC-0089 | buy_v2_catalogue.dart:6792 | _PagedFullStoreCatalogueState | onPressed | device_pass STORE-006 clear unmatched search; selected category preserved in recorded scenario |
 | SRC-0090 | buy_v2_catalogue.dart:6797 | _PagedFullStoreCatalogueState | onChanged | STORE-003 query executed with RV6-D001 empty recovery; not an overall search pass |
-| SRC-0091 | buy_v2_catalogue.dart:6798 | _PagedFullStoreCatalogueState | onSubmitted | Store search keyboard Submit unfocus exact action unverified; other keyboard dismissal not equivalent |
+| SRC-0091 | buy_v2_catalogue.dart:6798 | _PagedFullStoreCatalogueState | onSubmitted | device_pass STORE-ROUND144-03; wheat keyboard Enter retains results and dismisses keyboard; provider/accessibility/relaunch not inferred |
 | SRC-0092 | buy_v2_catalogue.dart:6816 | _PagedFullStoreCatalogueState | onTap | device_pass STORE-004 and STORE-ROUND85-02 category entry; forwards to Store-specific sheet |
 | SRC-0093 | buy_v2_catalogue.dart:6928 | _showBuyV2FullStoreCatalogue | onPressed | alternate finite Store catalogue Close; paged catalogue X is SRC-0088; conditional path unverified |
 | SRC-0094 | buy_v2_catalogue.dart:7032 | _RelatedStoreCard | onTap | related Store card forwarder; STORE-ROUND39-03 card body and return evidence applies at caller |
@@ -1843,3 +1843,9 @@ The following 17 work groups are concrete follow-ups from this catalogue invento
 | CAT-P17 | 0134 | Exact quantity Edit sheet; reconcile earlier edit evidence, quantity/limits and return context |
 
 Separate qualification dimensions remain open: screen-reader activation (0030/0043/0049/0083/0097/0100/0131/0133), parent-specific enlarged text and relaunch, live revisions/disabled states, resolved location and provider Retry (0011/0012/0017/0018/0020/0021/0022/0025/0059/0060/0063/0072/0074/0075/0076/0077/0103/0104/0106/0130/0135), and conditional alternate catalogue mounts (0001/0093/0113-0116/0121-0128/0136). These cannot be declared passed through ordinary paged fixtures. History clear remains preservation-excluded (0035/0070/0123). Medicine-only and workspace-only controls remain outside the public Buy boundary as annotated individually. Wrapper aliases retain caller evidence, not additional journey counts. Other source families and shared descendants still require reconciliation; this section is not a final handoff.
+
+## Round 144 - Exact Store close and keyboard controls
+
+Twelve captures995-1006 qualify four action checks STORE-ROUND144-01..04: Store X returns original wheat2; category-sheet X returns full catalogue unchanged; wheat keyboard Enter retains 1-40 of180 and dismisses keyboard; full-catalogue X restores Mool Market Store. No new defect;20 distinct remain. CAT-P11/P13/P14 default seeded pointer cases are qualified. CAT-P12 category X is qualified but All products selection remains pending.
+
+Capture998 caught opening animation. The following tap, intended for categories using that moving layout, actually opened soap5;999 is a transition, not category evidence. Android Back1000 was also transitional;settled1001 returned full catalogue. This accidental product visit is retained in evidence and may update recent-view history; no history was cleared. Correct category tap1002 and X1003 supply the actual category evidence. No Add, save, order, message or address mutation. Current device1006 is Store products with original wheat saved; cart remains empty. All product content/provider truth, enlarged text and process-death return limitations remain open.
