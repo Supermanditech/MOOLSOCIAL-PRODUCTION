@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 415,
+    "recordedActionRows": 421,
     "dispositions": {
-      "device_observation": 12,
-      "device_pass": 341,
+      "device_observation": 13,
+      "device_pass": 346,
       "blocked_provider": 21,
       "device_failure": 18,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 650,
-    "evidenceRows": 652,
+    "physicalCaptures": 659,
+    "evidenceRows": 661,
     "publicDataRows": 61,
     "confirmedDistinctDefects": 16,
     "countsAreExhaustiveDenominator": false
@@ -95,7 +95,7 @@
     "Complete public-data field reconciliation and final evidence handoff"
   ],
   "preservation": {
-    "cart": "empty after isolated mixed-cart cleanup644",
+    "cart": "empty after isolated Offers cleanup658;settled Offers659",
     "savedShop": "original wheat count1 retained650;Saved/Scheduled active after module reentry",
     "addresses": "Original Home/Work retained;isolated round57 address removed;Work selected598",
     "noNewApk": true,
@@ -107,5 +107,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 66
+  "latestAuditRound": 67
 }

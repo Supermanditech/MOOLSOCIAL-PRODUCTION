@@ -448,3 +448,9 @@ Reviewed remaining residual rows261-407,completing this pass over the current in
 Enumerated top-level screen/catalogue/views classes and sheet entry points as source inventory input,not coverage proof. Inspected views10202-10500 conditional cards and session adapter guards. Public journey_router253 constructs default session;balancePaymentAdapter/deliveryExceptionAdapter nullable and not wired. Added8 explicit blocked-provider actions SOURCE-ROUND66-01..08;B-012/B-013 prerequisite records;PD-060/061 field/authority/lifecycle maps. Actual reschedule,proof dispute,payment and reconciliation not executed. No new device pass,capture or defect. Initial BLOCKERS read hit cp1252 decode failure before write;bounded UTF-8 retry succeeded under standing recovery authority.
 
 650 physical captures;652 evidence rows;415 action rows;61 public mappings;16 defects. Source enumeration remains incomplete beyond these inspected controls. Remaining source families and physical reachable cases still require qualification. No product/policy/APK changes.
+
+## Round 67 - Offers promotion boundary and Add/cart return
+
+Physical651-659 reviewed. Nextpromotion652 showsmanufacturer580/10kgMOQ2;Previous653 restoresretail37/500g;firstboundarytap654unchanged. Add655creates1/37;cart656exacttomatoSKU1/500g/MoolMarket000001. Back657restoresOffers andquantity. Removedtestline;658Addrestored/no cart. FooterRefresh659settledtop/firstpromotion;notproviderrevisionpass. Fivepasses andoneobservation;no newdefect/closure. Lastpromotionboundary andcataloguepagecontrols remainunqualified.
+
+659 physicalcaptures;661 evidencerows;421 actionrows;61 publicmappings;16 defects. No originalsaved/addressmutation;cartempty. Completeaudit remainsopen. Founder overnightstatus answered using Git timestampwindow10h24m:68commits throughd2ce7ecb at timeofquery;not duration/performance proof.
