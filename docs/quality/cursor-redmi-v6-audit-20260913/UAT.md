@@ -528,3 +528,10 @@ Reconciled CHECKOUT-005 and007 residuals with091-097 and later177. Empty/short i
 ## Round 80 - GST defect source correlation and field reconciliation
 
 D017 linked to Buy InputChip6158-6175 and shared theme174-185 navy selected background/label. Source correlation only;no theme or product edit. PD023 updated for actual acceptance/removal/off captures691/694/695 while retaining invoice/lifecycle/reuse limits. Device and defect counts unchanged. Audit remains incomplete.
+
+
+## Round 81 - lower tracking and management at enlarged text
+
+Revalidated clean HEAD cc9e4b07899b7e3b9ac0003dc3cb5a3276cfe382 and implementation gate exit0. Previous combined tool output was truncated; existing capture700 was recovered and visually reviewed without overwriting it. Live701 confirmed Orders retained. Opened MS-NEW-09; original font read1.0 then set2.0. Lower tracking702-703 shows wrapping delivery details and readable timeline/action controls. Items704 retains order identity and pack; Android Back705 retains tracking scroll. Manage706 and Cancel choice707 show readable identity and blank reason with Submit disabled. No request submitted. Android Back dismissed; font restored and read1.0;708 confirms retained tracking, alerts ON and normal footer. Invoice below the captured200-percent scroll and reason menu remain unqualified by this round.
+
+Four narrow device passes; no new confirmed defect. 461 action rows,367 device passes,708 recorded captures,710 evidence rows,62 mappings,17 distinct confirmed defects. Source/action inventory and full audit remain incomplete. No product change, new APK, message, payment, order mutation or OPPO action.

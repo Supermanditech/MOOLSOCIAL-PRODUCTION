@@ -13,10 +13,10 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 457,
+    "recordedActionRows": 461,
     "dispositions": {
       "device_observation": 14,
-      "device_pass": 363,
+      "device_pass": 367,
       "blocked_provider": 21,
       "device_failure": 19,
       "excluded_authorization": 1,
@@ -28,8 +28,8 @@
       "data_observation": 4,
       "scope_boundary_observed": 1
     },
-    "physicalCaptures": 699,
-    "evidenceRows": 701,
+    "physicalCaptures": 708,
+    "evidenceRows": 710,
     "publicDataRows": 62,
     "confirmedDistinctDefects": 17,
     "countsAreExhaustiveDenominator": false
@@ -61,7 +61,7 @@
       "evidence": [
         "JOURNEYS.csv"
       ],
-      "remaining": "200 percent Offers visible cards/promotion/category sheet qualified round72 only;other screens and process-death persistence remain unqualified"
+      "remaining": "200 percent Offers subset qualified round72; Orders upper tracking round76 and lower tracking/Items/management subset round81. Other controls, screens and process-death persistence remain unqualified."
     },
     {
       "requirement": "Field-level public data ownership and lifecycle",
@@ -107,5 +107,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 79
+  "latestAuditRound": 81
 }
