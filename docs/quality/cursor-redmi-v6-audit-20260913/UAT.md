@@ -1026,23 +1026,23 @@ Source hashes bind the following index to the inspected files:
 | SRC-0423 | buy_v2_views.dart:13061 | BuyV2AccountView | onTap | unclassified |
 | SRC-0424 | buy_v2_views.dart:13072 | BuyV2AccountView | onTap | unclassified |
 | SRC-0425 | buy_v2_views.dart:13116 | _AccountActionRow | onTap | unclassified |
-| SRC-0426 | buy_v2_views.dart:13301 | showBuyV2FilterSheet | onPressed | unclassified |
-| SRC-0427 | buy_v2_views.dart:13327 | showBuyV2FilterSheet | onTap | unclassified |
-| SRC-0428 | buy_v2_views.dart:13329 | showBuyV2FilterSheet | onTap | unclassified |
-| SRC-0429 | buy_v2_views.dart:13351 | showBuyV2FilterSheet | onTap | unclassified |
-| SRC-0430 | buy_v2_views.dart:13376 | showBuyV2FilterSheet | onTap | unclassified |
-| SRC-0431 | buy_v2_views.dart:13520 | showBuyV2DiscoveryRefinementSheet | onPressed | unclassified |
-| SRC-0432 | buy_v2_views.dart:13546 | showBuyV2DiscoveryRefinementSheet | onTap | unclassified |
-| SRC-0433 | buy_v2_views.dart:13562 | showBuyV2DiscoveryRefinementSheet | onTap | unclassified |
-| SRC-0434 | buy_v2_views.dart:13570 | showBuyV2DiscoveryRefinementSheet | onTap | unclassified |
-| SRC-0435 | buy_v2_views.dart:13588 | showBuyV2DiscoveryRefinementSheet | onTap | unclassified |
-| SRC-0436 | buy_v2_views.dart:13598 | showBuyV2DiscoveryRefinementSheet | onTap | unclassified |
-| SRC-0437 | buy_v2_views.dart:13631 | showBuyV2DiscoveryRefinementSheet | onTap | unclassified |
-| SRC-0438 | buy_v2_views.dart:13648 | showBuyV2DiscoveryRefinementSheet | onChanged | unclassified |
-| SRC-0439 | buy_v2_views.dart:13660 | showBuyV2DiscoveryRefinementSheet | onTap | unclassified |
-| SRC-0440 | buy_v2_views.dart:13693 | showBuyV2DiscoveryRefinementSheet | onPressed | unclassified |
-| SRC-0441 | buy_v2_views.dart:13711 | showBuyV2DiscoveryRefinementSheet | onPressed | unclassified |
-| SRC-0442 | buy_v2_views.dart:13792 | _DiscoveryChoice | onTap | unclassified |
+| SRC-0426 | buy_v2_views.dart:13301 | showBuyV2FilterSheet | onPressed | Medicine-only entry in catalogue.dart4180; outside public Shop/Wholesale audit |
+| SRC-0427 | buy_v2_views.dart:13327 | showBuyV2FilterSheet | onTap | Placeholder action callback; wrapper SRC-0428 handles actual invocation; Medicine-only entry |
+| SRC-0428 | buy_v2_views.dart:13329 | showBuyV2FilterSheet | onTap | Medicine-only Sort/refine navigation; outside public Shop/Wholesale audit |
+| SRC-0429 | buy_v2_views.dart:13351 | showBuyV2FilterSheet | onTap | Medicine-only tools dispatch; outside public Shop/Wholesale audit |
+| SRC-0430 | buy_v2_views.dart:13376 | showBuyV2FilterSheet | onTap | Medicine-only filter options dispatch; Shop/Wholesale options not mounted by current selector |
+| SRC-0431 | buy_v2_views.dart:13520 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-ROUND55-04 Close after draft Clear; other draft variants unqualified |
+| SRC-0432 | buy_v2_views.dart:13546 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-002..006 sort choices; full ordering across pages unqualified |
+| SRC-0433 | buy_v2_views.dart:13562 | showBuyV2DiscoveryRefinementSheet | onTap | Any-price direct selection not separately qualified; global Clear covered FILTER-012 |
+| SRC-0434 | buy_v2_views.dart:13570 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-005/006; ROUND55-01..03; ROUND59-02; WHOLESALE-ROUND60-01..04; equality/provider boundary unqualified |
+| SRC-0435 | buy_v2_views.dart:13588 | showBuyV2DiscoveryRefinementSheet | onTap | Any-pack direct selection not separately qualified; global Clear covered FILTER-012 |
+| SRC-0436 | buy_v2_views.dart:13598 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-008/009 standard/multipack; Wholesale omitted per ROUND59-01 |
+| SRC-0437 | buy_v2_views.dart:13631 | showBuyV2DiscoveryRefinementSheet | onTap | FILTER-010 brand unavailable; positive toggle/multiselect requires populated brand fixture |
+| SRC-0438 | buy_v2_views.dart:13648 | showBuyV2DiscoveryRefinementSheet | onChanged | FILTER-011 enable available; direct disable and mixed-availability exclusion unqualified |
+| SRC-0439 | buy_v2_views.dart:13660 | showBuyV2DiscoveryRefinementSheet | onTap | Tools destinations covered rounds45-61 per FILTER-001; stale-scope rejection unqualified |
+| SRC-0440 | buy_v2_views.dart:13693 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-012 and ROUND55-04..06; disabled-empty Clear and combinations not all qualified |
+| SRC-0441 | buy_v2_views.dart:13711 | showBuyV2DiscoveryRefinementSheet | onPressed | FILTER-003/006/008/009/011/012 and ROUND55/59/60 Apply; stale-scope disabled state unqualified |
+| SRC-0442 | buy_v2_views.dart:13792 | _DiscoveryChoice | onTap | Reusable choice dispatch; counted through parent sort/price/pack/brand controls, not another journey |
 | SRC-0443 | buy_v2_views.dart:13849 | _BuyV2FilterToolAction | onTap | unclassified |
 | SRC-0444 | buy_v2_views.dart:13858 | _BuyV2FilterToolAction | onTap | unclassified |
 | SRC-0445 | buy_v2_views.dart:13922 | _BuyV2FilterOption | onTap | unclassified |
@@ -1168,3 +1168,14 @@ Explicit conditional descendants under existing B003 (not newly discovered defec
 - 200-percent text, keyboard and reduced-motion/screen-reader behavior of the eligible form.
 
 All above remain device-unverified because the tested SKU has no eligible purchase and real submissions are excluded. Source shows a rating/comment draft owner scope and validation but does not prove backend authority or runtime outcomes. Report accepted/failed/busy/Reported states are likewise unqualified; only normal opening, four reasons, Cancel, unselected Close and Android Back have device evidence. Public-panel reconnect fallback remains untested. This inventory does not convert source behavior to device passes or declare the full audit complete.
+
+
+## Round 92 - Filter source-to-device reconciliation
+
+Read buy_v2_views.dart 13182-13797 and catalogue.dart 4151-4225; matched all library references to showBuyV2FilterSheet / showBuyV2DiscoveryRefinementSheet including callback tear-offs. The legacy filter sheet is selected only for Medicine at catalogue.dart4180; Shop and Wholesale choose the discovery-refinement sheet. A search for call syntax alone would have missed this callback and is not proof of unreachability. No Medicine scope was added.
+
+Reconciled SRC-0426..0442 against existing FILTER-001..012 and rounds55/59/60. Seventeen source candidates reconciled; total 122 classified / 405 unclassified of 527 lexical candidates. This is not a completed unique-journey denominator. No new device result or defect in this source-only round; round91 device totals remain current.
+
+Remaining directly actionable filter checks identified: Any price after a selected cap; Any pack after Standard/Multipack; direct Available-to-order disable; empty-draft Clear disabled. Positive brand toggle/multiselect requires missing brand data. Full price-ordering/equality/mixed availability and provider pagination need suitable data. Scope-change rejection, preview loading/error/count unavailable, shared tool late callbacks, process-death restoration and all accessibility combinations are not qualified by ordinary Apply tests. Current field mapping and provider ownership remain subject to final reconciliation.
+
+The refinement source resets deliveryFastest to relevance when opening, suppresses pack for Wholesale and handles preview scope release in finally. These are implementation observations, not newly registered defects or device passes. The public Shop/Wholesale selectors, existing evidence and remaining cases above are the next device work; no product changes were made.
