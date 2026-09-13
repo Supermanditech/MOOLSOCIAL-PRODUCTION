@@ -1216,3 +1216,293 @@ Turned temporary reuse off778. Legal name focus779 preceded keyboard settlement7
 AndroidBack784 cancelled form, GST switched off785. Tapping Address progress indicator786 left summary unchanged (not claimed as navigation; Change action used next). Change787 opened original addresses with Work selected; Cart788 retained one279item; minus789 removed only the isolated item and returned to Scheduled Shop with original Saved1. Cart empty; no profile was created; no order/payment/message or provider submission.
 
 Twenty-two reviewed captures:789 physical captures;791 evidence rows;490 action rows including392 device passes. Seventeen distinct confirmed defects unchanged. Source326-329 reconciled to these exact narrow results. Full action inventory, remaining conditional coverage and public-field mapping remain incomplete.
+
+
+## Round 96 - Supplemental callback inventory
+
+The initial527 callback occurrences used a limited event-name list. Broader lexical scan of on[A-Z] named arguments finds271 additional references, including custom forwarding callbacks and framework-event references. They are supplemental source candidates, NOT271 new journeys, new defects or untested device actions. Reconcile to parent actions and conditional states before deriving a unique-journey denominator. Original527 remain142 classified/385 unclassified. Supplemental rows are an additional queue, not silently marked passed. Shared connected screens outside this directory still require reconciliation.
+
+Scan covers current ui_v2/buy/*.dart source only. It does not establish semantic completeness: gestures/commands can exist without on-prefixed named arguments. Source hashes bind the inventory. No device action, product change or new defect this round; round95 device totals remain current. The first append attempt rejected its count assertion before writing because line-by-line matching missed multiline arguments; the corrected whole-text match retains line locations and matches the original271-count scan under standing bounded recovery authority.
+
+| Source | SHA256 |
+|---|---|
+| buy_v2_catalogue.dart | 84FEF1B2C1D81178B0F136235298E239963C07323D149E60B3EDB5E0C879C259 |
+| buy_v2_design.dart | 4EA0F4877634CF4250C031B1EDC7739D5AB4BA818FC879A519036F56B3ED719F |
+| buy_v2_scanner.dart | 251C238D8BD807EDB594EE2E862A064036B71E3D92431D51EF9A6B2F8BC4C113 |
+| buy_v2_screen.dart | 7BE1D12EE7CA2ACB96B67B14EC02CAD0DCB25D613A07AF4B0473AE323EB9C0B7 |
+| buy_v2_shop_chat.dart | CFA29EB206A9368F9E6A129EA94CC5EB128FD047F82EC20ACDC62504A155DACC |
+| buy_v2_views.dart | 4787279F1A5064000412846207FAABF3778D318EDB7881F5E90989670398F9D4 |
+
+| Candidate | Source:line | Callback | Reconciliation |
+|---|---|---|---|
+| SUPSRC-0001 | buy_v2_catalogue.dart:276 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0002 | buy_v2_catalogue.dart:1141 | onArea | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0003 | buy_v2_catalogue.dart:1144 | onPrevious | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0004 | buy_v2_catalogue.dart:1147 | onNext | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0005 | buy_v2_catalogue.dart:1150 | onRefresh | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0006 | buy_v2_catalogue.dart:1172 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0007 | buy_v2_catalogue.dart:1179 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0008 | buy_v2_catalogue.dart:1186 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0009 | buy_v2_catalogue.dart:1247 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0010 | buy_v2_catalogue.dart:1267 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0011 | buy_v2_catalogue.dart:1806 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0012 | buy_v2_catalogue.dart:1808 | onSaved | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0013 | buy_v2_catalogue.dart:1832 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0014 | buy_v2_catalogue.dart:1843 | onShowAll | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0015 | buy_v2_catalogue.dart:2587 | onPrevious | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0016 | buy_v2_catalogue.dart:2590 | onNext | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0017 | buy_v2_catalogue.dart:2591 | onRefresh | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0018 | buy_v2_catalogue.dart:2599 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0019 | buy_v2_catalogue.dart:2694 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0020 | buy_v2_catalogue.dart:3077 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0021 | buy_v2_catalogue.dart:3470 | onFocus | framework-event candidate; unclassified |
+| SUPSRC-0022 | buy_v2_catalogue.dart:3471 | onSetText | framework-event candidate; unclassified |
+| SUPSRC-0023 | buy_v2_catalogue.dart:3557 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0024 | buy_v2_catalogue.dart:3801 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0025 | buy_v2_catalogue.dart:3842 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0026 | buy_v2_catalogue.dart:3895 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0027 | buy_v2_catalogue.dart:4101 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0028 | buy_v2_catalogue.dart:4221 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0029 | buy_v2_catalogue.dart:4234 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0030 | buy_v2_catalogue.dart:4331 | onOpenSavedProducts | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0031 | buy_v2_catalogue.dart:4336 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0032 | buy_v2_catalogue.dart:4337 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0033 | buy_v2_catalogue.dart:4345 | onOpenRecentlyViewed | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0034 | buy_v2_catalogue.dart:4350 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0035 | buy_v2_catalogue.dart:4351 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0036 | buy_v2_catalogue.dart:4914 | onTapOutside | framework-event candidate; unclassified |
+| SUPSRC-0037 | buy_v2_catalogue.dart:5241 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0038 | buy_v2_catalogue.dart:5242 | onSeeProducts | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0039 | buy_v2_catalogue.dart:5244 | onAddToCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0040 | buy_v2_catalogue.dart:5285 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0041 | buy_v2_catalogue.dart:5286 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0042 | buy_v2_catalogue.dart:5327 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0043 | buy_v2_catalogue.dart:5328 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0044 | buy_v2_catalogue.dart:5337 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0045 | buy_v2_catalogue.dart:5452 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0046 | buy_v2_catalogue.dart:5453 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0047 | buy_v2_catalogue.dart:5634 | onOrderForCollection | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0048 | buy_v2_catalogue.dart:5641 | onAskStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0049 | buy_v2_catalogue.dart:5653 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0050 | buy_v2_catalogue.dart:5669 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0051 | buy_v2_catalogue.dart:5738 | onAskStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0052 | buy_v2_catalogue.dart:5744 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0053 | buy_v2_catalogue.dart:5745 | onStoreChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0054 | buy_v2_catalogue.dart:5746 | onOpenStoreCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0055 | buy_v2_catalogue.dart:5748 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0056 | buy_v2_catalogue.dart:5773 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0057 | buy_v2_catalogue.dart:5812 | onAskStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0058 | buy_v2_catalogue.dart:5813 | onStoreChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0059 | buy_v2_catalogue.dart:5814 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0060 | buy_v2_catalogue.dart:5815 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0061 | buy_v2_catalogue.dart:5816 | onOpenStoreCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0062 | buy_v2_catalogue.dart:6595 | onAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0063 | buy_v2_catalogue.dart:6607 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0064 | buy_v2_catalogue.dart:6731 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0065 | buy_v2_catalogue.dart:6799 | onTapOutside | framework-event candidate; unclassified |
+| SUPSRC-0066 | buy_v2_catalogue.dart:6881 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0067 | buy_v2_catalogue.dart:6883 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0068 | buy_v2_catalogue.dart:6949 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0069 | buy_v2_catalogue.dart:6962 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0070 | buy_v2_catalogue.dart:7260 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0071 | buy_v2_catalogue.dart:7304 | onOpen | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0072 | buy_v2_catalogue.dart:7305 | onRemove | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0073 | buy_v2_catalogue.dart:7375 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0074 | buy_v2_catalogue.dart:7424 | onOpen | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0075 | buy_v2_catalogue.dart:7425 | onAdd | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0076 | buy_v2_catalogue.dart:7809 | onAddToCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0077 | buy_v2_catalogue.dart:7844 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0078 | buy_v2_catalogue.dart:8520 | onKeep | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0079 | buy_v2_catalogue.dart:8521 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0080 | buy_v2_catalogue.dart:8752 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0081 | buy_v2_catalogue.dart:8792 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0082 | buy_v2_catalogue.dart:9193 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0083 | buy_v2_catalogue.dart:9215 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0084 | buy_v2_catalogue.dart:10043 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0085 | buy_v2_catalogue.dart:10420 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0086 | buy_v2_catalogue.dart:10422 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0087 | buy_v2_catalogue.dart:10423 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0088 | buy_v2_catalogue.dart:10969 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0089 | buy_v2_catalogue.dart:10975 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0090 | buy_v2_catalogue.dart:10983 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0091 | buy_v2_design.dart:228 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0092 | buy_v2_design.dart:233 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0093 | buy_v2_design.dart:354 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0094 | buy_v2_design.dart:359 | onNotification | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0095 | buy_v2_design.dart:1591 | onPointerDown | framework-event candidate; unclassified |
+| SUPSRC-0096 | buy_v2_design.dart:1594 | onPointerUp | framework-event candidate; unclassified |
+| SUPSRC-0097 | buy_v2_design.dart:1595 | onPointerCancel | framework-event candidate; unclassified |
+| SUPSRC-0098 | buy_v2_scanner.dart:150 | onDetect | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0099 | buy_v2_scanner.dart:733 | onDetect | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0100 | buy_v2_scanner.dart:757 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0101 | buy_v2_scanner.dart:758 | onTorch | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0102 | buy_v2_scanner.dart:759 | onCamera | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0103 | buy_v2_scanner.dart:760 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0104 | buy_v2_scanner.dart:761 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0105 | buy_v2_scanner.dart:788 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0106 | buy_v2_scanner.dart:789 | onTorch | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0107 | buy_v2_scanner.dart:790 | onCamera | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0108 | buy_v2_scanner.dart:791 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0109 | buy_v2_scanner.dart:792 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0110 | buy_v2_scanner.dart:848 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0111 | buy_v2_scanner.dart:849 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0112 | buy_v2_scanner.dart:1001 | onScanNow | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0113 | buy_v2_scanner.dart:1002 | onEnterCode | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0114 | buy_v2_screen.dart:966 | onOpenRoute | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0115 | buy_v2_screen.dart:992 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0116 | buy_v2_screen.dart:1010 | onPopInvokedWithResult | framework-event candidate; unclassified |
+| SUPSRC-0117 | buy_v2_screen.dart:1071 | onOpenChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0118 | buy_v2_screen.dart:1073 | onLocation | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0119 | buy_v2_screen.dart:1076 | onAccount | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0120 | buy_v2_screen.dart:1138 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0121 | buy_v2_screen.dart:1153 | onParkingChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0122 | buy_v2_screen.dart:1161 | onPositionChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0123 | buy_v2_screen.dart:1495 | onPointerDown | framework-event candidate; unclassified |
+| SUPSRC-0124 | buy_v2_screen.dart:1499 | onPointerUp | framework-event candidate; unclassified |
+| SUPSRC-0125 | buy_v2_screen.dart:1500 | onPointerCancel | framework-event candidate; unclassified |
+| SUPSRC-0126 | buy_v2_screen.dart:1584 | onMinimizedChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0127 | buy_v2_screen.dart:1586 | onHiddenChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0128 | buy_v2_screen.dart:1596 | onSoundChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0129 | buy_v2_screen.dart:1598 | onKeepOnScreen | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0130 | buy_v2_screen.dart:1606 | onOpen | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0131 | buy_v2_screen.dart:1669 | onPositionChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0132 | buy_v2_screen.dart:1754 | onOpenMool | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0133 | buy_v2_screen.dart:1755 | onOpenAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0134 | buy_v2_screen.dart:1756 | onOpenChat | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0135 | buy_v2_screen.dart:1758 | onPreviousLocalAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0136 | buy_v2_screen.dart:1759 | onNextLocalAction | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0137 | buy_v2_screen.dart:2080 | onAskStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0138 | buy_v2_screen.dart:2081 | onStoreChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0139 | buy_v2_screen.dart:2082 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0140 | buy_v2_screen.dart:2083 | onOpenStoreCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0141 | buy_v2_screen.dart:2086 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0142 | buy_v2_screen.dart:2157 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0143 | buy_v2_screen.dart:2178 | onPopInvokedWithResult | framework-event candidate; unclassified |
+| SUPSRC-0144 | buy_v2_screen.dart:2222 | onProductReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0145 | buy_v2_screen.dart:2243 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0146 | buy_v2_screen.dart:2247 | onAskSeller | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0147 | buy_v2_screen.dart:2249 | onVisitComparisonProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0148 | buy_v2_screen.dart:2259 | onOpenPartnerCatalogue | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0149 | buy_v2_screen.dart:2275 | onOpenCart | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0150 | buy_v2_screen.dart:2408 | onPopInvokedWithResult | framework-event candidate; unclassified |
+| SUPSRC-0151 | buy_v2_screen.dart:2422 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0152 | buy_v2_screen.dart:2463 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0153 | buy_v2_screen.dart:2489 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0154 | buy_v2_screen.dart:2490 | onReturn | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0155 | buy_v2_screen.dart:2507 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0156 | buy_v2_screen.dart:2522 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0157 | buy_v2_screen.dart:2525 | onOpenStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0158 | buy_v2_screen.dart:2531 | onAskSeller | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0159 | buy_v2_screen.dart:2532 | onVisitComparisonProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0160 | buy_v2_screen.dart:2535 | onOpenPartnerCatalogue | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0161 | buy_v2_screen.dart:2541 | onBrowseStore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0162 | buy_v2_screen.dart:2544 | onBrowseMore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0163 | buy_v2_screen.dart:2569 | onRestoreDeliveryStatus | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0164 | buy_v2_screen.dart:2571 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0165 | buy_v2_screen.dart:2579 | onRestoreDeliveryStatus | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0166 | buy_v2_screen.dart:2581 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0167 | buy_v2_screen.dart:2593 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0168 | buy_v2_screen.dart:2886 | onEnd | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0169 | buy_v2_screen.dart:2943 | onEnd | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0170 | buy_v2_shop_chat.dart:624 | onBack | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0171 | buy_v2_shop_chat.dart:626 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0172 | buy_v2_shop_chat.dart:627 | onOpenAll | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0173 | buy_v2_shop_chat.dart:634 | onBack | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0174 | buy_v2_shop_chat.dart:635 | onOpenInfo | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0175 | buy_v2_shop_chat.dart:636 | onDispatch | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0176 | buy_v2_shop_chat.dart:637 | onOpenContext | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0177 | buy_v2_shop_chat.dart:644 | onBack | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0178 | buy_v2_shop_chat.dart:645 | onDispatch | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0179 | buy_v2_shop_chat.dart:646 | onOpenContext | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0180 | buy_v2_shop_chat.dart:679 | onBack | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0181 | buy_v2_shop_chat.dart:680 | onOpenAll | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0182 | buy_v2_shop_chat.dart:688 | onClear | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0183 | buy_v2_shop_chat.dart:724 | onClearSearch | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0184 | buy_v2_shop_chat.dart:728 | onShowAll | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0185 | buy_v2_shop_chat.dart:732 | onChooseConversation | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0186 | buy_v2_shop_chat.dart:733 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0187 | buy_v2_shop_chat.dart:734 | onOpenAll | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0188 | buy_v2_shop_chat.dart:1712 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0189 | buy_v2_shop_chat.dart:1922 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0190 | buy_v2_shop_chat.dart:1923 | onOpenAll | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0191 | buy_v2_shop_chat.dart:2020 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0192 | buy_v2_shop_chat.dart:2202 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0193 | buy_v2_shop_chat.dart:2203 | onReply | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0194 | buy_v2_shop_chat.dart:2210 | onReact | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0195 | buy_v2_shop_chat.dart:2217 | onCopy | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0196 | buy_v2_shop_chat.dart:2218 | onForward | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0197 | buy_v2_shop_chat.dart:2230 | onBack | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0198 | buy_v2_shop_chat.dart:2231 | onOpenInfo | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0199 | buy_v2_shop_chat.dart:2232 | onVoiceCall | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0200 | buy_v2_shop_chat.dart:2237 | onVideoCall | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0201 | buy_v2_shop_chat.dart:2242 | onMore | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0202 | buy_v2_shop_chat.dart:2258 | onInfo | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0203 | buy_v2_shop_chat.dart:2262 | onSearch | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0204 | buy_v2_shop_chat.dart:2267 | onNotifications | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0205 | buy_v2_shop_chat.dart:2272 | onSafety | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0206 | buy_v2_shop_chat.dart:2283 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0207 | buy_v2_shop_chat.dart:2327 | onForward | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0208 | buy_v2_shop_chat.dart:2398 | onTapField | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0209 | buy_v2_shop_chat.dart:2405 | onCancelReply | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0210 | buy_v2_shop_chat.dart:2406 | onToggleEmoji | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0211 | buy_v2_shop_chat.dart:2419 | onEmoji | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0212 | buy_v2_shop_chat.dart:2427 | onAttachment | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0213 | buy_v2_shop_chat.dart:2442 | onCamera | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0214 | buy_v2_shop_chat.dart:2447 | onSend | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0215 | buy_v2_shop_chat.dart:2448 | onVoice | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0216 | buy_v2_shop_chat.dart:3397 | onClose | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0217 | buy_v2_shop_chat.dart:3523 | onSend | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0218 | buy_v2_shop_chat.dart:3524 | onVoice | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0219 | buy_v2_views.dart:831 | onAdd | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0220 | buy_v2_views.dart:832 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0221 | buy_v2_views.dart:837 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0222 | buy_v2_views.dart:838 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0223 | buy_v2_views.dart:905 | onOpenWorkspace | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0224 | buy_v2_views.dart:917 | onOpenPartnerCatalogue | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0225 | buy_v2_views.dart:1199 | onReview | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0226 | buy_v2_views.dart:1201 | onReport | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0227 | buy_v2_views.dart:1213 | onAskSeller | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0228 | buy_v2_views.dart:1214 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0229 | buy_v2_views.dart:1234 | onAdd | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0230 | buy_v2_views.dart:1235 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0231 | buy_v2_views.dart:1236 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0232 | buy_v2_views.dart:1237 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0233 | buy_v2_views.dart:1238 | onRetryOffer | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0234 | buy_v2_views.dart:1240 | onOpenWorkspace | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0235 | buy_v2_views.dart:1457 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0236 | buy_v2_views.dart:1606 | onVisitProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0237 | buy_v2_views.dart:1909 | onOpenProduct | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0238 | buy_v2_views.dart:2385 | onRetry | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0239 | buy_v2_views.dart:2874 | onAdd | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0240 | buy_v2_views.dart:2875 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0241 | buy_v2_views.dart:2876 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0242 | buy_v2_views.dart:2877 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0243 | buy_v2_views.dart:3529 | onInteractionEnd | framework-event candidate; unclassified |
+| SUPSRC-0244 | buy_v2_views.dart:3679 | onPageChanged | framework-event candidate; unclassified |
+| SUPSRC-0245 | buy_v2_views.dart:4824 | onPopInvokedWithResult | Eligible review descendant B003 round91; device unverified |
+| SUPSRC-0246 | buy_v2_views.dart:4920 | onFocus | Eligible review descendant B003 round91; device unverified |
+| SUPSRC-0247 | buy_v2_views.dart:4921 | onSetText | Eligible review descendant B003 round91; device unverified |
+| SUPSRC-0248 | buy_v2_views.dart:6166 | onDeleted | Alias of SUP-GST-DELETE-01 round94; same action, not an extra journey |
+| SUPSRC-0249 | buy_v2_views.dart:7652 | onSelect | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0250 | buy_v2_views.dart:7653 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0251 | buy_v2_views.dart:8832 | onViewInvoice | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0252 | buy_v2_views.dart:11095 | onDetected | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0253 | buy_v2_views.dart:11282 | onOpenOrderHelp | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0254 | buy_v2_views.dart:11847 | onOpenSupport | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0255 | buy_v2_views.dart:11932 | onOpenSupport | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0256 | buy_v2_views.dart:13020 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0257 | buy_v2_views.dart:14531 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0258 | buy_v2_views.dart:14536 | onDelete | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0259 | buy_v2_views.dart:14875 | onSubmit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0260 | buy_v2_views.dart:15170 | onFocusChange | framework-event candidate; unclassified |
+| SUPSRC-0261 | buy_v2_views.dart:15766 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0262 | buy_v2_views.dart:15767 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0263 | buy_v2_views.dart:15768 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0264 | buy_v2_views.dart:15970 | onEdit | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0265 | buy_v2_views.dart:15972 | onDecrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0266 | buy_v2_views.dart:15973 | onIncrease | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0267 | buy_v2_views.dart:17024 | onSelect | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0268 | buy_v2_views.dart:17029 | onRemove | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0269 | buy_v2_views.dart:19701 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0270 | buy_v2_views.dart:19780 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
+| SUPSRC-0271 | buy_v2_views.dart:20024 | onHighlightChanged | custom/forwarded callback candidate; reconcile parent before counting |
