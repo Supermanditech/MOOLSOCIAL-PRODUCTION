@@ -418,3 +418,9 @@ Physical captures617-625 reviewed. Original unfiltered Wholesale617. Applied5000
 Physical captures626-630 reviewed. Wholesale tools opens Settings;lower scroll627. Help628 shows combined Shop/Wholesale orders. AndroidBack with keyboard hidden dismisses Help to identical Settings scroll629. SecondBack returns original Wholesale first page630,no filter badge,Saved0. Two narrow device passes;two stale Help pending notes reconciled. No new defect/closure;no data mutations, messages, transactions, force-stop or process-death qualification.
 
 630 physical captures;632 evidence rows;396 action rows;58 public-data mappings;16 defects. Audit remains incomplete. Source read failed once under platform-default cp1252;bounded UTF-8 retry succeeded under standing read-recovery authority;no source mutation.
+
+## Round 62 - Early coverage residual reconciliation
+
+Reconciled nine early remaining notes against later recorded Store/cart/quantity/order/Help evidence. Original observations and dispositions unchanged. Distinguish multi-product reordered cart quantities from historical line identity:round25 does not qualify historical identity. Mixed two-nonempty carts,Wholesale upper quantity bounds,Store-origin restoration,group controls,process-death and provider truth remain unqualified. Verified57 referenced artifact files against EVIDENCE.csv hashes;zero missing/mismatches. No new device actions,captures,passes,defects or closures.
+
+Counts unchanged630 physical captures;632 evidence rows;396 action rows;58 public mappings;16 defects. First130 early residual notes reviewed in bounded pages;later residual reconciliation and complete source-derived action inventory still open.

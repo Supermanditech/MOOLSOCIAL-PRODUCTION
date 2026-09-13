@@ -89,7 +89,7 @@
     }
   ],
   "nextWork": [
-    "Finish stale remaining-note reconciliation without changing original observations",
+    "Continue residual reconciliation after first130 action rows; preserve original observations and conditional limits",
     "Saved-address process-death persistence remains unqualified; edit/save and task resume qualified round57",
     "Remaining filter/Store/product/cart/order branches from source inventory",
     "Complete public-data field reconciliation and final evidence handoff"
@@ -107,5 +107,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 61
+  "latestAuditRound": 62
 }
