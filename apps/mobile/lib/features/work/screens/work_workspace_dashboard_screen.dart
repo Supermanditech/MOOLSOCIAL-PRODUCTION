@@ -507,6 +507,7 @@ class _WorkWorkspaceDashboardScreenState
                 : null,
             currentStoreId: () => session.activeWorkspace?.id,
             storeApproved: () => session.activeWorkspace?.verified == true,
+            reviewCatalogueAllowed: () => session.canLoadStoreReviewSeed,
           );
       session.addListener(_procurementIdentityChanged);
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1291,7 +1292,7 @@ class _WorkWorkspaceDashboardScreenState
                   ],
                 );
               }
-              return _StoreProcurementSurface(
+              final surface = _StoreProcurementSurface(
                 session: _activeProcurement,
                 accountIdentity: widget.accountIdentity,
                 accountAuthenticated: widget.accountAuthenticated,
@@ -1300,6 +1301,25 @@ class _WorkWorkspaceDashboardScreenState
                 orderId: _trackedPurchase?.orderId,
                 onExit: _leaveProcurement,
                 onDestinationChanged: _handleProcurementDestinationChanged,
+              );
+              if (_storeProcurement?.usesReviewCatalogue != true) {
+                return surface;
+              }
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Material(
+                    color: Colors.white,
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: Text(
+                        'Test catalogue · No real orders, payments or messages',
+                        key: Key('store-restock-review-notice'),
+                      ),
+                    ),
+                  ),
+                  Expanded(child: surface),
+                ],
               );
             },
           ),

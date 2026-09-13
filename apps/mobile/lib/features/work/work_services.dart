@@ -16,6 +16,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../shared/social_content_gateway.dart';
 import '../buy/buy_v2_models.dart';
+import '../buy/buy_v2_content_contracts.dart';
 import '../buy/buy_session.dart';
 import '../buy/buy_v2_session.dart';
 import '../buy/buy_v2_saved_products_store.dart';
@@ -35,16 +36,18 @@ class WorkProcurementController extends ChangeNotifier {
     required this.currentStoreId,
     required this.storeApproved,
     this.bookmarks = const SecureWorkProcurementBookmarkStore(),
+    this.reviewCatalogueAllowed,
     WorkProcurementSessionFactory? sessionFactory,
     BuyV2CustomerStateStore Function(String scope)? stateStoreFactory,
-  }) : _sessionFactory = sessionFactory ?? _newSession,
+  }) : _sessionFactory = sessionFactory,
        _ownsCore = sessionFactory == null,
        _stateStoreFactory = stateStoreFactory ?? _newStateStore;
 
   final String? Function() currentAccountId, currentStoreId;
   final bool Function() storeApproved;
   final WorkProcurementBookmarkStore bookmarks;
-  final WorkProcurementSessionFactory _sessionFactory;
+  final bool Function()? reviewCatalogueAllowed;
+  final WorkProcurementSessionFactory? _sessionFactory;
   final bool _ownsCore;
   final BuyV2CustomerStateStore Function(String) _stateStoreFactory;
   final _identity = ValueNotifier<BuyV2ProcurementContext?>(null);
@@ -59,15 +62,49 @@ class WorkProcurementController extends ChangeNotifier {
         SharedPreferencesAsync(),
         ownerScope: scope,
       );
-  static BuyV2Session _newSession(
+  bool get usesReviewCatalogue =>
+      session?.commerceAdapter is _StoreReviewProcurementCatalogue;
+
+  BuyV2Session _newSession(
     ValueListenable<BuyV2ProcurementContext?> identity,
     BuyV2CustomerStateStore stateStore,
-  ) => BuyV2Session(
-    core: BuySession(),
-    procurementIdentity: identity,
-    customerStateStore: stateStore,
-    reviewDataEnabled: false,
-  );
+  ) {
+    final context = identity.value;
+    final review =
+        context != null &&
+            context.purpose == BuyV2ProcurementPurpose.restock &&
+            kDebugMode &&
+            const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+            reviewCatalogueAllowed?.call() == true &&
+            [12, 100, 1000].any(
+              (count) =>
+                  StoreReviewSeed(
+                    accountScope: context.accountId,
+                    orderCount: count,
+                    now: DateTime.now(),
+                  ).storeId ==
+                  context.storeId,
+            )
+        ? _StoreReviewProcurementCatalogue(
+            context,
+            current: () =>
+                scopeCurrent &&
+                identity.value?.customerStateOwnerScope ==
+                    context.customerStateOwnerScope &&
+                reviewCatalogueAllowed?.call() == true,
+          )
+        : null;
+    return BuyV2Session(
+      core: BuySession(),
+      procurementIdentity: identity,
+      customerStateStore: stateStore,
+      reviewDataEnabled: false,
+      commerceAdapter: review,
+      cataloguePageSource: review,
+      initialCatalogueRegionId: review == null ? null : 'jodhpur',
+    );
+  }
 
   bool get scopeCurrent {
     final value = bookmark?.context;
@@ -192,7 +229,7 @@ class WorkProcurementController extends ChangeNotifier {
     _disposeSession();
     bookmark = chosen;
     _identity.value = chosen.context;
-    final opened = _sessionFactory(
+    final opened = (_sessionFactory ?? _newSession)(
       _identity,
       _stateStoreFactory(chosen.context.customerStateOwnerScope),
     );
@@ -228,6 +265,190 @@ class WorkProcurementController extends ChangeNotifier {
     _identity.dispose();
     super.dispose();
   }
+}
+
+/// Explicit review-build responses for the existing synthetic Store only.
+/// They exercise the normal eligibility contract, never real purchasing authority.
+/// No transport, payment, order creation or recipient action is available.
+class _StoreReviewProcurementCatalogue
+    implements BuyV2CommerceAdapter, BuyV2CataloguePageSource {
+  _StoreReviewProcurementCatalogue(this.context, {required this.current});
+  final BuyV2ProcurementContext context;
+  final bool Function() current;
+  final _source = BuyV2DevelopmentCatalogueSource(
+    destination: BuyV2Destination.wholesale,
+    providerCount: 24,
+    skusPerStore: 24,
+  );
+  static const _notice =
+      'Test catalogue. Orders, payments and messages are unavailable.';
+  void _requireCurrent([BuyV2CatalogueQuery? query]) {
+    if (!current() ||
+        (query != null &&
+            (query.destination != BuyV2Destination.wholesale ||
+                query.procurementContext?.customerStateOwnerScope !=
+                    context.customerStateOwnerScope))) {
+      throw StateError('Review catalogue scope changed');
+    }
+  }
+
+  BuyV2Product _product(BuyV2Product product) => product.copyWith(
+    seller: 'TEST · ${product.seller}',
+    procurementSupplierGrant: BuyV2ProcurementSupplierGrant(
+      workspaceId: 'review-workspace-${product.storeId}',
+      storeId: product.storeId!,
+      role: BuyV2SupplierWorkspaceRole.wholesaler,
+      approved: true,
+      listingId: product.id,
+      productCanonicalId: product.canonicalId,
+      offerId: 'review-offer-${product.id}',
+      offerRevision: '1',
+      channel: BuyV2SupplierListingChannel.wholesale,
+      published: true,
+      validUntil: DateTime.now().add(const Duration(minutes: 15)),
+    ),
+  );
+
+  BuyV2CataloguePage<R> _map<T, R>(
+    BuyV2CataloguePage<T> page,
+    R Function(T) convert,
+  ) => BuyV2CataloguePage<R>(
+    queryKey: page.queryKey,
+    snapshotId: page.snapshotId,
+    items: page.items.map(convert),
+    startIndex: page.startIndex,
+    totalCount: page.totalCount,
+    previousCursor: page.previousCursor,
+    nextCursor: page.nextCursor,
+  );
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2StoreListing>> loadStores(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    _requireCurrent(query);
+    final page = await _source.loadStores(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    _requireCurrent(query);
+    return _map(
+      page,
+      (store) => BuyV2StoreListing(
+        id: store.id,
+        name: 'TEST · ${store.name}',
+        area: store.area,
+        address: store.address,
+        regionId: store.regionId,
+        previewProduct: store.previewProduct == null
+            ? null
+            : _product(store.previewProduct!),
+      ),
+    );
+  }
+
+  @override
+  Future<BuyV2CataloguePage<BuyV2Product>> loadProducts(
+    BuyV2CatalogueQuery query, {
+    String? cursor,
+    required int pageSize,
+  }) async {
+    _requireCurrent(query);
+    final page = await _source.loadProducts(
+      query,
+      cursor: cursor,
+      pageSize: pageSize,
+    );
+    _requireCurrent(query);
+    return _map(page, _product);
+  }
+
+  @override
+  Future<List<BuyV2Product>> resolveProducts(Set<String> ids) async {
+    _requireCurrent();
+    final products = await _source.resolveProducts(ids);
+    _requireCurrent();
+    return products.map(_product).toList();
+  }
+
+  @override
+  Future<BuyV2CommerceSnapshot> refresh() async {
+    _requireCurrent();
+    final page = await loadProducts(
+      BuyV2CatalogueQuery(
+        destination: BuyV2Destination.wholesale,
+        regionId: 'jodhpur',
+        procurementContext: context,
+      ),
+      pageSize: 24,
+    );
+    return BuyV2CommerceSnapshot(
+      state: BuyV2CommerceLoadState.ready,
+      products: page.items,
+      businessVerified: true,
+      businessVerificationState: BuyV2BusinessVerificationState.verified,
+      customerMessage: _notice,
+      procurementBuyerGrant: BuyV2ProcurementBuyerGrant(
+        accountId: context.accountId,
+        storeId: context.storeId,
+        approved: true,
+        validUntil: DateTime.now().add(const Duration(minutes: 15)),
+      ),
+    );
+  }
+
+  @override
+  Future<BuyV2OrderPlacementResult> placeOrder(
+    BuyV2OrderPlacementRequest request,
+  ) async => const BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.unavailable,
+    customerMessage: _notice,
+  );
+  @override
+  Future<BuyV2OrderPlacementResult> reconcileOrder({
+    required String idempotencyKey,
+    required String paymentReference,
+  }) async => const BuyV2OrderPlacementResult(
+    outcome: BuyV2OrderPlacementOutcome.unavailable,
+    customerMessage: _notice,
+  );
+  @override
+  Future<BuyV2OrderRefreshResult> refreshOrder({
+    required String orderId,
+  }) async => const BuyV2OrderRefreshResult(
+    state: BuyV2CommerceLoadState.unavailable,
+    customerMessage: _notice,
+  );
+  @override
+  Future<BuyV2OrderAlertsResult> loadOrderAlerts() async =>
+      const BuyV2OrderAlertsResult(
+        available: false,
+        enabled: false,
+        customerMessage: _notice,
+      );
+  @override
+  Future<BuyV2OrderAlertsResult> setOrderAlerts({required bool enabled}) =>
+      loadOrderAlerts();
+  @override
+  Future<BuyV2MutationResult> submitProductReview({
+    required BuyV2Product product,
+    required int rating,
+    required String comment,
+  }) async =>
+      const BuyV2MutationResult(accepted: false, customerMessage: _notice);
+  @override
+  Future<BuyV2MutationResult> reportProduct({
+    required BuyV2Product product,
+    required String reason,
+  }) async =>
+      const BuyV2MutationResult(accepted: false, customerMessage: _notice);
+  @override
+  Future<BuyV2AddressRequestResult> createAddressRequest({
+    String recipient = '',
+  }) async => const BuyV2AddressRequestResult(customerMessage: _notice);
 }
 
 /// Durable Store navigation identity, never a buyer/supplier approval grant.

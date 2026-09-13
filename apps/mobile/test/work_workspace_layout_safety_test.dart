@@ -390,6 +390,91 @@ class _CollectionQrFixture extends CustomPainter {
 }
 
 void main() {
+  test(
+    'RESTOCK01 review catalogue uses exact existing Store and refuses external actions',
+    () async {
+      var account = 'restock-review-account';
+      final seed = StoreReviewSeed(
+        accountScope: account,
+        orderCount: 1000,
+        now: DateTime.now(),
+      );
+      var store = seed.storeId;
+      final bookmarks = _StorePurchaseBookmarks();
+      final controller = WorkProcurementController(
+        currentAccountId: () => account,
+        currentStoreId: () => store,
+        storeApproved: () => true,
+        reviewCatalogueAllowed: () => true,
+        bookmarks: bookmarks,
+        stateStoreFactory: _StorePurchaseState.new,
+      );
+      addTearDown(controller.dispose);
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isTrue,
+      );
+      final session = controller.session!;
+      const enabled =
+          bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+          bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+      expect(controller.usesReviewCatalogue, enabled);
+      if (!enabled) {
+        expect(session.procurementUnavailableMessage, isNotNull);
+        return;
+      }
+      expect(session.procurementUnavailableMessage, isNull);
+      final snapshot = await session.commerceAdapter.refresh();
+      expect(snapshot.products, isNotEmpty);
+      final product = snapshot.products.first;
+      expect(product.seller, startsWith('TEST · '));
+      expect(
+        session.procurementEligibilityFor(product),
+        BuyV2ProcurementEligibility.eligible,
+      );
+      expect(session.addProduct(product.id), isTrue);
+      expect(
+        (await session.commerceAdapter.createAddressRequest()).available,
+        isFalse,
+      );
+      expect(
+        (await session.commerceAdapter.reconcileOrder(
+          idempotencyKey: 'test',
+          paymentReference: 'test',
+        )).outcome,
+        BuyV2OrderPlacementOutcome.unavailable,
+      );
+      final savedContext = bookmarks.value!.context.customerStateOwnerScope;
+      expect(await controller.leave(), isTrue);
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isTrue,
+      );
+      expect(identical(controller.session, session), isTrue);
+      expect(bookmarks.value!.context.customerStateOwnerScope, savedContext);
+      account = 'another-account';
+      controller.invalidateIfChanged();
+      expect(controller.session, isNull);
+      await expectLater(session.commerceAdapter.refresh(), throwsStateError);
+      store = 'ordinary-approved-store';
+      expect(
+        await controller.open(
+          purpose: BuyV2ProcurementPurpose.restock,
+          returnTo: 'dashboard',
+        ),
+        isTrue,
+      );
+      expect(controller.usesReviewCatalogue, isFalse);
+      expect(controller.session!.procurementUnavailableMessage, isNotNull);
+    },
+  );
+
   WorkSession liveStore({ReviewWorkGateway? gateway}) =>
       WorkSession(gateway: gateway)
         ..seedVerifiedWorkspace()
@@ -534,6 +619,7 @@ void main() {
     Widget Function(Widget child)? wrapper,
     WorkProcurementController Function()? procurementFactory,
     bool dashboardAccountAuthenticated = true,
+    BuyV2CustomerStateStore? consumerStateStore,
   }) async {
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = viewport;
@@ -573,7 +659,10 @@ void main() {
     );
     if (procurementFactory != null) {
       final core = BuySession();
-      final consumer = BuyV2Session(core: core);
+      final consumer = BuyV2Session(
+        core: core,
+        customerStateStore: consumerStateStore,
+      );
       addTearDown(core.dispose);
       addTearDown(consumer.dispose);
       final router = GoRouter(
@@ -14037,6 +14126,60 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  for (final compact in [false, true]) {
+    testWidgets(
+      'RESTOCK02 existing test Store renders scoped catalogue $compact',
+      (tester) async {
+        const account = 'restock-render-account';
+        final seed = StoreReviewSeed(
+          accountScope: account,
+          orderCount: 1000,
+          now: DateTime.now(),
+        );
+        final work = liveStore()..activeWorkspace = seed.workspace;
+        final controller = WorkProcurementController(
+          currentAccountId: () => account,
+          currentStoreId: () => work.activeWorkspace?.id,
+          storeApproved: () => work.activeWorkspace?.verified == true,
+          reviewCatalogueAllowed: () => true,
+          bookmarks: _StorePurchaseBookmarks(),
+          stateStoreFactory: _StorePurchaseState.new,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard?section=dashboard',
+          work: work,
+          procurementFactory: () => controller,
+          viewport: compact ? const Size(320, 568) : const Size(360, 800),
+          consumerStateStore: _StorePurchaseState('restock-render-consumer'),
+          textScale: compact ? 2 : 1.4,
+        );
+        await tester.tap(find.byKey(const Key('work-quick-buy')));
+        await tester.pumpAndSettle();
+        const enabled =
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+        expect(
+          find.byKey(const Key('store-restock-review-notice')),
+          enabled ? findsOneWidget : findsNothing,
+        );
+        expect(controller.usesReviewCatalogue, enabled);
+        expect(
+          controller.session!.procurementUnavailableMessage,
+          enabled ? isNull : isNotNull,
+        );
+        if (enabled) {
+          expect(find.text('Store purchase unavailable'), findsNothing);
+          expect(
+            controller.session!.commerceLoadState,
+            BuyV2CommerceLoadState.ready,
+          );
+        }
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
 
   for (final explicitDashboard in [false, true]) {
     testWidgets(
