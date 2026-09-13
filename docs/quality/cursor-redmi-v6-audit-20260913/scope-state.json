@@ -130,11 +130,11 @@
     "locallyQualified": [
       "RV6-D001",
       "RV6-D002",
-      "RV6-D003"
+      "RV6-D003",
+      "RV6-D004"
     ],
     "deviceQualified": [],
     "remainingLocal": [
-      "RV6-D004",
       "RV6-D005",
       "RV6-D006",
       "RV6-D007",
@@ -159,11 +159,13 @@
     "frozenAuditCheckpoint": "HANDOFF.md remains historical authority for514 passes and1177 verified artifacts;no broad audit resumed",
     "additionalAdmissions": {
       "RV6-D002": "cea1699a42bf182c9648719b8780b5ec9afd05ba",
-      "RV6-D003": "3b0fd2fcdbcc444ead93590f7992e6ccb8d9b384"
+      "RV6-D003": "3b0fd2fcdbcc444ead93590f7992e6ccb8d9b384",
+      "RV6-D004": "41c5e36cfd2950521c918271afb56dcff2e02354"
     },
     "sealedImplementationCommits": {
       "RV6-D001": "d532b9dea97a52473a5a95e090a9831fd9635696",
-      "RV6-D002": "55877c20437bdc34c1a90de19904381e94014cde"
+      "RV6-D002": "55877c20437bdc34c1a90de19904381e94014cde",
+      "RV6-D003": "e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa"
     }
   }
 }

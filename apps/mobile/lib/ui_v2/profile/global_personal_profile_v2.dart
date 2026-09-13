@@ -338,35 +338,46 @@ class _GlobalPersonalProfileNameEditorV2State
         top: false,
         child: Padding(
           padding: const EdgeInsets.all(MoolSpacing.md),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              const Text(
-                'This is how people will see you across MoolSocial.',
-                style: TextStyle(color: Color(0xFF5E6378)),
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              TextField(
-                key: const Key('global-personal-profile-name-field'),
-                controller: _controller,
-                autofocus: true,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.done,
-                maxLength: 60,
-                onSubmitted: (_) => _save(),
-                decoration: InputDecoration(
-                  labelText: 'Display name',
-                  hintText: 'Enter your name',
-                  errorText: widget.session.errorMessage,
+          child: LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      const Text(
+                        'This is how people will see you across MoolSocial.',
+                        style: TextStyle(color: Color(0xFF5E6378)),
+                      ),
+                      const SizedBox(height: MoolSpacing.md),
+                      TextField(
+                        key: const Key('global-personal-profile-name-field'),
+                        controller: _controller,
+                        autofocus: true,
+                        textCapitalization: TextCapitalization.words,
+                        textInputAction: TextInputAction.done,
+                        maxLength: 60,
+                        onSubmitted: (_) => _save(),
+                        decoration: InputDecoration(
+                          labelText: 'Display name',
+                          hintText: 'Enter your name',
+                          error: widget.session.errorMessage == null
+                              ? null
+                              : Text(widget.session.errorMessage!),
+                        ),
+                      ),
+                      const Spacer(),
+                      FilledButton(
+                        key: const Key('global-personal-profile-name-save'),
+                        onPressed: _saving ? null : _save,
+                        child: Text(_saving ? 'Saving…' : 'Save display name'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const Spacer(),
-              FilledButton(
-                key: const Key('global-personal-profile-name-save'),
-                onPressed: _saving ? null : _save,
-                child: Text(_saving ? 'Saving…' : 'Save display name'),
-              ),
-            ],
+            ),
           ),
         ),
       ),

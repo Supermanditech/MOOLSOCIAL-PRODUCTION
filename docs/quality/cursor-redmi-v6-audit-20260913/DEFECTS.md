@@ -42,12 +42,16 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Local correction: shared freshness-preserving Chat/tracking/alert summaries and historical invoice/PDF disclosure; 64 connected checks passed, final analysis zero issues, twelve relevant Flutter captures reviewed. All exact owners, test/log hashes, visual limitations and intermediate failures are recorded in UAT.md under RV6-D003 local qualification. Original 112/147, 480 and 510-511 device acceptance and real provider timestamps remain pending; no local result closes this ticket.
 
 ## RV6-D004 - Display-name validation sentence is clipped at normal text size
-- Status: open; confirmed device visual defect. Severity: minor.
+- Status: open; implemented and locally qualified on 2026-09-14; successor Redmi acceptance pending. Severity: minor.
 - Journey: Buy account drawer > Personal profile > Display name > submit whitespace-only draft. Validation rejects it; Android Back hides keyboard.
 - Actual: error remains one truncated line, Enter a display name from 2 to 60 cha..., with and without keyboard at Redmi font scale1.0. The allowed numeric range remains visible; this is not a validation bypass or data-loss claim.
 - Expected: complete validation guidance fits or wraps, including characters, without requiring inference from clipped content.
 - Evidence:198-blank-name-error and199-name-error-keyboard-back. Capture197 contains an accidental whitespace from a tap while delayed autofocus opened the keyboard; it is not itself a defect. No valid profile save occurred.
 - Source correlation: apps/mobile/lib/features/journey01/journey_session.dart:466 supplies the full sentence. Shared profile form owns its error layout; exact rendering cause still to inspect. Connected shared profile UI owner, not Buy catalogue. No implementation during this audit.
+- Local correction: shared name editor renders the complete error as wrapping text and scrolls under constrained keyboard/text layouts. Validation, save operation and return contract unchanged.
+- Local qualification: all 11 profile tests pass (four new D004 cases at 390x844/320x568 and 100%/200% text, each with 220px keyboard inset then hidden); eight themed Flutter PNGs reviewed; analysis of both changed Dart owners reports zero issues. Existing name retained after rejection; Profile return checked. Test insets are not physical Android keyboard evidence.
+- Ownership admission: 41c5e36cfd2950521c918271afb56dcff2e02354 transfers only the shared profile source and existing test in this worktree. Source/test: apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart and apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart. Detailed evidence and initial failed/superseded runs are recorded in UAT.md.
+- Redmi closure remains pending exact successor APK reproduction of captures198/199. No device action or valid real profile save occurred during local qualification.
 
 ## RV6-D005 - Hindi preference changes its value but observed Buy and preference UI remain English
 - Status: open; confirmed device localization/wiring gap. Severity: moderate for Hindi-dependent users.

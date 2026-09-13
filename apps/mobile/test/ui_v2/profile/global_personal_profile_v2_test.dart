@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/ui_v2/profile/global_personal_profile_v2.dart';
 import 'package:moolsocial/ui_v2/profile/global_profile_panel_v2.dart';
+
+import '../buy/buy_v2_screen_test.dart'
+    show captureR66Visual, r66VisualCaptureRoot;
 
 void main() {
   Future<GoRouter> pumpProfile(
@@ -59,12 +64,13 @@ void main() {
     addTearDown(router.dispose);
     await tester.pumpWidget(
       MaterialApp.router(
+        theme: MoolTheme.light(),
         routerConfig: router,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(
             context,
           ).copyWith(textScaler: TextScaler.linear(textScale)),
-          child: child!,
+          child: r66VisualCaptureRoot(child!),
         ),
       ),
     );
@@ -72,6 +78,72 @@ void main() {
     await tester.tap(find.byKey(const Key('open-personal-profile')));
     await tester.pumpAndSettle();
     return router;
+  }
+
+  for (final textScale in [1.0, 2.0]) {
+    for (final size in [const Size(390, 844), const Size(320, 568)]) {
+      testWidgets('D004 complete name validation ${size.width} text $textScale', (
+        tester,
+      ) async {
+        final session = JourneySession(store: MemoryJourneyStore());
+        addTearDown(session.dispose);
+        final originalName = session.profileDisplayName;
+        final router = await pumpProfile(
+          tester,
+          session,
+          size: size,
+          textScale: textScale,
+        );
+        await tester.scrollUntilVisible(
+          find.byKey(const Key('global-personal-profile-name')),
+          180,
+          scrollable: find.descendant(
+            of: find.byKey(const Key('global-personal-profile-content')),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('global-personal-profile-name')));
+        await tester.pumpAndSettle();
+        final field = find.byKey(
+          const Key('global-personal-profile-name-field'),
+        );
+        await tester.enterText(field, '   ');
+        tester.view.viewInsets = const FakeViewPadding(bottom: 220);
+        await tester.pumpAndSettle();
+        await tester.testTextInput.receiveAction(TextInputAction.done);
+        await tester.pumpAndSettle();
+        const message = 'Enter a display name from 2 to 60 characters.';
+        expect(session.errorMessage, message);
+        expect(session.profileDisplayName, originalName);
+        for (final keyboard in [true, false]) {
+          if (!keyboard) {
+            tester.view.viewInsets = FakeViewPadding.zero;
+            await tester.pumpAndSettle();
+          }
+          final error = find.text(message);
+          await tester.ensureVisible(error);
+          await tester.pumpAndSettle();
+          final paragraph = tester.renderObject<RenderParagraph>(error);
+          expect(paragraph.didExceedMaxLines, isFalse);
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(
+            tester,
+            'rv6-d004-${size.width.toInt()}-text-$textScale-keyboard-$keyboard',
+          );
+        }
+        await tester.tap(
+          find.byKey(const Key('global-personal-profile-name-back')),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          router.routeInformationProvider.value.uri.path,
+          '/app/account/identity',
+        );
+        expect(session.profileDisplayName, originalName);
+        expect(tester.takeException(), isNull);
+      });
+    }
   }
 
   testWidgets('one personal profile shows only global account information', (

@@ -2211,3 +2211,34 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | `rv6-d003-invoice-shop-text-2.0.png` | superseded | `CB3ED581446413A8AD688DA4FEA5BEDB8584102771C2FAA4EEE1557BD85480F1` |
 | `rv6-d003-invoice-wholesale-text-1.0.png` | superseded | `0BB3CE37376679E65E235FEAF7730450E88CEF58893D3B15D2C0C19035798CCE` |
 | `rv6-d003-invoice-wholesale-text-2.0.png` | superseded | `8D4C7E1F2F0E180BBDCB5B9BDF48FA960471F3FA631C3FECD5E1000902F711D2` |
+
+## RV6-D004 local qualification - 2026-09-14
+
+- Scope: original Redmi captures198/199 only, full display-name rejection sentence with/without keyboard. No broad audit, real profile save, APK or device action.
+- Admission: 41c5e36cfd2950521c918271afb56dcff2e02354, parent e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa. Exactly two existing profile owners transferred from inherited root claim in this isolated worktree; claim29. Prior checker reconstructed exactly (normalized-LF SHA256 F0A61705FEE0F03F27034306A814412ED7DB7132739306A3FD2EB5BC01C2B2E2). All other rules preserved. Admission pushed, clean/live-equal; pre_commit and subsequent implementation gate passed (claims29/registry4584).
+- Changes: apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart uses uncapped wrapping error text and a constrained scrollable editor, preserving the existing flexible bottom placement when space permits. apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart adds four D004 cases and uses MoolTheme.light for representative text metrics.
+- Final suite: Flutter test --no-pub test/ui_v2/profile/global_personal_profile_v2_test.dart --reporter expanded with visual defines; 11 passed, zero failures, terminal0 (session18105, final chunk292b0a). Includes four new D004 cases at390x844/320x568, text1.0/2.0, each220px inset and hidden. Checks full error RenderParagraph without exceeded lines, unchanged name, no overflow and Profile return. Existing profile navigation/save/safe-return regressions pass.
+- Analysis: Flutter analyze --no-pub for the exact two Dart owners; zero issues, terminal0, chunked5b33. Diff reviewed; no unrelated formatter-only changes.
+- Visuals: all eight themed PNGs inspected; full characters guidance readable at both scales. At320/200% with keyboard inset the editor scrolls to the full error. Host captures model the keyboard inset, not Android's keyboard surface or Android Back. These remain successor Redmi acceptance criteria, not device passes.
+- Initial attempts: admission edit asserted before writing because the policy uses LF; corrected after bounded read. First pre_commit rejected the unstaged two-file admission; staged exact controls and reran normally, no bypass. Initial focused tests2passed/2failed: enlarged text exposed editor overflow, corrected by scrolling; compact profile setup needed scrolling to its lazy name row. Initial unthemed full suite11passed and capture run4passed are superseded for visual qualification: eight root PNGs use Flutter test glyphs. Retained unmodified and not claimed as readable visuals. Final themed run supersedes them.
+- Dependency: no backend/session/native changes. Physical Redmi captures198/199 still await the one successor APK. No D004 device closure.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d004-local-20260914. SHA256 inventory follows.
+
+| Artifact | SHA256 | Disposition |
+| --- | --- | --- |
+| rv6-d004-320-text-1.0-keyboard-false.png | 9AEFA6B5122ACAFBAC568330834F58C2FC1902211D5B66C2100489B199E0837F | Superseded test-font capture; not visual qualification |
+| rv6-d004-320-text-1.0-keyboard-true.png | 5D3D8993412929F407E07AF8FB7E3B68A52DCCB10B1EB5F42D19A5FEC545CDB2 | Superseded test-font capture; not visual qualification |
+| rv6-d004-320-text-2.0-keyboard-false.png | 8AF48950755C386A89FBDB13D0EE04B240041C21237E1FE019E9EE3969B855D9 | Superseded test-font capture; not visual qualification |
+| rv6-d004-320-text-2.0-keyboard-true.png | 021C59C635CF55A5B638DC33BD304DC13911DE09E922C138F5D2BFDCC0B2482E | Superseded test-font capture; not visual qualification |
+| rv6-d004-390-text-1.0-keyboard-false.png | C759BEC3140B6150DFF021E484778E5B14E8345F022E5021C35C419E7AAE7797 | Superseded test-font capture; not visual qualification |
+| rv6-d004-390-text-1.0-keyboard-true.png | 459CA7F292A737E8C189DF9DC2230DCC6F27F4A0002DD50AF51236453BA3FD6F | Superseded test-font capture; not visual qualification |
+| rv6-d004-390-text-2.0-keyboard-false.png | 511AE1BC485589EF60FDD81B29F602D1D7B2B2F4053FC1371F1947AFE20E2CBD | Superseded test-font capture; not visual qualification |
+| rv6-d004-390-text-2.0-keyboard-true.png | C07FE57A602C0C008D606822FDECD0FF1A2D47ED06BA1B7CC0428C80E0818C63 | Superseded test-font capture; not visual qualification |
+| themed/rv6-d004-320-text-1.0-keyboard-false.png | E4E06F4263B0D62E3E56379E157F9AA8B8A96572AF3B9AF410D825E9152A1DBE | Reviewed themed Flutter capture |
+| themed/rv6-d004-320-text-1.0-keyboard-true.png | 10203127A2CCFC1B2D8FCF1F0C2DA034D1165EAD086207048BD91ACC5858A822 | Reviewed themed Flutter capture |
+| themed/rv6-d004-320-text-2.0-keyboard-false.png | FF6FF3BA3F1266A5B448723FA1FD4C576D7F02F68D71475380C94A4F6A777A77 | Reviewed themed Flutter capture |
+| themed/rv6-d004-320-text-2.0-keyboard-true.png | 2772A7FDEE6E46F6019B5177ACAA3864CA8AE4E1FB44C0EF9E6E7E287B1D06F3 | Reviewed themed Flutter capture |
+| themed/rv6-d004-390-text-1.0-keyboard-false.png | 9E61B97895BAAC6EF9C73D7B40ABB0E3498D3A51FC1395D712546FBA886DA70F | Reviewed themed Flutter capture |
+| themed/rv6-d004-390-text-1.0-keyboard-true.png | D9DA3B723190625C017B53440CC9636CA2B173F29BAAFD1744B6173C8A42AAFD | Reviewed themed Flutter capture |
+| themed/rv6-d004-390-text-2.0-keyboard-false.png | FE72E2DC1FAB1D665AF8440FD09D4961503FDB6ADB204D09D716EDE0D0A445C8 | Reviewed themed Flutter capture |
+| themed/rv6-d004-390-text-2.0-keyboard-true.png | 05C39D5AACE0341A629B1BF4C0C9B981A9C0E368753D54C2F52461A066FF3843 | Reviewed themed Flutter capture |
