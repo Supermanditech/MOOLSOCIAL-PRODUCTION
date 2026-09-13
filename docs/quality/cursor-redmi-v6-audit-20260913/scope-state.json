@@ -13,7 +13,7 @@
   },
   "coverage": {
     "inventoryComplete": false,
-    "recordedActionRows": 440,
+    "recordedActionRows": 448,
     "dispositions": {
       "device_observation": 14,
       "device_pass": 355,
@@ -23,7 +23,7 @@
       "source_unreachable": 4,
       "blocked_authentication": 9,
       "device_fail": 1,
-      "blocked_test_data": 11,
+      "blocked_test_data": 19,
       "source_gap": 1,
       "data_observation": 4,
       "scope_boundary_observed": 1
@@ -107,5 +107,5 @@
     "Fixture passes do not establish publication authority or runtime enforcement",
     "No goal-completion claim"
   ],
-  "latestAuditRound": 74
+  "latestAuditRound": 75
 }

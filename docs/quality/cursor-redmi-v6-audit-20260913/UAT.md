@@ -498,3 +498,9 @@ No device actions or product edits;all counters unchanged. Full audit remains ac
 Library-wide references show public Buy only declares scannerLauncher at buy_v2_screen.dart284/312;actual showBuyV2ProductScanner calls occur in Workspace dashboard11278/21635. SCANNER-ROUND74-01 lists unreachable public descendants explicitly;no Workspace navigation or product change. This is not a confirmed customer failure without a promised public entry. Collection camera remains separately authentication-blocked.
 
 440 action rows;other counts unchanged. Source inventory and full audit remain incomplete.
+
+## Round 75 - supplier-media conditional controls
+
+Expanded B-008 into MEDIA-ROUND75-01 through08:gallery/count;pinch/pan/reset/reduced motion;video play/pause/replay;mute;seek;transcript/dismiss;Retry;variant/gallery shrink and background pause. Exact source pointers retained. Each remains blocked_test_data because supplier mediaAssets are absent in the current cohort;illustrations are not substitutes for decoding/playback/variant binding tests. No new defect, asset injection or device action.
+
+448 action rows;19 blocked_test_data rows include parent/descendant coverage and are not19 unique defects. Other counts unchanged;full audit incomplete.
