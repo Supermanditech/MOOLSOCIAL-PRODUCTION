@@ -466,3 +466,11 @@ Source-only reconciliation of buy_v2_views.dart 10794-11250 expands the earlier 
 Redmi TG8HCYTGGQT885OF connected. Captures660-664 physically reviewed: Offers resumed660; category icon opened661; Dairy & bakery selected662 with paneer46 INR92/200g promotion and dairy results; View offer opened exact product663; Android Back retained dairy promotion/grid664. Three device passes, no new confirmed defect. No cart/address/saved edits or transaction. Product visit can update recent history. Provider price/trust claims are not qualified by fixture navigation.
 
 432 action rows;349 device passes;664 physical captures;666 evidence rows;61 public mappings;16 distinct defects. All-category reset, remaining categories and terminal pagination remain pending; full audit and handoff incomplete.
+
+## Round 70 - physical Offers category reset and page return
+
+Captures665-670 reviewed. Selected Dairy highlighted665;All categories666 restores mixed grid while retaining an eligible paneer promotion. Footer667 Next loads noodles101/juice106/facewash111 and top scroll668. Footer669 Previous restores original tomato1/notebook6/chicken11 grid at lower scroll670 with Previous disabled. Three device passes;terminal page remains untested. No new defect or user cart/address/saved mutation.
+
+Execution sequencing note: implementation-gate command yielded session55531; the category-open/capture command ran before its completion was collected. The same gate session was polled to exit0/pass before further actions. This was a sequencing error, not a product pass; subsequent dependent gate actions must await terminal success. No checker changes or bypass were made.
+
+435 action rows;352 device passes;670 physical captures;672 evidence rows;61 public mappings;16 distinct defects. Full audit remains incomplete.
