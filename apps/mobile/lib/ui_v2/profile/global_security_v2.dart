@@ -34,140 +34,146 @@ class GlobalSecurityV2 extends StatelessWidget {
             _present(session.emailAddress) ??
             _present(session.phoneNumber) ??
             'Not added';
-        return Scaffold(
-          key: const Key('global-security-v2'),
-          backgroundColor: palette.canvas,
-          appBar: AppBar(
+        return PopScope<Object?>(
+          canPop: context.canPop(),
+          onPopInvokedWithResult: (didPop, _) {
+            if (!didPop) _leave(context);
+          },
+          child: Scaffold(
+            key: const Key('global-security-v2'),
             backgroundColor: palette.canvas,
-            surfaceTintColor: Colors.transparent,
-            toolbarHeight: 64,
-            leadingWidth: 56,
-            leading: Padding(
-              padding: const EdgeInsets.only(left: MoolSpacing.xs),
-              child: GlobalProfileBackButtonV2(
-                keyName: 'global-security-back',
-                palette: palette,
-                onPressed: () => _leave(context),
+            appBar: AppBar(
+              backgroundColor: palette.canvas,
+              surfaceTintColor: Colors.transparent,
+              toolbarHeight: 64,
+              leadingWidth: 56,
+              leading: Padding(
+                padding: const EdgeInsets.only(left: MoolSpacing.xs),
+                child: GlobalProfileBackButtonV2(
+                  keyName: 'global-security-back',
+                  palette: palette,
+                  onPressed: () => _leave(context),
+                ),
+              ),
+              titleSpacing: MoolSpacing.xs,
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Security',
+                    style: TextStyle(
+                      color: palette.ink,
+                      fontSize: 17,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -.2,
+                    ),
+                  ),
+                  const SizedBox(height: 1),
+                  Text(
+                    'Sign-in, recovery and device access',
+                    style: TextStyle(
+                      color: palette.muted,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
-            titleSpacing: MoolSpacing.xs,
-            title: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Security',
-                  style: TextStyle(
-                    color: palette.ink,
-                    fontSize: 17,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -.2,
-                  ),
-                ),
-                const SizedBox(height: 1),
-                Text(
-                  'Sign-in, recovery and device access',
-                  style: TextStyle(
-                    color: palette.muted,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          body: SafeArea(
-            top: false,
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 480),
-                child: ListView(
-                  key: const Key('global-security-content'),
-                  padding: const EdgeInsets.fromLTRB(
-                    MoolSpacing.md,
-                    MoolSpacing.xs,
-                    MoolSpacing.md,
-                    MoolSpacing.xl,
-                  ),
-                  children: [
-                    _SecurityHero(
-                      authenticated: session.isAuthenticated,
-                      name: identity?.primaryLabel ?? 'MoolSocial account',
-                      palette: palette,
+            body: SafeArea(
+              top: false,
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 480),
+                  child: ListView(
+                    key: const Key('global-security-content'),
+                    padding: const EdgeInsets.fromLTRB(
+                      MoolSpacing.md,
+                      MoolSpacing.xs,
+                      MoolSpacing.md,
+                      MoolSpacing.xl,
                     ),
-                    const SizedBox(height: MoolSpacing.md),
-                    _SecuritySection(
-                      title: 'Account access',
-                      palette: palette,
-                      children: [
-                        if (session.isAuthenticated) ...[
-                          _SecurityDetail(
-                            keyName: 'global-security-status',
-                            icon: Icons.verified_user_outlined,
-                            label: 'Account status',
-                            value: 'Signed in',
-                            valueColor: const Color(0xFF138808),
-                            palette: palette,
-                          ),
-                          _SecurityDetail(
-                            keyName: 'global-security-methods',
-                            icon: Icons.key_outlined,
-                            label: 'Sign-in methods',
-                            value: methods.isEmpty
-                                ? 'MoolSocial sign-in'
-                                : methods.join(' · '),
-                            palette: palette,
-                          ),
-                          _SecurityDetail(
-                            keyName: 'global-security-recovery',
-                            icon: Icons.contact_mail_outlined,
-                            label: 'Recovery contact',
-                            value: recovery,
-                            palette: palette,
-                          ),
-                        ] else
-                          _SecurityAction(
-                            keyName: 'global-security-sign-in',
-                            icon: Icons.login_rounded,
-                            title: 'Sign in',
-                            detail:
-                                'Manage account recovery and access methods',
-                            palette: palette,
-                            onTap: () => _beginSignIn(context),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: MoolSpacing.md),
-                    _SecuritySection(
-                      title: 'Device access',
-                      palette: palette,
-                      children: [
-                        _SecurityAction(
-                          keyName: 'global-security-device-settings',
-                          icon: Icons.settings_outlined,
-                          title: 'App permissions',
-                          detail:
-                              'Camera, location, microphone and notifications',
-                          palette: palette,
-                          onTap: () => _openSettings(context),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: MoolSpacing.md),
-                    if (session.isAuthenticated)
-                      OutlinedButton.icon(
-                        key: const Key('global-security-sign-out'),
-                        onPressed: () => _confirmSignOut(context, palette),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFFB42318),
-                          side: const BorderSide(color: Color(0xFFF0B6B2)),
-                          minimumSize: const Size.fromHeight(44),
-                        ),
-                        icon: const Icon(Icons.logout_rounded, size: 18),
-                        label: const Text('Sign out'),
+                    children: [
+                      _SecurityHero(
+                        authenticated: session.isAuthenticated,
+                        name: identity?.primaryLabel ?? 'MoolSocial account',
+                        palette: palette,
                       ),
-                  ],
+                      const SizedBox(height: MoolSpacing.md),
+                      _SecuritySection(
+                        title: 'Account access',
+                        palette: palette,
+                        children: [
+                          if (session.isAuthenticated) ...[
+                            _SecurityDetail(
+                              keyName: 'global-security-status',
+                              icon: Icons.verified_user_outlined,
+                              label: 'Account status',
+                              value: 'Signed in',
+                              valueColor: const Color(0xFF138808),
+                              palette: palette,
+                            ),
+                            _SecurityDetail(
+                              keyName: 'global-security-methods',
+                              icon: Icons.key_outlined,
+                              label: 'Sign-in methods',
+                              value: methods.isEmpty
+                                  ? 'MoolSocial sign-in'
+                                  : methods.join(' · '),
+                              palette: palette,
+                            ),
+                            _SecurityDetail(
+                              keyName: 'global-security-recovery',
+                              icon: Icons.contact_mail_outlined,
+                              label: 'Recovery contact',
+                              value: recovery,
+                              palette: palette,
+                            ),
+                          ] else
+                            _SecurityAction(
+                              keyName: 'global-security-sign-in',
+                              icon: Icons.login_rounded,
+                              title: 'Sign in',
+                              detail:
+                                  'Manage account recovery and access methods',
+                              palette: palette,
+                              onTap: () => _beginSignIn(context),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: MoolSpacing.md),
+                      _SecuritySection(
+                        title: 'Device access',
+                        palette: palette,
+                        children: [
+                          _SecurityAction(
+                            keyName: 'global-security-device-settings',
+                            icon: Icons.settings_outlined,
+                            title: 'App permissions',
+                            detail:
+                                'Camera, location, microphone and notifications',
+                            palette: palette,
+                            onTap: () => _openSettings(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: MoolSpacing.md),
+                      if (session.isAuthenticated)
+                        OutlinedButton.icon(
+                          key: const Key('global-security-sign-out'),
+                          onPressed: () => _confirmSignOut(context, palette),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFFB42318),
+                            side: const BorderSide(color: Color(0xFFF0B6B2)),
+                            minimumSize: const Size.fromHeight(44),
+                          ),
+                          icon: const Icon(Icons.logout_rounded, size: 18),
+                          label: const Text('Sign out'),
+                        ),
+                    ],
+                  ),
                 ),
               ),
             ),

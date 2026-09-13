@@ -2262,3 +2262,18 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | rv6-d005-disclosure-text-2.0.png | 36C968919D6384CE6C0EF5CF05D753A8D4447BD2A5EAF2434F9D597FE449A2E2 |
 | rv6-d005-selected-text-1.0.png | 44EA3664C166C5B0404F53D98E568EEC867554815EC238DC43EDE8B229BEBBD6 |
 | rv6-d005-selected-text-2.0.png | EE42B1FA4B4EE90438F3C8A4D8A953E786C71842D064E033B60C529FE73BF7BE |
+
+## RV6-D006 local qualification - 2026-09-14
+
+- Original230-235: Buy Quick > profile > Security > Sign in > Android Back > Security > Android Back must restore Buy. Existing test only used the on-screen Back for its second return; new test uses both actual system Back events in the real MoolSocialApp/Buy/sign-in router, plus the ordinary pushed-route control and exact Buy origin URI.
+- Admission9af7e19f79d61cabc5a96ba3be252ec242f2dcbc, parentdce65c05ab54b39751211a608c923c00226e4a26. Only apps/mobile/lib/ui_v2/profile/global_security_v2.dart and apps/mobile/test/ui_v2/profile/global_security_v2_test.dart added; claim33. Existing normalized checker reconstructs SHA256507F26FA6CFBD5C091FEAA6B955C86B88F8B2D1AB741F0CEB04D56B2F53C5FDE. Admission pre_commit/implementation passed and pushed clean/live-equal.
+- New regression reproduced before source correction: session15193 terminal1/f90da6; second Android Back left Security instead of Buy. No host claim that Android launcher rendered. Correction adds PopScope to Security with canPop=context.canPop; unsuccessful pop delegates to existing _leave safe return. No shared router/session/authentication/product data changes.
+- Final suite: flutter test --no-pub test/ui_v2/profile/global_security_v2_test.dart --reporter expanded with existing visual defines,11passed/0failures, session66862 terminal0/43a091. Previous source-equivalent noncapture run11passed too; counts overlap. Existing success/sign-out/Work/safe-origin/compact checks retained. All providers are review fixtures; no real authentication or sign-out.
+- Analysis of both Dart owners: zero issues, terminal0/bb7fe9. Diff check passed. Source reindentation is confined to the Scaffold wrapped by PopScope; no intentional layout change.
+- Two actual Flutter captures reviewed: cancellation shows Security; subsequent system Back shows Quick Buy catalogue and Shop rail. Only D006 destinations are visually qualified, not all incidental product content. No broad audit or physical Redmi action. Exact device original230-235 remains pending successor APK; all frozen prior evidence preserved.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d006-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| rv6-d006-android-back-buy.png | 967EB8350DFFD5C2098134F8BDB4742977A309C767E0B47DFC014132F8284EC8 |
+| rv6-d006-cancelled-security.png | 832A5496B3DEA606A50D3C3D048C78D31526A94A403D75314F4E9D83319FBACF |

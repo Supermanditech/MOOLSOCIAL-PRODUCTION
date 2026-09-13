@@ -65,7 +65,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Ownership admission: 0ee85fd2d98595b0134b6190d3e9af58532990f3. Session source was explicitly rejected by the UI-lane gate and excluded before admission; its authentication, persistence and stored success message are unchanged. The recorded preference screen does not render that stored success message. Existing legacy session-message/localization behavior is not claimed corrected or translated. See UAT.md for exact qualification and preservation evidence.
 
 ## RV6-D006 - Cancelling sign-in loses the originating Buy Back route
-- Status: open; confirmed device navigation defect. Severity: moderate.
+- Status: open; implemented and locally qualified; successor Redmi acceptance pending. Severity: moderate.
 - Controlled reproduction: fresh Buy Quick catalogue > profile drawer > Security > Sign in > Android Back returns Security > Android Back exits to Android launcher instead of Buy.
 - Control: Buy > Security > Android Back without entering sign-in returns the same Buy catalogue (231-232).
 - Evidence:230-235 controlled sequence;233 chooser,234 cancellation to Security,235 launcher. Earlier228 showed the same symptom after the prior Security round but is supporting observation only. No provider selected or authentication performed.
@@ -74,6 +74,9 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Source correlation: Buy _openBuyProfile pushes the shared route; global_security_v2.dart _beginSignIn uses context.go('/sign-in') and only securityLocation for return/cancel. Route-stack restoration needs later shared routing assessment; source correlation is not an isolated-test proof. No code changed.
 - Prior ACCOUNT-017 and ACCOUNT-019 remain narrow first-return passes; they do not qualify this second Back to Buy. PD-040 return requirements remain unresolved end to end.
 
+- Local correction (2026-09-14): Security PopScope allows ordinary pushed-route popping; when sign-in replacement leaves no poppable route, Android Back uses the existing safe _leave return handler. Sign-in/authentication/session/router contracts unchanged.
+- Reproduced with actual MoolSocialApp/Buy/chooser: control Back passed; cancel then second Android Back failed before correction (session15193, terminal1). Final Security suite11passed, zero failures (session66862 terminal0); includes actual Buy double-Back and exact originating URI, existing success/sign-out/Work/safe-return controls. Two Flutter destination captures inspected; analysis of both changed Dart owners zero issues. Device captures230-235 still require successor APK verification; no launcher or device closure claim from host tests.
+- Admission9af7e19f79d61cabc5a96ba3be252ec242f2dcbc adds only global_security_v2.dart and its existing test; claim33. Evidence in UAT.md.
 
 ## RV6-D007 - Related-product Back skips the preceding product detail
 - Status: open; confirmed device navigation defect. Severity: moderate.
