@@ -170,7 +170,6 @@
         "apps/mobile/lib/ui_v2/profile/global_profile_panel_v2.dart",
         "apps/mobile/lib/features/shared/screens/shared_screens.dart",
         "apps/mobile/test/ui_v2/profile/global_profile_entry_contract_test.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
         "artifacts/quality/codex-oppo-r66-5-review-20260907/candidate-contract.md",
@@ -358,7 +357,9 @@
         "docs/quality/cursor-redmi-v6-audit-20260913/HANDOFF.md",
         "docs/quality/cursor-redmi-v6-audit-20260913/apk-regression-state.json",
         "docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt",
-        "docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt"
+        "docs/quality/cursor-redmi-v6-audit-20260913/uaw-cursor-redmi-v6-review-20260913-build-provenance.txt",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart"
       ]
     }
   ],
