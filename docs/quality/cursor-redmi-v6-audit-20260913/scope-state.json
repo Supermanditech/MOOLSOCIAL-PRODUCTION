@@ -145,11 +145,11 @@
       "RV6-D015",
       "RV6-D016",
       "RV6-D017",
-      "RV6-D018"
+      "RV6-D018",
+      "RV6-D020"
     ],
     "deviceQualified": [],
     "remainingLocal": [
-      "RV6-D020",
       "RV6-D021",
       "RV6-D022"
     ],
@@ -164,7 +164,8 @@
       "RV6-D006": "9af7e19f79d61cabc5a96ba3be252ec242f2dcbc",
       "RV6-D007": "877656e54eab174f3c4dc698da23799553d8023a",
       "RV6-D008": "6104c9cc83d3407a142490e3fd4ac23c2b7cfec3",
-      "RV6-D013": "da9555f36919292a19f74ee1bff162a5730dec27"
+      "RV6-D013": "da9555f36919292a19f74ee1bff162a5730dec27",
+      "RV6-D020": "213d2e6c41fa4c123b9648fb4913e015bb973040"
     },
     "sealedImplementationCommits": {
       "RV6-D001": "d532b9dea97a52473a5a95e090a9831fd9635696",
@@ -188,6 +189,9 @@
     },
     "reconciledWithoutProductChange": {
       "RV6-D019": "Original registered capture hashes verified; minimized bike9+ visible in910/911/913; no product change justified. Successor Redmi check retained; not device-closed or implemented."
+    },
+    "reconciliationCommits": {
+      "RV6-D019": "70b117b966a58ca4a551edb31742e175c2723dde"
     }
   }
 }

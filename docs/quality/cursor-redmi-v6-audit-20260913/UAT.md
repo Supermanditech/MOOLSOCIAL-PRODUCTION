@@ -2643,3 +2643,31 @@ Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d019
 | real-app-before/rv6-d019-minimized-1-text-2.0.png | 8E6249AC8A14831E34335850A6582932DC68FB1C32CB77769740728759DB657C |
 | real-app-reproduction.log | 1974531C24BD2A68C5B4E8D553F8E1D6E77093533B885C5D9EAF1C69C6E9D9F4 |
 | reproduction.log | EDB6F6C9327A1EAA1DD79C8D9DEE7424096BF23FEAA1B485D4B07D1F03C08B63 |
+
+
+## RV6-D020 local qualification - 14 September 2026
+
+Locally qualified; open pending successor-APK Redmi acceptance. Original captures931-933 verified against EVIDENCE.csv;932 visibly clips the final No new conversations explanation below Android navigation.
+
+Exact one-source-owner admission under founder limited standing authorization:213d2e6c41fa4c123b9648fb4913e015bb973040, parent70b117b966a58ca4a551edb31742e175c2723dde. Transferred only apps/mobile/lib/features/chat/screens/chat_settings_screen.dart from root to this lane;37 owners, disjoint claims. Existing checker rules preserved by normalized-prior SHA256023D1887F9E52F92CE3374BE3E7B41DB47D7317FD7FD2625B229F90ADB726B89 reconstruction; exact parent/branch/path/subject/two-control admission constraints. Admission gates passed, pushed, clean and live remote equal. No other worktree edits.
+
+Implementation: three lines add bottom viewPadding to the existing message-permission SingleChildScrollView. Existing text, permission choices, save behavior and sheet dismissal remain unchanged. Tests added only to already-owned apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart. No additional test-owner transfer.
+
+Baseline two cases at390x844, normal/200% text,48px Android inset fail: explanation extends to818 instead of usable796 boundary. Earlier reproduction.log failed before sheet entry because a lazy settings row required scrolling; test setup corrected without product edits, retained separately. Corrected and final formatted focused tests:2 passed. Existing chat_settings_hub_test.dart:12 passed (read/run only), covering shared returns and privacy controls. Analysis of both changed Dart owners:zero issues. Two corrected actual Flutter captures reviewed: full final explanation visible above inset. At200%, sheet scrolls; header is partly above viewport after scrolling to final explanation, not missing content. Android Back dismisses picker to settings without a save confirmation. Local fixture, not authenticated provider qualification.
+
+Remaining device requirement: exact931-933 reproduction and necessary dismissal on checksum-bound successor Redmi APK. No device changes, original closure or APK. Changed owners: Chat settings source, Buy screen test, UAT.md, DEFECTS.md and scope-state.json.
+
+Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d020-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | D3F4445E3EEB1D919B9250CE6326762B1CB464CD31E834510492C7E009F7CCDD |
+| baseline/rv6-d020-audience-text-1.0.png | 181099ECB7ED0071C5E10438BFDC7E9FB5ED165A7517EEEFEC09C6434AD8F85F |
+| baseline/rv6-d020-audience-text-2.0.png | BAC2470843D70961B7BCD464906CB6AE0344D7ADFE06C954BF097402BA624A08 |
+| baseline.log | 24E805FF02CED4544AD28800C9BDB3898805BA8AE2197FF674465268B96C14FE |
+| chat-regression.log | F22FAEDA196337699904EB8D4AC23FDB9FD0A1CEB6C93328ADA3A951DE92BF2F |
+| corrected/rv6-d020-audience-text-1.0.png | FD3E25A083F1810CF54FE2A3DED56DA2F4A732CE71949532A517FB39F36EE158 |
+| corrected/rv6-d020-audience-text-2.0.png | B217E420BE93FE45A3D89BB3FB02AF132DF558E67C619CFADB6E7C596F8998FF |
+| corrected.log | 91A3DB0974270C8131DCD7DBD1B62BB2653E27AFE26B53E434D3E98AE3B6D980 |
+| final-focused.log | 3C7471E233A05A00B7E76D6A3911F2186BFE53196E35EBCDBEB01EEBD2705080 |
+| reproduction.log | F124500B7FFF18A1D7AC6E6EC7BBFA12C8D2E415349EEF96AC5558DCAA0903AB |

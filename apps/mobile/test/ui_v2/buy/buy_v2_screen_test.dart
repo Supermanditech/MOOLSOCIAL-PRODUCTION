@@ -9909,6 +9909,76 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('RV6 D020 audience explanation clears Android inset $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      tester.view.padding = const FakeViewPadding(bottom: 48);
+      tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'manual',
+            areaLabel: 'Sardarpura',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      addTearDown(journey.dispose);
+      await journey.start();
+      await tester.pumpWidget(
+        r66VisualCaptureRoot(
+          MoolSocialApp(
+            session: journey,
+            initialLocation: '/app/chat/inbox?return=%2Fapp%2Fbuy%3Fsub%3Dshop',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-more')));
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(const Key('chat-more-settings')));
+      await tester.pumpAndSettle();
+      final setting = find.byKey(const Key('chat-settings-who-can-message'));
+      await tester.scrollUntilVisible(
+        setting,
+        180,
+        scrollable: find.descendant(
+          of: find.byKey(const Key('chat-settings-list')),
+          matching: find.byType(Scrollable),
+        ),
+      );
+      await tester.ensureVisible(setting);
+      await tester.pumpAndSettle();
+      await tester.tap(setting);
+      await tester.pumpAndSettle();
+      final explanation = find.text(
+        'Existing conversations stay available; no one new can start.',
+      );
+      await tester.ensureVisible(explanation);
+      await tester.pumpAndSettle();
+      await captureR66Visual(tester, 'rv6-d020-audience-text-$scale');
+      expect(tester.getBottomRight(explanation).dy, lessThanOrEqualTo(796));
+      expect(explanation.hitTestable(), findsOneWidget);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('chat-message-permission-picker')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('chat-settings-screen')), findsOneWidget);
+      expect(find.text('Message permission saved.'), findsNothing);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   final d018Cases = [
     for (final scale in [1.0, 2.0])
       for (final systemBack in [true, false])
