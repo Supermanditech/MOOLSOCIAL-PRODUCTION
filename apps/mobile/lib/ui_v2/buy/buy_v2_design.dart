@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
@@ -13,6 +15,898 @@ final NumberFormat _buyV2Currency = NumberFormat.currency(
 );
 
 String buyV2Money(num value) => _buyV2Currency.format(value);
+
+/// Mode artwork is illustrative, never evidence of a vehicle assignment.
+enum BuyV2DeliveryArtwork { quick, wholesale, bulk, courier }
+
+BuyV2DeliveryArtwork buyV2DeliveryArtworkFor(
+  BuyV2Product product, {
+  BuyV2FulfilmentMode? fulfilmentMode,
+}) {
+  if (product.destination == BuyV2Destination.wholesale) {
+    // Match the existing Wholesale/Bulk catalogue buckets, not basket quantity.
+    return product.minimumOrder <= 2
+        ? BuyV2DeliveryArtwork.wholesale
+        : BuyV2DeliveryArtwork.bulk;
+  }
+  return (fulfilmentMode ?? buyV2CatalogueFulfilmentModeFor(product)) ==
+          BuyV2FulfilmentMode.quickLocal
+      ? BuyV2DeliveryArtwork.quick
+      : BuyV2DeliveryArtwork.courier;
+}
+
+BuyV2DeliveryArtwork buyV2DeliveryArtworkForLines(
+  Iterable<BuyV2CartLine> lines, {
+  required BuyV2FulfilmentMode Function(BuyV2Product) fulfilmentModeFor,
+}) {
+  final modes = lines
+      .map(
+        (line) => buyV2DeliveryArtworkFor(
+          line.product,
+          fulfilmentMode: fulfilmentModeFor(line.product),
+        ),
+      )
+      .toSet();
+  if (modes.length == 1) return modes.single;
+  if (modes.isNotEmpty &&
+      modes.every(
+        (mode) =>
+            mode == BuyV2DeliveryArtwork.wholesale ||
+            mode == BuyV2DeliveryArtwork.bulk,
+      )) {
+    return BuyV2DeliveryArtwork.bulk;
+  }
+  return BuyV2DeliveryArtwork.courier;
+}
+
+/// Decorative companion to the existing readable mode/status label.
+class BuyV2DeliveryModeIcon extends StatelessWidget {
+  const BuyV2DeliveryModeIcon({
+    super.key,
+    required this.artwork,
+    this.size = 20,
+    this.color = BuyV2Colors.navy,
+  });
+
+  final BuyV2DeliveryArtwork artwork;
+  final double size;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) => ExcludeSemantics(
+    child: SizedBox.square(
+      dimension: size,
+      child: switch (artwork) {
+        BuyV2DeliveryArtwork.courier => Icon(
+          Icons.local_shipping_outlined,
+          size: size,
+          color: color,
+        ),
+        _ => CustomPaint(painter: _BuyV2DrivenFreightPainter(artwork, color)),
+      },
+    ),
+  );
+}
+
+class _BuyV2DrivenFreightPainter extends CustomPainter {
+  const _BuyV2DrivenFreightPainter(this.artwork, this.color);
+
+  final BuyV2DeliveryArtwork artwork;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.scale(size.width / 24, size.height / 24);
+    final line = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5
+      ..strokeJoin = StrokeJoin.round
+      ..strokeCap = StrokeCap.round;
+    final fill = Paint()..color = color;
+    if (artwork == BuyV2DeliveryArtwork.quick) {
+      canvas.drawCircle(const Offset(5, 19), 3, line);
+      canvas.drawCircle(const Offset(20, 19), 3, line);
+      canvas.drawCircle(const Offset(14, 4), 2, fill);
+      canvas.drawPath(
+        Path()
+          ..moveTo(12, 7)
+          ..lineTo(10, 12)
+          ..lineTo(14, 14)
+          ..lineTo(12, 19)
+          ..moveTo(12, 7)
+          ..lineTo(16, 10)
+          ..lineTo(19, 9)
+          ..moveTo(18, 9)
+          ..lineTo(20, 19)
+          ..moveTo(5, 19)
+          ..lineTo(8, 13)
+          ..lineTo(15, 13)
+          ..moveTo(5, 19)
+          ..lineTo(15, 19),
+        line,
+      );
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(1, 8, 6, 5),
+          const Radius.circular(1),
+        ),
+        line,
+      );
+      canvas.restore();
+      return;
+    }
+    void tempo() {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          const Rect.fromLTWH(1, 6, 11, 11),
+          const Radius.circular(1),
+        ),
+        line,
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(12, 17)
+          ..lineTo(23, 17)
+          ..lineTo(23, 12)
+          ..lineTo(20, 8)
+          ..lineTo(14, 8)
+          ..lineTo(14, 17),
+        line,
+      );
+      // The driver is inside the cab, with a head and seated body.
+      canvas.drawCircle(const Offset(17.5, 10.5), 1.3, fill);
+      canvas.drawPath(
+        Path()
+          ..moveTo(17, 13)
+          ..lineTo(17, 15)
+          ..lineTo(20, 15)
+          ..moveTo(17, 13)
+          ..lineTo(20, 12.5),
+        line,
+      );
+      canvas.drawCircle(const Offset(5, 19), 2, line);
+      canvas.drawCircle(const Offset(19, 19), 2, line);
+    }
+
+    if (artwork == BuyV2DeliveryArtwork.bulk) {
+      canvas.save();
+      canvas.clipPath(
+        Path()
+          ..fillType = PathFillType.evenOdd
+          ..addRect(const Rect.fromLTWH(0, 0, 24, 24))
+          ..addRect(const Rect.fromLTWH(7, 11.4, 17, 12.6)),
+      );
+      canvas.scale(.68);
+      tempo();
+      canvas.restore();
+      canvas.translate(7, 8);
+      canvas.scale(.68);
+    }
+    tempo();
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_BuyV2DrivenFreightPainter oldDelegate) =>
+      oldDelegate.artwork != artwork || oldDelegate.color != color;
+}
+
+/// A persistent vertical overflow cue. The list keeps its own controller,
+/// gestures, focus and accessibility scroll actions; the paint intercepts none.
+class BuyV2VerticalScrollIndicator extends StatefulWidget {
+  const BuyV2VerticalScrollIndicator({super.key, required this.child});
+
+  final Widget child;
+
+  @override
+  State<BuyV2VerticalScrollIndicator> createState() =>
+      _BuyV2VerticalScrollIndicatorState();
+}
+
+class _BuyV2VerticalScrollIndicatorState
+    extends State<BuyV2VerticalScrollIndicator> {
+  final _metrics = ValueNotifier<ScrollMetrics?>(null);
+
+  void _update(ScrollMetrics metrics, int depth) {
+    // A nested horizontal product rail must never move the vertical ball.
+    if (depth == 0 && metrics.axis == Axis.vertical) {
+      _metrics.value = metrics.copyWith();
+    }
+  }
+
+  @override
+  void dispose() {
+    _metrics.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      NotificationListener<ScrollMetricsNotification>(
+        onNotification: (notification) {
+          _update(notification.metrics, notification.depth);
+          return false;
+        },
+        child: NotificationListener<ScrollNotification>(
+          onNotification: (notification) {
+            _update(notification.metrics, notification.depth);
+            return false;
+          },
+          child: CustomPaint(
+            foregroundPainter: _BuyV2VerticalScrollPainter(_metrics),
+            // An eight-pixel edge gutter keeps the ball off category/card taps.
+            child: Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: widget.child,
+            ),
+          ),
+        ),
+      );
+}
+
+class _BuyV2VerticalScrollPainter extends CustomPainter {
+  _BuyV2VerticalScrollPainter(this.metrics) : super(repaint: metrics);
+
+  final ValueNotifier<ScrollMetrics?> metrics;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final current = metrics.value;
+    if (current == null ||
+        !size.isFinite ||
+        size.height < 12 ||
+        size.width < 12) {
+      return;
+    }
+    final extent = current.maxScrollExtent - current.minScrollExtent;
+    if (!extent.isFinite || extent <= 0.5 || current.viewportDimension <= 0) {
+      return;
+    }
+    var fraction = ((current.pixels - current.minScrollExtent) / extent).clamp(
+      0.0,
+      1.0,
+    );
+    if (current.axisDirection == AxisDirection.up) fraction = 1 - fraction;
+    final x = size.width - 6;
+    const inset = 6.0;
+    final bottom = size.height - inset;
+    canvas.drawLine(
+      Offset(x, inset),
+      Offset(x, bottom),
+      Paint()
+        ..color = const Color(0xFF8993A2)
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+    canvas.drawCircle(
+      Offset(x, inset + (bottom - inset) * fraction),
+      5,
+      Paint()..color = const Color(0xFF1446D9),
+    );
+  }
+
+  @override
+  bool hitTest(Offset position) => false;
+
+  @override
+  bool shouldRepaint(_BuyV2VerticalScrollPainter oldDelegate) =>
+      oldDelegate.metrics != metrics;
+}
+
+/// Layout-only exclusions for the default floating cart, scoped to one surface.
+class BuyV2CartAvoidanceScope extends StatefulWidget {
+  const BuyV2CartAvoidanceScope({
+    super.key,
+    required this.child,
+    this.navigationIdentity,
+    this.cartVisible = true,
+  });
+  final Widget child;
+  final Object? navigationIdentity;
+  final bool cartVisible;
+
+  static BuyV2CartAvoidanceLayout? of(BuildContext context) => context
+      .dependOnInheritedWidgetOfExactType<_BuyV2CartAvoidanceOwner>()
+      ?.layout;
+
+  @override
+  State<BuyV2CartAvoidanceScope> createState() =>
+      _BuyV2CartAvoidanceScopeState();
+}
+
+class _BuyV2CartAvoidanceScopeState extends State<BuyV2CartAvoidanceScope> {
+  final layout = BuyV2CartAvoidanceLayout();
+  Object? _suspendedIdentity;
+  double _suspendedDockHeight = 0;
+
+  @override
+  void didUpdateWidget(BuyV2CartAvoidanceScope oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.cartVisible && !widget.cartVisible) {
+      _suspendedIdentity = oldWidget.navigationIdentity;
+      _suspendedDockHeight = layout.dockHeight;
+      layout.resetDock();
+    } else if (!oldWidget.cartVisible && widget.cartVisible) {
+      layout._setDockHeight(
+        _suspendedIdentity == widget.navigationIdentity
+            ? _suspendedDockHeight
+            : 0,
+      );
+      _suspendedIdentity = null;
+      _suspendedDockHeight = 0;
+    } else if (oldWidget.navigationIdentity != widget.navigationIdentity) {
+      layout.resetDock();
+    }
+  }
+
+  @override
+  void dispose() {
+    layout.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => _BuyV2CartAvoidanceOwner(
+    layout: layout,
+    child: NotificationListener<ScrollNotification>(
+      onNotification: (_) {
+        layout.schedule();
+        return false;
+      },
+      child: NotificationListener<SizeChangedLayoutNotification>(
+        onNotification: (_) {
+          layout.schedule();
+          return false;
+        },
+        child: widget.child,
+      ),
+    ),
+  );
+}
+
+class _BuyV2CartAvoidanceOwner extends InheritedWidget {
+  const _BuyV2CartAvoidanceOwner({required this.layout, required super.child});
+  final BuyV2CartAvoidanceLayout layout;
+  @override
+  bool updateShouldNotify(_BuyV2CartAvoidanceOwner oldWidget) =>
+      oldWidget.layout != layout;
+}
+
+class BuyV2CartAvoidanceRegion extends StatefulWidget {
+  const BuyV2CartAvoidanceRegion({super.key, required this.child});
+  final Widget child;
+  @override
+  State<BuyV2CartAvoidanceRegion> createState() =>
+      _BuyV2CartAvoidanceRegionState();
+}
+
+/// Keeps the content scrollable above a separately parked Cart when the
+/// visible decision regions leave no unobstructed floating position.
+class BuyV2CartAvoidanceViewport extends StatelessWidget {
+  const BuyV2CartAvoidanceViewport({
+    super.key,
+    required this.child,
+    this.reserveBottomSpace = true,
+  });
+  final Widget child;
+  final bool reserveBottomSpace;
+
+  @override
+  Widget build(BuildContext context) {
+    final layout = BuyV2CartAvoidanceScope.of(context);
+    if (layout == null) return child;
+    return AnimatedBuilder(
+      animation: layout,
+      child: child,
+      builder: (context, child) => Padding(
+        padding: EdgeInsets.only(
+          bottom: reserveBottomSpace ? layout.dockHeight : 0,
+        ),
+        child: ClipRect(
+          key: const ValueKey('buy-cart-content-viewport'),
+          child: child,
+        ),
+      ),
+    );
+  }
+}
+
+class _BuyV2CartAvoidanceRegionState extends State<BuyV2CartAvoidanceRegion> {
+  BuyV2CartAvoidanceLayout? _layout;
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final next = BuyV2CartAvoidanceScope.of(context);
+    if (next != _layout) {
+      _layout?._regions.remove(context);
+      _layout?.schedule();
+      _layout = next;
+      next?._regions.add(context);
+    }
+    _layout?.schedule();
+  }
+
+  @override
+  void deactivate() {
+    _layout?._regions.remove(context);
+    _layout?.schedule();
+    super.deactivate();
+  }
+
+  @override
+  void dispose() {
+    _layout?._regions.remove(context);
+    _layout?.schedule();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _layout?._regions.add(context);
+    _layout?.schedule();
+    return SizeChangedLayoutNotifier(child: widget.child);
+  }
+}
+
+class BuyV2CartAvoidanceLayout extends ChangeNotifier {
+  final _regions = <BuildContext>{};
+  bool _pending = false;
+  bool _disposed = false;
+  double _dockHeight = 0;
+  Size? _available;
+
+  double get dockHeight => _dockHeight;
+
+  void resetDock() => _setDockHeight(0);
+
+  void _setDockHeight(double height) {
+    if (_dockHeight == height) return;
+    _dockHeight = height;
+    schedule();
+  }
+
+  void schedule() {
+    if (_pending || _disposed) return;
+    _pending = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _pending = false;
+      if (!_disposed) notifyListeners();
+    });
+    WidgetsBinding.instance.ensureVisualUpdate();
+  }
+
+  Offset place(Offset preferred, Size cart, Size available, RenderBox owner) {
+    const edge = 8.0;
+    if (_available != available) {
+      _available = available;
+      resetDock();
+    }
+    final dockPosition = Offset(
+      (available.width - cart.width - edge).clamp(edge, double.infinity),
+      (available.height - cart.height - edge).clamp(edge, double.infinity),
+    );
+    // Scrolling or disappearing content can make the user's preference legal
+    // again without changing the viewport or navigation identity.
+    final viewport = Offset.zero & available;
+    final obstacles = <Rect>[];
+    for (final region in _regions) {
+      if (!region.mounted) continue;
+      final box = region.findRenderObject();
+      if (box is! RenderBox || !box.attached || !box.hasSize) continue;
+      RenderObject? ancestor = box;
+      while (ancestor != null && ancestor != owner) {
+        if (ancestor is RenderBox && !ancestor.hasSize) break;
+        ancestor = ancestor.parent;
+      }
+      if (ancestor != owner) continue;
+      final bounds = MatrixUtils.transformRect(
+        box.getTransformTo(owner),
+        Offset.zero & box.size,
+      ).inflate(6);
+      if (bounds.overlaps(viewport)) obstacles.add(bounds);
+    }
+    bool clear(Offset position) =>
+        !obstacles.any((rect) => rect.overlaps(position & cart));
+    if (clear(preferred)) {
+      _setDockHeight(0);
+      return preferred;
+    }
+    final maxX = (available.width - cart.width - edge).clamp(
+      edge,
+      double.infinity,
+    );
+    final maxY = (available.height - cart.height - edge).clamp(
+      edge,
+      double.infinity,
+    );
+    final xs = <double>{preferred.dx, edge, maxX};
+    final ys = <double>{preferred.dy, edge, maxY};
+    for (final obstacle in obstacles) {
+      xs.addAll([obstacle.left - cart.width, obstacle.right]);
+      ys.addAll([obstacle.top - cart.height, obstacle.bottom]);
+    }
+    Offset? best;
+    var distance = double.infinity;
+    for (final x in xs) {
+      for (final y in ys) {
+        final candidate = Offset(x.clamp(edge, maxX), y.clamp(edge, maxY));
+        final nextDistance = (candidate - preferred).distanceSquared;
+        if (nextDistance < distance && clear(candidate)) {
+          best = candidate;
+          distance = nextDistance;
+        }
+      }
+    }
+    if (best != null) {
+      _setDockHeight(0);
+      return best;
+    }
+    _setDockHeight(cart.height + edge * 2);
+    return dockPosition;
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _regions.clear();
+    super.dispose();
+  }
+}
+
+/// Natural bounds for a current value using the same inherited font and scaler
+/// as its Text. Callers still own available width, placement and tap targets.
+Size buyV2ValueTextSize(
+  BuildContext context,
+  String text,
+  TextStyle style, {
+  double maxWidth = double.infinity,
+  int? maxLines = 1,
+}) {
+  final painter = TextPainter(
+    text: TextSpan(
+      text: text,
+      style: DefaultTextStyle.of(context).style.merge(style),
+    ),
+    textDirection: Directionality.of(context),
+    textScaler: MediaQuery.textScalerOf(context),
+    locale: Localizations.maybeLocaleOf(context),
+    maxLines: maxLines,
+  )..layout(maxWidth: maxWidth);
+  final size = Size(
+    painter.width.ceilToDouble(),
+    painter.height.ceilToDouble(),
+  );
+  painter.dispose();
+  return size;
+}
+
+/// Keeps an identity readable when enlarged text needs the full row width.
+class BuyV2AdaptiveIdentityRow extends StatelessWidget {
+  const BuyV2AdaptiveIdentityRow({
+    super.key,
+    required this.leading,
+    required this.body,
+    this.trailing,
+    this.spacing = 8,
+  });
+
+  final Widget leading;
+  final Widget body;
+  final Widget? trailing;
+  final double spacing;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      if (MediaQuery.textScalerOf(context).scale(1) > 1.4 &&
+          constraints.maxWidth < 480) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(children: [leading, const Spacer(), ?trailing]),
+            SizedBox(height: spacing),
+            body,
+          ],
+        );
+      }
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          leading,
+          SizedBox(width: spacing),
+          Expanded(child: body),
+          if (trailing case final action?) ...[
+            SizedBox(width: spacing),
+            action,
+          ],
+        ],
+      );
+    },
+  );
+}
+
+/// Converts the server-owned delivery fact into one compact buyer promise.
+///
+/// Google route duration is only one upstream input. This presentation helper
+/// never calculates or guesses an ETA; it renders the complete promise already
+/// supplied through [BuyV2ProductFactsSnapshot].
+String buyV2BuyerDeliveryPromise(BuyV2ProductFactsSnapshot facts) {
+  if (facts.stale) return 'Delivery time needs review';
+
+  final orderability = facts.orderabilityLabel.trim().toLowerCase();
+  if (orderability.contains('checking')) return 'Checking delivery time';
+  if (orderability.contains('unavailable') ||
+      orderability.contains('not available')) {
+    return 'Currently unavailable';
+  }
+
+  return buyV2BuyerDeliveryPromiseSource(facts.deliveryPromise);
+}
+
+String buyV2BuyerDeliveryPromiseSource(String value) {
+  final source = value.trim();
+  final normalized = source.toLowerCase();
+  if (normalized.startsWith('delivered ')) {
+    return source.replaceFirst(
+      RegExp(r'^delivered\b', caseSensitive: false),
+      'Delivery',
+    );
+  }
+  if (normalized.startsWith('delivery ') ||
+      normalized.startsWith('dispatch') ||
+      normalized.contains('delivery schedule')) {
+    return source;
+  }
+  final minutes = RegExp(
+    r'(\d+)\s*(?:min|minute)s?',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (minutes != null) return 'Delivery in ${minutes.group(1)} min';
+  final longerDuration = RegExp(
+    r'(\d+)\s*(hour|day)s?',
+    caseSensitive: false,
+  ).firstMatch(source);
+  if (longerDuration != null) {
+    final amount = longerDuration.group(1)!;
+    final unit = longerDuration.group(2)!.toLowerCase();
+    return 'Delivery in $amount $unit${amount == '1' ? '' : 's'}';
+  }
+  return 'Delivery $source';
+}
+
+String buyV2DeliveryPromiseSummary({
+  required String promise,
+  String? promisedByLabel,
+}) {
+  final relative = buyV2BuyerDeliveryPromiseSource(promise);
+  final deadline = promisedByLabel?.trim();
+  return deadline == null || deadline.isEmpty
+      ? relative
+      : '$relative · $deadline';
+}
+
+String buyV2OrderPromiseSummary(BuyV2Order order) {
+  final summary = buyV2DeliveryPromiseSummary(
+    promise: order.promise,
+    promisedByLabel: order.promisedByLabel,
+  );
+  return order.status == BuyV2OrderStatus.delivered
+      ? 'Original promise: $summary'
+      : summary;
+}
+
+String buyV2AutomaticFulfilmentLabel(BuyV2Destination destination) =>
+    switch (destination) {
+      BuyV2Destination.shop ||
+      BuyV2Destination.wholesale => 'Mool delivery partner',
+      BuyV2Destination.medicine => 'Mool Pharmacy Partner',
+      BuyV2Destination.orders => 'Mool delivery partner',
+    };
+
+String buyV2FulfilmentModeLabel(BuyV2FulfilmentMode mode) => switch (mode) {
+  BuyV2FulfilmentMode.quickLocal => 'Quick local delivery',
+  BuyV2FulfilmentMode.standardCourier => 'Standard/courier delivery',
+  BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+};
+
+String buyV2CompactFulfilmentModeLabel(BuyV2FulfilmentMode mode) =>
+    switch (mode) {
+      BuyV2FulfilmentMode.quickLocal => 'Quick local',
+      BuyV2FulfilmentMode.standardCourier => 'Courier',
+      BuyV2FulfilmentMode.bulkFreight => 'Bulk freight',
+    };
+
+const buyV2ProductOfferDecisionContractVersion =
+    'buy-product-offer-decision-v1';
+
+/// UI/API handoff for optional, workspace-authorized Wholesale trade context.
+///
+/// The genuine runtime adapter must resolve the authenticated retailer
+/// workspace outside this presentation layer. It receives only the stable
+/// product IDs and the customer-visible delivery locality, and returns a
+/// timestamped signal that must never override price, stock, delivery or Cart
+/// authorization from [BuyV2ProductFactsSnapshot].
+const buyV2WholesaleTradeDecisionContractVersion =
+    'buy-wholesale-trade-decision-v1';
+
+const buyV2WholesaleCartTradeSummaryContractVersion =
+    'buy-wholesale-cart-trade-summary-v1';
+
+const buyV2WholesaleCheckoutPackCountContractVersion =
+    'buy-wholesale-checkout-pack-count-v1';
+
+const buyV2WholesaleCheckoutReceivingLinesContractVersion =
+    'buy-wholesale-checkout-receiving-lines-v1';
+
+const buyV2WholesaleCheckoutReceivingLocationContractVersion =
+    'buy-wholesale-checkout-receiving-location-v1';
+
+enum BuyV2WholesaleTradeSignalState { ready, unavailable, stale, error }
+
+@immutable
+class BuyV2WholesaleTradeSignal {
+  const BuyV2WholesaleTradeSignal({
+    required this.productId,
+    required this.state,
+    required this.localityLabel,
+    required this.headline,
+    required this.detail,
+    required this.sourceLabel,
+    required this.updatedLabel,
+    this.priceValidUntilLabel,
+  });
+
+  const BuyV2WholesaleTradeSignal.unavailable({required this.productId})
+    : state = BuyV2WholesaleTradeSignalState.unavailable,
+      localityLabel = '',
+      headline = 'Local market insight unavailable',
+      detail =
+          'You can still compare the current price, stock and delivery time.',
+      sourceLabel = '',
+      updatedLabel = '',
+      priceValidUntilLabel = null;
+
+  final String productId;
+  final BuyV2WholesaleTradeSignalState state;
+  final String localityLabel;
+  final String headline;
+  final String detail;
+  final String sourceLabel;
+  final String updatedLabel;
+  final String? priceValidUntilLabel;
+
+  bool get hasCurrentSignal =>
+      state == BuyV2WholesaleTradeSignalState.ready &&
+      localityLabel.trim().isNotEmpty &&
+      headline.trim().isNotEmpty &&
+      detail.trim().isNotEmpty &&
+      sourceLabel.trim().isNotEmpty &&
+      updatedLabel.trim().isNotEmpty;
+}
+
+abstract interface class BuyV2WholesaleTradeDecisionAdapter {
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  });
+}
+
+/// Production-safe default. Tests inject contract-conforming fixtures; the
+/// application never manufactures local demand, popularity or price validity.
+final class BuyV2UnavailableWholesaleTradeDecisionAdapter
+    implements BuyV2WholesaleTradeDecisionAdapter {
+  const BuyV2UnavailableWholesaleTradeDecisionAdapter();
+
+  @override
+  Future<BuyV2WholesaleTradeSignal> load({
+    required String productId,
+    required String canonicalProductId,
+    required String? deliveryLocality,
+  }) async => BuyV2WholesaleTradeSignal.unavailable(productId: productId);
+}
+
+enum BuyV2ProductOfferDecisionState {
+  ready,
+  checking,
+  stale,
+  unavailable,
+  changedPrice,
+  missingFulfilment,
+}
+
+@immutable
+class BuyV2ProductOfferDecision {
+  const BuyV2ProductOfferDecision({
+    required this.state,
+    required this.statusLabel,
+    required this.detail,
+  });
+
+  final BuyV2ProductOfferDecisionState state;
+  final String statusLabel;
+  final String detail;
+
+  bool get canAdd => state == BuyV2ProductOfferDecisionState.ready;
+}
+
+BuyV2ProductOfferDecision buyV2ResolveProductOfferDecision({
+  required BuyV2Product product,
+  required BuyV2ProductFactsSnapshot facts,
+}) {
+  final orderability = facts.orderabilityLabel.trim().toLowerCase();
+  final partner = facts.partner.trim().toLowerCase();
+  final automaticFulfilment =
+      product.destination == BuyV2Destination.shop ||
+      product.destination == BuyV2Destination.wholesale;
+
+  if (facts.storeOperatingState == BuyV2StoreOperatingState.closed) {
+    final nextOpening = facts.nextOpeningLabel?.trim();
+    return BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Store closed',
+      detail: nextOpening == null || nextOpening.isEmpty
+          ? 'This store is closed. Check again before adding to Cart.'
+          : 'This store is closed. $nextOpening.',
+    );
+  }
+  if (facts.stale) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.stale,
+      statusLabel: 'Check current availability',
+      detail:
+          'Price, stock or delivery may have changed. Check again before adding to Cart.',
+    );
+  }
+  if (orderability.contains('unavailable') ||
+      orderability.contains('not available') ||
+      orderability.contains('out of stock')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.unavailable,
+      statusLabel: 'Currently unavailable',
+      detail:
+          'This product cannot be added to Cart right now. Check again or choose another product.',
+    );
+  }
+  if (orderability.contains('checking') ||
+      orderability.contains('loading') ||
+      orderability.contains('pending review')) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.checking,
+      statusLabel: 'Checking availability',
+      detail:
+          'We’re confirming current stock and delivery before you add this product.',
+    );
+  }
+  if (facts.price != product.price) {
+    return BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.changedPrice,
+      statusLabel: 'Price changed',
+      detail:
+          'The price changed from ${buyV2Money(product.price)} to ${buyV2Money(facts.price)}. Check again or choose another product.',
+    );
+  }
+  if (automaticFulfilment &&
+      (facts.deliveryPromise.trim().isEmpty ||
+          partner.isEmpty ||
+          partner.contains('assignment pending') ||
+          partner.contains('not assigned') ||
+          partner.contains('missing'))) {
+    return const BuyV2ProductOfferDecision(
+      state: BuyV2ProductOfferDecisionState.missingFulfilment,
+      statusLabel: 'Delivery unavailable',
+      detail:
+          'A delivery time and delivery partner must be confirmed before adding to Cart.',
+    );
+  }
+  return const BuyV2ProductOfferDecision(
+    state: BuyV2ProductOfferDecisionState.ready,
+    statusLabel: 'Available now',
+    detail: 'Current price, stock and delivery are confirmed.',
+  );
+}
 
 abstract final class BuyV2Colors {
   static const navy = Color(0xFF000080);
@@ -201,6 +1095,7 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
     this.textAlign = TextAlign.center,
     this.maxLines = 1,
     this.duration = BuyV2Motion.stateChange,
+    this.incomingOnly = false,
   });
 
   final Object stateKey;
@@ -208,8 +1103,9 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
   final Size ownerSize;
   final TextStyle style;
   final TextAlign textAlign;
-  final int maxLines;
+  final int? maxLines;
   final Duration duration;
+  final bool incomingOnly;
 
   @override
   Widget build(BuildContext context) {
@@ -220,6 +1116,31 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
       TextAlign.end => AlignmentDirectional.centerEnd,
       TextAlign.center || TextAlign.justify => Alignment.center,
     };
+    if (incomingOnly) {
+      return SizedBox.fromSize(
+        size: ownerSize,
+        child: Semantics(
+          label: text,
+          excludeSemantics: true,
+          child: Align(
+            alignment: alignment,
+            child: BuyV2FiniteIncomingTransition(
+              stateKey: stateKey,
+              duration: duration,
+              child: Text(
+                text,
+                textAlign: textAlign,
+                maxLines: maxLines,
+                overflow: maxLines == null
+                    ? TextOverflow.clip
+                    : TextOverflow.ellipsis,
+                style: style,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     return MoolFiniteStateTransition(
       stateKey: stateKey,
       ownerSize: ownerSize,
@@ -230,7 +1151,7 @@ class BuyV2FiniteValueTransition extends StatelessWidget {
         text,
         textAlign: textAlign,
         maxLines: maxLines,
-        overflow: TextOverflow.ellipsis,
+        overflow: maxLines == null ? TextOverflow.clip : TextOverflow.ellipsis,
         style: style,
       ),
     );
@@ -337,6 +1258,157 @@ class BuyV2FiniteDepthReveal extends StatelessWidget {
             transformHitTests: false,
             child: child,
           ),
+        );
+      },
+    );
+  }
+}
+
+/// One finite cinematic card reveal with a single blue-white light sweep.
+/// It never loops, owns no semantics or hit testing, and resolves immediately
+/// when reduced motion is requested.
+class BuyV2CinematicCardReveal extends StatefulWidget {
+  const BuyV2CinematicCardReveal({
+    super.key,
+    required this.stateKey,
+    required this.child,
+    this.delay = Duration.zero,
+    this.duration = const Duration(milliseconds: 780),
+    this.borderRadius = const BorderRadius.all(Radius.circular(16)),
+  });
+
+  final Object stateKey;
+  final Widget child;
+  final Duration delay;
+  final Duration duration;
+  final BorderRadius borderRadius;
+
+  @override
+  State<BuyV2CinematicCardReveal> createState() =>
+      _BuyV2CinematicCardRevealState();
+}
+
+class _BuyV2CinematicCardRevealState extends State<BuyV2CinematicCardReveal>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: widget.duration,
+  );
+  Timer? _delayTimer;
+  bool _scheduled = false;
+
+  void _schedule() {
+    if (_scheduled || MediaQuery.disableAnimationsOf(context)) return;
+    _scheduled = true;
+    if (widget.delay == Duration.zero) {
+      _controller.forward();
+      return;
+    }
+    _delayTimer = Timer(widget.delay, () {
+      if (mounted) _controller.forward();
+    });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _delayTimer?.cancel();
+      _controller.value = 1;
+      _scheduled = true;
+      return;
+    }
+    _schedule();
+  }
+
+  @override
+  void didUpdateWidget(covariant BuyV2CinematicCardReveal oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _controller.duration = widget.duration;
+    if (oldWidget.stateKey == widget.stateKey) return;
+    _delayTimer?.cancel();
+    _scheduled = false;
+    _controller.value = MediaQuery.disableAnimationsOf(context) ? 1 : 0;
+    _schedule();
+  }
+
+  @override
+  void dispose() {
+    _delayTimer?.cancel();
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      key: ValueKey<Object>(widget.stateKey),
+      animation: _controller,
+      child: widget.child,
+      builder: (context, child) {
+        final progress = Curves.easeOutCubic.transform(_controller.value);
+        final shineProgress = ((_controller.value - .2) / .68).clamp(0.0, 1.0);
+        final shineOpacity =
+            (1 - ((shineProgress * 2) - 1).abs()).clamp(0.0, 1.0) * .52;
+        final transform =
+            Matrix4.translationValues((1 - progress) * 7, (1 - progress) * 9, 0)
+              ..setEntry(3, 2, .0012)
+              ..rotateY((1 - progress) * .045)
+              ..scaleByDouble(
+                .97 + (.03 * progress),
+                .97 + (.03 * progress),
+                1,
+                1,
+              );
+        return Stack(
+          fit: StackFit.passthrough,
+          children: [
+            Opacity(
+              key: ValueKey('buy-cinematic-card-content-${widget.stateKey}'),
+              opacity: .58 + (.42 * progress),
+              child: Transform(
+                alignment: Alignment.center,
+                transform: transform,
+                transformHitTests: false,
+                child: child,
+              ),
+            ),
+            Positioned.fill(
+              child: IgnorePointer(
+                child: ClipRRect(
+                  borderRadius: widget.borderRadius,
+                  child: Opacity(
+                    key: ValueKey(
+                      'buy-cinematic-card-sheen-${widget.stateKey}',
+                    ),
+                    opacity: shineOpacity,
+                    child: Align(
+                      alignment: Alignment(-1.7 + (3.4 * shineProgress), 0),
+                      child: FractionallySizedBox(
+                        widthFactor: .34,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.identity()..setEntry(0, 1, -.16),
+                          child: const DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Color(0x00FFFFFF),
+                                  Color(0xB8FFFFFF),
+                                  Color(0x5C63A4FF),
+                                  Color(0x00FFFFFF),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ],
         );
       },
     );
@@ -495,7 +1567,7 @@ class _BuyV2IntentDepthState extends State<BuyV2IntentDepth> {
   double _tiltY = 0;
 
   void _setPressed(bool value, [Offset? localPosition]) {
-    if (_pressed == value) return;
+    if (!mounted || _pressed == value) return;
     setState(() {
       _pressed = value;
       if (value && widget.spatial && localPosition != null) {
@@ -638,6 +1710,37 @@ class BuyV2ProductMediaSource {
   final String assetPath;
   final int cell;
   final BuyV2ProductMediaKind kind;
+
+  /// The product illustration sheet is not a uniform grid: use the inspected
+  /// artwork bounds so neighbouring packs are neither shown nor cut off.
+  Size get atlasSize => assetPath == BuyV2ProductPackshot.productAtlasPath
+      ? const Size(1536, 1024)
+      : const Size(1448, 1086);
+
+  Rect get sourceRect {
+    if (assetPath == BuyV2ProductPackshot.productAtlasPath) {
+      return switch (cell) {
+        0 => const Rect.fromLTRB(16, 56, 432, 368),
+        1 => const Rect.fromLTRB(432, 24, 784, 368),
+        2 => const Rect.fromLTRB(812, 24, 1138, 370),
+        3 => const Rect.fromLTRB(1160, 16, 1508, 368),
+        4 => const Rect.fromLTRB(20, 390, 400, 674),
+        5 => const Rect.fromLTRB(418, 384, 790, 674),
+        6 => const Rect.fromLTRB(810, 374, 1146, 674),
+        7 => const Rect.fromLTRB(1170, 370, 1518, 674),
+        11 => const Rect.fromLTRB(1168, 684, 1530, 1008),
+        _ => Rect.fromLTWH(
+          (cell % 4) * 384,
+          (cell ~/ 4) * (1024 / 3),
+          384,
+          1024 / 3,
+        ),
+      };
+    }
+    return Rect.fromLTWH((cell % 4) * 362, (cell ~/ 4) * 362, 362, 362);
+  }
+
+  double get cellAspectRatio => sourceRect.width / sourceRect.height;
 }
 
 class BuyV2ProductPackshot extends StatelessWidget {
@@ -663,14 +1766,30 @@ class BuyV2ProductPackshot extends StatelessWidget {
   final double borderRadius;
   final bool animateFirstFrame;
 
+  static String illustrationLabel(BuyV2Product product) =>
+      resolveMedia(product)?.kind == BuyV2ProductMediaKind.category
+      ? 'Category illustration'
+      : 'Illustration';
+
   @override
   Widget build(BuildContext context) {
+    final supplierMedia = BuyV2SupplierMediaPolicy.admittedAssets(product);
+    final supplied =
+        supplierMedia
+            .where(
+              (asset) => asset.kind == BuyV2ProductContentMediaKind.network,
+            )
+            .firstOrNull ??
+        supplierMedia.firstOrNull;
+    if (supplied != null) return _supplierPhoto(context, supplied);
     final source = resolveMedia(product);
     if (source == null) {
       return Semantics(
         image: true,
-        label: 'Category visual for ${product.title}',
-        child: _BuyV2ProductMediaFallback(
+        label:
+            'Product photo unavailable for ${product.title}, ${product.pack}',
+        excludeSemantics: true,
+        child: BuyV2ProductPhotoUnavailable(
           key: ValueKey('buy-product-media-fallback-${product.id}'),
           product: product,
           borderRadius: borderRadius,
@@ -678,77 +1797,141 @@ class BuyV2ProductPackshot extends StatelessWidget {
       );
     }
     final cell = source.cell;
-    final column = cell % 4;
-    final row = cell ~/ 4;
+    final crop = source.sourceRect;
     return Semantics(
       image: true,
-      label: source.kind == BuyV2ProductMediaKind.exactProduct
-          ? 'Product photo of ${product.title}'
-          : 'Category photo for ${product.title}',
+      label:
+          '${illustrationLabel(product)} for ${product.title}. '
+          'Supplier photo of this pack is unavailable.',
+      excludeSemantics: true,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(borderRadius),
         child: ColoredBox(
           color: Colors.white,
+          child: _BuyV2IllustrationDisclosure(
+            product: product,
+            child: Center(
+              child: AspectRatio(
+                aspectRatio: source.cellAspectRatio,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cellWidth = constraints.maxWidth;
+                    final pixelScale = cellWidth / crop.width;
+                    return Stack(
+                      clipBehavior: Clip.hardEdge,
+                      children: [
+                        Positioned.fill(
+                          child: ExcludeSemantics(
+                            child: _BuyV2ProductMediaFallback(
+                              product: product,
+                              borderRadius: borderRadius,
+                            ),
+                          ),
+                        ),
+                        Positioned(
+                          key: ValueKey(
+                            'buy-packshot-sprite-${product.id}-'
+                            '${source.assetPath}-$cell',
+                          ),
+                          left: -crop.left * pixelScale,
+                          top: -crop.top * pixelScale,
+                          width: source.atlasSize.width * pixelScale,
+                          height: source.atlasSize.height * pixelScale,
+                          child: Image.asset(
+                            source.assetPath,
+                            fit: BoxFit.fill,
+                            filterQuality: FilterQuality.medium,
+                            frameBuilder: animateFirstFrame
+                                ? (context, child, frame, synchronouslyLoaded) {
+                                    if (synchronouslyLoaded) {
+                                      return child;
+                                    }
+                                    return AnimatedOpacity(
+                                      key: ValueKey(
+                                        'buy-packshot-decoded-frame-${product.id}',
+                                      ),
+                                      opacity: frame == null ? 0 : 1,
+                                      duration: BuyV2Motion.resolved(
+                                        context,
+                                        const Duration(milliseconds: 180),
+                                      ),
+                                      curve: Curves.easeOutCubic,
+                                      child: child,
+                                    );
+                                  }
+                                : null,
+                            errorBuilder: (_, _, _) => const Center(
+                              child: Icon(
+                                Icons.inventory_2_outlined,
+                                color: BuyV2Colors.navy,
+                                size: 28,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _supplierPhoto(BuildContext context, BuyV2ProductMediaAsset asset) {
+    final video = asset.kind == BuyV2ProductContentMediaKind.networkVideo;
+    final file = video ? asset.binding!.posterFile! : asset.binding!.file;
+    final source = video ? asset.posterSource! : asset.source!;
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: ColoredBox(
+        color: Colors.white,
+        child: Padding(
+          padding: EdgeInsets.all(borderRadius / 2),
           child: LayoutBuilder(
             builder: (context, constraints) {
-              final cellWidth = constraints.maxWidth;
-              final cellHeight = constraints.maxHeight;
-              return Transform.scale(
-                scale: 1.04,
-                child: Stack(
-                  clipBehavior: Clip.hardEdge,
-                  children: [
-                    Positioned.fill(
-                      child: ExcludeSemantics(
-                        child: _BuyV2ProductMediaFallback(
-                          product: product,
-                          borderRadius: borderRadius,
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      key: ValueKey(
-                        'buy-packshot-sprite-${product.id}-'
-                        '${source.assetPath}-$cell',
-                      ),
-                      left: -column * cellWidth,
-                      top: -row * cellHeight,
-                      width: cellWidth * 4,
-                      height: cellHeight * 3,
-                      child: Image.asset(
-                        source.assetPath,
-                        fit: BoxFit.fill,
-                        filterQuality: FilterQuality.medium,
-                        frameBuilder: animateFirstFrame
-                            ? (context, child, frame, synchronouslyLoaded) {
-                                if (synchronouslyLoaded) {
-                                  return child;
-                                }
-                                return AnimatedOpacity(
-                                  key: ValueKey(
-                                    'buy-packshot-decoded-frame-${product.id}',
-                                  ),
-                                  opacity: frame == null ? 0 : 1,
-                                  duration: BuyV2Motion.resolved(
-                                    context,
-                                    const Duration(milliseconds: 180),
-                                  ),
-                                  curve: Curves.easeOutCubic,
-                                  child: child,
-                                );
-                              }
-                            : null,
-                        errorBuilder: (_, _, _) => const Center(
+              final targetWidth = constraints.maxWidth.isFinite
+                  ? (constraints.maxWidth *
+                            MediaQuery.devicePixelRatioOf(context))
+                        .ceil()
+                  : file.width;
+              return Image.network(
+                source,
+                key: ValueKey(
+                  'buy-supplier-photo-${product.id}-${asset.id}-${asset.binding!.assetRevision}',
+                ),
+                width: constraints.hasBoundedWidth ? double.infinity : null,
+                height: constraints.hasBoundedHeight ? double.infinity : null,
+                cacheWidth: targetWidth.clamp(1, file.width),
+                fit: BoxFit.contain,
+                excludeFromSemantics: true,
+                frameBuilder: (context, child, frame, synchronouslyLoaded) =>
+                    frame != null || synchronouslyLoaded
+                    ? Semantics(
+                        image: true,
+                        label: video
+                            ? 'Video preview. ${asset.semanticLabel}'
+                            : asset.semanticLabel,
+                        child: child,
+                      )
+                    : Semantics(
+                        label:
+                            'Loading supplier photo for ${product.title}, ${product.pack}',
+                        child: const Center(
                           child: Icon(
-                            Icons.inventory_2_outlined,
-                            color: BuyV2Colors.navy,
-                            size: 28,
+                            Icons.photo_outlined,
+                            color: BuyV2Colors.muted,
                           ),
                         ),
                       ),
+                errorBuilder: (context, error, stackTrace) =>
+                    BuyV2ProductPhotoUnavailable(
+                      product: product,
+                      borderRadius: borderRadius,
                     ),
-                  ],
-                ),
               );
             },
           ),
@@ -846,9 +2029,150 @@ class BuyV2ProductPackshot extends StatelessWidget {
   }
 }
 
+/// Keeps disclosure in the media bounds without overlaying the supplied pack.
+/// Tiny thumbnails use a neutral placeholder when readable text cannot fit.
+class _BuyV2IllustrationDisclosure extends StatelessWidget {
+  const _BuyV2IllustrationDisclosure({
+    required this.product,
+    required this.child,
+  });
+
+  final BuyV2Product product;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final label = BuyV2ProductPackshot.illustrationLabel(product);
+      const style = TextStyle(
+        fontSize: 10,
+        height: 1.2,
+        fontWeight: FontWeight.w600,
+        color: BuyV2Colors.muted,
+      );
+      final painter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: DefaultTextStyle.of(context).style.merge(style),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout(maxWidth: (constraints.maxWidth - 8).clamp(1, double.infinity));
+      final labelHeight = painter.height;
+      var minimumWordWidth = 0.0;
+      for (final word in label.split(RegExp(r'\s+'))) {
+        final wordPainter = TextPainter(
+          text: TextSpan(
+            text: word,
+            style: DefaultTextStyle.of(context).style.merge(style),
+          ),
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        )..layout();
+        if (wordPainter.width > minimumWordWidth) {
+          minimumWordWidth = wordPainter.width;
+        }
+        wordPainter.dispose();
+      }
+      painter.dispose();
+      if (constraints.maxWidth < 48 ||
+          minimumWordWidth > constraints.maxWidth - 8 ||
+          constraints.maxHeight < labelHeight + 28) {
+        return BuyV2ProductPhotoUnavailable(product: product);
+      }
+      return Column(
+        children: [
+          Expanded(child: child),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(4, 2, 4, 2),
+            child: Text(
+              label,
+              key: ValueKey('buy-product-illustration-${product.id}'),
+              textAlign: TextAlign.center,
+              style: style,
+            ),
+          ),
+        ],
+      );
+    },
+  );
+}
+
+class BuyV2ProductPhotoUnavailable extends StatelessWidget {
+  const BuyV2ProductPhotoUnavailable({
+    super.key,
+    required this.product,
+    this.borderRadius = 14,
+  });
+
+  final BuyV2Product product;
+  final double borderRadius;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+    image: true,
+    label: 'Product photo unavailable for ${product.title}, ${product.pack}',
+    excludeSemantics: true,
+    child: ClipRRect(
+      borderRadius: BorderRadius.circular(borderRadius),
+      child: ColoredBox(
+        color: Colors.white,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final icon = Icon(
+              Icons.image_not_supported_outlined,
+              key: ValueKey('buy-product-photo-unavailable-${product.id}'),
+              color: BuyV2Colors.muted,
+              size: constraints.biggest.shortestSide.clamp(0, 32),
+            );
+            const style = TextStyle(
+              fontSize: 10,
+              height: 1.2,
+              color: BuyV2Colors.muted,
+            );
+            final painter =
+                TextPainter(
+                  text: const TextSpan(text: 'Photo unavailable', style: style),
+                  textDirection: Directionality.of(context),
+                  textScaler: MediaQuery.textScalerOf(context),
+                )..layout(
+                  maxWidth: (constraints.maxWidth - 8).clamp(
+                    1,
+                    double.infinity,
+                  ),
+                );
+            final fits =
+                constraints.maxWidth >= 64 &&
+                constraints.maxHeight >= painter.height + 40;
+            painter.dispose();
+            return Center(
+              child: fits
+                  ? Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        icon,
+                        const SizedBox(height: 4),
+                        const Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: Text(
+                            'Photo unavailable',
+                            textAlign: TextAlign.center,
+                            style: style,
+                          ),
+                        ),
+                      ],
+                    )
+                  : icon,
+            );
+          },
+        ),
+      ),
+    ),
+  );
+}
+
 class _BuyV2ProductMediaFallback extends StatelessWidget {
   const _BuyV2ProductMediaFallback({
-    super.key,
     required this.product,
     required this.borderRadius,
   });
@@ -865,7 +2189,32 @@ class _BuyV2ProductMediaFallback extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final shortest = constraints.biggest.shortestSide;
-            final iconSize = (shortest * .38).clamp(20.0, 46.0);
+            final iconSize = (shortest * .38).clamp(0.0, 46.0);
+            const labelStyle = TextStyle(
+              color: BuyV2Colors.muted,
+              fontSize: 7,
+              fontWeight: FontWeight.w900,
+              letterSpacing: .4,
+            );
+            final labelMeasure = TextPainter(
+              text: TextSpan(
+                text: product.visualLabel,
+                style: DefaultTextStyle.of(context).style.merge(labelStyle),
+              ),
+              textDirection: Directionality.of(context),
+              textScaler: MediaQuery.textScalerOf(context),
+              maxLines: 1,
+            )..layout(maxWidth: constraints.maxWidth);
+            final labelFits = constraints.maxHeight >=
+                iconSize + 3 + labelMeasure.height;
+            labelMeasure.dispose();
+            if (!labelFits) {
+              return Center(child: Icon(
+                _fallbackIcon(product.categoryId),
+                size: iconSize,
+                color: BuyV2Colors.navy,
+              ));
+            }
             return Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -880,12 +2229,7 @@ class _BuyV2ProductMediaFallback extends StatelessWidget {
                     product.visualLabel,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      color: BuyV2Colors.muted,
-                      fontSize: 7,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: .4,
-                    ),
+                    style: labelStyle,
                   ),
                 ],
               ),
@@ -999,6 +2343,70 @@ class BuyV2PromotionCard extends StatefulWidget {
   final double width;
   final int sequenceIndex;
 
+  static const titleStyle = TextStyle(
+    color: BuyV2Colors.ink,
+    fontSize: 10.5,
+    height: 1.08,
+    fontWeight: FontWeight.w900,
+  );
+  static const detailStyle = TextStyle(
+    color: BuyV2Colors.muted,
+    fontSize: 9.5,
+    height: 1.2,
+    fontWeight: FontWeight.w700,
+  );
+
+  double requiredHeight(BuildContext context) {
+    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
+    var textHeight = 3.0;
+    for (final value in [
+      (text: title, style: titleStyle, lines: 3),
+      (text: detail, style: detailStyle, lines: 4),
+    ]) {
+      final painter = TextPainter(
+        text: TextSpan(
+          text: value.text,
+          style: DefaultTextStyle.of(context).style.merge(value.style),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+        maxLines: accessibleText ? null : value.lines,
+      )..layout(maxWidth: (width - 93).clamp(1, double.infinity));
+      textHeight += painter.height;
+      painter.dispose();
+    }
+    // The same row has a 38px icon, 18px vertical padding and two border edges.
+    return (textHeight < 38 ? 58.0 : textHeight + 20).ceilToDouble();
+  }
+
+  bool fitsTextWidth(BuildContext context, double cardWidth) {
+    // Match the row's icons/gaps, horizontal padding and both border edges.
+    final textWidth = cardWidth - 93;
+    if (textWidth <= 0) return false;
+    for (final value in [
+      (text: title, style: titleStyle, lines: 3),
+      (text: detail, style: detailStyle, lines: 4),
+    ]) {
+      final style = DefaultTextStyle.of(context).style.merge(value.style);
+      final painter = TextPainter(
+        text: TextSpan(text: value.text, style: style),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+        locale: Localizations.maybeLocaleOf(context),
+      )..layout(maxWidth: textWidth);
+      final fitsLines = painter.computeLineMetrics().length <= value.lines;
+      painter.dispose();
+      if (!fitsLines) return false;
+      for (final word in value.text.split(RegExp(r'\s+'))) {
+        if (buyV2ValueTextSize(context, word, value.style).width > textWidth) {
+          return false;
+        }
+      }
+    }
+    return true;
+  }
+
   @override
   State<BuyV2PromotionCard> createState() => _BuyV2PromotionCardState();
 }
@@ -1054,6 +2462,7 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
   Widget build(BuildContext context) {
     final theme = BuyV2ThemeScope.of(context);
     final entryBegin = (widget.sequenceIndex.clamp(0, 3) * .12).toDouble();
+    final accessibleText = MediaQuery.textScalerOf(context).scale(1) > 1.25;
     final entry = CurvedAnimation(
       parent: _entryController,
       curve: Interval(entryBegin, 1, curve: Curves.easeOutCubic),
@@ -1154,25 +2563,18 @@ class _BuyV2PromotionCardState extends State<BuyV2PromotionCard>
                                   children: [
                                     Text(
                                       widget.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: BuyV2Colors.ink,
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w900,
-                                      ),
+                                      maxLines: accessibleText ? null : 3,
+                                      overflow: TextOverflow.clip,
+                                      style: BuyV2PromotionCard.titleStyle,
                                     ),
                                     const SizedBox(height: 3),
                                     Text(
                                       widget.detail,
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: BuyV2Colors.muted,
-                                        fontSize: 8,
-                                        height: 1.15,
-                                        fontWeight: FontWeight.w700,
-                                      ),
+                                      maxLines: accessibleText ? null : 4,
+                                      overflow: accessibleText
+                                          ? TextOverflow.clip
+                                          : TextOverflow.ellipsis,
+                                      style: BuyV2PromotionCard.detailStyle,
                                     ),
                                   ],
                                 ),
