@@ -1438,7 +1438,10 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-W
         'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+        'apps/mobile/lib/main.dart',
+        'apps/mobile/lib/app/ui_review_language_store.dart',
+        'apps/mobile/test/app/ui_review_language_store_test.dart'
   )
   Assert-Coordination ($redmiClaim.Count -eq 1 -and $redmiClaim[0].role -ceq 'subagent' -and
     ((@($redmiClaim[0].owners | Sort-Object) -join '|') -ceq (@($redmiEvidenceOwners | Sort-Object) -join '|'))) 'Redmi operational claim changed.'
@@ -2287,6 +2290,13 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/.flutter-plugins-dependencies'
         )
       )
+      # Founder D005-C01 admission: exact review startup/persistence owners only.
+      $redmiLanguageOwner = (
+        $root.Replace([char]92,[char]47).TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' -and
+        $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and
+        $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
+        $effectiveOwner -cin @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -2299,7 +2309,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner) {
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -2311,7 +2321,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
@@ -2373,8 +2383,17 @@ if ($ProductionLane -ceq 'baseline') {
         $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and $branch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') 'Successor admission identity differs.'
       & git -C $root merge-base --is-ancestor $successorParent $head
       Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission requires qualified parent.'
-      & git -C $root diff --quiet $successorParent -- config/codex-subagent-coordination-policy.json
-      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission cannot change policy or ownership claims.'
+      # Founder authorizes exactly three D005-C01 owners; all other policy is retained.
+      $languageAddedOwners = @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
+      $languagePolicyBefore = Get-R66Utf8GitJson $successorParent 'config/codex-subagent-coordination-policy.json'
+      $languagePolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
+      $languageClaim = @($languagePolicyAfter.activeClaims | Where-Object task -CEQ '/root/cursor_redmi_v6_audit_20260913')
+      Assert-Coordination ($languageClaim.Count -eq 1 -and $languageClaim[0].owners.Count -eq 49) 'Language admission requires exactly49 owners.'
+      foreach ($languageOwner in $languageAddedOwners) {
+        Assert-Coordination (@($languageClaim[0].owners | Where-Object { $_ -ceq $languageOwner }).Count -eq 1) "Language owner absent or duplicated: $languageOwner"
+      }
+      $languageClaim[0].owners = @($languageClaim[0].owners | Where-Object { $_ -cnotin $languageAddedOwners })
+      Assert-Coordination (($languagePolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($languagePolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Language admission changed unrelated policy.'
       $successorPriorLines = @(& git -C $root show "${successorParent}:$successorChecker")
       Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor prior checker missing.'
       $successorPriorScript = ($successorPriorLines -join "`n") + "`n"
@@ -2383,6 +2402,20 @@ if ($ProductionLane -ceq 'baseline') {
       $successorCurrentBlock = [regex]::Match($successorScript, '(?ms)^    # BEGIN founder SUCCESSOR BUILD admission 20260914\n.*?^    # END founder SUCCESSOR BUILD admission 20260914\n')
       Assert-Coordination ($successorPriorBlock.Success -and $successorCurrentBlock.Success) 'Successor preservation blocks missing.'
       $successorRestored = $successorScript.Substring(0, $successorCurrentBlock.Index) + $successorPriorBlock.Value + $successorScript.Substring($successorCurrentBlock.Index + $successorCurrentBlock.Length)
+      $successorRestored = $successorRestored.Replace((',
+        ''apps/mobile/lib/main.dart'',
+        ''apps/mobile/lib/app/ui_review_language_store.dart'',
+        ''apps/mobile/test/app/ui_review_language_store_test.dart''').Replace("`r`n", "`n"), '')
+      $successorRestored = $successorRestored.Replace((@'
+      # Founder D005-C01 admission: exact review startup/persistence owners only.
+      $redmiLanguageOwner = (
+        $root.Replace([char]92,[char]47).TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913' -and
+        $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and
+        $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
+        $effectiveOwner -cin @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
+      )
+'@).Replace("`r`n", "`n") + "`n", '')
+      $successorRestored = $successorRestored.Replace(' -or $redmiLanguageOwner', '')
       $successorHasher = [Security.Cryptography.SHA256]::Create()
       try {
         $successorRestoredHash = [BitConverter]::ToString($successorHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($successorRestored))).Replace('-', '')
@@ -2393,14 +2426,21 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($successorHash -ceq $successorHashes[$successorOwner]) "Successor exact reviewed checker differs: $successorOwner"
         }
       } finally { $successorHasher.Dispose() }
-      # Founder-approved RV6 fixture prerequisite: exact two-file delta only.
+      # Founder-approved RV6 fixture plus D005-C01: exact five-file source delta only.
       # This admits local qualification, not a build or device acceptance.
       $fixtureHashes = @{
+        'apps/mobile/lib/main.dart' = '5FE1A6762CBB516D4935AACABF5DA0A81D0307ABD78EA96026335659AEB196EB'
+        'apps/mobile/lib/app/ui_review_language_store.dart' = '30816600AEDA842CBE06BBF38B11F6EA79D41679A03D3F8CF31BF9C975372A74'
+        'apps/mobile/test/app/ui_review_language_store_test.dart' = '921F901A32EE5A5BEB905CF07F8E05E1C7B9ED97D38A912B96631E0D17494A3F'
         'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = '72B6B01072F107F70E20034F2FE136109453A3D7A5E57E28A44327C8393B38E6'
         'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = '62C3C58D450451B766801EF662093DB68423957C986E7D3A45C2B2473D83C44A'
       }
       $fixtureDelta = @(& git -C $root diff --name-only $successorParent -- apps backend contracts packages package.json package-lock.json pubspec.yaml pubspec.lock)
       Assert-Coordination ($LASTEXITCODE -eq 0) 'Fixture source inventory failed.'
+      $languageUntracked = @(& git -C $root ls-files --others --exclude-standard -- apps backend contracts packages)
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Language untracked inventory failed.'
+      $fixtureDelta = @($fixtureDelta) + @($languageUntracked)
+
       if ($fixtureDelta.Count -gt 0) {
         & git -C $root merge-base --is-ancestor 'b437a216b3c61db9a7ef67968828b71ef7243474' $head
         Assert-Coordination ($LASTEXITCODE -eq 0) 'Fixture admission requires the preserved Redmi checkpoint.'

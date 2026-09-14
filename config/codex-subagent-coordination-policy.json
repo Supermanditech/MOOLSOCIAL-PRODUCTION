@@ -383,7 +383,10 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
+        "apps/mobile/lib/main.dart",
+        "apps/mobile/lib/app/ui_review_language_store.dart",
+        "apps/mobile/test/app/ui_review_language_store_test.dart"
       ]
     }
   ],
