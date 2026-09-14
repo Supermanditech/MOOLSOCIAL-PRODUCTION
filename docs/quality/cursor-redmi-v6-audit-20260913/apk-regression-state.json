@@ -208,9 +208,10 @@
       "RV6-D003",
       "RV6-D004",
       "RV6-D006",
-      "RV6-D007"
+      "RV6-D007",
+      "RV6-D008"
     ],
-    "remainingDispositions": 15,
+    "remainingDispositions": 14,
     "newChildren": [
       "RV6-D005-C01"
     ],

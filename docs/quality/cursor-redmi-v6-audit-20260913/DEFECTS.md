@@ -108,13 +108,16 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 
 ## RV6-D008 - Wholesale buyer label runs into the business name
 - Local implementation qualified 2026-09-14: _DecisionRow now reserves an explicit 8px gap between its normal-text label and value; existing enlarged-text stacked layout preserved. Four 320/360px at 100/200% text regressions pass for PO-240728, including complete buyer identity, View order and Android Back/query retention. Full Buy screen suite242passed/0failures; analysis zero issues; four actual Flutter captures reviewed. See UAT D008 section for hashes and limitations. Original device capture312 requires successor-APK Redmi verification; ticket remains open.
-- Status: open; confirmed Redmi visual defect. Severity: minor.
+- Status: closed; r66.20 recorded Redmi visual acceptance passed. Severity: minor.
 - Journey: Orders > search Wholesale > Delivered > PO-240728 View order.
 - Actual: Delivery details renders Retailer business immediately against Shree Balaji Retail,with no clear gap at the label/value boundary. Normal font_scale1.0,720x1600 Redmi. Other details remain legible;no identity/data corruption claimed.
 - Expected: buyer-type label and business-name value have a visible separation or wrap/stack so they read as distinct fields at supported text sizes.
 - Evidence:312-wholesale-delivered-detail. This is a direct device visual finding,not an assertion from host analysis.
 - Source correlation: buy_v2_views.dart11576-11580 passes order.buyerType and buyerName into the delivery-details row. Exact row sizing correction belongs to later implementation;no product code changed.
 
+
+
+- Successor acceptance: rv620-078 through083, PO-240728 buyer label/value visibly separated at normal text; Back retains Wholesale query and Delivered tab. Installed SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. UAT.md records exact scope/limits. No child.
 
 ## RV6-D009 - Confirmation deep link displays success without a confirmed purchase
 - Local implementation qualified 2026-09-14: confirmation view requires confirmed session state, nonblank purchase reference, nonzero product count and nonempty matching identified orders. Invalid entries show recovery with Orders/Shop actions and no success/address claim. Valid delivery address comes from confirmed order snapshots, never the currently selected saved address. Fifteen D009 cases plus connected confirmation/invoice checks pass; full screen suite257passed/0failures and final focused18passed (overlapping); analysis zero issues; two recovery Flutter captures reviewed. See UAT D009 evidence. Physical Redmi358-360 remains pending successor APK; status remains open. Backend authority not qualified by fixtures.
