@@ -337,6 +337,16 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   final _quickTrackerPointers = <int>{};
   int _quickTrackerNavigationSequence = 0;
   bool _searchOpen = false;
+  bool _searchAutofocus = true;
+  // The pager retains its data and offsets; this retains the return surface.
+  ({
+    BuyV2Destination destination,
+    String query,
+    String saleType,
+    String productId,
+    Object account,
+  })?
+  _searchProductReturn;
   bool _offersActive = false;
   bool _quickTrackerMinimized = true;
   bool _quickTrackerHidden = false;
@@ -468,6 +478,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _quickTrackerMinimized = true;
     }
     if (oldWidget.session != widget.session) {
+      _searchProductReturn = null;
       _storeQuestionReturn = null;
       _storeQuestionWasCovered = false;
       _relatedProductScrollOrigins.clear();
@@ -540,6 +551,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   }
 
   void _applyInitialState({bool afterRestore = false}) {
+    _searchProductReturn = null;
     if (widget.session.isStoreProcurement &&
         _hasExplicitBuyRoute &&
         !afterRestore) {
@@ -592,6 +604,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   void _sessionChanged() {
     if (!mounted) return;
     final previousStoreView = _observedStoreSessionView;
+    final previousRootProduct = _observedRootProductId;
     final session = widget.session;
     _observedStoreSessionView = session.view;
     if (_partnerCatalogueDepth > 0 &&
@@ -607,6 +620,7 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       _retainedStoreEmptyCartSequence = session.navigationMotionSequence;
     }
     if (!widget.session.procurementScopeCurrent) {
+      _searchProductReturn = null;
       _relatedProductScrollOrigins.clear();
       _observedRootProductId = null;
       _resetArrivalSound();
@@ -631,6 +645,28 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
       });
       setState(() {});
       return;
+    }
+    final searchReturn = _searchProductReturn;
+    if (searchReturn != null &&
+        (searchReturn.account != _arrivalIdentity ||
+            searchReturn.destination != session.destination ||
+            searchReturn.query != session.query ||
+            searchReturn.saleType != session.saleTypeSignature)) {
+      _searchProductReturn = null;
+    }
+    if (_searchOpen &&
+        previousStoreView == BuyV2View.catalogue &&
+        session.view == BuyV2View.product &&
+        session.selectedProductId != null &&
+        _lastSearchDestination == session.destination &&
+        _storeProductRouteDepth == 0) {
+      _searchProductReturn = (
+        destination: session.destination,
+        query: session.query,
+        saleType: session.saleTypeSignature,
+        productId: session.selectedProductId!,
+        account: _arrivalIdentity,
+      );
     }
     if (_arrivalAccount != _arrivalIdentity) {
       _resetArrivalSound();
@@ -743,6 +779,17 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     }
     if (destinationChanged || widget.session.view != BuyV2View.catalogue) {
       _searchOpen = false;
+    }
+    if (session.view == BuyV2View.catalogue && _searchProductReturn != null) {
+      final origin = _searchProductReturn!;
+      _searchProductReturn = null;
+      if (previousStoreView == BuyV2View.product &&
+          previousRootProduct == origin.productId &&
+          session.navigationMotionDirection ==
+              BuyV2NavigationMotionDirection.back) {
+        _searchOpen = true;
+        _searchAutofocus = false;
+      }
     }
     if (_searchController.text != widget.session.query) {
       _searchController.value = TextEditingValue(
@@ -1157,8 +1204,11 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
                                 offersActive: _offersActive,
                                 controller: _searchController,
                                 open: _searchOpen,
-                                onOpenChanged: (value) =>
-                                    setState(() => _searchOpen = value),
+                                autofocus: _searchAutofocus,
+                                onOpenChanged: (value) => setState(() {
+                                  _searchOpen = value;
+                                  _searchAutofocus = value;
+                                }),
                                 onLocation: () => session.pagedCatalogueEnabled
                                     ? showBuyV2CatalogueArea(context, session)
                                     : showBuyV2AddressSheet(context, session),
@@ -3114,6 +3164,7 @@ class _BuySearchBand extends StatelessWidget {
     required this.offersActive,
     required this.controller,
     required this.open,
+    this.autofocus = true,
     required this.onOpenChanged,
     required this.onLocation,
     required this.onAccount,
@@ -3124,6 +3175,7 @@ class _BuySearchBand extends StatelessWidget {
   final bool offersActive;
   final TextEditingController controller;
   final bool open;
+  final bool autofocus;
   final ValueChanged<bool> onOpenChanged;
   final VoidCallback onLocation;
   final VoidCallback onAccount;
@@ -3253,7 +3305,7 @@ class _BuySearchBand extends StatelessWidget {
                                 ? TextField(
                                     key: const ValueKey('buy-search-field'),
                                     controller: controller,
-                                    autofocus: true,
+                                    autofocus: autofocus,
                                     onChanged: session.updateQuery,
                                     textInputAction: TextInputAction.search,
                                     minLines: 1,

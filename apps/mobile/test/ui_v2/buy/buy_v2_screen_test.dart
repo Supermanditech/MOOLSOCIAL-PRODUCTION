@@ -9842,6 +9842,139 @@ void main() {
     }
   }
 
+  final d018Cases = [
+    for (final scale in [1.0, 2.0])
+      for (final systemBack in [true, false])
+        (scale: scale, systemBack: systemBack, change: 'none'),
+    for (final change in ['cart', 'account', 'query', 'mode'])
+      (scale: 1.0, systemBack: true, change: change),
+  ];
+  for (final entry in d018Cases) {
+    final scale = entry.scale;
+    final systemBack = entry.systemBack;
+    testWidgets(
+      'RV6 D018 paginated search Back retains visible page system $systemBack text $scale change ${entry.change}',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final session = BuyV2Session(
+          core: BuySession(),
+          reviewDataEnabled: true,
+          initialCatalogueRegionId: 'jodhpur',
+          cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+            destination: BuyV2Destination.shop,
+            providerCount: 10,
+            skusPerStore: 5000,
+          ),
+        );
+        addTearDown(session.dispose);
+        session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+        session.chooseFulfilmentMode(BuyV2FulfilmentMode.standardCourier);
+        expect(session.addProduct('w-notebook'), isTrue);
+        await tester.pumpWidget(app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-search-control')));
+        await tester.pumpAndSettle();
+        await tester.enterText(
+          find.byKey(const ValueKey('buy-search-field')),
+          'milk',
+        );
+        await tester.testTextInput.receiveAction(TextInputAction.search);
+        await tester.pumpAndSettle();
+        final search = find.byType(BuyV2SearchResultsView);
+        expect(search, findsOneWidget);
+        final next = find.byKey(const ValueKey('buy-page-next-search-shop'));
+        await tester.ensureVisible(next);
+        await tester.pumpAndSettle();
+        await tester.tap(next);
+        await tester.pumpAndSettle();
+        final rangeFinder = find.byKey(
+          const ValueKey('buy-page-range-search-shop'),
+        );
+        final range = tester.widget<Text>(rangeFinder).data!;
+        expect(range, startsWith('41'));
+        final card = find
+            .descendant(of: search, matching: find.byType(BuyV2ProductCard))
+            .first;
+        final product = tester.widget<BuyV2ProductCard>(card).product;
+        expect(product.title.toLowerCase(), contains('milk'));
+        await Scrollable.ensureVisible(tester.element(card), alignment: .35);
+        await tester.pumpAndSettle();
+        final vertical = find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-paged-scroll-search-shop')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final offset = tester.state<ScrollableState>(vertical).position.pixels;
+        final query = session.query;
+        final mode = session.saleTypeSignature;
+        final retainedQuantity = session.quantityFor('w-notebook');
+        await tester.tap(card);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, product.id);
+        expect(find.byType(BuyV2ProductView), findsOneWidget);
+        if (entry.change == 'cart') {
+          session.openCart();
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(session.selectedProductId, product.id);
+          expect(session.view, BuyV2View.product);
+        } else if (entry.change == 'account') {
+          await tester.pumpWidget(
+            app(session, textScale: scale, accountAuthenticated: true),
+          );
+          await tester.pumpAndSettle();
+        } else if (entry.change == 'query') {
+          session.updateQuery('rice');
+          await tester.pumpAndSettle();
+        } else if (entry.change == 'mode') {
+          session.chooseShopSaleType(BuyV2ShopSaleType.quickDelivery);
+          await tester.pumpAndSettle();
+        }
+        if (systemBack) {
+          await tester.binding.handlePopRoute();
+        } else {
+          await tester.tap(
+            find
+                .descendant(
+                  of: find.byType(BuyV2ProductView),
+                  matching: find.text('Shop'),
+                )
+                .first,
+          );
+        }
+        await tester.pumpAndSettle();
+        if (entry.change == 'none' || entry.change == 'cart') {
+          expect(search, findsOneWidget);
+          expect(tester.testTextInput.isVisible, isFalse);
+          expect(tester.widget<Text>(rangeFinder).data, range);
+          expect(
+            find.byKey(ValueKey('buy-paged-card-${product.id}')),
+            findsOneWidget,
+          );
+          expect(
+            tester.state<ScrollableState>(vertical).position.pixels,
+            closeTo(offset, 1),
+          );
+          expect(session.query, query);
+          expect(session.saleTypeSignature, mode);
+          await captureR66Visual(
+            tester,
+            'rv6-d018-search-return-system-$systemBack-text-$scale-${entry.change}',
+          );
+        } else {
+          expect(search, findsNothing);
+          expect(session.view, BuyV2View.catalogue);
+        }
+        expect(session.quantityFor('w-notebook'), retainedQuantity);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   final d014Cases = [
     for (final id in ['s-dog-food', 'w-notebook'])
       for (final overlay in ['store', 'other-open', 'other-return', 'full'])

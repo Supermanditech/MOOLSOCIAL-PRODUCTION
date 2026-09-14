@@ -2584,3 +2584,32 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | qualified-analysis.log | 128449F8A393F620158E7A3AC7B004C562E7BD4581066BEC3DA8A9B3AC59D529 |
 | qualified-focused.log | CB75888548D28B4BD26146B5EA1D3B1A27525D716A069EF91E4CA8622B9E39F8 |
 | shop-reproduction.log | F6E8E4428F82E7E2EAA9F7EC981B31E9CAE2EA4843F0D09DB0047C2E35B717EC |
+
+
+## RV6-D018 local correction qualification - 14 September 2026
+
+Status: locally qualified; original remains open pending successor-APK Redmi acceptance. Parent: 99f74b80e37850003f7fdd37db81e71387fbc9ca.
+
+Changed owners: apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart and apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart, plus this evidence, DEFECTS.md and scope-state.json. No additional admission or shared session/router changes.
+
+The search pager already retained its page and offsets. Product entry hid the dedicated search surface and Back did not restore it. Retain the originating search surface bound to account, destination, query, sale type and root product; restore only on matching product Back without reopening the keyboard. Clear stale return context on session/route/account/query/mode changes. Preserve the existing pager and unrelated cart.
+
+Baseline: four normal/200% Android/content Back cases reproduced the missing search-results destination. Final focused run: eight passed. Connected Buy-screen, search-recovery and product-continuity run: 379 passed, exit 0 (session 75176, terminal chunk b3cdd7). The eight focused checks overlap the connected count. Analysis of both Dart owners: zero issues. Tests cover page 41-80, query, scroll retention, both Back paths, cart roundtrip and rejection of stale account/query/mode context; retained Wholesale cart remains unchanged.
+
+All five qualified Flutter captures inspected individually: normal and 200% text with both Back paths, plus cart roundtrip. Restored query, page range and product grid fit; keyboard remains dismissed. At 200%, generated media uses missing-image placeholders in this host fixture; these captures qualify return/fit, not supplier-media delivery. Generated catalogue data is local evidence, not provider/device qualification. Exact Redmi reproduction 898-904 remains required on the successor APK. No device actions, ticket closure or new APK in this slice.
+
+Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d018-local-20260914. Retain baseline failures and intermediate runs; final captures are under qualified/.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | 067DC7E66F5A56A4B8E3E826990362480F2B5B2A59496B0BF4C95F036AE37C39 |
+| baseline-reproduction.log | BF23937A18EBDEC38CBFD8B2F437D6E161860E7CC227F7C3829E09C06AAFA604 |
+| connected-regression.log | 3E65BF3345488A52F5DD60B1470A7C2C7F88CCEC3DD4D5854E4EB2300D5790EF |
+| context-regression.log | AA6515D5C2323C0D658FE50C602041A67697970F87522B6B8A0D2FE34F037F3A |
+| final-focused.log | 5DC6380FC1AEA9DCF3832770732BB63D97D7ACBCFEBDB915A88ADEFB94F12DDF |
+| qualified/rv6-d018-search-return-system-false-text-1.0-none.png | AC8C209AD8216489BE333F8F129AE3BE0DE4478FACA7DFBA0D89E640329B3C8E |
+| qualified/rv6-d018-search-return-system-false-text-2.0-none.png | E4EB66FEE2B0F2EEB23AD7E1FAD7B2CFCAD29BEA634BA0FD6ED68751CF445201 |
+| qualified/rv6-d018-search-return-system-true-text-1.0-cart.png | AC8C209AD8216489BE333F8F129AE3BE0DE4478FACA7DFBA0D89E640329B3C8E |
+| qualified/rv6-d018-search-return-system-true-text-1.0-none.png | AC8C209AD8216489BE333F8F129AE3BE0DE4478FACA7DFBA0D89E640329B3C8E |
+| qualified/rv6-d018-search-return-system-true-text-2.0-none.png | E4EB66FEE2B0F2EEB23AD7E1FAD7B2CFCAD29BEA634BA0FD6ED68751CF445201 |
+| search-return-fix.log | F3FD5A19500CB882999AC35612C178BB9D1491ECB97BEC4C4A155CB796E05D87 |
