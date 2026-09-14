@@ -270,7 +270,7 @@ void main() {
       section: 'work',
       action: 'workspace',
       localKey: 'work-local-workspace',
-      owner: Key('my-work-screen'),
+      owner: Key('work-choose-screen'),
       rideType: null,
     ),
   ]) {
@@ -321,7 +321,11 @@ void main() {
       route: '/app/book/salon',
       owner: Key('salon-service-haircut'),
     ),
-    (section: 'work', route: '/app/work/my-work', owner: Key('my-work-screen')),
+    (
+      section: 'work',
+      route: '/app/work/my-work',
+      owner: Key('work-choose-screen'),
+    ),
   ]) {
     testWidgets(
       '${journeyCase.section} chooser Back preserves the exact non-default owner',
