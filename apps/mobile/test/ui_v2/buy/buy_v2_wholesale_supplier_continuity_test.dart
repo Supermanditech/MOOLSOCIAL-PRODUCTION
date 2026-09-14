@@ -105,7 +105,7 @@ void main() {
       await revealSupplierAction(tester, supplier);
       expect(supplier, findsOneWidget);
       expect(find.textContaining(session.product('w-oil').seller), findsWidgets);
-      expect(find.text('Surya Oils India'), findsOneWidget);
+      expect(find.text('Surya Oils India · Manufacturer'), findsWidgets);
       expect(find.textContaining('Surya Oils India'), findsWidgets);
       await tester.tap(supplier);
       await tester.pumpAndSettle();

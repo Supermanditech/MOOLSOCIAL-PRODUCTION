@@ -2865,3 +2865,16 @@ Full12 tests pass, including all4 previously failing cases. Focused analysis zer
 | --- | --- |
 | canonical-route-regression.log | 0BB291136D547FD225C0F003358926278FB020BEC63C4F3126DCAC0BE80D699F |
 | canonical-route-analysis.log | 7585FE4B7F59F2ABFD47073CB9533CDECD7BDAE6F16B927BBFD925D91DB2BD5D |
+
+
+## Wholesale subtotal and supplier identity reconciliation - 2026-09-14
+
+Parent0356a82179a805f63a33f73f62ac3fadbcd6e691. Test-only expectations updated in wholesale_cart_trade_summary_test and wholesale_supplier_continuity_test. Cart expectations retain exact product count, pack count, destination and rupee amount, adding the already-rendered Subtotal qualifier. Supplier expectation retains exact Surya Oils India identity and additionally requires its displayed Manufacturer role; bare standalone name is no longer required. No application behavior or UI changed. All quantity/MOQ, total arithmetic, mixed-cart isolation, landed totals, freight/GST, supplier selection, eligibility and navigation assertions remain.
+
+Five cart checks plus five supplier checks pass; all4 prior Wholesale failures reconciled. Focused analysis zero issues. Two original combined failure cases remain, both Offers last-quantity geometry. No final combined run, APK or Redmi closure claimed.
+
+| Artifact | SHA256 |
+| --- | --- |
+| wholesale-subtotal-regression.log | 12A6A81125E84B7DDC97D8D2E8253E19B9B427AFF8C7154E900E641F09492F98 |
+| wholesale-supplier-identity.log | C90ADD917103F4BAE30719A83D49E2E38B579FA330E604C78C5A01082612BC82 |
+| wholesale-contract-analysis.log | B07C8539600EE0AC72232BC73584852B77F1FB1EAD42C5DB4A02058E8F00CF6F |

@@ -63,7 +63,7 @@ void main() {
     );
     expect(
       find.text(
-        '1 product · ${product.minimumOrder} packs · Wholesale · '
+        '1 product · ${product.minimumOrder} packs · Wholesale · Subtotal '
         '${buyV2Money(expectedTotal)}',
       ),
       findsOneWidget,
@@ -124,7 +124,7 @@ void main() {
 
     expect(
       find.text(
-        '1 product · ${wholesale.minimumOrder} packs · Wholesale · '
+        '1 product · ${wholesale.minimumOrder} packs · Wholesale · Subtotal '
         '${buyV2Money(wholesaleTotal)}',
       ),
       findsOneWidget,
@@ -160,7 +160,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(session.quantityFor(product.id), product.minimumOrder + 1);
     expect(
-      find.text('1 product · 3 packs · Wholesale · ₹2,325'),
+      find.text('1 product · 3 packs · Wholesale · Subtotal ₹2,325'),
       findsOneWidget,
     );
     expect(find.byTooltip('Remove one trade pack'), findsOneWidget);
