@@ -9979,6 +9979,59 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('RV6 D021 empty cart restores grid height text $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(360, 800);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(
+        core: BuySession(),
+        reviewDataEnabled: true,
+        initialCatalogueRegionId: 'jodhpur',
+        cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+          destination: BuyV2Destination.shop,
+          providerCount: 10,
+          skusPerStore: 5000,
+        ),
+      );
+      addTearDown(session.dispose);
+      session.chooseShopSaleType(BuyV2ShopSaleType.courier);
+      session.chooseFulfilmentMode(BuyV2FulfilmentMode.standardCourier);
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final card = find.byType(BuyV2ProductCard).first;
+      final product = tester.widget<BuyV2ProductCard>(card).product;
+      final initialHeight = tester.getSize(card).height;
+      final address = session.selectedAddress.id;
+      session.toggleSaved(product.id);
+      await captureR66Visual(tester, 'rv6-d021-before-text-$scale');
+      expect(session.addProduct(product.id), isTrue);
+      expect(session.addProduct(product.id), isTrue);
+      await tester.pumpAndSettle();
+      final populatedHeight = tester.getSize(card).height;
+      expect(populatedHeight, greaterThanOrEqualTo(initialHeight));
+      if (scale == 1) expect(populatedHeight, greaterThan(initialHeight));
+      session.decrease(product.id);
+      await tester.pumpAndSettle();
+      expect(tester.getSize(card).height, populatedHeight);
+      session.decrease(product.id);
+      await tester.pumpAndSettle();
+      await captureR66Visual(tester, 'rv6-d021-empty-text-$scale');
+      expect(session.quantityFor(product.id), 0);
+      expect(tester.getSize(card).height, closeTo(initialHeight, .1));
+      expect(session.selectedAddress.id, address);
+      expect(
+        session
+            .savedProductsFor(BuyV2Destination.shop)
+            .any((p) => p.id == product.id),
+        isTrue,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   final d018Cases = [
     for (final scale in [1.0, 2.0])
       for (final systemBack in [true, false])

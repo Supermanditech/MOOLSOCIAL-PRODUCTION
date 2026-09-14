@@ -2671,3 +2671,37 @@ Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d020
 | corrected.log | 91A3DB0974270C8131DCD7DBD1B62BB2653E27AFE26B53E434D3E98AE3B6D980 |
 | final-focused.log | 3C7471E233A05A00B7E76D6A3911F2186BFE53196E35EBCDBEB01EEBD2705080 |
 | reproduction.log | F124500B7FFF18A1D7AC6E6EC7BBFA12C8D2E415349EEF96AC5558DCAA0903AB |
+
+
+## RV6-D021 local qualification - 14 September 2026
+
+Locally qualified; original remains open pending successor Redmi acceptance. Parent9a81541e866975c15c4044f8a5d68906e45dd638. No ownership admission needed. Changed source: apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart; focused tests: apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart; evidence: this document, DEFECTS.md and scope-state.json.
+
+Recorded1037/1043/1044/1045 artifact hashes match EVIDENCE.csv after case normalization (the first two recorded hashes are lowercase). Reviewed1037 initial and1044 settled: empty-cart rows retain44 logical pixels /88 physical pixels. Cause: _QuantityAwareGridLayout retained its largest quantity width until scope or viewport change. Reset it when no displayed product has a quantity; preserve existing maximum while quantities remain. All callers of this shared helper receive the correction. No session/cart arithmetic or provider logic changed.
+
+Normal-text baseline reproduced240px card remaining284px after removal. The200% fixture has wider cards and needs no extra stacked quantity height; its initial assertion incorrectly required growth and was corrected to require no shrink while populated and exact original height after emptying. Do not count that setup assertion as a reproduced200% product failure. Final focused2 pass; selected address and saved item retained, two additions and removals exercised through session actions in the actual Flutter screen. This local layout test is not a claim of physical quantity-editor tap verification.
+
+Connected Buy-screen and partner-catalogue regression:408 passed, terminal exit0, session65399/chunkcb27c3. Focused2 overlap408. Final analysis:zero issues. Four qualified actual Flutter captures reviewed (before/empty at normal/200%); normal row geometry restored, enlarged layout intact. Generated missing-image placeholders at200% are fixture limitations; media-provider qualification not claimed. Initial before captures include a transient Saved notice; layout comparison uses measured card height, not whole-image equality.
+
+Redmi requirement remains exact1037-1045 reproduction including quantity-edit/update/cancel and final minus removal with retained Saved/address and no module reentry. No original closure, device action, new APK or broad audit. Source remains a small shared-layout correction; connected Store cases passed.
+
+Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d021-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | 067DC7E66F5A56A4B8E3E826990362480F2B5B2A59496B0BF4C95F036AE37C39 |
+| baseline/rv6-d021-before-text-1.0.png | 23CEE50B65755ED51AD0A53EAC57E6B01DA55B4A142DFFF910D4F3016DF3AD2F |
+| baseline/rv6-d021-before-text-2.0.png | 9184339A4CAB92D597E79DCC5252952D52B763114FE7BB5181BF47AD50C991A9 |
+| baseline/rv6-d021-empty-text-1.0.png | EE0D16507935559976784AC7C39A7BE993E09D2D43544DCFD07BEFC22AB5AB07 |
+| baseline.log | 1053ECA32C670882AB1007F6EB814D0436A7BF5C41C571DCAE135C1E5A219146 |
+| connected-regression.log | A372D2814EEFBAC8663C5BB503B643992D8583A675CA50C0164B0613D7D9CA4C |
+| corrected/rv6-d021-before-text-1.0.png | 23CEE50B65755ED51AD0A53EAC57E6B01DA55B4A142DFFF910D4F3016DF3AD2F |
+| corrected/rv6-d021-before-text-2.0.png | 9184339A4CAB92D597E79DCC5252952D52B763114FE7BB5181BF47AD50C991A9 |
+| corrected/rv6-d021-empty-text-1.0.png | CC8BE196EB6B5FFEC04C0BE9263C19CA8D5C061F4F15609E6085CEF79C848740 |
+| corrected.log | DD8374B0818437E4B34643E49937FCC19C396BD5BCC1858300E32A201FC7D831 |
+| final-analysis.log | 1E54EA91903B8A786BA4C28A3BF79FDB5E8F1C2873147DA237288DE1ABDF0566 |
+| final-focused.log | 109D6BB1D725B7D0183EE82E2518B85055505757567D17F9FBCF85AD8A383539 |
+| qualified/rv6-d021-before-text-1.0.png | 23CEE50B65755ED51AD0A53EAC57E6B01DA55B4A142DFFF910D4F3016DF3AD2F |
+| qualified/rv6-d021-before-text-2.0.png | 9184339A4CAB92D597E79DCC5252952D52B763114FE7BB5181BF47AD50C991A9 |
+| qualified/rv6-d021-empty-text-1.0.png | CC8BE196EB6B5FFEC04C0BE9263C19CA8D5C061F4F15609E6085CEF79C848740 |
+| qualified/rv6-d021-empty-text-2.0.png | 97F3F29834BC9CB43F7FC64B7609570FE3317754796AB7320FBC049E28F82CA5 |

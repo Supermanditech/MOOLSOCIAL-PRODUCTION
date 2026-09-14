@@ -146,11 +146,11 @@
       "RV6-D016",
       "RV6-D017",
       "RV6-D018",
-      "RV6-D020"
+      "RV6-D020",
+      "RV6-D021"
     ],
     "deviceQualified": [],
     "remainingLocal": [
-      "RV6-D021",
       "RV6-D022"
     ],
     "newApkBuilt": false,
@@ -185,7 +185,8 @@
       "RV6-D015": "0c10682b9c5e6955e5cf845de8897090b95f60d4",
       "RV6-D016": "ac5a95e5f8fa410ca4e5d0e8c41ca5de7bd271eb",
       "RV6-D017": "99f74b80e37850003f7fdd37db81e71387fbc9ca",
-      "RV6-D018": "04afab670c14e5cc425269f6753a3410e0b82548"
+      "RV6-D018": "04afab670c14e5cc425269f6753a3410e0b82548",
+      "RV6-D020": "9a81541e866975c15c4044f8a5d68906e45dd638"
     },
     "reconciledWithoutProductChange": {
       "RV6-D019": "Original registered capture hashes verified; minimized bike9+ visible in910/911/913; no product change justified. Successor Redmi check retained; not device-closed or implemented."

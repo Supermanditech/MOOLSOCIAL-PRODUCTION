@@ -9025,10 +9025,11 @@ class _QuantityAwareGridLayoutState extends State<_QuantityAwareGridLayout> {
         widget.session,
         widget.products,
       );
-      if (measured > _largestQuantityWidth) _largestQuantityWidth = measured;
-      // Removing a quantity row must not shrink scroll extent under a buyer's
-      // finger. The product image uses the retained card space. A new product
-      // scope or viewport starts with its own compact geometry.
+      if (measured == 0 || measured > _largestQuantityWidth) {
+        _largestQuantityWidth = measured;
+      }
+      // Keep quantity controls stable while this grid has items in the cart.
+      // Once all its quantities are removed, restore the compact Add layout.
       return widget.builder(context, constraints, _largestQuantityWidth);
     },
   );
