@@ -1,0 +1,3 @@
+# r66.4 motion disposition
+
+The approved Work Dashboard placement, finite progress/selection/completion transitions, pressed feedback and zero-duration reduced-motion behavior are reused unchanged. The only new product edit is a shorter purchase-order hint. Both final connected cycles passed742 tests with83 intentional skips and0 failures, including Universal reduced-motion/accessibility and Buy payment-sheet contracts. Prior unchanged Work visual review covers compact320x568/140% recovery states. Local policy disposition is passed; OPPO motion/performance and founder appearance review remain pending. No fabricated live activity, perpetual decorative blinking, admin/order/rider/payment/GPS event or production service qualification is claimed.
