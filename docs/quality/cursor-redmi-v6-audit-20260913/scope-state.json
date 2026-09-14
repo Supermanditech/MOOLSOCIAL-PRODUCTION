@@ -92,7 +92,7 @@
   ],
   "nextWork": [
     "D005 and sole child D005-C01 are device-closed on installed r66.22; preserve the other 18 original closures and the original English preference restored in this round.",
-    "D014 correction and source checks are qualified, including two combined cycles of 2339 passes and 27 inherited skips each. Prepare r66.23, run unchanged wrapper preflight, build one corrective APK and qualify D014 on Redmi only. Installed r66.22 remains unchanged and D014 device-open. Carry the historical commit-label failure as an unresolved final-handoff gate."
+    "Corrected r66.23 is built, installed and checksum-verified on Redmi. D014 native-link process creation was rejected before execution by automatic approval review; await a permitted approval mechanism before any native retry. Ordinary returns, original Saved product, Home/Work addresses and font scale are preserved. Do not rebuild, repeat unrelated closures or bypass the denial. The historical commit-label handoff failure also remains unresolved."
   ],
   "preservation": {
     "cart": "1175 original Scheduled Shop Saved1 emptycart restored;no cart changes in round169",
@@ -222,17 +222,26 @@
         "id": "UAW-CURSOR-REDMI-RV6-D014-20260914",
         "versionName": "1.0.0-r66.23",
         "versionCode": 2026091404,
-        "status": "local_prebuild_inputs_qualified_wrapper_preflight_build_and_device_pending",
+        "status": "built_installed_checksum_equal_native_device_acceptance_blocked",
+        "sourceHead": "1d5c4be97dc13874af1f4348156782339ecacf60",
+        "apkSha256": "D59EADBB5A57568F91FED9319602BBC84E3B04831CF756534C3526EC0EDF512F",
+        "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+        "sourceManifestSha256": "8A80AF113CDD55C234AC8DE70E59B808767B742136E2EED00C1F89E3E43A97FA",
+        "buildAuthorization": "consumed_one_build",
+        "installationReceiptSha256": "6735920C95910C1EB2D0F3A79923BA571F07F8D6FD5E0FC759C0B6A8911C23E5",
+        "captureManifestSha256": "A2FE78BDA853CEA0EB04894659CE9E515F8DCEE530D0117209169F4CD072E046",
+        "dataClearPerformed": false,
+        "ordinaryDeviceChecks": "Store/product/Recently viewed returns pass; original saved wheat product and Home/Work addresses with Work selected remain; Quick Shop and font scale 1.0 restored; language and Cart not changed",
         "evidence": "PREBUILD.md D014 corrective r66.23 prebuild qualification",
         "finalHandoff": "historical_commit_label_failure_not_waived"
       },
-      "successorBuilt": false
+      "successorBuilt": true
     },
-    "externalLinkDeliveryUnverified": [],
-    "externalBlocker": "Historical native-link denial resolved for explicit require_escalated requests after founder switched IDE to Ask for approval. D014 actual device acceptance failed; no alternate-launch bypass. Separate historical commit-label handoff failure remains unresolved.",
+    "externalLinkDeliveryUnverified": ["RV6-D014"],
+    "externalBlocker": "r66.23 D014 ACTION_VIEW launch was rejected before process creation with blocked by policy. Earlier r66.22 approval-capable native executions remain valid but do not permit bypassing this new denial; current tools prohibit sandbox_permissions. No alternate launcher/email/browser/tool used. Exact action and evidence are in UAT.md and rv6-d014-final-20260914/native-01-original-approval-denial.txt. Separate historical commit-label handoff failure remains unresolved.",
     "children": [{"id": "RV6-D005-C01", "parent": "RV6-D005", "status": "implemented_device_verified_closed", "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34", "evidence": "UAT.md r66.22 device closure section; EVIDENCE.csv rv622 captures", "limits": "Signed-out Redmi review lane: Hindi and English selected radios and summaries persist across separate cold processes; affected Personal profile returns checked; Hindi glyph and honest English-screen disclosure visually reviewed. Original English restored. No claim of Buy translation or production qualification."}],
-    "currentInstalledVersion": "1.0.0-r66.22-cursorreview",
-    "currentInstalledVersionCode": 2026091403,
+    "currentInstalledVersion": "1.0.0-r66.23-cursorreview",
+    "currentInstalledVersionCode": 2026091404,
     "finalSuccessor": {
       "candidate": "UAW-CURSOR-REDMI-RV6-LANGUAGE-20260914",
       "sourceHead": "f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b",
