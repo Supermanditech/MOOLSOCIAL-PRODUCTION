@@ -33,7 +33,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 
 ## RV6-D003 — Order Chat presents a stale delivery promise without its unavailable qualifier
 
-- Status: open; locally implemented and qualified across all three recorded occurrences, pending successor APK and Redmi acceptance. Severity: moderate.
+- Status: closed; all three recorded frontend occurrences passed r66.20 Redmi acceptance. Severity: moderate.
 - Journey: open MS-NEW-09 tracking; Refresh produces Order updates unavailable and last recorded estimate/update unavailable (112); open Help; expand Order conversation context (146–147).
 - Actual: Chat context labels Delivery as Delivery in12min with no last-known or unavailable qualifier. Tracking for the same order explicitly says the update is unavailable. Order and purchase identity remain correct.
 - Expected: all current order-support surfaces preserve the estimate freshness/unavailability state; an unconfirmed stored relative promise must not appear as an unqualified current countdown.
@@ -43,6 +43,9 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Ownership: Buy-to-shared-Chat metadata/freshness contract; coordinate shared consumer rendering if needed in the later implementation scope. Backend live estimates remain separately unqualified.
 
 - Local correction: shared freshness-preserving Chat/tracking/alert summaries and historical invoice/PDF disclosure; 64 connected checks passed, final analysis zero issues, twelve relevant Flutter captures reviewed. All exact owners, test/log hashes, visual limitations and intermediate failures are recorded in UAT.md under RV6-D003 local qualification. Original 112/147, 480 and 510-511 device acceptance and real provider timestamps remain pending; no local result closes this ticket.
+
+
+- Successor acceptance: UAT.md r66.20 Redmi D003 acceptance, captures023-046 and actual downloaded invoice PDF/render. Installed SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Chat, historical invoice/PDF and alert preserve freshness and exact order identity; Back verified. Provider timestamps remain unqualified. No child found.
 
 ## RV6-D004 - Display-name validation sentence is clipped at normal text size
 - Status: open; implemented and locally qualified on 2026-09-14; successor Redmi acceptance pending. Severity: minor.
