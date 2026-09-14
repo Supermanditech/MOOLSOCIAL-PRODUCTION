@@ -4,7 +4,7 @@ Only findings from installed candidate `UAW-CURSOR-REDMI-V6-REVIEW-20260913`, SH
 
 ## RV6-D001 — Store empty-search recovery recommends an unavailable area control
 
-- Status: open, confirmed device copy/navigation guidance defect. Severity: minor. Locally implemented and qualified14September2026;successor-APK Redmi retest pending.
+- Status: closed after scoped Redmi r66.20 acceptance on14September2026. Severity: minor. Implementationd532b9dea97a52473a5a95e090a9831fd9635696; installed APK SHA2567734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Capturesrv620-001through011 verify corrected guidance, category/query recovery and AndroidBack through sameStore/product/Shop; details and limitations inUAT.md. No child found.
 - Journey: product → Visit store → Browse all products → Search this store → enter `zzzzzz`.
 - Actual: “No matching products. Try another search, category or area.” The Store-specific sheet offers search and categories, but no area selector. Its category sheet contains Store categories only.
 - Expected: recovery guidance should name actions available within this Store scope, such as changing/clearing the search or category. A shopper should not be directed to hunt for a nonexistent area control or leave the selected Store without explanation.

@@ -2949,3 +2949,14 @@ Retained candidate:apps/mobile/build/cursor-review-r66.20/apk/uaw-cursor-redmi-r
 | successor-apk-badging.log | A49512E1313AC297AA45FF60FE4A223AE512268BF6D691EC345DD7824FD2550D |
 | predecessor-apk-signer.log | DF32B0258C96DAD5939EEE4D72314434AEABE920199912E9976876C51166EE7D |
 | successor-wrapper-preflight-v2.log | 057A2B63C38ADE9687EC3E5AE558BB5A1B8C1D54854A5C98743C079C03ABCC1B |
+
+
+## r66.20 Redmi installation and D001 acceptance
+
+Installation: adb-sTG8HCYTGGQT885OF install-r completedSuccess/exit0(335c4f). No uninstall,downgrade,clear-data or permission grant option used. Installed packagecom.moolsocial.app.cursorreview/versionCode2026091401/versionName1.0.0-r66.20-cursorreview(f3cf7f). Installed base.apk SHA2567734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8(c92eca), exactly matching verified candidate and archived APK. Launch via declared MainActivity completedCOLD/Statusok(095a0e). Capturerv620-001shows Shop, Saved1 and minimized delivery9+. This is visible retained state, not a blanket claim that all user data or backend behavior is qualified.
+
+RV6-D001 CLOSED through scoped Redmi acceptance. Implementationd532b9dea97a52473a5a95e090a9831fd9635696; local evidence above; physical acceptance bound to the installed SHA256 above. Normal font_scale1.0/720x1600; exact StoreMoolMarket000001 via Fresh tomatoes1 product. Entry product differs from original audit's preceding product but enters the same Store and same shared paginated search surface; no supplier-data qualification inferred.
+
+Reviewed captures001-011: launch;product;Visit store;Browse all products;searchzzzzzz with keyboard;Store categories;chooseFruits&vegetables with query retained;clear query to restore240listed category products;AndroidBack tosameStore;Back tosameFresh tomatoes1;Back toShop. Empty guidance exactlyTry another search or category;no unavailable area advice. Categorycontrol is real and selection applies;clearingquery recovers listed products withinStore. Returned ShopSavedbadge1,emptybasket/noAdd performed anddelivery9+retained. No real message,order,payment,profile,address or permission action. No child defect found in this D001 verification.
+
+ElevenactualPNGcaptures inspected and hashed inEVIDENCE.csv under successor candidate, preserving all prior1177artifacts/514frozenpasses. Count:1of22device dispositions completed;remaining21(includingD019evidence-reconciliation check)pending. No other original markedclosed. D001closure is limited to its recorded normal-text guidance/recovery/return acceptance;no broadBuy re-audit.

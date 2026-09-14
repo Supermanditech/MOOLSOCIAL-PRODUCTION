@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "built_pending_scoped_redmi",
+  "machineState": "built_installed_scoped_uat_in_progress",
   "buildAuthorization": "consumed",
   "preBuildValidation": {
     "evidence": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
@@ -153,13 +153,17 @@
     },
     {
       "id": "installed-apk-checksum-equality",
-      "state": "pending",
-      "evidence": []
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
     },
     {
       "id": "redmi-data-preserving-upgrade",
-      "state": "pending",
-      "evidence": []
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
     },
     {
       "id": "redmi-RV6-D001-through-D022-recorded-reproductions",
@@ -195,5 +199,15 @@
     "package": "com.moolsocial.app.cursorreview",
     "versionName": "1.0.0-r66.20-cursorreview",
     "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25"
+  },
+  "scopedRedmiProgress": {
+    "totalOriginals": 22,
+    "closed": [
+      "RV6-D001"
+    ],
+    "remainingDispositions": 21,
+    "newChildren": [],
+    "installedApkSha256": "7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8",
+    "device": "TG8HCYTGGQT885OF"
   }
 }
