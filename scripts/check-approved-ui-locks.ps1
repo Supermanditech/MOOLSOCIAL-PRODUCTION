@@ -179,6 +179,9 @@ function Get-CursorAccessibilityNativeProjection {
     $redmiSource = $redmiBaseline
     & git -C $root merge-base --is-ancestor '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' HEAD
     if ($LASTEXITCODE -eq 0) { $redmiSource = '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' }
+    # Exact founder-approved fixture-only source; retain all source/native checks.
+    & git -C $root merge-base --is-ancestor '11b6562e7bf382afeb11e1801a0a390477fcae8f' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '11b6562e7bf382afeb11e1801a0a390477fcae8f' }
     & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
     if ($LASTEXITCODE -ne 0) {
       throw 'Redmi audit committed source differs from its exact admitted source.'

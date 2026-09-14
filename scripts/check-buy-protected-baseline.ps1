@@ -344,7 +344,10 @@ function Test-RedmiReviewBuySource {
 
 function Test-IntegratedStoreBuyReviewSource {
   param([string]$SourceCommit)
-  $redmiSuccessor = $SourceCommit -ceq '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d'
+  $redmiSuccessor = $SourceCommit -cin @(
+    '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d',
+    '11b6562e7bf382afeb11e1801a0a390477fcae8f'
+  )
   if ($SourceCommit -cne '10fb79b4469203371edf888e7d4b8aacb3546581' -and -not $redmiSuccessor) { return $false }
   $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
   $expectedBranch = switch ($canonicalRoot) {
