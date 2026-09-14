@@ -2820,3 +2820,13 @@ Test-only correction on parentd67d269d25cfc3376cc95447f7849b7735e1428f. The thre
 | --- | --- |
 | order-address-estimate-regression.log | A948746353817A909F5B3577A0567DFDF4BC686A926F6F2EFF8A61584D68A9F7 |
 | order-address-estimate-analysis.log | 085C7C220F1922063D981ACC68BE09658BA7912CDF66424C0BC18031F7E366A6 |
+
+
+## Optional brand contract reconciliation - 2026-09-14
+
+On parentcd92728c56cbfadfbd9fa4cb10703c888311c4d4, corrected only the vertical contract test: a missing supplier brand must produce the explicit Brand not provided label; supplied brands must retain their exact trimmed value. No invented identity or mandatory-brand requirement for loose produce. Every other product, pack, taxonomy, destination, offer identity and Medicine regulatory assertion remains unchanged. Six checks pass and focused analysis has zero issues. No product change, APK or device closure. Fourteen original combined failures remain.
+
+| Artifact | SHA256 |
+| --- | --- |
+| optional-brand-contract.log | DA8B2721585E18436EE35DBD3B1E83C0F28D8AC210A73F3C330AA70F29C507EE |
+| optional-brand-analysis.log | 85345934790F2DBA022A9F2C053291A4F5FC3E093DC0A548B59ABB084FDD4404 |
