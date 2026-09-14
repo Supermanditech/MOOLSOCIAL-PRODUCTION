@@ -3002,3 +3002,10 @@ RV6-D008 original312 passes on Redmi TG8HCYTGGQT885OF, font1.0/720x1600, APK SHA
 Captures rv620-084 through088 inspect the recorded Wholesale Fresh tomatoes1/10kg/Rs580 listing on Redmi TG8HCYTGGQT885OF, APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Normal text. Summary-only Highlights, Specifications and generated Description are absent; price/pack/MOQ2/Rs1160 minimum, freight/tax details, product details, product/pack information, ratings/reviews and related products remain visible. No Add or other product action. D011 final return and disposition not yet recorded; no closure claimed by this checkpoint.
 
 D011 final acceptance: capture089 AndroidBack restores same Wholesale catalogue. Implementation b46c582bc747c15576f8349b0c2fd144d452f02b. Recorded407-410 summary-only repetition correction passes; remaining structured Product details/Product and pack information are retained intentionally, not claimed globally deduplicated. No child; no cart/bookmark mutation. Nineof22 device dispositions complete:8closed,D005tested-open/onechild,13pending including D009/D010.
+
+
+### RV6-D016 scoped Redmi acceptance - 2026-09-14
+
+Implementation ac5a95e5f8fa410ca4e5d0e8c41ca5de7bd271eb. Redmi TG8HCYTGGQT885OF, r66.20, installed APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Captures rv620-097 through103: existing Shop filter > Shopping tools > Shopping settings > Shopping alerts > New Shop offers opens actual Offers heading, selected Offers tab, offer content and offer cards (102); Android Back restores the same four-alert sheet (103 versus101). No cart, saved item, notification preference, order or message changed. Recorded reproduction and expected return pass; original closed, no child found. This establishes fixture frontend navigation only, not provider offer publication.
+
+D012 setup captures090-096 inspected the nine current Recently viewed products; the required closed Pet Family product was absent. No D012 acceptance is inferred from these setup captures; original remains pending.
