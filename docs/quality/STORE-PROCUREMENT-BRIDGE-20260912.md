@@ -1643,3 +1643,26 @@ log ends success=true with 2607 passed, 83 skipped and zero failures; its summar
 confirms unchanged skip names and all 56 replacement checks passed. No assertion,
 exception or checker has been weakened or changed for these corrections.
 Both child defects remain open for successor APK/OPPO retest and founder review.
+
+### V23 exact admission for the tested Ledger child corrections
+
+Tested correction: 9f90dfff4e5f01ea397dba3e3f4262cf25da61ec, clean and remotely sealed.
+Successor destination: integration/moolsocial/store-buy-final-v23-20260915 at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v23-20260915.
+V22 and its failed device evidence remain preserved. Candidate version is
+1.0.0-r66.27+2026091501, isolated com.moolsocial.app.runtime for OPPO review only.
+
+Under the standing authorization for the necessary corrected APK, exactly 13
+destination references and three tested-source references advance in the existing
+coordination, protected-baseline, UI-lock and backend-boundary scripts. Their
+predecessors are preserved outside Git as outputs/store-ledger-mvp/v23-before-*.ps1.
+An exact replacement comparison proves no other checker text changed. Owners,
+permissions, assertions, exclusions and the sound-file content hash do not expand.
+The Buy sound owner, backend and contracts are unchanged from tested source7273.
+Backend self-tests, positive source review, changed-content rejection and
+wrong-source rejection pass; evidence is v23-backend-selftest.log,
+v23-source-backend-review.log and v23-pin-negative-controls.json.
+These remain disclosed review exceptions, never production security acceptance.
+
+Fresh admission, candidate tests, APK identity and OPPO Ledger journeys remain
+required. This pin update does not itself qualify a candidate or a device.
