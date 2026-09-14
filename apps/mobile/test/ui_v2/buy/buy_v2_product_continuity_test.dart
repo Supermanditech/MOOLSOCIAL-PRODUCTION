@@ -119,7 +119,11 @@ final class _R669ContinuityComparison implements BuyV2ComparisonSource {
   }
 }
 
-Future<BuyV2Session> r669ComparisonContinuitySession(BuySession core) async {
+Future<BuyV2Session> r669ComparisonContinuitySession(
+  BuySession core, {
+  BuyV2ProductContentAdapter productContentAdapter =
+      const BuyV2CatalogueProductContentAdapter(),
+}) async {
   final now = DateTime.utc(2026, 9, 10, 12);
   final products = BuyV2Catalogue.allProducts
       .map(
@@ -148,6 +152,7 @@ Future<BuyV2Session> r669ComparisonContinuitySession(BuySession core) async {
     reviewDataEnabled: false,
     catalogueNow: () => now,
     comparisonSource: _R669ContinuityComparison(products, now),
+    productContentAdapter: productContentAdapter,
   );
   commerce.snapshot = BuyV2CommerceSnapshot(
     state: BuyV2CommerceLoadState.ready,

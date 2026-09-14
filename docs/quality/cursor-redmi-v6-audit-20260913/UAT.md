@@ -2795,3 +2795,18 @@ All nine listed test owners are outside the current37-owner claim. Source fixes 
 | --- | --- |
 | commerce-fixture-reconciliation.log | 4B3F6B3916EB4502859C0AF175EF5712455F16691D927908E329C4DD5BCCC856 |
 | route-wholesale-reconciliation.log | D65BF729741A9D4574C60ED722BCA8464894392D9EC748B8AF632B05E039D410 |
+
+
+## Authorized test admission and D011 fixture reconciliation - 2026-09-14
+
+Founder explicitly authorized narrow test ownership and reviewed successor-build admission in the current chat. Test admission sealed separately at4881429fdfe3ade5cbfb35c1f7c736f22f323a95, parent e65f341b690d4345fda29fa3609d02e6293b6d25, clean/live remote-equal; implementation/pre-commit/handoff gates passed. Exactly nine previously unclaimed test owners added,37 to46. Other claims and policy values preserved; normalized prior checker hash12F1D4D45F7289C12BABD685A71F7067782E21A0B63900B9065294794FCADCA7 is enforced after removing only the explicit admission delta. No runtime/backend/test changes in that admission. Successor build gate remains unchanged and pending qualified-source admission.
+
+D011 reconciliation changes only the two test owners buy_v2_product_continuity_test.dart and buy_v2_scoped_cart_checkout_dock_continuity_test.dart. The shared session helper accepts an optional content adapter, retaining its original default. The eight R5 004 continuity cases explicitly provide distinct supplier storage/batch instructions instead of requiring the generic title/variant/pack/price paragraph that D011 intentionally removes. Existing readability, overlay/Cart obstruction, Compare navigation, scroll return, retained quantities and Back assertions are unchanged. This qualifies original continuity behavior using genuine distinct fixture content; no assertion was skipped and no production description was invented.
+
+Eight formerly failing cases pass at320/360/430 widths and640x360, each100/200% text. Full shared-helper product continuity suite26pass, including original default content and D007 return paths. Total34 distinct local checks. Focused analysis zero issues. Test-only fixture change; no application UI or new device qualification. Remaining16 original combined failure cases require reconciliation and final full combined run; no successor APK readiness claim.
+
+| Artifact | SHA256 |
+| --- | --- |
+| distinct-description-regression.log | E72CF672BA6DA3E5FA28F87AF8E00A797B38B0D899619877F3A6302CEB13C80D |
+| distinct-description-analysis.log | 8C74C00C01DE74A2B98D3635A1F9D87316168732D58E0223101BA68B964C936C |
+| description-helper-continuity.log | D421AF186999DE9A50850C59E5A19358D3544EEEED3E76D254E8767CCE33C082 |

@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
@@ -16,6 +17,25 @@ import 'package:moolsocial/ui_v2/universal/mool_global_navigation_v2.dart';
 
 import 'buy_v2_product_continuity_test.dart'
     show r669ComparisonContinuitySession;
+
+class _R5DistinctProductContent implements BuyV2ProductContentAdapter {
+  const _R5DistinctProductContent();
+
+  @override
+  BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
+    final base = const BuyV2CatalogueProductContentAdapter().snapshotFor(product);
+    return BuyV2ProductContentSnapshot(
+      productId: product.id,
+      state: base.state,
+      sourceId: 'r5-supplier-description-fixture',
+      media: base.media,
+      highlights: base.highlights,
+      specifications: base.specifications,
+      description: 'Store sealed containers away from direct sunlight. '
+          'Check the batch and best-before date on each container before use.',
+    );
+  }
+}
 
 class _R5DockArrivalSound implements BuyV2DeliveryArrivalSound {
   @override
@@ -441,7 +461,10 @@ void main() {
         tester.view.devicePixelRatio = 1;
         addTearDown(tester.view.reset);
         final core = BuySession();
-        final session = await r669ComparisonContinuitySession(core);
+        final session = await r669ComparisonContinuitySession(
+          core,
+          productContentAdapter: const _R5DistinctProductContent(),
+        );
         session.openDestination(BuyV2Destination.wholesale);
         expect(session.openProduct('w-oil'), isTrue);
         addTearDown(core.dispose);
