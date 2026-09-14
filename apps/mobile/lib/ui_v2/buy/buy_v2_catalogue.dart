@@ -6293,6 +6293,13 @@ class _PublicStoreTruthPanelState extends State<_PublicStoreTruthPanel>
                             border: Border.all(color: const Color(0x33000080)),
                           ),
                           child: AnimatedSwitcher(
+                            // A rapid reopen can overlap the previous close.
+                            // Keep transition identity separate from icon state.
+                            transitionBuilder: (child, animation) =>
+                                FadeTransition(
+                                  opacity: animation,
+                                  child: child,
+                                ),
                             duration: BuyV2Motion.resolved(
                               context,
                               BuyV2Motion.stateChange,

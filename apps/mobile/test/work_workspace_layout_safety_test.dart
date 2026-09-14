@@ -34,6 +34,9 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 // Host-only authoritative-response fixtures. These never qualify live grants.
 class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
   WorkProcurementBookmark? value;
+  bool failInactive = false;
+  Completer<bool>? pendingInactive;
+  int inactiveWrites = 0;
   @override
   Future<WorkProcurementBookmark?> read(String account, String store) async =>
       value?.context.accountId == account && value?.context.storeId == store
@@ -41,6 +44,13 @@ class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
       : null;
   @override
   Future<bool> save(WorkProcurementBookmark bookmark) async {
+    if (!bookmark.active) {
+      inactiveWrites++;
+      if (failInactive) return false;
+      if (pendingInactive != null && !await pendingInactive!.future) {
+        return false;
+      }
+    }
     value = bookmark;
     return true;
   }
@@ -10682,6 +10692,132 @@ void main() {
     });
   }
 
+  testWidgets(
+    'Store cart timed acknowledgement overlap and retained quantity',
+    (tester) async {
+      final work = liveStore();
+      final controller = WorkProcurementController(
+        currentAccountId: () => 'fixture-purchaser',
+        currentStoreId: () => work.activeWorkspace?.id,
+        storeApproved: () => work.activeWorkspace?.verified == true,
+        bookmarks: _StorePurchaseBookmarks(),
+        stateStoreFactory: _StorePurchaseState.new,
+        sessionFactory: (identity, state) {
+          final core = BuySession();
+          addTearDown(core.dispose);
+          return BuyV2Session(
+            core: core,
+            procurementIdentity: identity,
+            customerStateStore: state,
+            reviewDataEnabled: false,
+            commerceAdapter: _StorePurchaseCommerce(identity.value!),
+          );
+        },
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        procurementFactory: () => controller,
+      );
+      await tester.tap(find.text('Restock'));
+      await tester.pumpAndSettle();
+      final buy = controller.session!;
+      expect(buy.addProduct('w-rice'), isTrue);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-mini-cart-added-icon')),
+        findsOneWidget,
+      );
+      final before = buy.quantityFor('w-rice');
+      await tester.pump(const Duration(milliseconds: 2600));
+      await tester.pump(const Duration(milliseconds: 110));
+      expect(buy.cartAcknowledgement, isNull);
+      expect(buy.addProduct('w-rice'), isTrue);
+      await tester.pump(const Duration(milliseconds: 16));
+      expect(tester.takeException(), isNull);
+      expect(buy.quantityFor('w-rice'), greaterThan(before));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+    },
+  );
+  testWidgets('Store supplier delivery toggle overlapping transitions', (
+    tester,
+  ) async {
+    final work = liveStore();
+    final controller = WorkProcurementController(
+      currentAccountId: () => 'fixture-purchaser',
+      currentStoreId: () => work.activeWorkspace?.id,
+      storeApproved: () => work.activeWorkspace?.verified == true,
+      bookmarks: _StorePurchaseBookmarks(),
+      stateStoreFactory: _StorePurchaseState.new,
+      sessionFactory: (identity, state) {
+        final core = BuySession();
+        addTearDown(core.dispose);
+        return BuyV2Session(
+          core: core,
+          procurementIdentity: identity,
+          customerStateStore: state,
+          reviewDataEnabled: false,
+          commerceAdapter: _StorePurchaseCommerce(identity.value!),
+        );
+      },
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      procurementFactory: () => controller,
+    );
+    await tester.tap(find.text('Restock'));
+    await tester.pumpAndSettle();
+    final buy = controller.session!;
+    expect(buy.openProduct('w-rice'), isTrue);
+    await tester.pumpAndSettle();
+    final supplier = find.byKey(
+      const ValueKey('buy-wholesale-store-action-w-rice'),
+    );
+    await reveal(tester, supplier);
+    await tester.tap(supplier);
+    await tester.pumpAndSettle();
+    final toggle = find.byKey(
+      const ValueKey('buy-public-store-fulfilment-toggle'),
+    );
+    expect(toggle, findsOneWidget);
+    for (final delay in [110, 16, 16, 16]) {
+      await tester.tap(toggle);
+      await tester.pump(Duration(milliseconds: delay));
+      expect(tester.takeException(), isNull, reason: 'Supplier toggle $delay');
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Store search repeated empty results transition and exit', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    await tester.tap(find.byKey(const Key('work-dashboard-search')));
+    await tester.pumpAndSettle();
+    final field = find.byKey(const Key('work-dashboard-search-field'));
+    for (final (query, elapsed) in [
+      ('APP-1043', 220),
+      ('zz-no-record', 110),
+      ('APP-1043', 16),
+      ('zz-no-record', 16),
+    ]) {
+      await tester.enterText(field, query);
+      await tester.pump(Duration(milliseconds: elapsed));
+      expect(tester.takeException(), isNull, reason: 'Search $query');
+    }
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('Store search empty state fits compact 200% keyboard', (
     tester,
   ) async {
@@ -17575,6 +17711,171 @@ void main() {
         semantics.dispose();
       }
     });
+  }
+
+  if (storeReviewRuntime) {
+    testWidgets('STOREBACK04 dashboard workload count overlap and exit', (
+      tester,
+    ) async {
+      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
+      addTearDown(
+        () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+      );
+      final work = liveStore();
+      expect(work.loadStoreReviewSeed(1000), isTrue);
+      final controller = WorkProcurementController(
+        currentAccountId: () => 'fixture-purchaser',
+        currentStoreId: () => work.activeWorkspace?.id,
+        storeApproved: () => work.activeWorkspace?.verified == true,
+        bookmarks: _StorePurchaseBookmarks(),
+        stateStoreFactory: (scope) => _StorePurchaseState(scope),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        procurementFactory: () => controller,
+      );
+      final actions = find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'work-store-workload-',
+            ),
+      );
+      final transitions = tester
+          .widgetList<AnimatedSwitcher>(
+            find.descendant(
+              of: actions,
+              matching: find.byType(AnimatedSwitcher),
+            ),
+          )
+          .toList();
+      expect(transitions, hasLength(4));
+      for (final transition in transitions) {
+        for (final (count, elapsed) in [
+          (250, 220),
+          (249, 100),
+          (248, 16),
+          (249, 16),
+          (247, 16),
+        ]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: AnimatedSwitcher(
+                duration: transition.duration,
+                reverseDuration: transition.reverseDuration,
+                switchInCurve: transition.switchInCurve,
+                switchOutCurve: transition.switchOutCurve,
+                transitionBuilder: transition.transitionBuilder,
+                layoutBuilder: transition.layoutBuilder,
+                child: Text('$count', key: ValueKey(count)),
+              ),
+            ),
+          );
+          await tester.pump(Duration(milliseconds: elapsed));
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: 'Workload count $count',
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+      }
+    });
+  }
+  for (final delayed in [false, true]) {
+    testWidgets(
+      'STOREBACK03 return failure retry and repeated Back delayed=$delayed',
+      (tester) async {
+        final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+        SharedPreferencesAsyncPlatform.instance =
+            InMemorySharedPreferencesAsync.empty();
+        addTearDown(
+          () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+        );
+        final work = liveStore();
+        final bookmarks = _StorePurchaseBookmarks();
+        final states = <String, _StorePurchaseState>{};
+        final controller = WorkProcurementController(
+          currentAccountId: () => 'fixture-purchaser',
+          currentStoreId: () => work.activeWorkspace?.id,
+          storeApproved: () => work.activeWorkspace?.verified == true,
+          bookmarks: bookmarks,
+          stateStoreFactory: (scope) =>
+              states.putIfAbsent(scope, () => _StorePurchaseState(scope)),
+          sessionFactory: (identity, state) {
+            final core = BuySession();
+            addTearDown(core.dispose);
+            return BuyV2Session(
+              core: core,
+              procurementIdentity: identity,
+              customerStateStore: state,
+              commerceAdapter: _StorePurchaseCommerce(identity.value!),
+              reviewDataEnabled: false,
+            );
+          },
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          procurementFactory: () => controller,
+        );
+        await tester.tap(find.text('Restock'));
+        await tester.pumpAndSettle();
+        final buy = controller.session!;
+        final product = buy.visibleProducts.first;
+        expect(buy.addProduct(product.id), isTrue);
+        await tester.pumpAndSettle();
+        final quantity = buy.quantityFor(product.id);
+        if (delayed) {
+          bookmarks.pendingInactive = Completer<bool>();
+          await tester.binding.handlePopRoute();
+          await tester.pump();
+          await tester.binding.handlePopRoute();
+          await tester.pump();
+          bookmarks.pendingInactive!.complete(true);
+          await tester.pumpAndSettle();
+          expect(
+            bookmarks.inactiveWrites,
+            1,
+            reason: 'Repeated Back must share one pending return.',
+          );
+        } else {
+          bookmarks.failInactive = true;
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(
+            work.errorMessage,
+            'Your purchase return could not be saved. Please try again.',
+          );
+          expect(work.noticeMessage, isNull);
+          expect(bookmarks.value!.active, isTrue);
+          expect(
+            find.byKey(const Key('work-store-procurement-screen')),
+            findsOneWidget,
+          );
+          expect(buy.quantityFor(product.id), quantity);
+          bookmarks.failInactive = false;
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+        }
+        expect(work.errorMessage, isNull);
+        expect(work.noticeMessage, isNull);
+        expect(bookmarks.value!.active, isFalse);
+        expect(buy.quantityFor(product.id), quantity);
+        expect(
+          find.byKey(const Key('work-workspace-dashboard')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final (scale, viewport) in [

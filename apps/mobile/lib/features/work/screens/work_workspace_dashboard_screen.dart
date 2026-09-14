@@ -453,6 +453,7 @@ class _WorkWorkspaceDashboardScreenState
     extends State<WorkWorkspaceDashboardScreen> {
   WorkSession get session => widget.session;
   WorkProcurementController? _storeProcurement;
+  bool _leavingProcurement = false;
   BuyV2Session? _observedProcurement;
   String? _observedProcurementQuery;
   BuyV2Session get _activeProcurement =>
@@ -1985,31 +1986,36 @@ class _WorkWorkspaceDashboardScreenState
   }
 
   Future<void> _leaveProcurement() async {
-    // Release the shared field before awaiting native storage or detaching it.
-    _searchFocus.unfocus();
-    final controller = _storeProcurement;
-    if (controller != null && !await controller.leave()) {
-      if (mounted) {
-        session.showNotice(
-          'Your purchase return could not be saved. Please try again.',
-        );
+    if (_leavingProcurement) return;
+    _leavingProcurement = true;
+    const returnError =
+        'Your purchase return could not be saved. Please try again.';
+    try {
+      // Release the shared field before awaiting native storage or detaching it.
+      _searchFocus.unfocus();
+      final controller = _storeProcurement;
+      if (controller != null && !await controller.leave()) {
+        if (mounted) session.showError(returnError);
+        return;
       }
-      return;
+      if (!mounted) return;
+      if (session.errorMessage == returnError) session.dismissMessages();
+      final parent = _procurementReturnOperation;
+      setState(() {
+        _trackedPurchase = null;
+        _procurementReturnOperation = null;
+        if (parent == null) {
+          _view = _WorkspaceControlView.dashboard;
+        } else {
+          _operation = parent;
+          _operationReturnView = _WorkspaceControlView.dashboard;
+          _operationReturnOperation = null;
+          _view = _WorkspaceControlView.operation;
+        }
+      });
+    } finally {
+      _leavingProcurement = false;
     }
-    if (!mounted) return;
-    final parent = _procurementReturnOperation;
-    setState(() {
-      _trackedPurchase = null;
-      _procurementReturnOperation = null;
-      if (parent == null) {
-        _view = _WorkspaceControlView.dashboard;
-      } else {
-        _operation = parent;
-        _operationReturnView = _WorkspaceControlView.dashboard;
-        _operationReturnOperation = null;
-        _view = _WorkspaceControlView.operation;
-      }
-    });
   }
 
   void _releaseDirectFilter() {
@@ -3370,6 +3376,11 @@ bool _hasStoreWorkload(WorkSession session) =>
     );
 
 class _StoreWorkloadSummary extends StatelessWidget {
+  // Counts may repeat while an earlier fade is still outgoing. Let the
+  // switcher identify each transition independently of the displayed count.
+  static Widget _countTransition(Widget child, Animation<double> animation) =>
+      FadeTransition(opacity: animation, child: child);
+
   const _StoreWorkloadSummary({required this.session, required this.onOrders});
   final WorkSession session;
   final VoidCallback onOrders;
@@ -3451,6 +3462,7 @@ class _StoreWorkloadSummary extends StatelessWidget {
                             ),
                             child: ExcludeSemantics(
                               child: AnimatedSwitcher(
+                                transitionBuilder: _countTransition,
                                 duration: reducedMotion
                                     ? Duration.zero
                                     : const Duration(milliseconds: 140),
@@ -9433,6 +9445,10 @@ class _WorkspaceSearchSurface extends StatelessWidget {
     final results = _workspaceSearchRecords(session, normalized);
     return AnimatedSwitcher(
       key: const Key('work-dashboard-search-screen'),
+      // Repeated empty/results states can overlap outgoing fades. Let the
+      // switcher give each transition its own identity.
+      transitionBuilder: (child, animation) =>
+          FadeTransition(opacity: animation, child: child),
       duration: MediaQuery.of(context).disableAnimations
           ? Duration.zero
           : const Duration(milliseconds: 160),

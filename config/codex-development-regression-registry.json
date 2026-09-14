@@ -103501,6 +103501,27 @@
   "evidence": [
     "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
   ]
+},
+{
+  "id": "REG-20260914-4616-STORE-RETURN-AND-WORKLOAD-LIFECYCLE",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "build",
+    "device",
+    "evidence"
+  ],
+  "mistake": "The existing OPPO APK showed a purchase-return save failure with success styling. Host audit also reproduced duplicate return saves after repeated Back and duplicate keys in overlapping Dashboard workload counts, Dashboard search empty/results states and supplier delivery toggle icons.",
+  "rootCause": "The return method used showNotice for failure and had no pending-return guard. Default keyed workload fades reused count identity across overlapping outgoing transitions. STOREBACK03 failed on error classification and two writes, then passed after using showError, clearing the specific error on successful retry and serializing the UI return. STOREBACK04 failed with duplicate249 keys, then passed with an unkeyed fade root. Initial unseeded workload harness had no counters and was corrected; that setup failure remains separate.",
+  "prevention": "Require STOREBACK01 through STOREBACK04 with all five exact test names, successful non-skipped terminal results and actual candidate defines before successor review builds. Preserve failed evidence, test return retry/cart retention and uneven repeated count transitions; final exact APK OPPO proof remains mandatory. Do not claim all related transition risks resolved before their audit.",
+  "gates": [
+    "scripts/build-buy-device-review.ps1",
+    "scripts/test-public-auth-sideload-build-controls.ps1"
+  ],
+  "evidence": [
+    "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
+  ]
 }
 ]
 }

@@ -628,7 +628,7 @@ try {
         & flutter test --no-pub --reporter json `
           --dart-define-from-file $runtimeDefineFile `
           test/work_workspace_layout_safety_test.dart `
-          --name '^STOREBACK0[12] ' `
+          --name '^STOREBACK0[1-4] ' `
           1> $navigationLog
         if ($LASTEXITCODE -ne 0) {
           throw "Exact-candidate Store navigation replay failed: $navigationLog"
@@ -638,7 +638,10 @@ try {
         $navigationDone = @($navigationEvents | Where-Object { $_.type -ceq 'done' })
         foreach ($requiredNavigationTest in @(
           'STOREBACK01 full app Restock Bulk native Back lifecycle',
-          'STOREBACK02 SKU count overlapping loading transitions and exit'
+          'STOREBACK02 SKU count overlapping loading transitions and exit',
+          'STOREBACK03 return failure retry and repeated Back delayed=false',
+          'STOREBACK03 return failure retry and repeated Back delayed=true',
+          'STOREBACK04 dashboard workload count overlap and exit'
         )) {
         $navigationTests = @($navigationEvents | Where-Object {
           $_.type -ceq 'testStart' -and
