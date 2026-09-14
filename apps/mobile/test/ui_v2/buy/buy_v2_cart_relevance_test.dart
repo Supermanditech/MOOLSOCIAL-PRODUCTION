@@ -98,6 +98,27 @@ void main() {
               !candidate.requiresPrescription,
         );
         expect(session.addProduct(product.id), isTrue);
+        final coupons = adapter.benefitsFor(
+          kind: BuyV2CartBenefitKind.coupon,
+          destinations: {destination},
+          itemTotal: session.totalForDestination(destination),
+        );
+        final minimumSpend = coupons
+            .map((benefit) => benefit.minimumSpend!)
+            .reduce((left, right) => left > right ? left : right);
+        if (session.totalForDestination(destination) < minimumSpend) {
+          expect(
+            session.cartBenefits(
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: destination,
+            ),
+            isEmpty,
+          );
+          expect(session.chooseCartBenefit(coupons.first), isFalse);
+          final quantity = (minimumSpend / product.price).ceil();
+          expect(session.setCartQuantity(product.id, '$quantity'), isTrue);
+        }
+        expect(session.totalForDestination(destination), greaterThanOrEqualTo(minimumSpend));
       }
       final originalTotal = session.cartTotal;
 

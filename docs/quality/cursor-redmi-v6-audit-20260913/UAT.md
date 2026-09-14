@@ -2830,3 +2830,14 @@ On parentcd92728c56cbfadfbd9fa4cb10703c888311c4d4, corrected only the vertical c
 | --- | --- |
 | optional-brand-contract.log | DA8B2721585E18436EE35DBD3B1E83C0F28D8AC210A73F3C330AA70F29C507EE |
 | optional-brand-analysis.log | 85345934790F2DBA022A9F2C053291A4F5FC3E093DC0A548B59ABB084FDD4404 |
+
+
+## Seeded benefits minimum-spend reconciliation - 2026-09-14
+
+On parent8627359d0eb954b3f0909f787eb054362a103c1a, updated only the seed-benefit fixture in buy_v2_cart_relevance_test.dart. It previously requested all coupons after adding a single low-value item, below the existing disclosed minimum spend. It now asserts coupons absent and selection rejected below threshold, then raises quantity through the normal session operation to qualify before running every original selection/replacement/destination/total/savings assertion. It does not enable benefits globally or modify eligibility. Seeded case1pass plus4 related malformed/default-disabled/vertical/stale-selection checks pass; five distinct checks. Focused analysis zero issues. Delivery-instruction confirmation case in this file remains unresolved, not silently omitted from final qualification. No product/APK/device change. Thirteen original combined failures remain.
+
+| Artifact | SHA256 |
+| --- | --- |
+| seed-benefits-threshold.log | 692B3C0FBE9F924BF85FF9B4BB9A86A62E6341F7BAAB373C9ABC3E5FD430F89F |
+| benefits-contract-regression.log | 498A9D31B6B17ACBD127DA16314450B636C7920033D68F76CE93C12326F212B9 |
+| benefits-contract-analysis.log | 29B6648BFE36FEC971680DFCAD8393A9A8C329304DB5CA47C1930DABCDF4EAF1 |
