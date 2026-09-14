@@ -196,7 +196,7 @@ Local qualification2026-09-14: reproduced missing actual Offers view in real-app
 Redmi acceptance2026-09-14: captures097-103 verify actual Offers destination and restored original alert list. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md; historical local-only qualification above is superseded for this recorded reproduction. No child found.
 
 ## RV6-D017 - Saved GST profile selected chip has unreadable identity
-Status: open. Severity: moderate visual identification failure. Redmi TG8HCYTGGQT885OF;UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+Status: closed; recorded r66.20 Redmi selected-profile contrast and affected actions passed. Severity: moderate visual identification failure. Redmi TG8HCYTGGQT885OF;UAW-CURSOR-REDMI-V6-REVIEW-20260913.
 Reproduction:one isolated wheat pack279;Confirm order -> enable GST -> Add;enter local test name AuditRedmiTest, host-fixture GSTIN and test billing text;leave temporary reuse enabled;Use GST details. Captures691 and settled692 show dark selected Saved GST details chip with no readable name and low-contrast check/remove icons. The separate green current-details card is readable. Customers cannot identify the saved profile through its chip, especially when choosing among profiles. Expected:readable profile identity and selected/remove affordances. Source cause not established;no product correction. No order or payment submitted.
 
 ### RV6-D017 source correlation
@@ -204,6 +204,8 @@ Buy GST InputChip at buy_v2_views.dart6158-6175 uses Text(profile.legalName),sel
 
 
 Local qualification2026-09-14: reproduced1.0rendered label contrast on selected navy chips in Shop/Wholesale100/200%. Buy-only InputChip styling now sets white selected text/check/remove icons and navy unselected foreground, preserving font and callbacks. Four focused selection/contrast/removal-cancel cases and54connected GST/checkout cases pass; analysis zero issues. Eight qualified Flutter captures reviewed;29artifact hashes, fixture/setup corrections and full limitations are in UAT.md. Still open pending complete successor Redmi691-692 and affected profile actions; no device closure, APK, shared-theme or backend change.
+
+Redmi acceptance2026-09-14: captures104-124, selected chip117, Keep119, named removal120 and restored empty cart124. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. UAT.md records scope and restoration. No child; historical local-only status above is superseded for recorded acceptance.
 
 ## RV6-D018 - Product Back loses paginated search destination and position
 Status: open. Severity: moderate navigation/retention failure. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
