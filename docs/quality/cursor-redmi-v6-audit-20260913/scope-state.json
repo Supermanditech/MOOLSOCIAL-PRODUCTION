@@ -92,7 +92,7 @@
   ],
   "nextWork": [
     "D005 and sole child D005-C01 are device-closed on installed r66.22; preserve the other 18 original closures and the original English preference restored in this round.",
-    "D014 nested product return correction is implemented and locally qualified: 336 Buy screen tests, 21 overlapping D014 cases, two new Flutter visuals and full analysis pass. Complete required combined/source/build gates before a successor Redmi replay. Installed r66.22 remains unchanged and D014 device-open. Historical commit-label handoff failure remains unresolved."
+    "D014 correction and source checks are qualified, including two combined cycles of 2339 passes and 27 inherited skips each. Prepare r66.23, run unchanged wrapper preflight, build one corrective APK and qualify D014 on Redmi only. Installed r66.22 remains unchanged and D014 device-open. Carry the historical commit-label failure as an unresolved final-handoff gate."
   ],
   "preservation": {
     "cart": "1175 original Scheduled Shop Saved1 emptycart restored;no cart changes in round169",
@@ -215,8 +215,16 @@
         "focusedAdmissionTests": "exact source accepted; five negative cases rejected; existing backend and egress self-tests passed",
         "coordination": "49-owner claim and outside-admission preservation passed; four checker hashes updated",
         "evidence": "UAT.md D014 source admission qualification; rv622-device-qualification-20260914/d014-admission-check-*.log and d014-admission-negative.result.json",
-        "combinedCycles": "cycle_1_passed_2339_tests_27_inherited_skips_cycle_2_running",
+        "combinedCycles": "both_passed_2339_tests_27_inherited_skips_each_source_equal",
         "historicalCommitLabelExceptionApplied": false
+      },
+      "successorCandidate": {
+        "id": "UAW-CURSOR-REDMI-RV6-D014-20260914",
+        "versionName": "1.0.0-r66.23",
+        "versionCode": 2026091404,
+        "status": "local_prebuild_inputs_qualified_wrapper_preflight_build_and_device_pending",
+        "evidence": "PREBUILD.md D014 corrective r66.23 prebuild qualification",
+        "finalHandoff": "historical_commit_label_failure_not_waived"
       },
       "successorBuilt": false
     },
