@@ -287,7 +287,7 @@
       "childDeviceVerification": "D005-C01_closed_on_Redmi_20260914_under_subsequent_founder_goal",
       "evidence": "UAT.md final r66.22 delivery and subsequent device closure sections"
     },
-    "sourceBaseline": "Source41412f56 locally qualified by25 D014 cases,340 screen tests,analysis,two2343-pass/27-inherited-skip combined cycles and source/prebuild gates; built at32630c34, installed checksum-equal r66.24, ten D014 Redmi cases passed. Historical commit-label handoff gate remains failed.",
+    "sourceBaseline": "Source41412f56 locally qualified by25 D014 cases,340 screen tests,analysis,two2343-pass/27-inherited-skip combined cycles and source/prebuild gates; built at32630c34, installed checksum-equal r66.24, ten D014 Redmi cases passed. Exact historical label exception qualified; coordination handoff passed at3f4d1cf92100a3008223c43a89d65e3d820a0867.",
     "integration": "not_authorized",
     "productionQualification": "not_established",
     "nativeApprovalResumption": {
@@ -307,7 +307,7 @@
       "visuals": "Four new Shop/Wholesale repeated-link Flutter captures at100/200 percent visually reviewed",
       "installed": true,
       "successorBuilt": true,
-      "requiredNext": "Evidence commit/push/live readback and separate historical commit-label handoff disposition; no remaining original or child device verification.",
+      "requiredNext": "None within scoped Redmi original/child verification and evidence handoff. Any production/backend/provider/integration work requires its separate scope.",
       "sourceSha256Normalized": "97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C",
       "testSha256Normalized": "5F3629A79FCC623CAF2670458D9FDCF4BFDE1190DF9DBFB0AEB46E92CBB18243",
       "sourceCommit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
@@ -329,7 +329,7 @@
         "evidence": "UAT.md D014 r66.24 final Redmi device closure; rv6-d014-repeat-final-20260914/redmi-device-qualification-v1.json",
         "buildAuthorization": "consumed_one_build",
         "device": "TG8HCYTGGQT885OF",
-        "finalHandoff": "historical_commit_label_failure_not_waived",
+        "finalHandoff": "passed_at_3f4d1cf92100a3008223c43a89d65e3d820a0867",
         "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
         "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
         "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
@@ -350,7 +350,38 @@
       "child": "RV6-D005-C01_prior_r66.22_closure_preserved",
       "evidence": "UAT.md D014 r66.24 final Redmi device closure; rv6-d014-repeat-final-20260914/redmi-device-qualification-v1.json",
       "limits": "Scoped signed-out Redmi review fixtures only. Not all22 replayed on r66.24. No production/backend/provider/integration acceptance.",
-      "finalGitHandoff": "historical_commit_label_failure_not_waived"
+      "finalGitHandoff": "passed_at_3f4d1cf92100a3008223c43a89d65e3d820a0867"
+    },
+    "historicalLabelDisposition": {
+      "status": "exact_exception_implemented_qualified_handoff_passed",
+      "authority": "Founder response to exact exception request: follow , production grade discipline",
+      "historicalCommit": "448d4a2c7c10ee195e711e49aa4cc69a593ff37b",
+      "repairCommit": "3f4d1cf92100a3008223c43a89d65e3d820a0867",
+      "historyRewritten": false,
+      "ordinarySubjectPatternChanged": false,
+      "applicationTreeChanged": false,
+      "actualTests": "3 positives and26 negatives passed",
+      "testReceiptSha256": "13FF0A2B468F7AC2F89AE439E4AEB20F55E6D7FAA26192B739F3211B8969458A",
+      "coordinationHandoff": {
+        "status": "passed",
+        "verifiedHead": "3f4d1cf92100a3008223c43a89d65e3d820a0867",
+        "toolReceipt": "3ef436",
+        "liveRemoteEquality": true,
+        "remoteReadbackReceipt": "e50dfe"
+      },
+      "evidence": "UAT.md Exact historical evidence-label admission and final handoff closure sections"
+    },
+    "completion": {
+      "status": "scoped_device_verification_and_handoff_complete",
+      "originalsClosed": 22,
+      "childrenClosed": [
+        "RV6-D005-C01"
+      ],
+      "remainingScopedDependencies": [],
+      "qualifiedRepairHead": "3f4d1cf92100a3008223c43a89d65e3d820a0867",
+      "latestInstalledApk": "1.0.0-r66.24-cursorreview",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "limits": "Review qualification only; no production/backend/provider/integration acceptance. Prior historical fields retained."
     }
   }
 }
