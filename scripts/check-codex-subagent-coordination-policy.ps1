@@ -205,7 +205,74 @@ function Assert-R679OwnerAdmission($Before, $After) {
   ) 'Redmi dependency admission changed unrelated ownership or policy.'
 }
 
+# BEGIN founder RV6 historical evidence label exception 20260914
+# Founder directed following the exact448d4a2c proposal with production discipline.
+# This admits one immutable evidence commit, not another commit-prefix pattern.
+function Test-RedmiV6HistoricalEvidenceFacts([hashtable]$Facts) {
+  $expected = @{
+    Root = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913'
+    Role = 'subagent'
+    Task = '/root/cursor_redmi_v6_audit_20260913'
+    Lane = 'cursor_ui'
+    WorkId = 'redmi-v6-audit-20260913'
+    TicketId = 'UAW-CURSOR-REDMI-V6-AUDIT-20260913'
+    Branch = 'work/cursor-ui/redmi-v6-audit-20260913'
+    Commit = '448d4a2c7c10ee195e711e49aa4cc69a593ff37b'
+    Parent = 'd0dfea24e52c3c60c41d0cd01fcdcd2badfbcd6c'
+    Subject = 'docs(redmi): close D005 persistence with r66.22 device evidence'
+    AppsTree = 'e37147034016157ab241e26f0c8be091d4561a9c'
+    ParentAppsTree = 'e37147034016157ab241e26f0c8be091d4561a9c'
+  }
+  if ($null -eq $Facts -or $Facts.Count -ne ($expected.Count + 1)) { return $false }
+  foreach ($key in $expected.Keys) {
+    if (-not $Facts.ContainsKey($key) -or [string]$Facts[$key] -cne $expected[$key]) { return $false }
+  }
+  $blobs = $Facts['Blobs']
+  if ($blobs -isnot [hashtable]) { return $false }
+  $prefix = 'docs/quality/cursor-redmi-v6-audit-20260913/'
+  $expectedBlobs = @{
+    ($prefix + 'DEFECTS.md') = 'dd866dd5ee2f4e7637236095563bb15f568680ce'
+    ($prefix + 'EVIDENCE.csv') = '18c272611cb3ffd9e815cbfd476eef073778b8cd'
+    ($prefix + 'UAT.md') = 'd687685148c71995378459ec909e825c72b97050'
+    ($prefix + 'scope-state.json') = '17ae58a35b227394f23d8afb65ab8153f00d6137'
+  }
+  if ((@($blobs.Keys | Sort-Object) -join '|') -cne
+      (@($expectedBlobs.Keys | Sort-Object) -join '|')) { return $false }
+  foreach ($owner in $expectedBlobs.Keys) {
+    if ([string]$blobs[$owner] -cne $expectedBlobs[$owner]) { return $false }
+  }
+  return $true
+}
+
+function Test-RedmiV6HistoricalEvidenceCommit([string]$Commit, [string]$Subject) {
+  if ($Commit -cne '448d4a2c7c10ee195e711e49aa4cc69a593ff37b') { return $false }
+  $parents = @(& git -C $root show -s --format=%P $Commit)
+  if ($LASTEXITCODE -ne 0 -or $parents.Count -ne 1) { return $false }
+  $owners = @(& git -C $root diff-tree --no-commit-id --name-only -r $Commit)
+  if ($LASTEXITCODE -ne 0 -or $owners.Count -ne 4) { return $false }
+  $trees = @(& git -C $root rev-parse "${Commit}:apps" "$($parents[0]):apps")
+  if ($LASTEXITCODE -ne 0 -or $trees.Count -ne 2) { return $false }
+  $blobs = @{}
+  foreach ($owner in $owners) {
+    if ($blobs.ContainsKey([string]$owner)) { return $false }
+    $blob = @(& git -C $root rev-parse "${Commit}:$owner")
+    if ($LASTEXITCODE -ne 0 -or $blob.Count -ne 1) { return $false }
+    $blobs[[string]$owner] = [string]$blob[0]
+  }
+  return (Test-RedmiV6HistoricalEvidenceFacts @{
+    Root = $root.Replace('\','/').TrimEnd('/')
+    Role = $AgentRole; Task = $AgentTask; Lane = $ProductionLane
+    WorkId = $ProductionWorkId; TicketId = $ProductionTicketId; Branch = $branch
+    Commit = $Commit; Parent = [string]$parents[0]; Subject = $Subject
+    AppsTree = [string]$trees[0]; ParentAppsTree = [string]$trees[1]; Blobs = $blobs
+  })
+}
+# END founder RV6 historical evidence label exception 20260914
+
 function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
+  # BEGIN founder RV6 historical evidence label call 20260914
+  if (Test-RedmiV6HistoricalEvidenceCommit $Commit $Subject) { return $true }
+  # END founder RV6 historical evidence label call 20260914
   # R66-BUILD-003: retain two pushed label mistakes without rewriting history.
   # This is not an alternative prefix for any other task or future commit.
   if ($AgentRole -cne 'subagent' -or
@@ -2416,6 +2483,17 @@ if ($ProductionLane -ceq 'baseline') {
       )
 '@).Replace("`r`n", "`n") + "`n", '')
       $successorRestored = $successorRestored.Replace(' -or $redmiLanguageOwner', '')
+      # Verify exact admitted label code, then restore it before the unchanged
+      # outside-admission digest. Arbitrary code inside these markers fails.
+      $rv6LabelBlock = [regex]::Matches($successorRestored, '(?ms)^# BEGIN founder RV6 historical evidence label exception 20260914\n.*?^# END founder RV6 historical evidence label exception 20260914\n\n')
+      $rv6LabelCall = [regex]::Matches($successorRestored, '(?ms)^  # BEGIN founder RV6 historical evidence label call 20260914\n.*?^  # END founder RV6 historical evidence label call 20260914\n')
+      Assert-Coordination ($rv6LabelBlock.Count -eq 1 -and $rv6LabelCall.Count -eq 1) 'RV6 label admission markers differ.'
+      $rv6LabelHasher = [Security.Cryptography.SHA256]::Create()
+      try {
+        $rv6LabelHash = [BitConverter]::ToString($rv6LabelHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($rv6LabelBlock[0].Value + $rv6LabelCall[0].Value))).Replace('-', '')
+        Assert-Coordination ($rv6LabelHash -ceq 'A983D81EDDB98AC06164FCE7F00405BCA5453873365BE8B9DF99CF5BD51F40C4') 'RV6 label exception differs from exact reviewed code.'
+      } finally { $rv6LabelHasher.Dispose() }
+      $successorRestored = $successorRestored.Replace($rv6LabelBlock[0].Value, '').Replace($rv6LabelCall[0].Value, '')
       $successorHasher = [Security.Cryptography.SHA256]::Create()
       try {
         $successorRestoredHash = [BitConverter]::ToString($successorHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($successorRestored))).Replace('-', '')
