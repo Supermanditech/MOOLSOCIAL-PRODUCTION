@@ -11,6 +11,19 @@ import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
 
+class _LostCollectionGateway extends StoreReviewCustomerCollectionGateway {
+  _LostCollectionGateway(super.finance);
+  int submissions = 0;
+  @override
+  Future<WorkspaceFinanceSnapshot> recordCollection(
+    WorkspaceCustomerCollection request,
+  ) async {
+    submissions++;
+    await super.recordCollection(request);
+    throw TimeoutException('Simulated reply loss after application');
+  }
+}
+
 class _ProcurementBookmarks implements WorkProcurementBookmarkStore {
   final values = <String, WorkProcurementBookmark>{};
   Completer<void>? holdRead;
@@ -58,6 +71,7 @@ class _OrderJournalStorage extends FlutterSecureStorage {
   final values = <String, String>{};
   final writes = <String>[];
   bool failRead = false, failWrite = false;
+  bool loseWriteResponseOnce = false;
   Completer<void>? holdWrite;
   @override
   Future<String?> read({
@@ -88,6 +102,10 @@ class _OrderJournalStorage extends FlutterSecureStorage {
     await holdWrite?.future;
     if (failWrite) throw StateError('test write failure');
     values[key] = value!;
+    if (loseWriteResponseOnce) {
+      loseWriteResponseOnce = false;
+      throw StateError('Write completed but its response was lost');
+    }
   }
 }
 
@@ -495,6 +513,1941 @@ WorkspaceReceiptDraft _receiptDraft({
 );
 
 void main() {
+  test(
+    'LEDGER01 stock journal admits new SKUs without rebasing existing stock',
+    () {
+      final at = DateTime.utc(2026, 9, 14);
+      final original = WorkspaceInventoryLedger(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        revision: 1,
+        asOf: at,
+        openingQuantities: const {'original': 8},
+        movements: const [],
+      );
+      final opening = WorkspaceStockMovement(
+        id: 'OPEN-NEW',
+        productId: 'new',
+        productLabel: 'New grocery pack',
+        kind: WorkspaceStockMovementKind.openingStock,
+        quantityDelta: 5,
+        reason: 'Initial counted stock',
+        occurredAt: at,
+      );
+      expect(original.post([opening], at: at), isNull);
+      final added = original.post(
+        [opening],
+        at: at,
+        newProductIds: {'new', 'empty'},
+      )!;
+      expect(added.quantities, {'original': 8, 'new': 5, 'empty': 0});
+      expect(added.openingQuantities, {'original': 8, 'new': 0, 'empty': 0});
+      expect(added.canFollow(original), isTrue);
+      expect(
+        identical(added.post([opening], at: at, newProductIds: {'new'}), added),
+        isTrue,
+      );
+      final rebased = WorkspaceInventoryLedger(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        revision: 2,
+        asOf: at,
+        openingQuantities: const {'original': 9, 'new': 0},
+        movements: [opening],
+      );
+      expect(rebased.canFollow(original), isFalse);
+      final invented = WorkspaceInventoryLedger(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        revision: 2,
+        asOf: at,
+        openingQuantities: const {'original': 8, 'new': 5},
+        movements: const [],
+      );
+      expect(invented.canFollow(original), isFalse);
+      expect(
+        WorkspaceInventoryLedger.fromJson(added.toJson()).quantities,
+        added.quantities,
+      );
+    },
+  );
+  test(
+    'LEDGER01 unsent invoice form survives reopening and isolates bill revisions',
+    () async {
+      var account = 'account-A';
+      final storage = _OrderJournalStorage();
+      SecureWorkLedgerFormDraftStore open() => SecureWorkLedgerFormDraftStore(
+        accountScope: () => account,
+        storage: storage,
+      );
+      WorkspaceLedgerFormKey key({
+        String store = 'store-A',
+        String kind = 'refund',
+        int ledgerRevision = 7,
+      }) => (
+        account: 'account-A',
+        store: store,
+        customer: 'customer-A',
+        invoice: 'invoice-A',
+        order: 'order-A',
+        kind: kind,
+        ledgerRevision: ledgerRevision,
+      );
+      final draft = WorkspaceLedgerFormDraft(
+        key: key(),
+        revision: 1,
+        fields: const {
+          'amount': '120.50',
+          'channel': 'directUpi',
+          'reference': 'TEST-REF',
+        },
+      );
+      await open().save(draft, expectedRevision: null);
+      expect((await open().read(key()))!.fields, draft.fields);
+      expect(await open().read(key(store: 'store-B')), isNull);
+      expect(await open().read(key(kind: 'collection')), isNull);
+      expect(await open().read(key(ledgerRevision: 8)), isNull);
+      account = 'account-B';
+      await expectLater(
+        open().read(key()),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      account = 'account-A';
+      await expectLater(
+        open().save(
+          WorkspaceLedgerFormDraft(
+            key: key(),
+            revision: 1,
+            fields: const {'amount': '1'},
+          ),
+          expectedRevision: null,
+        ),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect((await open().read(key()))!.fields, draft.fields);
+      storage.loseWriteResponseOnce = true;
+      final updated = WorkspaceLedgerFormDraft(
+        key: key(),
+        revision: 2,
+        fields: const {'amount': '90.25', 'channel': 'cash'},
+      );
+      await expectLater(
+        open().save(updated, expectedRevision: 1),
+        throwsStateError,
+      );
+      await open().save(updated, expectedRevision: 1);
+      expect((await open().read(key()))!.fields, updated.fields);
+      final retired = WorkspaceLedgerFormDraft(
+        key: key(),
+        revision: 3,
+        fields: const {},
+      );
+      await open().save(retired, expectedRevision: 2);
+      expect((await open().read(key()))!.fields, isEmpty);
+      await expectLater(
+        open().save(updated, expectedRevision: 1),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      final storedKey = storage.values.keys.single;
+      storage.values[storedKey] = '{broken';
+      await expectLater(
+        open().read(key()),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      await expectLater(
+        open().save(draft, expectedRevision: null),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(storage.values[storedKey], '{broken');
+      expect(
+        WorkspaceLedgerFormDraft(
+          key: key(),
+          revision: 1,
+          fields: const {'paid': 'true'},
+        ).valid,
+        isFalse,
+      );
+    },
+  );
+  test(
+    'LEDGER01 stock quantities recover and acknowledge each return once',
+    () async {
+      final at = DateTime.utc(2026, 9, 14);
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: at,
+      );
+      final initial = WorkspaceInventoryLedger(
+        accountScope: 'account-A',
+        workspaceId: seed.storeId,
+        revision: 1,
+        asOf: at,
+        openingQuantities: const {'sku-A': 8},
+        movements: const [],
+      );
+      WorkspaceStockMovement movement(String id, int quantity) =>
+          WorkspaceStockMovement(
+            id: id,
+            productId: 'sku-A',
+            productLabel: 'Original pack',
+            kind: quantity > 0
+                ? WorkspaceStockMovementKind.returned
+                : WorkspaceStockMovementKind.sale,
+            quantityDelta: quantity,
+            reason: 'Invoice A',
+            occurredAt: at,
+            referenceKind: WorkspaceStockReferenceKind.order,
+            referenceId: 'ORDER-A',
+          );
+      final sale = initial.post([movement('SALE-A', -2)], at: at)!;
+      final returned = sale.post([movement('RETURN-A', 1)], at: at)!;
+      expect(returned.quantities, {'sku-A': 7});
+      expect(
+        identical(returned.post([movement('RETURN-A', 1)], at: at), returned),
+        isTrue,
+      );
+      expect(returned.post([movement('RETURN-A', 2)], at: at), isNull);
+      expect(returned.post([movement('EXCESS-SALE', -8)], at: at), isNull);
+      final bytes = _OrderJournalStorage();
+      SecureWorkLedgerCheckpointStore open() => SecureWorkLedgerCheckpointStore(
+        accountScope: () => 'account-A',
+        storage: bytes,
+      );
+      await open().save(
+        WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: seed.finance,
+          inventory: sale,
+        ),
+        expectedRevision: null,
+      );
+      await open().save(
+        WorkspaceLedgerCheckpoint(
+          revision: 2,
+          finance: seed.finance,
+          inventory: returned,
+        ),
+        expectedRevision: 1,
+      );
+      final recovered = (await open().read('account-A', seed.storeId))!;
+      expect(recovered.inventory!.quantities, {'sku-A': 7});
+      expect(
+        recovered.inventory!.post([
+          movement('RETURN-A', 1),
+        ], at: at)!.quantities,
+        {'sku-A': 7},
+      );
+      await expectLater(
+        open().save(
+          WorkspaceLedgerCheckpoint(revision: 3, finance: seed.finance),
+          expectedRevision: 2,
+        ),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      final changedOpening = WorkspaceInventoryLedger(
+        accountScope: 'account-A',
+        workspaceId: seed.storeId,
+        revision: 4,
+        asOf: at,
+        openingQuantities: const {'sku-A': 9},
+        movements: returned.movements,
+      );
+      expect(changedOpening.canFollow(returned), isFalse);
+      expect(
+        (await open().read('account-A', seed.storeId))!.inventory!.quantities,
+        {'sku-A': 7},
+      );
+    },
+  );
+
+  group('LEDGER01 customer return allocation', () {
+    WorkspaceCustomerReturn request(
+      String operation,
+      int quantity, {
+      int? restock,
+      String account = 'account-A',
+      String sku = 'sku-A',
+    }) => WorkspaceCustomerReturn(
+      accountScope: account,
+      workspaceId: 'store-A',
+      customerId: 'customer-A',
+      invoiceId: 'invoice-A',
+      orderId: 'order-A',
+      operationId: operation,
+      expectedRevision: 1,
+      reason: 'Customer return',
+      lines: [
+        WorkspaceCustomerReturnLine(
+          productId: sku,
+          quantity: quantity,
+          restockQuantity: restock ?? quantity,
+        ),
+      ],
+    );
+    final order = WorkspaceOrderRecord(
+      id: 'order-A',
+      customer: 'Customer A',
+      items: '3 packs',
+      quantities: const {'sku-A': 3},
+      amount: 10,
+      source: 'Counter',
+      fulfilment: 'At the shop',
+      payment: 'Customer due',
+      address: '',
+      stage: 'Completed',
+      needsDelivery: false,
+      createdAt: DateTime.utc(2026, 9, 14),
+      itemSnapshots: const [
+        WorkspaceOrderItemSnapshot(
+          productId: 'sku-A',
+          name: 'Original grocery',
+          pack: '1 pack',
+          quantity: 3,
+          unitPricePaise: 400,
+          lineTotalPaise: 1000,
+        ),
+      ],
+    );
+    test('LEDGER01 original bill snapshot round trips without repricing', () {
+      final recovered = WorkspaceOrderRecord.fromLedgerJson(
+        order.toLedgerJson(),
+      )!;
+      expect(recovered.toLedgerJson(), order.toLedgerJson());
+      expect(recovered.itemSnapshots.single.unitPricePaise, 400);
+      expect(recovered.itemSnapshots.single.lineTotalPaise, 1000);
+      expect(() => recovered.quantities.clear(), throwsUnsupportedError);
+      expect(() => recovered.itemSnapshots.clear(), throwsUnsupportedError);
+      expect(
+        WorkspaceOrderRecord.fromLedgerJson(
+          order.toLedgerJson()..['amount'] = 11,
+        ),
+        isNull,
+      );
+      expect(
+        WorkspaceOrderRecord.fromLedgerJson(
+          order.toLedgerJson()..['stage'] = 'Preparing',
+        ),
+        isNull,
+      );
+      expect(
+        WorkspaceOrderRecord.fromLedgerJson(
+          order.toLedgerJson()..['itemSnapshots'] = [],
+        ),
+        isNull,
+      );
+    });
+    for (final paid in [0, 600, 1000]) {
+      test('LEDGER01 return posts once with collected=$paid', () async {
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 14),
+        );
+        final adapter = StoreReviewCustomerCollectionGateway(seed.finance);
+        final invoice = WorkspaceCustomerInvoice(
+          id: 'invoice-A',
+          orderId: 'order-A',
+          customer: '9000000088',
+          items: '3 packs',
+          amount: 10,
+          payment: 'Customer due',
+          issuedAt: DateTime.utc(2026, 9, 14),
+        );
+        var finance = await adapter.recordInvoice(
+          accountScope: 'account-A',
+          storeId: seed.storeId,
+          invoice: invoice,
+        );
+        if (paid > 0) {
+          finance = await adapter.recordCollection(
+            WorkspaceCustomerCollection(
+              accountScope: 'account-A',
+              workspaceId: seed.storeId,
+              customerId: invoice.customer,
+              invoiceId: invoice.id,
+              orderId: invoice.orderId,
+              operationId: 'COLLECT-A',
+              expectedRevision: 1,
+              amountMinor: paid,
+              channel: WorkspacePaymentChannel.cash,
+            ),
+          );
+        }
+        final before = finance;
+        final returned = WorkspaceCustomerReturn(
+          accountScope: 'account-A',
+          workspaceId: seed.storeId,
+          customerId: invoice.customer,
+          invoiceId: invoice.id,
+          orderId: invoice.orderId,
+          operationId: 'RETURN-A',
+          expectedRevision: paid > 0 ? 2 : 1,
+          reason: 'Two packs returned',
+          lines: const [
+            WorkspaceCustomerReturnLine(
+              productId: 'sku-A',
+              quantity: 2,
+              restockQuantity: 1,
+            ),
+          ],
+        );
+        final native = _OrderJournalStorage();
+        SecureWorkLedgerCheckpointStore openJournal() =>
+            SecureWorkLedgerCheckpointStore(
+              accountScope: () => 'account-A',
+              storage: native,
+            );
+        final intent = WorkspacePendingCustomerReturn(
+          request: returned,
+          creditMinor: 666,
+          originalItems: order.itemSnapshots,
+        );
+        final pendingInventory = WorkspaceInventoryLedger(
+          accountScope: 'account-A',
+          workspaceId: seed.storeId,
+          revision: 1,
+          asOf: before.asOf,
+          openingQuantities: const {'sku-A': 8},
+          movements: const [],
+        );
+        final pendingCheckpoint = WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: before,
+          pendingReturn: intent,
+          inventory: pendingInventory,
+        );
+        expect(pendingCheckpoint.valid, isTrue);
+        await openJournal().save(pendingCheckpoint, expectedRevision: null);
+        final recoveredPending = (await openJournal().read(
+          'account-A',
+          seed.storeId,
+        ))!;
+        expect(recoveredPending.pendingReturn!.toJson(), intent.toJson());
+        await expectLater(
+          openJournal().save(
+            WorkspaceLedgerCheckpoint(revision: 2, finance: before),
+            expectedRevision: 1,
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        final changedIntent = WorkspacePendingCustomerReturn(
+          request: WorkspaceCustomerReturn.fromJson({
+            ...returned.toJson(),
+            'operationId': 'REPLACEMENT',
+          }),
+          creditMinor: 666,
+        );
+        await expectLater(
+          openJournal().save(
+            WorkspaceLedgerCheckpoint(
+              revision: 2,
+              finance: before,
+              pendingReturn: changedIntent,
+            ),
+            expectedRevision: 1,
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(
+          (await openJournal().read(
+            'account-A',
+            seed.storeId,
+          ))!.pendingReturn!.toJson(),
+          intent.toJson(),
+        );
+        final result = await adapter.recordReturn(
+          returned,
+          order.copyWith(customer: invoice.customer),
+        );
+        final creditEntry = result.customerLedgers
+            .singleWhere((item) => item.customerId == invoice.customer)
+            .entries
+            .last;
+        await expectLater(
+          openJournal().save(
+            WorkspaceLedgerCheckpoint(
+              revision: 2,
+              finance: result,
+              inventory: pendingInventory,
+            ),
+            expectedRevision: 1,
+          ),
+          throwsA(
+            isA<WorkGatewayException>().having(
+              (error) => error.message,
+              'reason',
+              'Return stock movements must be saved with the credit.',
+            ),
+          ),
+        );
+        final completedInventory = pendingInventory.post(
+          creditEntry.returnStockMovements(order)!,
+          at: result.asOf,
+        )!;
+        await openJournal().save(
+          WorkspaceLedgerCheckpoint(
+            revision: 2,
+            finance: result,
+            inventory: completedInventory,
+          ),
+          expectedRevision: 1,
+        );
+        final recoveredResult = (await openJournal().read(
+          'account-A',
+          seed.storeId,
+        ))!;
+        expect(recoveredResult.pendingReturn, isNull);
+        expect(
+          recoveredResult.finance.customerLedgers
+              .singleWhere((l) => l.customerId == invoice.customer)
+              .entries
+              .last
+              .customerReturn!
+              .toJson(),
+          returned.toJson(),
+        );
+        final payment = result.payments.singleWhere(
+          (p) => p.invoiceId == invoice.id,
+        );
+        final expectedDue = paid == 0 ? 334 : 0;
+        expect(payment.dueMinor, expectedDue);
+        expect(payment.paidMinor, paid);
+        expect(payment.refundedMinor, 0);
+        expect(
+          payment.state,
+          paid == 0
+              ? WorkspacePaymentState.unpaid
+              : WorkspacePaymentState.refundPending,
+        );
+        expect(
+          result.duesMinor,
+          before.duesMinor - (1000 - paid) + expectedDue,
+        );
+        expect(result.salesTodayMinor, before.salesTodayMinor);
+        expect(result.availableMinor, before.availableMinor);
+        expect(result.refundsMinor, before.refundsMinor);
+        final ledger = result.customerLedgers.singleWhere(
+          (l) => l.customerId == invoice.customer,
+        );
+        expect(ledger.entries.last.amountMinor, 666);
+        final movements = ledger.entries.last.returnStockMovements(
+          order.copyWith(customer: invoice.customer),
+        )!;
+        expect(movements, hasLength(1));
+        expect(movements.single.quantityDelta, 1);
+        expect(movements.single.referenceId, invoice.orderId);
+        expect(
+          movements.single.referenceKind,
+          WorkspaceStockReferenceKind.order,
+        );
+        expect(movements.single.valid, isTrue);
+        expect(movements.single.productLabel, 'Original grocery · 1 pack');
+        final recoveredEntry = recoveredResult.finance.customerLedgers
+            .singleWhere((l) => l.customerId == invoice.customer)
+            .entries
+            .last;
+        expect(
+          recoveredEntry.returnStockMovements(order)!.single.contentIdentity,
+          movements.single.contentIdentity,
+        );
+        expect(() => movements.clear(), throwsUnsupportedError);
+        expect(
+          ledger.entries.last.returnStockMovements(
+            order.copyWith(itemSnapshots: []),
+          ),
+          isNull,
+        );
+
+        expect(
+          ledger.entries.last.customerReturn!.lines.single.restockQuantity,
+          1,
+        );
+        expect(
+          ledger.invoiceBalance(invoice.id)!.refundableMinor,
+          paid == 0 ? 0 : paid - 334,
+        );
+        expect(
+          identical(
+            await adapter.recordReturn(
+              returned,
+              order.copyWith(customer: invoice.customer),
+            ),
+            result,
+          ),
+          isTrue,
+        );
+        expect(
+          identical(await adapter.reconcileReturn(returned), result),
+          isTrue,
+        );
+        final altered = WorkspaceCustomerReturn.fromJson({
+          ...returned.toJson(),
+          'reason': 'Changed accepted return',
+        });
+        await expectLater(
+          adapter.recordReturn(altered, order),
+          throwsStateError,
+        );
+        final newAdapter = StoreReviewCustomerCollectionGateway(seed.finance);
+        expect(newAdapter.restoreCheckpoint(result, seed.finance), isTrue);
+        expect(
+          identical(await newAdapter.reconcileReturn(returned), result),
+          isTrue,
+        );
+        if (paid == 0) {
+          final settled = await adapter.recordCollection(
+            WorkspaceCustomerCollection(
+              accountScope: 'account-A',
+              workspaceId: seed.storeId,
+              customerId: invoice.customer,
+              invoiceId: invoice.id,
+              orderId: invoice.orderId,
+              operationId: 'COLLECT-REMAINING',
+              expectedRevision: ledger.revision,
+              amountMinor: 334,
+              channel: WorkspacePaymentChannel.cash,
+            ),
+          );
+          final paidBill = settled.payments.singleWhere(
+            (p) => p.invoiceId == invoice.id,
+          );
+          expect(paidBill.dueMinor, 0);
+          expect(paidBill.paidMinor, 334);
+          expect(paidBill.state, WorkspacePaymentState.returnAdjusted);
+          expect(settled.availableMinor, before.availableMinor);
+        }
+        if (paid > 0) {
+          final refundable = ledger.invoiceBalance(invoice.id)!.refundableMinor;
+          WorkspaceCustomerRefund refund(String id, int amount, int revision) =>
+              WorkspaceCustomerRefund(
+                accountScope: 'account-A',
+                workspaceId: seed.storeId,
+                customerId: invoice.customer,
+                invoiceId: invoice.id,
+                orderId: invoice.orderId,
+                operationId: id,
+                expectedRevision: revision,
+                amountMinor: amount,
+                channel: WorkspacePaymentChannel.cash,
+              );
+          await expectLater(
+            adapter.recordRefund(
+              refund('EXCESS', refundable + 1, ledger.revision),
+            ),
+            throwsStateError,
+          );
+          final firstRefund = refund('REFUND-1', 100, ledger.revision);
+          await openJournal().save(
+            WorkspaceLedgerCheckpoint(
+              revision: 3,
+              finance: result,
+              inventory: completedInventory,
+              pendingRefund: firstRefund,
+            ),
+            expectedRevision: 2,
+          );
+          expect(
+            (await openJournal().read(
+              'account-A',
+              seed.storeId,
+            ))!.pendingRefund!.identityData,
+            firstRefund.identityData,
+          );
+          await expectLater(
+            openJournal().save(
+              WorkspaceLedgerCheckpoint(
+                revision: 4,
+                finance: result,
+                inventory: completedInventory,
+              ),
+              expectedRevision: 3,
+            ),
+            throwsA(isA<WorkGatewayException>()),
+          );
+          await expectLater(
+            openJournal().save(
+              WorkspaceLedgerCheckpoint(
+                revision: 4,
+                finance: result,
+                inventory: completedInventory,
+                pendingRefund: refund('REPLACEMENT', 100, ledger.revision),
+              ),
+              expectedRevision: 3,
+            ),
+            throwsA(isA<WorkGatewayException>()),
+          );
+
+          final first = await adapter.recordRefund(firstRefund);
+          final wrongAmount = await StoreReviewCustomerCollectionGateway(
+            result,
+          ).recordRefund(refund('REFUND-1', 101, ledger.revision));
+          final changedInventory = completedInventory.post([
+            WorkspaceStockMovement(
+              id: 'UNRELATED-REFUND-STOCK',
+              productId: movements.single.productId,
+              productLabel: movements.single.productLabel,
+              kind: WorkspaceStockMovementKind.returned,
+              quantityDelta: 1,
+              reason: 'Refund must not return stock again',
+              occurredAt: first.asOf,
+            ),
+          ], at: first.asOf)!;
+          for (final invalid in [
+            WorkspaceLedgerCheckpoint(
+              revision: 4,
+              finance: wrongAmount,
+              inventory: completedInventory,
+            ),
+            WorkspaceLedgerCheckpoint(
+              revision: 4,
+              finance: first,
+              inventory: changedInventory,
+            ),
+          ]) {
+            expect(invalid.valid, isTrue);
+            await expectLater(
+              openJournal().save(invalid, expectedRevision: 3),
+              throwsA(
+                isA<WorkGatewayException>().having(
+                  (error) => error.message,
+                  'reason',
+                  'Confirmed refund must match its invoice without changing stock.',
+                ),
+              ),
+            );
+            final retained = (await openJournal().read(
+              'account-A',
+              seed.storeId,
+            ))!;
+            expect(retained.revision, 3);
+            expect(
+              retained.pendingRefund!.identityData,
+              firstRefund.identityData,
+            );
+            expect(
+              retained.inventory!.quantities,
+              completedInventory.quantities,
+            );
+            expect(
+              retained.finance.payments
+                  .singleWhere((payment) => payment.invoiceId == invoice.id)
+                  .refundedMinor,
+              0,
+            );
+          }
+          await openJournal().save(
+            WorkspaceLedgerCheckpoint(
+              revision: 4,
+              finance: first,
+              inventory: completedInventory,
+            ),
+            expectedRevision: 3,
+          );
+          final recoveredRefund = (await openJournal().read(
+            'account-A',
+            seed.storeId,
+          ))!;
+          expect(recoveredRefund.pendingRefund, isNull);
+          expect(
+            recoveredRefund.inventory!.quantities,
+            completedInventory.quantities,
+          );
+
+          final firstPayment = first.payments.singleWhere(
+            (p) => p.invoiceId == invoice.id,
+          );
+          expect(firstPayment.refundedMinor, 100);
+          expect(firstPayment.paidMinor, paid);
+          expect(firstPayment.dueMinor, 0);
+          expect(firstPayment.state, WorkspacePaymentState.refundPending);
+          expect(first.availableMinor, before.availableMinor);
+          expect(first.refundsMinor, before.refundsMinor + 100);
+          expect(
+            identical(await adapter.recordRefund(firstRefund), first),
+            isTrue,
+          );
+          final finalRefund = refund(
+            'REFUND-2',
+            refundable - 100,
+            ledger.revision + 1,
+          );
+          final completed = await adapter.recordRefund(finalRefund);
+          final completedLedger = completed.customerLedgers.singleWhere(
+            (l) => l.customerId == invoice.customer,
+          );
+          expect(
+            completedLedger.invoiceBalance(invoice.id)!.refundableMinor,
+            0,
+          );
+          expect(
+            completedLedger.entries.where(
+              (e) => e.kind == WorkspaceLedgerEntryKind.refund,
+            ),
+            hasLength(2),
+          );
+          expect(
+            completedLedger.entries.where(
+              (e) => e.kind == WorkspaceLedgerEntryKind.creditNote,
+            ),
+            hasLength(1),
+          );
+          expect(completed.refundsMinor, before.refundsMinor + refundable);
+          expect(completed.salesTodayMinor, before.salesTodayMinor);
+          expect(completed.availableMinor, before.availableMinor);
+          expect(
+            identical(await adapter.reconcileRefund(finalRefund), completed),
+            isTrue,
+          );
+          final restoredRefund = WorkspaceLedgerCheckpoint.fromJson(
+            jsonDecode(
+              jsonEncode(
+                WorkspaceLedgerCheckpoint(
+                  revision: 1,
+                  finance: completed,
+                ).toJson(),
+              ),
+            ),
+          )!;
+          final recoveredAdapter = StoreReviewCustomerCollectionGateway(
+            seed.finance,
+          );
+          expect(
+            recoveredAdapter.restoreCheckpoint(
+              restoredRefund.finance,
+              seed.finance,
+            ),
+            isTrue,
+          );
+          expect(
+            (await recoveredAdapter.reconcileRefund(finalRefund)).revision,
+            completed.revision,
+          );
+          await expectLater(
+            recoveredAdapter.reconcileRefund(
+              refund('REFUND-2', refundable - 100, ledger.revision + 99),
+            ),
+            throwsStateError,
+          );
+          await expectLater(
+            adapter.recordRefund(
+              refund('AFTER-SETTLED', 1, completedLedger.revision),
+            ),
+            throwsStateError,
+          );
+        }
+      });
+    }
+
+    test('discounted partial returns preserve exact full invoice value', () {
+      final first = request('return-1', 1);
+      final second = request('return-2', 1, restock: 0);
+      final third = request('return-3', 1);
+      expect(first.creditMinorFor(order, priorReturns: []), 333);
+      expect(second.creditMinorFor(order, priorReturns: [first]), 333);
+      expect(third.creditMinorFor(order, priorReturns: [first, second]), 334);
+      expect(request('full', 3).creditMinorFor(order, priorReturns: []), 1000);
+      expect(second.lines.single.restockQuantity, 0);
+      expect(() => first.lines.clear(), throwsUnsupportedError);
+    });
+    test(
+      'duplicates, excess quantities and another account cannot create credit',
+      () {
+        final first = request('return-1', 2);
+        expect(first.creditMinorFor(order, priorReturns: [first]), isNull);
+        expect(
+          request('return-2', 2).creditMinorFor(order, priorReturns: [first]),
+          isNull,
+        );
+        expect(
+          request('return-2', 1).creditMinorFor(
+            order,
+            priorReturns: [request('other', 1, account: 'account-B')],
+          ),
+          isNull,
+        );
+        expect(
+          request(
+            'return-2',
+            1,
+            sku: 'other',
+          ).creditMinorFor(order, priorReturns: []),
+          isNull,
+        );
+        expect(request('return-2', 1, restock: 2).valid, isFalse);
+        expect(request('return-2', 0).valid, isFalse);
+      },
+    );
+    test('missing prices or unfinished orders cannot authorize a return', () {
+      final result = request('return-1', 1);
+      expect(
+        result.creditMinorFor(
+          order.copyWith(itemSnapshots: []),
+          priorReturns: [],
+        ),
+        isNull,
+      );
+      expect(
+        result.creditMinorFor(
+          order.copyWith(stage: 'Preparing'),
+          priorReturns: [],
+        ),
+        isNull,
+      );
+      expect(
+        result.creditMinorFor(order.copyWith(amount: 11), priorReturns: []),
+        isNull,
+      );
+    });
+  });
+
+  group('LEDGER01 customer statement', () {
+    final now = DateTime.utc(2026, 9, 14, 12);
+    test(
+      'customer book follows collections in paise rather than stale order labels',
+      () async {
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 11),
+        );
+        final work = WorkSession(
+          gateway: ReviewWorkGateway(),
+          pendingProofStore: _CommandAccountStore(),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(work.dispose);
+        work.workspaceOrders.addAll(seed.orders);
+        work.applyWorkspaceFinance(seed.finance);
+        work.bindCustomerCollectionGateway(
+          accountScope: 'account-A',
+          storeId: seed.storeId,
+          adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+          checkpointStore: SecureWorkLedgerCheckpointStore(
+            accountScope: () => 'account-A',
+            storage: _OrderJournalStorage(),
+          ),
+        );
+        final payment = seed.finance.payments.first;
+        WorkspaceCustomerRecord customer() => work.workspaceCustomerBook
+            .singleWhere((c) => c.id == payment.customerId);
+        expect(customer().amountDueMinor, payment.dueMinor);
+        expect(
+          await work.recordCustomerCollection(
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            amountMinor: 101,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isTrue,
+        );
+        expect(customer().amountDueMinor, payment.dueMinor - 101);
+        expect(customer().hasDues, isTrue);
+        expect(
+          work.workspaceCustomerBook
+              .singleWhere((c) => c.id == 'QA-CUSTOMER-3')
+              .balanceAvailable,
+          isFalse,
+        );
+        expect(
+          await work.recordCustomerCollection(
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            amountMinor: payment.dueMinor - 101,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isTrue,
+        );
+        expect(customer().amountDueMinor, 0);
+        expect(customer().hasDues, isFalse);
+        expect(work.workspaceOrders.first.payment, 'Payment due');
+        expect(work.workspaceStockMovements, isEmpty);
+      },
+    );
+    for (final authorityRetained in [true, false]) {
+      test(
+        'pending collection survives restart; authority retained=$authorityRetained',
+        () async {
+          final bytes = _OrderJournalStorage();
+          final journal = SecureWorkLedgerCheckpointStore(
+            accountScope: () => 'account-A',
+            storage: bytes,
+          );
+          final seed = StoreReviewSeed(
+            accountScope: 'account-A',
+            orderCount: 12,
+            now: DateTime.utc(2026, 9, 11),
+          );
+          WorkSession open(WorkCustomerCollectionGateway adapter) {
+            final work = WorkSession(
+              gateway: ReviewWorkGateway(),
+              pendingProofStore: _CommandAccountStore(),
+            )..activeWorkspace = seed.workspace;
+            work.applyWorkspaceFinance(seed.finance);
+            work.bindCustomerCollectionGateway(
+              accountScope: 'account-A',
+              storeId: seed.storeId,
+              adapter: adapter,
+              checkpointStore: journal,
+            );
+            return work;
+          }
+
+          final authority = _LostCollectionGateway(seed.finance);
+          final first = open(authority);
+          final payment = seed.finance.payments.first;
+          expect(
+            await first.recordCustomerCollection(
+              customerId: payment.customerId,
+              invoiceId: payment.invoiceId!,
+              amountMinor: 100,
+              channel: WorkspacePaymentChannel.cash,
+            ),
+            isFalse,
+          );
+          final operation = first.pendingCustomerCollection!.operationId;
+          first.dispose();
+          final nextAdapter = authorityRetained
+              ? authority
+              : _LostCollectionGateway(seed.finance);
+          final restarted = open(nextAdapter);
+          addTearDown(restarted.dispose);
+          expect(await restarted.recoverCustomerLedger(), isTrue);
+          expect(restarted.pendingCustomerCollection!.operationId, operation);
+          expect(
+            await restarted.recordCustomerCollection(
+              customerId: payment.customerId,
+              invoiceId: payment.invoiceId!,
+              amountMinor: 100,
+              channel: WorkspacePaymentChannel.cash,
+            ),
+            isFalse,
+          );
+          expect(
+            await restarted.reconcileCustomerCollection(),
+            authorityRetained,
+          );
+          expect(nextAdapter.submissions, authorityRetained ? 1 : 0);
+          expect(
+            restarted.workspaceFinance!.duesMinor,
+            seed.finance.duesMinor - (authorityRetained ? 100 : 0),
+          );
+          if (!authorityRetained) {
+            expect(restarted.pendingCustomerCollection!.operationId, operation);
+            expect(
+              (await journal.read(
+                'account-A',
+                seed.storeId,
+              ))!.pending!.operationId,
+              operation,
+            );
+          }
+        },
+      );
+    }
+    test(
+      'LEDGER01 pending return survives session recovery and locks money actions',
+      () async {
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 11),
+        );
+        final payment = seed.finance.payments.first;
+        final ledger = seed.finance.customerLedgers.singleWhere(
+          (item) => item.customerId == payment.customerId,
+        );
+        final intent = WorkspacePendingCustomerReturn(
+          creditMinor: 100,
+          request: WorkspaceCustomerReturn(
+            accountScope: 'account-A',
+            workspaceId: seed.storeId,
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            orderId: payment.orderId,
+            operationId: 'RETURN-RECOVER',
+            expectedRevision: ledger.revision,
+            reason: 'One pack returned',
+            lines: const [
+              WorkspaceCustomerReturnLine(
+                productId: 'sku-A',
+                quantity: 1,
+                restockQuantity: 1,
+              ),
+            ],
+          ),
+        );
+        final bytes = _OrderJournalStorage();
+        final journal = SecureWorkLedgerCheckpointStore(
+          accountScope: () => 'account-A',
+          storage: bytes,
+        );
+        await journal.save(
+          WorkspaceLedgerCheckpoint(
+            revision: 1,
+            finance: seed.finance,
+            pendingReturn: intent,
+          ),
+          expectedRevision: null,
+        );
+        final session = WorkSession(
+          gateway: ReviewWorkGateway(),
+          pendingProofStore: _CommandAccountStore(),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(session.dispose);
+        expect(session.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          session.bindCustomerCollectionGateway(
+            accountScope: 'account-A',
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: journal,
+          ),
+          isTrue,
+        );
+        expect(await session.recoverCustomerLedger(), isTrue);
+        expect(session.pendingCustomerReturn!.toJson(), intent.toJson());
+        expect(session.customerCollectionAvailable, isFalse);
+        expect(
+          await session.recordCustomerCollection(
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            amountMinor: 100,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isFalse,
+        );
+        expect(
+          session.bindCustomerCollectionGateway(
+            accountScope: 'account-A',
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: journal,
+          ),
+          isFalse,
+        );
+        expect(await session.submitWorkspaceCounterBill(), isNull);
+        expect(session.workspaceInvoices, isEmpty);
+        expect(session.workspaceStockMovements, isEmpty);
+        expect(bytes.writes, hasLength(1));
+        expect(
+          (await journal.read(
+            'account-A',
+            seed.storeId,
+          ))!.pendingReturn!.toJson(),
+          intent.toJson(),
+        );
+      },
+    );
+
+    test(
+      'completed collection survives session restart without reseeding balances',
+      () async {
+        final bytes = _OrderJournalStorage();
+        final journal = SecureWorkLedgerCheckpointStore(
+          accountScope: () => 'account-A',
+          storage: bytes,
+        );
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 11),
+        );
+        WorkSession open(
+          StoreReviewSeed value,
+          WorkCustomerCollectionGateway adapter,
+        ) {
+          final session = WorkSession(
+            gateway: ReviewWorkGateway(),
+            pendingProofStore: _CommandAccountStore(),
+          )..activeWorkspace = value.workspace;
+          session.workspaceOrders.addAll(value.orders);
+          expect(session.applyWorkspaceFinance(value.finance), isTrue);
+          expect(
+            session.bindCustomerCollectionGateway(
+              accountScope: 'account-A',
+              storeId: value.storeId,
+              adapter: adapter,
+              checkpointStore: journal,
+            ),
+            isTrue,
+          );
+          return session;
+        }
+
+        final first = open(
+          seed,
+          StoreReviewCustomerCollectionGateway(seed.finance),
+        );
+        final payment = seed.finance.payments.first;
+        final amount = payment.dueMinor ~/ 2;
+        expect(
+          await first.recordCustomerCollection(
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            amountMinor: amount,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isTrue,
+        );
+        first.dispose();
+        final freshSeed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 12),
+        );
+        final second = open(
+          freshSeed,
+          StoreReviewCustomerCollectionGateway(freshSeed.finance),
+        );
+        addTearDown(second.dispose);
+        expect(await second.recoverCustomerLedger(), isTrue);
+        expect(
+          second.workspaceFinance!.duesMinor,
+          seed.finance.duesMinor - amount,
+        );
+        expect(second.pendingCustomerCollection, isNull);
+        expect(
+          second.workspaceOrders.map((o) => o.id),
+          freshSeed.orders.map((o) => o.id),
+        );
+        expect(
+          await second.recordCustomerCollection(
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            amountMinor: payment.dueMinor - amount,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isTrue,
+        );
+        expect(second.workspaceFinance!.payments.first.dueMinor, 0);
+        expect(
+          second.workspaceFinance!.salesTodayMinor,
+          seed.finance.salesTodayMinor,
+        );
+        expect(second.workspaceStockMovements, isEmpty);
+      },
+    );
+
+    test(
+      'storage failure prevents adapter submission and keeps the same receipt',
+      () async {
+        final bytes = _OrderJournalStorage()..failWrite = true;
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 11),
+        );
+        final adapter = _LostCollectionGateway(seed.finance);
+        final work = WorkSession(
+          gateway: ReviewWorkGateway(),
+          pendingProofStore: _CommandAccountStore(),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(work.dispose);
+        work.applyWorkspaceFinance(seed.finance);
+        work.bindCustomerCollectionGateway(
+          accountScope: 'account-A',
+          storeId: seed.storeId,
+          adapter: adapter,
+          checkpointStore: SecureWorkLedgerCheckpointStore(
+            accountScope: () => 'account-A',
+            storage: bytes,
+          ),
+        );
+        final payment = seed.finance.payments.first;
+        expect(
+          await work.recordCustomerCollection(
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            amountMinor: 100,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isFalse,
+        );
+        expect(adapter.submissions, 0);
+        final original = work.pendingCustomerCollection!.operationId;
+        bytes.failWrite = false;
+        expect(
+          await work.reconcileCustomerCollection(),
+          isFalse,
+        ); // Adapter applies but deliberately loses reply.
+        expect(adapter.submissions, 1);
+        expect(work.pendingCustomerCollection!.operationId, original);
+        expect(await work.reconcileCustomerCollection(), isTrue);
+        expect(adapter.submissions, 1);
+      },
+    );
+    test(
+      'checkpoint corruption is preserved and concurrent stale write is rejected',
+      () async {
+        final bytes = _OrderJournalStorage();
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: now,
+        );
+        final first = SecureWorkLedgerCheckpointStore(
+          accountScope: () => 'account-A',
+          storage: bytes,
+        );
+        final second = SecureWorkLedgerCheckpointStore(
+          accountScope: () => 'account-A',
+          storage: bytes,
+        );
+        final checkpoint = WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: seed.finance,
+        );
+        bytes.holdWrite = Completer<void>();
+        final saving = first.save(checkpoint, expectedRevision: null);
+        await _drainOrderJournal();
+        final stale = second.save(
+          WorkspaceLedgerCheckpoint(
+            revision: 1,
+            finance: StoreReviewSeed(
+              accountScope: 'account-A',
+              orderCount: 12,
+              now: now.add(const Duration(seconds: 1)),
+            ).finance,
+          ),
+          expectedRevision: null,
+        );
+        final rejection = expectLater(
+          stale,
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await _drainOrderJournal();
+        expect(bytes.writes, hasLength(1));
+        bytes.holdWrite!.complete();
+        await saving;
+        await rejection;
+        final key = bytes.values.keys.single;
+        bytes.values[key] = '{invalid retained data';
+        await expectLater(
+          first.read('account-A', seed.storeId),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        await expectLater(
+          first.save(checkpoint, expectedRevision: null),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(bytes.values[key], '{invalid retained data');
+      },
+    );
+    test(
+      'LEDGER01 return quantities survive secure checkpoint recovery',
+      () async {
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: now,
+        );
+        final original = WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: seed.finance,
+        );
+        final json = jsonDecode(jsonEncode(original.toJson())) as Map;
+        final finance = json['finance'] as Map;
+        final ledgers = finance['customerLedgers'] as List;
+        final ledger = ledgers.first as Map;
+        final entries = ledger['entries'] as List;
+        final bill = entries.first as Map;
+        final request = WorkspaceCustomerReturn(
+          accountScope: 'account-A',
+          workspaceId: seed.storeId,
+          customerId: ledger['customerId'] as String,
+          invoiceId: bill['invoiceId'] as String,
+          orderId: bill['orderId'] as String,
+          operationId: 'RETURN-1',
+          expectedRevision: ledger['revision'] as int,
+          reason: 'One damaged pack',
+          lines: const [
+            WorkspaceCustomerReturnLine(
+              productId: 'sku-return',
+              quantity: 1,
+              restockQuantity: 0,
+            ),
+          ],
+        );
+        entries.add({
+          'id': 'CREDIT-RETURN-1',
+          'operationId': request.operationId,
+          'invoiceId': request.invoiceId,
+          'orderId': request.orderId,
+          'sequence': (entries.last['sequence'] as int) + 1,
+          'occurredAt': ledger['asOf'],
+          'kind': 'creditNote',
+          'state': 'posted',
+          'amountMinor': 100,
+          'channel': 'unknown',
+          'paymentReference': null,
+          'customerReturn': request.toJson(),
+        });
+        ledger['revision'] = (ledger['revision'] as int) + 1;
+        finance['revision'] = (finance['revision'] as int) + 1;
+        json['revision'] = 2;
+        final checkpoint = WorkspaceLedgerCheckpoint.fromJson(json)!;
+        final storage = _OrderJournalStorage();
+        SecureWorkLedgerCheckpointStore open() =>
+            SecureWorkLedgerCheckpointStore(
+              accountScope: () => 'account-A',
+              storage: storage,
+            );
+        await open().save(original, expectedRevision: null);
+        await open().save(checkpoint, expectedRevision: 1);
+        final restored = (await open().read('account-A', seed.storeId))!;
+        final recovered = restored.finance.customerLedgers.first.entries.last;
+        expect(recovered.customerReturn!.toJson(), request.toJson());
+        expect(recovered.customerReturn!.lines.single.restockQuantity, 0);
+        expect(
+          recovered.identityData,
+          checkpoint.finance.customerLedgers.first.entries.last.identityData,
+        );
+        (entries.last['customerReturn'] as Map)['workspaceId'] =
+            'another-store';
+        expect(WorkspaceLedgerCheckpoint.fromJson(json), isNull);
+        (entries.last['customerReturn'] as Map)['workspaceId'] = seed.storeId;
+        (entries.last['customerReturn']['lines'] as List)
+                .first['restockQuantity'] =
+            2;
+        expect(WorkspaceLedgerCheckpoint.fromJson(json), isNull);
+        (entries.last['customerReturn']['lines'] as List)
+                .first['restockQuantity'] =
+            1;
+        json['revision'] = 3;
+        finance['revision'] = (finance['revision'] as int) + 1;
+        ledger['revision'] = (ledger['revision'] as int) + 1;
+        final altered = WorkspaceLedgerCheckpoint.fromJson(json)!;
+        expect(
+          altered.finance.customerLedgers.first.canFollow(
+            restored.finance.customerLedgers.first,
+          ),
+          isFalse,
+        );
+        await expectLater(
+          open().save(altered, expectedRevision: 2),
+          throwsA(
+            isA<WorkGatewayException>().having(
+              (error) => error.toString(),
+              'reason',
+              'Known ledger history cannot be replaced.',
+            ),
+          ),
+        );
+      },
+    );
+
+    test(
+      'checkpoint round trip preserves projection and pending receipt identity',
+      () {
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: now,
+        );
+        final payment = seed.finance.payments.first;
+        final checkpoint = WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: seed.finance,
+          pending: WorkspaceCustomerCollection(
+            accountScope: 'account-A',
+            workspaceId: seed.storeId,
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            orderId: payment.orderId,
+            operationId: 'recover-1',
+            expectedRevision: 1,
+            amountMinor: 100,
+            channel: WorkspacePaymentChannel.directUpi,
+            reference: 'UPI-REFERENCE',
+          ),
+        );
+        final decoded = WorkspaceLedgerCheckpoint.fromJson(
+          jsonDecode(jsonEncode(checkpoint.toJson())),
+        )!;
+        expect(decoded.toJson(), checkpoint.toJson());
+        expect(decoded.pending!.identityData, checkpoint.pending!.identityData);
+        for (final invalid in [
+          null,
+          {},
+          {...checkpoint.toJson(), 'version': 2},
+          {...checkpoint.toJson(), 'revision': 1.5},
+          {
+            ...checkpoint.toJson(),
+            'finance': {'accountScope': 'other'},
+          },
+        ]) {
+          expect(WorkspaceLedgerCheckpoint.fromJson(invalid), isNull);
+        }
+      },
+    );
+
+    test(
+      'encrypted checkpoint survives new instance and forbids loss of pending collection',
+      () async {
+        final bytes = _OrderJournalStorage();
+        String? account = 'account-A';
+        final store = SecureWorkLedgerCheckpointStore(
+          accountScope: () => account,
+          storage: bytes,
+        );
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 11),
+        );
+        final payment = seed.finance.payments.first;
+        final request = WorkspaceCustomerCollection(
+          accountScope: 'account-A',
+          workspaceId: seed.storeId,
+          customerId: payment.customerId,
+          invoiceId: payment.invoiceId!,
+          orderId: payment.orderId,
+          operationId: 'recover-1',
+          expectedRevision: 1,
+          amountMinor: 100,
+          channel: WorkspacePaymentChannel.cash,
+        );
+        final pending = WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: seed.finance,
+          pending: request,
+        );
+        await store.save(pending, expectedRevision: null);
+        final restarted = SecureWorkLedgerCheckpointStore(
+          accountScope: () => account,
+          storage: bytes,
+        );
+        expect(
+          (await restarted.read(
+            'account-A',
+            seed.storeId,
+          ))!.pending!.identityData,
+          request.identityData,
+        );
+        await restarted.save(
+          pending,
+          expectedRevision: null,
+        ); // Same uncertain native write, not a second operation.
+        await expectLater(
+          restarted.save(
+            WorkspaceLedgerCheckpoint(revision: 2, finance: seed.finance),
+            expectedRevision: 1,
+          ),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        final posted = await StoreReviewCustomerCollectionGateway(
+          seed.finance,
+        ).recordCollection(request);
+        final complete = WorkspaceLedgerCheckpoint(
+          revision: 2,
+          finance: posted,
+        );
+        await restarted.save(complete, expectedRevision: 1);
+        expect(
+          (await store.read('account-A', seed.storeId))!.finance.duesMinor,
+          seed.finance.duesMinor - 100,
+        );
+        await expectLater(
+          store.save(pending, expectedRevision: null),
+          throwsA(isA<WorkGatewayException>()),
+        );
+        expect(await store.read('account-A', 'different-store'), isNull);
+        account = 'account-B';
+        await expectLater(
+          store.read('account-A', seed.storeId),
+          throwsA(isA<WorkGatewayException>()),
+        );
+      },
+    );
+    test(
+      'collection lost reply reconciles once without a sale or stock movement',
+      () async {
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 11),
+        );
+        final work = WorkSession(
+          gateway: ReviewWorkGateway(),
+          pendingProofStore: _CommandAccountStore(),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(work.dispose);
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        final gateway = _LostCollectionGateway(seed.finance);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: 'account-A',
+            storeId: seed.storeId,
+            adapter: gateway,
+            checkpointStore: SecureWorkLedgerCheckpointStore(
+              accountScope: () => 'account-A',
+              storage: _OrderJournalStorage(),
+            ),
+          ),
+          isTrue,
+        );
+        final invoice = seed.finance.payments.first;
+        final amount = invoice.dueMinor ~/ 2;
+        expect(
+          await work.recordCustomerCollection(
+            customerId: invoice.customerId,
+            invoiceId: invoice.invoiceId!,
+            amountMinor: amount,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isFalse,
+        );
+        final operation = work.pendingCustomerCollection!.operationId;
+        expect(work.workspaceFinance!.duesMinor, seed.finance.duesMinor);
+        expect(
+          await work.recordCustomerCollection(
+            customerId: invoice.customerId,
+            invoiceId: invoice.invoiceId!,
+            amountMinor: amount,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isFalse,
+        );
+        expect(gateway.submissions, 1);
+        expect(await work.reconcileCustomerCollection(), isTrue);
+        expect(work.pendingCustomerCollection, isNull);
+        final result = work.workspaceFinance!;
+        expect(result.duesMinor, seed.finance.duesMinor - amount);
+        expect(
+          result.customerLedgers.first.entries.where(
+            (e) => e.operationId == operation,
+          ),
+          hasLength(1),
+        );
+        expect(result.salesTodayMinor, seed.finance.salesTodayMinor);
+        expect(result.availableMinor, seed.finance.availableMinor);
+        expect(work.workspaceStockMovements, isEmpty);
+        expect(work.workspaceInvoices, isEmpty);
+        expect(await work.reconcileCustomerCollection(), isFalse);
+      },
+    );
+
+    test(
+      'collection adapter rejects overpayment and operation retargeting',
+      () async {
+        final seed = StoreReviewSeed(
+          accountScope: 'account-A',
+          orderCount: 12,
+          now: DateTime.utc(2026, 9, 11),
+        );
+        final adapter = StoreReviewCustomerCollectionGateway(seed.finance);
+        final invoice = seed.finance.payments.first;
+        WorkspaceCustomerCollection request(
+          int amount, {
+          String operation = 'op-1',
+        }) => WorkspaceCustomerCollection(
+          accountScope: 'account-A',
+          workspaceId: seed.storeId,
+          customerId: invoice.customerId,
+          invoiceId: invoice.invoiceId!,
+          orderId: invoice.orderId,
+          operationId: operation,
+          expectedRevision: 1,
+          amountMinor: amount,
+          channel: WorkspacePaymentChannel.cash,
+        );
+        await expectLater(
+          adapter.recordCollection(request(invoice.dueMinor + 1)),
+          throwsStateError,
+        );
+        final applied = await adapter.recordCollection(
+          request(invoice.dueMinor),
+        );
+        expect(applied.payments.first.dueMinor, 0);
+        expect(
+          identical(
+            await adapter.recordCollection(request(invoice.dueMinor)),
+            applied,
+          ),
+          isTrue,
+        );
+        await expectLater(
+          adapter.recordCollection(request(1)),
+          throwsStateError,
+        );
+        expect(request(0).valid, isFalse);
+      },
+    );
+    test('existing test Store history agrees with its payment projection', () {
+      for (final count in [12, 100, 1000]) {
+        final seed = StoreReviewSeed(
+          accountScope: 'qa-ledger',
+          orderCount: count,
+          now: now,
+        );
+        final finance = seed.finance;
+        expect(finance.valid, isTrue);
+        expect(finance.customerLedgers, hasLength(3));
+        for (final history in finance.customerLedgers) {
+          final payment = finance.payments.singleWhere(
+            (record) => record.customerId == history.customerId,
+          );
+          expect(history.closingBalanceMinor, payment.dueMinor);
+          expect(
+            history.entries.every(
+              (entry) =>
+                  entry.invoiceId == payment.invoiceId &&
+                  entry.orderId == payment.orderId,
+            ),
+            isTrue,
+          );
+        }
+      }
+    });
+    WorkspaceCustomerLedgerEntry entry(
+      int sequence,
+      WorkspaceLedgerEntryKind kind,
+      int amount, {
+      WorkspaceLedgerPostingState state = WorkspaceLedgerPostingState.posted,
+      String? operation,
+      String invoice = 'invoice-1',
+    }) => WorkspaceCustomerLedgerEntry(
+      id: 'entry-$sequence',
+      operationId: operation ?? 'operation-$sequence',
+      invoiceId: invoice,
+      orderId: 'sale-1',
+      sequence: sequence,
+      occurredAt: now,
+      kind: kind,
+      state: state,
+      amountMinor: amount,
+    );
+    WorkspaceCustomerLedger ledger(
+      List<WorkspaceCustomerLedgerEntry> entries, {
+      int? opening = 0,
+      bool complete = true,
+      String customer = 'customer-1',
+      int revision = 1,
+    }) => WorkspaceCustomerLedger(
+      accountScope: 'account-A',
+      workspaceId: 'store-A',
+      customerId: customer,
+      customerName: 'Test customer',
+      revision: revision,
+      asOf: now,
+      openingBalanceMinor: opening,
+      historyComplete: complete,
+      entries: entries,
+    );
+
+    test(
+      'refresh preserves posted facts and only resolves pending entries',
+      () {
+        final bill = entry(1, WorkspaceLedgerEntryKind.invoice, 100000);
+        final waiting = ledger([
+          bill,
+          entry(
+            2,
+            WorkspaceLedgerEntryKind.collection,
+            60000,
+            state: WorkspaceLedgerPostingState.pending,
+          ),
+        ]);
+        final paid = ledger([
+          bill,
+          entry(2, WorkspaceLedgerEntryKind.collection, 60000),
+        ], revision: 2);
+        expect(paid.canFollow(waiting), isTrue);
+        expect(waiting.canFollow(paid), isFalse);
+        expect(ledger(paid.entries, revision: 2).canFollow(paid), isTrue);
+        expect(ledger(paid.entries).canFollow(waiting), isFalse);
+        expect(ledger([bill], revision: 3).canFollow(paid), isFalse);
+        expect(
+          ledger([
+            bill,
+            entry(2, WorkspaceLedgerEntryKind.collection, 50000),
+          ], revision: 3).canFollow(paid),
+          isFalse,
+        );
+        expect(
+          ledger(paid.entries, revision: 3, opening: 100).canFollow(paid),
+          isFalse,
+        );
+        expect(
+          ledger(paid.entries, revision: 3, customer: 'other').canFollow(paid),
+          isFalse,
+        );
+      },
+    );
+
+    test('partial sale and later collection do not post another invoice', () {
+      final bill = entry(1, WorkspaceLedgerEntryKind.invoice, 100000);
+      final firstPayment = entry(2, WorkspaceLedgerEntryKind.collection, 60000);
+      expect(ledger([bill, firstPayment]).closingBalanceMinor, 40000);
+      final paid = ledger([
+        bill,
+        firstPayment,
+        entry(3, WorkspaceLedgerEntryKind.collection, 40000),
+      ]);
+      expect(paid.valid, isTrue);
+      expect(paid.closingBalanceMinor, 0);
+      expect(
+        paid.entries.where((e) => e.kind == WorkspaceLedgerEntryKind.invoice),
+        hasLength(1),
+      );
+      expect(() => paid.entries.clear(), throwsUnsupportedError);
+    });
+
+    test('one collection may allocate once to each linked invoice', () {
+      final statement = ledger([
+        entry(1, WorkspaceLedgerEntryKind.invoice, 60000),
+        entry(2, WorkspaceLedgerEntryKind.invoice, 40000, invoice: 'invoice-2'),
+        entry(
+          3,
+          WorkspaceLedgerEntryKind.collection,
+          60000,
+          operation: 'collection-1',
+        ),
+        entry(
+          4,
+          WorkspaceLedgerEntryKind.collection,
+          40000,
+          operation: 'collection-1',
+          invoice: 'invoice-2',
+        ),
+      ]);
+      expect(statement.valid, isTrue);
+      expect(statement.closingBalanceMinor, 0);
+      expect(
+        ledger([
+          entry(1, WorkspaceLedgerEntryKind.invoice, 100000),
+          entry(2, WorkspaceLedgerEntryKind.invoice, 100000),
+        ]).valid,
+        isFalse,
+      );
+    });
+
+    test('pending or failed collection never clears customer dues', () {
+      for (final state in [
+        WorkspaceLedgerPostingState.pending,
+        WorkspaceLedgerPostingState.failed,
+      ]) {
+        expect(
+          ledger([
+            entry(1, WorkspaceLedgerEntryKind.invoice, 100000),
+            entry(2, WorkspaceLedgerEntryKind.collection, 100000, state: state),
+          ]).closingBalanceMinor,
+          100000,
+        );
+      }
+    });
+
+    test('LEDGER01 invoice return credit offsets dues before any refund', () {
+      final history = [
+        entry(1, WorkspaceLedgerEntryKind.invoice, 100000),
+        entry(2, WorkspaceLedgerEntryKind.collection, 60000),
+        entry(3, WorkspaceLedgerEntryKind.creditNote, 50000),
+      ];
+      final balance = ledger(history).invoiceBalance('invoice-1');
+      expect(balance, isNotNull);
+      expect(balance!.dueMinor, 0);
+      expect(balance.refundableMinor, 10000);
+      final refunded = ledger([
+        ...history,
+        entry(4, WorkspaceLedgerEntryKind.refund, 10000),
+      ]).invoiceBalance('invoice-1');
+      expect(refunded!.refundableMinor, 0);
+      expect(refunded.refundedMinor, 10000);
+      expect(
+        ledger([
+          ...history,
+          entry(4, WorkspaceLedgerEntryKind.refund, 10001),
+        ]).invoiceBalance('invoice-1'),
+        isNull,
+      );
+      expect(
+        ledger([
+          ...history,
+          entry(4, WorkspaceLedgerEntryKind.creditNote, 50001),
+        ]).invoiceBalance('invoice-1'),
+        isNull,
+      );
+      expect(
+        ledger([
+          ...history,
+          entry(4, WorkspaceLedgerEntryKind.collection, 1),
+        ]).invoiceBalance('invoice-1'),
+        isNull,
+      );
+      expect(ledger(history).invoiceBalance('missing'), isNull);
+      for (final state in [
+        WorkspaceLedgerPostingState.pending,
+        WorkspaceLedgerPostingState.failed,
+      ]) {
+        expect(
+          ledger([
+            ...history,
+            entry(4, WorkspaceLedgerEntryKind.refund, 10000, state: state),
+          ]).invoiceBalance('invoice-1')!.refundableMinor,
+          10000,
+        );
+      }
+    });
+
+    test('return credit and completed refund stay separate from sales', () {
+      final history = [
+        entry(1, WorkspaceLedgerEntryKind.invoice, 100000),
+        entry(2, WorkspaceLedgerEntryKind.collection, 100000),
+        entry(3, WorkspaceLedgerEntryKind.creditNote, 20000),
+      ];
+      expect(ledger(history).closingBalanceMinor, -20000);
+      expect(
+        ledger([
+          ...history,
+          entry(
+            4,
+            WorkspaceLedgerEntryKind.refund,
+            20000,
+            state: WorkspaceLedgerPostingState.pending,
+          ),
+        ]).closingBalanceMinor,
+        -20000,
+      );
+      expect(
+        ledger([
+          ...history,
+          entry(4, WorkspaceLedgerEntryKind.refund, 20000),
+        ]).closingBalanceMinor,
+        0,
+      );
+    });
+
+    test('duplicates, reordering and unidentified customer are rejected', () {
+      final bill = entry(1, WorkspaceLedgerEntryKind.invoice, 100000);
+      for (final invalid in [
+        ledger([bill, bill]),
+        ledger([
+          bill,
+          entry(
+            2,
+            WorkspaceLedgerEntryKind.invoice,
+            100000,
+            operation: bill.operationId,
+          ),
+        ]),
+        ledger([entry(2, WorkspaceLedgerEntryKind.collection, 60000), bill]),
+        ledger([bill], customer: ''),
+      ]) {
+        expect(invalid.valid, isFalse);
+        expect(invalid.closingBalanceMinor, isNull);
+      }
+    });
+
+    test('missing opening or partial history cannot imply a balance', () {
+      final bill = entry(1, WorkspaceLedgerEntryKind.invoice, 100000);
+      expect(ledger([bill], opening: null).valid, isFalse);
+      final partial = ledger([bill], opening: null, complete: false);
+      expect(partial.valid, isTrue);
+      expect(partial.closingBalanceMinor, isNull);
+      expect(ledger([bill], opening: 5000).closingBalanceMinor, 105000);
+      expect(ledger([bill], opening: 9007199254740991).valid, isFalse);
+    });
+  });
   test(
     'Supplier payment access is specific to supplier, account and Store',
     () {
@@ -1260,6 +3213,470 @@ void main() {
         payment: 'Cash',
       );
       expect(await work.saveWorkspaceCounterDraft(), isTrue);
+    }
+
+    for (final returnFailure in [
+      'none',
+      'response',
+      'unknown',
+      'save',
+      'save-response',
+      'save-response-relaunch',
+    ]) {
+      final loseReturnResponse =
+          returnFailure == 'response' || returnFailure == 'unknown';
+      test(
+        'LEDGER01 counter bill connects to ledger once and later collection only reduces dues returnFailure=$returnFailure',
+        () async {
+          var work = session();
+          await fill(work);
+          final finance = WorkspaceFinanceSnapshot(
+            accountScope: 'account-A',
+            workspaceId: 'store-A',
+            revision: 1,
+            asOf: DateTime.utc(2026, 9, 11),
+            salesTodayMinor: 0,
+            duesMinor: 0,
+            availableMinor: 70000,
+            heldMinor: 0,
+            requestedMinor: 0,
+            paidOutMinor: 0,
+            feesMinor: 0,
+            deliveryAdjustmentsMinor: 0,
+            refundsMinor: 0,
+            taxWithheldMinor: 0,
+            payments: const [],
+            payouts: const [],
+            historyComplete: true,
+          );
+          final returnAdapter = _InterruptedReturnGateway(
+            finance,
+            loseResponse: loseReturnResponse,
+            applyReturn: returnFailure != 'unknown',
+          );
+          returnAdapter.afterReturnRecorded = () {
+            if (returnFailure.startsWith('save-response')) {
+              storage.loseWriteResponseOnce = true;
+            }
+          };
+          expect(work.applyWorkspaceFinance(finance), isTrue);
+          expect(
+            work.bindCustomerCollectionGateway(
+              accountScope: 'account-A',
+              storeId: 'store-A',
+              adapter: returnAdapter,
+              checkpointStore: SecureWorkLedgerCheckpointStore(
+                accountScope: () => account.accountScope,
+                storage: storage,
+              ),
+            ),
+            isTrue,
+          );
+          final result = await work.submitWorkspaceCounterBill();
+          expect(result, isNotNull);
+          final invoice = result!.invoice!;
+          final movementCount = work.workspaceStockMovements.length;
+          final stock = work.workspaceCatalogueItems.single.stock;
+          expect(work.workspaceFinance!.salesTodayMinor, 55000);
+          expect(work.workspaceFinance!.payments.single.dueMinor, 55000);
+          expect(work.workspaceFinance!.availableMinor, 70000);
+          expect(
+            await work.recordCustomerCollection(
+              customerId: '9000000013',
+              invoiceId: invoice.id,
+              amountMinor: 22000,
+              channel: WorkspacePaymentChannel.cash,
+            ),
+            isTrue,
+          );
+          expect(work.workspaceFinance!.payments.single.dueMinor, 33000);
+          expect(work.workspaceFinance!.salesTodayMinor, 55000);
+          expect(await work.recordWorkspaceInvoiceInLedger(invoice), isTrue);
+          expect(
+            work.workspaceFinance!.customerLedgers.single.entries.where(
+              (e) => e.kind == WorkspaceLedgerEntryKind.invoice,
+            ),
+            hasLength(1),
+          );
+          expect(work.workspaceStockMovements, hasLength(movementCount));
+          expect(work.workspaceCatalogueItems.single.stock, stock);
+          expect(work.workspaceInvoices, hasLength(1));
+          WorkSession reopen({
+            bool conflictingStock = false,
+            WorkCustomerCollectionGateway? recoveryAdapter,
+          }) {
+            final recovered = session();
+            if (conflictingStock) {
+              recovered.workspaceCatalogueItems[0] = recovered
+                  .workspaceCatalogueItems[0]
+                  .copyWith(stock: 7);
+            }
+            expect(recovered.applyWorkspaceFinance(finance), isTrue);
+            expect(
+              recovered.bindCustomerCollectionGateway(
+                accountScope: 'account-A',
+                storeId: 'store-A',
+                adapter:
+                    recoveryAdapter ??
+                    StoreReviewCustomerCollectionGateway(finance),
+                checkpointStore: SecureWorkLedgerCheckpointStore(
+                  accountScope: () => account.accountScope,
+                  storage: storage,
+                ),
+              ),
+              isTrue,
+            );
+            return recovered;
+          }
+
+          final recovered = reopen();
+          expect(await recovered.recoverCustomerLedger(), isTrue);
+          expect(
+            recovered.workspaceInvoices.single.toLedgerJson(),
+            invoice.toLedgerJson(),
+          );
+          expect(
+            recovered.workspaceOrders.single.toLedgerJson(),
+            work.workspaceOrders.single.toLedgerJson(),
+          );
+          expect(
+            recovered
+                .workspaceOrders
+                .single
+                .itemSnapshots
+                .single
+                .unitPricePaise,
+            27500,
+          );
+          expect(recovered.workspaceCatalogueItems.single.stock, stock);
+          final preservedJournal = SecureWorkLedgerCheckpointStore(
+            accountScope: () => account.accountScope,
+            storage: storage,
+          );
+          final savedBill = (await preservedJournal.read(
+            'account-A',
+            'store-A',
+          ))!;
+          await expectLater(
+            preservedJournal.save(
+              WorkspaceLedgerCheckpoint(
+                revision: savedBill.revision + 1,
+                finance: savedBill.finance,
+                inventory: savedBill.inventory,
+              ),
+              expectedRevision: savedBill.revision,
+            ),
+            throwsA(isA<WorkGatewayException>()),
+          );
+          await expectLater(
+            preservedJournal.save(
+              WorkspaceLedgerCheckpoint(
+                revision: savedBill.revision + 1,
+                finance: savedBill.finance,
+                inventory: savedBill.inventory,
+                billedInvoices: savedBill.billedInvoices,
+                billedOrders: {
+                  invoice.id: savedBill.billedOrders[invoice.id]!.copyWith(
+                    items: 'Changed bill',
+                  ),
+                },
+              ),
+              expectedRevision: savedBill.revision,
+            ),
+            throwsA(isA<WorkGatewayException>()),
+          );
+          expect(
+            (await preservedJournal.read('account-A', 'store-A'))!.toJson(),
+            savedBill.toJson(),
+          );
+          expect(recovered.workspaceStockMovements, hasLength(movementCount));
+          expect(recovered.workspaceFinance!.payments.single.dueMinor, 33000);
+          expect(await recovered.recoverCustomerLedger(), isTrue);
+          expect(recovered.workspaceCatalogueItems.single.stock, stock);
+          final conflict = reopen(conflictingStock: true);
+          expect(await conflict.recoverCustomerLedger(), isFalse);
+          expect(conflict.workspaceCatalogueItems.single.stock, 7);
+          expect(conflict.customerLedgerRecoveryError, isNotNull);
+          expect(
+            await work.recordCustomerReturn(
+              invoiceId: invoice.id,
+              lines: const [
+                WorkspaceCustomerReturnLine(
+                  productId: 'atta-5kg',
+                  quantity: 1,
+                  restockQuantity: 1,
+                ),
+              ],
+              reason: 'Stale preview',
+              expectedCreditMinor: 1,
+            ),
+            isFalse,
+          );
+          expect(work.pendingCustomerReturn, isNull);
+          expect(returnAdapter.submissions, 0);
+          storage.failWrite = returnFailure == 'save';
+          expect(
+            await work.recordCustomerReturn(
+              invoiceId: invoice.id,
+              lines: const [
+                WorkspaceCustomerReturnLine(
+                  productId: 'atta-5kg',
+                  quantity: 1,
+                  restockQuantity: 1,
+                ),
+              ],
+              reason: 'One unopened pack returned',
+            ),
+            returnFailure == 'none',
+          );
+          if (returnFailure.startsWith('save-response')) {
+            expect(work.pendingCustomerReturn, isNotNull);
+            expect(work.workspaceCatalogueItems.single.stock, stock);
+            expect(work.workspaceFinance!.payments.single.dueMinor, 33000);
+            if (returnFailure == 'save-response-relaunch') {
+              work = reopen(recoveryAdapter: returnAdapter);
+              expect(await work.recoverCustomerLedger(), isTrue);
+              expect(work.pendingCustomerReturn, isNull);
+            } else {
+              expect(await work.reconcileCustomerReturn(), isTrue);
+            }
+          }
+          if (returnFailure == 'save') {
+            expect(returnAdapter.submissions, 0);
+            expect(work.customerReturnSaved, isFalse);
+            expect(work.workspaceCatalogueItems.single.stock, stock);
+            expect(work.workspaceFinance!.payments.single.dueMinor, 33000);
+            final pendingId = work.pendingCustomerReturn!.request.operationId;
+            storage.failWrite = false;
+            expect(await work.reconcileCustomerReturn(), isTrue);
+            expect(returnAdapter.lastOperation, pendingId);
+          }
+          if (loseReturnResponse) {
+            final pendingId = work.pendingCustomerReturn!.request.operationId;
+            expect(work.workspaceCatalogueItems.single.stock, stock);
+            expect(work.workspaceFinance!.payments.single.dueMinor, 33000);
+            work = reopen(recoveryAdapter: returnAdapter);
+            expect(work.workspaceOrders, isEmpty);
+            expect(await work.recoverCustomerLedger(), isTrue);
+            expect(work.pendingCustomerReturn!.request.operationId, pendingId);
+            expect(work.pendingCustomerReturn!.originalItems, hasLength(1));
+            expect(work.customerReturnSaved, isTrue);
+            if (returnFailure == 'unknown') {
+              expect(await work.reconcileCustomerReturn(), isFalse);
+              expect(
+                work.pendingCustomerReturn!.request.operationId,
+                pendingId,
+              );
+              expect(work.workspaceCatalogueItems.single.stock, stock);
+              expect(work.workspaceFinance!.payments.single.dueMinor, 33000);
+              expect(returnAdapter.submissions, 1);
+              return;
+            }
+            expect(await work.reconcileCustomerReturn(), isTrue);
+            expect(returnAdapter.lastOperation, pendingId);
+          }
+          expect(returnAdapter.submissions, 1);
+
+          expect(work.workspaceFinance!.payments.single.dueMinor, 5500);
+          expect(work.workspaceFinance!.payments.single.paidMinor, 22000);
+          expect(work.workspaceCatalogueItems.single.stock, stock + 1);
+          expect(work.workspaceStockMovements, hasLength(movementCount + 1));
+          expect(work.pendingCustomerReturn, isNull);
+          final afterReturn = reopen();
+          expect(await afterReturn.recoverCustomerLedger(), isTrue);
+          expect(
+            afterReturn.workspaceInvoices.single.toLedgerJson(),
+            invoice.toLedgerJson(),
+          );
+          expect(
+            afterReturn.workspaceOrders.single.hasCompleteItemSnapshot,
+            isTrue,
+          );
+          expect(afterReturn.workspaceCatalogueItems.single.stock, stock + 1);
+          expect(afterReturn.workspaceFinance!.payments.single.dueMinor, 5500);
+          expect(
+            afterReturn.workspaceStockMovements,
+            hasLength(movementCount + 1),
+          );
+          if (returnFailure == 'none') {
+            expect(
+              await work.recordCustomerReturn(
+                invoiceId: invoice.id,
+                lines: const [
+                  WorkspaceCustomerReturnLine(
+                    productId: 'atta-5kg',
+                    quantity: 1,
+                    restockQuantity: 0,
+                  ),
+                ],
+                reason: 'Remaining pack returned damaged',
+              ),
+              isTrue,
+            );
+            expect(work.workspaceFinance!.payments.single.dueMinor, 0);
+            expect(
+              await work.recordCustomerRefund(
+                customerId: '9000000013',
+                invoiceId: invoice.id,
+                amountMinor: 22001,
+                channel: WorkspacePaymentChannel.cash,
+              ),
+              isFalse,
+            );
+            expect(returnAdapter.refundSubmissions, 0);
+            var confirmedRefunds = 0;
+            for (final failure in [
+              'none',
+              'save',
+              'pending-write-response',
+              'confirmation-write-response',
+              'confirmation-write-relaunch',
+              'response',
+              'unknown',
+            ]) {
+              returnAdapter.refundFailure = failure;
+              storage.failWrite = failure == 'save';
+              storage.loseWriteResponseOnce =
+                  failure == 'pending-write-response';
+              returnAdapter.afterRefundRecorded = () {
+                if (failure.startsWith('confirmation-write')) {
+                  storage.loseWriteResponseOnce = true;
+                }
+              };
+              final callsBefore = returnAdapter.refundSubmissions;
+              expect(
+                await work.recordCustomerRefund(
+                  customerId: '9000000013',
+                  invoiceId: invoice.id,
+                  amountMinor: 1000,
+                  channel: WorkspacePaymentChannel.cash,
+                ),
+                failure == 'none',
+              );
+              if (failure != 'none') {
+                final identity = work.pendingCustomerRefund!.identityData;
+                expect(work.customerRefundAvailable, isFalse);
+                expect(work.customerCollectionAvailable, isFalse);
+                expect(
+                  work.workspaceFinance!.payments.single.refundedMinor,
+                  confirmedRefunds,
+                );
+                if (failure == 'save' || failure == 'pending-write-response') {
+                  expect(work.customerRefundSaved, isFalse);
+                  expect(returnAdapter.refundSubmissions, callsBefore);
+                  storage.failWrite = false;
+                } else if (failure != 'confirmation-write-response') {
+                  work = reopen(recoveryAdapter: returnAdapter);
+                  expect(await work.recoverCustomerLedger(), isTrue);
+                  if (failure == 'confirmation-write-relaunch') {
+                    expect(work.pendingCustomerRefund, isNull);
+                    expect(
+                      work.workspaceFinance!.payments.single.refundedMinor,
+                      confirmedRefunds + 1000,
+                    );
+                  } else {
+                    expect(work.pendingCustomerRefund!.identityData, identity);
+                    expect(work.customerRefundSaved, isTrue);
+                  }
+                }
+                if (failure != 'confirmation-write-relaunch') {
+                  expect(
+                    await work.reconcileCustomerRefund(),
+                    failure != 'unknown',
+                  );
+                }
+                expect(returnAdapter.refundSubmissions, callsBefore + 1);
+                if (failure == 'unknown') {
+                  expect(work.pendingCustomerRefund!.identityData, identity);
+                  expect(
+                    work.workspaceFinance!.payments.single.refundedMinor,
+                    confirmedRefunds,
+                  );
+                  expect(await work.reconcileCustomerRefund(), isFalse);
+                  expect(returnAdapter.refundSubmissions, callsBefore + 1);
+                  break;
+                }
+              }
+              confirmedRefunds += 1000;
+              expect(work.pendingCustomerRefund, isNull);
+              expect(
+                work.workspaceFinance!.payments.single.refundedMinor,
+                confirmedRefunds,
+              );
+              expect(work.workspaceFinance!.payments.single.paidMinor, 22000);
+              expect(work.workspaceFinance!.availableMinor, 70000);
+              expect(work.workspaceCatalogueItems.single.stock, stock + 1);
+              expect(
+                work.workspaceStockMovements,
+                hasLength(movementCount + 1),
+              );
+            }
+          }
+        },
+      );
+    }
+
+    for (final applied in [true, false]) {
+      test(
+        'LEDGER01 interrupted counter invoice recovery applied=$applied',
+        () async {
+          final work = session();
+          await fill(work);
+          final finance = WorkspaceFinanceSnapshot(
+            accountScope: 'account-A',
+            workspaceId: 'store-A',
+            revision: 1,
+            asOf: DateTime.utc(2026, 9, 11),
+            salesTodayMinor: 0,
+            duesMinor: 0,
+            availableMinor: 70000,
+            heldMinor: 0,
+            requestedMinor: 0,
+            paidOutMinor: 0,
+            feesMinor: 0,
+            deliveryAdjustmentsMinor: 0,
+            refundsMinor: 0,
+            taxWithheldMinor: 0,
+            payments: const [],
+            payouts: const [],
+            historyComplete: true,
+          );
+          final adapter = _InterruptedInvoiceGateway(finance, applied: applied);
+          expect(work.applyWorkspaceFinance(finance), isTrue);
+          expect(
+            work.bindCustomerCollectionGateway(
+              accountScope: 'account-A',
+              storeId: 'store-A',
+              adapter: adapter,
+              checkpointStore: SecureWorkLedgerCheckpointStore(
+                accountScope: () => account.accountScope,
+                storage: storage,
+              ),
+            ),
+            isTrue,
+          );
+          expect(await work.submitWorkspaceCounterBill(), isNull);
+          final invoice = work.workspaceInvoices.single;
+          final stock = work.workspaceCatalogueItems.single.stock;
+          final movements = work.workspaceStockMovements.length;
+          expect(work.counterDraftEditingBlocked, isTrue);
+          expect(await work.retryWorkspaceCounterDraft(), applied);
+          expect(adapter.submissions, 1);
+          expect(adapter.reconciliations, 1);
+          expect(work.workspaceInvoices.single.id, invoice.id);
+          expect(work.workspaceCatalogueItems.single.stock, stock);
+          expect(work.workspaceStockMovements, hasLength(movements));
+          expect(work.workspaceFinance!.salesTodayMinor, applied ? 55000 : 0);
+          expect(work.counterDraftEditingBlocked, !applied);
+          final saved = await journal.read('account-A', 'store-A');
+          expect(
+            saved!.stage,
+            applied
+                ? WorkspaceCounterDraftStage.retired
+                : WorkspaceCounterDraftStage.submitting,
+          );
+        },
+      );
     }
 
     test('restores exact bill in a new session without sale effects', () async {
@@ -4924,9 +7341,13 @@ void main() {
     String? customer,
     WorkspacePaymentState? state,
   }) {
+    // ORDER-012 is the paid-to-Store row asserted by the isolation journey.
     final status =
         state ??
-        WorkspacePaymentState.values[i % WorkspacePaymentState.values.length];
+        (i == 12
+            ? WorkspacePaymentState.paid
+            : WorkspacePaymentState.values[i %
+                  WorkspacePaymentState.values.length]);
     final paid =
         {
           WorkspacePaymentState.paid,
@@ -4946,7 +7367,9 @@ void main() {
       updatedAt: financeTime,
       amountMinor: 27500,
       paidMinor: paid,
-      dueMinor: 27500 - paid,
+      dueMinor: status == WorkspacePaymentState.returnAdjusted
+          ? 0
+          : 27500 - paid,
       refundedMinor: status == WorkspacePaymentState.refunded ? paid : 0,
       state: status,
       channel: WorkspacePaymentChannel
@@ -4975,6 +7398,7 @@ void main() {
     String store = 'store-A',
     List<WorkspacePaymentRecord>? payments,
     List<WorkspacePayoutRecord>? payouts,
+    List<WorkspaceCustomerLedger> customerLedgers = const [],
     int available = 1000000000050,
   }) => WorkspaceFinanceSnapshot(
     accountScope: account,
@@ -4993,6 +7417,104 @@ void main() {
     taxWithheldMinor: 200,
     payments: payments ?? [for (var i = 0; i < 25; i++) paymentFact(i)],
     payouts: payouts ?? [payoutFact()],
+    customerLedgers: customerLedgers,
+  );
+
+  test(
+    'LEDGER01 checkpoint retains existing payment payout and signed adjustment fields',
+    () {
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: 1,
+        finance: financeFact(1),
+      );
+      final recovered = WorkspaceLedgerCheckpoint.fromJson(
+        jsonDecode(jsonEncode(checkpoint.toJson())),
+      )!;
+      expect(recovered.toJson(), checkpoint.toJson());
+      expect(recovered.finance.payments, hasLength(25));
+      expect(
+        recovered.finance.payouts.single.revisionData,
+        checkpoint.finance.payouts.single.revisionData,
+      );
+      expect(recovered.finance.deliveryAdjustmentsMinor, -525);
+      expect(recovered.finance.availableMinor, 1000000000050);
+    },
+  );
+
+  test(
+    'LEDGER01 session rejects history rewrites and Store/account leakage',
+    () {
+      final session = WorkSession(
+        gateway: ReviewWorkGateway(),
+        pendingProofStore: _CommandAccountStore(),
+      )..activeWorkspace = _commandStore;
+      addTearDown(session.dispose);
+      WorkspaceCustomerLedger statement({
+        int revision = 1,
+        int amount = 100000,
+        String account = 'account-A',
+        String store = 'store-A',
+      }) => WorkspaceCustomerLedger(
+        accountScope: account,
+        workspaceId: store,
+        customerId: 'customer-1',
+        customerName: 'Test customer',
+        revision: revision,
+        asOf: financeTime,
+        openingBalanceMinor: 0,
+        historyComplete: true,
+        entries: [
+          WorkspaceCustomerLedgerEntry(
+            id: 'entry-1',
+            operationId: 'sale-1',
+            invoiceId: 'invoice-1',
+            orderId: 'order-1',
+            sequence: 1,
+            occurredAt: financeTime,
+            kind: WorkspaceLedgerEntryKind.invoice,
+            state: WorkspaceLedgerPostingState.posted,
+            amountMinor: amount,
+          ),
+        ],
+      );
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(1, customerLedgers: [statement()]),
+        ),
+        isTrue,
+      );
+      for (final rejected in [
+        statement(revision: 2, amount: 90000),
+        statement(account: 'other-account'),
+        statement(store: 'other-store'),
+      ]) {
+        expect(
+          session.applyWorkspaceFinance(
+            financeFact(2, customerLedgers: [rejected]),
+          ),
+          isFalse,
+        );
+        expect(session.workspaceFinance!.revision, 1);
+      }
+      expect(session.applyWorkspaceFinance(financeFact(2)), isTrue);
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(
+            3,
+            customerLedgers: [statement(revision: 3, amount: 90000)],
+          ),
+        ),
+        isFalse,
+      );
+      expect(
+        session.applyWorkspaceFinance(
+          financeFact(3, customerLedgers: [statement(revision: 2)]),
+        ),
+        isTrue,
+      );
+      expect(session.workspaceStockMovements, isEmpty);
+      expect(session.workspaceInvoices, isEmpty);
+    },
   );
 
   test(
@@ -5959,6 +8481,54 @@ void main() {
     expect(session.workspaceSettlementReference, startsWith('SET-'));
   });
 
+  for (final payment in ['Cash', 'UPI', 'Paid online', 'Customer due']) {
+    for (final readyStage in ['Ready for pickup', 'Ready']) {
+      test(
+        'LEDGER01 pickup completion does not create settlement funds or duplicate a sale: $payment $readyStage',
+        () async {
+          final session = liveSession()..workspaceSettlementBalance = 700;
+          session.addOrUpdateWorkspaceProduct(_product(stock: 10));
+          session.prepareWorkspaceOrder(source: 'App', fulfilment: 'Pickup');
+          session.adjustWorkspaceOrderQuantity('atta-5kg', 1);
+          session.saveWorkspaceOrderDraft(
+            customer: '9829012321',
+            source: 'App',
+            fulfilment: 'Pickup',
+            payment: payment,
+            address: '',
+          );
+          session.advanceWorkspaceOrder();
+          for (final line in session.workspacePackingLines) {
+            session.setWorkspacePackingLine(line.id, true);
+          }
+          session.advanceWorkspaceOrder();
+          if (readyStage == 'Ready') {
+            final index = session.workspaceOrders.indexWhere(
+              (o) => o.id == session.currentWorkspaceOrderId,
+            );
+            session.workspaceOrders[index] = session.workspaceOrders[index]
+                .copyWith(stage: readyStage);
+            session.workspaceOrderStage = readyStage;
+          }
+          session.advanceWorkspaceOrder();
+          final invoice = session.latestWorkspaceInvoice!;
+          final sales = session.workspaceSalesToday;
+          final stock = session.workspaceCatalogueItems.single.stock;
+          final movementCount = session.workspaceStockMovements.length;
+          expect(session.workspaceSettlementBalance, 700);
+          // A repeated generic handover reply reaches the same completion handler.
+          expect(await session.verifyWorkspaceHandover('123456'), isTrue);
+          expect(session.latestWorkspaceInvoice, same(invoice));
+          expect(session.workspaceInvoices, hasLength(1));
+          expect(session.workspaceSalesToday, sales);
+          expect(session.workspaceSettlementBalance, 700);
+          expect(session.workspaceCatalogueItems.single.stock, stock);
+          expect(session.workspaceStockMovements, hasLength(movementCount));
+        },
+      );
+    }
+  }
+
   test('pickup never requests delivery and creates an invoice at handover', () {
     final session = liveSession();
     session.addOrUpdateWorkspaceProduct(_product(stock: 10));
@@ -6181,6 +8751,7 @@ void main() {
     );
     save();
     final first = session.completeWorkspaceCounterSale()!;
+    expect(first.id, 'INV-${first.orderId}');
     final movementCount = session.workspaceStockMovements.length;
     save();
     expect(session.completeWorkspaceCounterSale(), same(first));
@@ -7141,3 +9712,89 @@ WorkspaceCatalogueItem _product({
   returnPolicy: 'Return accepted for a damaged sealed pack.',
   publicListing: true,
 );
+
+class _InterruptedInvoiceGateway extends StoreReviewCustomerCollectionGateway {
+  _InterruptedInvoiceGateway(super.finance, {required this.applied});
+  final bool applied;
+  int submissions = 0;
+  int reconciliations = 0;
+  @override
+  Future<WorkspaceFinanceSnapshot> recordInvoice({
+    required String accountScope,
+    required String storeId,
+    required WorkspaceCustomerInvoice invoice,
+  }) async {
+    submissions++;
+    if (applied) {
+      await super.recordInvoice(
+        accountScope: accountScope,
+        storeId: storeId,
+        invoice: invoice,
+      );
+    }
+    throw TimeoutException('Invoice response interrupted');
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> reconcileInvoice({
+    required String accountScope,
+    required String storeId,
+    required WorkspaceCustomerInvoice invoice,
+  }) {
+    reconciliations++;
+    return super.reconcileInvoice(
+      accountScope: accountScope,
+      storeId: storeId,
+      invoice: invoice,
+    );
+  }
+}
+
+class _InterruptedReturnGateway extends StoreReviewCustomerCollectionGateway {
+  _InterruptedReturnGateway(
+    super.finance, {
+    required this.loseResponse,
+    required this.applyReturn,
+  });
+  final bool applyReturn;
+  final bool loseResponse;
+  int submissions = 0;
+  String? lastOperation;
+  String refundFailure = 'none';
+  void Function()? afterRefundRecorded;
+  void Function()? afterReturnRecorded;
+  int refundSubmissions = 0;
+  @override
+  Future<WorkspaceFinanceSnapshot> recordRefund(
+    WorkspaceCustomerRefund request,
+  ) async {
+    refundSubmissions++;
+    if (refundFailure == 'unknown') {
+      throw TimeoutException('Refund status unknown');
+    }
+    final reply = await super.recordRefund(request);
+    afterRefundRecorded?.call();
+    if (refundFailure == 'response') {
+      throw TimeoutException('Refund response lost after posting');
+    }
+    return reply;
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> recordReturn(
+    WorkspaceCustomerReturn request,
+    WorkspaceOrderRecord originalOrder,
+  ) async {
+    submissions++;
+    lastOperation = request.operationId;
+    if (!applyReturn) {
+      throw TimeoutException('Return not confirmed by service');
+    }
+    final reply = await super.recordReturn(request, originalOrder);
+    afterReturnRecorded?.call();
+    if (loseResponse) {
+      throw TimeoutException('Return response interrupted after posting');
+    }
+    return reply;
+  }
+}

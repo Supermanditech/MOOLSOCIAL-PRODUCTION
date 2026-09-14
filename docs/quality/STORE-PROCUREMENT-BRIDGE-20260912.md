@@ -741,3 +741,614 @@ completed both supplier/search cases without review defines. The actual changed
 build-gate/selftest blocks passed 21 rejection cases and two positive controls,
 recorded with source hashes in `permanent-gates-control-results.json`. No full
 APK build or device run is claimed for this test-only prevention update.
+
+## Active frontend MVP: Store Ledger 01-03
+
+Founder approved the three bounded frontend tickets on 2026-09-14. Start from
+source c39c70416969e2057c14ad74baee008d90e723fb; installed OPPO V19 remains
+unchanged. No new backend, database, live money/message, credit scoring, tax
+filing, valuation, payroll or multi-branch scope is authorized.
+
+1. STORE-LEDGER-01: connect app/counter sales, customer dues, allocated
+   collections, returns/refunds and existing linked stock movements to current
+   statements. Stable identities, amount calculations and account/Store scoping
+   are shared requirements. Partial sale1000/paid600/due400 and later collection400
+   must clear dues without another sale or stock reduction.
+2. STORE-LEDGER-02: connect existing Wholesale/Bulk purchase orders, supplier
+   bills, advances, approved terms, balances, partial receipts, returns and stock.
+   Order, bill, payment and receipt stay separate. Bill2000/advance500 leaves1500
+   outstanding; receiving goods cannot post another bill or payment.
+3. STORE-LEDGER-03: reuse View statement, Collect dues and Settle for money
+   registers, basic existing expenses, opening/closing balances and settlement
+   reconciliation. A settlement request cannot increase bank balance; a confirmed
+   receipt cannot create another sale. Finish cross-journey frontend qualification.
+
+Each ticket requires suitable local tests and actual Flutter captures, followed
+by OPPO technical checks and founder screen-by-screen visual acceptance. OPPO is
+not needed for initial implementation. Preserve the existing labelled test Store.
+Missing backend authority must remain explicit and unavailable actions fail safely.
+
+Current work: LEDGER01 customer transaction history is connected to existing
+finance snapshots and the Collect dues/customer payments view. Refreshes retain
+known entries and posted amounts; pending entries can resolve, while replay,
+opening-balance changes and cross-customer invoice reassignment are rejected.
+Customer statement tiles expand in place and are built lazily. The existing test
+Store seed adds three synthetic histories matching its existing invoice/payment
+identities and totals; its Store identity, orders and cart are not replaced.
+
+Evidence lives in the task outputs/store-ledger-mvp directory. The r2 widget run
+passed both normal and 320x568/200% cases; six actual Flutter images are under
+MOOLSOCIAL-POST-UI-AUDIT-20260905/store-ledger-mvp-20260914-r2. Normal statement and
+compact final-balance captures were inspected. These are local test fixtures,
+not founder visual acceptance or OPPO qualification. Initial bad capture-path
+invocation and two analyzer warnings were retained with corrected successors.
+
+Collection recording now targets one existing customer invoice, requires a valid
+positive amount within its dues, and supports cash/UPI receipt recording. The
+existing labelled review seed binds a synthetic collection adapter; no production
+adapter or endpoint is supplied. A confirmed response must match the operation,
+customer, invoice, amount, method/reference and payment balance changes. Unknown
+responses retain the operation for reconciliation and block a second submission.
+The in-place sheet and invoice update passed four LEDGER01 widget cases across
+normal/compact layouts before the final method/reference display addition. New
+r3 captures were inspected; they remain local review evidence, not device proof.
+Source tests cover overpayment, identity retargeting, repeat requests and a lost
+reply after the synthetic adapter applied the collection. Original analyzer lint
+failures and corrected logs remain under outputs/store-ledger-mvp.
+
+Earlier intermediate limitation: collection operations/history initially lived
+only in session memory. The session connection below supersedes that limitation,
+but Android process-relaunch/device qualification and production storage/privacy
+qualification remain open. Do not install this intermediate change on OPPO or
+use whole-Store overwrites to persist ledger work.
+
+Recovery component added: WorkspaceLedgerCheckpoint serializes the complete
+finance projection and optional pending receipt with a versioned, strict decoder.
+SecureWorkLedgerCheckpointStore uses the existing FlutterSecureStorage mechanism,
+per-account/Store keys, serialized native writes, revision comparison and exact
+retry acceptance. It retains corrupt bytes and rejects stale writes, pending
+identity replacement or unconfirmed removal. Tests recreate the store over the
+same storage fake and cover a held concurrent write and account change; this is
+host evidence, not Android encryption or process-relaunch qualification. The
+component was tested independently before the WorkSession connection below.
+Evidence: ledger-checkpoint-suite.jsonl and ledger-checkpoint-final-analysis.log
+under outputs/store-ledger-mvp. The added complete-fields run found that local
+DateTime and its equivalent UTC value produced unequal revision records after
+serialization. That failure remains in ledger-checkpoint-complete-fields.jsonl;
+analysis did not run after that failure. Payment/payout/ledger entry identity
+comparisons now normalize timestamps, and ledger snapshot equality compares the
+same instant. Successor evidence uses ledger-checkpoint-timezone-suite.jsonl and
+ledger-checkpoint-timezone-analysis.log.
+
+Session recovery connection: a scoped checkpoint is saved before submission;
+the exact confirmed projection is saved before success is shown. Failed saves
+prevent submission, retain the operation, and retry that same identity. Restart
+restores completed history or the pending identity; an unknown authority reply
+does not resubmit. Only an untouched labelled review seed may be replaced by its
+matching saved projection; this preserves orders/cart and avoids regenerating
+balances from new fixture timestamps. Production cached projections remain stale
+until refreshed by their authority. Recovery errors disable collection recording
+and expose Retry ledger recovery. Scope checks follow asynchronous reads/writes.
+
+Host tests recreate WorkSession and the journal, exercise completed and pending
+recovery, reject duplicate recording after restart, keep unknown operations
+pending, and prove failed storage prevents adapter submission. This is not an
+Android process restart or a backend idempotency claim. Evidence:
+ledger-session-restart-tests.jsonl, ledger-session-restart-analysis.log, and the
+broader ledger-session-recovery-suite/layout/analysis successor logs. Initial
+seven brace-style analyzer findings remain in their original logs; code was
+corrected without suppressing checks. No checker or owner changes were made.
+
+Still open in ticket01: app/counter sale wiring, return/refund controls, persisted history/relaunch,
+all relevant stock links, full journey checks, OPPO and founder acceptance.
+Tickets02/03 remain unimplemented. No APK, installation, live money operation,
+backend implementation, checker/ownership changes or Cursor work occurred.
+
+Customer-book reconciliation: grouping uses linked finance customer identities
+when available; due displays/filtering use the confirmed ledger balance in paise.
+An incomplete customer history is unavailable, not a zero balance. The historical
+order payment label cannot restore a debt after a confirmed collection. The
+existing customer card and sheet retain their layout; legacy review paths keep
+their existing amount units. New invoice IDs derive from the source order ID
+instead of millisecond creation time; existing invoices are returned unchanged.
+
+Evidence: ledger-customer-book-suite.jsonl and ledger-customer-book-analysis.log;
+the six LEDGER01 layout cases in ledger-customer-book-layout.jsonl; and eight
+existing customer cases in ledger-existing-customer-layout.jsonl. Two existing
+optional captures were skipped (Store Live v1 Customer Book and founder Customers)
+and are not counted as passes or device evidence. Current local paise/identity
+captures use the r6 folder, following the r5 full-layout run. This does not finish
+the app/counter posting connection or return/refund workflow.
+
+Counter posting connection: the existing counter submission now requires its
+invoice-capable adapter when a finance projection is present, then records the
+same invoice before retiring the saved counter draft. The labelled review
+adapter adds one invoice/payment/customer-ledger projection and leaves settlement
+funds unchanged. Selecting Cash or UPI does not itself create a receipt; the
+existing Record collection confirmation records money separately. Replaying the
+same invoice preserves its order/customer/amount and does not add another sale.
+The checkpoint is saved before projection success. Missing invoice capability or
+an unresolved collection keeps the bill instead of proceeding without a ledger.
+No production invoice endpoint or backend implementation was added.
+
+Confirmed completion defects corrected: generic order completion formerly added
+the order value to platform settlement and could increment sales again after a
+repeated completion reply. It now preserves the separately supplied settlement
+balance and returns an existing order invoice without repeating business effects.
+New tests cover Cash, UPI, Paid online and Customer due. Initial tests mistakenly
+used the already-blocked completed-pickup entry point and double-disposed the
+helper session; both harness errors are preserved in ledger-completion-tests.jsonl.
+The successor exercises the common completion handler through handover.
+
+Evidence: ledger-completion-confirmation-tests.jsonl and
+ledger-counter-posting-verified.jsonl/verified-analysis.log, followed by the
+broader ledger-counter-posting-suite and existing pickup/counter layout logs.
+The compiler's invoice-capability narrowing issue and initial analyzer findings
+remain preserved; an explicit cast follows the checked capability guard.
+The connected host journey creates a 55000-paise bill, collects 22000 paise,
+leaves 33000 paise due and verifies one invoice with unchanged stock effects and
+settlement funds. Interrupted invoice-posting recovery, further app sale paths,
+return/refund controls, actual Flutter sale-journey captures, OPPO and founder
+acceptance remain open. This intermediate source is not an APK qualification.
+
+
+Ledger Ticket 01 continuation: interrupted counter invoice responses now use
+read-only reconcileInvoice through the existing saved-bill Retry action. The
+original submitting draft stays locked; only a matching confirmed invoice and
+persisted ledger checkpoint allow retirement. Unknown status does not submit
+again. Tests cover both applied-but-response-lost and unconfirmed submission,
+with one invoice, unchanged stock movements and exactly one dispatch. This
+recovers the current session's retained invoice; reconstructing an invoice after
+process loss still requires verified order/invoice recovery and is not claimed.
+
+Invoice-local balance calculation now derives billed, credited, collected,
+refunded, due and refundable amounts from complete posted history. Return credit
+reduces dues first; only excess confirmed collections become refundable. It
+rejects over-credit, over-refund, over-collection, missing invoice and inconsistent
+order links, and ignores pending/failed financial effects. The review collection
+adapter checks this remaining invoice balance before accepting a collection.
+Return entry controls and linked physical stock disposition are still pending;
+this calculation alone is not the completed returns journey.
+
+Evidence: ledger-invoice-balance-suite.jsonl: 297 actual tests passed, zero skips,
+zero failures (atomic operations plus vertical slice). Final analysis:
+ledger-invoice-balance-verified-analysis.log, no issues. The preceding analysis
+logs retain the missing-brace findings; braces were corrected without suppressions
+or assertion changes. No APK/device changes, commits, pushes or ticket acceptance.
+
+
+Ticket 01 return calculation continuation: WorkspaceCustomerReturn carries the
+account/Store/customer/invoice/order/operation identity and original-item return
+quantities, with sellable restock quantities separate from goods accepted back.
+Credit is allocated from the original completed order's billed line totals,
+including discount and cumulative paise rounding; current catalogue prices are
+not used. Duplicate return IDs, over-return, missing/inconsistent price snapshots,
+unfinished orders and mismatched prior-return scope are rejected. No return UI,
+posting gateway or persistence is claimed by this calculation-only increment.
+Three focused tests pass in ledger-return-allocation-tests.jsonl, including
+333+333+334 paise for three partial returns of a 1000-paise billed line. The
+initial missing-brace style finding is preserved in the analysis log; final
+analysis is recorded separately. OPPO, baseline and device data remain unchanged.
+
+
+Ticket 01 saved return detail: credit-note entries may now carry their scoped
+WorkspaceCustomerReturn payload. Its original order/invoice/operation, quantities,
+sellable restock quantities and reason survive the existing ledger checkpoint
+codec. The payload is part of immutable entry identity; a subsequent revision
+cannot replace it. Invalid scope or malformed quantities reject recovery rather
+than silently dropping the return data. Older entries without return payloads
+remain readable; their missing physical-return evidence is not invented.
+
+Evidence: ledger-return-checkpoint-verified-suite.jsonl completed with 300 passes
+and one new-test failure (expected StateError instead of WorkGatewayException;
+its altered checkpoint also needed a successor revision). The test was corrected
+to use valid sequential saves and assert the exact history-protection reason.
+ledger-return-checkpoint-final-test.jsonl passes and final-analysis.log has no
+issues. The earlier failing logs remain preserved. Native storage is replaced by
+the existing test storage fixture in this host test: no device relaunch proof.
+Return submission/reconciliation, stock posting and user controls remain pending.
+
+
+Ticket 01 return adapter: WorkCustomerReturnGateway now separates recordReturn
+from read-only reconcileReturn. The existing labelled review adapter validates
+the scoped original invoice/order/customer and complete return history, records
+one immutable credit note and updates invoice/customer dues. Replays reconcile
+the exact saved payload, including after restoring a confirmed checkpoint. Gross
+sales, actual collections/refunds and settlement totals are preserved. Excess
+customer credit is Refund pending, not a completed refund. A fully adjusted bill
+uses Adjusted for return; subsequent collection of the reduced balance no longer
+requires payment of the original gross invoice amount.
+
+Evidence: ledger-return-posting-final-suite.jsonl has 304 actual passes, zero
+skips/failures; ledger-return-posting-clean-analysis.log has no issues. Tests cover
+unpaid, partially paid and fully paid returns, replay, payload alteration, restored
+adapter reconciliation, and collection after return credit. Earlier failures are
+preserved: enum-cycling fixtures needed zero due for the new adjusted state and an
+explicit paid ORDER-012 to retain the original Paid-to-Store isolation assertion.
+No required assertion was removed. Initial missing-brace analysis is preserved.
+Pending-operation persistence, session stock posting, return/refund controls and
+device/founder evidence remain open. The adapter is synthetic, not live authority.
+
+
+Ticket 01 pending return checkpoint: the existing ledger journal now accepts a
+scoped pending return request plus its verified credit amount, mutually exclusive
+with a pending collection. Its scope, invoice, ledger revision and remaining
+credit capacity are validated. Pending return identity cannot be replaced or
+cleared without the matching posted credit note and original invoice paid/refunded
+amounts with the expected due reduction. This prepares interrupted-return recovery;
+the session does not yet dispatch this action or post stock.
+Evidence: ledger-pending-return-tests.jsonl passes all three unpaid/part-paid/paid
+cases with journal reopen, premature clearing/replacement rejection and confirmed
+clearing. ledger-pending-return-clean-analysis.log: no issues. The initial two
+missing-brace style findings remain in ledger-pending-return-analysis.log and were
+fixed without rule changes. This host journal test is not OPPO relaunch evidence.
+
+
+Ticket 01 session return recovery: saved pending returns now restore into the
+Store session. They disable collection availability, prevent conflicting invoice
+posting/counter-bill submission and prevent replacing the bound adapter. Invoice
+posting also rechecks pending operations after asynchronous ledger recovery. The
+existing money surface displays a saved-return-awaiting-confirmation notice.
+No return submission button is exposed yet; confirmed stock posting/recovery is
+still being connected before enabling that action.
+Evidence: ledger-return-session-tests.jsonl (all selected LEDGER01 tests pass),
+ledger-return-session-analysis.log (no issues). The new session recovery case
+verifies the original intent is retained, collection and adapter replacement are
+blocked, and no invoice, stock movement or extra journal write is produced. These
+are host tests; no actual device restart, new visual approval or APK qualification.
+
+
+Ticket 01 stock link continuation: confirmed return credit entries derive stable,
+order-linked WorkspaceStockMovement records from their saved operation/SKU IDs,
+original purchased labels and sellable restock quantities. Damaged/non-restock
+units do not create positive stock events. Missing original line evidence rejects
+projection. Three return scenarios in ledger-return-stock-links-tests.jsonl pass,
+including identical stock-event identity after checkpoint recovery; analysis has
+no issues in ledger-return-stock-links-analysis.log.
+
+Source inspection confirms the remaining recovery boundary: loadStoreReviewSeed
+regenerates catalogue quantities, while _persistOperationalState deliberately
+avoids whole-Store writes when per-order operations are bound. Consequently these
+return events are not automatically replayed into regenerated counts. A durable
+inventory projection/acknowledgement is still required before enabling return
+confirmation. No stock count was fabricated, no legacy write guard bypassed and
+no backend or device change occurred.
+
+
+Ticket 01 inventory checkpoint: WorkspaceInventoryLedger stores scoped opening
+quantities and immutable acknowledged stock movements. It computes bounded
+nonnegative counts, rejects changed movement-ID replays and permits exact replays
+without adding stock. It serializes inside the existing ledger checkpoint; saved
+inventory cannot be discarded or have known movements/opening counts replaced.
+Session recovery retains this record and financial checkpoint writes preserve it.
+The live catalogue is not yet overwritten from this record: capture/application
+and all subsequent stock changes still need the same recovery path before return
+confirmation is enabled.
+Evidence: ledger-inventory-checkpoint-tests.jsonl selected LEDGER01 tests pass;
+ledger-inventory-checkpoint-clean-analysis.log has no issues. New host coverage
+saves 8 opening units, a sale of 2 and return of 1, reopens at 7, replays the same
+return at 7, and rejects changed IDs, overselling and discarded stock records.
+Initial four missing-brace findings are retained in the earlier analysis log.
+No APK, device, backend, ownership/checker or baseline change was made.
+
+
+Ticket 01 counter stock recovery connection: invoice posting captures current
+exact-quantity catalogue counts and their recorded movements into the ledger
+checkpoint. Known inventory appends only new immutable movements and must agree
+with live counts. Review-ledger recovery restores saved quantities only for a
+matching catalogue (saved opening/current quantity match and no conflicting
+movement identity). Missing/conflicting products retain their current state and
+fail recovery. Restoring stock does not enable an unavailable product or publish
+its listing. Stored events are merged once by stable ID.
+Evidence: ledger-stock-session-tests.jsonl selected LEDGER01 tests pass. The
+connected counter bill/collection test now reopens a new session with original
+catalogue stock, restores reduced stock and 33000 paise due, repeats recovery
+without another deduction, and preserves a conflicting quantity of 7 with a
+recovery error. ledger-stock-session-clean-analysis.log: no issues. Initial brace
+style findings are preserved. Counter order/invoice reconstruction, all subsequent
+stock-update persistence and the complete return submission/UI remain unfinished.
+No device test, APK or baseline qualification is claimed.
+
+
+Ticket 01 return session action: recordCustomerReturn now validates the original
+bill, saves the pending intent with inventory, dispatches once, checks the matched
+credit response and saves finance plus acknowledged return stock movements before
+updating session state. reconcileCustomerReturn uses the existing return ID and
+read-only status when dispatch may have occurred. The original order must still
+be recoverable; lost-response/process-loss scenarios need further tests and work.
+No user-facing confirmation button is enabled at this checkpoint.
+
+The connected test found a real missing source fact: counter orders did not retain
+purchased item snapshots. Both counter creation paths now freeze SKU/name/pack,
+quantity and original unit/line prices. This allows return valuation without using
+current catalogue prices. The original test failure remains in tool evidence;
+the corrected journey passes sale 55000, collection 22000, return credit 27500,
+remaining due 5500 paise, one sellable pack restored, and session reopen preserving
+both dues and stock. ledger-return-action-suite.jsonl: 306 passes, zero skips or
+failures. ledger-return-action-clean-analysis.log: no issues. Original 11 brace
+style findings are retained. Return loss/retry tests, original-order recovery,
+subsequent stock persistence, refund confirmation and UI/device review remain open.
+
+
+Ticket 01 interrupted return recovery: pending returns now preserve immutable
+original item snapshots. Reconciliation may use those saved item details after
+session recreation without inventing or resubmitting an order. A missing original
+order still blocks an undispatched retry, and older pending records without item
+evidence cannot manufacture stock details. Stable stock movements derive from the
+matched posted credit and saved originals.
+Evidence: ledger-return-interrupted-session-tests.jsonl selected LEDGER01 tests
+pass; ledger-return-interrupted-session-analysis.log has no issues. The counter
+journey runs both normal and applied-but-response-lost cases. The lost case
+retains 33000 paise due and unchanged stock until a new session recovers the same
+pending ID, reconciles through the retained test adapter, and reaches 5500 due
+with one returned pack. The adapter recorded exactly one submission. The new
+session has no order rows loaded. This is simulated process-loss evidence with
+fixture storage/adapter, not a real native process kill or production service.
+Return UI, unknown-authority/write-failure cases, refund confirmation, general
+invoice history recovery and remaining stock-update persistence remain unfinished.
+
+
+Ticket 01 return failure boundaries: the connected journey now covers normal,
+applied-but-response-lost, service-unconfirmed and initial-save-failed outcomes.
+Unknown authority keeps the original pending ID and unchanged stock/dues with one
+submission. A failed native fixture write sends no return request; retry uses the
+same ID after saving succeeds. Session/UI text now distinguishes confirmed saved
+intent from an unsaved in-memory return instead of falsely claiming it is saved.
+
+The checkpoint store additionally requires expected return stock events to be
+acknowledged alongside the credit before clearing a pending return with original
+item evidence. A credit-only save is rejected; the combined inventory/credit save
+succeeds for unpaid, partially paid and fully paid invoices. Evidence:
+ledger-return-failure-tests.jsonl/failure-analysis.log and
+ledger-return-atomic-stock-tests.jsonl/atomic-stock-analysis.log pass, analysis
+reports no issues. No assertion/exclusion or owner/checker change was used.
+Return UI, completed-write uncertainty, refund confirmation and remaining general
+order/inventory recovery remain open; no device/production qualification yet.
+
+
+Ticket 01 return UI: the existing invoice view now opens a Flutter return sheet
+for a completed bill with purchased item evidence. It selects one billed SKU per
+confirmation, records returned/sellable quantities and reason, previews the credit,
+and uses the rendered credit/revision for confirmation. Conflicting or unavailable
+invoices are rejected before dispatch. Pending returns offer status/retry actions
+with saved-versus-unsaved wording. This remains local work pending full ticket and
+device qualification; unsent sheet draft recovery and multi-item usability still
+need review before ticket acceptance.
+
+Evidence: ledger-return-ui-captures.jsonl and ledger-return-ui-verified-captures.jsonl
+pass both 412x915/100% and 320x568/200% journeys through confirmed dues/stock changes.
+Actual Flutter PNGs are preserved in store-ledger-mvp-20260914-r7 and r8 under the
+POST-UI audit directory. Inspection found r7 truncating the selected item at 200%;
+r8 separates the selector from a wrapping original name/pack and omits it for a
+single-item bill. Inspected r8 normal form and compact top are readable. The final
+rendered-preview confirmation change does not alter pixels; its four counter
+scenarios (including stale credit rejection without dispatch) pass in
+ledger-return-preview-guard-tests.jsonl. Corresponding analysis logs report no
+issues. No OPPO/native keyboard test or founder visual acceptance is claimed.
+
+
+Ticket 01 refund adapter: WorkspaceCustomerRefund is a distinct typed request,
+validated for exact account/Store/customer/invoice/order, positive minor-unit
+amount and supported method/reference. The labelled review adapter records a
+refund only within the confirmed invoice credit, preserving original collections,
+stock credit entries and settlement/sales totals. Partial refunds leave Refund
+pending; completing the refundable balance adjusts the payment status. Platform
+payments require original provider authority and are unavailable in this manual
+review path. No live payment is sent.
+
+Refund entries persist the exact request identity in the existing checkpoint.
+Reconciliation after restore rejects changed expected revision or request data.
+Evidence: ledger-refund-adapter-tests.jsonl selected LEDGER01 tests pass;
+ledger-refund-adapter-analysis.log has no issues. Cases cover excessive refund
+rejection, partial and remaining refunds, idempotent replay, preserved stock/credit
+entries and totals, restored reconciliation and further-refund rejection after
+credit is exhausted. Pending-refund persistence, session confirmation/UI and
+interrupted write/response cases remain to be implemented before enabling this
+journey to users. Ticket 01 remains unaccepted; OPPO and baseline are unchanged.
+
+Ticket 01 pending-refund checkpoint: the existing secure journal now retains a
+distinct pending refund, mutually exclusive with collections and returns. Its
+saved identity cannot be replaced or cleared without the matching posted refund
+and exact invoice balance change. Confirmation cannot change the stock journal.
+Session recovery retains this pending request and blocks competing postings;
+refund submission/reconciliation and UI connections are still incomplete.
+
+Evidence: ledger-refund-journal-tests.jsonl passes the focused return/refund cases.
+ledger-refund-journal-identity-tests.jsonl passes the selected LEDGER01 tests,
+including reopened pending identity, premature clearing/replacement rejection,
+changed refund amount rejection, unrelated stock movement rejection, and correct
+confirmation. Rejected writes preserve revision, pending identity, refund balance
+and stock. ledger-refund-journal-identity-analysis.log reports no issues.
+These are host tests with synthetic data, not device or payment authority proof.
+No source commit, APK update, device action or ticket acceptance occurred.
+
+Ticket 01 refund session: recordCustomerRefund saves the original scoped request
+before gateway submission and applies confirmed finance only after saving the
+matching result. Excess refunds and manual refunds of platform payments are
+unavailable. Pending refunds block competing financial postings. Recovery uses
+the original identity and read-only status reconciliation after any possible
+submission; an unsaved request retries saving before its first submission.
+Saved and unsaved pending states are exposed separately for the invoice UI.
+
+ledger-refund-session-tests.jsonl passes the selected LEDGER01 tests, including
+the counter bill -> collection -> sellable/damaged return -> refund session flow.
+It covers excessive amounts, normal confirmation, save failure without dispatch,
+lost response followed by reopened-session reconciliation, and unknown outcomes
+that remain pending across repeated status checks without another submission.
+Refunds preserve stock movements, historical collections and settlement funds.
+ledger-refund-session-analysis.log reports no issues. Refund entry/status UI,
+completed native-write uncertainty and full ticket/device verification remain
+open; these host checks are not live-payment or production-storage acceptance.
+
+Ticket 01 refund UI: the existing compact collection sheet also presents a
+distinct refund action, backed by recordCustomerRefund. It shows only confirmed
+invoice credit, rejects excess amounts, requires a UPI reference when selected,
+and says it records money already returned rather than transferring money.
+The invoice view exposes saved/unsaved pending-refund status and recovery actions.
+Confirmed refunds remove the action when the invoice credit is exhausted.
+
+The first compact test exposed an 87-pixel vertical overflow in the statement
+Column at a constrained 58-pixel height. The statement now provides a scrollable
+minimum-height content area only when its available height is insufficient;
+ordinary layouts retain their existing structure. Subsequent testing exposed a
+missed tap from nested ensureVisible positioning. The test now performs actual
+directional scrolling and asserts hitTestable before tapping. No missed-tap
+warning or assertion was disabled. Original failures remain in
+ledger-refund-ui-tests.jsonl, compact-tests, hit-target-tests, scroll-tests and
+diagnostic-tests under the ledger evidence directory.
+
+ledger-refund-ui-visible-tests.jsonl passes both 412x915/100% and 320x568/200%
+journeys, from paid bill through return and refund, with unchanged stock and paid
+history and excessive-refund rejection. Corresponding analysis reports no issues.
+Actual Flutter captures are in POST-UI/store-ledger-mvp-20260914-r14; normal and
+compact refund forms were inspected. At 200% the sheet scrolls and confirmation
+is reachable. This does not establish native keyboard or OPPO qualification.
+Unsent draft retention, pending UI scenarios and remaining ticket recovery checks
+are still open. No founder approval, commit or APK qualification is claimed.
+
+Connected verification: ledger-refund-connected-tests.jsonl confirms 50 selected
+LEDGER01 atomic and Flutter layout tests passed, zero skips and zero failures.
+This is focused frontend evidence, not a full candidate regression or OPPO pass.
+
+Interrupted-write verification: ledger-refund-native-write-response-tests.jsonl
+and ledger-return-refund-write-response-tests.jsonl pass. The latter covers six
+counter scenarios, including return confirmation persisted before loss of its
+write response, recovered both in-session and after reopening. Refund cases
+include lost pending-write and confirmation-write responses, with same-session
+and reopened recovery. Existing exact-write retry and journal recovery preserve
+one submission, invoice balances and stock movement identity; no additional
+production code change was necessary for these cases. Both analysis logs report
+no issues. These injected host failures do not prove native device process-death
+durability. Unfinished-form retention and remaining ticket checks stay open.
+
+Ticket 01 unsent form storage: WorkspaceLedgerFormDraft retains bounded input
+fields for collection/refund/return, separately from submitted operations. Keys
+include account, Store, customer, invoice, order, form kind and customer-ledger
+revision. Confirming a financial operation therefore cannot silently restore its
+old input as a new payment. SecureWorkLedgerFormDraftStore uses encrypted storage,
+serialized writes and revision checks; unreadable bytes remain preserved. Empty
+retired drafts prevent an older write from resurrecting input. Session access
+checks account/Store/ledger revision before and after storage awaits.
+
+ledger-form-retention-tests.jsonl passes reopening, Store/kind/revision isolation,
+account rejection, stale write rejection, exact retry after lost write response,
+retirement and corrupt-byte preservation. ledger-form-retention-analysis.log and
+ledger-form-session-analysis.log report no issues. The sheets are not connected
+to this storage yet: Back/relaunch form retention is not claimed complete.
+
+Ticket 01 form connection: collection/refund and return sheets now use the same
+local autosave helper with the scoped ledger-form store. Fields load before
+editing. Changes are serialized and submission waits for successful persistence.
+Back waits for pending input saves; failed saves expose retry, while failed reads
+leave editing disabled but permit leaving. Outside-tap/drag dismissal is disabled
+for these sheets. Exact pending writes are retried before newer input is written.
+No saved form is treated as a confirmed collection, refund or return.
+
+ledger-payment-form-back-tests.jsonl passed before analysis caught an asynchronous
+BuildContext guard; that original analysis log is retained. The context-mounted
+guard correction is verified by ledger-payment-form-back-verified-tests.jsonl
+and clean verified-analysis. ledger-all-form-back-tests.jsonl passes all selected
+LEDGER01 Flutter cases at both sizes, now including return/refund Back, reopened
+input equality, and later confirmation with unchanged original accounting
+assertions. ledger-all-form-back-analysis.log reports no issues. These tests use
+an injected draft store; encrypted-store reopening/isolation is separately tested.
+Real app relaunch, save-failure UI handling and final ticket qualification remain
+open. No OPPO, APK, commit or founder acceptance is claimed.
+
+Save-failure UI verification: injecting unavailable draft storage exposed missing
+return-form error/retry controls. Submission was already blocked, but the user
+could not see why or retry. The return sheet now renders the same error/retry
+controls as the payment sheets. Original ledger-form-save-failure-tests.jsonl
+failures are preserved; verified-tests passes the selected LEDGER01 widgets at
+both sizes and verified-analysis reports no issues. The test proves failed input
+stays visible, Back preserves it, confirmation remains disabled, and retry saves
+the same reason before the return can proceed. App process-death and OPPO remain
+unverified; source-level tests do not establish device durability.
+
+The broader work_store_atomic_operations_test.dart and work_vertical_slice_test.dart
+run completed successfully in ledger-draft-connected-regression-tests.jsonl.
+This verifies the current local changes against those suites only, not all
+candidate/APK release checks or ticket acceptance.
+
+Relaunch audit: _recoverCustomerLedger currently restores finance, pending
+operations and inventory, but not workspaceOrders/workspaceInvoices. Counter
+draft retirement is not an archive of all completed bills. This remains a core
+ticket 01 gap: a recovered balance alone does not let the user reopen the original
+billed items for a later return. Earlier progress reports must not be read as
+proof that only OPPO checks remain.
+
+The existing WorkspaceOrderRecord now has a local-ledger snapshot codec that
+preserves original quantities, discounted line totals, names/packs and order
+metadata. Recovery requires a completed order with matching billed totals and
+complete item snapshots; decoded collections are immutable. It never reprices
+from today's catalogue. ledger-original-bill-snapshot-tests.jsonl passes exact
+round trip, immutable data, inconsistent total/incomplete/uncompleted rejection;
+corresponding analysis reports no issues. Checkpoint persistence and session
+restoration of these snapshots are still to be connected and tested. No device
+or ticket qualification is claimed.
+
+Original bill recovery connection: checkpoints now retain original completed
+orders and invoices keyed by invoice ID, including issued date and original item
+snapshots. Validity requires their matching posted invoice/payment evidence.
+The secure journal rejects dropping or changing these saved originals. Session
+invoice posting adds available complete original snapshots; collections, returns
+and refunds carry them forward. Review-session recovery restores missing rows
+without replaying sale/stock effects and refuses conflicts with current records.
+Production cached records do not grant fulfilment/payment authority. Legacy
+checkpoints without original bill evidence cannot fabricate missing items.
+
+ledger-bill-recovery-tests.jsonl passes the six counter interruption scenarios
+with exact recovered invoice/order equality and original-price assertions.
+ledger-bill-preservation-regression-tests.jsonl passes the broader atomic/work
+workflow suites, including rejection of dropped/altered originals and preserved
+checkpoint equality. ledger-bill-recovery-analysis.log and preservation-analysis
+report no issues. This is fresh-session host evidence, not OPPO process-death
+qualification or full ticket acceptance. App-order connections and the remaining
+ticket requirements still require final source/evidence reconciliation.
+
+App-order completion audit: scoped WorkOrderOperations projects authenticated
+order snapshots without deriving stock, invoices or payment/settlement authority
+from a fulfilment status. That boundary remains intact. The legacy non-delivery
+Ready transition was a concrete exception: it directly incremented settlement
+funds and did not use the existing invoice completion handler. It now follows the
+same completion handler as Ready for pickup; duplicate fulfilment cannot create
+another sale/invoice or platform funds. This is a bounded ticket 01 correction,
+not a backend payment implementation.
+
+ledger-ready-completion-tests.jsonl passes eight cases (both ready states across
+Cash, UPI, Paid online and Customer due), retaining invoice, stock, sales and
+settlement identity on repeated handover. ledger-ready-completion-analysis.log
+reports no issues. ledger-completion-connected-tests.jsonl passes the broader
+Store atomic and work workflow suites after this change. Full candidate/device
+qualification and founder approval are still absent; ticket 01 is not accepted.
+
+Current visual/runtime verification: ledger-current-flutter-captures-tests.jsonl
+passes the selected LEDGER01 Flutter journeys on the current local source. Twenty
+PNG captures are preserved under POST-UI/store-ledger-mvp-20260914-r15. Inspected
+normal refund/customer balance and compact collection/return forms; compact forms
+scroll to confirmation and these host journeys complete. This is not founder
+visual acceptance. ledger-runtime-storeback-tests.jsonl passes the required
+STOREBACK suite using both existing review-runtime defines, without changed tests,
+skips or exceptions. OPPO qualification remains pending.
+
+A preliminary pre_commit invocation rejected the unstaged state because it
+requires one fully staged atomic change set. No files were staged, committed or
+pushed by that invocation; no checker/owner changes were made. Commit preflight
+must be repeated at the actual staging boundary, after final ticket source review.
+
+Catalogue growth review: an inventory checkpoint previously fixed its exact SKU
+set, causing later ledger capture to reject a newly added catalogue product.
+Inventory posting now admits explicit new SKU identities at zero; recorded stock
+movements supply quantities. Existing opening quantities and movement prefixes
+cannot be changed or removed, and a new nonzero opening baseline is rejected.
+Session capture passes current exact-stock identities and checks the resulting
+counts against the catalogue. Recovery preserves extra catalogue products while
+checking all previously tracked quantities and movement identities; missing old
+products or conflicting known movements still require reconciliation.
+
+ledger-sku-growth-regression-tests.jsonl passes Store atomic/work suites, including
+new zero-stock identity, opening movement, idempotent replay, changed old baseline
+and fabricated new baseline rejection. Initial analysis identified a braces-only
+formatting issue; the original log is retained. After adding braces,
+ledger-sku-growth-verified-analysis.log reports no issues. This remains local
+frontend evidence, not device or production stock-authority qualification.

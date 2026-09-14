@@ -269,6 +269,7 @@ enum WorkspacePaymentState {
   failed,
   refundPending,
   refunded,
+  returnAdjusted,
   disputed,
   unknown;
 
@@ -280,6 +281,7 @@ enum WorkspacePaymentState {
     failed => 'Payment failed',
     refundPending => 'Refund pending',
     refunded => 'Refunded',
+    returnAdjusted => 'Adjusted for return',
     disputed => 'Payment under review',
     unknown => 'Payment update unavailable',
   };
@@ -352,7 +354,7 @@ class WorkspacePaymentRecord {
     orderId,
     customerId,
     customerName,
-    updatedAt,
+    updatedAt.toUtc(),
     amountMinor,
     paidMinor,
     dueMinor,
@@ -378,6 +380,7 @@ class WorkspacePaymentRecord {
           (dueMinor == 0 && paidMinor == amountMinor)) &&
       (state != WorkspacePaymentState.partPaid ||
           (paidMinor > 0 && dueMinor > 0)) &&
+      (state != WorkspacePaymentState.returnAdjusted || dueMinor == 0) &&
       (state != WorkspacePaymentState.refunded ||
           (paidMinor > 0 && refundedMinor == paidMinor));
   String get label => state == WorkspacePaymentState.paid
@@ -413,7 +416,7 @@ class WorkspacePayoutRecord {
     id,
     operationId,
     amountMinor,
-    updatedAt,
+    updatedAt.toUtc(),
     state,
     bankLabel,
     expectedBy,
@@ -424,6 +427,609 @@ class WorkspacePayoutRecord {
       operationId.trim().isNotEmpty &&
       revision > 0 &&
       _financeAmountValid(amountMinor);
+}
+
+/// Goods accepted back against one original customer invoice. A returned unit
+/// need not be sellable; only restockQuantity may increase available stock.
+class WorkspaceCustomerReturnLine {
+  const WorkspaceCustomerReturnLine({
+    required this.productId,
+    required this.quantity,
+    required this.restockQuantity,
+  });
+  final String productId;
+  final int quantity, restockQuantity;
+  bool get valid =>
+      productId.trim().isNotEmpty &&
+      quantity > 0 &&
+      quantity <= 2147483647 &&
+      restockQuantity >= 0 &&
+      restockQuantity <= quantity;
+}
+
+class WorkspaceCustomerReturn {
+  WorkspaceCustomerReturn({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.customerId,
+    required this.invoiceId,
+    required this.orderId,
+    required this.operationId,
+    required this.expectedRevision,
+    required this.reason,
+    required List<WorkspaceCustomerReturnLine> lines,
+  }) : lines = List.unmodifiable(lines);
+  final String accountScope,
+      workspaceId,
+      customerId,
+      invoiceId,
+      orderId,
+      operationId,
+      reason;
+  final int expectedRevision;
+  final List<WorkspaceCustomerReturnLine> lines;
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        customerId,
+        invoiceId,
+        orderId,
+        operationId,
+        reason,
+      ].every((value) => value.trim().isNotEmpty) &&
+      expectedRevision > 0 &&
+      lines.isNotEmpty &&
+      lines.every((line) => line.valid) &&
+      lines.map((line) => line.productId).toSet().length == lines.length;
+
+  Map<String, Object?> toJson() => {
+    'accountScope': accountScope,
+    'workspaceId': workspaceId,
+    'customerId': customerId,
+    'invoiceId': invoiceId,
+    'orderId': orderId,
+    'operationId': operationId,
+    'expectedRevision': expectedRevision,
+    'reason': reason,
+    'lines': [
+      for (final line in lines)
+        {
+          'productId': line.productId,
+          'quantity': line.quantity,
+          'restockQuantity': line.restockQuantity,
+        },
+    ],
+  };
+
+  factory WorkspaceCustomerReturn.fromJson(Object? value) {
+    if (value is! Map) throw const FormatException('Return data is missing.');
+    final result = WorkspaceCustomerReturn(
+      accountScope: value['accountScope'] as String,
+      workspaceId: value['workspaceId'] as String,
+      customerId: value['customerId'] as String,
+      invoiceId: value['invoiceId'] as String,
+      orderId: value['orderId'] as String,
+      operationId: value['operationId'] as String,
+      expectedRevision: value['expectedRevision'] as int,
+      reason: value['reason'] as String,
+      lines: [
+        for (final line in value['lines'] as List)
+          WorkspaceCustomerReturnLine(
+            productId: line['productId'] as String,
+            quantity: line['quantity'] as int,
+            restockQuantity: line['restockQuantity'] as int,
+          ),
+      ],
+    );
+    if (!result.valid) throw const FormatException('Return data is invalid.');
+    return result;
+  }
+
+  /// Uses the invoiced line total, including its original discount, never today's
+  /// catalogue price. Cumulative allocation preserves every paise on a full return.
+  /// priorReturns must contain only confirmed returns for this scoped invoice.
+  int? creditMinorFor(
+    WorkspaceOrderRecord order, {
+    required List<WorkspaceCustomerReturn> priorReturns,
+  }) {
+    if (!valid ||
+        order.id != orderId ||
+        !order.isCompleted ||
+        !order.hasCompleteItemSnapshot ||
+        order.itemSnapshots.any(
+          (line) =>
+              !_financeAmountValid(line.lineTotalPaise) ||
+              !_financeAmountValid(line.unitPricePaise),
+        ) ||
+        order.itemSnapshots.fold<int>(
+              0,
+              (sum, line) => sum + line.lineTotalPaise,
+            ) !=
+            order.amount * 100) {
+      return null;
+    }
+    final returned = <String, int>{};
+    final operations = <String>{operationId};
+    for (final previous in priorReturns) {
+      if (!previous.valid ||
+          previous.accountScope != accountScope ||
+          previous.workspaceId != workspaceId ||
+          previous.customerId != customerId ||
+          previous.invoiceId != invoiceId ||
+          previous.orderId != orderId ||
+          !operations.add(previous.operationId)) {
+        return null;
+      }
+      for (final line in previous.lines) {
+        returned.update(
+          line.productId,
+          (quantity) => quantity + line.quantity,
+          ifAbsent: () => line.quantity,
+        );
+      }
+    }
+    final sold = {for (final line in order.itemSnapshots) line.productId: line};
+    if (returned.entries.any(
+      (entry) =>
+          sold[entry.key] == null || entry.value > sold[entry.key]!.quantity,
+    )) {
+      return null;
+    }
+    int credit = 0;
+    for (final line in lines) {
+      final original = sold[line.productId];
+      final before = returned[line.productId] ?? 0;
+      final after = before + line.quantity;
+      if (original == null || after > original.quantity) return null;
+      // BigInt avoids intermediate multiplication losing precision on Flutter web.
+      final total = BigInt.from(original.lineTotalPaise);
+      final quantity = BigInt.from(original.quantity);
+      credit +=
+          ((total * BigInt.from(after)) ~/ quantity -
+                  (total * BigInt.from(before)) ~/ quantity)
+              .toInt();
+    }
+    return _financeAmountValid(credit) ? credit : null;
+  }
+}
+
+enum WorkspaceLedgerEntryKind { invoice, collection, creditNote, refund }
+
+enum WorkspaceLedgerPostingState { pending, posted, failed }
+
+/// A request to record one receipt against one existing customer invoice.
+/// It does not establish that money was received; the adapter confirms that.
+class WorkspaceCustomerCollection {
+  const WorkspaceCustomerCollection({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.customerId,
+    required this.invoiceId,
+    required this.orderId,
+    required this.operationId,
+    required this.expectedRevision,
+    required this.amountMinor,
+    required this.channel,
+    this.reference,
+  });
+  final String accountScope,
+      workspaceId,
+      customerId,
+      invoiceId,
+      orderId,
+      operationId;
+  final int expectedRevision, amountMinor;
+  final WorkspacePaymentChannel channel;
+  final String? reference;
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        customerId,
+        invoiceId,
+        orderId,
+        operationId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      expectedRevision > 0 &&
+      amountMinor > 0 &&
+      _financeAmountValid(amountMinor) &&
+      (channel == WorkspacePaymentChannel.cash ||
+          (channel == WorkspacePaymentChannel.directUpi &&
+              reference?.trim().isNotEmpty == true));
+  Object get identityData => (
+    accountScope,
+    workspaceId,
+    customerId,
+    invoiceId,
+    orderId,
+    operationId,
+    expectedRevision,
+    amountMinor,
+    channel,
+    reference,
+  );
+}
+
+/// Refund confirmation request; it cannot be used as a collection command.
+class WorkspaceCustomerRefund {
+  const WorkspaceCustomerRefund({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.customerId,
+    required this.invoiceId,
+    required this.orderId,
+    required this.operationId,
+    required this.expectedRevision,
+    required this.amountMinor,
+    required this.channel,
+    this.reference,
+  });
+  final String accountScope,
+      workspaceId,
+      customerId,
+      invoiceId,
+      orderId,
+      operationId;
+  final int expectedRevision, amountMinor;
+  final WorkspacePaymentChannel channel;
+  final String? reference;
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        customerId,
+        invoiceId,
+        orderId,
+        operationId,
+      ].every((value) => value.trim().isNotEmpty) &&
+      expectedRevision > 0 &&
+      amountMinor > 0 &&
+      _financeAmountValid(amountMinor) &&
+      (channel == WorkspacePaymentChannel.cash ||
+          (channel == WorkspacePaymentChannel.directUpi &&
+              reference?.trim().isNotEmpty == true));
+  Map<String, Object?> toJson() => {
+    'accountScope': accountScope,
+    'workspaceId': workspaceId,
+    'customerId': customerId,
+    'invoiceId': invoiceId,
+    'orderId': orderId,
+    'operationId': operationId,
+    'expectedRevision': expectedRevision,
+    'amountMinor': amountMinor,
+    'channel': channel.name,
+    'reference': reference,
+  };
+  factory WorkspaceCustomerRefund.fromJson(Object? value) {
+    if (value is! Map) {
+      throw const FormatException('Refund data is missing.');
+    }
+    final result = WorkspaceCustomerRefund(
+      accountScope: value['accountScope'] as String,
+      workspaceId: value['workspaceId'] as String,
+      customerId: value['customerId'] as String,
+      invoiceId: value['invoiceId'] as String,
+      orderId: value['orderId'] as String,
+      operationId: value['operationId'] as String,
+      expectedRevision: value['expectedRevision'] as int,
+      amountMinor: value['amountMinor'] as int,
+      channel: WorkspacePaymentChannel.values.byName(
+        value['channel'] as String,
+      ),
+      reference: value['reference'] as String?,
+    );
+    if (!result.valid) {
+      throw const FormatException('Refund data is invalid.');
+    }
+    return result;
+  }
+  Object get identityData => (
+    accountScope,
+    workspaceId,
+    customerId,
+    invoiceId,
+    orderId,
+    operationId,
+    expectedRevision,
+    amountMinor,
+    channel,
+    reference,
+  );
+}
+
+/// A dated customer-account event, not a command to move money or stock.
+/// Positive balances mean the customer owes the Store; negative balances are
+/// customer credit. A refund consumes that credit without creating another sale.
+class WorkspaceCustomerLedgerEntry {
+  const WorkspaceCustomerLedgerEntry({
+    required this.id,
+    required this.operationId,
+    required this.invoiceId,
+    required this.orderId,
+    required this.sequence,
+    required this.occurredAt,
+    required this.kind,
+    required this.state,
+    required this.amountMinor,
+    this.channel = WorkspacePaymentChannel.unknown,
+    this.paymentReference,
+    this.customerReturn,
+    this.customerRefund,
+  });
+
+  final String id, operationId, invoiceId, orderId;
+  final int sequence, amountMinor;
+  final DateTime occurredAt;
+  final WorkspaceLedgerEntryKind kind;
+  final WorkspaceLedgerPostingState state;
+  final WorkspacePaymentChannel channel;
+  final String? paymentReference;
+  final WorkspaceCustomerReturn? customerReturn;
+  final WorkspaceCustomerRefund? customerRefund;
+
+  Object get identityData => (
+    id,
+    operationId,
+    invoiceId,
+    orderId,
+    sequence,
+    occurredAt.toUtc(),
+    kind,
+    amountMinor,
+    channel,
+    paymentReference,
+    customerReturn == null ? null : jsonEncode(customerReturn!.toJson()),
+    customerRefund?.identityData,
+  );
+
+  bool get valid =>
+      [id, operationId, invoiceId, orderId].every((v) => v.trim().isNotEmpty) &&
+      sequence > 0 &&
+      amountMinor > 0 &&
+      _financeAmountValid(amountMinor) &&
+      (customerRefund == null ||
+          (kind == WorkspaceLedgerEntryKind.refund &&
+              customerRefund!.valid &&
+              customerRefund!.operationId == operationId &&
+              customerRefund!.invoiceId == invoiceId &&
+              customerRefund!.orderId == orderId &&
+              customerRefund!.amountMinor == amountMinor &&
+              customerRefund!.channel == channel &&
+              customerRefund!.reference == paymentReference)) &&
+      (customerReturn == null ||
+          (kind == WorkspaceLedgerEntryKind.creditNote &&
+              customerReturn!.valid &&
+              customerReturn!.operationId == operationId &&
+              customerReturn!.invoiceId == invoiceId &&
+              customerReturn!.orderId == orderId));
+
+  /// Stable linked stock events for a confirmed credit. This does not mutate
+  /// inventory; an inventory projection must acknowledge these IDs once.
+  List<WorkspaceStockMovement>? returnStockMovements(
+    WorkspaceOrderRecord order,
+  ) {
+    if (order.id != orderId ||
+        !order.isCompleted ||
+        !order.hasCompleteItemSnapshot) {
+      return null;
+    }
+    return returnStockMovementsFromSavedItems(order.itemSnapshots);
+  }
+
+  List<WorkspaceStockMovement>? returnStockMovementsFromSavedItems(
+    List<WorkspaceOrderItemSnapshot> items,
+  ) {
+    final returned = customerReturn;
+    if (!valid ||
+        state != WorkspaceLedgerPostingState.posted ||
+        returned == null ||
+        items.isEmpty ||
+        items.map((item) => item.productId).toSet().length != items.length ||
+        items.any(
+          (item) =>
+              item.productId.trim().isEmpty ||
+              item.name.trim().isEmpty ||
+              item.pack.trim().isEmpty ||
+              item.quantity <= 0,
+        )) {
+      return null;
+    }
+    final sold = {for (final line in items) line.productId: line};
+    final movements = <WorkspaceStockMovement>[];
+    for (final line in returned.lines) {
+      final original = sold[line.productId];
+      if (original == null || line.quantity > original.quantity) {
+        return null;
+      }
+      if (line.restockQuantity == 0) continue;
+      movements.add(
+        WorkspaceStockMovement(
+          id: 'RETURN-${Uri.encodeComponent(operationId)}-${Uri.encodeComponent(line.productId)}',
+          productId: line.productId,
+          productLabel: '${original.name} · ${original.pack}',
+          kind: WorkspaceStockMovementKind.returned,
+          quantityDelta: line.restockQuantity,
+          reason: returned.reason,
+          occurredAt: occurredAt,
+          referenceKind: WorkspaceStockReferenceKind.order,
+          referenceId: orderId,
+        ),
+      );
+    }
+    return List.unmodifiable(movements);
+  }
+
+  int get balanceDeltaMinor => state != WorkspaceLedgerPostingState.posted
+      ? 0
+      : switch (kind) {
+          WorkspaceLedgerEntryKind.invoice ||
+          WorkspaceLedgerEntryKind.refund => amountMinor,
+          WorkspaceLedgerEntryKind.collection ||
+          WorkspaceLedgerEntryKind.creditNote => -amountMinor,
+        };
+}
+
+/// A complete statement may calculate balances only from a supplied opening
+/// balance. Partial history is displayable but cannot imply a closing balance.
+class WorkspaceCustomerLedger {
+  WorkspaceCustomerLedger({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.customerId,
+    required this.customerName,
+    required this.revision,
+    required this.asOf,
+    required List<WorkspaceCustomerLedgerEntry> entries,
+    this.openingBalanceMinor,
+    this.historyComplete = false,
+  }) : entries = List.unmodifiable(entries);
+
+  final String accountScope, workspaceId, customerId, customerName;
+  final int revision;
+  final DateTime asOf;
+  final int? openingBalanceMinor;
+  final bool historyComplete;
+  final List<WorkspaceCustomerLedgerEntry> entries;
+
+  /// Invoice-local amounts never use another bill's payments or opening balance.
+  /// Null means the history cannot authorize a collection, credit or refund.
+  ({
+    int billedMinor,
+    int creditedMinor,
+    int collectedMinor,
+    int refundedMinor,
+    int dueMinor,
+    int refundableMinor,
+  })?
+  invoiceBalance(String invoiceId) {
+    if (!valid || !historyComplete || invoiceId.trim().isEmpty) return null;
+    final lines = entries.where((entry) => entry.invoiceId == invoiceId);
+    int billed = 0, credited = 0, collected = 0, refunded = 0;
+    String? orderId;
+    for (final entry in lines) {
+      if (orderId != null && orderId != entry.orderId) return null;
+      orderId = entry.orderId;
+      if (entry.state != WorkspaceLedgerPostingState.posted) continue;
+      final balance = billed - credited - collected + refunded;
+      switch (entry.kind) {
+        case WorkspaceLedgerEntryKind.invoice:
+          if (billed != 0) return null;
+          billed = entry.amountMinor;
+        case WorkspaceLedgerEntryKind.collection:
+          if (billed == 0 || entry.amountMinor > balance) return null;
+          collected += entry.amountMinor;
+        case WorkspaceLedgerEntryKind.creditNote:
+          if (billed == 0 || entry.amountMinor > billed - credited) return null;
+          credited += entry.amountMinor;
+        case WorkspaceLedgerEntryKind.refund:
+          if (billed == 0 ||
+              entry.amountMinor > -balance ||
+              entry.amountMinor > collected - refunded) {
+            return null;
+          }
+          refunded += entry.amountMinor;
+      }
+    }
+    if (billed == 0) return null;
+    final balance = billed - credited - collected + refunded;
+    return (
+      billedMinor: billed,
+      creditedMinor: credited,
+      collectedMinor: collected,
+      refundedMinor: refunded,
+      dueMinor: balance > 0 ? balance : 0,
+      refundableMinor: balance < 0 ? -balance : 0,
+    );
+  }
+
+  /// Refreshes preserve known events. Corrections to posted money require a
+  /// separate linked credit/refund, never an edit of an accepted event.
+  bool canFollow(WorkspaceCustomerLedger previous) {
+    if (!valid ||
+        accountScope != previous.accountScope ||
+        workspaceId != previous.workspaceId ||
+        customerId != previous.customerId ||
+        revision < previous.revision ||
+        asOf.isBefore(previous.asOf) ||
+        (previous.openingBalanceMinor != null &&
+            openingBalanceMinor != previous.openingBalanceMinor) ||
+        (previous.historyComplete && !historyComplete)) {
+      return false;
+    }
+    final current = {for (final entry in entries) entry.id: entry};
+    for (final old in previous.entries) {
+      final next = current[old.id];
+      if (next == null ||
+          next.identityData != old.identityData ||
+          (old.state != WorkspaceLedgerPostingState.pending &&
+              next.state != old.state)) {
+        return false;
+      }
+    }
+    if (revision == previous.revision) {
+      return customerName == previous.customerName &&
+          asOf.isAtSameMomentAs(previous.asOf) &&
+          openingBalanceMinor == previous.openingBalanceMinor &&
+          historyComplete == previous.historyComplete &&
+          entries.length == previous.entries.length &&
+          previous.entries.every((old) => current[old.id]?.state == old.state);
+    }
+    return true;
+  }
+
+  bool get valid {
+    if (![
+          accountScope,
+          workspaceId,
+          customerId,
+          customerName,
+        ].every((v) => v.trim().isNotEmpty) ||
+        revision <= 0 ||
+        (historyComplete && openingBalanceMinor == null) ||
+        (openingBalanceMinor != null &&
+            !_financeAmountValid(openingBalanceMinor!, signed: true))) {
+      return false;
+    }
+    final ids = <String>{};
+    final operations = <(WorkspaceLedgerEntryKind, String, String)>{};
+    final invoices = <String>{};
+    var previousSequence = 0;
+    DateTime? previousTime;
+    var balance = openingBalanceMinor ?? 0;
+    for (final entry in entries) {
+      if (!entry.valid ||
+          (entry.customerRefund != null &&
+              (entry.customerRefund!.accountScope != accountScope ||
+                  entry.customerRefund!.workspaceId != workspaceId ||
+                  entry.customerRefund!.customerId != customerId)) ||
+          (entry.customerReturn != null &&
+              (entry.customerReturn!.accountScope != accountScope ||
+                  entry.customerReturn!.workspaceId != workspaceId ||
+                  entry.customerReturn!.customerId != customerId)) ||
+          entry.occurredAt.isAfter(asOf) ||
+          (previousTime != null && entry.occurredAt.isBefore(previousTime)) ||
+          entry.sequence <= previousSequence ||
+          !ids.add(entry.id) ||
+          !operations.add((entry.kind, entry.operationId, entry.invoiceId)) ||
+          (entry.kind == WorkspaceLedgerEntryKind.invoice &&
+              !invoices.add(entry.invoiceId))) {
+        return false;
+      }
+      balance += entry.balanceDeltaMinor;
+      if (!_financeAmountValid(balance, signed: true)) return false;
+      previousSequence = entry.sequence;
+      previousTime = entry.occurredAt;
+    }
+    return true;
+  }
+
+  int? get closingBalanceMinor => !valid || !historyComplete
+      ? null
+      : entries.fold<int>(
+          openingBalanceMinor!,
+          (balance, entry) => balance + entry.balanceDeltaMinor,
+        );
 }
 
 /// One atomic, read-only finance projection from an authenticated Store ledger.
@@ -447,9 +1053,11 @@ class WorkspaceFinanceSnapshot {
     required this.taxWithheldMinor,
     required List<WorkspacePaymentRecord> payments,
     required List<WorkspacePayoutRecord> payouts,
+    List<WorkspaceCustomerLedger> customerLedgers = const [],
     this.historyComplete = false,
   }) : payments = List.unmodifiable(payments),
-       payouts = List.unmodifiable(payouts);
+       payouts = List.unmodifiable(payouts),
+       customerLedgers = List.unmodifiable(customerLedgers);
   final String accountScope, workspaceId;
   final int revision,
       salesTodayMinor,
@@ -466,7 +1074,25 @@ class WorkspaceFinanceSnapshot {
   final bool historyComplete;
   final List<WorkspacePaymentRecord> payments;
   final List<WorkspacePayoutRecord> payouts;
+  final List<WorkspaceCustomerLedger> customerLedgers;
+  bool get _customerIdentitiesValid {
+    final ids = <String>{};
+    final invoiceCustomers = <String, String>{};
+    for (final ledger in customerLedgers) {
+      for (final entry in ledger.entries) {
+        if (!ids.add(entry.id)) return false;
+        final customer = invoiceCustomers.putIfAbsent(
+          entry.invoiceId,
+          () => ledger.customerId,
+        );
+        if (customer != ledger.customerId) return false;
+      }
+    }
+    return true;
+  }
+
   bool get valid =>
+      _customerIdentitiesValid &&
       accountScope.trim().isNotEmpty &&
       workspaceId.trim().isNotEmpty &&
       revision > 0 &&
@@ -488,7 +1114,491 @@ class WorkspaceFinanceSnapshot {
       payouts.every((p) => p.valid && !p.updatedAt.isAfter(asOf)) &&
       payments.map((p) => p.orderId).toSet().length == payments.length &&
       payouts.map((p) => p.id).toSet().length == payouts.length &&
-      payouts.map((p) => p.operationId).toSet().length == payouts.length;
+      payouts.map((p) => p.operationId).toSet().length == payouts.length &&
+      customerLedgers.every(
+        (ledger) =>
+            ledger.valid &&
+            ledger.accountScope == accountScope &&
+            ledger.workspaceId == workspaceId &&
+            !ledger.asOf.isAfter(asOf),
+      ) &&
+      customerLedgers.map((l) => l.customerId).toSet().length ==
+          customerLedgers.length;
+}
+
+/// Device recovery of a validated projection and its one unresolved collection.
+/// These retained bytes are a cache, never fresh backend/payment authority.
+class WorkspacePendingCustomerReturn {
+  WorkspacePendingCustomerReturn({
+    required this.request,
+    required this.creditMinor,
+    List<WorkspaceOrderItemSnapshot> originalItems = const [],
+  }) : originalItems = List.unmodifiable(originalItems);
+  final WorkspaceCustomerReturn request;
+  final int creditMinor;
+  final List<WorkspaceOrderItemSnapshot> originalItems;
+  bool get valid =>
+      request.valid &&
+      creditMinor > 0 &&
+      _financeAmountValid(creditMinor) &&
+      (originalItems.isEmpty ||
+          (originalItems.map((item) => item.productId).toSet().length ==
+                  originalItems.length &&
+              originalItems.every(
+                (item) =>
+                    item.productId.trim().isNotEmpty &&
+                    item.name.trim().isNotEmpty &&
+                    item.pack.trim().isNotEmpty &&
+                    item.quantity > 0 &&
+                    _financeAmountValid(item.unitPricePaise) &&
+                    _financeAmountValid(item.lineTotalPaise),
+              ) &&
+              request.lines.every(
+                (line) => originalItems.any(
+                  (item) =>
+                      item.productId == line.productId &&
+                      item.quantity >= line.quantity,
+                ),
+              )));
+  Map<String, Object?> toJson() => {
+    'request': request.toJson(),
+    'creditMinor': creditMinor,
+    if (originalItems.isNotEmpty)
+      'originalItems': [
+        for (final item in originalItems)
+          {
+            'productId': item.productId,
+            'name': item.name,
+            'pack': item.pack,
+            'quantity': item.quantity,
+            'unitPricePaise': item.unitPricePaise,
+            'lineTotalPaise': item.lineTotalPaise,
+          },
+      ],
+  };
+  factory WorkspacePendingCustomerReturn.fromJson(Object? value) {
+    if (value is! Map) {
+      throw const FormatException('Pending return is missing.');
+    }
+    final result = WorkspacePendingCustomerReturn(
+      request: WorkspaceCustomerReturn.fromJson(value['request']),
+      creditMinor: value['creditMinor'] as int,
+      originalItems: [
+        for (final item in (value['originalItems'] as List? ?? const []))
+          WorkspaceOrderItemSnapshot(
+            productId: item['productId'] as String,
+            name: item['name'] as String,
+            pack: item['pack'] as String,
+            quantity: item['quantity'] as int,
+            unitPricePaise: item['unitPricePaise'] as int,
+            lineTotalPaise: item['lineTotalPaise'] as int,
+          ),
+      ],
+    );
+    if (!result.valid) {
+      throw const FormatException('Pending return is invalid.');
+    }
+    return result;
+  }
+}
+
+class WorkspaceLedgerCheckpoint {
+  const WorkspaceLedgerCheckpoint({
+    required this.revision,
+    required this.finance,
+    this.pending,
+    this.pendingReturn,
+    this.pendingRefund,
+    this.inventory,
+    this.billedOrders = const {},
+    this.billedInvoices = const {},
+  });
+  final int revision;
+  final WorkspaceFinanceSnapshot finance;
+  final WorkspaceInventoryLedger? inventory;
+  final Map<String, WorkspaceOrderRecord> billedOrders;
+  final Map<String, WorkspaceCustomerInvoice> billedInvoices;
+  final WorkspaceCustomerCollection? pending;
+  final WorkspacePendingCustomerReturn? pendingReturn;
+  final WorkspaceCustomerRefund? pendingRefund;
+  bool get valid =>
+      revision > 0 &&
+      finance.valid &&
+      billedInvoices.length == billedOrders.length &&
+      billedInvoices.entries.every(
+        (entry) =>
+            entry.key == entry.value.id &&
+            billedOrders[entry.key]?.id == entry.value.orderId &&
+            billedOrders[entry.key]?.amount == entry.value.amount,
+      ) &&
+      billedOrders.entries.every(
+        (entry) =>
+            entry.key.trim().isNotEmpty &&
+            WorkspaceOrderRecord.fromLedgerJson(entry.value.toLedgerJson()) !=
+                null &&
+            finance.payments.any(
+              (payment) =>
+                  payment.invoiceId == entry.key &&
+                  payment.orderId == entry.value.id &&
+                  payment.amountMinor == entry.value.amount * 100,
+            ) &&
+            finance.customerLedgers.any(
+              (ledger) => ledger.entries.any(
+                (line) =>
+                    line.invoiceId == entry.key &&
+                    line.orderId == entry.value.id &&
+                    line.kind == WorkspaceLedgerEntryKind.invoice &&
+                    line.state == WorkspaceLedgerPostingState.posted &&
+                    line.amountMinor == entry.value.amount * 100,
+              ),
+            ),
+      ) &&
+      (inventory == null ||
+          (inventory!.valid &&
+              inventory!.accountScope == finance.accountScope &&
+              inventory!.workspaceId == finance.workspaceId)) &&
+      [
+            pending,
+            pendingReturn,
+            pendingRefund,
+          ].where((item) => item != null).length <=
+          1 &&
+      (pendingReturn == null || _validPendingReturn()) &&
+      (pendingRefund == null || _validPendingRefund()) &&
+      (pending == null ||
+          (pending!.valid &&
+              pending!.accountScope == finance.accountScope &&
+              pending!.workspaceId == finance.workspaceId &&
+              finance.customerLedgers.any(
+                (ledger) =>
+                    ledger.customerId == pending!.customerId &&
+                    ledger.historyComplete &&
+                    ledger.revision == pending!.expectedRevision,
+              ) &&
+              finance.payments.any(
+                (payment) =>
+                    payment.customerId == pending!.customerId &&
+                    payment.invoiceId == pending!.invoiceId &&
+                    payment.orderId == pending!.orderId &&
+                    payment.dueMinor >= pending!.amountMinor,
+              ) &&
+              !finance.customerLedgers
+                  .expand((ledger) => ledger.entries)
+                  .any((entry) => entry.operationId == pending!.operationId)));
+
+  bool _validPendingRefund() {
+    final request = pendingRefund!;
+    final ledger = finance.customerLedgers
+        .where((item) => item.customerId == request.customerId)
+        .firstOrNull;
+    final balance = ledger?.invoiceBalance(request.invoiceId);
+    return request.valid &&
+        request.accountScope == finance.accountScope &&
+        request.workspaceId == finance.workspaceId &&
+        ledger?.revision == request.expectedRevision &&
+        balance != null &&
+        request.amountMinor <= balance.refundableMinor &&
+        finance.payments.any(
+          (payment) =>
+              payment.customerId == request.customerId &&
+              payment.invoiceId == request.invoiceId &&
+              payment.orderId == request.orderId &&
+              payment.paidMinor - payment.refundedMinor >= request.amountMinor,
+        ) &&
+        !finance.customerLedgers
+            .expand((item) => item.entries)
+            .any((entry) => entry.operationId == request.operationId);
+  }
+
+  bool _validPendingReturn() {
+    final pending = pendingReturn!;
+    final request = pending.request;
+    final ledger = finance.customerLedgers
+        .where((item) => item.customerId == request.customerId)
+        .firstOrNull;
+    final balance = ledger?.invoiceBalance(request.invoiceId);
+    return pending.valid &&
+        request.accountScope == finance.accountScope &&
+        request.workspaceId == finance.workspaceId &&
+        ledger?.revision == request.expectedRevision &&
+        balance != null &&
+        pending.creditMinor <= balance.billedMinor - balance.creditedMinor &&
+        finance.payments.any(
+          (payment) =>
+              payment.customerId == request.customerId &&
+              payment.invoiceId == request.invoiceId &&
+              payment.orderId == request.orderId,
+        ) &&
+        !finance.customerLedgers
+            .expand((item) => item.entries)
+            .any((entry) => entry.operationId == request.operationId);
+  }
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    if (inventory != null) 'inventory': inventory!.toJson(),
+    if (billedOrders.isNotEmpty)
+      'billedOrders': {
+        for (final entry in billedOrders.entries)
+          entry.key: entry.value.toLedgerJson(),
+      },
+    if (billedInvoices.isNotEmpty)
+      'billedInvoices': {
+        for (final entry in billedInvoices.entries)
+          entry.key: entry.value.toLedgerJson(),
+      },
+    if (pendingReturn != null) 'pendingReturn': pendingReturn!.toJson(),
+    if (pendingRefund != null) 'pendingRefund': pendingRefund!.toJson(),
+    'revision': revision,
+    'finance': {
+      'accountScope': finance.accountScope,
+      'workspaceId': finance.workspaceId,
+      'revision': finance.revision,
+      'asOf': finance.asOf.toUtc().toIso8601String(),
+      'salesTodayMinor': finance.salesTodayMinor,
+      'duesMinor': finance.duesMinor,
+      'availableMinor': finance.availableMinor,
+      'heldMinor': finance.heldMinor,
+      'requestedMinor': finance.requestedMinor,
+      'paidOutMinor': finance.paidOutMinor,
+      'feesMinor': finance.feesMinor,
+      'deliveryAdjustmentsMinor': finance.deliveryAdjustmentsMinor,
+      'refundsMinor': finance.refundsMinor,
+      'taxWithheldMinor': finance.taxWithheldMinor,
+      'historyComplete': finance.historyComplete,
+      'payments': [
+        for (final p in finance.payments)
+          {
+            'orderId': p.orderId,
+            'customerId': p.customerId,
+            'customerName': p.customerName,
+            'revision': p.revision,
+            'updatedAt': p.updatedAt.toUtc().toIso8601String(),
+            'amountMinor': p.amountMinor,
+            'paidMinor': p.paidMinor,
+            'dueMinor': p.dueMinor,
+            'refundedMinor': p.refundedMinor,
+            'state': p.state.name,
+            'channel': p.channel.name,
+            'invoiceId': p.invoiceId,
+            'transactionId': p.transactionId,
+          },
+      ],
+      'payouts': [
+        for (final p in finance.payouts)
+          {
+            'id': p.id,
+            'operationId': p.operationId,
+            'revision': p.revision,
+            'amountMinor': p.amountMinor,
+            'updatedAt': p.updatedAt.toUtc().toIso8601String(),
+            'state': p.state.name,
+            'bankLabel': p.bankLabel,
+            'expectedBy': p.expectedBy,
+            'message': p.message,
+          },
+      ],
+      'customerLedgers': [
+        for (final l in finance.customerLedgers)
+          {
+            'accountScope': l.accountScope,
+            'workspaceId': l.workspaceId,
+            'customerId': l.customerId,
+            'customerName': l.customerName,
+            'revision': l.revision,
+            'asOf': l.asOf.toUtc().toIso8601String(),
+            'openingBalanceMinor': l.openingBalanceMinor,
+            'historyComplete': l.historyComplete,
+            'entries': [
+              for (final e in l.entries)
+                {
+                  'id': e.id,
+                  'operationId': e.operationId,
+                  'invoiceId': e.invoiceId,
+                  'orderId': e.orderId,
+                  'sequence': e.sequence,
+                  'occurredAt': e.occurredAt.toUtc().toIso8601String(),
+                  'kind': e.kind.name,
+                  'state': e.state.name,
+                  'amountMinor': e.amountMinor,
+                  'channel': e.channel.name,
+                  'paymentReference': e.paymentReference,
+                  if (e.customerRefund != null)
+                    'customerRefund': e.customerRefund!.toJson(),
+                  if (e.customerReturn != null)
+                    'customerReturn': e.customerReturn!.toJson(),
+                },
+            ],
+          },
+      ],
+    },
+    'pending': pending == null
+        ? null
+        : {
+            'accountScope': pending!.accountScope,
+            'workspaceId': pending!.workspaceId,
+            'customerId': pending!.customerId,
+            'invoiceId': pending!.invoiceId,
+            'orderId': pending!.orderId,
+            'operationId': pending!.operationId,
+            'expectedRevision': pending!.expectedRevision,
+            'amountMinor': pending!.amountMinor,
+            'channel': pending!.channel.name,
+            'reference': pending!.reference,
+          },
+  };
+
+  static WorkspaceLedgerCheckpoint? fromJson(Object? value) {
+    try {
+      final root = value as Map;
+      if (root['version'] is! int || root['version'] != 1) return null;
+      final f = root['finance'] as Map;
+      final pending = root['pending'] as Map?;
+      final result = WorkspaceLedgerCheckpoint(
+        revision: root['revision'] as int,
+        billedOrders: Map.unmodifiable({
+          for (final entry
+              in ((root['billedOrders'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceOrderRecord.fromLedgerJson(
+              entry.value,
+            )!,
+        }),
+        billedInvoices: Map.unmodifiable({
+          for (final entry
+              in ((root['billedInvoices'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceCustomerInvoice.fromLedgerJson(
+              entry.value,
+            ),
+        }),
+        pendingRefund: root.containsKey('pendingRefund')
+            ? WorkspaceCustomerRefund.fromJson(root['pendingRefund'])
+            : null,
+        inventory: root.containsKey('inventory')
+            ? WorkspaceInventoryLedger.fromJson(root['inventory'])
+            : null,
+        pendingReturn: root.containsKey('pendingReturn')
+            ? WorkspacePendingCustomerReturn.fromJson(root['pendingReturn'])
+            : null,
+        pending: pending == null
+            ? null
+            : WorkspaceCustomerCollection(
+                accountScope: pending['accountScope'] as String,
+                workspaceId: pending['workspaceId'] as String,
+                customerId: pending['customerId'] as String,
+                invoiceId: pending['invoiceId'] as String,
+                orderId: pending['orderId'] as String,
+                operationId: pending['operationId'] as String,
+                expectedRevision: pending['expectedRevision'] as int,
+                amountMinor: pending['amountMinor'] as int,
+                channel: WorkspacePaymentChannel.values.byName(
+                  pending['channel'] as String,
+                ),
+                reference: pending['reference'] as String?,
+              ),
+        finance: WorkspaceFinanceSnapshot(
+          accountScope: f['accountScope'] as String,
+          workspaceId: f['workspaceId'] as String,
+          revision: f['revision'] as int,
+          asOf: DateTime.parse(f['asOf'] as String),
+          salesTodayMinor: f['salesTodayMinor'] as int,
+          duesMinor: f['duesMinor'] as int,
+          availableMinor: f['availableMinor'] as int,
+          heldMinor: f['heldMinor'] as int,
+          requestedMinor: f['requestedMinor'] as int,
+          paidOutMinor: f['paidOutMinor'] as int,
+          feesMinor: f['feesMinor'] as int,
+          deliveryAdjustmentsMinor: f['deliveryAdjustmentsMinor'] as int,
+          refundsMinor: f['refundsMinor'] as int,
+          taxWithheldMinor: f['taxWithheldMinor'] as int,
+          historyComplete: f['historyComplete'] as bool,
+          payments: [
+            for (final p in f['payments'] as List)
+              WorkspacePaymentRecord(
+                orderId: p['orderId'] as String,
+                customerId: p['customerId'] as String,
+                customerName: p['customerName'] as String,
+                revision: p['revision'] as int,
+                updatedAt: DateTime.parse(p['updatedAt'] as String),
+                amountMinor: p['amountMinor'] as int,
+                paidMinor: p['paidMinor'] as int,
+                dueMinor: p['dueMinor'] as int,
+                refundedMinor: p['refundedMinor'] as int,
+                state: WorkspacePaymentState.values.byName(
+                  p['state'] as String,
+                ),
+                channel: WorkspacePaymentChannel.values.byName(
+                  p['channel'] as String,
+                ),
+                invoiceId: p['invoiceId'] as String?,
+                transactionId: p['transactionId'] as String?,
+              ),
+          ],
+          payouts: [
+            for (final p in f['payouts'] as List)
+              WorkspacePayoutRecord(
+                id: p['id'] as String,
+                operationId: p['operationId'] as String,
+                revision: p['revision'] as int,
+                amountMinor: p['amountMinor'] as int,
+                updatedAt: DateTime.parse(p['updatedAt'] as String),
+                state: WorkspacePayoutState.values.byName(p['state'] as String),
+                bankLabel: p['bankLabel'] as String?,
+                expectedBy: p['expectedBy'] as String?,
+                message: p['message'] as String?,
+              ),
+          ],
+          customerLedgers: [
+            for (final l in f['customerLedgers'] as List)
+              WorkspaceCustomerLedger(
+                accountScope: l['accountScope'] as String,
+                workspaceId: l['workspaceId'] as String,
+                customerId: l['customerId'] as String,
+                customerName: l['customerName'] as String,
+                revision: l['revision'] as int,
+                asOf: DateTime.parse(l['asOf'] as String),
+                openingBalanceMinor: l['openingBalanceMinor'] as int?,
+                historyComplete: l['historyComplete'] as bool,
+                entries: [
+                  for (final e in l['entries'] as List)
+                    WorkspaceCustomerLedgerEntry(
+                      id: e['id'] as String,
+                      operationId: e['operationId'] as String,
+                      invoiceId: e['invoiceId'] as String,
+                      orderId: e['orderId'] as String,
+                      sequence: e['sequence'] as int,
+                      occurredAt: DateTime.parse(e['occurredAt'] as String),
+                      kind: WorkspaceLedgerEntryKind.values.byName(
+                        e['kind'] as String,
+                      ),
+                      state: WorkspaceLedgerPostingState.values.byName(
+                        e['state'] as String,
+                      ),
+                      amountMinor: e['amountMinor'] as int,
+                      channel: WorkspacePaymentChannel.values.byName(
+                        e['channel'] as String,
+                      ),
+                      paymentReference: e['paymentReference'] as String?,
+                      customerRefund: e.containsKey('customerRefund')
+                          ? WorkspaceCustomerRefund.fromJson(
+                              e['customerRefund'],
+                            )
+                          : null,
+                      customerReturn: e.containsKey('customerReturn')
+                          ? WorkspaceCustomerReturn.fromJson(
+                              e['customerReturn'],
+                            )
+                          : null,
+                    ),
+                ],
+              ),
+          ],
+        ),
+      );
+      return result.valid ? result : null;
+    } on Object {
+      return null; // Corrupt/unknown data is not an empty, editable statement.
+    }
+  }
 }
 
 enum WorkspaceSupplyStage {
@@ -1185,6 +2295,97 @@ class WorkspaceOrderRecord {
   final List<WorkspaceOrderItemSnapshot> itemSnapshots;
   final String? rejectionReason;
 
+  /// Frozen original bill details for local ledger recovery, not fulfilment authority.
+  Map<String, Object?> toLedgerJson() => {
+    'id': id,
+    'customer': customer,
+    'items': items,
+    'quantities': quantities,
+    'amount': amount,
+    'source': source,
+    'fulfilment': fulfilment,
+    'payment': payment,
+    'address': address,
+    'stage': stage,
+    'needsDelivery': needsDelivery,
+    'createdAt': createdAt.toUtc().toIso8601String(),
+    'actionDeadline': actionDeadline?.toUtc().toIso8601String(),
+    'fulfilmentDeadline': fulfilmentDeadline?.toUtc().toIso8601String(),
+    'extraMinutes': extraMinutes,
+    'stockReserved': stockReserved,
+    'collectionStoreId': collectionStoreId,
+    'rejectionReason': rejectionReason,
+    'itemSnapshots': [
+      for (final item in itemSnapshots)
+        {
+          'productId': item.productId,
+          'name': item.name,
+          'pack': item.pack,
+          'quantity': item.quantity,
+          'unitPricePaise': item.unitPricePaise,
+          'lineTotalPaise': item.lineTotalPaise,
+        },
+    ],
+  };
+
+  static WorkspaceOrderRecord? fromLedgerJson(Object? value) {
+    try {
+      final map = value as Map;
+      DateTime? date(String key) =>
+          map[key] == null ? null : DateTime.parse(map[key] as String).toUtc();
+      final order = WorkspaceOrderRecord(
+        id: map['id'] as String,
+        customer: map['customer'] as String,
+        items: map['items'] as String,
+        quantities: Map.unmodifiable(
+          (map['quantities'] as Map).cast<String, int>(),
+        ),
+        amount: map['amount'] as int,
+        source: map['source'] as String,
+        fulfilment: map['fulfilment'] as String,
+        payment: map['payment'] as String,
+        address: map['address'] as String,
+        stage: map['stage'] as String,
+        needsDelivery: map['needsDelivery'] as bool,
+        createdAt: date('createdAt')!,
+        actionDeadline: date('actionDeadline'),
+        fulfilmentDeadline: date('fulfilmentDeadline'),
+        extraMinutes: map['extraMinutes'] as int,
+        stockReserved: map['stockReserved'] as bool,
+        collectionStoreId: map['collectionStoreId'] as String?,
+        rejectionReason: map['rejectionReason'] as String?,
+        itemSnapshots: List.unmodifiable(
+          (map['itemSnapshots'] as List).map((raw) {
+            final item = raw as Map;
+            return WorkspaceOrderItemSnapshot(
+              productId: item['productId'] as String,
+              name: item['name'] as String,
+              pack: item['pack'] as String,
+              quantity: item['quantity'] as int,
+              unitPricePaise: item['unitPricePaise'] as int,
+              lineTotalPaise: item['lineTotalPaise'] as int,
+            );
+          }),
+        ),
+      );
+      if (!order.isCompleted ||
+          !order.hasCompleteItemSnapshot ||
+          order.id.trim().isEmpty ||
+          order.customer.trim().isEmpty ||
+          order.amount < 0 ||
+          order.itemSnapshots.fold<int>(
+                0,
+                (sum, item) => sum + item.lineTotalPaise,
+              ) !=
+              order.amount * 100) {
+        return null;
+      }
+      return order;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// A changed SKU/quantity must not retain stale purchased-price information.
   bool get hasCompleteItemSnapshot =>
       itemSnapshots.isNotEmpty &&
@@ -1278,6 +2479,8 @@ class WorkspaceCustomerRecord {
     required this.followingStore,
     required this.messagesAllowed,
     this.lastContactAt,
+    this.confirmedBalanceMinor,
+    this.balanceAvailable = true,
   });
 
   final String id;
@@ -1286,6 +2489,10 @@ class WorkspaceCustomerRecord {
   final List<WorkspaceOrderRecord> orders;
   final int totalSpend;
   final int amountDue;
+  final int? confirmedBalanceMinor;
+  final bool balanceAvailable;
+  int get amountDueMinor => confirmedBalanceMinor ?? amountDue * 100;
+  bool get hasDues => balanceAvailable && amountDueMinor > 0;
   final DateTime lastPurchaseAt;
   final bool followingStore;
   final bool messagesAllowed;
@@ -1396,6 +2603,32 @@ class WorkspaceCustomerInvoice {
   final DateTime issuedAt;
   final Set<String> sharedChannels;
 
+  Map<String, Object?> toLedgerJson() => {
+    'id': id,
+    'orderId': orderId,
+    'customer': customer,
+    'items': items,
+    'amount': amount,
+    'payment': payment,
+    'issuedAt': issuedAt.toUtc().toIso8601String(),
+    'sharedChannels': sharedChannels.toList()..sort(),
+  };
+  factory WorkspaceCustomerInvoice.fromLedgerJson(Object? value) {
+    final map = value as Map;
+    return WorkspaceCustomerInvoice(
+      id: map['id'] as String,
+      orderId: map['orderId'] as String,
+      customer: map['customer'] as String,
+      items: map['items'] as String,
+      amount: map['amount'] as int,
+      payment: map['payment'] as String,
+      issuedAt: DateTime.parse(map['issuedAt'] as String).toUtc(),
+      sharedChannels: Set.unmodifiable(
+        (map['sharedChannels'] as List).cast<String>(),
+      ),
+    );
+  }
+
   bool get needsCustomerHandoff => sharedChannels.isEmpty;
 
   WorkspaceCustomerInvoice copyWith({Set<String>? sharedChannels}) =>
@@ -1449,6 +2682,97 @@ enum WorkspaceStockMovementKind {
 }
 
 enum WorkspaceStockReferenceKind { order, supplierReceipt }
+
+typedef WorkspaceLedgerFormKey = ({
+  String account,
+  String store,
+  String customer,
+  String invoice,
+  String order,
+  String kind,
+  int ledgerRevision,
+});
+
+/// Unsent input only. An updated bill uses a different key so an old refund or
+/// collection amount cannot silently become a new payment after confirmation.
+class WorkspaceLedgerFormDraft {
+  WorkspaceLedgerFormDraft({
+    required this.key,
+    required this.revision,
+    required Map<String, String> fields,
+  }) : fields = Map.unmodifiable(fields);
+  final WorkspaceLedgerFormKey key;
+  final int revision;
+  final Map<String, String> fields;
+  bool get valid =>
+      revision > 0 &&
+      key.ledgerRevision > 0 &&
+      [
+        key.account,
+        key.store,
+        key.customer,
+        key.invoice,
+        key.order,
+      ].every((value) => value.trim().isNotEmpty && value.length <= 512) &&
+      const ['collection', 'refund', 'return'].contains(key.kind) &&
+      fields.keys.every(
+        (field) =>
+            (key.kind == 'return'
+                    ? const ['product', 'quantity', 'sellable', 'reason']
+                    : const ['amount', 'channel', 'reference'])
+                .contains(field),
+      ) &&
+      fields.values.every((value) => value.length <= 512);
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'account': key.account,
+    'store': key.store,
+    'customer': key.customer,
+    'invoice': key.invoice,
+    'order': key.order,
+    'kind': key.kind,
+    'ledgerRevision': key.ledgerRevision,
+    'revision': revision,
+    'fields': fields,
+  };
+  static WorkspaceLedgerFormDraft? fromJson(Object? value) {
+    if (value is! Map ||
+        value['version'] != 1 ||
+        value['revision'] is! int ||
+        value['ledgerRevision'] is! int ||
+        value['fields'] is! Map ||
+        ![
+          'account',
+          'store',
+          'customer',
+          'invoice',
+          'order',
+          'kind',
+        ].every((key) => value[key] is String)) {
+      return null;
+    }
+    final raw = value['fields'] as Map;
+    if (raw.entries.any(
+      (entry) => entry.key is! String || entry.value is! String,
+    )) {
+      return null;
+    }
+    final draft = WorkspaceLedgerFormDraft(
+      key: (
+        account: value['account'] as String,
+        store: value['store'] as String,
+        customer: value['customer'] as String,
+        invoice: value['invoice'] as String,
+        order: value['order'] as String,
+        kind: value['kind'] as String,
+        ledgerRevision: value['ledgerRevision'] as int,
+      ),
+      revision: value['revision'] as int,
+      fields: raw.cast<String, String>(),
+    );
+    return draft.valid ? draft : null;
+  }
+}
 
 class WorkspaceStockMovement {
   const WorkspaceStockMovement({
@@ -1528,6 +2852,182 @@ typedef WorkspaceStockHistoryKey = ({
 
 /// Immutable read scope. Calendar dates are converted to UTC by the caller;
 /// from is inclusive, until exclusive. A cursor belongs to one snapshot only.
+/// Scoped quantity recovery for the local frontend journey. A movement ID is
+/// acknowledged once; saving this record does not establish backend stock authority.
+class WorkspaceInventoryLedger {
+  WorkspaceInventoryLedger({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.revision,
+    required this.asOf,
+    required Map<String, int> openingQuantities,
+    required List<WorkspaceStockMovement> movements,
+  }) : openingQuantities = Map.unmodifiable(openingQuantities),
+       movements = List.unmodifiable(movements);
+  final String accountScope, workspaceId;
+  final int revision;
+  final DateTime asOf;
+  final Map<String, int> openingQuantities;
+  final List<WorkspaceStockMovement> movements;
+
+  Map<String, int>? get quantities {
+    if (accountScope.trim().isEmpty ||
+        workspaceId.trim().isEmpty ||
+        revision <= 0 ||
+        openingQuantities.entries.any(
+          (item) =>
+              item.key.trim().isEmpty ||
+              item.value < 0 ||
+              item.value > 2147483647,
+        )) {
+      return null;
+    }
+    final result = Map<String, int>.of(openingQuantities);
+    final ids = <String>{};
+    for (final movement in movements) {
+      if (!movement.valid ||
+          !ids.add(movement.id) ||
+          movement.occurredAt.isAfter(asOf) ||
+          !result.containsKey(movement.productId)) {
+        return null;
+      }
+      final quantity = result[movement.productId]! + movement.quantityDelta;
+      if (quantity < 0 || quantity > 2147483647) return null;
+      result[movement.productId] = quantity;
+    }
+    return Map.unmodifiable(result);
+  }
+
+  bool get valid => quantities != null;
+
+  WorkspaceInventoryLedger? post(
+    List<WorkspaceStockMovement> incoming, {
+    required DateTime at,
+    Set<String> newProductIds = const {},
+  }) {
+    if (!valid || at.isBefore(asOf)) return null;
+    if (newProductIds.any((id) => id.trim().isEmpty)) {
+      return null;
+    }
+    final opening = Map<String, int>.of(openingQuantities);
+    for (final id in newProductIds) {
+      opening.putIfAbsent(id, () => 0);
+    }
+    final known = {for (final movement in movements) movement.id: movement};
+    final additions = <WorkspaceStockMovement>[];
+    for (final movement in incoming) {
+      final previous = known[movement.id];
+      if (previous != null) {
+        if (previous.contentIdentity != movement.contentIdentity) return null;
+      } else {
+        known[movement.id] = movement;
+        additions.add(movement);
+      }
+    }
+    if (additions.isEmpty && opening.length == openingQuantities.length) {
+      return this;
+    }
+    final next = WorkspaceInventoryLedger(
+      accountScope: accountScope,
+      workspaceId: workspaceId,
+      revision: revision + 1,
+      asOf: at,
+      openingQuantities: opening,
+      movements: [...movements, ...additions],
+    );
+    return next.valid ? next : null;
+  }
+
+  bool canFollow(WorkspaceInventoryLedger previous) {
+    if (!valid ||
+        !previous.valid ||
+        accountScope != previous.accountScope ||
+        workspaceId != previous.workspaceId ||
+        revision < previous.revision ||
+        asOf.isBefore(previous.asOf) ||
+        previous.openingQuantities.entries.any(
+          (entry) => openingQuantities[entry.key] != entry.value,
+        ) ||
+        openingQuantities.entries.any(
+          (entry) =>
+              !previous.openingQuantities.containsKey(entry.key) &&
+              entry.value != 0,
+        )) {
+      return false;
+    }
+    if (revision == previous.revision) {
+      return jsonEncode(toJson()) == jsonEncode(previous.toJson());
+    }
+    if (movements.length < previous.movements.length) return false;
+    for (var i = 0; i < previous.movements.length; i++) {
+      if (movements[i].contentIdentity !=
+          previous.movements[i].contentIdentity) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  Map<String, Object?> toJson() => {
+    'version': 1,
+    'accountScope': accountScope,
+    'workspaceId': workspaceId,
+    'revision': revision,
+    'asOf': asOf.toUtc().toIso8601String(),
+    'openingQuantities': openingQuantities,
+    'movements': [
+      for (final movement in movements)
+        {
+          'id': movement.id,
+          'productId': movement.productId,
+          'productLabel': movement.productLabel,
+          'kind': movement.kind.name,
+          'quantityDelta': movement.quantityDelta,
+          'reason': movement.reason,
+          'occurredAt': movement.occurredAt.toUtc().toIso8601String(),
+          'referenceKind': movement.referenceKind?.name,
+          'referenceId': movement.referenceId,
+        },
+    ],
+  };
+  factory WorkspaceInventoryLedger.fromJson(Object? value) {
+    if (value is! Map || value['version'] != 1) {
+      throw const FormatException('Stock recovery version is unavailable.');
+    }
+    final result = WorkspaceInventoryLedger(
+      accountScope: value['accountScope'] as String,
+      workspaceId: value['workspaceId'] as String,
+      revision: value['revision'] as int,
+      asOf: DateTime.parse(value['asOf'] as String),
+      openingQuantities: Map<String, int>.from(
+        value['openingQuantities'] as Map,
+      ),
+      movements: [
+        for (final movement in value['movements'] as List)
+          WorkspaceStockMovement(
+            id: movement['id'] as String,
+            productId: movement['productId'] as String,
+            productLabel: movement['productLabel'] as String,
+            kind: WorkspaceStockMovementKind.values.byName(
+              movement['kind'] as String,
+            ),
+            quantityDelta: movement['quantityDelta'] as int,
+            reason: movement['reason'] as String,
+            occurredAt: DateTime.parse(movement['occurredAt'] as String),
+            referenceKind: movement['referenceKind'] == null
+                ? null
+                : WorkspaceStockReferenceKind.values.byName(
+                    movement['referenceKind'] as String,
+                  ),
+            referenceId: movement['referenceId'] as String?,
+          ),
+      ],
+    );
+    if (!result.valid) throw const FormatException('Saved stock is invalid.');
+    return result;
+  }
+}
+
 class WorkspaceStockHistoryQuery {
   const WorkspaceStockHistoryQuery({
     required this.accountScope,

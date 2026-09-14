@@ -32,6 +32,49 @@ import 'package:moolsocial/ui_v2/profile/global_security_v2.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 // Host-only authoritative-response fixtures. These never qualify live grants.
+class _LedgerFormFixtureStore implements WorkLedgerFormDraftStore {
+  bool failWrite = false;
+  final drafts = <WorkspaceLedgerFormKey, WorkspaceLedgerFormDraft>{};
+  @override
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) async =>
+      drafts[key];
+  @override
+  Future<void> save(
+    WorkspaceLedgerFormDraft draft, {
+    required int? expectedRevision,
+  }) async {
+    if (failWrite) {
+      throw StateError('Draft storage unavailable');
+    }
+    if (!draft.valid ||
+        drafts[draft.key]?.revision != expectedRevision ||
+        draft.revision != (expectedRevision ?? 0) + 1) {
+      throw StateError('Draft revision mismatch');
+    }
+    drafts[draft.key] = draft;
+  }
+}
+
+class _LedgerCheckpointFixtureStore implements WorkLedgerCheckpointStore {
+  WorkspaceLedgerCheckpoint? value;
+  @override
+  Future<WorkspaceLedgerCheckpoint?> read(String account, String store) async =>
+      value?.finance.accountScope == account &&
+          value?.finance.workspaceId == store
+      ? value
+      : null;
+  @override
+  Future<void> save(
+    WorkspaceLedgerCheckpoint checkpoint, {
+    required int? expectedRevision,
+  }) async {
+    if (!checkpoint.valid || value?.revision != expectedRevision) {
+      throw StateError('Stale fixture write');
+    }
+    value = checkpoint;
+  }
+}
+
 class _StorePurchaseBookmarks implements WorkProcurementBookmarkStore {
   WorkProcurementBookmark? value;
   bool failInactive = false;
@@ -829,6 +872,7 @@ void main() {
             gateway: gateway,
             contactDraftStore: contactStore,
             counterDraftStore: _CounterDraftFixtureStore(),
+            ledgerFormDraftStore: _LedgerFormFixtureStore(),
             issueDraftStore: issueDraftStore ?? _IssueDraftFixtureStore(),
             issueCommandGateway: issueCommandGateway,
             issueCommandStore: issueCommandStore ?? _IssueCommandFixtureStore(),
@@ -22269,6 +22313,626 @@ void main() {
         },
       );
     }
+
+    testWidgets(
+      'LEDGER01 return sheet confirms original bill and stock $scale',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        final product = seed.products.first;
+        work.workspaceCatalogueItems.add(product);
+        final order = WorkspaceOrderRecord(
+          id: 'RETURN-ORDER',
+          customer: '9000000088',
+          items: product.title,
+          quantities: {product.id: 1},
+          amount: product.sellingPrice,
+          source: 'Counter',
+          fulfilment: 'At the shop',
+          payment: 'Customer due',
+          address: '',
+          stage: 'Completed',
+          needsDelivery: false,
+          createdAt: seed.finance.asOf,
+          itemSnapshots: [
+            WorkspaceOrderItemSnapshot(
+              productId: product.id,
+              name: product.title,
+              pack: product.pack,
+              quantity: 1,
+              unitPricePaise: product.sellingPrice * 100,
+              lineTotalPaise: product.sellingPrice * 100,
+            ),
+          ],
+        );
+        work.workspaceOrders.add(order);
+        final empty = WorkspaceFinanceSnapshot(
+          accountScope: seed.accountScope,
+          workspaceId: seed.storeId,
+          revision: 1,
+          asOf: seed.finance.asOf,
+          salesTodayMinor: 0,
+          duesMinor: 0,
+          availableMinor: 0,
+          heldMinor: 0,
+          requestedMinor: 0,
+          paidOutMinor: 0,
+          feesMinor: 0,
+          deliveryAdjustmentsMinor: 0,
+          refundsMinor: 0,
+          taxWithheldMinor: 0,
+          payments: const [],
+          payouts: const [],
+          historyComplete: true,
+        );
+        final adapter = StoreReviewCustomerCollectionGateway(empty);
+        final finance = await adapter.recordInvoice(
+          accountScope: seed.accountScope,
+          storeId: seed.storeId,
+          invoice: WorkspaceCustomerInvoice(
+            id: 'RETURN-INVOICE',
+            orderId: order.id,
+            customer: order.customer,
+            items: order.items,
+            amount: order.amount,
+            payment: order.payment,
+            issuedAt: order.createdAt,
+          ),
+        );
+        expect(work.applyWorkspaceFinance(finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: adapter,
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await reveal(tester, find.byKey(const Key('work-pulse-dues')));
+        await tester.tap(find.byKey(const Key('work-pulse-dues')));
+        await tester.pumpAndSettle();
+        final button = find.byKey(const ValueKey('record-return-RETURN-ORDER'));
+        await reveal(tester, button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'ledger01-return-top-$scale');
+        await reveal(tester, find.byKey(const Key('return-sellable')));
+        await tester.enterText(find.byKey(const Key('return-sellable')), '1');
+        await reveal(tester, find.byKey(const Key('return-reason')));
+        await tester.enterText(
+          find.byKey(const Key('return-reason')),
+          'Unopened pack',
+        );
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('return-reason')), findsNothing);
+        expect(work.pendingCustomerReturn, isNull);
+        await reveal(tester, button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('return-sellable')))
+              .controller!
+              .text,
+          '1',
+        );
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('return-reason')))
+              .controller!
+              .text,
+          'Unopened pack',
+        );
+        final draftStore =
+            work.ledgerFormDraftStore! as _LedgerFormFixtureStore;
+        draftStore.failWrite = true;
+        await reveal(tester, find.byKey(const Key('return-reason')));
+        await tester.enterText(
+          find.byKey(const Key('return-reason')),
+          'Retain this unsaved reason',
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Input is not saved yet. Retry saving before leaving.'),
+          findsOneWidget,
+        );
+        expect(
+          tester
+              .widget<FilledButton>(
+                find.widgetWithText(FilledButton, 'Confirm return'),
+              )
+              .onPressed,
+          isNull,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('return-reason')))
+              .controller!
+              .text,
+          'Retain this unsaved reason',
+        );
+        expect(work.pendingCustomerReturn, isNull);
+        draftStore.failWrite = false;
+        await reveal(tester, find.text('Retry saving input'));
+        await tester.tap(find.text('Retry saving input'));
+        await tester.pumpAndSettle();
+        expect(
+          find.text('Input is not saved yet. Retry saving before leaving.'),
+          findsNothing,
+        );
+        expect(
+          draftStore.drafts.values.single.fields['reason'],
+          'Retain this unsaved reason',
+        );
+        await captureStoreView(tester, 'ledger01-return-form-$scale');
+        expect(tester.takeException(), isNull);
+        await reveal(tester, find.text('Confirm return'));
+        await tester.tap(find.text('Confirm return'));
+        await tester.pumpAndSettle();
+        expect(work.pendingCustomerReturn, isNull);
+        expect(work.workspaceFinance!.payments.single.dueMinor, 0);
+        expect(work.workspaceFinance!.payments.single.paidMinor, 0);
+        expect(work.workspaceCatalogueItems.single.stock, product.stock + 1);
+        expect(
+          work.workspaceStockMovements.single.kind,
+          WorkspaceStockMovementKind.returned,
+        );
+        expect(find.byKey(const Key('return-reason')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'LEDGER01 refund sheet confirms credit without stock changes $scale',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        final product = seed.products.first;
+        work.workspaceCatalogueItems.add(product);
+        final order = WorkspaceOrderRecord(
+          id: 'RETURN-ORDER',
+          customer: '9000000088',
+          items: product.title,
+          quantities: {product.id: 1},
+          amount: product.sellingPrice,
+          source: 'Counter',
+          fulfilment: 'At the shop',
+          payment: 'Customer due',
+          address: '',
+          stage: 'Completed',
+          needsDelivery: false,
+          createdAt: seed.finance.asOf,
+          itemSnapshots: [
+            WorkspaceOrderItemSnapshot(
+              productId: product.id,
+              name: product.title,
+              pack: product.pack,
+              quantity: 1,
+              unitPricePaise: product.sellingPrice * 100,
+              lineTotalPaise: product.sellingPrice * 100,
+            ),
+          ],
+        );
+        work.workspaceOrders.add(order);
+        final empty = WorkspaceFinanceSnapshot(
+          accountScope: seed.accountScope,
+          workspaceId: seed.storeId,
+          revision: 1,
+          asOf: seed.finance.asOf,
+          salesTodayMinor: 0,
+          duesMinor: 0,
+          availableMinor: 0,
+          heldMinor: 0,
+          requestedMinor: 0,
+          paidOutMinor: 0,
+          feesMinor: 0,
+          deliveryAdjustmentsMinor: 0,
+          refundsMinor: 0,
+          taxWithheldMinor: 0,
+          payments: const [],
+          payouts: const [],
+          historyComplete: true,
+        );
+        final adapter = StoreReviewCustomerCollectionGateway(empty);
+        final finance = await adapter.recordInvoice(
+          accountScope: seed.accountScope,
+          storeId: seed.storeId,
+          invoice: WorkspaceCustomerInvoice(
+            id: 'RETURN-INVOICE',
+            orderId: order.id,
+            customer: order.customer,
+            items: order.items,
+            amount: order.amount,
+            payment: order.payment,
+            issuedAt: order.createdAt,
+          ),
+        );
+        expect(work.applyWorkspaceFinance(finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: adapter,
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        expect(
+          await work.recordCustomerCollection(
+            customerId: order.customer,
+            invoiceId: 'RETURN-INVOICE',
+            amountMinor: order.amount * 100,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await reveal(tester, find.byKey(const Key('work-pulse-sales')));
+        await tester.tap(find.byKey(const Key('work-pulse-sales')));
+        await tester.pumpAndSettle();
+        final button = find.byKey(const ValueKey('record-return-RETURN-ORDER'));
+        await reveal(tester, button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+
+        await reveal(tester, find.byKey(const Key('return-sellable')));
+        await tester.enterText(find.byKey(const Key('return-sellable')), '1');
+        await reveal(tester, find.byKey(const Key('return-reason')));
+        await tester.enterText(
+          find.byKey(const Key('return-reason')),
+          'Unopened pack',
+        );
+        await tester.pumpAndSettle();
+
+        expect(tester.takeException(), isNull);
+        await reveal(tester, find.text('Confirm return'));
+        await tester.tap(find.text('Confirm return'));
+        await tester.pumpAndSettle();
+        expect(work.pendingCustomerReturn, isNull);
+        expect(work.workspaceFinance!.payments.single.dueMinor, 0);
+        expect(
+          work.workspaceFinance!.payments.single.paidMinor,
+          order.amount * 100,
+        );
+        expect(work.workspaceCatalogueItems.single.stock, product.stock + 1);
+        expect(
+          work.workspaceStockMovements.single.kind,
+          WorkspaceStockMovementKind.returned,
+        );
+        final refundButton = find.byKey(
+          const ValueKey('record-refund-RETURN-ORDER'),
+        );
+        await reveal(tester, refundButton);
+        await Scrollable.ensureVisible(
+          tester.element(refundButton),
+          alignment: 0.5,
+        );
+        await tester.pumpAndSettle();
+        for (
+          var scroll = 0;
+          scroll < 8 && refundButton.hitTestable().evaluate().isEmpty;
+          scroll++
+        ) {
+          await tester.drag(
+            find.byKey(const Key('work-first-tap-working-surface')),
+            Offset(
+              0,
+              tester.getCenter(refundButton).dy <
+                      tester
+                          .getCenter(
+                            find.byKey(
+                              const Key('work-first-tap-working-surface'),
+                            ),
+                          )
+                          .dy
+                  ? 48
+                  : -48,
+            ),
+          );
+          await tester.pumpAndSettle();
+        }
+        await captureStoreView(
+          tester,
+          'ledger01-refund-entry-diagnostic-$scale',
+        );
+        debugPrint(
+          'Refund rect: ${tester.getRect(refundButton)}; surface: ${tester.getRect(find.byKey(const Key('work-first-tap-working-surface')))}',
+        );
+        expect(refundButton.hitTestable(), findsOneWidget);
+        await tester.tap(refundButton);
+        await tester.pumpAndSettle();
+        await reveal(tester, find.byKey(const Key('refund-amount')));
+        await tester.enterText(
+          find.byKey(const Key('refund-amount')),
+          '${order.amount + 1}',
+        );
+        await reveal(tester, find.text('Confirm refund'));
+        await tester.tap(find.text('Confirm refund'));
+        await tester.pumpAndSettle();
+        expect(work.pendingCustomerRefund, isNull);
+        expect(work.workspaceFinance!.payments.single.refundedMinor, 0);
+        await reveal(tester, find.byKey(const Key('refund-amount')));
+        await tester.enterText(
+          find.byKey(const Key('refund-amount')),
+          '${order.amount}',
+        );
+        await tester.pumpAndSettle();
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('refund-amount')), findsNothing);
+        expect(work.workspaceFinance!.payments.single.refundedMinor, 0);
+        expect(refundButton.hitTestable(), findsOneWidget);
+        await tester.tap(refundButton);
+        await tester.pumpAndSettle();
+        expect(
+          tester
+              .widget<TextField>(find.byKey(const Key('refund-amount')))
+              .controller!
+              .text,
+          '${order.amount}',
+        );
+        await captureStoreView(tester, 'ledger01-refund-form-$scale');
+        await reveal(tester, find.text('Confirm refund'));
+        await tester.tap(find.text('Confirm refund'));
+        await tester.pumpAndSettle();
+        expect(work.pendingCustomerRefund, isNull);
+        expect(
+          work.workspaceFinance!.payments.single.refundedMinor,
+          order.amount * 100,
+        );
+        expect(
+          work.workspaceFinance!.payments.single.paidMinor,
+          order.amount * 100,
+        );
+        expect(work.workspaceCatalogueItems.single.stock, product.stock + 1);
+        expect(work.workspaceStockMovements, hasLength(1));
+        expect(find.byKey(const Key('refund-amount')), findsNothing);
+        expect(
+          find.byKey(const ValueKey('record-refund-RETURN-ORDER')),
+          findsNothing,
+        );
+        expect(find.byKey(const Key('return-reason')), findsNothing);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    testWidgets(
+      'LEDGER01 record partial collection against existing invoice $scale',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await reveal(tester, find.byKey(const Key('work-pulse-dues')));
+        await tester.tap(find.byKey(const Key('work-pulse-dues')));
+        await tester.pumpAndSettle();
+        final invoice = seed.finance.payments.first;
+        final button = find.byKey(
+          ValueKey('record-collection-${invoice.orderId}'),
+        );
+        await reveal(tester, button);
+        await tester.tap(button);
+        await tester.pumpAndSettle();
+        final amount = invoice.dueMinor ~/ 2;
+        await tester.enterText(
+          find.byKey(const Key('collection-amount')),
+          (amount / 100).toStringAsFixed(2),
+        );
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'ledger01-collection-form-$scale');
+        await reveal(tester, find.text('Confirm collection'));
+        await tester.tap(find.text('Confirm collection'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('collection-amount')), findsNothing);
+        expect(
+          work.workspaceFinance!.duesMinor,
+          seed.finance.duesMinor - amount,
+        );
+        expect(
+          work.workspaceFinance!.salesTodayMinor,
+          seed.finance.salesTodayMinor,
+        );
+        expect(work.pendingCustomerCollection, isNull);
+        expect(tester.takeException(), isNull);
+        await captureStoreView(tester, 'ledger01-after-collection-$scale');
+      },
+    );
+
+    testWidgets(
+      'LEDGER01 customer book shows the collected balance in paise $scale',
+      (tester) async {
+        final work = storeViewFixture(null, _ContactDraftFixtureStore());
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        work.workspaceOrders.addAll(seed.orders);
+        work.applyWorkspaceFinance(seed.finance);
+        work.bindCustomerCollectionGateway(
+          accountScope: seed.accountScope,
+          storeId: seed.storeId,
+          adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+          checkpointStore: _LedgerCheckpointFixtureStore(),
+        );
+        final payment = seed.finance.payments.first;
+        expect(
+          await work.recordCustomerCollection(
+            customerId: payment.customerId,
+            invoiceId: payment.invoiceId!,
+            amountMinor: 101,
+            channel: WorkspacePaymentChannel.cash,
+          ),
+          isTrue,
+        );
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        await openStoreTools(tester);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-business-customers')));
+        await tester.pumpAndSettle();
+        final customer = find.byKey(
+          ValueKey('work-customer-${payment.customerId}'),
+        );
+        await reveal(tester, customer);
+        final due = find.descendant(
+          of: customer,
+          matching: find.textContaining('262.99'),
+        );
+        await reveal(tester, due.first);
+        expect(due, findsWidgets);
+        expect(tester.takeException(), isNull);
+        await tester.ensureVisible(customer);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'ledger01-customer-book-paise-$scale');
+      },
+    );
+
+    testWidgets('LEDGER01 customer statement opens within dues at $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final now = DateTime.now();
+      expect(
+        work.applyWorkspaceFinance(
+          WorkspaceFinanceSnapshot(
+            accountScope: 'review-draft-account',
+            workspaceId: work.activeWorkspace!.id,
+            revision: 1,
+            asOf: now,
+            salesTodayMinor: 100000,
+            duesMinor: 40000,
+            availableMinor: 0,
+            heldMinor: 0,
+            requestedMinor: 0,
+            paidOutMinor: 0,
+            feesMinor: 0,
+            deliveryAdjustmentsMinor: 0,
+            refundsMinor: 0,
+            taxWithheldMinor: 0,
+            payments: const [],
+            payouts: const [],
+            customerLedgers: [
+              WorkspaceCustomerLedger(
+                accountScope: 'review-draft-account',
+                workspaceId: work.activeWorkspace!.id,
+                customerId: 'ledger-customer',
+                customerName: 'Ledger test customer',
+                revision: 1,
+                asOf: now,
+                openingBalanceMinor: 0,
+                historyComplete: true,
+                entries: [
+                  for (var i = 1; i <= 2; i++)
+                    WorkspaceCustomerLedgerEntry(
+                      id: 'ledger-event-$i',
+                      operationId: 'ledger-operation-$i',
+                      invoiceId: 'INV-LEDGER',
+                      orderId: 'APP-LEDGER',
+                      sequence: i,
+                      occurredAt: now,
+                      kind: i == 1
+                          ? WorkspaceLedgerEntryKind.invoice
+                          : WorkspaceLedgerEntryKind.collection,
+                      state: WorkspaceLedgerPostingState.posted,
+                      amountMinor: i == 1 ? 100000 : 60000,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        isTrue,
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      await reveal(tester, find.byKey(const Key('work-pulse-dues')));
+      await tester.tap(find.byKey(const Key('work-pulse-dues')));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.text('Ledger test customer'));
+      await tester.tap(find.text('Ledger test customer'));
+      await tester.pumpAndSettle();
+      await reveal(tester, find.text('Opening balance'));
+      await captureStoreView(tester, 'ledger01-customer-opening-$scale');
+      await reveal(
+        tester,
+        find.byKey(const ValueKey('customer-ledger-entry-ledger-event-2')),
+      );
+      expect(find.text('Payment received'), findsOneWidget);
+      expect(find.text('INV-LEDGER · APP-LEDGER'), findsWidgets);
+      await captureStoreView(tester, 'ledger01-customer-collection-$scale');
+      final balance = find.descendant(
+        of: find.byKey(const ValueKey('customer-ledger-entry-ledger-event-2')),
+        matching: find.text('₹400'),
+      );
+      await reveal(tester, balance);
+      expect(balance.hitTestable(), findsOneWidget);
+      await captureStoreView(tester, 'ledger01-customer-balance-$scale');
+      expect(tester.takeException(), isNull);
+      expect(work.workspaceStockMovements, isEmpty);
+      await tester.binding.handlePopRoute();
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-finance-dues')), findsNothing);
+    });
 
     testWidgets(
       'DASH08 finance first taps keep 25 payment updates separate from 100 orders $scale',

@@ -860,6 +860,103 @@ abstract interface class WorkIssueDraftStore {
   Future<void> save(WorkspaceIssueDraft draft);
 }
 
+abstract interface class WorkLedgerFormDraftStore {
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key);
+  Future<void> save(
+    WorkspaceLedgerFormDraft draft, {
+    required int? expectedRevision,
+  });
+}
+
+/// Uses the existing encrypted draft storage approach; never financial authority.
+class SecureWorkLedgerFormDraftStore implements WorkLedgerFormDraftStore {
+  SecureWorkLedgerFormDraftStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  static final _pending = <String, Future<void>>{};
+  String _key(WorkspaceLedgerFormKey key) =>
+      'moolsocial.workspace.ledger-form.v1.${[key.account, key.store, key.customer, key.invoice, key.order, key.kind, '${key.ledgerRevision}'].map(Uri.encodeComponent).join('/')}';
+  void _check(WorkspaceLedgerFormKey key) {
+    if (key.account != accountScope() ||
+        !WorkspaceLedgerFormDraft(
+          key: key,
+          revision: 1,
+          fields: const {},
+        ).valid) {
+      throw const WorkGatewayException('Return to the correct Store invoice.');
+    }
+  }
+
+  Future<T> _serial<T>(String key, Future<T> Function() action) {
+    final result = (_pending[key] ?? Future<void>.value()).then(
+      (_) => action(),
+    );
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _pending[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_pending[key], tail)) {
+          _pending.remove(key);
+        }
+      }),
+    );
+    return result;
+  }
+
+  Future<WorkspaceLedgerFormDraft?> _read(WorkspaceLedgerFormKey key) async {
+    _check(key);
+    final raw = await _storage.read(key: _key(key));
+    _check(key);
+    if (raw == null) {
+      return null;
+    }
+    WorkspaceLedgerFormDraft? draft;
+    try {
+      draft = WorkspaceLedgerFormDraft.fromJson(jsonDecode(raw));
+    } on FormatException {
+      // Preserve unreadable data rather than replacing it with an empty form.
+    }
+    if (draft == null || draft.key != key) {
+      throw const WorkGatewayException(
+        'Saved invoice input could not be opened.',
+      );
+    }
+    return draft;
+  }
+
+  @override
+  Future<WorkspaceLedgerFormDraft?> read(WorkspaceLedgerFormKey key) =>
+      _serial(_key(key), () => _read(key));
+  @override
+  Future<void> save(
+    WorkspaceLedgerFormDraft draft, {
+    required int? expectedRevision,
+  }) => _serial(_key(draft.key), () async {
+    _check(draft.key);
+    if (!draft.valid || draft.revision != (expectedRevision ?? 0) + 1) {
+      throw const WorkGatewayException('Invoice input could not be saved.');
+    }
+    final previous = await _read(draft.key);
+    final encoded = jsonEncode(draft.toJson());
+    if (previous != null && jsonEncode(previous.toJson()) == encoded) {
+      return;
+    }
+    if (previous?.revision != expectedRevision) {
+      throw const WorkGatewayException(
+        'Saved invoice input changed. Reopen it first.',
+      );
+    }
+    await _storage.write(key: _key(draft.key), value: encoded);
+    _check(draft.key);
+  });
+}
+
 /// Separate encrypted keys per account, Store and case. Drafts contain no OTP,
 /// customer collection challenge, payment credential or decision authority.
 class SecureWorkIssueDraftStore implements WorkIssueDraftStore {
@@ -2882,6 +2979,1025 @@ class AuthenticatedWorkGateway implements WorkGateway {
   }
 }
 
+abstract interface class WorkCustomerCollectionGateway {
+  Future<WorkspaceFinanceSnapshot> recordCollection(
+    WorkspaceCustomerCollection request,
+  );
+  Future<WorkspaceFinanceSnapshot> reconcileCollection(
+    WorkspaceCustomerCollection request,
+  );
+}
+
+abstract interface class WorkCustomerInvoiceGateway {
+  Future<WorkspaceFinanceSnapshot> reconcileInvoice({
+    required String accountScope,
+    required String storeId,
+    required WorkspaceCustomerInvoice invoice,
+  });
+
+  Future<WorkspaceFinanceSnapshot> recordInvoice({
+    required String accountScope,
+    required String storeId,
+    required WorkspaceCustomerInvoice invoice,
+  });
+}
+
+abstract interface class WorkCustomerRefundGateway {
+  Future<WorkspaceFinanceSnapshot> recordRefund(
+    WorkspaceCustomerRefund request,
+  );
+  Future<WorkspaceFinanceSnapshot> reconcileRefund(
+    WorkspaceCustomerRefund request,
+  );
+}
+
+abstract interface class WorkCustomerReturnGateway {
+  Future<WorkspaceFinanceSnapshot> recordReturn(
+    WorkspaceCustomerReturn request,
+    WorkspaceOrderRecord originalOrder,
+  );
+  Future<WorkspaceFinanceSnapshot> reconcileReturn(
+    WorkspaceCustomerReturn request,
+  );
+}
+
+abstract interface class WorkLedgerCheckpointStore {
+  Future<WorkspaceLedgerCheckpoint?> read(String account, String store);
+  Future<void> save(
+    WorkspaceLedgerCheckpoint checkpoint, {
+    required int? expectedRevision,
+  });
+}
+
+/// Uses the existing encrypted device-storage mechanism, scoped to one Store.
+/// Serializes native writes; a timeout cannot release an unfinished write.
+class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore {
+  SecureWorkLedgerCheckpointStore({
+    required this.accountScope,
+    FlutterSecureStorage? storage,
+  }) : _storage = storage ?? const FlutterSecureStorage();
+  final String? Function() accountScope;
+  final FlutterSecureStorage _storage;
+  static final _tails = <String, Future<void>>{};
+  String _key(String account, String store) =>
+      'moolsocial.workspace.ledger.v1.${Uri.encodeComponent(account)}/${Uri.encodeComponent(store)}';
+  void _check(String account, String store) {
+    if (account.trim().isEmpty ||
+        store.trim().isEmpty ||
+        accountScope() != account) {
+      throw const WorkGatewayException(
+        'Sign in again to recover this Store ledger.',
+      );
+    }
+  }
+
+  Future<T> _serial<T>(String key, Future<T> Function() action) {
+    final result = (_tails[key] ?? Future<void>.value()).then((_) => action());
+    final tail = result.then<void>(
+      (_) {},
+      onError: (Object _, StackTrace _) {},
+    );
+    _tails[key] = tail;
+    unawaited(
+      tail.then((_) {
+        if (identical(_tails[key], tail)) _tails.remove(key);
+      }),
+    );
+    return result;
+  }
+
+  Future<WorkspaceLedgerCheckpoint?> _read(String account, String store) async {
+    _check(account, store);
+    final raw = await _storage.read(key: _key(account, store));
+    _check(account, store);
+    if (raw == null) return null;
+    WorkspaceLedgerCheckpoint? result;
+    try {
+      result = WorkspaceLedgerCheckpoint.fromJson(jsonDecode(raw));
+    } on FormatException {
+      /* Retain invalid bytes. */
+    }
+    if (result == null ||
+        result.finance.accountScope != account ||
+        result.finance.workspaceId != store) {
+      throw const WorkGatewayException(
+        'Saved ledger needs recovery. Its data has been kept.',
+      );
+    }
+    return result;
+  }
+
+  @override
+  Future<WorkspaceLedgerCheckpoint?> read(String account, String store) =>
+      _serial(_key(account, store), () => _read(account, store));
+
+  @override
+  Future<void> save(
+    WorkspaceLedgerCheckpoint checkpoint, {
+    required int? expectedRevision,
+  }) => _serial(
+    _key(checkpoint.finance.accountScope, checkpoint.finance.workspaceId),
+    () async {
+      final next = checkpoint.finance;
+      _check(next.accountScope, next.workspaceId);
+      if (!checkpoint.valid ||
+          checkpoint.revision != (expectedRevision ?? 0) + 1) {
+        throw const WorkGatewayException('Ledger checkpoint is invalid.');
+      }
+      final current = await _read(next.accountScope, next.workspaceId);
+      final encoded = jsonEncode(checkpoint.toJson());
+      if (current != null && jsonEncode(current.toJson()) == encoded) return;
+      if (current?.revision != expectedRevision) {
+        throw const WorkGatewayException(
+          'Saved ledger changed. Recover it before continuing.',
+        );
+      }
+      if (current != null) {
+        final previous = current.finance;
+        if (current.billedInvoices.entries.any(
+          (entry) =>
+              jsonEncode(
+                checkpoint.billedInvoices[entry.key]?.toLedgerJson(),
+              ) !=
+              jsonEncode(entry.value.toLedgerJson()),
+        )) {
+          throw const WorkGatewayException(
+            'Original invoices cannot be replaced or discarded.',
+          );
+        }
+        if (current.billedOrders.entries.any(
+          (entry) =>
+              jsonEncode(checkpoint.billedOrders[entry.key]?.toLedgerJson()) !=
+              jsonEncode(entry.value.toLedgerJson()),
+        )) {
+          throw const WorkGatewayException(
+            'Original billed items cannot be replaced or discarded.',
+          );
+        }
+        if (current.inventory != null &&
+            checkpoint.inventory?.canFollow(current.inventory!) != true) {
+          throw const WorkGatewayException(
+            'Saved stock movements cannot be replaced or discarded.',
+          );
+        }
+
+        if (next.revision < previous.revision ||
+            next.asOf.isBefore(previous.asOf) ||
+            (next.revision == previous.revision &&
+                jsonEncode(checkpoint.toJson()['finance']) !=
+                    jsonEncode(current.toJson()['finance'])) ||
+            previous.customerLedgers.any(
+              (old) =>
+                  next.customerLedgers
+                      .where((l) => l.customerId == old.customerId)
+                      .firstOrNull
+                      ?.canFollow(old) !=
+                  true,
+            )) {
+          throw const WorkGatewayException(
+            'Known ledger history cannot be replaced.',
+          );
+        }
+        final pendingRefund = current.pendingRefund;
+        if (pendingRefund != null) {
+          if (checkpoint.pending != null ||
+              checkpoint.pendingReturn != null ||
+              (checkpoint.pendingRefund != null &&
+                  checkpoint.pendingRefund!.identityData !=
+                      pendingRefund.identityData)) {
+            throw const WorkGatewayException(
+              'The original refund must be reconciled first.',
+            );
+          }
+          if (checkpoint.pendingRefund == null) {
+            final entries = next.customerLedgers
+                .where(
+                  (ledger) => ledger.customerId == pendingRefund.customerId,
+                )
+                .expand((ledger) => ledger.entries)
+                .where(
+                  (entry) => entry.operationId == pendingRefund.operationId,
+                )
+                .toList();
+            final before = previous.payments
+                .where(
+                  (p) =>
+                      p.invoiceId == pendingRefund.invoiceId &&
+                      p.orderId == pendingRefund.orderId &&
+                      p.customerId == pendingRefund.customerId,
+                )
+                .firstOrNull;
+            final after = next.payments
+                .where(
+                  (p) =>
+                      p.invoiceId == pendingRefund.invoiceId &&
+                      p.orderId == pendingRefund.orderId &&
+                      p.customerId == pendingRefund.customerId,
+                )
+                .firstOrNull;
+            if (entries.length != 1 ||
+                entries.single.kind != WorkspaceLedgerEntryKind.refund ||
+                entries.single.state != WorkspaceLedgerPostingState.posted ||
+                entries.single.customerRefund?.identityData !=
+                    pendingRefund.identityData ||
+                before == null ||
+                after == null ||
+                after.amountMinor != before.amountMinor ||
+                after.paidMinor != before.paidMinor ||
+                after.dueMinor != before.dueMinor ||
+                after.refundedMinor !=
+                    before.refundedMinor + pendingRefund.amountMinor ||
+                jsonEncode(checkpoint.inventory?.toJson()) !=
+                    jsonEncode(current.inventory?.toJson())) {
+              throw const WorkGatewayException(
+                'Confirmed refund must match its invoice without changing stock.',
+              );
+            }
+          }
+        }
+        final pendingReturn = current.pendingReturn;
+        if (pendingReturn != null) {
+          if (checkpoint.pending != null ||
+              (checkpoint.pendingReturn != null &&
+                  jsonEncode(checkpoint.pendingReturn!.toJson()) !=
+                      jsonEncode(pendingReturn.toJson()))) {
+            throw const WorkGatewayException(
+              'The original return must be reconciled first.',
+            );
+          }
+          if (checkpoint.pendingReturn == null) {
+            final request = pendingReturn.request;
+            final entries = next.customerLedgers
+                .where((ledger) => ledger.customerId == request.customerId)
+                .expand((ledger) => ledger.entries)
+                .where((entry) => entry.operationId == request.operationId)
+                .toList();
+            final before = previous.payments
+                .where(
+                  (p) =>
+                      p.invoiceId == request.invoiceId &&
+                      p.orderId == request.orderId &&
+                      p.customerId == request.customerId,
+                )
+                .firstOrNull;
+            final after = next.payments
+                .where(
+                  (p) =>
+                      p.invoiceId == request.invoiceId &&
+                      p.orderId == request.orderId &&
+                      p.customerId == request.customerId,
+                )
+                .firstOrNull;
+            final due = before == null
+                ? null
+                : (before.dueMinor - pendingReturn.creditMinor).clamp(
+                    0,
+                    before.dueMinor,
+                  );
+            if (entries.length != 1 ||
+                entries.single.kind != WorkspaceLedgerEntryKind.creditNote ||
+                entries.single.state != WorkspaceLedgerPostingState.posted ||
+                entries.single.amountMinor != pendingReturn.creditMinor ||
+                entries.single.customerReturn == null ||
+                jsonEncode(entries.single.customerReturn!.toJson()) !=
+                    jsonEncode(request.toJson()) ||
+                before == null ||
+                after == null ||
+                after.dueMinor != due ||
+                after.amountMinor != before.amountMinor ||
+                after.paidMinor != before.paidMinor ||
+                after.refundedMinor != before.refundedMinor) {
+              throw const WorkGatewayException(
+                'Confirmed return must match its original invoice and quantities.',
+              );
+            }
+            if (pendingReturn.originalItems.isNotEmpty) {
+              final expected = entries.single
+                  .returnStockMovementsFromSavedItems(
+                    pendingReturn.originalItems,
+                  );
+              final acknowledged = {
+                for (final movement
+                    in checkpoint.inventory?.movements ??
+                        const <WorkspaceStockMovement>[])
+                  movement.id: movement,
+              };
+              if (current.inventory == null ||
+                  checkpoint.inventory == null ||
+                  expected == null ||
+                  expected.any(
+                    (movement) =>
+                        acknowledged[movement.id]?.contentIdentity !=
+                        movement.contentIdentity,
+                  )) {
+                throw const WorkGatewayException(
+                  'Return stock movements must be saved with the credit.',
+                );
+              }
+            }
+          }
+        }
+        final pending = current.pending;
+        if (pending != null) {
+          if (checkpoint.pending != null &&
+              checkpoint.pending!.identityData != pending.identityData) {
+            throw const WorkGatewayException(
+              'The original collection must be reconciled first.',
+            );
+          }
+          if (checkpoint.pending == null) {
+            final before = previous.payments
+                .where(
+                  (p) =>
+                      p.orderId == pending.orderId &&
+                      p.invoiceId == pending.invoiceId &&
+                      p.customerId == pending.customerId,
+                )
+                .firstOrNull;
+            final after = next.payments
+                .where(
+                  (p) =>
+                      p.orderId == pending.orderId &&
+                      p.invoiceId == pending.invoiceId &&
+                      p.customerId == pending.customerId,
+                )
+                .firstOrNull;
+            if (before == null ||
+                after == null ||
+                after.amountMinor != before.amountMinor ||
+                after.dueMinor != before.dueMinor - pending.amountMinor ||
+                after.paidMinor != before.paidMinor + pending.amountMinor ||
+                after.refundedMinor != before.refundedMinor) {
+              throw const WorkGatewayException(
+                'Confirmed collection must match its invoice balance.',
+              );
+            }
+            final entries = next.customerLedgers
+                .where((l) => l.customerId == pending.customerId)
+                .expand((l) => l.entries)
+                .where((e) => e.operationId == pending.operationId);
+            if (entries.length != 1 ||
+                entries.single.invoiceId != pending.invoiceId ||
+                entries.single.orderId != pending.orderId ||
+                entries.single.kind != WorkspaceLedgerEntryKind.collection ||
+                entries.single.state != WorkspaceLedgerPostingState.posted ||
+                entries.single.amountMinor != pending.amountMinor ||
+                entries.single.channel != pending.channel ||
+                entries.single.paymentReference != pending.reference) {
+              throw const WorkGatewayException(
+                'Unconfirmed collection cannot be removed.',
+              );
+            }
+          }
+        }
+      }
+      await _storage.write(
+        key: _key(next.accountScope, next.workspaceId),
+        value: encoded,
+      );
+      _check(next.accountScope, next.workspaceId);
+    },
+  );
+}
+
+/// Synthetic adapter for the existing labelled Store. No network or real money.
+class StoreReviewCustomerCollectionGateway
+    implements
+        WorkCustomerCollectionGateway,
+        WorkCustomerInvoiceGateway,
+        WorkCustomerReturnGateway,
+        WorkCustomerRefundGateway {
+  StoreReviewCustomerCollectionGateway(this._finance);
+  WorkspaceFinanceSnapshot _finance;
+  final _requests = <String, WorkspaceCustomerCollection>{};
+  final _replies = <String, WorkspaceFinanceSnapshot>{};
+  bool _hasRecordedInvoices = false;
+
+  @override
+  Future<WorkspaceFinanceSnapshot> reconcileInvoice({
+    required String accountScope,
+    required String storeId,
+    required WorkspaceCustomerInvoice invoice,
+  }) async {
+    final payment = _finance.payments
+        .where((p) => p.invoiceId == invoice.id && p.orderId == invoice.orderId)
+        .firstOrNull;
+    if (accountScope != _finance.accountScope ||
+        storeId != _finance.workspaceId ||
+        payment == null ||
+        payment.customerId != workspaceCustomerMobile(invoice.customer) ||
+        payment.amountMinor != invoice.amount * 100) {
+      throw StateError('Invoice status is not confirmed.');
+    }
+    return _finance;
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> recordInvoice({
+    required String accountScope,
+    required String storeId,
+    required WorkspaceCustomerInvoice invoice,
+  }) async {
+    final customerId = workspaceCustomerMobile(invoice.customer);
+    if (accountScope != _finance.accountScope ||
+        storeId != _finance.workspaceId ||
+        customerId == null ||
+        invoice.id.trim().isEmpty ||
+        invoice.orderId.trim().isEmpty ||
+        invoice.amount <= 0) {
+      throw StateError('Invoice does not identify this Store and customer.');
+    }
+    final previousPayment = _finance.payments
+        .where((p) => p.invoiceId == invoice.id || p.orderId == invoice.orderId)
+        .firstOrNull;
+    if (previousPayment != null) {
+      if (previousPayment.invoiceId != invoice.id ||
+          previousPayment.orderId != invoice.orderId ||
+          previousPayment.customerId != customerId ||
+          previousPayment.amountMinor != invoice.amount * 100) {
+        throw StateError('Invoice identity cannot be changed.');
+      }
+      return _finance;
+    }
+    final previous = _finance.customerLedgers
+        .where((l) => l.customerId == customerId)
+        .firstOrNull;
+    if (previous != null && !previous.historyComplete) {
+      throw StateError('Customer history needs recovery.');
+    }
+    final now = DateTime.now().toUtc();
+    final amount = invoice.amount * 100;
+    final ledger = WorkspaceCustomerLedger(
+      accountScope: accountScope,
+      workspaceId: storeId,
+      customerId: customerId,
+      customerName: invoice.customer,
+      revision: (previous?.revision ?? 0) + 1,
+      asOf: now,
+      openingBalanceMinor: previous?.openingBalanceMinor ?? 0,
+      historyComplete: true,
+      entries: [
+        ...?previous?.entries,
+        WorkspaceCustomerLedgerEntry(
+          id: 'QA-BILL-${invoice.id}',
+          operationId: 'BILL-${invoice.orderId}',
+          invoiceId: invoice.id,
+          orderId: invoice.orderId,
+          sequence: (previous?.entries.lastOrNull?.sequence ?? 0) + 1,
+          occurredAt: now,
+          kind: WorkspaceLedgerEntryKind.invoice,
+          state: WorkspaceLedgerPostingState.posted,
+          amountMinor: amount,
+        ),
+      ],
+    );
+    final next = WorkspaceFinanceSnapshot(
+      accountScope: accountScope,
+      workspaceId: storeId,
+      revision: _finance.revision + 1,
+      asOf: now,
+      salesTodayMinor: _finance.salesTodayMinor + amount,
+      duesMinor: _finance.duesMinor + amount,
+      availableMinor: _finance.availableMinor,
+      heldMinor: _finance.heldMinor,
+      requestedMinor: _finance.requestedMinor,
+      paidOutMinor: _finance.paidOutMinor,
+      feesMinor: _finance.feesMinor,
+      deliveryAdjustmentsMinor: _finance.deliveryAdjustmentsMinor,
+      refundsMinor: _finance.refundsMinor,
+      taxWithheldMinor: _finance.taxWithheldMinor,
+      payments: [
+        ..._finance.payments,
+        WorkspacePaymentRecord(
+          orderId: invoice.orderId,
+          customerId: customerId,
+          customerName: invoice.customer,
+          revision: 1,
+          updatedAt: now,
+          amountMinor: amount,
+          paidMinor: 0,
+          dueMinor: amount,
+          refundedMinor: 0,
+          state: WorkspacePaymentState.unpaid,
+          channel: invoice.payment == 'Customer due'
+              ? WorkspacePaymentChannel.credit
+              : WorkspacePaymentChannel.unknown,
+          invoiceId: invoice.id,
+        ),
+      ],
+      payouts: _finance.payouts,
+      customerLedgers: [
+        ..._finance.customerLedgers.where((l) => l.customerId != customerId),
+        ledger,
+      ],
+      historyComplete: _finance.historyComplete,
+    );
+    if (!next.valid || (previous != null && !ledger.canFollow(previous))) {
+      throw StateError('Invoice projection is invalid.');
+    }
+    _finance = next;
+    _hasRecordedInvoices = true;
+    return next;
+  }
+
+  final _refundRequests = <String, WorkspaceCustomerRefund>{};
+  @override
+  Future<WorkspaceFinanceSnapshot> reconcileRefund(
+    WorkspaceCustomerRefund request,
+  ) async {
+    if (!request.valid ||
+        request.accountScope != _finance.accountScope ||
+        request.workspaceId != _finance.workspaceId) {
+      throw StateError('Refund does not belong to this Store.');
+    }
+    final entry = _finance.customerLedgers
+        .where((ledger) => ledger.customerId == request.customerId)
+        .expand((ledger) => ledger.entries)
+        .where(
+          (entry) =>
+              entry.operationId == request.operationId &&
+              entry.kind == WorkspaceLedgerEntryKind.refund,
+        )
+        .firstOrNull;
+    final known = _refundRequests[request.operationId];
+    if (entry == null ||
+        entry.state != WorkspaceLedgerPostingState.posted ||
+        entry.customerRefund?.identityData != request.identityData ||
+        entry.invoiceId != request.invoiceId ||
+        entry.orderId != request.orderId ||
+        entry.amountMinor != request.amountMinor ||
+        entry.channel != request.channel ||
+        entry.paymentReference != request.reference ||
+        (known != null && known.identityData != request.identityData)) {
+      throw StateError('Refund status is not confirmed.');
+    }
+    return _finance;
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> recordRefund(
+    WorkspaceCustomerRefund request,
+  ) async {
+    if (!request.valid ||
+        request.accountScope != _finance.accountScope ||
+        request.workspaceId != _finance.workspaceId) {
+      throw StateError('Refund does not belong to this Store.');
+    }
+    if (_finance.customerLedgers
+        .expand((ledger) => ledger.entries)
+        .any(
+          (entry) =>
+              entry.operationId == request.operationId &&
+              entry.kind == WorkspaceLedgerEntryKind.refund,
+        )) {
+      return reconcileRefund(request);
+    }
+    final ledger = _finance.customerLedgers
+        .where((ledger) => ledger.customerId == request.customerId)
+        .firstOrNull;
+    final payment = _finance.payments
+        .where(
+          (payment) =>
+              payment.customerId == request.customerId &&
+              payment.invoiceId == request.invoiceId &&
+              payment.orderId == request.orderId,
+        )
+        .firstOrNull;
+    final balance = ledger?.invoiceBalance(request.invoiceId);
+    if (ledger == null ||
+        ledger.revision != request.expectedRevision ||
+        payment == null ||
+        balance == null ||
+        request.amountMinor > balance.refundableMinor ||
+        payment.paidMinor != balance.collectedMinor ||
+        payment.refundedMinor != balance.refundedMinor ||
+        payment.channel == WorkspacePaymentChannel.platform) {
+      throw StateError(
+        'Refund requires a confirmed refundable balance and the original payment authority.',
+      );
+    }
+    final now = DateTime.now().toUtc();
+    final nextLedger = WorkspaceCustomerLedger(
+      accountScope: ledger.accountScope,
+      workspaceId: ledger.workspaceId,
+      customerId: ledger.customerId,
+      customerName: ledger.customerName,
+      revision: ledger.revision + 1,
+      asOf: now,
+      openingBalanceMinor: ledger.openingBalanceMinor,
+      historyComplete: ledger.historyComplete,
+      entries: [
+        ...ledger.entries,
+        WorkspaceCustomerLedgerEntry(
+          id: 'QA-REFUND-${request.operationId}',
+          operationId: request.operationId,
+          invoiceId: request.invoiceId,
+          orderId: request.orderId,
+          sequence: (ledger.entries.lastOrNull?.sequence ?? 0) + 1,
+          occurredAt: now,
+          kind: WorkspaceLedgerEntryKind.refund,
+          customerRefund: request,
+          state: WorkspaceLedgerPostingState.posted,
+          amountMinor: request.amountMinor,
+          channel: request.channel,
+          paymentReference: request.reference,
+        ),
+      ],
+    );
+    final refunded = payment.refundedMinor + request.amountMinor;
+    final nextPayment = WorkspacePaymentRecord(
+      orderId: payment.orderId,
+      customerId: payment.customerId,
+      customerName: payment.customerName,
+      revision: payment.revision + 1,
+      updatedAt: now,
+      amountMinor: payment.amountMinor,
+      paidMinor: payment.paidMinor,
+      dueMinor: payment.dueMinor,
+      refundedMinor: refunded,
+      state: request.amountMinor < balance.refundableMinor
+          ? WorkspacePaymentState.refundPending
+          : refunded == payment.paidMinor
+          ? WorkspacePaymentState.refunded
+          : WorkspacePaymentState.returnAdjusted,
+      channel: payment.channel,
+      invoiceId: payment.invoiceId,
+      transactionId: payment.transactionId,
+    );
+    final next = WorkspaceFinanceSnapshot(
+      accountScope: _finance.accountScope,
+      workspaceId: _finance.workspaceId,
+      revision: _finance.revision + 1,
+      asOf: now,
+      salesTodayMinor: _finance.salesTodayMinor,
+      duesMinor: _finance.duesMinor,
+      availableMinor: _finance.availableMinor,
+      heldMinor: _finance.heldMinor,
+      requestedMinor: _finance.requestedMinor,
+      paidOutMinor: _finance.paidOutMinor,
+      feesMinor: _finance.feesMinor,
+      deliveryAdjustmentsMinor: _finance.deliveryAdjustmentsMinor,
+      refundsMinor: _finance.refundsMinor + request.amountMinor,
+      taxWithheldMinor: _finance.taxWithheldMinor,
+      payments: [
+        for (final item in _finance.payments)
+          item.orderId == payment.orderId ? nextPayment : item,
+      ],
+      payouts: _finance.payouts,
+      customerLedgers: [
+        for (final item in _finance.customerLedgers)
+          item.customerId == ledger.customerId ? nextLedger : item,
+      ],
+      historyComplete: _finance.historyComplete,
+    );
+    if (!next.valid ||
+        !nextLedger.canFollow(ledger) ||
+        nextLedger.invoiceBalance(request.invoiceId) == null) {
+      throw StateError('Refund projection is invalid.');
+    }
+    _refundRequests[request.operationId] = request;
+    _finance = next;
+    _hasRecordedInvoices = true;
+    return next;
+  }
+
+  void _checkReturnScope(WorkspaceCustomerReturn request) {
+    if (!request.valid ||
+        request.accountScope != _finance.accountScope ||
+        request.workspaceId != _finance.workspaceId) {
+      throw StateError('Return does not belong to this Store.');
+    }
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> reconcileReturn(
+    WorkspaceCustomerReturn request,
+  ) async {
+    _checkReturnScope(request);
+    final recorded = _finance.customerLedgers
+        .expand((ledger) => ledger.entries)
+        .where(
+          (entry) =>
+              entry.kind == WorkspaceLedgerEntryKind.creditNote &&
+              entry.operationId == request.operationId,
+        )
+        .firstOrNull;
+    if (recorded == null ||
+        recorded.state != WorkspaceLedgerPostingState.posted ||
+        recorded.customerReturn == null ||
+        jsonEncode(recorded.customerReturn!.toJson()) !=
+            jsonEncode(request.toJson())) {
+      throw StateError('Return status is not confirmed.');
+    }
+    return _finance;
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> recordReturn(
+    WorkspaceCustomerReturn request,
+    WorkspaceOrderRecord originalOrder,
+  ) async {
+    _checkReturnScope(request);
+    final replay = _finance.customerLedgers
+        .expand((ledger) => ledger.entries)
+        .any(
+          (entry) =>
+              entry.kind == WorkspaceLedgerEntryKind.creditNote &&
+              entry.operationId == request.operationId,
+        );
+    if (replay) return reconcileReturn(request);
+    final ledger = _finance.customerLedgers
+        .where((ledger) => ledger.customerId == request.customerId)
+        .firstOrNull;
+    final payment = _finance.payments
+        .where(
+          (payment) =>
+              payment.invoiceId == request.invoiceId &&
+              payment.orderId == request.orderId &&
+              payment.customerId == request.customerId,
+        )
+        .firstOrNull;
+    final balance = ledger?.invoiceBalance(request.invoiceId);
+    if (ledger == null ||
+        ledger.revision != request.expectedRevision ||
+        balance == null ||
+        payment == null ||
+        payment.amountMinor != originalOrder.amount * 100 ||
+        workspaceCustomerMobile(originalOrder.customer) != request.customerId ||
+        payment.dueMinor != balance.dueMinor) {
+      throw StateError(
+        'Refresh the original invoice before accepting a return.',
+      );
+    }
+    final credits = ledger.entries.where(
+      (entry) =>
+          entry.invoiceId == request.invoiceId &&
+          entry.kind == WorkspaceLedgerEntryKind.creditNote,
+    );
+    if (credits.any(
+      (entry) =>
+          entry.customerReturn == null ||
+          entry.state == WorkspaceLedgerPostingState.pending,
+    )) {
+      throw StateError('Earlier return quantities need confirmation.');
+    }
+    final amount = request.creditMinorFor(
+      originalOrder,
+      priorReturns: [
+        for (final entry in credits)
+          if (entry.state == WorkspaceLedgerPostingState.posted)
+            entry.customerReturn!,
+      ],
+    );
+    if (amount == null ||
+        amount <= 0 ||
+        amount > balance.billedMinor - balance.creditedMinor) {
+      throw StateError(
+        'Return quantities or original prices cannot be verified.',
+      );
+    }
+    final now = DateTime.now().toUtc();
+    final nextLedger = WorkspaceCustomerLedger(
+      accountScope: ledger.accountScope,
+      workspaceId: ledger.workspaceId,
+      customerId: ledger.customerId,
+      customerName: ledger.customerName,
+      revision: ledger.revision + 1,
+      asOf: now,
+      openingBalanceMinor: ledger.openingBalanceMinor,
+      historyComplete: ledger.historyComplete,
+      entries: [
+        ...ledger.entries,
+        WorkspaceCustomerLedgerEntry(
+          id: 'QA-CREDIT-${request.operationId}',
+          operationId: request.operationId,
+          invoiceId: request.invoiceId,
+          orderId: request.orderId,
+          sequence: (ledger.entries.lastOrNull?.sequence ?? 0) + 1,
+          occurredAt: now,
+          kind: WorkspaceLedgerEntryKind.creditNote,
+          state: WorkspaceLedgerPostingState.posted,
+          amountMinor: amount,
+          customerReturn: request,
+        ),
+      ],
+    );
+    final nextBalance = nextLedger.invoiceBalance(request.invoiceId);
+    if (nextBalance == null) {
+      throw StateError('Return balance is inconsistent.');
+    }
+    final nextPayment = WorkspacePaymentRecord(
+      orderId: payment.orderId,
+      customerId: payment.customerId,
+      customerName: payment.customerName,
+      revision: payment.revision + 1,
+      updatedAt: now,
+      amountMinor: payment.amountMinor,
+      paidMinor: payment.paidMinor,
+      dueMinor: nextBalance.dueMinor,
+      refundedMinor: payment.refundedMinor,
+      state: nextBalance.refundableMinor > 0
+          ? WorkspacePaymentState.refundPending
+          : nextBalance.dueMinor == 0
+          ? WorkspacePaymentState.returnAdjusted
+          : payment.paidMinor > 0
+          ? WorkspacePaymentState.partPaid
+          : WorkspacePaymentState.unpaid,
+      channel: payment.channel,
+      invoiceId: payment.invoiceId,
+      transactionId: payment.transactionId,
+    );
+    final next = WorkspaceFinanceSnapshot(
+      accountScope: _finance.accountScope,
+      workspaceId: _finance.workspaceId,
+      revision: _finance.revision + 1,
+      asOf: now,
+      salesTodayMinor: _finance.salesTodayMinor,
+      duesMinor: _finance.duesMinor - payment.dueMinor + nextBalance.dueMinor,
+      availableMinor: _finance.availableMinor,
+      heldMinor: _finance.heldMinor,
+      requestedMinor: _finance.requestedMinor,
+      paidOutMinor: _finance.paidOutMinor,
+      feesMinor: _finance.feesMinor,
+      deliveryAdjustmentsMinor: _finance.deliveryAdjustmentsMinor,
+      refundsMinor: _finance.refundsMinor,
+      taxWithheldMinor: _finance.taxWithheldMinor,
+      payments: [
+        for (final item in _finance.payments)
+          item.orderId == payment.orderId ? nextPayment : item,
+      ],
+      payouts: _finance.payouts,
+      customerLedgers: [
+        for (final item in _finance.customerLedgers)
+          item.customerId == ledger.customerId ? nextLedger : item,
+      ],
+      historyComplete: _finance.historyComplete,
+    );
+    if (!next.valid || !nextLedger.canFollow(ledger)) {
+      throw StateError('Return projection is invalid.');
+    }
+    _finance = next;
+    _hasRecordedInvoices = true;
+    return next;
+  }
+
+  /// Only replace an untouched synthetic seed; never reset an active adapter.
+  bool restoreCheckpoint(
+    WorkspaceFinanceSnapshot saved,
+    WorkspaceFinanceSnapshot current,
+  ) {
+    String fingerprint(WorkspaceFinanceSnapshot value) => jsonEncode(
+      WorkspaceLedgerCheckpoint(
+        revision: 1,
+        finance: value,
+      ).toJson()['finance'],
+    );
+    if (_hasRecordedInvoices ||
+        _requests.isNotEmpty ||
+        _replies.isNotEmpty ||
+        !saved.valid ||
+        saved.accountScope != _finance.accountScope ||
+        saved.workspaceId != _finance.workspaceId ||
+        fingerprint(current) != fingerprint(_finance)) {
+      return false;
+    }
+    _finance = saved;
+    return true;
+  }
+
+  void _checkIdentity(WorkspaceCustomerCollection request) {
+    if (!request.valid ||
+        request.accountScope != _finance.accountScope ||
+        request.workspaceId != _finance.workspaceId ||
+        (_requests[request.operationId] != null &&
+            _requests[request.operationId]!.identityData !=
+                request.identityData)) {
+      throw StateError('Collection identity does not match this test Store.');
+    }
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> recordCollection(
+    WorkspaceCustomerCollection request,
+  ) async {
+    _checkIdentity(request);
+    final replay = _replies[request.operationId];
+    if (replay != null) return replay;
+    final ledger = _finance.customerLedgers
+        .where((l) => l.customerId == request.customerId)
+        .firstOrNull;
+    final payment = _finance.payments
+        .where(
+          (p) =>
+              p.invoiceId == request.invoiceId &&
+              p.orderId == request.orderId &&
+              p.customerId == request.customerId,
+        )
+        .firstOrNull;
+    final invoiceBalance = ledger?.invoiceBalance(request.invoiceId);
+    if (invoiceBalance == null ||
+        request.amountMinor > invoiceBalance.dueMinor ||
+        ledger == null ||
+        !ledger.historyComplete ||
+        ledger.revision != request.expectedRevision ||
+        payment == null ||
+        request.amountMinor > payment.dueMinor ||
+        request.amountMinor > _finance.duesMinor) {
+      throw StateError('Refresh this invoice before recording a collection.');
+    }
+    final now = DateTime.now().toUtc();
+    final nextLedger = WorkspaceCustomerLedger(
+      accountScope: ledger.accountScope,
+      workspaceId: ledger.workspaceId,
+      customerId: ledger.customerId,
+      customerName: ledger.customerName,
+      revision: ledger.revision + 1,
+      asOf: now,
+      openingBalanceMinor: ledger.openingBalanceMinor,
+      historyComplete: true,
+      entries: [
+        ...ledger.entries,
+        WorkspaceCustomerLedgerEntry(
+          id: 'QA-COLLECTION-${request.operationId}',
+          channel: request.channel,
+          paymentReference: request.reference,
+          operationId: request.operationId,
+          invoiceId: request.invoiceId,
+          orderId: request.orderId,
+          sequence: (ledger.entries.lastOrNull?.sequence ?? 0) + 1,
+          occurredAt: now,
+          kind: WorkspaceLedgerEntryKind.collection,
+          state: WorkspaceLedgerPostingState.posted,
+          amountMinor: request.amountMinor,
+        ),
+      ],
+    );
+    final due = payment.dueMinor - request.amountMinor;
+    final nextPayment = WorkspacePaymentRecord(
+      orderId: payment.orderId,
+      customerId: payment.customerId,
+      customerName: payment.customerName,
+      revision: payment.revision + 1,
+      updatedAt: now,
+      amountMinor: payment.amountMinor,
+      paidMinor: payment.paidMinor + request.amountMinor,
+      dueMinor: due,
+      refundedMinor: payment.refundedMinor,
+      state: due == 0
+          ? payment.paidMinor + request.amountMinor == payment.amountMinor
+                ? WorkspacePaymentState.paid
+                : WorkspacePaymentState.returnAdjusted
+          : WorkspacePaymentState.partPaid,
+      channel: request.channel,
+      invoiceId: payment.invoiceId,
+      transactionId: request.operationId,
+    );
+    final next = WorkspaceFinanceSnapshot(
+      accountScope: _finance.accountScope,
+      workspaceId: _finance.workspaceId,
+      revision: _finance.revision + 1,
+      asOf: now,
+      salesTodayMinor: _finance.salesTodayMinor,
+      duesMinor: _finance.duesMinor - request.amountMinor,
+      availableMinor: _finance.availableMinor,
+      heldMinor: _finance.heldMinor,
+      requestedMinor: _finance.requestedMinor,
+      paidOutMinor: _finance.paidOutMinor,
+      feesMinor: _finance.feesMinor,
+      deliveryAdjustmentsMinor: _finance.deliveryAdjustmentsMinor,
+      refundsMinor: _finance.refundsMinor,
+      taxWithheldMinor: _finance.taxWithheldMinor,
+      payments: [
+        for (final p in _finance.payments)
+          p.orderId == payment.orderId ? nextPayment : p,
+      ],
+      payouts: _finance.payouts,
+      customerLedgers: [
+        for (final l in _finance.customerLedgers)
+          l.customerId == ledger.customerId ? nextLedger : l,
+      ],
+      historyComplete: _finance.historyComplete,
+    );
+    if (!next.valid || !nextLedger.canFollow(ledger)) {
+      throw StateError('Invalid synthetic collection projection.');
+    }
+    _requests[request.operationId] = request;
+    _finance = next;
+    _replies[request.operationId] = next;
+    return next;
+  }
+
+  @override
+  Future<WorkspaceFinanceSnapshot> reconcileCollection(
+    WorkspaceCustomerCollection request,
+  ) async {
+    _checkIdentity(request);
+    final reply = _replies[request.operationId];
+    if (reply == null) throw StateError('Collection is not confirmed.');
+    return reply;
+  }
+}
+
 enum WorkReviewTestCase { pending, clarification, rejected, approved }
 
 /// Versioned, synthetic projections for frontend UAT and future adapter tests.
@@ -3003,6 +4119,46 @@ class StoreReviewSeed {
               ? WorkspacePaymentChannel.credit
               : WorkspacePaymentChannel.platform,
           invoiceId: 'QA-INVOICE-$i',
+        ),
+    ],
+    customerLedgers: [
+      // Explicit synthetic history for existing test customers. It does not
+      // derive production transaction history from payment status.
+      for (var i = 0; i < 3; i++)
+        WorkspaceCustomerLedger(
+          accountScope: accountScope,
+          workspaceId: storeId,
+          customerId: 'QA-CUSTOMER-$i',
+          customerName: orders[i].customer,
+          revision: 1,
+          asOf: now,
+          openingBalanceMinor: 0,
+          historyComplete: true,
+          entries: [
+            WorkspaceCustomerLedgerEntry(
+              id: 'QA-LEDGER-INVOICE-$i',
+              operationId: 'QA-INVOICE-OP-$i',
+              invoiceId: 'QA-INVOICE-$i',
+              orderId: orders[i].id,
+              sequence: 1,
+              occurredAt: orders[i].createdAt,
+              kind: WorkspaceLedgerEntryKind.invoice,
+              state: WorkspaceLedgerPostingState.posted,
+              amountMinor: orders[i].amount * 100,
+            ),
+            if (i % 3 != 0)
+              WorkspaceCustomerLedgerEntry(
+                id: 'QA-LEDGER-PAYMENT-$i',
+                operationId: 'QA-PAYMENT-OP-$i',
+                invoiceId: 'QA-INVOICE-$i',
+                orderId: orders[i].id,
+                sequence: 2,
+                occurredAt: now,
+                kind: WorkspaceLedgerEntryKind.collection,
+                state: WorkspaceLedgerPostingState.posted,
+                amountMinor: orders[i].amount * 100,
+              ),
+          ],
         ),
     ],
     payouts: const [],

@@ -9534,6 +9534,11 @@ class _WorkspaceSearchSurface extends StatelessWidget {
   }
 }
 
+String _customerBalanceText(WorkspaceCustomerRecord customer) =>
+    !customer.balanceAvailable
+    ? 'Balance unavailable'
+    : _purchaseAmount(customer.amountDueMinor);
+
 String _purchaseAmount(int minor) {
   final magnitude = minor.abs();
   return '${minor < 0 ? '−' : ''}₹${_formatStoreAmount(magnitude ~/ 100)}'
@@ -10177,7 +10182,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
         ),
       ),
     );
-    return Column(
+    final content = Column(
       key: const Key('work-store-statement'),
       children: [
         if (_book != 'Purchases' || session.focusedWorkspacePurchaseId == null)
@@ -10358,6 +10363,17 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
           ),
         ),
       ],
+    );
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final minimumHeight = largeText ? 320.0 : 240.0;
+        if (constraints.maxHeight >= minimumHeight) {
+          return content;
+        }
+        return SingleChildScrollView(
+          child: SizedBox(height: minimumHeight, child: content),
+        );
+      },
     );
   }
 }
@@ -17539,7 +17555,7 @@ class _CustomersDestinationSurfaceState
 
     final largeAmounts =
         customer.totalSpend >= 10000000 ||
-        customer.amountDue >= 10000000 ||
+        customer.amountDueMinor.abs() >= 1000000000 ||
         MediaQuery.textScalerOf(context).scale(1) > 1.4;
     await showModalBottomSheet<void>(
       context: context,
@@ -17589,9 +17605,12 @@ class _CustomersDestinationSurfaceState
                             ],
                           ),
                         ),
-                        if (customer.amountDue > 0 && !largeAmounts)
+                        if ((customer.hasDues || !customer.balanceAvailable) &&
+                            !largeAmounts)
                           Text(
-                            '₹${customer.amountDue} due',
+                            customer.balanceAvailable
+                                ? '${_customerBalanceText(customer)} due'
+                                : 'Balance unavailable',
                             style: const TextStyle(
                               color: Color(0xFFB42318),
                               fontWeight: FontWeight.w900,
@@ -17600,12 +17619,13 @@ class _CustomersDestinationSurfaceState
                       ],
                     ),
                   ),
-                  if (largeAmounts && customer.amountDue > 0)
+                  if (largeAmounts &&
+                      (customer.hasDues || !customer.balanceAvailable))
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: _MoneyDestinationLine(
                         label: 'Payment due',
-                        value: '₹${_formatStoreAmount(customer.amountDue)}',
+                        value: _customerBalanceText(customer),
                       ),
                     ),
                   AnimatedBuilder(
@@ -17815,7 +17835,11 @@ class _CustomersDestinationSurfaceState
         .length;
     final due = allCustomers.fold<int>(
       0,
-      (total, customer) => total + customer.amountDue,
+      (total, customer) =>
+          total + (customer.hasDues ? customer.amountDueMinor : 0),
+    );
+    final duesKnown = allCustomers.every(
+      (customer) => customer.balanceAvailable,
     );
     return Container(
       key: const Key('work-customers-destination'),
@@ -17830,7 +17854,7 @@ class _CustomersDestinationSurfaceState
         children: [
           _StoreScaledPair(
             forceStack:
-                due >= 10000000 || MediaQuery.sizeOf(context).width < 380,
+                due >= 1000000000 || MediaQuery.sizeOf(context).width < 380,
             first: Text(
               widget.customerId == null ? 'Customers' : 'Customer record',
               style: const TextStyle(
@@ -17849,7 +17873,7 @@ class _CustomersDestinationSurfaceState
                 _CustomerHeaderFact(label: 'Repeat', value: '$repeat'),
                 _CustomerHeaderFact(
                   label: 'Due',
-                  value: '₹${_formatStoreAmount(due)}',
+                  value: duesKnown ? _purchaseAmount(due) : 'Unavailable',
                   attention: due > 0,
                 ),
               ],
@@ -18012,7 +18036,7 @@ class _CustomerBookRow extends StatelessWidget {
     final lastContact = customer.lastContactAt;
     final expandedAmounts =
         customer.totalSpend >= 10000000 ||
-        customer.amountDue >= 10000000 ||
+        customer.amountDueMinor.abs() >= 1000000000 ||
         MediaQuery.textScalerOf(context).scale(11) > 16;
     return Material(
       key: Key('work-customer-${customer.id}'),
@@ -18066,13 +18090,17 @@ class _CustomerBookRow extends StatelessWidget {
                           ),
                         if (!expandedAmounts)
                           Text(
-                            customer.amountDue > 0
-                                ? '${_storeSummaryAmount('₹${_formatStoreAmount(customer.amountDue)}')} payment due'
+                            !customer.balanceAvailable
+                                ? 'Balance unavailable'
+                                : customer.hasDues
+                                ? '${_storeSummaryAmount(_customerBalanceText(customer))} payment due'
+                                : customer.amountDueMinor < 0
+                                ? '${_purchaseAmount(customer.amountDueMinor.abs())} customer credit'
                                 : lastContact == null
                                 ? 'Last purchase ${customer.lastPurchaseAt.day}/${customer.lastPurchaseAt.month}'
                                 : 'Contacted ${lastContact.day}/${lastContact.month}',
                             style: TextStyle(
-                              color: customer.amountDue > 0
+                              color: customer.hasDues
                                   ? const Color(0xFFB42318)
                                   : const Color(0xFF08765D),
                               fontSize: 8.5,
@@ -18124,15 +18152,21 @@ class _CustomerBookRow extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (customer.amountDue > 0) ...[
+                if (customer.hasDues ||
+                    !customer.balanceAvailable ||
+                    customer.amountDueMinor < 0) ...[
                   const SizedBox(height: 4),
                   _StoreScaledPair(
-                    first: const Text(
-                      'Payment due',
-                      style: TextStyle(fontSize: 12),
+                    first: Text(
+                      customer.amountDueMinor < 0 && customer.balanceAvailable
+                          ? 'Customer credit'
+                          : 'Payment due',
+                      style: const TextStyle(fontSize: 12),
                     ),
                     second: _StoreMoneyText(
-                      '₹${_formatStoreAmount(customer.amountDue)}',
+                      customer.amountDueMinor < 0 && customer.balanceAvailable
+                          ? _purchaseAmount(customer.amountDueMinor.abs())
+                          : _customerBalanceText(customer),
                       summary: true,
                       textAlign: TextAlign.end,
                       style: const TextStyle(
@@ -18633,6 +18667,94 @@ class _PeriodStrip extends StatelessWidget {
 
 /// Existing financial destinations share one scoped projection, with no local
 /// money-moving capability. Summary totals are not inferred from partial rows.
+class _CustomerLedgerStatement extends StatelessWidget {
+  const _CustomerLedgerStatement({required this.ledger});
+  final WorkspaceCustomerLedger ledger;
+
+  @override
+  Widget build(BuildContext context) {
+    var running = ledger.openingBalanceMinor;
+    final balances = <int?>[
+      for (final entry in ledger.entries)
+        running = running == null ? null : running + entry.balanceDeltaMinor,
+    ];
+    final closing = ledger.closingBalanceMinor;
+    return ExpansionTile(
+      key: PageStorageKey(
+        'customer-ledger-${ledger.accountScope}-${ledger.workspaceId}-${ledger.customerId}',
+      ),
+      tilePadding: EdgeInsets.zero,
+      title: Text(ledger.customerName),
+      subtitle: Text(
+        closing == null
+            ? 'Customer statement · Balance unavailable'
+            : 'Customer statement · ${closing < 0 ? 'Credit' : 'Due'} ${_purchaseAmount(closing.abs())}',
+      ),
+      children: [
+        const Align(
+          alignment: Alignment.centerLeft,
+          child: Text('Available transaction history'),
+        ),
+        _MoneyDestinationLine(
+          label: 'Opening balance',
+          value: ledger.openingBalanceMinor == null
+              ? 'Unavailable'
+              : _purchaseAmount(ledger.openingBalanceMinor!),
+        ),
+        if (!ledger.historyComplete)
+          const Text(
+            'History is incomplete. A closing balance cannot be confirmed.',
+          ),
+        for (var i = 0; i < ledger.entries.length; i++)
+          Padding(
+            key: ValueKey('customer-ledger-entry-${ledger.entries[i].id}'),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _MoneyDestinationLine(
+                  label: switch (ledger.entries[i].kind) {
+                    WorkspaceLedgerEntryKind.invoice => 'Invoice',
+                    WorkspaceLedgerEntryKind.collection => 'Payment received',
+                    WorkspaceLedgerEntryKind.creditNote => 'Return credit',
+                    WorkspaceLedgerEntryKind.refund => 'Refund',
+                  },
+                  value: _purchaseAmount(ledger.entries[i].amountMinor),
+                ),
+                Text(
+                  '${ledger.entries[i].invoiceId} · ${ledger.entries[i].orderId}',
+                ),
+                if (ledger.entries[i].channel !=
+                    WorkspacePaymentChannel.unknown)
+                  Text(ledger.entries[i].channel.label),
+                if (ledger.entries[i].paymentReference?.isNotEmpty == true)
+                  Text('Reference ${ledger.entries[i].paymentReference}'),
+                Text(
+                  MaterialLocalizations.of(
+                    context,
+                  ).formatShortDate(ledger.entries[i].occurredAt.toLocal()),
+                ),
+                if (ledger.entries[i].state !=
+                    WorkspaceLedgerPostingState.posted)
+                  Text(
+                    ledger.entries[i].state ==
+                            WorkspaceLedgerPostingState.pending
+                        ? 'Pending · Balance unchanged'
+                        : 'Failed · Balance unchanged',
+                  ),
+                if (ledger.historyComplete && balances[i] != null)
+                  _MoneyDestinationLine(
+                    label: balances[i]! < 0 ? 'Customer credit' : 'Balance due',
+                    value: _purchaseAmount(balances[i]!.abs()),
+                  ),
+              ],
+            ),
+          ),
+      ],
+    );
+  }
+}
+
 class _StoreFinanceSurface extends StatelessWidget {
   const _StoreFinanceSurface({
     required this.session,
@@ -18711,6 +18833,10 @@ class _StoreFinanceSurface extends StatelessWidget {
         ? finance.payouts
         : const <WorkspacePayoutRecord>[];
     final orders = {for (final o in session.visibleWorkspaceOrders) o.id: o};
+    final ledgers =
+        target == null && (section == 'dues' || section == 'payments')
+        ? finance.customerLedgers
+        : const <WorkspaceCustomerLedger>[];
     return ListView.builder(
       key: ValueKey('work-finance-$section'),
       padding: EdgeInsets.symmetric(
@@ -18720,7 +18846,7 @@ class _StoreFinanceSurface extends StatelessWidget {
             : 16,
         vertical: 16,
       ),
-      itemCount: 1 + payouts.length + payments.length,
+      itemCount: 1 + ledgers.length + payouts.length + payments.length,
       itemBuilder: (context, index) {
         if (index == 0) {
           return Column(
@@ -18752,6 +18878,61 @@ class _StoreFinanceSurface extends StatelessWidget {
                   'Showing the last confirmed update. Current payment status is unavailable.',
                   key: Key('work-finance-stale'),
                 ),
+              if (session.pendingCustomerReturn != null) ...[
+                Text(
+                  session.customerReturnSaved
+                      ? 'A return is awaiting confirmation. Its details are saved; do not enter it again.'
+                      : 'Return details are not saved yet. Keep this bill open and retry.',
+                ),
+                TextButton(
+                  onPressed: session.customerCollectionBusy
+                      ? null
+                      : () => session.reconcileCustomerReturn(),
+                  child: Text(
+                    session.customerReturnSaved
+                        ? 'Check return status'
+                        : 'Retry saving return',
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              if (session.pendingCustomerRefund != null) ...[
+                Text(
+                  session.customerRefundSaved
+                      ? 'A refund is awaiting confirmation. Its details are saved; do not record it again.'
+                      : 'Refund details are not saved yet. Keep this bill open and retry.',
+                ),
+                TextButton(
+                  onPressed: session.customerCollectionBusy
+                      ? null
+                      : session.reconcileCustomerRefund,
+                  child: Text(
+                    session.customerRefundSaved
+                        ? 'Check refund status'
+                        : 'Retry saving refund',
+                  ),
+                ),
+              ],
+              if (session.pendingCustomerCollection != null) ...[
+                const Text(
+                  'A collection is awaiting confirmation. Do not record it again.',
+                ),
+                TextButton(
+                  onPressed: session.customerCollectionBusy
+                      ? null
+                      : session.reconcileCustomerCollection,
+                  child: const Text('Check collection status'),
+                ),
+              ],
+              if (session.customerLedgerRecoveryError != null) ...[
+                Text(session.customerLedgerRecoveryError!),
+                TextButton(
+                  onPressed: session.customerCollectionBusy
+                      ? null
+                      : session.recoverCustomerLedger,
+                  child: const Text('Retry ledger recovery'),
+                ),
+              ],
               const SizedBox(height: 12),
               if (target == null && section == 'settlement') ...[
                 for (final fact in <(String, int)>[
@@ -18801,7 +18982,10 @@ class _StoreFinanceSurface extends StatelessWidget {
                     'Showing available records. Full history is not available yet.',
                   ),
                 ),
-              if (payments.isEmpty && payouts.isEmpty)
+              if (payments.isEmpty &&
+                  payouts.isEmpty &&
+                  !((section == 'dues' || section == 'payments') &&
+                      finance.customerLedgers.isNotEmpty))
                 Text(
                   finance.historyComplete
                       ? 'No matching records in this view.'
@@ -18810,8 +18994,12 @@ class _StoreFinanceSurface extends StatelessWidget {
             ],
           );
         }
-        if (index <= payouts.length) {
-          final payout = payouts[index - 1];
+        if (index <= ledgers.length) {
+          return _CustomerLedgerStatement(ledger: ledgers[index - 1]);
+        }
+        final recordIndex = index - ledgers.length;
+        if (recordIndex <= payouts.length) {
+          final payout = payouts[recordIndex - 1];
           return Padding(
             key: ValueKey('work-finance-payout-${payout.id}'),
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -18836,7 +19024,7 @@ class _StoreFinanceSurface extends StatelessWidget {
             ),
           );
         }
-        final payment = payments[index - 1 - payouts.length];
+        final payment = payments[recordIndex - 1 - payouts.length];
         final order = orders[payment.orderId];
         return Padding(
           key: ValueKey('work-finance-payment-${payment.orderId}'),
@@ -18882,6 +19070,100 @@ class _StoreFinanceSurface extends StatelessWidget {
                 ),
               if (payment.invoiceId?.isNotEmpty == true)
                 Text('Invoice ${payment.invoiceId}'),
+              if (payment.dueMinor > 0 &&
+                  payment.invoiceId != null &&
+                  (section == 'dues' || section == 'payments'))
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: ValueKey('record-collection-${payment.orderId}'),
+                    onPressed:
+                        session.customerCollectionAvailable &&
+                            !session.customerCollectionBusy &&
+                            session.pendingCustomerCollection == null &&
+                            finance.customerLedgers.any(
+                              (l) =>
+                                  l.customerId == payment.customerId &&
+                                  l.historyComplete,
+                            )
+                        ? () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            useSafeArea: true,
+                            isDismissible: false,
+                            enableDrag: false,
+                            builder: (_) => _CustomerCollectionSheet(
+                              session: session,
+                              payment: payment,
+                              accountScope: finance.accountScope,
+                              storeId: finance.workspaceId,
+                            ),
+                          )
+                        : null,
+                    child: const Text('Record collection'),
+                  ),
+                ),
+              if (payment.invoiceId != null &&
+                  finance.customerLedgers.any(
+                    (ledger) =>
+                        ledger.customerId == payment.customerId &&
+                        (ledger
+                                    .invoiceBalance(payment.invoiceId!)
+                                    ?.refundableMinor ??
+                                0) >
+                            0,
+                  ))
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: ValueKey('record-refund-${payment.orderId}'),
+                    onPressed:
+                        session.customerRefundAvailable &&
+                            payment.channel != WorkspacePaymentChannel.platform
+                        ? () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            useSafeArea: true,
+                            isDismissible: false,
+                            enableDrag: false,
+                            builder: (_) => _CustomerCollectionSheet(
+                              session: session,
+                              payment: payment,
+                              accountScope: finance.accountScope,
+                              storeId: finance.workspaceId,
+                              refund: true,
+                            ),
+                          )
+                        : null,
+                    child: const Text('Record refund'),
+                  ),
+                ),
+              if (payment.invoiceId != null &&
+                  order?.isCompleted == true &&
+                  order!.hasCompleteItemSnapshot)
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    key: ValueKey('record-return-${payment.orderId}'),
+                    onPressed: session.customerReturnAvailable
+                        ? () => showModalBottomSheet<void>(
+                            context: context,
+                            isScrollControlled: true,
+                            useSafeArea: true,
+                            isDismissible: false,
+                            enableDrag: false,
+                            builder: (_) => _CustomerReturnSheet(
+                              session: session,
+                              payment: payment,
+                              order: order,
+                              account: finance.accountScope,
+                              store: finance.workspaceId,
+                            ),
+                          )
+                        : null,
+                    child: const Text('Record return'),
+                  ),
+                ),
               if (payment.transactionId?.isNotEmpty == true)
                 Text('Transaction ${payment.transactionId}'),
               if (order != null)
@@ -18912,6 +19194,664 @@ class _StoreFinanceSurface extends StatelessWidget {
       },
     );
   }
+}
+
+class _CustomerReturnSheet extends StatefulWidget {
+  const _CustomerReturnSheet({
+    required this.session,
+    required this.payment,
+    required this.order,
+    required this.account,
+    required this.store,
+  });
+  final WorkSession session;
+  final WorkspacePaymentRecord payment;
+  final WorkspaceOrderRecord order;
+  final String account, store;
+  @override
+  State<_CustomerReturnSheet> createState() => _CustomerReturnSheetState();
+}
+
+class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
+  final quantity = TextEditingController(text: '1');
+  final sellable = TextEditingController(text: '0');
+  final reason = TextEditingController();
+  String? productId;
+  late final _LedgerFormAutosave draft;
+  bool saving = false;
+  String? error;
+  int? renderedCredit, renderedRevision;
+  @override
+  void initState() {
+    super.initState();
+    productId = widget.order.itemSnapshots.first.productId;
+    draft = _LedgerFormAutosave(
+      widget.session,
+      widget.session.ledgerFormKey(widget.payment, 'return'),
+    );
+    draft.addListener(refreshDraft);
+    unawaited(loadDraft());
+  }
+
+  void refreshDraft() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> loadDraft() async {
+    final fields = await draft.load();
+    if (!mounted || fields == null) {
+      return;
+    }
+    productId = fields['product'] ?? productId;
+    quantity.text = fields['quantity'] ?? '1';
+    sellable.text = fields['sellable'] ?? '0';
+    reason.text = fields['reason'] ?? '';
+    quantity.addListener(saveDraft);
+    sellable.addListener(saveDraft);
+    reason.addListener(saveDraft);
+    setState(() {});
+  }
+
+  void saveDraft() {
+    draft.save({
+      'product': productId ?? '',
+      'quantity': quantity.text,
+      'sellable': sellable.text,
+      'reason': reason.text,
+    });
+  }
+
+  @override
+  void dispose() {
+    draft.removeListener(refreshDraft);
+    draft.dispose();
+    quantity.dispose();
+    sellable.dispose();
+    reason.dispose();
+    super.dispose();
+  }
+
+  WorkspaceCustomerLedger? get ledger => widget
+      .session
+      .workspaceFinance
+      ?.customerLedgers
+      .where((item) => item.customerId == widget.payment.customerId)
+      .firstOrNull;
+  List<WorkspaceCustomerReturnLine> get lines => [
+    WorkspaceCustomerReturnLine(
+      productId: productId ?? '',
+      quantity: int.tryParse(quantity.text) ?? 0,
+      restockQuantity: int.tryParse(sellable.text) ?? -1,
+    ),
+  ];
+  int? get credit {
+    final history = ledger;
+    if (history == null) return null;
+    final credits = history.entries.where(
+      (item) =>
+          item.invoiceId == widget.payment.invoiceId &&
+          item.kind == WorkspaceLedgerEntryKind.creditNote,
+    );
+    if (credits.any(
+      (item) =>
+          item.customerReturn == null ||
+          item.state == WorkspaceLedgerPostingState.pending,
+    )) {
+      return null;
+    }
+    return WorkspaceCustomerReturn(
+      accountScope: widget.account,
+      workspaceId: widget.store,
+      customerId: widget.payment.customerId,
+      invoiceId: widget.payment.invoiceId!,
+      orderId: widget.order.id,
+      operationId: 'preview',
+      expectedRevision: history.revision,
+      reason: 'Return preview',
+      lines: lines,
+    ).creditMinorFor(
+      widget.order,
+      priorReturns: [
+        for (final item in credits)
+          if (item.state == WorkspaceLedgerPostingState.posted)
+            item.customerReturn!,
+      ],
+    );
+  }
+
+  Future<void> submit() async {
+    if (!await draft.flush() || !mounted) {
+      return;
+    }
+    final amount = renderedCredit;
+    final revision = renderedRevision;
+    if (amount == null ||
+        amount <= 0 ||
+        reason.text.trim().isEmpty ||
+        widget.session.workspaceFinance?.accountScope != widget.account ||
+        widget.session.workspaceFinance?.workspaceId != widget.store) {
+      setState(
+        () =>
+            error = 'Check the quantities, reason and original Store invoice.',
+      );
+      return;
+    }
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    final success = await widget.session.recordCustomerReturn(
+      invoiceId: widget.payment.invoiceId!,
+      lines: lines,
+      reason: reason.text,
+      expectedCreditMinor: amount,
+      expectedLedgerRevision: revision,
+    );
+    if (!mounted) return;
+    if (success) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      saving = false;
+      error = widget.session.pendingCustomerReturn != null
+          ? 'Return is not confirmed. Use Check return status or Retry saving in the invoice view.'
+          : 'Invoice changed or return unavailable. Review the current bill before retrying.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    renderedCredit = credit;
+    renderedRevision = ledger?.revision;
+    return PopScope(
+      canPop: !saving && !draft.busy && (!draft.ready || draft.error == null),
+      onPopInvokedWithResult: (didPop, result) async {
+        if (!didPop && !saving && await draft.flush() && context.mounted) {
+          Navigator.pop(context);
+        }
+      },
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              'Record return',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            Text('Invoice ${widget.payment.invoiceId}'),
+            const SizedBox(height: 12),
+            if (widget.order.itemSnapshots.length > 1)
+              DropdownButtonFormField<String>(
+                initialValue: productId,
+                itemHeight: null,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Billed item'),
+                selectedItemBuilder: (_) => [
+                  for (var i = 0; i < widget.order.itemSnapshots.length; i++)
+                    Text('Item ${i + 1}'),
+                ],
+                items: [
+                  for (final item in widget.order.itemSnapshots)
+                    DropdownMenuItem(
+                      value: item.productId,
+                      child: Text(
+                        '${item.name} · ${item.pack}',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                ],
+                onChanged: saving || !draft.ready
+                    ? null
+                    : (value) {
+                        setState(() => productId = value);
+                        saveDraft();
+                      },
+              ),
+            const SizedBox(height: 12),
+            for (final item in widget.order.itemSnapshots.where(
+              (item) => item.productId == productId,
+            )) ...[
+              Text(
+                '${item.name} · ${item.pack}',
+                key: const Key('return-original-item'),
+              ),
+              Text('Billed quantity: ${item.quantity}'),
+              const SizedBox(height: 12),
+            ],
+            TextField(
+              key: const Key('return-quantity'),
+              controller: quantity,
+              enabled: !saving && draft.ready,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Units returned'),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('return-sellable'),
+              controller: sellable,
+              enabled: !saving && draft.ready,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: 'Units fit for resale',
+                helperText:
+                    'Damaged units must not go back into sellable stock.',
+                helperMaxLines: 3,
+              ),
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('return-reason'),
+              controller: reason,
+              enabled: !saving && draft.ready,
+              maxLength: 160,
+              decoration: const InputDecoration(labelText: 'Reason for return'),
+            ),
+            Text(
+              credit == null
+                  ? 'Enter valid quantities within the original bill.'
+                  : 'Return credit: ${_purchaseAmount(credit!)}',
+            ),
+            const Text(
+              'Credit reduces this invoice’s dues first. Any amount owed back remains pending until a refund is confirmed.',
+            ),
+            if (draft.error != null) ...[
+              Text(draft.error!),
+              TextButton(
+                onPressed: draft.busy
+                    ? null
+                    : () {
+                        if (draft.ready) {
+                          saveDraft();
+                        } else {
+                          unawaited(loadDraft());
+                        }
+                      },
+                child: const Text('Retry saving input'),
+              ),
+            ],
+            if (error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(error!),
+              ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed:
+                  !draft.ready ||
+                      draft.busy ||
+                      draft.error != null ||
+                      saving ||
+                      widget.session.pendingCustomerReturn != null
+                  ? null
+                  : submit,
+              child: Text(saving ? 'Recording…' : 'Confirm return'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LedgerFormAutosave extends ChangeNotifier {
+  _LedgerFormAutosave(this.session, this.key);
+  final WorkSession session;
+  final WorkspaceLedgerFormKey? key;
+  int? revision;
+  bool ready = false, busy = false, closed = false;
+  String? error;
+  WorkspaceLedgerFormDraft? pending;
+  Future<void> writes = Future<void>.value();
+  void changed() {
+    if (!closed) {
+      notifyListeners();
+    }
+  }
+
+  Future<Map<String, String>?> load() async {
+    try {
+      if (key == null) {
+        throw StateError('Invoice unavailable');
+      }
+      final saved = await session.readLedgerForm(key!);
+      revision = saved?.revision;
+      ready = true;
+      error = null;
+      changed();
+      return saved?.fields ?? const {};
+    } catch (_) {
+      error = 'Saved input could not be opened. Retry before editing.';
+      changed();
+      return null;
+    }
+  }
+
+  void save(Map<String, String> fields) {
+    if (!ready || key == null) {
+      return;
+    }
+    final snapshot = Map<String, String>.of(fields);
+    busy = true;
+    changed();
+    writes = writes.then((_) async {
+      try {
+        if (pending != null) {
+          await session.saveLedgerForm(pending!, expectedRevision: revision);
+          revision = pending!.revision;
+          pending = null;
+        }
+        pending = WorkspaceLedgerFormDraft(
+          key: key!,
+          revision: (revision ?? 0) + 1,
+          fields: snapshot,
+        );
+        await session.saveLedgerForm(pending!, expectedRevision: revision);
+        revision = pending!.revision;
+        pending = null;
+        error = null;
+      } catch (_) {
+        error = 'Input is not saved yet. Retry saving before leaving.';
+      }
+    });
+    final current = writes;
+    unawaited(
+      current.then((_) {
+        if (identical(current, writes)) {
+          busy = false;
+          changed();
+        }
+      }),
+    );
+  }
+
+  Future<bool> flush() async {
+    await writes;
+    return ready && pending == null && error == null;
+  }
+
+  @override
+  void dispose() {
+    closed = true;
+    super.dispose();
+  }
+}
+
+class _CustomerCollectionSheet extends StatefulWidget {
+  const _CustomerCollectionSheet({
+    required this.session,
+    required this.payment,
+    required this.accountScope,
+    required this.storeId,
+    this.refund = false,
+  });
+  final bool refund;
+  final WorkSession session;
+  final WorkspacePaymentRecord payment;
+  final String accountScope, storeId;
+  @override
+  State<_CustomerCollectionSheet> createState() =>
+      _CustomerCollectionSheetState();
+}
+
+class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
+  final amount = TextEditingController();
+  final reference = TextEditingController();
+  WorkspacePaymentChannel channel = WorkspacePaymentChannel.cash;
+  bool saving = false;
+  String? error;
+  late final _LedgerFormAutosave draft;
+  Map<String, String> get draftFields => {
+    'amount': amount.text,
+    'reference': reference.text,
+    'channel': channel.name,
+  };
+  @override
+  void initState() {
+    super.initState();
+    draft = _LedgerFormAutosave(
+      widget.session,
+      widget.session.ledgerFormKey(
+        widget.payment,
+        widget.refund ? 'refund' : 'collection',
+      ),
+    );
+    draft.addListener(refreshDraft);
+    unawaited(loadDraft());
+  }
+
+  void refreshDraft() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> loadDraft() async {
+    final fields = await draft.load();
+    if (!mounted || fields == null) {
+      return;
+    }
+    amount.text = fields['amount'] ?? '';
+    reference.text = fields['reference'] ?? '';
+    channel = fields['channel'] == 'directUpi'
+        ? WorkspacePaymentChannel.directUpi
+        : WorkspacePaymentChannel.cash;
+    amount.addListener(saveDraft);
+    reference.addListener(saveDraft);
+    setState(() {});
+  }
+
+  void saveDraft() {
+    draft.save(draftFields);
+  }
+
+  @override
+  void dispose() {
+    draft.removeListener(refreshDraft);
+    draft.dispose();
+    amount.dispose();
+    reference.dispose();
+    super.dispose();
+  }
+
+  int get limitMinor => widget.refund
+      ? widget.session.workspaceFinance?.customerLedgers
+                .where(
+                  (ledger) => ledger.customerId == widget.payment.customerId,
+                )
+                .firstOrNull
+                ?.invoiceBalance(widget.payment.invoiceId!)
+                ?.refundableMinor ??
+            0
+      : widget.payment.dueMinor;
+
+  Future<void> submit() async {
+    if (!await draft.flush() || !mounted) {
+      return;
+    }
+    final text = amount.text.trim();
+    if (!RegExp(r'^\d{1,10}(\.\d{1,2})?$').hasMatch(text)) {
+      setState(
+        () => error = 'Enter a valid amount with up to two decimal places.',
+      );
+      return;
+    }
+    final parts = text.split('.');
+    final minor =
+        int.parse(parts[0]) * 100 +
+        (parts.length == 1 ? 0 : int.parse(parts[1].padRight(2, '0')));
+    if (minor <= 0 ||
+        minor > limitMinor ||
+        (channel == WorkspacePaymentChannel.directUpi &&
+            reference.text.trim().isEmpty)) {
+      setState(
+        () => error =
+            'Enter an amount within the invoice balance and a UPI reference when applicable.',
+      );
+      return;
+    }
+    if (widget.session.workspaceFinance?.accountScope != widget.accountScope ||
+        widget.session.workspaceFinance?.workspaceId != widget.storeId) {
+      setState(() => error = 'Store changed. Return to the correct invoice.');
+      return;
+    }
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    final record = widget.refund
+        ? widget.session.recordCustomerRefund
+        : widget.session.recordCustomerCollection;
+    final recorded = await record(
+      customerId: widget.payment.customerId,
+      invoiceId: widget.payment.invoiceId!,
+      amountMinor: minor,
+      channel: channel,
+      reference: reference.text,
+    );
+    if (!mounted) return;
+    if (recorded) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      saving = false;
+      error = widget.refund
+          ? 'Refund not confirmed. Close this sheet and check its status.'
+          : 'Collection not confirmed. Close this sheet and check its status.';
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !saving && !draft.busy && (!draft.ready || draft.error == null),
+    onPopInvokedWithResult: (didPop, result) async {
+      if (!didPop && !saving && await draft.flush() && context.mounted) {
+        Navigator.pop(context);
+      }
+    },
+    child: SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        16 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            widget.refund ? 'Record refund' : 'Record collection',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          Text('${widget.payment.customerName} · ${widget.payment.invoiceId}'),
+          Text(
+            '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
+          ),
+          TextField(
+            key: Key(widget.refund ? 'refund-amount' : 'collection-amount'),
+            controller: amount,
+            onChanged: (_) {
+              if (error != null) {
+                setState(() => error = null);
+              }
+            },
+            enabled: !saving && draft.ready,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: widget.refund
+                  ? 'Amount refunded (₹)'
+                  : 'Amount received (₹)',
+            ),
+          ),
+          Wrap(
+            spacing: 8,
+            children: [
+              for (final mode in [
+                WorkspacePaymentChannel.cash,
+                WorkspacePaymentChannel.directUpi,
+              ])
+                ChoiceChip(
+                  label: Text(
+                    mode == WorkspacePaymentChannel.cash ? 'Cash' : 'UPI',
+                  ),
+                  selected: channel == mode,
+                  onSelected: saving || !draft.ready
+                      ? null
+                      : (_) {
+                          setState(() => channel = mode);
+                          saveDraft();
+                        },
+                ),
+            ],
+          ),
+          if (channel == WorkspacePaymentChannel.directUpi)
+            TextField(
+              key: Key(
+                widget.refund ? 'refund-reference' : 'collection-reference',
+              ),
+              controller: reference,
+              enabled: !saving && draft.ready,
+              decoration: const InputDecoration(
+                labelText: 'UPI transaction reference',
+              ),
+            ),
+          Text(
+            widget.refund
+                ? 'Record money already returned to this customer. This does not transfer money.'
+                : 'Record a payment already received. This does not request or transfer money.',
+          ),
+          if (draft.error != null) ...[
+            Text(draft.error!),
+            TextButton(
+              onPressed: draft.busy
+                  ? null
+                  : () {
+                      if (draft.ready) {
+                        saveDraft();
+                      } else {
+                        unawaited(loadDraft());
+                      }
+                    },
+              child: const Text('Retry saving input'),
+            ),
+          ],
+          if (error != null) Text(error!),
+          FilledButton(
+            onPressed:
+                !draft.ready ||
+                    draft.busy ||
+                    draft.error != null ||
+                    saving ||
+                    (widget.refund &&
+                        widget.session.pendingCustomerRefund != null)
+                ? null
+                : submit,
+            child: Text(
+              saving
+                  ? 'Checking…'
+                  : widget.refund
+                  ? 'Confirm refund'
+                  : 'Confirm collection',
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _MoneyDestinationSurface extends StatelessWidget {
