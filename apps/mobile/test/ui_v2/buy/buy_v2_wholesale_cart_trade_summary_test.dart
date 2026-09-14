@@ -71,7 +71,7 @@ void main() {
     expect(find.text('${product.minimumOrder} products'), findsNothing);
     expect(
       find.text(
-        'MOQ ${product.minimumOrder} packs · '
+        'Minimum order ${product.minimumOrder} packs · '
         '${buyV2Money(product.price)} per pack',
       ),
       findsOneWidget,

@@ -160,12 +160,17 @@ void main() {
           final second = find.byKey(ValueKey('buy-product-${products[1].id}'));
           final firstRect = tester.getRect(first);
           final secondRect = tester.getRect(second);
-          expect(firstRect.top, closeTo(secondRect.top, 0.01));
-          expect(secondRect.left, greaterThan(firstRect.right));
+          if (scale > 1.6) {
+            expect(secondRect.top, greaterThan(firstRect.bottom));
+            expect(secondRect.left, closeTo(firstRect.left, .01));
+          } else {
+            expect(firstRect.top, closeTo(secondRect.top, 0.01));
+            expect(secondRect.left, greaterThan(firstRect.right));
+          }
           expect(secondRect.right, lessThanOrEqualTo(width));
           expect(
             find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
-            findsNothing,
+            scale > 1.6 ? findsOneWidget : findsNothing,
           );
           expect(tester.takeException(), isNull);
           if (const bool.fromEnvironment('BUY_R66_SPARSE_CAPTURE')) {

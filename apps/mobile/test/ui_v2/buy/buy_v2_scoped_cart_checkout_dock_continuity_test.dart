@@ -23,7 +23,9 @@ class _R5DistinctProductContent implements BuyV2ProductContentAdapter {
 
   @override
   BuyV2ProductContentSnapshot snapshotFor(BuyV2Product product) {
-    final base = const BuyV2CatalogueProductContentAdapter().snapshotFor(product);
+    final base = const BuyV2CatalogueProductContentAdapter().snapshotFor(
+      product,
+    );
     return BuyV2ProductContentSnapshot(
       productId: product.id,
       state: base.state,
@@ -31,7 +33,8 @@ class _R5DistinctProductContent implements BuyV2ProductContentAdapter {
       media: base.media,
       highlights: base.highlights,
       specifications: base.specifications,
-      description: 'Store sealed containers away from direct sunlight. '
+      description:
+          'Store sealed containers away from direct sunlight. '
           'Check the batch and best-before date on each container before use.',
     );
   }
@@ -2460,8 +2463,13 @@ void main() {
           // the normal extent clamp, never an unrelated scroll reset.
           expect(
             state.position.pixels,
-            closeTo(offset.clamp(state.position.minScrollExtent,
-                state.position.maxScrollExtent), .1),
+            closeTo(
+              offset.clamp(
+                state.position.minScrollExtent,
+                state.position.maxScrollExtent,
+              ),
+              .1,
+            ),
           );
           expect(tester.getSize(card), compactSize);
           expect(
@@ -3397,7 +3405,7 @@ void main() {
             expect(
               find.descendant(
                 of: card,
-                matching: find.text('Published by ${offerProduct.seller}'),
+                matching: find.text('From ${offerProduct.seller}'),
               ),
               findsOneWidget,
             );

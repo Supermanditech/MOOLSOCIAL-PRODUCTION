@@ -548,8 +548,8 @@ void main() {
         await tester.pumpWidget(app(session, textScale: 2));
         await tester.pumpAndSettle();
         if (destination == BuyV2Destination.wholesale) {
-          expect(find.textContaining('MOQ 1 pack ·'), findsOneWidget);
-          expect(find.textContaining('MOQ 1 packs'), findsNothing);
+          expect(find.textContaining('Minimum order 1 pack ·'), findsOneWidget);
+          expect(find.textContaining('Minimum order 1 packs'), findsNothing);
         }
         final owner = find.byKey(
           ValueKey('buy-cart-delivery-instructions-${destination.name}'),

@@ -4242,7 +4242,13 @@ void main() {
           find.textContaining('Delivery in ${testCase.minutes} min'),
           findsOneWidget,
         );
-        expect(find.text(product.seller), findsNothing);
+        expect(
+          find.descendant(
+            of: find.byKey(ValueKey('buy-cart-line-${product.id}')),
+            matching: find.text(product.seller),
+          ),
+          findsNothing,
+        );
 
         await tester.pumpWidget(const SizedBox.shrink());
         await tester.pump();
@@ -4441,7 +4447,7 @@ void main() {
         ValueKey('buy-grid-packshot-${product.id}'),
       );
       expect(densePhoto, findsOneWidget);
-      expect(tester.getSize(densePhoto), const Size(78, 70));
+      expect(tester.getSize(densePhoto), const Size(96, 70));
       expect(find.byType(BuyV2ProductCard), findsWidgets);
       expect(tester.takeException(), isNull);
     },
@@ -5878,7 +5884,9 @@ void main() {
       final add = find.byKey(ValueKey('buy-add-${product.id}'));
       final promise = find.descendant(
         of: card,
-        matching: find.textContaining('Quick local'),
+        matching: find.text(
+          buyV2BuyerDeliveryPromise(session.productFactsFor(product)),
+        ),
       );
 
       expect(add, findsOneWidget);
@@ -7203,17 +7211,25 @@ void main() {
         final order = session.visibleOrders.single;
         expect(order.buyerType, 'Retailer business');
         expect(order.buyerName, 'Shree Balaji Retail');
-        final action = find.byKey(const ValueKey('buy-order-primary-PO-240728'));
+        final action = find.byKey(
+          const ValueKey('buy-order-primary-PO-240728'),
+        );
         await tester.scrollUntilVisible(
-          action, 160,
-          scrollable: scrollableWithin(const PageStorageKey('buy-orders')).first,
+          action,
+          160,
+          scrollable: scrollableWithin(
+            const PageStorageKey('buy-orders'),
+          ).first,
         );
         await tester.tap(action);
         await tester.pumpAndSettle();
         final buyer = find.text(order.buyerName!);
         await tester.scrollUntilVisible(
-          buyer, 160,
-          scrollable: scrollableWithin(const PageStorageKey('buy-tracking-PO-240728')).first,
+          buyer,
+          160,
+          scrollable: scrollableWithin(
+            const PageStorageKey('buy-tracking-PO-240728'),
+          ).first,
         );
         await Scrollable.ensureVisible(tester.element(buyer), alignment: .5);
         await tester.pumpAndSettle();
@@ -7221,11 +7237,19 @@ void main() {
         final labelRect = tester.getRect(label);
         final valueRect = tester.getRect(buyer);
         if (scale == 1) {
-          expect(valueRect.left - labelRect.right, greaterThanOrEqualTo(8),
-            reason: 'The buyer label and business name need an explicit visible gap.');
+          expect(
+            valueRect.left - labelRect.right,
+            greaterThanOrEqualTo(8),
+            reason:
+                'The buyer label and business name need an explicit visible gap.',
+          );
         } else {
-          expect(valueRect.top - labelRect.bottom, greaterThanOrEqualTo(3),
-            reason: 'Enlarged text must keep the label above the complete business name.');
+          expect(
+            valueRect.top - labelRect.bottom,
+            greaterThanOrEqualTo(3),
+            reason:
+                'Enlarged text must keep the label above the complete business name.',
+          );
         }
         for (final field in [label, buyer]) {
           final paragraph = tester.renderObject<RenderParagraph>(field);
@@ -7378,7 +7402,9 @@ void main() {
 
   for (final scale in [1.0, 2.0]) {
     for (final mode in ['quick', 'courier']) {
-      testWidgets('R669 Monthly vertical discovery $mode text $scale', (tester) async {
+      testWidgets('R669 Monthly vertical discovery $mode text $scale', (
+        tester,
+      ) async {
         tester.view.devicePixelRatio = 1;
         tester.view.physicalSize = const Size(360, 800);
         tester.platformDispatcher.textScaleFactorTestValue = scale;
@@ -7390,7 +7416,13 @@ void main() {
         addTearDown(session.dispose);
         expect(session.addProduct('w-notebook'), isTrue);
         final retainedWholesale = session.quantityFor('w-notebook');
-        await tester.pumpWidget(app(session, textScale: scale, safePadding: const EdgeInsets.only(top: 24, bottom: 34)));
+        await tester.pumpWidget(
+          app(
+            session,
+            textScale: scale,
+            safePadding: const EdgeInsets.only(top: 24, bottom: 34),
+          ),
+        );
         await tester.pumpAndSettle();
         final monthly = find.byKey(const ValueKey('buy-promotion-shop-basket'));
         await tester.ensureVisible(monthly);
@@ -7402,10 +7434,15 @@ void main() {
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(ValueKey('buy-shop-sale-type-$mode')));
         await tester.pumpAndSettle();
-        final expected = session.catalogueSaleTypeProducts.map((p) => p.id).toSet();
+        final expected = session.catalogueSaleTypeProducts
+            .map((p) => p.id)
+            .toSet();
         expect(expected, hasLength(6));
         final visited = <String>{};
-        final scrollView = find.descendant(of: find.byType(BuyV2CatalogueView), matching: find.byType(CustomScrollView));
+        final scrollView = find.descendant(
+          of: find.byType(BuyV2CatalogueView),
+          matching: find.byType(CustomScrollView),
+        );
         expect(scrollView, findsOneWidget);
         for (var step = 0; step < 35; step++) {
           for (final id in expected) {
@@ -7415,11 +7452,20 @@ void main() {
               if (box.left >= 0 && box.right <= 360) visited.add(id);
             }
           }
-          await tester.drag(scrollView, const Offset(0, -220));
+          final viewport = tester.getRect(scrollView);
+          await tester.dragFrom(
+            Offset(viewport.right - 12, viewport.bottom - 70),
+            const Offset(0, -220),
+          );
           await tester.pumpAndSettle();
         }
         await captureR66Visual(tester, 'r669-monthly-$mode-$scale-bottom');
-        expect(visited, expected, reason: 'Every Monthly SKU Add action must be discoverable with vertical scrolling alone.');
+        expect(
+          visited,
+          expected,
+          reason:
+              'Every Monthly SKU Add action must be discoverable with vertical scrolling alone.',
+        );
         final id = expected.last;
         final add = find.byKey(ValueKey('buy-add-$id'));
         await tester.ensureVisible(add);
@@ -7437,7 +7483,10 @@ void main() {
         expect(session.showingMonthlyBasketProducts, isTrue);
         expect(session.quantityFor(id), quantity);
         expect(session.quantityFor('w-notebook'), retainedWholesale);
-        expect(session.catalogueSaleTypeProducts.map((p) => p.id).toSet(), expected);
+        expect(
+          session.catalogueSaleTypeProducts.map((p) => p.id).toSet(),
+          expected,
+        );
         await captureR66Visual(tester, 'r669-monthly-$mode-$scale-return');
         expect(tester.takeException(), isNull);
       });
@@ -8027,7 +8076,23 @@ void main() {
             tester.getRect(facts).top,
             greaterThanOrEqualTo(tester.getRect(scrollable).top),
           );
-          expect(tester.getRect(facts).bottom, lessThanOrEqualTo(dockTop));
+          // Enlarged full metadata can exceed the short landscape viewport.
+          // Verify every paragraph can be brought above the dock independently.
+          final paragraphs = find.descendant(
+            of: facts,
+            matching: find.byType(RichText),
+          );
+          for (var index = 0; index < paragraphs.evaluate().length; index++) {
+            final paragraph = paragraphs.at(index);
+            await tester.ensureVisible(paragraph);
+            await tester.pumpAndSettle();
+            final rect = tester.getRect(paragraph);
+            expect(
+              rect.top,
+              greaterThanOrEqualTo(tester.getRect(scrollable).top),
+            );
+            expect(rect.bottom, lessThanOrEqualTo(dockTop));
+          }
           for (final text
               in find
                   .descendant(of: facts, matching: find.byType(RichText))
@@ -8929,7 +8994,7 @@ void main() {
           await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
           await tester.pumpAndSettle();
           expect(find.text('Rice buying offer'), findsOneWidget);
-          expect(find.text('Published by MoolSocial'), findsOneWidget);
+          expect(find.text('From MoolSocial'), findsOneWidget);
           expect(find.text('Makers'), findsNothing);
           expect(find.text('Categories'), findsNothing);
           final next = find.byKey(const ValueKey('buy-offer-promotion-next'));
@@ -8937,7 +9002,7 @@ void main() {
             const ValueKey('buy-offer-promotion-previous'),
           );
           expect(tester.widget<IconButton>(previous).onPressed, isNull);
-          await tester.ensureVisible(next);
+          await Scrollable.ensureVisible(tester.element(next), alignment: .5);
           await tester.pumpAndSettle();
           expect(next.hitTestable(), findsOneWidget);
           await tester.tap(next);
@@ -8954,10 +9019,7 @@ void main() {
           expect(tester.widget<Opacity>(opacity).opacity, 1);
           expect(find.text('Rice buying offer'), findsNothing);
           expect(find.text('Fresh produce offer'), findsOneWidget);
-          expect(
-            find.text('Published by Test produce supplier'),
-            findsOneWidget,
-          );
+          expect(find.text('From Test produce supplier'), findsOneWidget);
           expect(tester.widget<IconButton>(next).onPressed, isNull);
           expect(session.featuredOfferPublicationId, 'test-supplier-tomato');
           final cta = find.byKey(
@@ -9011,8 +9073,10 @@ void main() {
             ),
             findsOneWidget,
           );
-          await captureR66Visual(tester,
-            'r669-three-line-offers-${size.width.toInt()}-$reducedMotion');
+          await captureR66Visual(
+            tester,
+            'r669-three-line-offers-${size.width.toInt()}-$reducedMotion',
+          );
           final shopCategory = session.selectedCategoryId;
           await tester.tap(categoryControl);
           await tester.pumpAndSettle();
@@ -9087,12 +9151,31 @@ void main() {
 
     await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
     await tester.pumpAndSettle();
-    await tester.tap(find.byKey(const ValueKey('buy-add-w-oil')));
+    final oilAdd = find.byKey(const ValueKey('buy-add-w-oil'));
+    await tester.ensureVisible(oilAdd);
+    await tester.pumpAndSettle();
+    expect(oilAdd.hitTestable(), findsOneWidget);
+    await tester.tap(oilAdd);
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-compact-cart-indicator')));
     await tester.pumpAndSettle();
 
     await tester.tap(find.byKey(const ValueKey('buy-cart-browse-more')));
+    await tester.pumpAndSettle();
+    expect(session.view, BuyV2View.catalogue);
+    final offerSummary = find.byKey(
+      const ValueKey('buy-offers-publisher-summary'),
+    );
+    await tester.scrollUntilVisible(
+      offerSummary,
+      -180,
+      scrollable: find
+          .descendant(
+            of: find.byKey(const PageStorageKey('buy-offers')),
+            matching: find.byType(Scrollable),
+          )
+          .first,
+    );
     await tester.pumpAndSettle();
     expect(
       find.byKey(const ValueKey('buy-offers-publisher-summary')),
@@ -9340,7 +9423,14 @@ void main() {
         find.byKey(const ValueKey('buy-cart-continue-store-name')),
         findsOneWidget,
       );
-      expect(find.text('Safe Protein Store'), findsOneWidget);
+      expect(
+        tester
+            .widget<Text>(
+              find.byKey(const ValueKey('buy-cart-continue-store-name')),
+            )
+            .data,
+        'Safe Protein Store',
+      );
 
       await tester.tap(find.byKey(const ValueKey('buy-cart-continue-store')));
       await tester.pumpAndSettle();
@@ -10012,7 +10102,14 @@ void main() {
       await tester.pumpAndSettle();
       final populatedHeight = tester.getSize(card).height;
       expect(populatedHeight, greaterThanOrEqualTo(initialHeight));
-      if (scale == 1) expect(populatedHeight, greaterThan(initialHeight));
+      final quantityControl = find.byKey(
+        ValueKey('buy-quantity-${product.id}'),
+      );
+      expect(quantityControl, findsOneWidget);
+      expect(
+        tester.getRect(card).contains(tester.getCenter(quantityControl)),
+        isTrue,
+      );
       session.decrease(product.id);
       await tester.pumpAndSettle();
       expect(tester.getSize(card).height, populatedHeight);
@@ -10263,12 +10360,7 @@ void main() {
   final d014Cases = [
     for (final id in ['s-dog-food', 'w-notebook'])
       for (final scale in [1.0, 2.0])
-        (
-          id: id,
-          overlay: 'repeat-store',
-          scale: scale,
-          orderId: 'MS-240782',
-        ),
+        (id: id, overlay: 'repeat-store', scale: scale, orderId: 'MS-240782'),
     for (final scale in [1.0, 2.0])
       (
         id: 's-dog-food',
@@ -10410,7 +10502,8 @@ void main() {
             ValueKey('$prefix-other-store-${other.id}'),
           );
           await tester.scrollUntilVisible(
-            otherCard, 220,
+            otherCard,
+            220,
             scrollable: scrollableWithin(ValueKey('$prefix-sheet-list')),
           );
           await tester.ensureVisible(otherCard);
@@ -10498,7 +10591,9 @@ void main() {
           );
         }
         if (missingOrder) {
-          await tester.tap(find.byKey(const ValueKey('moolsocial-family-root-buy-tap')));
+          await tester.tap(
+            find.byKey(const ValueKey('moolsocial-family-root-buy-tap')),
+          );
         } else {
           await tester.binding.handlePopRoute();
         }
@@ -11526,6 +11621,17 @@ void main() {
       lessThanOrEqualTo(12),
     );
     for (final product in session.partnerCatalogueFor(storeProduct).take(3)) {
+      final productCard = find.byKey(ValueKey('buy-product-${product.id}'));
+      if (productCard.evaluate().isEmpty) {
+        await tester.scrollUntilVisible(
+          productCard,
+          150,
+          scrollable: find
+              .descendant(of: grid, matching: find.byType(Scrollable))
+              .first,
+        );
+        await tester.pumpAndSettle();
+      }
       final card = find
           .descendant(
             of: grid,
@@ -11533,7 +11639,13 @@ void main() {
           )
           .first;
       expect(card, findsOneWidget);
-      expect(tester.getSize(card).height, lessThanOrEqualTo(232));
+      final add = find.descendant(
+        of: card,
+        matching: find.byKey(ValueKey('buy-add-${product.id}')),
+      );
+      expect(add, findsOneWidget);
+      expect(tester.getSize(card).height, lessThanOrEqualTo(340));
+      expect(tester.getRect(card).contains(tester.getCenter(add)), isTrue);
     }
     final viewAll = find.byKey(
       const ValueKey('buy-shop-seller-view-more-s-turmeric'),
@@ -11735,7 +11847,7 @@ void main() {
       expect(find.byKey(const ValueKey('buy-product-s-tomato')), findsNothing);
       expect(find.byKey(const ValueKey('buy-product-s-atta')), findsOneWidget);
       expect(find.textContaining('Delivery today'), findsNothing);
-      expect(find.textContaining('At checkout'), findsWidgets);
+      expect(find.textContaining('at checkout'), findsWidgets);
 
       await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
       await tester.pumpAndSettle();

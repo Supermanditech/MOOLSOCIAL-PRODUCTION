@@ -97,7 +97,10 @@ void main() {
     );
     expect(find.text('WHOLESALE PRICE'), findsOneWidget);
     expect(find.text(buyV2Money(product.price)), findsWidgets);
-    expect(find.text('MOQ ${product.minimumOrder} packs'), findsWidgets);
+    expect(
+      find.text('Minimum order ${product.minimumOrder} packs'),
+      findsWidgets,
+    );
     expect(
       find.text(
         '${buyV2Money(product.price * product.minimumOrder)} minimum total',

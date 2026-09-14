@@ -1226,7 +1226,7 @@ void main() {
         expect(addLabel, findsOneWidget);
         expect(find.textContaining(RegExp(r'\b1 packs\b')), findsNothing);
         await capturePack(tester, 'r5-pack-$offers-$scale-minimum');
-        final trade = find.text('MOQ 1 pack');
+        final trade = find.text('Minimum order 1 pack');
         await tester.scrollUntilVisible(
           trade,
           160,
@@ -1302,6 +1302,24 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(session.view, BuyV2View.cart);
+        final cartFacts = find.byKey(
+          ValueKey('buy-wholesale-cart-line-facts-$selectedId'),
+        );
+        final cartScroll = find
+            .descendant(
+              of: find.byKey(
+                PageStorageKey('buy-cart-${session.cartScope.name}'),
+              ),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        await tester.scrollUntilVisible(
+          cartFacts,
+          180,
+          scrollable: cartScroll,
+          maxScrolls: 30,
+        );
+        await tester.pumpAndSettle();
         expect(
           find.byWidgetPredicate(
             (widget) =>
@@ -1323,9 +1341,6 @@ void main() {
           findsWidgets,
         );
         await capturePack(tester, 'r5-pack-$offers-$scale-cart');
-        final cartFacts = find.byKey(
-          ValueKey('buy-wholesale-cart-line-facts-$selectedId'),
-        );
         await Scrollable.ensureVisible(
           tester.element(cartFacts),
           alignment: .45,
@@ -1333,7 +1348,7 @@ void main() {
         await tester.pumpAndSettle();
         final cartPackLabel = find.descendant(
           of: cartFacts,
-          matching: find.textContaining('MOQ 1 pack'),
+          matching: find.textContaining('Minimum order 1 pack'),
         );
         expect(cartPackLabel.hitTestable(), findsOneWidget);
         expect(

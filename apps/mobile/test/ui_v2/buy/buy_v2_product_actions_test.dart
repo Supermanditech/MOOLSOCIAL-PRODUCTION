@@ -20,9 +20,13 @@ void _expectIntactDisclosure(WidgetTester tester, Finder scope, String id) {
     matching: find.byKey(ValueKey('buy-product-illustration-$id')),
   );
   if (disclosure.evaluate().isEmpty) {
-    expect(find.descendant(of: scope,
-      matching: find.byKey(ValueKey('buy-product-photo-unavailable-$id'))),
-      findsOneWidget);
+    expect(
+      find.descendant(
+        of: scope,
+        matching: find.byKey(ValueKey('buy-product-photo-unavailable-$id')),
+      ),
+      findsOneWidget,
+    );
     return;
   }
   final label = tester.widget<Text>(disclosure).data!;
@@ -31,7 +35,11 @@ void _expectIntactDisclosure(WidgetTester tester, Finder scope, String id) {
     final boxes = paragraph.getBoxesForSelection(
       TextSelection(baseOffset: word.start, extentOffset: word.end),
     );
-    expect(boxes, hasLength(1), reason: 'A disclosure word must not split across lines: ${word.group(0)}');
+    expect(
+      boxes,
+      hasLength(1),
+      reason: 'A disclosure word must not split across lines: ${word.group(0)}',
+    );
     expect(boxes.single.left, greaterThanOrEqualTo(0));
     expect(boxes.single.right, lessThanOrEqualTo(paragraph.size.width + .01));
   }
@@ -172,80 +180,143 @@ Future<void> _openR669Review(WidgetTester tester) async {
 
 void main() {
   for (final size in [const Size(360, 800), const Size(800, 600)]) {
-    testWidgets('R669 Fresh picks disclosure clears Add and retained quantity $size', (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = size;
-      addTearDown(tester.view.reset);
-      final core = BuySession();
-      final session = BuyV2Session(core: core);
-      addTearDown(core.dispose);
-      addTearDown(session.dispose);
-      await tester.pumpWidget(MaterialApp(
-        theme: MoolTheme.light(),
-        builder: (context, child) => r66VisualCaptureRoot(child!),
-        home: BuyV2Screen(session: session),
-      ));
-      await tester.pumpAndSettle();
-      final card = find.byKey(const ValueKey('buy-product-s-tomato')).first;
-      final photo = find.descendant(of: card,
-        matching: find.byKey(const ValueKey('buy-featured-packshot-s-tomato')));
-      final add = find.descendant(of: card,
-        matching: find.byKey(const ValueKey('buy-add-s-tomato')));
-      await tester.ensureVisible(card);
-      await tester.pumpAndSettle();
-      expect(photo, findsOneWidget);
-      expect(tester.getRect(photo).overlaps(tester.getRect(add)), isFalse,
-        reason: 'The photo and its disclosure must remain clear of Add');
-      _expectIntactDisclosure(tester, photo, 's-tomato');
-      await captureR66Visual(tester, 'r669-fresh-picks-add-${size.width.toInt()}');
-      await tester.tap(add);
-      await tester.pumpAndSettle();
-      expect(session.quantityFor('s-tomato'), 1);
-      final quantity = find.descendant(of: card,
-        matching: find.byKey(const ValueKey('buy-quantity-s-tomato')));
-      expect(tester.getRect(photo).overlaps(tester.getRect(quantity)), isFalse);
-      await tester.tap(photo);
-      await tester.pumpAndSettle();
-      expect(session.view, BuyV2View.product);
-      await tester.binding.handlePopRoute();
-      await tester.pumpAndSettle();
-      expect(session.view, BuyV2View.catalogue);
-      expect(session.quantityFor('s-tomato'), 1);
-      expect(tester.getRect(photo).overlaps(tester.getRect(quantity)), isFalse);
-      await captureR66Visual(tester, 'r669-fresh-picks-return-${size.width.toInt()}');
-      await tester.tap(find.descendant(of: card, matching: find.byTooltip('Add one')));
-      await tester.pumpAndSettle();
-      expect(session.quantityFor('s-tomato'), 2);
-      await tester.tap(find.descendant(of: card, matching: find.byTooltip('Remove one')));
-      await tester.pumpAndSettle();
-      expect(session.quantityFor('s-tomato'), 1);
-      session.setCartQuantity('s-tomato', '123456789');
-      await tester.pumpAndSettle();
-      expect(session.quantityFor('s-tomato'), 123456789);
-      expect(tester.getRect(photo).overlaps(tester.getRect(quantity)), isFalse);
-      _expectIntactDisclosure(tester, photo, 's-tomato');
-      await captureR66Visual(tester, 'r669-fresh-picks-large-quantity-${size.width.toInt()}');
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'R669 Fresh picks disclosure clears Add and retained quantity $size',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = size;
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => r66VisualCaptureRoot(child!),
+            home: BuyV2Screen(session: session),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final card = find.byKey(const ValueKey('buy-product-s-tomato')).first;
+        final photo = find.descendant(
+          of: card,
+          matching: find.byKey(
+            const ValueKey('buy-featured-packshot-s-tomato'),
+          ),
+        );
+        final add = find.descendant(
+          of: card,
+          matching: find.byKey(const ValueKey('buy-add-s-tomato')),
+        );
+        await tester.ensureVisible(card);
+        await tester.pumpAndSettle();
+        expect(photo, findsOneWidget);
+        expect(
+          tester.getRect(photo).overlaps(tester.getRect(add)),
+          isFalse,
+          reason: 'The photo and its disclosure must remain clear of Add',
+        );
+        _expectIntactDisclosure(tester, photo, 's-tomato');
+        await captureR66Visual(
+          tester,
+          'r669-fresh-picks-add-${size.width.toInt()}',
+        );
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 1);
+        final quantity = find.descendant(
+          of: card,
+          matching: find.byKey(const ValueKey('buy-quantity-s-tomato')),
+        );
+        expect(
+          tester.getRect(photo).overlaps(tester.getRect(quantity)),
+          isFalse,
+        );
+        await tester.tap(photo);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.quantityFor('s-tomato'), 1);
+        expect(
+          tester.getRect(photo).overlaps(tester.getRect(quantity)),
+          isFalse,
+        );
+        await captureR66Visual(
+          tester,
+          'r669-fresh-picks-return-${size.width.toInt()}',
+        );
+        await tester.tap(
+          find.descendant(of: card, matching: find.byTooltip('Add one')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 2);
+        await tester.tap(
+          find.descendant(of: card, matching: find.byTooltip('Remove one')),
+        );
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 1);
+        session.setCartQuantity('s-tomato', '123456789');
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('s-tomato'), 123456789);
+        expect(
+          tester.getRect(photo).overlaps(tester.getRect(quantity)),
+          isFalse,
+        );
+        _expectIntactDisclosure(tester, photo, 's-tomato');
+        await captureR66Visual(
+          tester,
+          'r669-fresh-picks-large-quantity-${size.width.toInt()}',
+        );
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final eligible in [false, true]) {
     for (final scale in [1.0, 2.0]) {
-      testWidgets('R669 review complete action clears bottom navigation $eligible $scale', (tester) async {
-        final adapter = _R669ReviewCommerce()..eligible = eligible;
-        await _mountR669Review(tester, adapter, size: const Size(320, 568), scale: scale, bottomInset: 72);
-        final action = find.byKey(ValueKey(eligible ? 'buy-submit-review-s-milk' : 'buy-review-check-eligibility'));
-        await tester.ensureVisible(action);
-        await tester.pumpAndSettle();
-        expect(tester.getRect(action).bottom, lessThanOrEqualTo(496), reason: 'Complete action must clear Android navigation, not only its tap centre.');
-        expect(tester.takeException(), isNull);
-        await captureR66Visual(tester, 'r669-review-bottom-clearance-$eligible-$scale');
-        expect(adapter.submissions, 0);
-      });
+      testWidgets(
+        'R669 review complete action clears bottom navigation $eligible $scale',
+        (tester) async {
+          final adapter = _R669ReviewCommerce()..eligible = eligible;
+          await _mountR669Review(
+            tester,
+            adapter,
+            size: const Size(320, 568),
+            scale: scale,
+            bottomInset: 72,
+          );
+          final action = find.byKey(
+            ValueKey(
+              eligible
+                  ? 'buy-submit-review-s-milk'
+                  : 'buy-review-check-eligibility',
+            ),
+          );
+          await tester.ensureVisible(action);
+          await tester.pumpAndSettle();
+          expect(
+            tester.getRect(action).bottom,
+            lessThanOrEqualTo(496),
+            reason:
+                'Complete action must clear Android navigation, not only its tap centre.',
+          );
+          expect(tester.takeException(), isNull);
+          await captureR66Visual(
+            tester,
+            'r669-review-bottom-clearance-$eligible-$scale',
+          );
+          expect(adapter.submissions, 0);
+        },
+      );
     }
   }
 
-  testWidgets('R669 review draft survives Android Back and explicit close', (tester) async {
+  testWidgets('R669 review draft survives Android Back and explicit close', (
+    tester,
+  ) async {
     final adapter = _R669ReviewCommerce()..eligible = true;
     final session = await _mountR669Review(tester, adapter);
     final comment = find.byKey(const ValueKey('buy-review-comment-s-milk'));
@@ -256,16 +327,28 @@ void main() {
     await tester.pumpAndSettle();
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-product-review-sheet')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('buy-product-review-sheet')),
+      findsNothing,
+    );
     expect(adapter.submissions, 0);
     await _openR669Review(tester);
-    expect(tester.widget<TextFormField>(comment).controller!.text, 'Keep this unsent review.');
-    expect((tester.widget<IconButton>(rating).icon as Icon).icon, Icons.star_rounded);
+    expect(
+      tester.widget<TextFormField>(comment).controller!.text,
+      'Keep this unsent review.',
+    );
+    expect(
+      (tester.widget<IconButton>(rating).icon as Icon).icon,
+      Icons.star_rounded,
+    );
     await captureR66Visual(tester, 'r669-review-draft-back-restored');
     await tester.tap(find.byKey(const ValueKey('buy-close-product-review')));
     await tester.pumpAndSettle();
     await _openR669Review(tester);
-    expect(tester.widget<TextFormField>(comment).controller!.text, 'Keep this unsent review.');
+    expect(
+      tester.widget<TextFormField>(comment).controller!.text,
+      'Keep this unsent review.',
+    );
     expect(session.productReviewDraft('s-milk')?.rating, 4);
     expect(adapter.submissions, 0);
     expect(tester.takeException(), isNull);
@@ -529,7 +612,9 @@ void main() {
   );
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('R669 cart illustration disclosure remains intact $scale', (tester) async {
+    testWidgets('R669 cart illustration disclosure remains intact $scale', (
+      tester,
+    ) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(360, 800);
       tester.platformDispatcher.textScaleFactorTestValue = scale;
@@ -538,35 +623,57 @@ void main() {
       final session = BuyV2Session(core: BuySession());
       addTearDown(session.dispose);
       session.addProduct('s-tomato');
-      await tester.pumpWidget(MaterialApp(
-        theme: MoolTheme.light(),
-        builder: (context, child) => r66VisualCaptureRoot(child!),
-        home: BuyV2Screen(session: session, initialView: BuyV2View.cart),
-      ));
+      await tester.pumpWidget(
+        MaterialApp(
+          theme: MoolTheme.light(),
+          builder: (context, child) => r66VisualCaptureRoot(child!),
+          home: BuyV2Screen(session: session, initialView: BuyV2View.cart),
+        ),
+      );
       await tester.pumpAndSettle();
-      final thumbnail = find.byKey(const ValueKey('buy-cart-packshot-s-tomato'));
+      final thumbnail = find.byKey(
+        const ValueKey('buy-cart-packshot-s-tomato'),
+      );
       await tester.ensureVisible(thumbnail);
       await tester.pumpAndSettle();
       _expectIntactDisclosure(tester, thumbnail, 's-tomato');
 
       expect(session.quantityFor('s-tomato'), 1);
-      await captureR66Visual(tester, 'r669-cart-illustration-disclosure-$scale');
+      await captureR66Visual(
+        tester,
+        'r669-cart-illustration-disclosure-$scale',
+      );
       expect(tester.takeException(), isNull);
     });
   }
 
-  testWidgets('R669 narrow illustration disclosure does not split words', (tester) async {
-    final product = BuyV2Catalogue.allProducts.firstWhere((p) => p.id == 's-tomato');
-    await tester.pumpWidget(MaterialApp(
-      theme: MoolTheme.light(),
-      builder: (context, child) => r66VisualCaptureRoot(child!),
-      home: Scaffold(body: Center(child: SizedBox(
-        width: 60, height: 120,
-        child: BuyV2ProductPackshot(product: product),
-      ))),
-    ));
+  testWidgets('R669 narrow illustration disclosure does not split words', (
+    tester,
+  ) async {
+    final product = BuyV2Catalogue.allProducts.firstWhere(
+      (p) => p.id == 's-tomato',
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: MoolTheme.light(),
+        builder: (context, child) => r66VisualCaptureRoot(child!),
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: 60,
+              height: 120,
+              child: BuyV2ProductPackshot(product: product),
+            ),
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
-    _expectIntactDisclosure(tester, find.byType(BuyV2ProductPackshot), 's-tomato');
+    _expectIntactDisclosure(
+      tester,
+      find.byType(BuyV2ProductPackshot),
+      's-tomato',
+    );
 
     await captureR66Visual(tester, 'r669-narrow-illustration-disclosure');
     expect(tester.takeException(), isNull);
@@ -744,12 +851,7 @@ void main() {
             await tester.pumpAndSettle();
             expect(disclosure.hitTestable(), findsOneWidget);
             final product = session.product(id);
-            expect(
-              tester.widget<Text>(disclosure).data,
-              id.startsWith('s-milk')
-                  ? 'Illustration'
-                  : 'Category illustration',
-            );
+            expect(tester.widget<Text>(disclosure).data, 'Illustration');
             expect(session.selectedProductId, id);
             expect(session.cartLines, isEmpty);
             final semantics = tester.ensureSemantics();
@@ -845,56 +947,79 @@ void main() {
   }
 
   for (final scale in [1.0, 2.0]) {
-    testWidgets('R669 landscape quantity digits remain visible with keyboard $scale', (tester) async {
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(640, 360);
-      tester.view.viewPadding = const FakeViewPadding(top: 34, right: 47);
-      tester.view.padding = const FakeViewPadding(top: 34, right: 47);
-      tester.platformDispatcher.textScaleFactorTestValue = scale;
-      addTearDown(tester.view.reset);
-      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-      final core = BuySession();
-      final session = BuyV2Session(core: core);
-      addTearDown(core.dispose);
-      addTearDown(session.dispose);
-      expect(session.addProduct('w-rice'), isTrue);
-      expect(session.setCartQuantity('w-rice', '13'), isTrue);
-      await tester.pumpWidget(MaterialApp(
-        theme: MoolTheme.light(),
-        builder: (context, child) => r66VisualCaptureRoot(child!),
-        home: BuyV2Screen(session: session, initialDestination: BuyV2Destination.wholesale,
-            initialView: BuyV2View.product, productId: 'w-rice'),
-      ));
-      await tester.pumpAndSettle();
-      final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
-      await tester.ensureVisible(edit);
-      await tester.tap(edit);
-      await tester.pumpAndSettle();
-      final input = find.byKey(const ValueKey('buy-quantity-input'));
-      tester.view.viewInsets = const FakeViewPadding(bottom: 200);
-      await tester.pumpAndSettle();
-      await tester.enterText(input, '14');
-      await tester.pumpAndSettle();
-      final editable = find.descendant(of: input, matching: find.byType(EditableText));
-      final render = tester.state<EditableTextState>(editable).renderEditable;
-      final caret = render.getLocalRectForCaret(const TextPosition(offset: 1)).shift(render.localToGlobal(Offset.zero));
-      final viewport = tester.getRect(find.ancestor(of: input, matching: find.byType(SingleChildScrollView)).first);
-      await captureR66Visual(tester, 'r669-quantity-keyboard-digits-$scale');
-      expect(caret.top, greaterThanOrEqualTo(viewport.top));
-      expect(caret.bottom, lessThanOrEqualTo(viewport.bottom), reason: 'The complete enlarged digit line must fit inside the editor viewport while typing.');
-      expect(caret.bottom, lessThanOrEqualTo(160));
-      expect(session.quantityFor('w-rice'), 13);
-      tester.view.viewInsets = const FakeViewPadding();
-      await tester.pumpAndSettle();
-      final save = find.byKey(const ValueKey('buy-quantity-save'));
-      await tester.ensureVisible(save);
-      await tester.tap(save);
-      await tester.pumpAndSettle();
-      expect(session.quantityFor('w-rice'), 14);
-      expect(input, findsNothing);
-      expect(session.view, BuyV2View.product);
-      expect(tester.takeException(), isNull);
-    });
+    testWidgets(
+      'R669 landscape quantity digits remain visible with keyboard $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(640, 360);
+        tester.view.viewPadding = const FakeViewPadding(top: 34, right: 47);
+        tester.view.padding = const FakeViewPadding(top: 34, right: 47);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final core = BuySession();
+        final session = BuyV2Session(core: core);
+        addTearDown(core.dispose);
+        addTearDown(session.dispose);
+        expect(session.addProduct('w-rice'), isTrue);
+        expect(session.setCartQuantity('w-rice', '13'), isTrue);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            builder: (context, child) => r66VisualCaptureRoot(child!),
+            home: BuyV2Screen(
+              session: session,
+              initialDestination: BuyV2Destination.wholesale,
+              initialView: BuyV2View.product,
+              productId: 'w-rice',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final edit = find.byKey(const ValueKey('buy-product-edit-quantity'));
+        await tester.ensureVisible(edit);
+        await tester.tap(edit);
+        await tester.pumpAndSettle();
+        final input = find.byKey(const ValueKey('buy-quantity-input'));
+        tester.view.viewInsets = const FakeViewPadding(bottom: 200);
+        await tester.pumpAndSettle();
+        await tester.enterText(input, '14');
+        await tester.pumpAndSettle();
+        final editable = find.descendant(
+          of: input,
+          matching: find.byType(EditableText),
+        );
+        final render = tester.state<EditableTextState>(editable).renderEditable;
+        final caret = render
+            .getLocalRectForCaret(const TextPosition(offset: 1))
+            .shift(render.localToGlobal(Offset.zero));
+        final viewport = tester.getRect(
+          find
+              .ancestor(of: input, matching: find.byType(SingleChildScrollView))
+              .first,
+        );
+        await captureR66Visual(tester, 'r669-quantity-keyboard-digits-$scale');
+        expect(caret.top, greaterThanOrEqualTo(viewport.top));
+        expect(
+          caret.bottom,
+          lessThanOrEqualTo(viewport.bottom),
+          reason:
+              'The complete enlarged digit line must fit inside the editor viewport while typing.',
+        );
+        expect(caret.bottom, lessThanOrEqualTo(160));
+        expect(session.quantityFor('w-rice'), 13);
+        tester.view.viewInsets = const FakeViewPadding();
+        await tester.pumpAndSettle();
+        final save = find.byKey(const ValueKey('buy-quantity-save'));
+        await tester.ensureVisible(save);
+        await tester.tap(save);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor('w-rice'), 14);
+        expect(input, findsNothing);
+        expect(session.view, BuyV2View.product);
+        expect(tester.takeException(), isNull);
+      },
+    );
   }
 
   for (final scale in [1.0, 2.0]) {

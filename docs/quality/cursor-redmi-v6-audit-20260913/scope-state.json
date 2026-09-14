@@ -383,5 +383,186 @@
       "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
       "limits": "Review qualification only; no production/backend/provider/integration acceptance. Prior historical fields retained."
     }
+  },
+  "contractId": "MOOLSOCIAL-MVP-SCOPE-GATE-STATE-001",
+  "policy": "config/mvp-scope-policy.json",
+  "state": "ticket_disclosed_and_authorized",
+  "deliveryDisciplineLock": {
+    "lockId": "MOOLSOCIAL-MVP-ROBUST-60-75-DAY-NO-DUPLICATION-DELIVERY-LOCK-20260805",
+    "path": "config/mvp-robust-60-75-day-delivery-lock.json",
+    "sha256": "D257D6203DB07DBE1DD9DE4722BC3F283981D8172CCF7474C6AE53E48E26C544",
+    "state": "founder_locked_active"
+  },
+  "preTicketSelectionCheckpoint": {
+    "checkpointId": "MOOLSOCIAL-MVP-PRE-TICKET-SELECTION-ROBUSTNESS-REUSE-CHECKPOINT-20260805",
+    "path": "config/mvp-pre-ticket-selection-robustness-checkpoint.json",
+    "sha256": "4D614F74B98DDF83FDE3A1091B4344ECFD70FE87D9A23C886E5CC696886E482A",
+    "state": "successor_assessment_complete",
+    "currentTicketId": "UAW-CURSOR-SKU-METADATA-20260914",
+    "selectedTicketAssessment": {
+      "ticketId": "UAW-CURSOR-SKU-METADATA-20260914",
+      "customerOutcome": "Personal shoppers identify and compare product, pack, price, seller and order contents in readable native Buy presentations.",
+      "necessityProof": "Reuse existing shared cards, packshot, offer promotion and order lines; no new screen/route/service/backend. Exact fixture display adapter preserves model identity.",
+      "implementationDisposition": [
+        "reuse",
+        "thin_policy_adapter",
+        "test_only_acceptance"
+      ],
+      "sharedImplementationOwners": [
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+      ],
+      "newScreens": [],
+      "newRoutes": [],
+      "newBackendOwners": [],
+      "robustnessCoverage": [
+        "320/360/390 logical widths and100/130/200 percent text",
+        "Long name/pack/seller/price and quantity; missing media/facts and stale offers",
+        "Save/Cart/navigation/store boundaries; snapshot order identity; Rx and collection checks"
+      ],
+      "adjustments": [
+        "Shared presentation wave for five separately traceable acceptance units"
+      ],
+      "explicitExclusions": [
+        "No backend/auth/provider changes or real transactions/messages",
+        "No OPPO/integration/production deployment or locked Screens01-03 changes"
+      ],
+      "dependenciesAndApprovals": [
+        "Existing exact owner/source admission for founder-requested native presentation change",
+        "Required local and two combined regressions; unique APK gate and Redmi qualification"
+      ],
+      "manifestPath": "docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md",
+      "manifestSha256": "5184AD1E7AE46C3678C315ADEE593B5A2F40C9097EDAFED41C03BD64B161998B",
+      "timelineImpactDays": 1,
+      "reuseInventoryComplete": true,
+      "duplicateSearchComplete": true,
+      "within60To75DayLock": true,
+      "evidencePath": "docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md"
+    }
+  },
+  "ticket": {
+    "id": "UAW-CURSOR-SKU-METADATA-20260914",
+    "classification": "mvp_supporting",
+    "customerOutcome": "Personal shoppers identify and compare product, pack, price, seller and order contents in readable native Buy presentations.",
+    "classificationReason": "Bounded readability and customer-language correction to core existing buying journey",
+    "minimumCompleteScope": [
+      "SKU-M01 through SKU-M05 as defined in DEFECTS.md; shared native presentation and focused tests"
+    ],
+    "explicitExclusions": [
+      "No backend/auth/provider changes or real transactions/messages",
+      "No OPPO/integration/production deployment or locked Screens01-03 changes"
+    ],
+    "dependenciesAndApprovals": [
+      "Existing exact owner/source admission for founder-requested native presentation change",
+      "Required local and two combined regressions; unique APK gate and Redmi qualification"
+    ],
+    "testAndEvidencePlan": [
+      "320/360/390 logical widths and100/130/200 percent text",
+      "Long name/pack/seller/price and quantity; missing media/facts and stale offers",
+      "Save/Cart/navigation/store boundaries; snapshot order identity; Rx and collection checks",
+      "Actual Flutter images and checksum-bound Redmi successor verification"
+    ]
+  },
+  "founderDisclosure": {
+    "state": "presented_before_execution",
+    "evidence": "docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md"
+  },
+  "authorization": {
+    "state": "founder_acknowledged_mvp_scope",
+    "beyondMvpExplicitlyAuthorized": false,
+    "evidence": "docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md"
+  },
+  "execution": {
+    "referenceWriteAuthorized": false,
+    "runtimeWriteAuthorized": true,
+    "testOrGateWriteAuthorized": true,
+    "backendWriteAuthorized": false,
+    "buildAuthorized": true,
+    "deviceInstallAuthorized": true,
+    "externalServiceWriteAuthorized": false
+  },
+  "skuMetadataWorkflow": {
+    "state": "source_locally_qualified_prebuild_handoff_in_progress",
+    "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
+    "tickets": [
+      "SKU-M01",
+      "SKU-M02",
+      "SKU-M03",
+      "SKU-M04",
+      "SKU-M05"
+    ],
+    "device": "TG8HCYTGGQT885OF",
+    "evidenceRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/sku-metadata-redmi-20260914",
+    "prior22OriginalAndSoleChildClosuresPreserved": true,
+    "sourceCommitted": false,
+    "localChecksPassed": 20,
+    "localFlutterImages": 68,
+    "manuallyReviewedImages": 2,
+    "qualificationReportSha256": "A5D824A5599815784675E067B57D3A7E178B2F7FEA4AE7376A0939C42609BDC0",
+    "redmiRedesignVerified": false,
+    "newApkBuilt": false,
+    "remaining": [
+      "Commit qualified source and exact-source boundary admission",
+      "Finish source-bound prebuild gates and clean live remote evidence seal",
+      "Build unique r66.25 successor and data-preserving Redmi install",
+      "Verify all five SKU tickets on Redmi and complete Git handoff"
+    ],
+    "registryEntryCount": 4587,
+    "registrySha256": "CB8C61F0457D313C54602A4D79C1DEDA897A2E6889600F3974E19F61096422E2",
+    "qualificationAppliesTo": "Current analysis and two full combined runs passed with 3044 tracked source/reference owners preserved. Focused visual reports remain case/source-specific; device closure is pending.",
+    "latestFullScreenRun": {
+      "passed": 325,
+      "failed": 15,
+      "receiptSha256": "FBE9D6F3FF372AC99665FC77F94EB3F7009F5D015C0AD8AED06E8735BD4CAFC7",
+      "qualification": "Historical failed run preserved; superseded by both current full combined passes."
+    },
+    "latestCorrectionRun": {
+      "log": "focused-08.log",
+      "state": "passed",
+      "passed": 20,
+      "failed": 0
+    },
+    "latestCombinedRun": {
+      "state": "both_passed_current_source",
+      "cycles": [
+        {
+          "log": "combined-behavior-05.log",
+          "passed": 2364,
+          "skipped": 27,
+          "failed": 0,
+          "logSha256": "E0D232EEE7AB56D0A6BFBEDCE8027CCEF53B3791794D35E7FAC6D131599B3D00"
+        },
+        {
+          "log": "combined-behavior-06.log",
+          "passed": 2364,
+          "skipped": 27,
+          "failed": 0,
+          "logSha256": "A6B0436A2E7DD8B6517F82C848C1212F28E20D0179F444D889E545D507C12615"
+        }
+      ],
+      "preservedOwnerCount": 3044,
+      "terminal": "e6eb1b",
+      "currentSourceQualification": "Verified by current-source-qualification-01.json; both current runs pass; 27 inherited skips and 10 frozen-reference exclusions remain separately disclosed."
+    },
+    "implementationStatus": "All five tickets implemented and locally qualified; successor APK and actual Redmi verification pending.",
+    "successorAuthorization": {
+      "basis": "Current founder goal explicitly requests necessary unique successor APK and data-preserving Redmi qualification after local checks.",
+      "candidatePlan": "UAW-CURSOR-SKU-METADATA-20260915",
+      "device": "TG8HCYTGGQT885OF",
+      "buildReady": false,
+      "qualificationPrerequisitesRemainRequired": true
+    },
+    "currentCombinedProcess": {
+      "session": 72812,
+      "analysis": "analysis-06.log",
+      "cycles": [
+        "combined-behavior-05.log",
+        "combined-behavior-06.log"
+      ],
+      "state": "completed_exit_zero_support_restored",
+      "terminal": "e6eb1b"
+    },
+    "sourceQualificationReceiptSha256": "665EA731666C43789C44E606BE4AF47E21B4A503C3F9203ACBD405397B03928A"
   }
 }

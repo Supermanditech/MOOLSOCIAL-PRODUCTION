@@ -103459,6 +103459,63 @@
     "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
     "apps/mobile/build/r66-7-prebuild-20260909/R66-UAT-023-R667-FEATURED-RETURN-001.md"
   ]
-}
+},
+    {
+      "id": "REG-20260914-4614-SKU-PYTHON-STDIN-SEPARATOR-ENCODING",
+      "status": "registered_prevention_active",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "evidence"
+      ],
+      "mistake": "PowerShell default Python stdin encoding converted newly supplied middle-dot separators to literal question marks in the first SKU catalogue and order preview edits.",
+      "rootCause": "Unicode patch text crossed an ASCII-default Windows PowerShell pipeline into Python; explicit UTF-8 output encoding did not repair input transport.",
+      "prevention": "Use ASCII-only Python patch scripts with explicit Unicode escapes or apply_patch for Unicode content. Read back each owner and verify display separators/codepoints before tests; preserve original attempts and reject accidental question-mark display copy in focused checks.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1"
+      ],
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "REG-20260914-4615-SKU-PIN-REFRESH-BOUNDARY-AND-DEPENDENCY",
+      "status": "registered_prevention_active",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "coordination",
+        "evidence"
+      ],
+      "mistake": "SKU source-pin refresh matched current and historical design hashes, stopped before writing, but orchestration launched the dependent gate which rejected stale source pins.",
+      "rootCause": "Regex operated across historical and current blocks; orchestration printed rather than enforced the failed mutation exit.",
+      "prevention": "Bound refresh to the single current SUCCESSOR BUILD admission block; require one match per literal owner and unchanged outside-block bytes. Abort dependent actions unless mutation exit is zero. Preserve failure and rerun actual gate only after exact readback.",
+      "gates": [
+        "scripts/check-codex-subagent-coordination-policy.ps1",
+        "scripts/check-codex-development-regression-memory.ps1"
+      ],
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "REG-20260915-4616-SKU-TEST-NAVIGATION-ENUM",
+      "status": "registered_prevention_active",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "evidence"
+      ],
+      "mistake": "New SKU test referenced nonexistent BuyV2Destination.offers, preventing both selected test owners from loading. Preserved corrections-01.log terminal fd8212 exit1.",
+      "rootCause": "Assumed a displayed navigation tab mapped to the destination enum without checking its declared model.",
+      "prevention": "Read the declared enum and actual navigation contract before adding state assertions. Use catalogue view plus visible Offers owner to qualify return. Treat compiler failure as zero executed tests; correct and rerun before any pass/build claim.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1"
+      ],
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    }
   ]
 }

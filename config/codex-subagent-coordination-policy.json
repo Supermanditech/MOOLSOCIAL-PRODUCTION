@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4584,
-    "sha256": "A2991B9301030325D1D8073D252CCBBE2B8190E099223A0F509A2AAFA9A82A64"
+    "entryCount": 4587,
+    "sha256": "CB8C61F0457D313C54602A4D79C1DEDA897A2E6889600F3974E19F61096422E2"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -386,7 +386,13 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
         "apps/mobile/lib/main.dart",
         "apps/mobile/lib/app/ui_review_language_store.dart",
-        "apps/mobile/test/app/ui_review_language_store_test.dart"
+        "apps/mobile/test/app/ui_review_language_store_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart"
       ]
     }
   ],
