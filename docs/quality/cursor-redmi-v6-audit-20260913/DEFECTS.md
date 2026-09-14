@@ -208,7 +208,7 @@ Local qualification2026-09-14: reproduced1.0rendered label contrast on selected 
 Redmi acceptance2026-09-14: captures104-124, selected chip117, Keep119, named removal120 and restored empty cart124. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. UAT.md records scope and restoration. No child; historical local-only status above is superseded for recorded acceptance.
 
 ## RV6-D018 - Product Back loses paginated search destination and position
-Status: open. Severity: moderate navigation/retention failure. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
+Status: closed; r66.20 original keyboard-search/page/product/Back acceptance passed. Severity: moderate navigation/retention failure. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
 Reproduction: Scheduled Shop -> search milk -> keyboard Search after settled query (898) -> Next (899, range41-80) -> open Toned fresh milk1184 (900) -> Android Back. Settled902 returns main Shop catalogue starting milk8/cereal74/chocolate144, not originating search page41-80. Query milk is retained but page and dedicated search surface are lost. Capture901 is a transition frame, not a separate blank-screen defect. Expected: return to the same search result page and retained query so the customer can continue browsing without repaging. No cart mutation or real transaction. Distinct from related-product Back D007: origin here is paginated search results. Ordinary catalogue page return passed round124; it does not cover this branch. Root cause and implementation remain pending; preserve exact route/search context in correction.
 
 
@@ -217,6 +217,8 @@ Capture904 after explicitly reopening the search field restores range41-80 and m
 
 
 **Local implementation disposition (14 September 2026):** D018 corrected in Buy screen/test owners. Eight focused checks and 379 connected checks passed (overlapping counts); analysis zero issues; five actual Flutter captures reviewed. Search page/query/offset return is retained for Android/content Back and cart roundtrip; stale account/query/mode context is rejected. See UAT.md D018 qualification and hashed evidence. Remains open pending successor-APK Redmi acceptance of 898-904; host results are not device closure.
+
+Redmi acceptance2026-09-14: captures173-179 use keyboard taps and Search, then exact41-80/milk1184/Back. Query, dedicated surface and original position restored. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. UAT.md reconciles prior injected-text setup limitation. No child.
 
 ## RV6-D019 - Minimized delivery rail retains collapse chevron instead of delivery identity
 Status: closed; evidence-reconciled and successor Redmi135-139 confirmed. No product change justified. Severity: minor visual/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913.
