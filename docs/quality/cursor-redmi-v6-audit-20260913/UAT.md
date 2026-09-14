@@ -3054,3 +3054,21 @@ Implementation4eb257d146fa656b63d7e0fe003cc8898ee8cd09. Redmi TG8HCYTGGQT885OF, 
 Implementation04afab670c14e5cc425269f6753a3410e0b82548. Redmi TG8HCYTGGQT885OF, r66.20, APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Captures170-179 supersede the prior partial-disposition limitation. Injected text170-172 again yielded milke when Search was touched; source image confirmed720x1600. Cleared only query, then typed m/i/l/k using individual physical-keyboard touch coordinates173-175 (no adb input text). Tapping the same Search key now submits correctly, hides keyboard and retains milk176. Thus the earlier injected-text result is not established as a customer defect; no child registered from it.
 
 From submitted dedicated search176, Next177 yields41-80 and milk1184. Open milk1184(178), AndroidBack179 restores the same dedicated search, exact milk query,41-80 range, top position and card identities. Original898-902 reproduction and corrected return pass. No cart/bookmark/address/order/message mutation. Earlier arbitrary scroll134 is not claimed as a separate return check; the original position is top-of-page. D018 closed for complete recorded acceptance; broader host-only matrix remains host evidence only.
+
+
+### Remaining scoped device prerequisites - 2026-09-14
+
+Checkpoint: 15 originals closed, D005 tested-open with one child D005-C01; six originals still await complete physical acceptance. Source and APK unchanged. Installed r66.20 SHA2567734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8, RedmiTG8HCYTGGQT885OF.
+
+| Ticket | Exact missing device acceptance | Current prerequisite |
+| --- | --- | --- |
+| D009 | Invalid confirmation entry must show recovery, no purchase success; Orders/Shop returns preserve data | Declared-link delivery was rejected before execution by automatic approval review; result only said blocked by policy |
+| D010 | Existing MS-240782 -> delay recovery -> Return to order must restore Orders and same order | Requires declared recovery-link entry; not executed or passed |
+| D012 | Closed Pet Family Store full catalogue says four products listed; restrictions retained; affected status fit | Required original closed product absent from current nine-product Recently viewed setup090-096; its declared product-link entry was rejected before execution |
+| D013 | Pet Family Store Ask has compact static context; Back restores exact Store and unsent draft | Original Store fixture prerequisite not reached; another Store would not close this exact reproduction |
+| D014 | Declared order link over original returned Store overlay reaches order without navigator assertion; retained user context | Requires both original Store fixture and declared order-link delivery; no successor physical pass |
+| D015 | Recently viewed closed dog-food and unavailable shampoo show correct Details/feedback and product Back | Required original non-orderable fixtures not present in current history; no substitute fixture or data injection performed |
+
+Read-only source reconciliation: review session initially retains BuyV2Catalogue.allProducts; paged catalogue mode is selected from a catalogue page source/device source. The original Pet Family records remain in buy_v2_catalogue_data.dart. This establishes source fixture presence only, not a reachable device route or device acceptance. No application/test data modified. No link-launch retry through a different tool, launcher or syntax.
+
+Existing rejected confirmation/product-link attempts are automation prerequisites, not product failures. Host passes do not close any of these six. D005-C01 remains the only new child. Full scoped round and consolidated final handoff remain incomplete. The earlier prebuild document read was truncated; omitted text is not used to assert any new qualification.

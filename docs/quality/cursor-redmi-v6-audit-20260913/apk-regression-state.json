@@ -227,6 +227,18 @@
     "device": "TG8HCYTGGQT885OF",
     "testedOpen": [
       "RV6-D005"
-    ]
+    ],
+    "pendingOriginals": [
+      "RV6-D009",
+      "RV6-D010",
+      "RV6-D012",
+      "RV6-D013",
+      "RV6-D014",
+      "RV6-D015"
+    ],
+    "pendingPrerequisites": {
+      "declaredLinkDelivery": "Automatic approval review rejected earlier confirmation/product-link launch before execution; no alternate launcher retry.",
+      "originalFixtureAccess": "Closed Pet Family Store and unavailable shampoo not reached in current device history; source presence is not device access."
+    }
   }
 }
