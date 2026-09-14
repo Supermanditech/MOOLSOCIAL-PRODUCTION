@@ -3072,3 +3072,43 @@ Checkpoint: 15 originals closed, D005 tested-open with one child D005-C01; six o
 Read-only source reconciliation: review session initially retains BuyV2Catalogue.allProducts; paged catalogue mode is selected from a catalogue page source/device source. The original Pet Family records remain in buy_v2_catalogue_data.dart. This establishes source fixture presence only, not a reachable device route or device acceptance. No application/test data modified. No link-launch retry through a different tool, launcher or syntax.
 
 Existing rejected confirmation/product-link attempts are automation prerequisites, not product failures. Host passes do not close any of these six. D005-C01 remains the only new child. Full scoped round and consolidated final handoff remain incomplete. The earlier prebuild document read was truncated; omitted text is not used to assert any new qualification.
+
+
+## Consolidated scoped qualification checkpoint - 2026-09-14
+
+Not a completion declaration: 15 closed, D005 tested-open with D005-C01, six pending. Exact missing acceptance is listed in the preceding prerequisite table. Device evidence prefixes below are rv620-. All rows bind the installed r66.20 APK SHA2567734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8 on RedmiTG8HCYTGGQT885OF.
+
+| Original | Implementation/reconciliation commit | Local result | Redmi disposition and evidence |
+| --- | --- | --- | --- |
+| RV6-D001 | d532b9dea97a52473a5a95e090a9831fd9635696 | Passed focused/local qualification; see per-ticket UAT section | Closed: 001-011 |
+| RV6-D002 | 55877c20437bdc34c1a90de19904381e94014cde | Passed focused/local qualification; see per-ticket UAT section | Closed: 012-022 |
+| RV6-D003 | e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa | Passed focused/local qualification; see per-ticket UAT section | Closed: 023-046 plus downloaded PDF/render |
+| RV6-D004 | 2967bf188ffe6587a9f3e6409584ce3686504f60 | Passed focused/local qualification; see per-ticket UAT section | Closed: 047-054 |
+| RV6-D005 | dce65c05ab54b39751211a608c923c00226e4a26 | Passed focused/local qualification; see per-ticket UAT section | Tested-open: 055-064; child D005-C01 |
+| RV6-D006 | ed0233761e825e22a4d6e14c7d0f0e0073f9ea25 | Passed focused/local qualification; see per-ticket UAT section | Closed: 065-070 |
+| RV6-D007 | e604579b1f102573766bcaee8bcbf772f9cf96bd | Passed focused/local qualification; see per-ticket UAT section | Closed: 071-077 |
+| RV6-D008 | 0fe77e604fc4787a3b1584a3c0e3e92bff1e53e5 | Passed focused/local qualification; see per-ticket UAT section | Closed: 078-083 |
+| RV6-D009 | e29194eb14d0d90ebf37eff329705e8ee4ec2381 | Passed focused/local qualification; see per-ticket UAT section | Pending: Pending declared confirmation entry |
+| RV6-D010 | 6fcb36cbd8e9ae1b42ee7f97c31230633b50f0f1 | Passed focused/local qualification; see per-ticket UAT section | Pending: Pending declared recovery entry |
+| RV6-D011 | b46c582bc747c15576f8349b0c2fd144d452f02b | Passed focused/local qualification; see per-ticket UAT section | Closed: 084-089 |
+| RV6-D012 | 4194ea5985bc95ddd228f25011ccf198dda38926 | Passed focused/local qualification; see per-ticket UAT section | Pending: 090-096 setup only; original fixture pending |
+| RV6-D013 | 4fccb654d602319e4b7352c5160e93c2bbf4e485 | Passed focused/local qualification; see per-ticket UAT section | Pending: Original Store fixture/return pending |
+| RV6-D014 | da26e9ff88616262c6677b0cb7903fd952b42656 | Passed focused/local qualification; see per-ticket UAT section | Pending: Original overlay/link pending |
+| RV6-D015 | 0c10682b9c5e6955e5cf845de8897090b95f60d4 | Passed focused/local qualification; see per-ticket UAT section | Pending: Original unavailable history fixtures pending |
+| RV6-D016 | ac5a95e5f8fa410ca4e5d0e8c41ca5de7bd271eb | Passed focused/local qualification; see per-ticket UAT section | Closed: 097-103 |
+| RV6-D017 | 99f74b80e37850003f7fdd37db81e71387fbc9ca | Passed focused/local qualification; see per-ticket UAT section | Closed: 104-124 |
+| RV6-D018 | 04afab670c14e5cc425269f6753a3410e0b82548 | Passed focused/local qualification; see per-ticket UAT section | Closed: 125-134 partial; 170-179 complete recorded reproduction |
+| RV6-D019 | 70b117b966a58ca4a551edb31742e175c2723dde | No product fix warranted; original evidence reconciled and local regression passed | Closed: 135-139 evidence reconciliation confirmed |
+| RV6-D020 | 9a81541e866975c15c4044f8a5d68906e45dd638 | Passed focused/local qualification; see per-ticket UAT section | Closed: 140-146 |
+| RV6-D021 | 7e811a753a9896947f514a209f50138d21ea9544 | Passed focused/local qualification; see per-ticket UAT section | Closed: 147-162 |
+| RV6-D022 | 4eb257d146fa656b63d7e0fe003cc8898ee8cd09 | Passed focused/local qualification; see per-ticket UAT section | Closed: 163-169 |
+
+Required D014 follow-up: 9d73a543e0aa01dfd01c488eb04897eca1300def restores product position after Store route completion. Subsequent combined regression adjustments are preserved in the source ancestry through9b7e5aa7fddc08517432f9b3932da5a36ef7a92d; this table is traceability, not a standalone cherry-pick plan. No integration authorized.
+
+Local combined evidence in PREBUILD.md: two cycles2325passed/27inherited capture skips/zero failures each; analysis zero issues. Per-ticket actual Flutter captures and focused limitations remain in their UAT sections. Local passes do not close pending originals or D005.
+
+Build identity: source32ebd7361fedf2224dae9cd89bb02337ca53286a; packagecom.moolsocial.app.cursorreview; installed version1.0.0-r66.20-cursorreview/versionCode2026091401; signerSHA256CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25. One authorized build consumed; no new build, data clearing or downgrade. Review fixtures do not qualify production/backend/providers.
+
+Preservation reconciliation at this checkpoint: all1177 EVIDENCE.csv rows from a846c558fe4bd606a69cfc613112979ba6d6a022 are present unchanged in current1358 rows. This verifies the original index records, not a fresh rerun of514 routes. No frozen route retests claimed.
+
+Only child: RV6-D005-C01, moderate, saved Hindi preference returns to English on cold relaunch. Parent remains open; full reproduction, expected/actual behavior and captures055-064 are retained under the child in DEFECTS.md. No child implementation performed. Final completion handoff remains pending complete applicable device acceptance or an explicit final blocker disposition.
