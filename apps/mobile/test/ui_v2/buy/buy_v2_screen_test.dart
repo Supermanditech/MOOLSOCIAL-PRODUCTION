@@ -9842,6 +9842,73 @@ void main() {
     }
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('RV6 D019 minimize restores delivery identity text $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      tester.platformDispatcher.textScaleFactorTestValue = scale;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      final journey = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'manual',
+            areaLabel: 'Sardarpura',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      addTearDown(journey.dispose);
+      await journey.start();
+      await tester.pumpWidget(
+        r66VisualCaptureRoot(
+          MoolSocialApp(session: journey, initialLocation: '/app/buy?sub=shop'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      final artwork = find.byKey(
+        const ValueKey('buy-delivery-compact-artwork'),
+      );
+      final toggle = find.byKey(const ValueKey('buy-quick-delivery-expand'));
+      expect(artwork, findsOneWidget);
+      final count = tester
+          .widget<Text>(find.byKey(const ValueKey('buy-delivery-count')))
+          .data;
+      for (var round = 0; round < 2; round++) {
+        await tester.tap(toggle);
+        await tester.pumpAndSettle();
+        expect(
+          find.byKey(const ValueKey('buy-quick-delivery-status-expanded')),
+          findsOneWidget,
+        );
+        final minimize = find.byKey(
+          const ValueKey('buy-quick-delivery-minimize'),
+        );
+        await tester.ensureVisible(minimize);
+        await tester.tap(minimize);
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'rv6-d019-minimized-$round-text-$scale');
+        expect(
+          find.byKey(const ValueKey('buy-quick-delivery-status-expanded')),
+          findsNothing,
+        );
+        expect(artwork, findsOneWidget);
+        expect(
+          tester
+              .widget<Text>(find.byKey(const ValueKey('buy-delivery-count')))
+              .data,
+          count,
+        );
+        expect(tester.widget<IconButton>(toggle).tooltip, startsWith('Show '));
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   final d018Cases = [
     for (final scale in [1.0, 2.0])
       for (final systemBack in [true, false])

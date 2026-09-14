@@ -2613,3 +2613,33 @@ Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d018
 | qualified/rv6-d018-search-return-system-true-text-1.0-none.png | AC8C209AD8216489BE333F8F129AE3BE0DE4478FACA7DFBA0D89E640329B3C8E |
 | qualified/rv6-d018-search-return-system-true-text-2.0-none.png | E4EB66FEE2B0F2EEB23AD7E1FAD7B2CFCAD29BEA634BA0FD6ED68751CF445201 |
 | search-return-fix.log | F3FD5A19500CB882999AC35612C178BB9D1491ECB97BEC4C4A155CB796E05D87 |
+
+
+## RV6-D019 evidence reconciliation - 14 September 2026
+
+Disposition: original defect description contradicted by its own hash-verified physical evidence. No product correction justified. Preserve ticket ID and original narrative; retain D019 in the planned successor-APK scoped verification, not a device closure or an implemented-fix claim.
+
+Reviewed original Redmi captures909 (expanded),910 (minimized),911 (settled),913 (repeat). 910/911 clearly show bike +9+ in the rail;913 also shows bike +9+. Their bytes match EVIDENCE.csv. 910/911 SHA256 7D92BE68C1E4163E4EFAC14694DC9AE8086AFA70C714451C8AD0C597D21B786F;913 SHA256 530EC8E30C13DFB799C08722219D893421AC4A8B433F8C59DFA4D355756AA982. Expanded909 has the expected collapse chevron; SHA2564362B3F8F313FF3FCCD94EDC0EB07894A93BE863E74B83F747FD017298C54A19. Written claim of absent bike/count after minimizing is not supported by these images.
+
+Added two focused actual-MoolSocialApp regressions in the existing owned buy_v2_screen_test.dart, normal/200% text, two open/minimize rounds each; check panel dismissal, restored delivery artwork/count and Show tooltip. Both pass on unchanged product source; final session92071 terminal exit0. Analysis zero issues. Reviewed first-round actual Flutter capture at both scales; truck +2 remains visible in this local fixture. Fixture has two seeded deliveries, not the physical twelve-order state. Captures for repeated rounds retained. These host passes do not qualify the successor APK on Redmi.
+
+Initial invocation had a misquoted visual-directory argument interpreted as an extra missing test path; its exit1 is an invocation error, not a product failure. Preserve reproduction.log; no claim of a clean baseline from that run. Correct quoted full-app invocation and final formatted regression both passed. A formatter block-extraction read failed before writing, then bounded extraction preserved all existing tests. No application, policy or shared-owner modification. No live order, device action, APK or broad audit.
+
+Parent04afab670c14e5cc425269f6753a3410e0b82548. Changed owners: existing screen test, UAT.md, DEFECTS.md and scope-state.json. D001-D018 remain locally qualified; D019 is separately reconciled without product change; D020-D022 remain pending local work.
+
+Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d019-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | 9462CC0009BB9F0B020E9DD43CAFE9DBB7EB87A2078AD6E5CFB9906A27CEEAC0 |
+| qualified/rv6-d019-minimized-0-text-1.0.png | 967EB8350DFFD5C2098134F8BDB4742977A309C767E0B47DFC014132F8284EC8 |
+| qualified/rv6-d019-minimized-0-text-2.0.png | 8E6249AC8A14831E34335850A6582932DC68FB1C32CB77769740728759DB657C |
+| qualified/rv6-d019-minimized-1-text-1.0.png | 967EB8350DFFD5C2098134F8BDB4742977A309C767E0B47DFC014132F8284EC8 |
+| qualified/rv6-d019-minimized-1-text-2.0.png | 8E6249AC8A14831E34335850A6582932DC68FB1C32CB77769740728759DB657C |
+| qualified-focused.log | 058E573A34B591ECA4A164C6548908CBDA61A6420C963433ED9E9C194FD86A54 |
+| real-app-before/rv6-d019-minimized-0-text-1.0.png | 967EB8350DFFD5C2098134F8BDB4742977A309C767E0B47DFC014132F8284EC8 |
+| real-app-before/rv6-d019-minimized-0-text-2.0.png | 8E6249AC8A14831E34335850A6582932DC68FB1C32CB77769740728759DB657C |
+| real-app-before/rv6-d019-minimized-1-text-1.0.png | 967EB8350DFFD5C2098134F8BDB4742977A309C767E0B47DFC014132F8284EC8 |
+| real-app-before/rv6-d019-minimized-1-text-2.0.png | 8E6249AC8A14831E34335850A6582932DC68FB1C32CB77769740728759DB657C |
+| real-app-reproduction.log | 1974531C24BD2A68C5B4E8D553F8E1D6E77093533B885C5D9EAF1C69C6E9D9F4 |
+| reproduction.log | EDB6F6C9327A1EAA1DD79C8D9DEE7424096BF23FEAA1B485D4B07D1F03C08B63 |
