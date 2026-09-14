@@ -2897,3 +2897,31 @@ First retained attempt incorrectly addressed viewport top before scroll clamp; s
 | offers-compact-visuals/r5-offers-s-tomato-320-700-2.0-before.png | F821615CED38A0425DFADD9260ACF09E50A12700E67BAB428D2334F0BB3E8BC2 |
 | offers-compact-visuals/r5-offers-w-notebook-320-700-2.0-after.png | ACF41E6D398ADD3404D8A670FE80702BDED0681445BC675C253DF7BF58A82BA5 |
 | offers-compact-visuals/r5-offers-w-notebook-320-700-2.0-before.png | D5EA03CD291078254B137AFA063B97B84B414B646EA9D2F307F3098976BFA492 |
+
+
+## Final connected local regression - 2026-09-14
+
+Exact tested source9b7e5aa7fddc08517432f9b3932da5a36ef7a92d; branch work/cursor-ui/redmi-v6-audit-20260913. Full Buy directory plus personal profile, privacy, security and Chat settings hub: 2325 passed, 27 skipped, zero failures; terminal session95789 exit0 (f0de88). Full flutter analyze --no-pub: zero issues, terminal50778 exit0 (b5a878). This supersedes the first combined failure result only for this corrected source; original failing logs and each reconciliation remain preserved.
+
+All27 skipped cases are inherited capture tests. Each entire skipped test block is unchanged from V6; source inventory and preservation evidence below. These are not passes or device evidence. Defect-specific actual Flutter visuals remain recorded in their per-ticket sections. D019 remains evidence-reconciled without product correction, pending scoped successor-device confirmation. No original ticket is closed by this local result.
+
+Before this evidence update, worktree clean and exact live remote equality at9b7e5aa7fddc08517432f9b3932da5a36ef7a92d (12838b); implementation gate passed46owners/registry4584 (74f43d). All34 changed application/test owners relative to V6 are within this lane. Fifteen protected groups/files, including Android/iOS/assets/dependencies/backend/contracts, saved-products persistence, session and scanner, are unchanged. Entire screen import/arrival-sound prefix is byte-identical to V6. The exact source inventory is retained below.
+
+Prior r66.19 APK copied without overwriting to external evidence root/preserved-r66.19-cursorreview.apk:210792649bytes; SHA25697750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7. Both source and preserved copy verified. No device change or data clearing.
+
+Successor admission remains unapplied: exact three-checker proposal prepared under founder authorization; native rules/data-egress checker unchanged. Proposed protected-source function passes11 preliminary checks, including actual-source acceptance and rejection of wrong source/root/branch, missing ancestry, committed/working/untracked drift, Git failure and Desktop use. First harness had PowerShell argument-forwarding errors; its negative results are not relied upon. Corrected harness verifies each intended rejection boundary; both logs preserved. Remaining: narrow coordination admission, full candidate gates, atomic Git sealing, new build record/APK and scoped Redmi verification. No security/runtime/backend acceptance or build readiness is claimed by proposal tests.
+
+External evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-successor-qualification-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| combined-regression-v2.log | 3F6E31095B819BF0BB9218D2EBDCC423666192C97A6930546B7E96CA16649508 |
+| full-analysis-v2.log | 6FF2F528BA3FB1E9EC5FCC5F57C3DCCCC131C574E6FFD4703F9BA8527F3D0B8F |
+| combined-v2-skip-source-inventory.json | CC269A2B438DA84184DA3214CD91DE34CC91CAD5CEBBFB6F2581DE19EAEB4733 |
+| combined-v2-skip-preservation.json | 39E5F6C93948CD3BAA627366F32744E7C562C74B64709CA6EAF6321724C0B607 |
+| successor-admission-source-review.json | 32E6F60EF5B8D722C01BF4073E03193343846945F21111BCCA11971D10B4F29B |
+| successor-admission-proposed-three-checkers.patch | 4D996865AAC0A9353A317F6DAA3549D7506B1B6D09EB649A65A3E09CE83B167C |
+| successor-admission-proposed-three-checkers.json | DB12BA2F15245A6FFF2248E40FD4CCBF993DD2F797AFF787671B78D4AE290F60 |
+| proposed-source-admission-validation.log | E0A73ED12EC84D94FB61A8BF89D565E5202DAEF3673E51FB97CDE2B765965CD8 |
+| proposed-source-admission-validation-v2.log | 7784E021D54643E9DB1599BE7EAFBF1EBF7A52FF0B52E3672DF38A26EB340CB0 |
+| successor-admission-validation-plan.md | 883E140C3BB0894ED045C7A67528A259952CF44767259A2BD1900C5BB23AB5A2 |
