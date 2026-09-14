@@ -91,8 +91,8 @@
     }
   ],
   "nextWork": [
-    "Seal delivery evidence and verify clean Git/live remote equality; source baselinef1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b and r66.22 Redmi installation are complete.",
-    "Stop at the authorized APK-delivery boundary. D005/C01 new-APK device testing requires a subsequent instruction; D009/D010/D014 native-link delivery remains externally blocked."
+    "D005 and sole child D005-C01 are device-closed on installed r66.22; preserve the other 18 original closures and the original English preference restored in this round.",
+    "Finish D009/D010/D014 only when permitted native-link delivery and the required original Store fixture are available. Prior automatic approval rejection remains unresolved; no bypass or substitute pass."
   ],
   "preservation": {
     "cart": "1175 original Scheduled Shop Saved1 emptycart restored;no cart changes in round169",
@@ -150,7 +150,7 @@
       "RV6-D021",
       "RV6-D022"
     ],
-    "deviceQualified": ["RV6-D001", "RV6-D002", "RV6-D003", "RV6-D004", "RV6-D006", "RV6-D007", "RV6-D008", "RV6-D011", "RV6-D012", "RV6-D013", "RV6-D015", "RV6-D016", "RV6-D017", "RV6-D018", "RV6-D019", "RV6-D020", "RV6-D021", "RV6-D022"],
+    "deviceQualified": ["RV6-D001", "RV6-D002", "RV6-D003", "RV6-D004", "RV6-D005", "RV6-D006", "RV6-D007", "RV6-D008", "RV6-D011", "RV6-D012", "RV6-D013", "RV6-D015", "RV6-D016", "RV6-D017", "RV6-D018", "RV6-D019", "RV6-D020", "RV6-D021", "RV6-D022"],
     "remainingLocal": [],
     "newApkBuilt": true,
     "deviceTestingStarted": true,
@@ -197,14 +197,14 @@
     }
   },
   "latestScopedWorkflow": {
-    "authority": "Founder confirmed resume from fe3ee1d3 and supplied later explicit narrow shared startup/persistence ownership authorization; UAT.md records that admission.",
+    "authority": "Founder subsequently requested goal mode to close all 22 within remaining D005/C01 and D009/D010/D014 Redmi verification scope; this authorizes post-delivery device verification. Earlier narrow startup ownership admission remains recorded in UAT.md.",
     "historicalAudit": "Top-level audit, coverage, preservation and original requirements retain the frozen full-audit checkpoint; they are not current successor build status or an exhaustive production qualification.",
     "originalCount": 22,
-    "deviceClosedCount": 18,
-    "deviceOpen": ["RV6-D005"],
+    "deviceClosedCount": 19,
+    "deviceOpen": [],
     "externalLinkDeliveryUnverified": ["RV6-D009", "RV6-D010", "RV6-D014"],
     "externalBlocker": "Declared native-link launches rejected by automatic approval review; no equivalent alternate launch or bypass attempted.",
-    "children": [{"id": "RV6-D005-C01", "parent": "RV6-D005", "status": "implemented_locally_qualified_device_open", "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34", "evidence": "UAT.md", "limits": "Host adapter/session checks and English Flutter captures; host Hindi glyph qualification unavailable; no successor Redmi process-restart closure."}],
+    "children": [{"id": "RV6-D005-C01", "parent": "RV6-D005", "status": "implemented_device_verified_closed", "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34", "evidence": "UAT.md r66.22 device closure section; EVIDENCE.csv rv622 captures", "limits": "Signed-out Redmi review lane: Hindi and English selected radios and summaries persist across separate cold processes; affected Personal profile returns checked; Hindi glyph and honest English-screen disclosure visually reviewed. Original English restored. No claim of Buy translation or production qualification."}],
     "currentInstalledVersion": "1.0.0-r66.22-cursorreview",
     "currentInstalledVersionCode": 2026091403,
     "finalSuccessor": {
@@ -217,8 +217,8 @@
       "manifestSha256": "6364AD7D65BD1A6DC85C2E073B143274700125DB8C89067ED5B1B43A068B83D0",
       "buildAuthorization": "consumed_one_build",
       "dataClearPerformed": false,
-      "childDeviceVerification": "not_performed_requires_subsequent_instruction",
-      "evidence": "UAT.md final r66.22 delivery section"
+      "childDeviceVerification": "D005-C01_closed_on_Redmi_20260914_under_subsequent_founder_goal",
+      "evidence": "UAT.md final r66.22 delivery and subsequent device closure sections"
     },
     "sourceBaseline": "locally_qualified_two_combined_cycles_analysis_and_source_gates_passed_see_PREBUILD.md",
     "integration": "not_authorized",

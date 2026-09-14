@@ -3226,3 +3226,25 @@ Remaining acceptance is explicit:
 Operational evidence retained: an extra coordination call used integration-only candidate_preflight and correctly failed for cursor_ui; the unchanged valid Cursor handoff invocation passed. The external APK metadata helper initially rejected command-echo scaffolding joined to scalar metadata; the SDK's actual package/version/code were correct. Its parser was corrected to require one typed output and exact expected values, preserving raw output. No source/checker change, second build or premature install resulted. All earlier failed logs and frozen evidence remain preserved.
 
 The workflow stops at delivery. New-APK child verification, new build, integration and OPPO actions are not part of this handoff.
+
+## r66.22 device closure under subsequent founder goal - 2026-09-14
+
+The founder subsequently authorized goal mode for D005/C01 and D009/D010/D014 verification and requested closure of all 22 originals. This supersedes the historical delivery-only stopping point for device verification. No source correction, new build, integration or OPPO action was performed in this round.
+
+Exact installed Redmi TG8HCYTGGQT885OF package com.moolsocial.app.cursorreview was verified as 1.0.0-r66.22-cursorreview, code 2026091403. Installed base.apk SHA256 matched 4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16, source baseline f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b. Implementation remains 3c30ba11521db6bb1a1ec6995b181a81df1a6b34; this is evidence-only qualification.
+
+Evidence directory: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv622-device-qualification-20260914. EVIDENCE.csv registers the 22 captures; capture-manifest.json binds 90 capture metadata, PNG/XML and operational log files, SHA256 25DBBD3E3C71B6081BFCFE8D25311140D4D98A5716AE1BD3657890AFC1AA301A. Twenty-two captures represent one original and one child verification, not 22 fresh defect passes.
+
+| Check | Physical Redmi result | Evidence |
+| --- | --- | --- |
+| Original preference and honest coverage | English initially selected; Hindi option visibly explains preference-only support and English app screens | 004-preferences-settled, 005-language-initial |
+| Hindi persistence | Select Hindi, return to Shop, force-stop review package, confirm process absent, ordinary MainActivity cold launch; Hindi summary and selected radio retained | 006-hindi-selected; cold-hindi-02.log (COLD, new PID 11094); 011-hindi-after-cold; 012-hindi-radio-after-cold |
+| Affected profile return | Personal profile reports Hindi preferred / App screens: English; language row opens Preferences | 014-personal-hindi, 015-personal-to-preferences |
+| English restoration and persistence | Restore original English, header Back preserves Personal profile summary; separate force-stop/cold launch retains English summary and selected radio | 018-personal-return-english; cold-english-01.log (COLD, new PID 11757); 020-english-after-cold; 021-english-radio-after-cold |
+| Final preserved context | Return to Shop; Quick catalogue and Saved 1 retained; font_scale remains 1.0 | 022-final-shop-restored |
+
+The settled acceptance screenshots were visually inspected, including rendered Hindi glyphs, radios, coverage disclosure and profile summaries. RV6-D005 and the sole deduplicated registered child RV6-D005-C01 are closed for this signed-out Redmi review scope. This does not claim Hindi translation of Buy screens, exhaustive persisted-field coverage or production readiness. Original English was restored and verified. No data clear, uninstall, sign-out, real transaction or message occurred. The other 18 original closures remain preserved; original closure count is now 19 of 22. No new product child was found in this focused round.
+
+Operational evidence is retained transparently: capture003 caught a transition and is excluded from acceptance; later captures use settled screens. MIUI uiautomator warnings accompanied successful complete XML dumps. cold-hindi-01.log records a failed command missing `am`, which did not stop/relaunch the app; the corrected cold-hindi-02.log is the acceptance restart. Ordinary MainActivity starts used no URI and do not qualify any native-link defect.
+
+RV6-D009, RV6-D010 and RV6-D014 remain externally blocked and unverified. Their recorded prerequisite is declared native-link delivery, previously rejected before execution by automatic approval review with only the reason "blocked by policy". D014 also requires the original returned Store overlay fixture. No evidence establishes that the rejection or fixture prerequisite has changed. No rejected link was retried through another tool, launcher or syntax. D009 still requires invalid-confirmation recovery and safe Orders/Shop returns; D010 requires the existing MS-240782 delay-recovery return to the same order; D014 requires the declared order link over the original Store overlay without navigator assertion and with context retained. Their local implementation does not substitute for those missing device checks. The all-22 closure goal is therefore incomplete.

@@ -63,7 +63,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Successor acceptance: captures rv620-047 through054 and UAT.md D004 acceptance. Exact installed APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Complete guidance visible with/without keyboard; rejected whitespace; Back retained original profile. No child.
 
 ## RV6-D005 - Hindi preference changes its value but observed Buy and preference UI remain English
-- Status: open; r66.20 immediate disclosure passes, cold-relaunch retention fails; linked RV6-D005-C01. Severity: moderate for Hindi-dependent users.
+- Status: closed on Redmi r66.22 on 2026-09-14; honest coverage disclosure and Hindi/English cold-relaunch retention verified, including linked RV6-D005-C01. See UAT.md r66.22 device closure section. Historical observations below remain preserved.
 - Journey: Buy account > Personal profile > Language > Privacy and preferences > Language > Hindi; return to Buy catalogue.
 - Actual: preference reads Hindi but headings/actions on the preference screen and returned Buy catalogue remain English, including Stores or products, Wholesale, Bulk and Add. No unavailable/restart/partial-language disclosure was visible.
 - Expected: choosing an offered app language applies to supported customer navigation and guidance; unavailable coverage must be explicit rather than implying the language changed throughout the experience. Supplier-authored product names are not required to be translated by this finding.
@@ -268,7 +268,7 @@ Area guidance now follows actual showAreaControl availability. Four focused regr
 
 ## RV6-D005-C01 - Saved Hindi preference resets to English after cold relaunch
 
-- Parent: RV6-D005. Status: implemented and locally qualified; device acceptance remains open. Commit 3c30ba11521db6bb1a1ec6995b181a81df1a6b34. Severity: moderate. Historical reproduction and ownership-blocker notes below are preserved; the later founder authorization supersedes that ownership restriction.
+- Parent: RV6-D005. Status: closed on Redmi r66.22 on 2026-09-14 after Hindi and English cold-relaunch persistence checks and affected Personal profile returns. Original English preference restored and verified. Implementation commit 3c30ba11521db6bb1a1ec6995b181a81df1a6b34. See UAT.md r66.22 device closure section. Historical reproduction and ownership-blocker notes below are preserved; later founder authorization supersedes that ownership restriction.
 - Actor/outcome: signed-out Buy customer choosing Hindi as a saved language preference expects the selected preference and honest coverage disclosure to survive restarting the app.
 - Reproduction: Personal profile > Language preference > Privacy & preferences > Language > Hindi; observe Hindi preferred / App screens: English; Back to profile (same summary), Back to Shop. Force-stop only com.moolsocial.app.cursorreview, cold launch declared MainActivity, account > Privacy and preferences > Language.
 - Actual: preference summary and selected radio return to English. Before restart picker explicitly promises Selecting Hindi saves your preference only. No sign-out, account switch, data clear, uninstall or preference restoration was performed between selection and observation.
