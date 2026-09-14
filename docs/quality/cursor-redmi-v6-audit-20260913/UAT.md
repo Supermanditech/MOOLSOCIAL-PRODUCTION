@@ -2541,3 +2541,46 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | final-analysis.log | 0AAAC678E2EC6742F989EFF375243869EA2A4299C4E378008E0E70A592E8E838 |
 | final-focused.log | D8010A2415776CFC12237F1F89D5416D5AB936078CB12EB5C4DE48ADF65BD273 |
 | initial-offers-fix.log | 940D784FA6E82F1321EFF44F573CAD3113F164AF589CC116D8AC869E90F4D0A3 |
+
+## RV6-D017 local qualification - 2026-09-14
+
+- Scope: original691-692 selected saved GST chip showed no readable profile name and low-contrast check/remove icons. Start ac5a95e5f8fa410ca4e5d0e8c41ca5de7bd271eb; branch/HEAD and zero-byte clean digest revalidated, implementation gate27b026 terminal0,36existing owners. Previous turn made concrete progress sealing D015/D016; no external wait/blocker or scope change.
+- Confirmed source cause: shared MoolTheme chipTheme selectedColor navy and labelStyle navy; InputChip did not apply a contrasting selected label or icon foreground. Actual rendered RichText against selected RawChip background measured1.0contrast in both Shop and Wholesale at100/200%. The first Shop fixture used nonexistent s-wheat and failed before rendering; corrected to actual s-atta. Wholesale reproduced in baseline-reproduction.log (65154 terminal1/fcd0bf); corrected Shop reproduced in shop-reproduction.log (70474 terminal1/6daff8). Before captures preserve the invisible selected label. Missing first Shop screenshot was not treated as evidence; actual output inventory and corrected reproduction were used.
+- Source owner apps/mobile/lib/ui_v2/buy/buy_v2_views.dart only: Buy GST InputChip now explicitly uses navy selected background, white selected label/checkmark/remove icon, navy unselected label/remove icon. Existing theme font styling retained through copyWith; shared MoolTheme and every selection/removal/persistence callback remain unchanged. No shared-theme, ownership, policy/checker, session, provider or backend edits.
+- Test owner apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: four Shop/Wholesale x100/200% cases at390x844 with48px safe area. Real Buy checkout advances to Confirm without submitting. Two explicit in-memory review GST profiles are seeded through the existing controller to exercise selected/unselected identity; these fixtures do not validate GST registration or backend storage. Tests inspect actual rendered label contrast >=4.5 and explicit icon contrast >=3, switch profiles using the chip label, verify both foreground states, open removal and cancel, and preserve selected profile, two saved entries, one Cart line and Confirm step. Existing GST creation/save/reuse/failure flows are covered by the connected suites. Original device Add/form/Use GST details sequence remains for successor Redmi qualification.
+- Focused4passed after source correction (49379 terminal0/dddd0b). Initial final/ capture run4passed (43891 terminal0/8e1dce); its200% scroll alignment placed chips at the screen edge, so the test was refined to center the target for review. Qualified4passed (94919 terminal0/4417b9), eight qualified/ images inspected at both profile selections/scales/destinations. These are the final visual set; before/,before-shop/ and final/ remain retained earlier evidence. Product code did not change during capture alignment. Final analysis zero issues (e8a59a terminal0,qualified-analysis.log); initial missing test-braces lint retained in analysis.log, corrected without assertion changes. Prior test bodies preserved.
+- Connected regression: flutter test --no-pub test/ui_v2/buy/buy_v2_gst_session_continuity_test.dart test/ui_v2/buy/buy_v2_checkout_cart_return_continuity_test.dart --reporter expanded;54passed/0failures (96687 terminal0/7737f7). Includes profile reuse across screen recreation, account restoration and failed-save handling, optional GST Add/form wiring, checkout/Cart return and compact layout cases. These54 are separate from the four new focused cases. No extra source changes after this run; final test-only centering and formatting were qualified separately above. Diff check passed.
+- No APK/build/install/device action or closure. D017 remains open pending full successor Redmi691-692 and directly affected selection/remove-cancel verification bound to APK checksum. No order/payment/provider action was submitted; visible Check delivery limitation in Shop fixtures remains unchanged and is not a successful payment/delivery claim. Frozen514 records/1177 artifacts preserved; no broad audit, child implementation, OPPO or integration.
+- Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d017-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | B9430A4249CC06B783D391490068D9FFD03F110AD7BE39F0648AA6C7BC15F082 |
+| baseline-reproduction.log | D169C2B485CA8D8BA3526CF3F3ED3B277BA00502EC6A70830311237AF62F2DB5 |
+| before/rv6-d017-wholesale-selected-text-1.0.png | 60B1AC4B6854CB901CE344080A507522327B373752B4DA29935BAC1A8E3E0DC6 |
+| before/rv6-d017-wholesale-selected-text-2.0.png | B6BF802AD67BBE4A013FA2CC6D092AA8534BC0E46C43584826DE98FE744C6C81 |
+| before-shop/rv6-d017-shop-selected-text-1.0.png | 9E47D486D4AAC14122884A246F701721FC3E281BA0C60CB7ED683F1234CE66B2 |
+| before-shop/rv6-d017-shop-selected-text-2.0.png | 0610F458DB4FCA09DD1E6861D323BF95F8BF733EC668D36598ED6DE000F814CF |
+| connected-regression.log | 70EDA3D619D0F1308FFF0461C050440E272DF6499809919510F5EB374FC56329 |
+| contrast-fix.log | 03362AFB97FEBBBA78F61CFA2ABA9A4CB327BA29CED426435BD6798F7E848B86 |
+| final/rv6-d017-shop-selected-text-1.0.png | 28D213691E8A3196A9A3350377E3381002A78E35430A48EFCE7778EF7368DCAF |
+| final/rv6-d017-shop-selected-text-2.0.png | DFCDA61EB74B4AADD2E0D30E869CB772314183B51251BDF34E732CC42D7FDB3E |
+| final/rv6-d017-shop-switched-text-1.0.png | 015EE484D86B852ECD5BF04614BA6CCCF5E12BA008BAB0863826329EB0725624 |
+| final/rv6-d017-shop-switched-text-2.0.png | 27C8F140551F4BC6A43C195E31B00B3AE19F2840C27B917E32FFA7C0476EA29B |
+| final/rv6-d017-wholesale-selected-text-1.0.png | 29013F2C945228464BE3228807DF8E53FE01695927C0C01B91FD270417FBF1E4 |
+| final/rv6-d017-wholesale-selected-text-2.0.png | F4CECD64C1A72EEF67C12FC64014B79138521AD8E459119E21CFB16019E2864B |
+| final/rv6-d017-wholesale-switched-text-1.0.png | FAD30F665975DDAB58F0F59CB333018D7BDFA3F075FD98BCEF620CA9CBED21C6 |
+| final/rv6-d017-wholesale-switched-text-2.0.png | 29EF794D81E2A0EFC847F950B1699675869E7AD4D5B51A617B303BC8B443B7AF |
+| final-analysis.log | 7C961928B430CDB3BE75FEF8C9058ADE6242D3D0C31393C072F4420C0AE7D3D6 |
+| final-focused.log | AFFE5415F6204DFE0E466346F012143163A625AAD11C00B41FDF581087B8F6E6 |
+| qualified/rv6-d017-shop-selected-text-1.0.png | F23CA15EC362BC3696D8729D6456DB955EDC53DD34B95BF85B1D9C94F0374660 |
+| qualified/rv6-d017-shop-selected-text-2.0.png | D4CA5E649BF92CD305CB996EE48A699FEC631396A0B9A14E11E5362746F66E60 |
+| qualified/rv6-d017-shop-switched-text-1.0.png | 0C685698960A8FF9284959DA620F3F1ABD282E3F44690C5E00827868D55254C3 |
+| qualified/rv6-d017-shop-switched-text-2.0.png | 4C4510577E52D6CFC49FF51DF9B5AA8F7A8774BFD791F704222B32686F144557 |
+| qualified/rv6-d017-wholesale-selected-text-1.0.png | 5167C0802E7A1E6F94813C95541D1BC9E7AE2C561FF92633630AB882C32AFD75 |
+| qualified/rv6-d017-wholesale-selected-text-2.0.png | 421D89EA2CE7FE754F5372329B5376535D910B7CCA0F21B875278E3BEF1D48A1 |
+| qualified/rv6-d017-wholesale-switched-text-1.0.png | 70BC4667F12094FF35A3162625698AE05C16FDEA446195D7BFA203075F47FC07 |
+| qualified/rv6-d017-wholesale-switched-text-2.0.png | AA52AAF48003B974A6A50EA20AEB8FCACFD21C0CD14385DA0D3045DE5E325C3E |
+| qualified-analysis.log | 128449F8A393F620158E7A3AC7B004C562E7BD4581066BEC3DA8A9B3AC59D529 |
+| qualified-focused.log | CB75888548D28B4BD26146B5EA1D3B1A27525D716A069EF91E4CA8622B9E39F8 |
+| shop-reproduction.log | F6E8E4428F82E7E2EAA9F7EC981B31E9CAE2EA4843F0D09DB0047C2E35B717EC |

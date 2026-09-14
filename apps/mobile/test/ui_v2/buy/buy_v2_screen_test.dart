@@ -9693,6 +9693,155 @@ void main() {
     );
   }
 
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets(
+        'RV6 D017 GST profile contrast and selection ${destination.name} text $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(390, 844);
+          addTearDown(tester.view.reset);
+          final session = BuyV2Session(core: BuySession());
+          addTearDown(session.dispose);
+          await tester.pumpWidget(
+            app(
+              session,
+              initialDestination: destination,
+              textScale: scale,
+              safePadding: const EdgeInsets.only(bottom: 48),
+            ),
+          );
+          await tester.pumpAndSettle();
+          final product = destination == BuyV2Destination.shop
+              ? 's-atta'
+              : 'w-notebook';
+          expect(session.addProduct(product), isTrue);
+          session.openCart();
+          expect(session.openCheckout(), isTrue);
+          await tester.pumpAndSettle();
+          await advanceCheckoutToConfirm(tester, session);
+          final controller = tester
+              .widget<BuyV2CheckoutView>(find.byType(BuyV2CheckoutView))
+              .gstInvoiceController;
+          final other = destination == BuyV2Destination.shop
+              ? BuyV2Destination.wholesale
+              : BuyV2Destination.shop;
+          expect(
+            await controller.save(
+              destination: other,
+              legalName: 'Market Retail',
+              gstin: '08ABCDE1234F1Z5',
+              billingAddress: 'Test billing address',
+              remember: true,
+            ),
+            isTrue,
+          );
+          expect(
+            await controller.save(
+              destination: destination,
+              legalName: 'AuditRedmiTest',
+              gstin: '08ABCDE1234F1Z5',
+              billingAddress: 'Test billing address',
+              remember: true,
+            ),
+            isTrue,
+          );
+          await tester.pumpAndSettle();
+          final selectedProfile = controller.detailsFor(destination)!;
+          final otherProfile = controller.savedProfiles.firstWhere(
+            (p) => p.id != selectedProfile.id,
+          );
+          final selected = find.byKey(
+            ValueKey('buy-gst-profile-${selectedProfile.id}'),
+          );
+          await Scrollable.ensureVisible(
+            tester.element(selected),
+            alignment: .5,
+          );
+          await tester.pumpAndSettle();
+          await captureR66Visual(
+            tester,
+            'rv6-d017-${destination.name}-selected-text-$scale',
+          );
+          double contrast(Color a, Color b) {
+            final x = a.computeLuminance(), y = b.computeLuminance();
+            return x > y ? (x + .05) / (y + .05) : (y + .05) / (x + .05);
+          }
+
+          void expectReadable(Finder chip, String label, bool isSelected) {
+            final raw = tester.widget<RawChip>(
+              find.descendant(of: chip, matching: find.byType(RawChip)),
+            );
+            expect(raw.selected, isSelected);
+            final theme = Theme.of(tester.element(chip)).chipTheme;
+            final background = isSelected
+                ? raw.selectedColor ?? theme.selectedColor!
+                : raw.backgroundColor ?? theme.backgroundColor!;
+            final rich = tester.widget<RichText>(
+              find.descendant(of: chip, matching: find.byType(RichText)).first,
+            );
+            expect(rich.text.toPlainText(), label);
+            expect(
+              contrast(rich.text.style!.color!, background),
+              greaterThanOrEqualTo(4.5),
+            );
+            expect(
+              contrast(raw.deleteIconColor!, background),
+              greaterThanOrEqualTo(3),
+            );
+            if (isSelected) {
+              expect(
+                contrast(raw.checkmarkColor!, background),
+                greaterThanOrEqualTo(3),
+              );
+            }
+          }
+
+          expectReadable(selected, selectedProfile.legalName, true);
+          final unselected = find.byKey(
+            ValueKey('buy-gst-profile-${otherProfile.id}'),
+          );
+          expectReadable(unselected, otherProfile.legalName, false);
+          await Scrollable.ensureVisible(
+            tester.element(unselected),
+            alignment: .5,
+          );
+          await tester.pumpAndSettle();
+          await tester.tap(
+            find.descendant(
+              of: unselected,
+              matching: find.text(otherProfile.legalName),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(controller.detailsFor(destination)?.id, otherProfile.id);
+          expectReadable(unselected, otherProfile.legalName, true);
+          expectReadable(selected, selectedProfile.legalName, false);
+          await captureR66Visual(
+            tester,
+            'rv6-d017-${destination.name}-switched-text-$scale',
+          );
+          final remove = find.descendant(
+            of: unselected,
+            matching: find.byTooltip('Remove GST details'),
+          );
+          await tester.tap(remove);
+          await tester.pumpAndSettle();
+          await tester.tap(find.byKey(const ValueKey('buy-gst-remove-cancel')));
+          await tester.pumpAndSettle();
+          expect(controller.savedProfiles, hasLength(2));
+          expect(controller.detailsFor(destination)?.id, otherProfile.id);
+          expect(session.cartLines, hasLength(1));
+          expect(session.checkoutStep, BuyV2CheckoutStep.confirm);
+          expect(tester.takeException(), isNull);
+        },
+      );
+    }
+  }
+
   final d014Cases = [
     for (final id in ['s-dog-food', 'w-notebook'])
       for (final overlay in ['store', 'other-open', 'other-return', 'full'])

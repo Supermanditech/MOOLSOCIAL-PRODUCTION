@@ -6159,6 +6159,19 @@ class _GstInvoiceCard extends StatelessWidget {
                       key: ValueKey('buy-gst-profile-${profile.id}'),
                       label: Text(profile.legalName),
                       selected: details?.id == profile.id,
+                      selectedColor: BuyV2Colors.navy,
+                      labelStyle:
+                          (Theme.of(context).chipTheme.labelStyle ??
+                                  const TextStyle())
+                              .copyWith(
+                                color: details?.id == profile.id
+                                    ? Colors.white
+                                    : BuyV2Colors.navy,
+                              ),
+                      checkmarkColor: Colors.white,
+                      deleteIconColor: details?.id == profile.id
+                          ? Colors.white
+                          : BuyV2Colors.navy,
                       onSelected: controller.busy
                           ? null
                           : (_) => controller.selectSaved(destination, profile),

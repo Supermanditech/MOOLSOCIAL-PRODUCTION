@@ -143,11 +143,11 @@
       "RV6-D013",
       "RV6-D014",
       "RV6-D015",
-      "RV6-D016"
+      "RV6-D016",
+      "RV6-D017"
     ],
     "deviceQualified": [],
     "remainingLocal": [
-      "RV6-D017",
       "RV6-D018",
       "RV6-D019",
       "RV6-D020",
@@ -182,7 +182,8 @@
       "RV6-D012": "4194ea5985bc95ddd228f25011ccf198dda38926",
       "RV6-D013": "4fccb654d602319e4b7352c5160e93c2bbf4e485",
       "RV6-D014": "da26e9ff88616262c6677b0cb7903fd952b42656",
-      "RV6-D015": "0c10682b9c5e6955e5cf845de8897090b95f60d4"
+      "RV6-D015": "0c10682b9c5e6955e5cf845de8897090b95f60d4",
+      "RV6-D016": "ac5a95e5f8fa410ca4e5d0e8c41ca5de7bd271eb"
     }
   }
 }
