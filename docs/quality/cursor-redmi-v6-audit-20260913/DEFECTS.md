@@ -91,7 +91,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Successor acceptance: rv620-065 through070; cancellation returns Security, second AndroidBack restores same Quick Buy catalogue and retained Saved1/emptybasket. No provider selected. Exact installed SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. UAT.md records limits; no child.
 
 ## RV6-D007 - Related-product Back skips the preceding product detail
-- Status: open; implemented and locally qualified; successor Redmi acceptance pending. Severity: moderate.
+- Status: closed; recorded related-product Redmi acceptance passed on r66.20. Severity: moderate.
 - Reproduction: Saved Shop wheat atta2 > product details > scroll to You may also like > related wheat from Sardarpura Supermart > Android Back.
 - Actual: Back returns directly to Saved Shop instead of the preceding Mool Market product detail and its position. Customer must reopen the original product and find the previous information again.
 - Expected: exploring a related offer preserves the preceding product-detail context for Back; leaving the original product then returns to its Saved/catalogue origin.
@@ -102,6 +102,9 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Local correction (2026-09-14): both touch and accessibility continuation actions preserve product history. Buy root retains scroll offsets per nested visit, including returning through a repeated product, and restores them only for matching Back navigation. Existing Cart/Store restoration paths remain separate; session/scope replacement clears local offset history.
 - Local evidence: strengthened test first reproduced catalogue shortcut, then exposed original-scroll reset after history-only correction. Full correction passes Saved wheat and search entry, two related visits, Android Back through both preceding details, exact scroll offsets and final Saved/query origin. Connected product-continuity/partner-catalogue suites102passed/0failures; final390x844 D007 cases2passed. Eight Flutter captures reviewed across default host and phone; analysis zero issues. Counts overlap, not104 unique tests. No physical Redmi closure.
 - Source owners: buy_v2_views.dart and buy_v2_screen.dart. Existing buy_v2_product_continuity_test.dart admitted at877656e54eab174f3c4dc698da23799553d8023a; claim34. Full evidence and hashes in UAT.md. Original281-283 remains pending successor APK verification.
+
+
+- Successor acceptance: rv620-071 through077, same Saved wheat / Sardarpura related wheat reproduction281-283; Back restores preceding product/scroll then Saved. Installed SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. UAT.md distinguishes physical scope from additional host cases. No child.
 
 ## RV6-D008 - Wholesale buyer label runs into the business name
 - Local implementation qualified 2026-09-14: _DecisionRow now reserves an explicit 8px gap between its normal-text label and value; existing enlarged-text stacked layout preserved. Four 320/360px at 100/200% text regressions pass for PO-240728, including complete buyer identity, View order and Android Back/query retention. Full Buy screen suite242passed/0failures; analysis zero issues; four actual Flutter captures reviewed. See UAT D008 section for hashes and limitations. Original device capture312 requires successor-APK Redmi verification; ticket remains open.
