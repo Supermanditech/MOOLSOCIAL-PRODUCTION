@@ -1548,3 +1548,35 @@ admits the pin-only source successor through the existing two-parent merge proce
 V20 and its tested source/candidate evidence remain preserved. No new application,
 backend, contract or test change is included in this admission-only checkpoint.
 The new candidate, APK, OPPO and founder acceptance remain pending.
+
+### Approved sound source pin and V22 successor
+
+V21 remains preserved at 671a50c13038fa5eb259d5bd3b27938e7baca8ea. Both exact
+candidate cycles passed 2,607 tests, skipped 83 and failed zero; all 56 replacement
+checks passed in each cycle. Analysis and locked dependencies passed. Seven
+current Flutter capture groups passed 26 checks, including seven STOREBACK cases;
+62 PNGs are hash-indexed outside the repository. These are local evidence only.
+
+The unchanged backend review gate rejected the Buy screen's dart:io import.
+That screen is byte-identical to the previously pinned source; its exact content
+hash remains AF14A9355A47233DD25802F7741E6AFB065BCFF8F03CCDB298F67BF871C23466.
+The old exception additionally required source04208634a04aa9e28fc367e70cecefa3a36a05f5.
+After reviewing the exact one-line proposal, the founder explicitly approved
+aligning only this source SHA with tested Ledger source7273cb4a650b9b6cb0c865f2adfe9d07559961c4
+in the voice conversation. Seal2a3b5fccbc14b41e09071fd8b00199e5ef13d149 contains
+exactly that one-line correction. Original failure/checker/proposal are preserved.
+Positive validation, checker self-tests, changed-content rejection and wrong-source
+rejection passed. The content hash, all other assertions and ownership stay intact.
+This remains a review exception, not production storage/privacy/backend acceptance.
+
+Only the existing thirteen literal V21 destination pin lines advance to V22 in
+coordination, protected review and approved UI-lock scripts. The tested application
+source pin remains7273cb4a650b9b6cb0c865f2adfe9d07559961c4. No application, dependency,
+test, backend or contract content changes. Original scripts are preserved as
+outputs/store-ledger-mvp/v22-before-*.ps1 outside the repository.
+
+Destination: integration/moolsocial/store-buy-final-v22-20260914 at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v22-20260914.
+Fresh admission, exact merge and successor build checks remain required. Reuse
+V21 evidence only where exact source identity and the existing requirements permit.
+No V22 APK exists. OPPO technical testing and founder visual acceptance remain open.
