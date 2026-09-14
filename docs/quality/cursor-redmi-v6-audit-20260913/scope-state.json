@@ -483,7 +483,7 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "source_locally_qualified_prebuild_handoff_in_progress",
+    "state": "qualified_source_and_admission_prebuild_seal_in_progress",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
@@ -495,7 +495,7 @@
     "device": "TG8HCYTGGQT885OF",
     "evidenceRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/sku-metadata-redmi-20260914",
     "prior22OriginalAndSoleChildClosuresPreserved": true,
-    "sourceCommitted": false,
+    "sourceCommitted": true,
     "localChecksPassed": 20,
     "localFlutterImages": 68,
     "manuallyReviewedImages": 2,
@@ -503,10 +503,10 @@
     "redmiRedesignVerified": false,
     "newApkBuilt": false,
     "remaining": [
-      "Commit qualified source and exact-source boundary admission",
-      "Finish source-bound prebuild gates and clean live remote evidence seal",
-      "Build unique r66.25 successor and data-preserving Redmi install",
-      "Verify all five SKU tickets on Redmi and complete Git handoff"
+      "Commit and push exact-source admission/prebuild evidence; verify clean live remote seal",
+      "Prepare and pass fresh r66.25 machine state and unchanged wrapper preflight/build",
+      "Verify APK and data-preserving Redmi install",
+      "Qualify all five SKU tickets on Redmi and final clean live Git handoff"
     ],
     "registryEntryCount": 4587,
     "registrySha256": "CB8C61F0457D313C54602A4D79C1DEDA897A2E6889600F3974E19F61096422E2",
@@ -563,6 +563,23 @@
       "state": "completed_exit_zero_support_restored",
       "terminal": "e6eb1b"
     },
-    "sourceQualificationReceiptSha256": "665EA731666C43789C44E606BE4AF47E21B4A503C3F9203ACBD405397B03928A"
+    "sourceQualificationReceiptSha256": "665EA731666C43789C44E606BE4AF47E21B4A503C3F9203ACBD405397B03928A",
+    "applicationSource": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
+    "implementationGitCheckpoint": {
+      "state": "clean_live_remote_equal",
+      "receiptSha256": "49C54A9AD1BD51C6F45C918C7BAD9353A27F704706164455153D34EFEEEF7F50"
+    },
+    "sourceAdmission": {
+      "state": "qualified",
+      "source": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
+      "positiveGates": 4,
+      "negativeCasesRejected": 5,
+      "receiptSha256": "7C1490291FF5B93007948078D510F726C7A042D5964D4A598B63980F0245EB7F"
+    },
+    "prebuildChecks": {
+      "state": "source_gates_passed",
+      "receiptSha256": "B5D8B6B0F64B70CDB68A599280AA74DD1092489F1C36CDB11020C5D3010122AB",
+      "candidateMachinePreflight": "pending"
+    }
   }
 }

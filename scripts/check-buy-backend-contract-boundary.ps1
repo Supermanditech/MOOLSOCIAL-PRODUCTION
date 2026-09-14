@@ -173,8 +173,8 @@ function Get-MobileBoundaryViolations {
           $IntegratedReviewSourceCommit -ceq '4221158fead95a89047e3408aaeb11c9a12dd135' -and
           $soundSourceHash -ceq 'C00636022B4C0AEC1CB662F4D2FE28C0B20366358BE9E1E19CE7329848BE4CCA'
         ) -or (
-          # D014 repeated-link navigation retains the same arrival-sound seam.
-          $IntegratedReviewSourceCommit -ceq '41412f56a4af4d75e2976dc04843dd293ae4869d' -and
+          # D014 and exact SKU successor retain the same arrival-sound seam.
+          $IntegratedReviewSourceCommit -cin @('41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c') -and
           $soundSourceHash -ceq '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')

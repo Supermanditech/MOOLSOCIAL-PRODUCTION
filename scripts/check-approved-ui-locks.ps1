@@ -191,6 +191,9 @@ function Get-CursorAccessibilityNativeProjection {
     # Exact reproduced D014 repeated order-link correction.
     & git -C $root merge-base --is-ancestor '41412f56a4af4d75e2976dc04843dd293ae4869d' HEAD
     if ($LASTEXITCODE -eq 0) { $redmiSource = '41412f56a4af4d75e2976dc04843dd293ae4869d' }
+    # Exact founder-authorized, locally qualified SKU metadata source.
+    & git -C $root merge-base --is-ancestor '253cbe16da07f069c878bed8f0f5722b8c4aa29c' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '253cbe16da07f069c878bed8f0f5722b8c4aa29c' }
     & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
     if ($LASTEXITCODE -ne 0) {
       throw 'Redmi audit committed source differs from its exact admitted source.'
