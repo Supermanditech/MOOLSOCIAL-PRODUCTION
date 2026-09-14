@@ -1708,3 +1708,21 @@ The exact skipped-name set matches V23. Review-enabled Ledger02/03 capture tests
 also completed successfully (ledger02-c01-review-captures.jsonl). These are
 source-local results; they do not qualify the still-installed V23 APK or replace
 required exact-successor checks.
+
+### V24 exact successor admission pins — 2026-09-15
+
+Tested correction: 29c4d3744e7fedc9f9d6a3737beda4020fe91760, clean and
+normal-pushed with live remote equality. V23 remains preserved and unqualified.
+The four existing admission scripts replace only 13 V23 destination literals
+with V24 and three tested-source literals with this correction. Destination is
+MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v24-20260915, branch
+integration/moolsocial/store-buy-final-v24-20260915. No owner, permission,
+assertion, exclusion or content-hash exception expands.
+
+Original scripts are preserved as outputs/store-ledger-mvp/v24-before-*.ps1.
+Exact replacement comparison, parser checks, backend selftests and actual
+source review passed. v24-pin-negative-controls.json proves exact source/hash
+acceptance, changed-content rejection and predecessor-source rejection. These
+remain disclosed review exceptions, not production security acceptance.
+V24 creation, exact-candidate validation, build and OPPO qualification remain
+pending; this metadata seal does not satisfy them.
