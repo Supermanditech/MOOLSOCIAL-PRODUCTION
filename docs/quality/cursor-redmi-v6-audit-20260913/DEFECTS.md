@@ -228,11 +228,13 @@ From Scheduled Shop908 with bike9+ rail, open delivery909 (12 deliveries;MS-NEW-
 Redmi acceptance2026-09-14: Minimize and Hide retain bike9+; reopen preserves MS-NEW-09 and12 deliveries. Captures135-139, APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md. No child.
 
 ## RV6-D020 - Message audience sheet clips final privacy explanation
-Status: open. Severity: minor visual/content accessibility. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; font_scale1.0 confirmed.
+Status: closed; recorded r66.20 Redmi description fit and dismissal passed. Severity: minor visual/content accessibility. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; font_scale1.0 confirmed.
 Reproduction: public Buy -> Chat -> More -> Chat settings -> Privacy and spam -> Who can message you. Captures931 and settled932 show No new conversations explanation only as Existing conversations stay at the Android navigation boundary. Upward swipe933 does not reveal the rest. Source chat_settings_screen.dart529 supplies Existing conversations stay available; no one new can start. Customer cannot read the complete consequence before choosing a privacy setting. Expected: complete readable option descriptions above system navigation, with scrolling when needed. Source85-125 uses a Column in sheet padding; exact layout correction remains unimplemented. No permission choice selected and no service update issued. Separate from existing Buy address validation clippingD004; distinct shared Chat surface and reproduction.
 
 
 **Local implementation disposition (14 September 2026):** D020 corrected with bottom-inset scroll padding. Two focused normal/200% Android-inset checks and12 connected Chat settings checks pass; analysis zero issues; two actual Flutter captures reviewed. See UAT.md for admission and hashed evidence. Remains open pending successor Redmi reproduction931-933 and dismissal; no host-only device closure.
+
+Redmi acceptance2026-09-14: captures140-146 show complete final explanation above Android navigation and unchanged Everyone after dismissal. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md; supersedes historical local-only pending status for this reproduction. No child.
 
 ## RV6-D021 - Empty-cart catalogue retains expanded quantity space until Shop reentry
 Status: open. Severity: minor catalogue visual density/state refresh. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.

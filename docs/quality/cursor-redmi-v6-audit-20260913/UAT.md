@@ -3030,3 +3030,8 @@ Navigation correction passes this equivalent-origin setup, but D018 remains pend
 ### RV6-D019 scoped Redmi reconciliation acceptance - 2026-09-14
 
 Evidence-only reconciliation70b117b966a58ca4a551edb31742e175c2723dde; no product correction claimed. Redmi TG8HCYTGGQT885OF, r66.20, APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Captures135-139: closed search via its check control to Scheduled Shop; opened delivery rail136 showing12 deliveries, MS-NEW-09, sound off and Keep off. Minimize137 retains bike and9+ count. Reopen138 retains same order/count and unchanged off controls; Hide139 restores bike9+. No lost identity or stale collapse icon found. Original closed as evidence-reconciled and successor-device confirmed, not an implemented fix. No child. Cart remains empty, Saved1; no sound/Keep toggles, provider action or order/message change.
+
+
+### RV6-D020 scoped Redmi acceptance - 2026-09-14
+
+Implementation9a81541e866975c15c4044f8a5d68906e45dd638. Redmi TG8HCYTGGQT885OF, r66.20, APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Captures140-146. Public Shop Chat > More > Chat settings > Privacy and spam > Who can message you.144 and settled145 after upward swipe show full final explanation: Existing conversations stay available; no one new can start. Last line ends above Android navigation with clear bottom space. Everyone remains selected. AndroidBack146 dismisses to original settings position with Everyone unchanged. No permission choice selected, no message or service action. Recorded normal-text931-933 reproduction and dismissal pass; 200% remains local evidence only. Original D020 closed, no child found.
