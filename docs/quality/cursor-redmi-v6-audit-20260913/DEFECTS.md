@@ -138,11 +138,14 @@ Source: buy_v2_screen.dart527-529 overwrites destination with initialDestination
 
 ## RV6-D011 - Wholesale product repeats summary data across several content sections
 - Local implementation qualified 2026-09-14: identical summary highlights/specifications/generated description are filtered in Wholesale/Bulk as in Shop, including the displayed brand fallback. Distinct supplier facts and purchase/compliance information remain. Empty content no longer leaves extra spacing. Twelve Shop/Wholesale/Bulk100/200% cases pass; screen suite278passed and two affected D007 return checks passed; analysis zero issues; four final Flutter captures reviewed. Original Redmi407-410 remains pending successor APK; ticket stays open.
-Status: open. Severity: minor visual/content usability defect. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+Status: closed; recorded r66.20 Redmi content acceptance passed. Severity: minor visual/content usability defect. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913.
 Reproduction: Wholesale Fresh tomatoes1/10kg580 product407;scroll408-410. Product details repeats Brand not provided/variant/pack/policy;Product and pack information repeats product/pack/unit price;Highlights repeats variant/unit price/policy;Specifications repeats brand/pack/variant;Description repeats title/variant/pack/unit price. Customer must scroll through repeated information before ratings/reviews. This is actual default content,not distinct technical specifications.
 Expected: preserve useful supplier-specific information while suppressing identical summary-only highlights/specifications/generated description in Wholesale as in Shop. Keep the price/MOQ/pack decision accessible;do not remove genuinely distinct supplier facts.
 Source corroboration: buy_v2_views.dart3877-3910 suppresses identical content only when destination is Shop (`!shop` admits all Wholesale duplicates). This is a frontend deduplication gap. Physical scope verified for this Wholesale listing;other products/Bulk require separate qualification. No implementation.
 
+
+
+- Successor acceptance: captures rv620-084 through089; summary-only Highlights/Specifications/generated Description removed, retained commercial details and Wholesale Back. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. UAT.md defines physical scope, no global deduplication claim. No child.
 
 ## RV6-D012 - Store listing count is labelled available despite non-orderable products
 - Local implementation qualified 2026-09-14: full Store count now says products listed in neutral text, with singular/plural wording; product availability/Add restrictions unchanged. Required closed-Store setup at200% exposed a111px status-badge overflow; its label now wraps without truncating status or changing rules. Six closed/open/mixed100/200% cases and76 Store catalogue regressions pass; analysis zero issues; four final Flutter captures reviewed. Original Redmi423/428 and affected closed-status setup remain pending successor-APK qualification; status remains open.
