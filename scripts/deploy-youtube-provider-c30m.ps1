@@ -21,6 +21,19 @@ $expectedProject = "moolsocial-dev-503018"
 $expectedRegion = "asia-south1"
 $expectedConfirmation = "DEPLOY_C30M_DEV_YOUTUBE_PROVIDER_ONLY"
 $exactDeployTarget = "functions:provider:youtubeProvider"
+$expectedProviderEnvironment = "dev"
+$expectedProviderOAuthCallback = (
+  "https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/" +
+  "youtubeOAuthCallback"
+)
+$expectedProviderRuntimeEnabled = "true"
+$expectedProviderRuntimeMode = "accepted"
+$permanentProviderRuntimeValues = @(
+  "MOOLSOCIAL_PROVIDER_ENV=$expectedProviderEnvironment",
+  "YOUTUBE_OAUTH_REDIRECT_URI=$expectedProviderOAuthCallback",
+  "YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED=$expectedProviderRuntimeEnabled",
+  "YOUTUBE_SOCIAL_RUNTIME_MODE=$expectedProviderRuntimeMode"
+) -join ","
 $expectedProviderService = "youtubeprovider"
 $expectedOAuthCallbackService = "youtubeoauthcallback"
 $expectedSocialContentService = "moolsocialcontent"
@@ -62,7 +75,8 @@ function Read-C30MRunServiceState {
   $stateFormat = (
     "json(metadata.name,status.latestReadyRevisionName," +
     "status.latestCreatedRevisionName,status.traffic," +
-    "spec.template.spec.serviceAccountName)"
+    "spec.template.spec.serviceAccountName," +
+    "spec.template.spec.containers)"
   )
   $stateOutput = & $script:gcloudExecutable run services describe `
     $ServiceName `
@@ -141,6 +155,42 @@ function Assert-C30MTrafficRevision {
     $traffic[0].revisionName -ne $ExpectedRevision
   ) {
     throw "$Label is not routing exactly 100 percent to $ExpectedRevision."
+  }
+}
+
+function Assert-C30MPermanentProviderRuntime {
+  param(
+    [Parameter(Mandatory = $true)]
+    [object]$State,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Label
+  )
+
+  $containers = @($State.spec.template.spec.containers)
+  if ($containers.Count -ne 1) {
+    throw "$Label does not have one exact runtime container."
+  }
+  $environment = @{}
+  foreach ($entry in @($containers[0].env)) {
+    $valueProperty = $entry.PSObject.Properties['value']
+    if (
+      -not [string]::IsNullOrWhiteSpace([string]$entry.name) -and
+      $null -ne $valueProperty
+    ) {
+      $environment[[string]$entry.name] = [string]$valueProperty.Value
+    }
+  }
+  $expectedEnvironment = [ordered]@{
+    MOOLSOCIAL_PROVIDER_ENV = $expectedProviderEnvironment
+    YOUTUBE_OAUTH_REDIRECT_URI = $expectedProviderOAuthCallback
+    YOUTUBE_SOCIAL_AUTH_RUNTIME_ENABLED = $expectedProviderRuntimeEnabled
+    YOUTUBE_SOCIAL_RUNTIME_MODE = $expectedProviderRuntimeMode
+  }
+  foreach ($requiredName in $expectedEnvironment.Keys) {
+    if ($environment[$requiredName] -cne $expectedEnvironment[$requiredName]) {
+      throw "$Label is missing permanent runtime value $requiredName."
+    }
   }
 }
 
@@ -257,6 +307,9 @@ Assert-C30MServiceIdentity `
   -ExpectedRevision $ExpectedProviderRevision `
   -ExpectedServiceAccount $expectedProviderServiceAccount `
   -Label "youtubeProvider before deployment"
+Assert-C30MPermanentProviderRuntime `
+  -State $providerBefore `
+  -Label "youtubeProvider before deployment"
 Assert-C30MServiceIdentity `
   -State $callbackBefore `
   -ExpectedRevision $ExpectedOAuthCallbackRevision `
@@ -327,6 +380,7 @@ try {
       $expectedProviderService `
       --region=$expectedRegion `
       --project=$ProjectId `
+      --update-env-vars=$permanentProviderRuntimeValues `
       --no-invoker-iam-check `
       --quiet *> $null
   } "The provider App Check invocation posture could not be restored."
@@ -372,6 +426,9 @@ try {
   Assert-C30MTrafficRevision `
     -State $providerAfter `
     -ExpectedRevision $providerAfter.status.latestReadyRevisionName `
+    -Label "youtubeProvider after deployment"
+  Assert-C30MPermanentProviderRuntime `
+    -State $providerAfter `
     -Label "youtubeProvider after deployment"
   Assert-C30MServiceIdentity `
     -State $callbackAfter `
