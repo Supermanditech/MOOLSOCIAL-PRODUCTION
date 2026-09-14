@@ -4,6 +4,8 @@ import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
+import 'buy_v2_cart_relevance_test.dart' show QualificationDeliveryFacts;
+
 void main() {
   group('Buy V2 deterministic state invariants', () {
     BuyV2Session createSession() => BuyV2Session(core: BuySession());
@@ -161,7 +163,10 @@ void main() {
     });
 
     test('checkout views are immutable and confirmation is single-use', () {
-      final session = createSession();
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: const QualificationDeliveryFacts(),
+      );
       final products = [
         BuyV2Catalogue.products.firstWhere(
           (product) => product.destination == BuyV2Destination.shop,

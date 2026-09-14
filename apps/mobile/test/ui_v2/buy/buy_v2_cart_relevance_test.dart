@@ -1,11 +1,51 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_cart_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 
+class QualificationDeliveryFacts implements BuyV2ProductFactsAdapter {
+  const QualificationDeliveryFacts({this.available = true});
+
+  final bool available;
+
+  @override
+  BuyV2ProductFactsSnapshot snapshotFor(BuyV2Product product) =>
+      const BuyV2CatalogueProductFactsAdapter().snapshotFor(product).copyWith(
+        sourceId: 'qualification-delivery-fixture',
+        deliveryPromise: 'Delivery time confirmed at checkout',
+        promisedByLabel: available ? '15 Sep 2026, 10 AM–12 PM' : '',
+      );
+}
+
 void main() {
+  test('missing delivery estimate preserves cart and creates no order', () {
+    final session = BuyV2Session(
+      core: BuySession(),
+      productFactsAdapter: const QualificationDeliveryFacts(available: false),
+    );
+    addTearDown(session.dispose);
+    expect(session.addProduct('s-tomato'), isTrue);
+    expect(session.addProduct('w-oil'), isTrue);
+    final orderIds = session.orders.map((order) => order.id).toList();
+    final quantities = {
+      for (final line in session.cartLines) line.product.id: line.quantity,
+    };
+    final total = session.cartTotal;
+    expect(session.openCheckout(), isTrue);
+    expect(session.checkoutDeliveryEstimateReviewRequired, isTrue);
+    expect(session.confirmOrder(), isFalse);
+    expect(session.notice, contains('Delivery estimate unavailable'));
+    expect(session.orders.map((order) => order.id), orderIds);
+    expect(session.confirmedOrders, isEmpty);
+    expect(session.cartTotal, total);
+    for (final entry in quantities.entries) {
+      expect(session.quantityFor(entry.key), entry.value);
+    }
+  });
+
   group('R37 Cart relevance contracts', () {
     test('recommendations stay in-family and exclude Cart products', () {
       final session = BuyV2Session(core: BuySession());
@@ -325,7 +365,10 @@ void main() {
     );
 
     test('delivery instructions stay vertical-owned through confirmation', () {
-      final session = BuyV2Session(core: BuySession());
+      final session = BuyV2Session(
+        core: BuySession(),
+        productFactsAdapter: const QualificationDeliveryFacts(),
+      );
       final shop = BuyV2Catalogue.products.firstWhere(
         (candidate) => candidate.destination == BuyV2Destination.shop,
       );

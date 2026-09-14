@@ -2841,3 +2841,15 @@ On parent8627359d0eb954b3f0909f787eb054362a103c1a, updated only the seed-benefit
 | seed-benefits-threshold.log | 692B3C0FBE9F924BF85FF9B4BB9A86A62E6341F7BAAB373C9ABC3E5FD430F89F |
 | benefits-contract-regression.log | 498A9D31B6B17ACBD127DA16314450B636C7920033D68F76CE93C12326F212B9 |
 | benefits-contract-analysis.log | 29B6648BFE36FEC971680DFCAD8393A9A8C329304DB5CA47C1930DABCDF4EAF1 |
+
+
+## Explicit delivery fixture qualification - 2026-09-14
+
+Parent260e5d4da422da433c8b4181c9069a06ae4b72f5. Three old success-path tests used default products whose delivery estimate is intentionally unavailable. Added one shared test-only QualificationDeliveryFacts adapter in cart_relevance_test, retaining default price, partner, orderability and all other facts but explicitly supplying a fixture window. Used only by delivery-instruction confirmation, immutable/single-use checkout and mixed-action state machine tests. All their original invariant assertions remain. An additional unavailable-window case proves confirmation rejection, unchanged order IDs, no confirmed order, exact retained cart quantities and total. No application or delivery gate change.
+
+Full three-file replay21pass, including the new negative case and prior Cart/Saved/benefits/prescription checks. Focused analysis zero issues. Three original failures reconciled; ten remain (four route, three Wholesale summary, one supplier identity, two Offers geometry). No final combined rerun, APK, device qualification or backend claim.
+
+| Artifact | SHA256 |
+| --- | --- |
+| explicit-delivery-fixtures.log | FD31300078E32FEEE49BC3152719DEC12CE2E7727A5249AC24C5F0FCFBC0ACFD |
+| explicit-delivery-analysis.log | 77E62EFC901DD3CBDD7802106EC6C297910A19E133F96B5C20CAFEFCAE622DF6 |
