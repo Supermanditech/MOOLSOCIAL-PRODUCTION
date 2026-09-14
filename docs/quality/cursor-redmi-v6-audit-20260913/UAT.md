@@ -2853,3 +2853,15 @@ Full three-file replay21pass, including the new negative case and prior Cart/Sav
 | --- | --- |
 | explicit-delivery-fixtures.log | FD31300078E32FEEE49BC3152719DEC12CE2E7727A5249AC24C5F0FCFBC0ACFD |
 | explicit-delivery-analysis.log | 77E62EFC901DD3CBDD7802106EC6C297910A19E133F96B5C20CAFEFCAE622DF6 |
+
+
+## Canonical Medicine route and boot fixture reconciliation - 2026-09-14
+
+Parent28a25ab53251eb70642821bb30b6a8384e1eb790. Test-only changes to buy_route_continuity_test.dart align canonical Medicine route assertions with existing _careMedicineRedirect in journey_router.dart: /app/book/medicine, with obsolete sub removed. Legacy /app/buy?sub=medicine inputs remain exercised; route persistence, language refresh, Mool root exit and internal Back assertions remain. The boot fixture now settles asynchronous route mounting before advancing the existing three-second presentation interval, preserving the exact Social cold-launch and no-Buy-screen assertions. No router, startup timer, native code, UI or safeguard change.
+
+Full12 tests pass, including all4 previously failing cases. Focused analysis zero issues. Six original combined failures remain: three Wholesale summary, one supplier identity and two Offers geometry. No final combined run/APK/device qualification claim.
+
+| Artifact | SHA256 |
+| --- | --- |
+| canonical-route-regression.log | 0BB291136D547FD225C0F003358926278FB020BEC63C4F3126DCAC0BE80D699F |
+| canonical-route-analysis.log | 7585FE4B7F59F2ABFD47073CB9533CDECD7BDAE6F16B927BBFD925D91DB2BD5D |
