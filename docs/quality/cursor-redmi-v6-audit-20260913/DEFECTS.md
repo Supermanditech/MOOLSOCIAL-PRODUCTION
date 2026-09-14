@@ -63,7 +63,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Successor acceptance: captures rv620-047 through054 and UAT.md D004 acceptance. Exact installed APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Complete guidance visible with/without keyboard; rejected whitespace; Back retained original profile. No child.
 
 ## RV6-D005 - Hindi preference changes its value but observed Buy and preference UI remain English
-- Status: open; unavailable-coverage disclosure implemented and locally qualified; successor Redmi acceptance pending. Severity: moderate for Hindi-dependent users.
+- Status: open; r66.20 immediate disclosure passes, cold-relaunch retention fails; linked RV6-D005-C01. Severity: moderate for Hindi-dependent users.
 - Journey: Buy account > Personal profile > Language > Privacy and preferences > Language > Hindi; return to Buy catalogue.
 - Actual: preference reads Hindi but headings/actions on the preference screen and returned Buy catalogue remain English, including Stores or products, Wholesale, Bulk and Add. No unavailable/restart/partial-language disclosure was visible.
 - Expected: choosing an offered app language applies to supported customer navigation and guidance; unavailable coverage must be explicit rather than implying the language changed throughout the experience. Supplier-authored product names are not required to be translated by this finding.
@@ -233,3 +233,14 @@ Reproduction: original Any-area catalogue -> Shopping area1087 -> choose Jaipur 
 ### RV6-D001 local implementation qualification
 
 Area guidance now follows actual showAreaControl availability. Four focused regressions reproduce the old area-absent failure at normal/200% text and pass after correction;full search-recovery suite27passed;analysis zero issues;four actual Flutter component captures reviewed at320x568. See UAT.md RV6-D001 implementation section for owners,admission,results and artifact hashes. Original physical reproduction037-038 must be checked on the later successor APK before closure. This does not add a physical pass or close the defect. Founder authorized implementation of22 findings after the historical audit freeze;all original evidence remains retained.
+
+## RV6-D005-C01 - Saved Hindi preference resets to English after cold relaunch
+
+- Parent: RV6-D005. Status: open, device reproduced; no implementation authorized in this round. Severity: moderate.
+- Actor/outcome: signed-out Buy customer choosing Hindi as a saved language preference expects the selected preference and honest coverage disclosure to survive restarting the app.
+- Reproduction: Personal profile > Language preference > Privacy & preferences > Language > Hindi; observe Hindi preferred / App screens: English; Back to profile (same summary), Back to Shop. Force-stop only com.moolsocial.app.cursorreview, cold launch declared MainActivity, account > Privacy and preferences > Language.
+- Actual: preference summary and selected radio return to English. Before restart picker explicitly promises Selecting Hindi saves your preference only. No sign-out, account switch, data clear, uninstall or preference restoration was performed between selection and observation.
+- Expected: retain the selected preference across restart, or explicitly disclose a temporary selection instead of claiming it is saved. Buy translation itself is outside this child.
+- Evidence: rv620-055 through063; selection057/profile058, cold launch060 (am start Status ok/COLD, tool7472bd), English summary062 and radio063. Redmi TG8HCYTGGQT885OF, r66.20, APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8.
+- Scope/ownership: shared preference persistence or review startup dependency; cause not yet established. Host restored-session tests did not establish actual Android durability. No claim this affects authenticated production accounts. Original English state is currently restored by the observed reset; no user data cleared.
+- Qualification: immediate D005 disclosure and Hindi glyph rendering pass, full D005 acceptance remains open because directly affected retention fails. Distinct from unavailable translation disclosure; deduplicated as one child. No code/checker/policy change or new APK.
