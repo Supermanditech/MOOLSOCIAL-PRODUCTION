@@ -1580,3 +1580,66 @@ C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v22-202609
 Fresh admission, exact merge and successor build checks remain required. Reuse
 V21 evidence only where exact source identity and the existing requirements permit.
 No V22 APK exists. OPPO technical testing and founder visual acceptance remain open.
+
+### Ledger child defects and full-ticket device verification — 2026-09-15
+
+The preceding V22 note is historical. V22 e257e0db45845080192891b2621bfaead69728db
+was built and installed on OPPO 2b3e0f71 without uninstalling or clearing data.
+Installed APK SHA256 is 808A4BB8253790A0080216F307D68B3E2CC72357C2F4837B3F1440B70C9A7620.
+The existing 1000-order test Store, Store cart (2 items, INR1160) and consumer
+cart (4 items, INR2880) were retained. This is not full device qualification.
+
+Founder requested correction plus full testing of all three Ledger tickets,
+with confirmed issues registered as child defects under their parent ticket.
+Child defects do not expand the approved frontend MVP or authorize live money.
+
+STORE-LEDGER-03-C01 — Expense submit clipped by Android navigation.
+Status: reproduced on V22 OPPO; source correction under validation; device retest open.
+The expense sheet showed amount/reference fields but its submit action extended
+below the usable viewport. Three native scroll attempts did not expose it.
+Draft amount 37.30 and reference V22-OPPO-EXPENSE-01 survived Back/reopening;
+no expense was submitted on the device. Evidence is preserved outside Git in
+outputs/store-ledger-mvp/v22-oppo-ledger-initial-check.json, expense-form and
+expense-after-scroll PNGs, and work/v22-expense-*.xml under the task workspace.
+
+Root cause: the shared Store money sheet omitted bottom safe-area handling.
+The new existing-suite assertion reproduces the defect at enlarged text:
+submit bottom 552 exceeds usable bottom 524 at 320x568 with 44px system padding.
+ledger03-c01-red.jsonl preserves the failing result. The correction wraps only
+the shared expense/supplier-payment form in a bottom SafeArea; posting, identity,
+amount, permission and persistence logic are unchanged. Both forms now assert
+their submit button clears Android navigation. All original assertions remain.
+
+The first combined review-mode UI invocation incorrectly included Ledger01's
+non-review fixtures and failed; ledger03-c01-green-all-ui.jsonl is preserved.
+Separate established configurations passed Ledger01 (10 cases) and Ledger02/03
+(4 cases), before the additional supplier-button clearance assertion. These
+host passes do not qualify OPPO. Full corrected suites, candidate checks,
+successor APK, all Ledger device journeys and founder visual review remain open.
+Further confirmed issues must receive a parent-specific child ID, reproduction,
+expected/actual behavior, corrective scope and separate local/device disposition.
+
+STORE-LEDGER-01-C01 — Collection, refund and return submit clearance.
+Status: confirmed by six Flutter reproduction cases; correction under validation;
+OPPO retest open. The related forms share the omitted bottom-safe-area pattern.
+With Android padding 44, all three submit buttons end at 899 instead of at or
+above 871 on 412x915, and at 552 instead of at or above 524 on 320x568/200%.
+ledger01-clearance-red.jsonl preserves each original failed bounds assertion.
+Only bottom SafeArea wrappers are added to the collection/refund and return
+sheets; every original financial, stock, identity, retry and draft assertion stays.
+The assertions remain in the existing full regression suite.
+
+Before this second correction, the C01 expense/payment revision completed full
+analysis with zero issues and the 45-file regression run with 2607 passes,
+83 skips and zero failures. Its skip names match the prior disposition and all
+56 replacement checks pass (ledger03-c01-full-regression-summary.json). This
+is predecessor evidence, not qualification of the subsequently corrected forms.
+
+Final combined child-correction source validation completed on 2026-09-15:
+ledger-child-corrections-ui01.log passes all 10 Ledger01 UI cases, and
+ledger-child-corrections-ui02-03.log passes all 4 review Ledger02/03 UI cases.
+ledger-child-corrections-analysis.log reports zero issues. The full regression
+log ends success=true with 2607 passed, 83 skipped and zero failures; its summary
+confirms unchanged skip names and all 56 replacement checks passed. No assertion,
+exception or checker has been weakened or changed for these corrections.
+Both child defects remain open for successor APK/OPPO retest and founder review.

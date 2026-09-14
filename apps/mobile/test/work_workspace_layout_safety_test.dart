@@ -22319,6 +22319,9 @@ void main() {
     testWidgets(
       'LEDGER03 expenses show scoped entries for the selected period $scale',
       (tester) async {
+        // OPPO exports both padding and viewPadding for its system controls.
+        tester.view.padding = const FakeViewPadding(bottom: 44);
+        addTearDown(tester.view.resetPadding);
         final previousPreferences = SharedPreferencesAsyncPlatform.instance;
         SharedPreferencesAsyncPlatform.instance =
             InMemorySharedPreferencesAsync.empty();
@@ -22448,6 +22451,14 @@ void main() {
             'Record test expense',
           );
           await reveal(tester, record);
+          expect(
+            tester.getRect(record).bottom,
+            lessThanOrEqualTo(
+              tester.view.physicalSize.height / tester.view.devicePixelRatio -
+                  44,
+            ),
+            reason: 'STORE-LEDGER-03-C01: submit must clear Android navigation',
+          );
           await tester.tap(record);
           await tester.pumpAndSettle();
           expect(amount, findsNothing);
@@ -22590,6 +22601,8 @@ void main() {
       testWidgets('LEDGER02 purchase payment and receiving screens $scale', (
         tester,
       ) async {
+        tester.view.padding = const FakeViewPadding(bottom: 44);
+        addTearDown(tester.view.resetPadding);
         final previousPreferences = SharedPreferencesAsyncPlatform.instance;
         SharedPreferencesAsyncPlatform.instance =
             InMemorySharedPreferencesAsync.empty();
@@ -22691,6 +22704,14 @@ void main() {
           'Record test payment',
         );
         await reveal(tester, recordPayment);
+        expect(
+          tester.getRect(recordPayment).bottom,
+          lessThanOrEqualTo(
+            tester.view.physicalSize.height / tester.view.devicePixelRatio - 44,
+          ),
+          reason:
+              'STORE-LEDGER-03-C01: shared payment submit clears navigation',
+        );
         await tester.tap(recordPayment);
         await tester.pumpAndSettle();
         expect(amount, findsNothing);
@@ -22750,6 +22771,8 @@ void main() {
     testWidgets(
       'LEDGER01 return sheet confirms original bill and stock $scale',
       (tester) async {
+        tester.view.padding = const FakeViewPadding(bottom: 44);
+        addTearDown(tester.view.resetPadding);
         final work = storeViewFixture(null, _ContactDraftFixtureStore());
         final seed = StoreReviewSeed(
           accountScope: 'review-draft-account',
@@ -22917,6 +22940,15 @@ void main() {
         await captureStoreView(tester, 'ledger01-return-form-$scale');
         expect(tester.takeException(), isNull);
         await reveal(tester, find.text('Confirm return'));
+        expect(
+          tester
+              .getRect(find.widgetWithText(FilledButton, 'Confirm return'))
+              .bottom,
+          lessThanOrEqualTo(
+            tester.view.physicalSize.height / tester.view.devicePixelRatio - 44,
+          ),
+          reason: 'Ledger return submit must clear Android navigation',
+        );
         await tester.tap(find.text('Confirm return'));
         await tester.pumpAndSettle();
         expect(work.pendingCustomerReturn, isNull);
@@ -22935,6 +22967,8 @@ void main() {
     testWidgets(
       'LEDGER01 refund sheet confirms credit without stock changes $scale',
       (tester) async {
+        tester.view.padding = const FakeViewPadding(bottom: 44);
+        addTearDown(tester.view.resetPadding);
         final work = storeViewFixture(null, _ContactDraftFixtureStore());
         final seed = StoreReviewSeed(
           accountScope: 'review-draft-account',
@@ -23108,6 +23142,15 @@ void main() {
           '${order.amount + 1}',
         );
         await reveal(tester, find.text('Confirm refund'));
+        expect(
+          tester
+              .getRect(find.widgetWithText(FilledButton, 'Confirm refund'))
+              .bottom,
+          lessThanOrEqualTo(
+            tester.view.physicalSize.height / tester.view.devicePixelRatio - 44,
+          ),
+          reason: 'Ledger refund submit must clear Android navigation',
+        );
         await tester.tap(find.text('Confirm refund'));
         await tester.pumpAndSettle();
         expect(work.pendingCustomerRefund, isNull);
@@ -23160,6 +23203,8 @@ void main() {
     testWidgets(
       'LEDGER01 record partial collection against existing invoice $scale',
       (tester) async {
+        tester.view.padding = const FakeViewPadding(bottom: 44);
+        addTearDown(tester.view.resetPadding);
         final work = storeViewFixture(null, _ContactDraftFixtureStore());
         final seed = StoreReviewSeed(
           accountScope: 'review-draft-account',
@@ -23202,6 +23247,15 @@ void main() {
         await tester.pumpAndSettle();
         await captureStoreView(tester, 'ledger01-collection-form-$scale');
         await reveal(tester, find.text('Confirm collection'));
+        expect(
+          tester
+              .getRect(find.widgetWithText(FilledButton, 'Confirm collection'))
+              .bottom,
+          lessThanOrEqualTo(
+            tester.view.physicalSize.height / tester.view.devicePixelRatio - 44,
+          ),
+          reason: 'Ledger collection submit must clear Android navigation',
+        );
         await tester.tap(find.text('Confirm collection'));
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('collection-amount')), findsNothing);

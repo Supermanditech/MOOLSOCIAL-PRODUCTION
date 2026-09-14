@@ -19574,133 +19574,138 @@ class _CustomerReturnSheetState extends State<_CustomerReturnSheet> {
           Navigator.pop(context);
         }
       },
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          16,
-          16,
-          16,
-          16 + MediaQuery.viewInsetsOf(context).bottom,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Text(
-              'Record return',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            Text('Invoice ${widget.payment.invoiceId}'),
-            const SizedBox(height: 12),
-            if (widget.order.itemSnapshots.length > 1)
-              DropdownButtonFormField<String>(
-                initialValue: productId,
-                itemHeight: null,
-                isExpanded: true,
-                decoration: const InputDecoration(labelText: 'Billed item'),
-                selectedItemBuilder: (_) => [
-                  for (var i = 0; i < widget.order.itemSnapshots.length; i++)
-                    Text('Item ${i + 1}'),
-                ],
-                items: [
-                  for (final item in widget.order.itemSnapshots)
-                    DropdownMenuItem(
-                      value: item.productId,
-                      child: Text(
-                        '${item.name} · ${item.pack}',
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                ],
-                onChanged: saving || !draft.ready
-                    ? null
-                    : (value) {
-                        setState(() => productId = value);
-                        saveDraft();
-                      },
-              ),
-            const SizedBox(height: 12),
-            for (final item in widget.order.itemSnapshots.where(
-              (item) => item.productId == productId,
-            )) ...[
+      child: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            16,
+            16,
+            16,
+            16 + MediaQuery.viewInsetsOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
               Text(
-                '${item.name} · ${item.pack}',
-                key: const Key('return-original-item'),
+                'Record return',
+                style: Theme.of(context).textTheme.titleLarge,
               ),
-              Text('Billed quantity: ${item.quantity}'),
+              Text('Invoice ${widget.payment.invoiceId}'),
               const SizedBox(height: 12),
-            ],
-            TextField(
-              key: const Key('return-quantity'),
-              controller: quantity,
-              enabled: !saving && draft.ready,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Units returned'),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('return-sellable'),
-              controller: sellable,
-              enabled: !saving && draft.ready,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Units fit for resale',
-                helperText:
-                    'Damaged units must not go back into sellable stock.',
-                helperMaxLines: 3,
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              key: const Key('return-reason'),
-              controller: reason,
-              enabled: !saving && draft.ready,
-              maxLength: 160,
-              decoration: const InputDecoration(labelText: 'Reason for return'),
-            ),
-            Text(
-              credit == null
-                  ? 'Enter valid quantities within the original bill.'
-                  : 'Return credit: ${_purchaseAmount(credit!)}',
-            ),
-            const Text(
-              'Credit reduces this invoice’s dues first. Any amount owed back remains pending until a refund is confirmed.',
-            ),
-            if (draft.error != null) ...[
-              Text(draft.error!),
-              TextButton(
-                onPressed: draft.busy
-                    ? null
-                    : () {
-                        if (draft.ready) {
+              if (widget.order.itemSnapshots.length > 1)
+                DropdownButtonFormField<String>(
+                  initialValue: productId,
+                  itemHeight: null,
+                  isExpanded: true,
+                  decoration: const InputDecoration(labelText: 'Billed item'),
+                  selectedItemBuilder: (_) => [
+                    for (var i = 0; i < widget.order.itemSnapshots.length; i++)
+                      Text('Item ${i + 1}'),
+                  ],
+                  items: [
+                    for (final item in widget.order.itemSnapshots)
+                      DropdownMenuItem(
+                        value: item.productId,
+                        child: Text(
+                          '${item.name} · ${item.pack}',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                  ],
+                  onChanged: saving || !draft.ready
+                      ? null
+                      : (value) {
+                          setState(() => productId = value);
                           saveDraft();
-                        } else {
-                          unawaited(loadDraft());
-                        }
-                      },
-                child: const Text('Retry saving input'),
+                        },
+                ),
+              const SizedBox(height: 12),
+              for (final item in widget.order.itemSnapshots.where(
+                (item) => item.productId == productId,
+              )) ...[
+                Text(
+                  '${item.name} · ${item.pack}',
+                  key: const Key('return-original-item'),
+                ),
+                Text('Billed quantity: ${item.quantity}'),
+                const SizedBox(height: 12),
+              ],
+              TextField(
+                key: const Key('return-quantity'),
+                controller: quantity,
+                enabled: !saving && draft.ready,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Units returned'),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('return-sellable'),
+                controller: sellable,
+                enabled: !saving && draft.ready,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                  labelText: 'Units fit for resale',
+                  helperText:
+                      'Damaged units must not go back into sellable stock.',
+                  helperMaxLines: 3,
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                key: const Key('return-reason'),
+                controller: reason,
+                enabled: !saving && draft.ready,
+                maxLength: 160,
+                decoration: const InputDecoration(
+                  labelText: 'Reason for return',
+                ),
+              ),
+              Text(
+                credit == null
+                    ? 'Enter valid quantities within the original bill.'
+                    : 'Return credit: ${_purchaseAmount(credit!)}',
+              ),
+              const Text(
+                'Credit reduces this invoice’s dues first. Any amount owed back remains pending until a refund is confirmed.',
+              ),
+              if (draft.error != null) ...[
+                Text(draft.error!),
+                TextButton(
+                  onPressed: draft.busy
+                      ? null
+                      : () {
+                          if (draft.ready) {
+                            saveDraft();
+                          } else {
+                            unawaited(loadDraft());
+                          }
+                        },
+                  child: const Text('Retry saving input'),
+                ),
+              ],
+              if (error != null)
+                Padding(
+                  padding: const EdgeInsets.only(top: 8),
+                  child: Text(error!),
+                ),
+              const SizedBox(height: 12),
+              FilledButton(
+                onPressed:
+                    !draft.ready ||
+                        draft.busy ||
+                        draft.error != null ||
+                        saving ||
+                        widget.session.pendingCustomerReturn != null
+                    ? null
+                    : submit,
+                child: Text(saving ? 'Recording…' : 'Confirm return'),
               ),
             ],
-            if (error != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 8),
-                child: Text(error!),
-              ),
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed:
-                  !draft.ready ||
-                      draft.busy ||
-                      draft.error != null ||
-                      saving ||
-                      widget.session.pendingCustomerReturn != null
-                  ? null
-                  : submit,
-              child: Text(saving ? 'Recording…' : 'Confirm return'),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -20181,95 +20186,61 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
         Navigator.pop(context);
       }
     },
-    child: SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        16 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            expense ? 'Record test expense' : 'Record test payment',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text(
-            expense
-                ? 'Business expense not already recorded elsewhere.'
-                : '${widget.purchase!.supplierName} · ${draft.key?.invoice ?? 'Bill unavailable'}',
-          ),
-          const Text('Test record only. No money is transferred.'),
-          if (!expense)
+    child: SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
             Text(
-              billBalance == null
-                  ? 'Bill balance unavailable'
-                  : 'Bill balance ${_purchaseAmount(billBalance!)}',
+              expense ? 'Record test expense' : 'Record test payment',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-          TextField(
-            key: Key(
-              expense ? 'store-expense-amount' : 'supplier-payment-amount',
-            ),
-            controller: amount,
-            enabled: draft.ready && !saving,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: const InputDecoration(labelText: 'Paid (₹)'),
-            onChanged: (_) => draft.save(fields),
-          ),
-          DropdownButtonFormField<String>(
-            key: ValueKey('supplier-payment-method-$method'),
-            initialValue: method,
-            isExpanded: true,
-            decoration: const InputDecoration(labelText: 'Method used'),
-            items: [
-              for (final value in {
-                'UPI',
-                'Cheque',
-                'Bank transfer',
-                'NEFT',
-                'RTGS',
-                'Cash',
-                method,
-              })
-                DropdownMenuItem(value: value, child: Text(value)),
-            ],
-            onChanged: !draft.ready || saving
-                ? null
-                : (value) {
-                    if (value != null) {
-                      setState(() => method = value);
-                      draft.save(fields);
-                    }
-                  },
-          ),
-          TextField(
-            key: Key(
+            Text(
               expense
-                  ? 'store-expense-reference'
-                  : 'supplier-payment-reference',
+                  ? 'Business expense not already recorded elsewhere.'
+                  : '${widget.purchase!.supplierName} · ${draft.key?.invoice ?? 'Bill unavailable'}',
             ),
-            controller: reference,
-            enabled: draft.ready && !saving,
-            decoration: const InputDecoration(labelText: 'Payment reference'),
-            onChanged: (_) => draft.save(fields),
-          ),
-          if (expense) ...[
+            const Text('Test record only. No money is transferred.'),
+            if (!expense)
+              Text(
+                billBalance == null
+                    ? 'Bill balance unavailable'
+                    : 'Bill balance ${_purchaseAmount(billBalance!)}',
+              ),
+            TextField(
+              key: Key(
+                expense ? 'store-expense-amount' : 'supplier-payment-amount',
+              ),
+              controller: amount,
+              enabled: draft.ready && !saving,
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: const InputDecoration(labelText: 'Paid (₹)'),
+              onChanged: (_) => draft.save(fields),
+            ),
             DropdownButtonFormField<String>(
-              key: ValueKey('store-expense-category-$category'),
-              initialValue: category,
+              key: ValueKey('supplier-payment-method-$method'),
+              initialValue: method,
               isExpanded: true,
-              decoration: const InputDecoration(labelText: 'Category'),
+              decoration: const InputDecoration(labelText: 'Method used'),
               items: [
                 for (final value in {
-                  'Shop expense',
-                  'Delivery',
-                  'Electricity',
-                  'Salary',
-                  'Repair',
-                  'Other',
-                  category,
+                  'UPI',
+                  'Cheque',
+                  'Bank transfer',
+                  'NEFT',
+                  'RTGS',
+                  'Cash',
+                  method,
                 })
                   DropdownMenuItem(value: value, child: Text(value)),
               ],
@@ -20277,45 +20248,85 @@ class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
                   ? null
                   : (value) {
                       if (value != null) {
-                        setState(() => category = value);
+                        setState(() => method = value);
                         draft.save(fields);
                       }
                     },
             ),
             TextField(
-              key: const Key('store-expense-note'),
-              controller: note,
-              maxLength: 512,
+              key: Key(
+                expense
+                    ? 'store-expense-reference'
+                    : 'supplier-payment-reference',
+              ),
+              controller: reference,
               enabled: draft.ready && !saving,
-              decoration: const InputDecoration(labelText: 'Expense note'),
+              decoration: const InputDecoration(labelText: 'Payment reference'),
               onChanged: (_) => draft.save(fields),
             ),
+            if (expense) ...[
+              DropdownButtonFormField<String>(
+                key: ValueKey('store-expense-category-$category'),
+                initialValue: category,
+                isExpanded: true,
+                decoration: const InputDecoration(labelText: 'Category'),
+                items: [
+                  for (final value in {
+                    'Shop expense',
+                    'Delivery',
+                    'Electricity',
+                    'Salary',
+                    'Repair',
+                    'Other',
+                    category,
+                  })
+                    DropdownMenuItem(value: value, child: Text(value)),
+                ],
+                onChanged: !draft.ready || saving
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          setState(() => category = value);
+                          draft.save(fields);
+                        }
+                      },
+              ),
+              TextField(
+                key: const Key('store-expense-note'),
+                controller: note,
+                maxLength: 512,
+                enabled: draft.ready && !saving,
+                decoration: const InputDecoration(labelText: 'Expense note'),
+                onChanged: (_) => draft.save(fields),
+              ),
+            ],
+            if (error != null || draft.error != null)
+              Text(error ?? draft.error!),
+            if (!draft.ready)
+              TextButton(
+                onPressed: load,
+                child: const Text('Retry opening saved input'),
+              ),
+            if (draft.error != null && draft.ready)
+              TextButton(
+                onPressed: () => draft.save(fields),
+                child: const Text('Retry saving input'),
+              ),
+            FilledButton(
+              onPressed:
+                  draft.ready && !saving && !draft.busy && draft.error == null
+                  ? submit
+                  : null,
+              child: Text(
+                saving
+                    ? 'Recording…'
+                    : expense
+                    ? 'Record test expense'
+                    : 'Record test payment',
+              ),
+            ),
           ],
-          if (error != null || draft.error != null) Text(error ?? draft.error!),
-          if (!draft.ready)
-            TextButton(
-              onPressed: load,
-              child: const Text('Retry opening saved input'),
-            ),
-          if (draft.error != null && draft.ready)
-            TextButton(
-              onPressed: () => draft.save(fields),
-              child: const Text('Retry saving input'),
-            ),
-          FilledButton(
-            onPressed:
-                draft.ready && !saving && !draft.busy && draft.error == null
-                ? submit
-                : null,
-            child: Text(
-              saving
-                  ? 'Recording…'
-                  : expense
-                  ? 'Record test expense'
-                  : 'Record test payment',
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );
@@ -20474,113 +20485,120 @@ class _CustomerCollectionSheetState extends State<_CustomerCollectionSheet> {
         Navigator.pop(context);
       }
     },
-    child: SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        16 + MediaQuery.viewInsetsOf(context).bottom,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text(
-            widget.refund ? 'Record refund' : 'Record collection',
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
-          Text('${widget.payment.customerName} · ${widget.payment.invoiceId}'),
-          Text(
-            '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
-          ),
-          TextField(
-            key: Key(widget.refund ? 'refund-amount' : 'collection-amount'),
-            controller: amount,
-            onChanged: (_) {
-              if (error != null) {
-                setState(() => error = null);
-              }
-            },
-            enabled: !saving && draft.ready,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: widget.refund
-                  ? 'Amount refunded (₹)'
-                  : 'Amount received (₹)',
+    child: SafeArea(
+      top: false,
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          16,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              widget.refund ? 'Record refund' : 'Record collection',
+              style: Theme.of(context).textTheme.titleLarge,
             ),
-          ),
-          Wrap(
-            spacing: 8,
-            children: [
-              for (final mode in [
-                WorkspacePaymentChannel.cash,
-                WorkspacePaymentChannel.directUpi,
-              ])
-                ChoiceChip(
-                  label: Text(
-                    mode == WorkspacePaymentChannel.cash ? 'Cash' : 'UPI',
-                  ),
-                  selected: channel == mode,
-                  onSelected: saving || !draft.ready
-                      ? null
-                      : (_) {
-                          setState(() => channel = mode);
-                          saveDraft();
-                        },
-                ),
-            ],
-          ),
-          if (channel == WorkspacePaymentChannel.directUpi)
+            Text(
+              '${widget.payment.customerName} · ${widget.payment.invoiceId}',
+            ),
+            Text(
+              '${widget.refund ? 'Available to refund' : 'Due'} ${_purchaseAmount(limitMinor)}',
+            ),
             TextField(
-              key: Key(
-                widget.refund ? 'refund-reference' : 'collection-reference',
-              ),
-              controller: reference,
+              key: Key(widget.refund ? 'refund-amount' : 'collection-amount'),
+              controller: amount,
+              onChanged: (_) {
+                if (error != null) {
+                  setState(() => error = null);
+                }
+              },
               enabled: !saving && draft.ready,
-              decoration: const InputDecoration(
-                labelText: 'UPI transaction reference',
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
+                labelText: widget.refund
+                    ? 'Amount refunded (₹)'
+                    : 'Amount received (₹)',
               ),
             ),
-          Text(
-            widget.refund
-                ? 'Record money already returned to this customer. This does not transfer money.'
-                : 'Record a payment already received. This does not request or transfer money.',
-          ),
-          if (draft.error != null) ...[
-            Text(draft.error!),
-            TextButton(
-              onPressed: draft.busy
+            Wrap(
+              spacing: 8,
+              children: [
+                for (final mode in [
+                  WorkspacePaymentChannel.cash,
+                  WorkspacePaymentChannel.directUpi,
+                ])
+                  ChoiceChip(
+                    label: Text(
+                      mode == WorkspacePaymentChannel.cash ? 'Cash' : 'UPI',
+                    ),
+                    selected: channel == mode,
+                    onSelected: saving || !draft.ready
+                        ? null
+                        : (_) {
+                            setState(() => channel = mode);
+                            saveDraft();
+                          },
+                  ),
+              ],
+            ),
+            if (channel == WorkspacePaymentChannel.directUpi)
+              TextField(
+                key: Key(
+                  widget.refund ? 'refund-reference' : 'collection-reference',
+                ),
+                controller: reference,
+                enabled: !saving && draft.ready,
+                decoration: const InputDecoration(
+                  labelText: 'UPI transaction reference',
+                ),
+              ),
+            Text(
+              widget.refund
+                  ? 'Record money already returned to this customer. This does not transfer money.'
+                  : 'Record a payment already received. This does not request or transfer money.',
+            ),
+            if (draft.error != null) ...[
+              Text(draft.error!),
+              TextButton(
+                onPressed: draft.busy
+                    ? null
+                    : () {
+                        if (draft.ready) {
+                          saveDraft();
+                        } else {
+                          unawaited(loadDraft());
+                        }
+                      },
+                child: const Text('Retry saving input'),
+              ),
+            ],
+            if (error != null) Text(error!),
+            FilledButton(
+              onPressed:
+                  !draft.ready ||
+                      draft.busy ||
+                      draft.error != null ||
+                      saving ||
+                      (widget.refund &&
+                          widget.session.pendingCustomerRefund != null)
                   ? null
-                  : () {
-                      if (draft.ready) {
-                        saveDraft();
-                      } else {
-                        unawaited(loadDraft());
-                      }
-                    },
-              child: const Text('Retry saving input'),
+                  : submit,
+              child: Text(
+                saving
+                    ? 'Checking…'
+                    : widget.refund
+                    ? 'Confirm refund'
+                    : 'Confirm collection',
+              ),
             ),
           ],
-          if (error != null) Text(error!),
-          FilledButton(
-            onPressed:
-                !draft.ready ||
-                    draft.busy ||
-                    draft.error != null ||
-                    saving ||
-                    (widget.refund &&
-                        widget.session.pendingCustomerRefund != null)
-                ? null
-                : submit,
-            child: Text(
-              saving
-                  ? 'Checking…'
-                  : widget.refund
-                  ? 'Confirm refund'
-                  : 'Confirm collection',
-            ),
-          ),
-        ],
+        ),
       ),
     ),
   );
