@@ -2769,3 +2769,29 @@ Evidence root: C:\GUARANTEED OUTCOME\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\rv6-succ
 | return-frame-visuals/r5-related-shop-360-1.0-product-return.png | A923B2AC8B447F5FC99B1035C2AA85C4E8FDBEC0ED88CE71CBA276C5ACFF1975 |
 | return-frame-visuals/r5-related-shop-360-1.0-related-return.png | E8050ACE155EF3777D06FCB5DFE4324E5E4096ED31702C23EC67E827A2C48EC7 |
 | return-frame-visuals/r5-related-shop-360-1.0-related.png | E8050ACE155EF3777D06FCB5DFE4324E5E4096ED31702C23EC67E827A2C48EC7 |
+
+
+## Remaining combined failures: bounded reconciliation - 2026-09-14
+
+Source9d73a543e0aa01dfd01c488eb04897eca1300def. No source/test/checker changes in this reconciliation. Combined30 failures minus6 Store-return failures corrected and replayed leaves24 unresolved failure cases; this is not24 new device defects.
+
+| Existing test owner under apps/mobile/test/ui_v2/buy | Cases | Observed conflict / required reconciliation |
+| --- | --- | --- |
+| buy_route_continuity_test.dart | 4 | Tests expect Medicine under /app/buy; router returns /app/book/medicine. Check authoritative routing contract and preserve cold-start/root-return assertions; no Care/router scope expansion. |
+| buy_v2_cart_relevance_test.dart | 2 | Seeded benefits expected3 but empty; confirmation fails. Verify seeded eligibility and supply authoritative delivery fixtures without weakening fail-closed behavior. |
+| buy_v2_state_invariant_test.dart | 1 | Confirmation expected3 orders but produced0; establish required delivery readiness before asserting immutable/single-use success. |
+| buy_v2_state_machine_test.dart | 1 | Step9 confirmation rejected: Delivery estimate unavailable. Preserve order/quantity/account assertions and test explicit unavailable plus authoritative-ready fixture paths. |
+| buy_v2_vertical_contract_test.dart | 1 | Every product expected nonempty brand; s-tomato brand empty. Reconcile optional brand/public-data contract; do not fabricate brands to satisfy a fixture. |
+| buy_v2_order_delivery_address_context_test.dart | 1 | Expects raw promise summary; D003 deliberately uses truthful estimate/refresh summary. Preserve immutable order/address identity and missing-data assertions. |
+| buy_v2_scoped_cart_checkout_dock_continuity_test.dart | 10 | Eight D011 description cases expect the removed duplicate generic summary. Test unique supplier content and its return continuity. Two D021 Offers cases require both unchanged scroll offset and card-top position despite empty-grid compaction; reconcile geometry and usable Add/return acceptance explicitly, not blanket dismissal. |
+| buy_v2_wholesale_cart_trade_summary_test.dart | 3 | Exact composite Wholesale Cart header absent. Verify actual product/pack/amount presentation and arithmetic before deciding fixture vs product correction. |
+| buy_v2_wholesale_supplier_continuity_test.dart | 1 | Exact Surya Oils India text absent at supplier action. Verify retained brand/supplier identity and navigation before deciding fixture vs product correction. |
+
+Isolated serial commerce replay completed21pass/5fail; isolated serial route/Wholesale replay14pass/8fail. These13 failures reproduce outside combined concurrency. This is35 passing checks,13 failing checks, not a qualified regression result. A static local import/export/part closure for the four commerce test files contains17 files, no missing local references; compared with frozena846c558, its only changed dependency is shopping-alert updatedLabel from Updated recently to Recorded order estimate. This supports fixture reconciliation but is not an executed baseline replay or proof that no runtime dependency differs. No baseline checkout was changed.
+
+All nine listed test owners are outside the current37-owner claim. Source fixes remain within admitted owners; changing these tests requires established ownership. The current goal excludes ownership/checker work. Existing check-approved-ui-locks.ps1 also requires committed apps/backend/contracts/packages/dependency source equal unchangedV6, so authorized implementation cannot pass that audit-only gate as written. No exception, new pin, excluded failure, skipped assertion or checker alteration has been applied. Exact test reconciliation and approved successor build admission remain prerequisites; no APK readiness/device closure claim.
+
+| Artifact | SHA256 |
+| --- | --- |
+| commerce-fixture-reconciliation.log | 4B3F6B3916EB4502859C0AF175EF5712455F16691D927908E329C4DD5BCCC856 |
+| route-wholesale-reconciliation.log | D65BF729741A9D4574C60ED722BCA8464894392D9EC748B8AF632B05E039D410 |
