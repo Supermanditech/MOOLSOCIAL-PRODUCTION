@@ -246,11 +246,13 @@ Reproduction: Scheduled Shop empty cart1037 -> Add wheat2 -> quantity edit/updat
 Redmi acceptance2026-09-14: captures147-162 verify original quantity edit/update/cancel/removal and directly affected Wholesale/Offers restoration. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md. No child; all test items removed.
 
 ## RV6-D022 - Shopping area chooser does not identify the selected area
-Status: open. Severity: minor selection/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
+Status: closed; r66.20 Redmi area indication, filtering and restoration passed. Severity: minor selection/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
 Reproduction: original Any-area catalogue -> Shopping area1087 -> choose Jaipur ->1088 suppliers change to Mool Market000002;search milk1089 explicitly reports Jaipur. Clear active query and reopen Shopping area1090: Jaipur is an ordinary unmarked row, no active-city summary is shown, and the chooser looks the same as1087 before selection. The In this area chip marks a scope, not the selected city. Expected: identify active city/area (or Any area) in the chooser so a customer can verify the scope before choosing another supplier. Actual selection works; no claim of wrong filtering or lost address. Source catalogue1719-1743 renders ordinary Any area/area ListTiles with no selected indication. Different from provider lookup B001 and earlier address validation clipping. Tap Any area1091 restores original catalogue supplier000001 and saved wheat marker;Saved1 and emptycart preserved. No delivery-address edit, permission change or product implementation.
 
 
 **Local implementation disposition (14 September 2026):** D022 corrected with current-area summary and selected city/Any-area indication. Two actual tap/reopen checks and26 connected area checks pass; analysis zero issues; four Flutter captures reviewed. UAT.md records evidence and fixture limitations. Original remains open pending successor-APK Redmi1087-1091; no host-only closure.
+
+Redmi acceptance2026-09-14: captures163-169 verify selected Any area/Jaipur summary and checkmark after query clearing/reopen, then original scope restoration. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md; no child.
 
 ### RV6-D001 local implementation qualification
 
