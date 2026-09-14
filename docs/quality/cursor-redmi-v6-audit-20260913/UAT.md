@@ -3345,3 +3345,23 @@ The actual backend function accepted the exact source and rejected wrong SHA, ch
 | repeat-admission-check-buy-data-egress-boundary.log | 6584726EDC8AB1E76C363CEFF0FDC9CF318610AD6522AC32A3F72882AEF91FD3 |
 | repeat-admission-negative.log | 7A57E005F89D31C4DD4D4343FF4B03CD1C7753301BEA562F7B420957153417F8 |
 | repeat-admission-negative.result.json | A4363AAF735D826645ADE9F7F75F94A174915174CDC9BB4A43E49E19452A39B1 |
+
+
+### D014 repeated-link combined baseline and Wholesale fixture preparation
+
+Both combined cycles are terminal: session84333 exit0; each2343 passes/27 inherited skips/zero failures. Both raw log hashes and source41412f56/support-restoration receipts were independently verified. The first UTF-8 read of a UTF-16 log failed decoding; BOM-aware reading resolved the evidence-reader issue without rerunning tests or changing any log bytes. PREBUILD.md records the complete source baseline and r66.24 candidate prerequisites. Source admissione52f60301c8d5bdd28895681d2888c9612ba6dd6 is pushed,clean and exact live remote-equal.
+
+The required existing Wholesale fixture was not listed in current Recently viewed: captures041-044 show the lone tomato product. The existing /app/buy/product/:productId route and w-notebook fixture ID were verified in source. A separately approved ACTION_VIEW to https://moolsocial.com/app/buy/product/w-notebook executed on Redmi only,Status ok,exit0,WaitTime12ms,top-most delivery (toole6f4bd). Capture045 shows A4 ruled notebooks/Carton120/Rajasthan Paper Products;046 exposes Visit supplier;047 shows four supplier packs,Other stores and View all. Images045/047 were visually reviewed. This is fixture preparation,not an order-link pass; browsing may add a recent entry but no old history was cleared or replaced. Root Shop is restored in048,with Saved count1 and no Cart dock. No source/backend,Cart,Saved,address,language,text-scale,transaction or message changes were made by fixture preparation. Recheck the entry after data-preserving upgrade; do not claim persistence from preparation alone. Eight new PNG rows append to EVIDENCE.csv,which now has1473 rows,with previous bytes preserved.
+
+Fresh build prerequisites pass. The initial incremental prebuild check was invoked in PowerShell5.1; its catch masked the unsupported ConvertFrom-Json -Depth option as invalid JSON. The unchanged gate passed in verified PowerShell7.6.6 (tool298678). No JSON or gate was changed to force a pass. Original failure and qualified-host logs are retained separately. The six prebuild logs,focused/visual evidence,all native receipts and original denials remain preserved. No r66.24 APK has yet been built or installed; D014 stays device-open.
+
+| Evidence | SHA256 |
+| --- | --- |
+| repeat-combined-cycle1.log | FB4EDEEB33A3122B1F5BDCEE500393F5EC4D932C8CEA4DFB28A18618784D3AFF |
+| repeat-combined-cycle1.result.json | D879E2DCD2FA1EACAFE75097D14E6D54001C46EFE831C81BD2080DAA54595547 |
+| repeat-combined-cycle2.log | E1B0B5430240F41C545F70DAA0C95DA15CCA250DC6EF38F2D77A0315291BF5A7 |
+| repeat-combined-cycle2.result.json | 9328E1C369431F017184D558ED6C0A96F7F426975AE6E34804B2AA17E88AC80B |
+| repeat-prebuild-checks.json | 5FF6D4C71511B68E84BFE997C31F8576FFE88F383227EE65117C7B35DC64834B |
+| repeat-prebuild-incremental.log | 8D689FFAB4F40B5871588B865DB7A224375404DBFCC0280EC7EE8C9E3D6A0D39 |
+| repeat-prebuild-incremental-pwsh7.log | 9BB0A43076D8CDC1F706973475B44BCDE644753834B0D600866CFE9FBBC905DD |
+| wholesale-fixture-preparation.json | 4909F1D886CDD0DAADF107D23502426491963C183BE312ECD25FE0AB2431B3C5 |

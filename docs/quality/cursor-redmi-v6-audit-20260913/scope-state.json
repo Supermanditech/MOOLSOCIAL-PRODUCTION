@@ -291,7 +291,7 @@
       "childDeviceVerification": "D005-C01_closed_on_Redmi_20260914_under_subsequent_founder_goal",
       "evidence": "UAT.md final r66.22 delivery and subsequent device closure sections"
     },
-    "sourceBaseline": "Prior r66.23 baseline remains preserved in PREBUILD.md; repeated-link correction has focused qualification only, with combined source baseline pending.",
+    "sourceBaseline": "Repeated-link source41412f56 locally qualified by25 D014 cases,340 screen tests,analysis,two2343-pass combined cycles and source/prebuild gates; r66.24 build/device acceptance pending.",
     "integration": "not_authorized",
     "productionQualification": "not_established",
     "nativeApprovalResumption": {
@@ -311,7 +311,7 @@
       "visuals": "Four new Shop/Wholesale repeated-link Flutter captures at100/200 percent visually reviewed",
       "installed": false,
       "successorBuilt": false,
-      "requiredNext": "Complete both running combined cycles and existing prebuild gates; establish clean live-remote-equal source baseline; build one uniquely identified corrective successor and complete remaining Redmi native checks.",
+      "requiredNext": "Seal clean live-remote-equal baseline, prepare exact manifest/machine state, pass unchanged wrapper preflight, build/verify/install one r66.24 corrective APK preserving Redmi data, then execute all required D014 native cases.",
       "sourceSha256Normalized": "97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C",
       "testSha256Normalized": "5F3629A79FCC623CAF2670458D9FDCF4BFDE1190DF9DBFB0AEB46E92CBB18243",
       "sourceCommit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
@@ -320,9 +320,22 @@
         "negativeCases": "exact accepted; five invalid cases rejected; existing backend and egress self-tests passed",
         "coordination": "same49 owners and registry4584; only four checker hashes refreshed in existing admission block",
         "historicalCommitLabelExceptionApplied": false,
-        "evidence": "UAT.md D014 repeated-link source admission"
+        "evidence": "UAT.md D014 repeated-link source admission",
+        "commit": "e52f60301c8d5bdd28895681d2888c9612ba6dd6"
       },
-      "combinedCycles": "running_same41412f56_source_not_yet_qualified"
+      "combinedCycles": "both_passed_2343_tests_27_inherited_skips_each_source_equal",
+      "successorCandidate": {
+        "id": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
+        "versionName": "1.0.0-r66.24",
+        "versionCode": 2026091405,
+        "status": "prebuild_source_qualified_not_built",
+        "sourceCommit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+        "evidence": "PREBUILD.md D014 repeated-link corrective r66.24 baseline",
+        "buildAuthorization": "one_necessary_corrective_build_under_active_goal_after_machine_and_wrapper_gates",
+        "device": "TG8HCYTGGQT885OF",
+        "finalHandoff": "historical_commit_label_failure_not_waived"
+      },
+      "wholesaleFixture": "Existing w-notebook opened through separately approved native product route on r66.23; required supplier/Other Store/full catalogue available; no source/backend mutation; history not cleared; successor persistence not yet verified."
     }
   }
 }
