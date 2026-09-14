@@ -1666,3 +1666,45 @@ These remain disclosed review exceptions, never production security acceptance.
 
 Fresh admission, candidate tests, APK identity and OPPO Ledger journeys remain
 required. This pin update does not itself qualify a candidate or a device.
+
+### STORE-LEDGER-02-C01 — Supplier expansion state after purchase return
+
+V23 defc4b168391d610b5877181ae42e1dcdf62b589 was installed on OPPO
+2b3e0f71 with SHA256 D1562B12381EF5CE201E79754D8397CE5376095AA1F8E4C046AEBD31A06EE9BA.
+Expense, customer collection, counter invoice/collection/return/refund and
+supplier payment journeys produced the expected separate Ledger and stock
+changes. A 19/20-pack receipt added 19 packs once despite repeated confirmation.
+These are partial device results; V23 is not qualified.
+
+Returning from Sell to Orders/Purchases after that receipt produced a red
+Flutter error: type 'double' is not a subtype of type 'bool?' in type cast.
+Preserved evidence under the task outputs/store-ledger-mvp directory includes
+v23-receipt-return-current.png, v23-oppo-receipt-runtime-failure.log and
+STORE-LEDGER-02-C01.md. The device log lacks a Dart stack; the screenshot and
+local reproduction establish the failure.
+
+Root cause: the supplier account ExpansionTile had only a ValueKey and could
+read the ancestor purchase scroll position from PageStorage as its bool state.
+The bounded correction gives it a PageStorageKey scoped by account, Store,
+supplier and order. No finance, posting, stock or authority logic changes.
+
+The existing LEDGER02 payment/receipt/return widget tests now leave for Sell,
+return through Orders/Purchases, reveal the supplier summary and verify retained
+stock and receipt counts at normal and 320x568/200% sizes. Both failed with the
+same type error before the fix (ledger02-c01-red-r2.jsonl), and both pass after
+the fix (ledger02-c01-green-r3.jsonl). Earlier test-navigation failures remain
+preserved; compact lazy-list checks explicitly scroll to each asserted control.
+No existing assertion or checker is weakened.
+
+Broader validation, source seal, exact successor admission/build and renewed
+OPPO verification remain required. Supplier return, settlement, relaunch and
+final runtime checks remain pending; founder visual approval is separate.
+
+Correction validation: analysis reports zero issues; the full regression run
+completed 2607 passed, 83 skipped, zero failures with one successful terminal
+event (ledger02-c01-full-regression.jsonl, SHA256
+232C755D6B14659D61CFF0D75EE8F2C6902DC13A9D44F7A1A4476506674B3AD0).
+The exact skipped-name set matches V23. Review-enabled Ledger02/03 capture tests
+also completed successfully (ledger02-c01-review-captures.jsonl). These are
+source-local results; they do not qualify the still-installed V23 APK or replace
+required exact-successor checks.

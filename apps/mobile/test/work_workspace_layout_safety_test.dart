@@ -22760,6 +22760,33 @@ void main() {
           seed.products.first.stock + 3,
         );
         await captureStoreView(tester, 'ledger02-return-confirmed-$scale');
+        // STORE-LEDGER-02-C01: a retained purchase scroll offset must not
+        // become the supplier account expansion state after leaving Orders.
+        await tester.tap(find.byKey(const Key('work-store-sell')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const Key('work-store-orders')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Purchases').hitTestable());
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        final purchaseScroll = find.byKey(
+          PageStorageKey(
+            'work-purchase-details-${seed.storeId}-${purchase.shipmentId}-false',
+          ),
+        );
+        final supplierTitle = find.text('Supplier account');
+        for (var i = 0; i < 12 && supplierTitle.evaluate().isEmpty; i++) {
+          await tester.drag(purchaseScroll, const Offset(0, 400));
+          await tester.pumpAndSettle();
+        }
+        await reveal(tester, supplierTitle);
+        expect(supplierTitle, findsOneWidget);
+        await reveal(tester, payment);
+        expect(
+          work.workspaceCatalogueItems.first.stock,
+          seed.products.first.stock + 3,
+        );
+        await reveal(tester, find.text('Ordered 20 packs · Received 4 packs'));
         expect(
           find.text('Ordered 20 packs · Received 4 packs'),
           findsOneWidget,

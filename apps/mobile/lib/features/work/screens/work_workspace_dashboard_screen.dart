@@ -10252,7 +10252,13 @@ class _StoreSupplierLedgerSummary extends StatelessWidget {
     final payable = current.payableMinor;
     final entries = current.entries.where((entry) => entry.orderId == orderId);
     return ExpansionTile(
-      key: ValueKey('supplier-ledger-${current.supplierId}-$orderId'),
+      key: PageStorageKey((
+        'supplier-ledger-expansion',
+        current.accountScope,
+        current.workspaceId,
+        current.supplierId,
+        orderId,
+      )),
       tilePadding: EdgeInsets.zero,
       title: const Text('Supplier account'),
       subtitle: Text(
