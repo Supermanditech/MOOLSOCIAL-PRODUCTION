@@ -16,7 +16,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 
 ## RV6-D002 — Removing the last item while browsing a Store exits the Store
 
-- Status: open; locally implemented and qualified, pending successor APK and Redmi acceptance. Severity: moderate.
+- Status: closed; r66.20 Redmi acceptance passed. Severity: moderate.
 - Journey: Turmeric product → Visit store → Browse all products → Fruits & vegetables → add Fresh tomatoes 1 → open cart → Continue browsing Mool Market 000001 → Browse all products → decrement Fresh tomatoes from 1 to 0.
 - Precondition: only this test-added item in Shop cart; selected Store category still retained on return (capture 044).
 - Actual: the product briefly becomes Add (045), then both Store sheets disappear and the app returns to the general Shop catalogue at its earlier page/horizontal position (046), without Back or Close being pressed.
@@ -27,6 +27,9 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Subsequent source correlation: `BuyV2Session.decrease` (near line 10318) replaces cart/checkout with catalogue when the last line is removed. `_sessionChanged` in `buy_v2_screen.dart` (near line 607) dismisses Store routes whenever the underlying session becomes catalogue. This matches the observed Store-over-cart sequence; an isolated regression has not been run or added in this audit.
 
 - Local implementation: Buy screen retains Store browsing through the exact empty-cart navigation sequence. Eight focused cases passed (legacy/paginated, Shop/Wholesale, normal/200% text), 72 connected checks passed before the four paginated additions; counts overlap. Eight Flutter captures and final analysis verified; exact evidence and limitations in UAT.md, RV6-D002 local checkpoint. Original physical 040-046 acceptance remains pending.
+
+
+- Successor Redmi acceptance: captures rv620-012 through rv620-022, exact installed APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Same Store/category retained after last-item removal; basket rail removed; Back through Store overview to Shop; test-added item removed. UAT.md records entry variation, implementation commit and limitations. No child found.
 
 ## RV6-D003 — Order Chat presents a stale delivery promise without its unavailable qualifier
 
