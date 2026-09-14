@@ -91,8 +91,8 @@
     }
   ],
   "nextWork": [
-    "Seal D001 atomic implementation with normal gates,push,clean live equality;then inspect D002 exact source/test admission under founder limited authority.",
-    "After all22 local qualifications build one successor APK;only scoped22 Redmi verification;register children then stop."
+    "Finish combined regressions, analysis and unchanged release gates for committed D005-C01 source 3c30ba11521db6bb1a1ec6995b181a81df1a6b34; seal qualified source baseline and exact remote equality.",
+    "Build one uniquely identified final Cursor Review successor and install preserving data on Redmi TG8HCYTGGQT885OF only; report remaining device acceptance then stop. New-APK child testing requires a subsequent instruction."
   ],
   "preservation": {
     "cart": "1175 original Scheduled Shop Saved1 emptycart restored;no cart changes in round169",
@@ -150,10 +150,10 @@
       "RV6-D021",
       "RV6-D022"
     ],
-    "deviceQualified": [],
+    "deviceQualified": ["RV6-D001", "RV6-D002", "RV6-D003", "RV6-D004", "RV6-D006", "RV6-D007", "RV6-D008", "RV6-D011", "RV6-D012", "RV6-D013", "RV6-D015", "RV6-D016", "RV6-D017", "RV6-D018", "RV6-D019", "RV6-D020", "RV6-D021", "RV6-D022"],
     "remainingLocal": [],
-    "newApkBuilt": false,
-    "deviceTestingStarted": false,
+    "newApkBuilt": true,
+    "deviceTestingStarted": true,
     "frozenAuditCheckpoint": "HANDOFF.md remains historical authority for514 passes and1177 verified artifacts;no broad audit resumed",
     "additionalAdmissions": {
       "RV6-D002": "cea1699a42bf182c9648719b8780b5ec9afd05ba",
@@ -186,13 +186,29 @@
       "RV6-D017": "99f74b80e37850003f7fdd37db81e71387fbc9ca",
       "RV6-D018": "04afab670c14e5cc425269f6753a3410e0b82548",
       "RV6-D020": "9a81541e866975c15c4044f8a5d68906e45dd638",
-      "RV6-D021": "7e811a753a9896947f514a209f50138d21ea9544"
+      "RV6-D021": "7e811a753a9896947f514a209f50138d21ea9544",
+      "RV6-D022": "4eb257d146fa656b63d7e0fe003cc8898ee8cd09"
     },
     "reconciledWithoutProductChange": {
-      "RV6-D019": "Original registered capture hashes verified; minimized bike9+ visible in910/911/913; no product change justified. Successor Redmi check retained; not device-closed or implemented."
+      "RV6-D019": "Original registered capture hashes verified; no product change justified. Closed by r66.20 Redmi evidence135-139; see UAT.md."
     },
     "reconciliationCommits": {
       "RV6-D019": "70b117b966a58ca4a551edb31742e175c2723dde"
     }
+  },
+  "latestScopedWorkflow": {
+    "authority": "Founder confirmed resume from fe3ee1d3 and supplied later explicit narrow shared startup/persistence ownership authorization; UAT.md records that admission.",
+    "historicalAudit": "Top-level audit, coverage, preservation and original requirements retain the frozen full-audit checkpoint; they are not current successor build status or an exhaustive production qualification.",
+    "originalCount": 22,
+    "deviceClosedCount": 18,
+    "deviceOpen": ["RV6-D005"],
+    "externalLinkDeliveryUnverified": ["RV6-D009", "RV6-D010", "RV6-D014"],
+    "externalBlocker": "Declared native-link launches rejected by automatic approval review; no equivalent alternate launch or bypass attempted.",
+    "children": [{"id": "RV6-D005-C01", "parent": "RV6-D005", "status": "implemented_locally_qualified_device_open", "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34", "evidence": "UAT.md", "limits": "Host adapter/session checks and English Flutter captures; host Hindi glyph qualification unavailable; no successor Redmi process-restart closure."}],
+    "currentInstalledVersion": "1.0.0-r66.21-cursorreview",
+    "currentInstalledVersionCode": 2026091402,
+    "finalSuccessor": "not_yet_built",
+    "integration": "not_authorized",
+    "productionQualification": "not_established"
   }
 }

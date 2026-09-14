@@ -268,7 +268,7 @@ Area guidance now follows actual showAreaControl availability. Four focused regr
 
 ## RV6-D005-C01 - Saved Hindi preference resets to English after cold relaunch
 
-- Parent: RV6-D005. Status: open, device reproduced; no implementation authorized in this round. Severity: moderate.
+- Parent: RV6-D005. Status: implemented and locally qualified; device acceptance remains open. Commit 3c30ba11521db6bb1a1ec6995b181a81df1a6b34. Severity: moderate. Historical reproduction and ownership-blocker notes below are preserved; the later founder authorization supersedes that ownership restriction.
 - Actor/outcome: signed-out Buy customer choosing Hindi as a saved language preference expects the selected preference and honest coverage disclosure to survive restarting the app.
 - Reproduction: Personal profile > Language preference > Privacy & preferences > Language > Hindi; observe Hindi preferred / App screens: English; Back to profile (same summary), Back to Shop. Force-stop only com.moolsocial.app.cursorreview, cold launch declared MainActivity, account > Privacy and preferences > Language.
 - Actual: preference summary and selected radio return to English. Before restart picker explicitly promises Selecting Hindi saves your preference only. No sign-out, account switch, data clear, uninstall or preference restoration was performed between selection and observation.
@@ -289,3 +289,7 @@ Required source ownership is main.dart (review bootstrap composition) and an exa
 Qualification plan: new store/session instance restores Hindi, a new instance restores a subsequent English choice, fresh state keeps existing seed, storage failure rolls back with honest error, unknown/corrupt stored value recovers safely, review key does not touch other journey/auth keys, original route/guest behavior remains unchanged; focused actual Flutter profile/disclosure visuals and connected regressions then follow. Host instances prove adapter behavior, not Redmi process-restart closure. Final child device verification remains separately instructed under the goal.
 
 The child is authorized in the revised workflow but remains unimplemented because its required shared bootstrap owner is outside the current claim. Earlier no-implementation-in-this-round wording is historical. D009/D010/D014 remain separate external link-delivery blockers.
+
+### D005-C01 implementation checkpoint - 2026-09-14
+
+The founder subsequently admitted the exact shared startup/persistence ownership. Commit3c30ba11521db6bb1a1ec6995b181a81df1a6b34 is pushed and live remote-equal at its clean checkpoint. Review startup now uses an isolated language-only durable adapter; production startup and other persisted journey/auth keys are unchanged. Eight focused adapter/session checks,50 connected checks (overlapping), zero-issue analysis, two visual checks/four Flutter captures and ten source-admission cases qualify the local correction. UAT.md records hash-bound evidence and the host Hindi-glyph limitation. Broader final source/build qualification is in progress. D005 and C01 remain open for subsequent exact-successor Redmi restart verification; no host result is a device closure. No additional distinct child was reproduced in the completed accessible original verification round.
