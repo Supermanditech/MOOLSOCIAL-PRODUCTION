@@ -1,399 +1,22 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/design/mool_design_system.dart';
-import '../../../core/design/mool_service_home.dart';
 import '../../../core/design/mool_theme.dart';
 import '../widgets/work_widgets.dart';
+import '../widgets/work_workspace_benefit_card.dart';
 import '../work_models.dart';
+import '../work_document_preview.dart';
+import '../work_services.dart';
 import '../work_session.dart';
+import '../work_workspace_benefits.dart';
 
-const _workAccent = Color(0xFF4D46A8);
-
-class MyWorkScreen extends StatelessWidget {
-  const MyWorkScreen({required this.session, super.key});
-
-  final WorkSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: session,
-      builder: (context, _) {
-        final workspace = session.activeWorkspace;
-        return WorkPageScaffold(
-          session: session,
-          title: 'Workspace',
-          subtitle: workspace == null
-              ? 'Start and operate verified work'
-              : workspace.name,
-          fallbackBackRoute: '/app/work',
-          showBack: false,
-          activeLocalAction: 'workspace',
-          body: ListView(
-            key: const Key('my-work-screen'),
-            padding: const EdgeInsets.fromLTRB(
-              MoolServiceHomeTokens.pagePadding,
-              MoolSpacing.xs,
-              MoolServiceHomeTokens.pagePadding,
-              MoolSpacing.xxl,
-            ),
-            children: [
-              if (session.savedOpportunity case final opportunity?) ...[
-                WorkCard(
-                  color: const Color(0xFFFFF4E5),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const WorkPill(
-                        label: 'Opportunity saved',
-                        color: MoolColors.orange,
-                        icon: Icons.bookmark_added_outlined,
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      Text(
-                        opportunity.title,
-                        style: const TextStyle(
-                          color: MoolColors.ink,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      Text(
-                        workspace == null
-                            ? 'Start My Work, then return to apply.'
-                            : 'Your verified workspace can apply directly.',
-                        style: const TextStyle(color: MoolColors.muted),
-                      ),
-                      const SizedBox(height: MoolSpacing.sm),
-                      if (workspace != null)
-                        WorkPrimaryButton(
-                          keyName: 'my-work-return-opportunity',
-                          label: 'Return to opportunity',
-                          onPressed: () {
-                            session.openOpportunity(opportunity.id);
-                            context.go(
-                              '/app/work/opportunity/${opportunity.id}',
-                            );
-                          },
-                          icon: Icons.arrow_back_rounded,
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-              ],
-              if (workspace == null)
-                _NewWorkState(session: session)
-              else ...[
-                _ActiveWorkspaceCard(workspace: workspace),
-                const SizedBox(height: MoolSpacing.md),
-                const WorkSectionTitle(
-                  title: 'Needs attention',
-                  detail: 'Only actions that change an outcome appear here',
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                _AttentionCard(
-                  icon: Icons.inventory_2_outlined,
-                  title: session.reviewStage == WorkReviewStage.live
-                      ? 'Review available stock'
-                      : 'Finish shop readiness',
-                  detail: session.reviewStage == WorkReviewStage.live
-                      ? 'Price, quantity and fulfilment must stay accurate.'
-                      : 'Add stock, price and fulfilment before customers see products.',
-                  actionLabel: session.reviewStage == WorkReviewStage.live
-                      ? 'Open shop'
-                      : 'Continue setup',
-                  keyName: 'my-work-open-active',
-                  onPressed: () => context.go(
-                    session.reviewStage == WorkReviewStage.approved
-                        ? '/app/work/ready'
-                        : session.reviewStage == WorkReviewStage.live
-                        ? '/app/retailer/home'
-                        : '/app/work/retailer/setup',
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                _AttentionCard(
-                  icon: Icons.payments_outlined,
-                  title: 'Settlement summary',
-                  detail:
-                      'Review completed sales and any amount due in your operating workspace.',
-                  actionLabel: 'View summary',
-                  keyName: 'my-work-settlement',
-                  onPressed: () =>
-                      _showSettlementSummary(context, workspace.name),
-                ),
-                if (session.otherWorkspaces.isNotEmpty) ...[
-                  const SizedBox(height: MoolSpacing.md),
-                  const WorkSectionTitle(
-                    title: 'Other workspaces',
-                    detail: 'Your current workspace stays selected',
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  Column(
-                    key: const Key('my-work-other-list'),
-                    children: [
-                      for (final other in session.otherWorkspaces)
-                        Padding(
-                          padding: const EdgeInsets.only(
-                            bottom: MoolServiceHomeTokens.cardGap,
-                          ),
-                          child: MoolServiceCard(
-                            key: Key('my-work-other-${other.id}'),
-                            title: other.name,
-                            subtitle: '${other.profileLabel} · ${other.area}',
-                            icon: Icons.verified_user_outlined,
-                            accent: _workAccent,
-                            metadata: const [
-                              MoolServiceMeta(
-                                icon: Icons.verified_rounded,
-                                label: 'Verified workspace',
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-                const SizedBox(height: MoolSpacing.md),
-                OutlinedButton.icon(
-                  key: const Key('my-work-add-another'),
-                  onPressed: () {
-                    session.startAnotherWork();
-                    context.go('/app/work/workspace/choose');
-                  },
-                  icon: const Icon(Icons.add_rounded),
-                  label: const Text('Add Another Work'),
-                ),
-              ],
-            ],
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _NewWorkState extends StatelessWidget {
-  const _NewWorkState({required this.session});
-
-  final WorkSession session;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        WorkCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const MoolServiceSectionHeader(
-                title: 'Set up your Workspace',
-                subtitle:
-                    'Use one verified profile for opportunities or an existing business.',
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              WorkPrimaryButton(
-                keyName: 'my-work-start',
-                label: 'Start Workspace setup',
-                onPressed: () {
-                  session.startMyWork();
-                  context.go('/app/work/workspace/choose');
-                },
-                icon: Icons.arrow_forward_rounded,
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: MoolSpacing.md),
-        const MoolServiceCard(
-          key: Key('my-work-account-context'),
-          title: 'Verified account contact',
-          subtitle:
-              'Your personal account stays active while Workspace setup is reviewed.',
-          icon: Icons.verified_user_outlined,
-          accent: MoolColors.success,
-          metadata: [
-            MoolServiceMeta(
-              icon: Icons.phone_android_rounded,
-              label: '+91 98••• ••321',
-            ),
-            MoolServiceMeta(
-              icon: Icons.lock_outline_rounded,
-              label: 'No account change',
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ActiveWorkspaceCard extends StatelessWidget {
-  const _ActiveWorkspaceCard({required this.workspace});
-
-  final WorkWorkspace workspace;
-
-  @override
-  Widget build(BuildContext context) {
-    return MoolServiceCard(
-      key: const Key('my-work-active-workspace'),
-      title: workspace.name,
-      subtitle: '${workspace.profileLabel} · ${workspace.area}',
-      icon: Icons.storefront_outlined,
-      accent: _workAccent,
-      emphasized: true,
-      metadata: [
-        const MoolServiceMeta(
-          icon: Icons.verified_rounded,
-          label: 'Verified workspace',
-        ),
-        if (workspace.gstReminder)
-          const MoolServiceMeta(
-            icon: Icons.schedule_rounded,
-            label: 'GST reminder active',
-          ),
-      ],
-    );
-  }
-}
-
-class _AttentionCard extends StatelessWidget {
-  const _AttentionCard({
-    required this.icon,
-    required this.title,
-    required this.detail,
-    required this.actionLabel,
-    required this.keyName,
-    required this.onPressed,
-  });
-
-  final IconData icon;
-  final String title;
-  final String detail;
-  final String actionLabel;
-  final String keyName;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkCard(
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFFEDEEFF),
-            foregroundColor: MoolColors.navy,
-            child: Icon(icon),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                Text(
-                  detail,
-                  style: const TextStyle(color: MoolColors.muted, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: MoolSpacing.xs),
-          TextButton(
-            key: Key(keyName),
-            onPressed: onPressed,
-            child: Text(actionLabel),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-Future<void> _showSettlementSummary(
-  BuildContext context,
-  String workspaceName,
-) {
-  return showModalBottomSheet<void>(
-    context: context,
-    useSafeArea: true,
-    showDragHandle: true,
-    builder: (sheetContext) => Padding(
-      padding: const EdgeInsets.fromLTRB(
-        MoolSpacing.lg,
-        0,
-        MoolSpacing.lg,
-        MoolSpacing.lg,
-      ),
-      child: Column(
-        key: const Key('my-work-settlement-sheet'),
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          const Text(
-            'Settlement summary',
-            style: TextStyle(
-              color: MoolColors.ink,
-              fontSize: 22,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          WorkCard(
-            color: const Color(0xFFF0FAF3),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  workspaceName,
-                  style: const TextStyle(
-                    color: MoolColors.ink,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                const Text(
-                  'No payout is due now',
-                  style: TextStyle(
-                    color: MoolColors.success,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.xs),
-                const Text(
-                  'Completed orders, refunds and fees will appear here after '
-                  'their payment records are verified.',
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: MoolSpacing.md),
-          FilledButton(
-            key: const Key('my-work-settlement-open-workspace'),
-            onPressed: () {
-              Navigator.of(sheetContext).pop();
-              context.go('/app/retailer/home');
-            },
-            child: const Text('Open operating workspace'),
-          ),
-          TextButton(
-            key: const Key('my-work-settlement-close'),
-            onPressed: () => Navigator.of(sheetContext).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    ),
-  );
+double _workViewBottomInset(BuildContext context) {
+  final view = View.of(context);
+  return view.viewPadding.bottom / view.devicePixelRatio;
 }
 
 class WorkChooseActivityScreen extends StatefulWidget {
@@ -407,6 +30,1033 @@ class WorkChooseActivityScreen extends StatefulWidget {
 }
 
 class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
+  String? _expandedProfileId;
+  String _workspaceQuery = '';
+  String? _categoryId;
+  final _searchController = TextEditingController();
+  final _searchFocus = FocusNode();
+  final _choicesScroll = ScrollController();
+  double _choicesOffset = 0;
+  bool _entryRedirectQueued = false;
+
+  bool _matches(WorkProfileOption option) {
+    final query = _workspaceQuery.replaceAll('saloon', 'salon');
+    return option.label.toLowerCase().contains(query);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _searchFocus.addListener(_refreshSearch);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.session.loadInitialWorkspaceState();
+    });
+  }
+
+  void _refreshSearch() => setState(() {});
+
+  @override
+  void dispose() {
+    _searchFocus.removeListener(_refreshSearch);
+    _searchFocus.dispose();
+    _searchController.dispose();
+    _choicesScroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: widget.session,
+      builder: (context, _) {
+        final ordinaryEntry =
+            GoRouterState.of(context).uri.queryParameters['entry'] ==
+            'workspaces';
+        if (ordinaryEntry &&
+            (!widget.session.initialWorkspaceStateLoaded ||
+                widget.session.hasVerifiedWorkspace)) {
+          if (widget.session.hasVerifiedWorkspace && !_entryRedirectQueued) {
+            _entryRedirectQueued = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+                context.go('/app/work/workspace/dashboard');
+              }
+            });
+          }
+          final failed =
+              widget.session.errorMessage != null && !widget.session.busy;
+          return WorkPageScaffold(
+            session: widget.session,
+            title: 'Workspaces',
+            subtitle: '',
+            activeLocalAction: 'workspace',
+            showHeaderChat: false,
+            showTrailingAction: false,
+            showMessageBanner: false,
+            body: Center(
+              child: SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(24),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (!failed) const CircularProgressIndicator(),
+                      const SizedBox(height: 12),
+                      Text(
+                        failed
+                            ? 'Your Workspaces could not be loaded.'
+                            : 'Opening your Workspaces…',
+                        textAlign: TextAlign.center,
+                      ),
+                      if (failed)
+                        TextButton(
+                          key: const Key('work-entry-retry'),
+                          onPressed: widget.session.loadInitialWorkspaceState,
+                          child: const Text('Retry'),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          );
+        }
+        final family = widget.session.selectedFamilyId;
+        final resumeApplication =
+            widget.session.reviewCaseId != null &&
+            !widget.session.hasVerifiedWorkspace;
+        final category = _categoryId ?? family;
+        final matchingFamilies = widget.session.familyIds
+            .where(
+              (id) =>
+                  (category == null || category.isEmpty || category == id) &&
+                  widget.session.profilesForFamily(id).any(_matches),
+            )
+            .toList();
+        final focusedOption = _expandedProfileId == null
+            ? null
+            : widget.session.familyIds
+                  .expand(widget.session.profilesForFamily)
+                  .where(
+                    (option) =>
+                        option.id == _expandedProfileId &&
+                        workWorkspaceBenefitFor(option.id).hasTopics,
+                  )
+                  .firstOrNull;
+        final dockChoose =
+            focusedOption != null &&
+            (MediaQuery.sizeOf(context).height < 850 ||
+                MediaQuery.textScalerOf(context).scale(14) > 18);
+
+        void restoreScroll(double offset) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _choicesScroll.hasClients) {
+              _choicesScroll.jumpTo(
+                offset.clamp(0, _choicesScroll.position.maxScrollExtent),
+              );
+            }
+          });
+        }
+
+        void collapseBenefits() {
+          setState(() => _expandedProfileId = null);
+          if (focusedOption != null) restoreScroll(_choicesOffset);
+        }
+
+        void toggleBenefits(String profileId) {
+          if (_expandedProfileId == profileId) {
+            collapseBenefits();
+            return;
+          }
+          _searchFocus.unfocus();
+          _choicesOffset = _choicesScroll.hasClients
+              ? _choicesScroll.offset
+              : 0;
+          setState(() => _expandedProfileId = profileId);
+          if (workWorkspaceBenefitFor(profileId).hasTopics) restoreScroll(0);
+        }
+
+        void chooseWorkspace(WorkProfileOption option) {
+          if (resumeApplication) {
+            context.push('/app/work/workspace/proof');
+            return;
+          }
+          widget.session.selectProfile(option.id);
+          context.push('/app/work/workspace/requirements');
+        }
+
+        return WorkPageScaffold(
+          session: widget.session,
+          title: 'Grow with MoolSocial',
+          headerHeight: 56,
+          headerTitle: TextField(
+            key: const Key('work-workspace-search'),
+            controller: _searchController,
+            focusNode: _searchFocus,
+            textInputAction: TextInputAction.search,
+            style: const TextStyle(fontSize: 15, color: MoolColors.ink),
+            decoration: InputDecoration(
+              hintText: 'Search',
+              filled: false,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 12),
+              prefixIcon: const Icon(Icons.search, size: 22),
+              suffixIcon: _workspaceQuery.isEmpty
+                  ? null
+                  : IconButton(
+                      key: const Key('work-workspace-search-clear'),
+                      tooltip: 'Clear search',
+                      onPressed: () {
+                        _searchController.clear();
+                        setState(() {
+                          _workspaceQuery = '';
+                          _expandedProfileId = null;
+                        });
+                      },
+                      icon: const Icon(Icons.close, size: 20),
+                    ),
+            ),
+            onChanged: (value) => setState(() {
+              _workspaceQuery = value.trim().toLowerCase();
+              _expandedProfileId = null;
+              // A search spans every category without changing the application.
+              _categoryId = '';
+            }),
+            onSubmitted: (_) => _searchFocus.unfocus(),
+          ),
+          subtitle: family == null
+              ? 'Choose the Workspace that matches what you do'
+              : widget.session.familyLabel(family),
+          fallbackBackRoute: '/app/work/earn',
+          showBack:
+              _expandedProfileId != null ||
+              family != null ||
+              Navigator.of(context).canPop(),
+          onBack: _expandedProfileId != null
+              ? collapseBenefits
+              : family == null
+              ? null
+              : () {
+                  if (resumeApplication) {
+                    if (context.canPop()) {
+                      context.pop();
+                    } else {
+                      context.go('/app/work/earn');
+                    }
+                  } else {
+                    widget.session.changeFamily();
+                  }
+                },
+          activeLocalAction: 'workspace',
+          showHeaderChat: false,
+          showTrailingAction: true,
+          hideNavigationWhenKeyboardVisible: true,
+          trailing: PopupMenuButton<String>(
+            key: const Key('work-workspace-category'),
+            tooltip: 'Business categories',
+            requestFocus: false,
+            onOpened: _searchFocus.unfocus,
+            onCanceled: _searchFocus.unfocus,
+            icon: const Icon(Icons.tune_rounded),
+            initialValue: category ?? '',
+            onSelected: (value) {
+              _searchFocus.unfocus();
+              _searchController.clear();
+              setState(() {
+                _categoryId = value;
+                _workspaceQuery = '';
+                _expandedProfileId = null;
+              });
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: '', child: Text('All businesses')),
+              for (final id in widget.session.familyIds)
+                PopupMenuItem(
+                  value: id,
+                  child: Text(widget.session.familyLabel(id)),
+                ),
+            ],
+          ),
+          bottomAction: dockChoose && !_searchFocus.hasFocus
+              ? WorkWorkspaceChooseButton(
+                  profileId: focusedOption.id,
+                  onChoose: () => chooseWorkspace(focusedOption),
+                  showNextStep: false,
+                  resumeApplication: resumeApplication,
+                )
+              : null,
+          body: ListView(
+            key: const Key('work-choose-screen'),
+            controller: _choicesScroll,
+            padding: const EdgeInsets.fromLTRB(
+              MoolSpacing.md,
+              MoolSpacing.sm,
+              MoolSpacing.md,
+              MoolSpacing.xl,
+            ),
+            children: [
+              if (focusedOption == null &&
+                  !_searchFocus.hasFocus &&
+                  _workspaceQuery.isEmpty)
+                const _WorkspaceEntryHero(),
+              if (widget.session.selectedOpportunity
+                  case final opportunity?) ...[
+                const SizedBox(height: MoolSpacing.sm),
+                _WorkspaceOpportunityContext(opportunity: opportunity),
+              ],
+              if (resumeApplication) ...[
+                const SizedBox(height: MoolSpacing.sm),
+                _WorkspaceApplicationSummary(session: widget.session),
+              ],
+              const SizedBox(height: MoolSpacing.sm),
+              for (final familyId in matchingFamilies) ...[
+                if (focusedOption == null && familyId != 'products-trade') ...[
+                  if (_searchFocus.hasFocus || _workspaceQuery.isNotEmpty)
+                    Text(
+                      widget.session.familyLabel(familyId),
+                      style: Theme.of(context).textTheme.labelLarge,
+                    )
+                  else
+                    WorkSectionTitle(
+                      title: widget.session.familyLabel(familyId),
+                      detail: _workspaceGroupPresentation(familyId).examples,
+                    ),
+                  const SizedBox(height: MoolSpacing.sm),
+                ],
+                for (final option
+                    in widget.session
+                        .profilesForFamily(familyId)
+                        .where(
+                          (option) =>
+                              _matches(option) &&
+                              (focusedOption == null ||
+                                  option.id == focusedOption.id),
+                        )) ...[
+                  WorkWorkspaceBenefitCard(
+                    key: ValueKey('workspace-choice-${option.id}'),
+                    option: option,
+                    content: workWorkspaceBenefitFor(option.id),
+                    expanded: _expandedProfileId == option.id,
+                    onToggle: () => toggleBenefits(option.id),
+                    onChoose: () => chooseWorkspace(option),
+                    showChooseAction: !dockChoose,
+                    resumeApplication: resumeApplication,
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                ],
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              if (matchingFamilies.isEmpty)
+                Padding(
+                  key: const Key('work-workspace-no-match'),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(
+                    'No matching Workspace. Try another name or tell us what you do.',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ),
+              if (focusedOption == null)
+                OutlinedButton.icon(
+                  key: const Key('work-profile-not-shown'),
+                  onPressed: () => _showUnsupportedRequest(context),
+                  icon: const Icon(Icons.chat_bubble_outline_rounded),
+                  label: const Text(
+                    'Can’t find your Workspace? Tell us what you do',
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _showUnsupportedRequest(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) =>
+          _WorkspaceRequestSheet(session: widget.session),
+    );
+  }
+}
+
+class _WorkspaceRequestSheet extends StatefulWidget {
+  const _WorkspaceRequestSheet({required this.session});
+
+  final WorkSession session;
+
+  @override
+  State<_WorkspaceRequestSheet> createState() => _WorkspaceRequestSheetState();
+}
+
+class _WorkspaceRequestSheetState extends State<_WorkspaceRequestSheet> {
+  static const _categories = <String>[
+    'Products & Trade',
+    'Food Business',
+    'Health & Medicine',
+    'Services & Salon',
+    'Travel Partners',
+    'Delivery & Logistics',
+    'Create & Work',
+    'Other',
+  ];
+
+  final TextEditingController _workspace = TextEditingController();
+  final TextEditingController _area = TextEditingController();
+  final TextEditingController _otherActivity = TextEditingController();
+  final FocusNode _workspaceFocus = FocusNode();
+  final FocusNode _areaFocus = FocusNode();
+  final FocusNode _otherActivityFocus = FocusNode();
+  final ScrollController _formScroll = ScrollController();
+  String _category = '';
+  String? _error;
+  bool _validationShown = false;
+  bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _workspace.text = widget.session.unsupportedWorkspace;
+    _area.text = widget.session.unsupportedArea;
+    _otherActivity.text = widget.session.unsupportedOtherActivity;
+    _category = widget.session.unsupportedFamily;
+  }
+
+  @override
+  void dispose() {
+    if (!widget.session.unsupportedRequestSent) {
+      widget.session.unsupportedWorkspace = _workspace.text;
+      widget.session.unsupportedArea = _area.text;
+      widget.session.unsupportedOtherActivity = _otherActivity.text;
+      widget.session.unsupportedFamily = _category;
+    }
+    _workspace.dispose();
+    _area.dispose();
+    _otherActivity.dispose();
+    _workspaceFocus.dispose();
+    _areaFocus.dispose();
+    _otherActivityFocus.dispose();
+    _formScroll.dispose();
+    super.dispose();
+  }
+
+  String? get _validationError => _workspace.text.trim().length < 3
+      ? 'Enter your business, profession or service.'
+      : _category.isEmpty
+      ? 'Choose the closest category.'
+      : _category == 'Other' && _otherActivity.text.trim().length < 3
+      ? 'Enter the activity you want to offer.'
+      : _area.text.trim().length < 3
+      ? 'Enter your city or service area.'
+      : null;
+
+  void _refreshValidation(String _) {
+    if (!_validationShown) return;
+    setState(() => _error = _validationError);
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    FocusManager.instance.primaryFocus?.unfocus();
+    final validationError = _validationError;
+    if (validationError != null) {
+      setState(() {
+        _validationShown = true;
+        _error = validationError;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _formScroll.hasClients) _formScroll.jumpTo(0);
+      });
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _validationShown = false;
+      _error = null;
+    });
+    final sent = await widget.session.sendUnsupportedRequest(
+      workspace: _workspace.text,
+      family: _category,
+      area: _area.text,
+      otherActivity: _otherActivity.text,
+    );
+    if (!mounted) return;
+    if (sent) {
+      Navigator.of(context).pop();
+      return;
+    }
+    setState(() {
+      _submitting = false;
+      _error = widget.session.errorMessage;
+    });
+  }
+
+  void _close() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keyboardInset = MediaQuery.viewInsetsOf(context).bottom;
+    final reportedBottomInset = _workViewBottomInset(context);
+    final gestureSafeBottom = reportedBottomInset < 24
+        ? 24.0
+        : reportedBottomInset;
+    return SafeArea(
+      top: true,
+      minimum: EdgeInsets.only(bottom: gestureSafeBottom + MoolSpacing.xs),
+      child: Padding(
+        padding: EdgeInsets.only(bottom: keyboardInset),
+        child: Align(
+          alignment: Alignment.bottomCenter,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight:
+                  (MediaQuery.sizeOf(context).height -
+                          keyboardInset -
+                          MediaQuery.paddingOf(context).top -
+                          24)
+                      .clamp(0, 500),
+            ),
+            child: Material(
+              key: const Key('work-profile-request-sheet'),
+              color: Colors.white,
+              clipBehavior: Clip.antiAlias,
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(MoolRadii.sheet),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(
+                      MoolSpacing.md,
+                      MoolSpacing.xs,
+                      MoolSpacing.xs,
+                      MoolSpacing.xs,
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Center(
+                            child: Container(
+                              width: 42,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFD8DAE8),
+                                borderRadius: BorderRadius.circular(
+                                  MoolRadii.capsule,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        IconButton(
+                          key: const Key('work-profile-request-close'),
+                          tooltip: 'Close',
+                          onPressed: _close,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Flexible(
+                    fit: FlexFit.loose,
+                    child: ListView(
+                      key: const Key('work-profile-request-scroll'),
+                      controller: _formScroll,
+                      shrinkWrap: true,
+                      primary: false,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolSpacing.md,
+                        MoolSpacing.xs,
+                        MoolSpacing.md,
+                        MoolSpacing.md,
+                      ),
+                      children: [
+                        const Text(
+                          'Tell us what you do',
+                          style: TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.xs),
+                        const Text(
+                          'Share your business, profession or service. MoolSocial will guide you to the right Workspace.',
+                          style: TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 11,
+                            height: 1.3,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.xs),
+                        if (_error case final error?)
+                          Semantics(
+                            liveRegion: true,
+                            child: Container(
+                              key: const Key('work-profile-request-error'),
+                              width: double.infinity,
+                              margin: const EdgeInsets.only(
+                                bottom: MoolSpacing.xs,
+                              ),
+                              padding: const EdgeInsets.all(MoolSpacing.xs),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFFE9E7),
+                                borderRadius: BorderRadius.circular(
+                                  MoolRadii.control,
+                                ),
+                              ),
+                              child: Text(
+                                error,
+                                style: const TextStyle(
+                                  color: Color(0xFF9D1C15),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                        TextField(
+                          key: const Key('work-request-profile-name'),
+                          controller: _workspace,
+                          focusNode: _workspaceFocus,
+                          enabled: !_submitting,
+                          textInputAction: TextInputAction.next,
+                          scrollPadding: const EdgeInsets.only(bottom: 120),
+                          onSubmitted: (_) => _areaFocus.requestFocus(),
+                          onChanged: _refreshValidation,
+                          decoration: const InputDecoration(
+                            labelText: 'Business, profession or service',
+                            hintText: 'Furniture repair',
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.sm),
+                        DropdownButtonFormField<String>(
+                          key: const Key('work-request-family'),
+                          isExpanded: true,
+                          isDense:
+                              MediaQuery.textScalerOf(context).scale(16) <=
+                              20.8,
+                          itemHeight: null,
+                          initialValue: _category.isEmpty ? null : _category,
+                          decoration: const InputDecoration(
+                            labelText: 'Closest category',
+                          ),
+                          items: _categories
+                              .map(
+                                (value) => DropdownMenuItem(
+                                  value: value,
+                                  child: Text(value),
+                                ),
+                              )
+                              .toList(growable: false),
+                          onTap: () =>
+                              FocusManager.instance.primaryFocus?.unfocus(),
+                          onChanged: _submitting
+                              ? null
+                              : (value) => setState(() {
+                                  _category = value ?? '';
+                                  if (_validationShown) {
+                                    _error = _validationError;
+                                  }
+                                }),
+                        ),
+                        if (_category == 'Other') ...[
+                          const SizedBox(height: MoolSpacing.sm),
+                          TextField(
+                            key: const Key('work-request-other-activity'),
+                            controller: _otherActivity,
+                            focusNode: _otherActivityFocus,
+                            enabled: !_submitting,
+                            textInputAction: TextInputAction.next,
+                            scrollPadding: const EdgeInsets.only(bottom: 120),
+                            onSubmitted: (_) => _areaFocus.requestFocus(),
+                            onChanged: _refreshValidation,
+                            decoration: const InputDecoration(
+                              labelText: 'Describe your activity',
+                              hintText: 'Handloom repair',
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: MoolSpacing.sm),
+                        TextField(
+                          key: const Key('work-request-area'),
+                          controller: _area,
+                          focusNode: _areaFocus,
+                          enabled: !_submitting,
+                          textInputAction: TextInputAction.done,
+                          scrollPadding: const EdgeInsets.only(bottom: 120),
+                          onChanged: _refreshValidation,
+                          decoration: const InputDecoration(
+                            labelText: 'City or service area',
+                            hintText: 'Jodhpur',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Material(
+                    key: const Key('work-profile-request-actions'),
+                    color: Colors.white,
+                    elevation: 8,
+                    shadowColor: const Color(0x22000050),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(
+                        MoolSpacing.md,
+                        MoolSpacing.sm,
+                        MoolSpacing.md,
+                        MoolSpacing.xs + 24,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: OutlinedButton(
+                              key: const Key('work-profile-request-back'),
+                              onPressed: _submitting ? null : _close,
+                              child: const Text('Cancel'),
+                            ),
+                          ),
+                          const SizedBox(width: MoolSpacing.xs),
+                          Expanded(
+                            child: FilledButton(
+                              key: const Key('work-send-profile-request'),
+                              onPressed: _submitting ? null : _submit,
+                              child: Text(
+                                _submitting ? 'Sending…' : 'Send request',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class WorkDocumentRequirementsScreen extends StatelessWidget {
+  const WorkDocumentRequirementsScreen({required this.session, super.key});
+
+  final WorkSession session;
+
+  @override
+  Widget build(BuildContext context) {
+    final profile = session.selectedProfile;
+
+    void returnToRoles() {
+      session.clearMessages();
+      if (context.canPop()) {
+        context.pop();
+      } else {
+        context.go('/app/work/my-work');
+      }
+    }
+
+    if (profile == null) {
+      return WorkPageScaffold(
+        session: session,
+        title: 'Choose a Workspace first',
+        subtitle: 'Return to Workspace choices to continue',
+        fallbackBackRoute: '/app/work/my-work',
+        activeLocalAction: 'workspace',
+        showHeaderChat: false,
+        showTrailingAction: false,
+        onBack: returnToRoles,
+        body: ListView(
+          padding: const EdgeInsets.all(MoolSpacing.md),
+          children: [
+            WorkEmptyState(
+              title: 'No Workspace selected',
+              detail: 'Choose the Workspace that best matches what you do.',
+              actionLabel: 'Browse Workspaces',
+              onAction: returnToRoles,
+            ),
+          ],
+        ),
+      );
+    }
+
+    return WorkPageScaffold(
+      session: session,
+      title: 'Documents to keep ready',
+      subtitle: profile.label,
+      wrapHeader: true,
+      fallbackBackRoute: '/app/work/my-work',
+      activeLocalAction: 'workspace',
+      showHeaderChat: false,
+      showTrailingAction: false,
+      onBack: returnToRoles,
+      bottomAction: _DocumentsReadyAction(
+        onPressed: () => context.push('/app/work/workspace/contact'),
+      ),
+      body: ListView(
+        key: const Key('work-requirements-screen'),
+        padding: const EdgeInsets.fromLTRB(
+          MoolSpacing.md,
+          MoolSpacing.sm,
+          MoolSpacing.md,
+          MoolSpacing.xl,
+        ),
+        children: [
+          const Padding(
+            key: Key('work-requirements-role-summary'),
+            padding: EdgeInsets.symmetric(vertical: 8),
+            child: Text(
+              'MoolSocial will verify your documents and update you on activation or further details by MoolSocial Chat, WhatsApp, email or phone. You can add documents later.',
+              style: TextStyle(
+                color: MoolColors.muted,
+                fontSize: 12,
+                height: 1.4,
+              ),
+            ),
+          ),
+          for (
+            var index = 0;
+            index < profile.verificationDocuments.length;
+            index += 1
+          ) ...[
+            _DocumentRequirementCard(
+              index: index,
+              item: profile.verificationDocuments[index],
+              retailer: const {
+                'retailer-grocery',
+                'retailer-speciality',
+              }.contains(profile.id),
+            ),
+            const SizedBox(height: MoolSpacing.sm),
+          ],
+          _GstComplianceNotice(profile: profile),
+        ],
+      ),
+    );
+  }
+}
+
+class _DocumentRequirementCard extends StatelessWidget {
+  const _DocumentRequirementCard({
+    required this.index,
+    required this.item,
+    required this.retailer,
+  });
+  final int index;
+  final WorkDocumentChecklistItem item;
+  final bool retailer;
+
+  // Presentation only: canonical document names still bind stored proof IDs.
+  (String, String) get _copy => !retailer
+      ? (item.title, item.detail)
+      : switch (item.title) {
+          'Account owner identity' => (
+            'Your identity proof',
+            'PAN, Aadhaar or another accepted government ID.',
+          ),
+          'Shop address document' || 'Store address document' => (
+            'Shop address proof',
+            'Ownership papers, rent or lease agreement, owner’s consent, or a recent utility bill.',
+          ),
+          'Food business registration or licence' => (
+            'Food business licence',
+            'FSSAI registration or licence, where applicable.',
+          ),
+          'Owner or operator authority' => (
+            'Owner’s authorisation',
+            'Permission from the shop owner if you are setting up the shop on their behalf.',
+          ),
+          'Payout bank account proof' => (
+            'Bank proof for payments',
+            'A cancelled cheque or recent bank statement PDF showing the account holder’s name, account number and IFSC.',
+          ),
+          'GST registration certificate' => (
+            'GST certificate',
+            'Your registration certificate, where GST registration applies to your business.',
+          ),
+          _ => (item.title, item.detail),
+        };
+
+  @override
+  Widget build(BuildContext context) => Container(
+    key: ValueKey('work-requirement-$index'),
+    padding: const EdgeInsets.symmetric(vertical: 12),
+    decoration: const BoxDecoration(
+      border: Border(bottom: BorderSide(color: Color(0xFFE4E7F0))),
+    ),
+    child: Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(item.icon, color: MoolColors.navy, size: 22),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _copy.$1,
+                style: const TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                _copy.$2,
+                style: const TextStyle(
+                  color: MoolColors.muted,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+              if (item.importance == WorkDocumentImportance.ifApplicable)
+                const Padding(
+                  padding: EdgeInsets.only(top: 4),
+                  child: Text(
+                    'When applicable',
+                    style: TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
+class _GstComplianceNotice extends StatelessWidget {
+  const _GstComplianceNotice({required this.profile});
+
+  final WorkProfileOption profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('work-gst-compliance-guidance'),
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF5F6FD),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: const Color(0xFFE4E7F0)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(Icons.gavel_rounded, color: MoolColors.navy),
+          const SizedBox(width: MoolSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'GST registration requirement',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  _gstComplianceText(profile.gstMatchCategory),
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 10.5,
+                    height: 1.35,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Aggregate turnover is calculated across India for the same PAN. Keep your GST certificate ready if registered. If you are unsure whether registration applies, confirm the current Central and State/UT rules with a GST professional.',
+                  style: TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10,
+                    height: 1.32,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _gstComplianceText(WorkGstMatchCategory category) => switch (category) {
+  WorkGstMatchCategory.retailGoodsSupplier ||
+  WorkGstMatchCategory.wholesaleDistributor ||
+  WorkGstMatchCategory.manufacturerSupplier ||
+  WorkGstMatchCategory.pharmacySupplier =>
+    'For businesses supplying goods, GST registration depends on annual PAN-wide aggregate turnover, the State or Union Territory of supply, the nature of the supplies and any compulsory-registration rule.',
+  WorkGstMatchCategory.healthcareProvider =>
+    'Qualifying health-care services may be GST-exempt. Taxable or mixed supplies can change the requirement under the current Central and State/UT GST rules.',
+  WorkGstMatchCategory.bikeTravelProvider ||
+  WorkGstMatchCategory.autoTravelProvider ||
+  WorkGstMatchCategory.cabTravelProvider ||
+  WorkGstMatchCategory.busTravelProvider ||
+  WorkGstMatchCategory.quickDeliveryBiker ||
+  WorkGstMatchCategory.wholesaleFleetDelivery ||
+  WorkGstMatchCategory.bulkDeliveryFleet =>
+    'Transport and delivery GST treatment depends on the exact service, payment arrangement, place of supply, reverse-charge treatment and any compulsory-registration rule.',
+  _ =>
+    'For service businesses, GST registration depends on annual PAN-wide aggregate turnover, the State or Union Territory of supply, the nature of the service and any compulsory-registration rule.',
+};
+
+class _DocumentsReadyAction extends StatelessWidget {
+  const _DocumentsReadyAction({required this.onPressed});
+  final VoidCallback onPressed;
+  @override
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerRight,
+    child: FilledButton(
+      key: const Key('work-requirements-ready'),
+      onPressed: onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: MoolColors.navy,
+        foregroundColor: Colors.white,
+        minimumSize: const Size(0, 48),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      ),
+      child: const Text('Continue setup'),
+    ),
+  );
+}
+
+class WorkWorkspaceContactScreen extends StatefulWidget {
+  const WorkWorkspaceContactScreen({required this.session, super.key});
+
+  final WorkSession session;
+
+  @override
+  State<WorkWorkspaceContactScreen> createState() =>
+      _WorkWorkspaceContactScreenState();
+}
+
+class _WorkWorkspaceContactScreenState
+    extends State<WorkWorkspaceContactScreen> {
   late final TextEditingController _alternate = TextEditingController(
     text: widget.session.alternateMobile,
   );
@@ -424,388 +1074,378 @@ class _WorkChooseActivityScreenState extends State<WorkChooseActivityScreen> {
     return AnimatedBuilder(
       animation: widget.session,
       builder: (context, _) {
-        final family = widget.session.selectedFamilyId;
         final profile = widget.session.selectedProfile;
         return WorkPageScaffold(
           session: widget.session,
-          title: 'Choose Your Work',
-          subtitle: 'Select one exact profile at a time',
-          fallbackBackRoute: '/app/work/my-work',
+          title: 'Set up your Workspace',
+          subtitle: profile?.setupSubtitle ?? 'Choose a Workspace first',
+          wrapHeader: true,
+          fallbackBackRoute: '/app/work/workspace/requirements',
           activeLocalAction: 'workspace',
+          showHeaderChat: false,
+          showTrailingAction: false,
           bottomAction: profile == null
               ? null
               : WorkPrimaryButton(
-                  keyName: 'work-continue-proof',
-                  label: 'Continue to proof',
-                  busy: widget.session.busy,
+                  keyName: 'work-contact-continue',
+                  label: 'Continue to Workspace details',
                   onPressed: () {
                     if (widget.session.continueToProof()) {
-                      context.go('/app/work/workspace/proof');
+                      context.push('/app/work/workspace/proof');
                     }
                   },
                 ),
           body: ListView(
-            key: const Key('work-choose-screen'),
+            key: const Key('work-contact-screen'),
             padding: const EdgeInsets.fromLTRB(
               MoolSpacing.md,
               MoolSpacing.sm,
               MoolSpacing.md,
               MoolSpacing.xl,
             ),
-            children: [
-              const WorkCard(
-                child: Row(
-                  children: [
-                    CircleAvatar(
-                      backgroundColor: Color(0xFFEAF7E8),
-                      foregroundColor: MoolColors.success,
-                      child: Icon(Icons.verified_user_outlined),
+            children: profile == null
+                ? [
+                    WorkEmptyState(
+                      title: 'No Workspace selected',
+                      detail:
+                          'Choose the Workspace that best matches what you do.',
+                      actionLabel: 'Browse Workspaces',
+                      onAction: () {
+                        widget.session.changeFamily();
+                        context.go('/app/work/my-work');
+                      },
                     ),
-                    SizedBox(width: MoolSpacing.sm),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                  ]
+                : [
+                    _SelectedProfileCard(option: profile),
+                    const SizedBox(height: MoolSpacing.md),
+                    const WorkSectionTitle(
+                      title: 'Contact for this Workspace',
+                      detail:
+                          'We’ll use your signed-in number unless you add another work number.',
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                    const WorkCard(
+                      child: _ContactRow(
+                        label: 'Signed-in number',
+                        value: '+91 98••• ••321',
+                        state: 'Account',
+                      ),
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                    TextField(
+                      key: const Key('work-alternate-mobile'),
+                      controller: _alternate,
+                      enabled: !widget.session.alternateVerified,
+                      keyboardType: TextInputType.phone,
+                      decoration: InputDecoration(
+                        labelText: 'Alternate work number · optional',
+                        prefixText: '+91 ',
+                        suffixIcon: widget.session.alternateVerified
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                color: MoolColors.success,
+                              )
+                            : null,
+                      ),
+                    ),
+                    if (!widget.session.alternateOtpSent)
+                      TextButton(
+                        key: const Key('work-send-alternate-otp'),
+                        onPressed: widget.session.busy
+                            ? null
+                            : () => widget.session.sendAlternateOtp(
+                                _alternate.text,
+                              ),
+                        child: const Text('Send OTP'),
+                      )
+                    else if (!widget.session.alternateVerified) ...[
+                      const SizedBox(height: MoolSpacing.xs),
+                      TextField(
+                        key: const Key('work-alternate-otp'),
+                        controller: _otp,
+                        keyboardType: TextInputType.number,
+                        maxLength: 6,
+                        decoration: const InputDecoration(
+                          labelText: '6-digit OTP',
+                          counterText: '',
+                        ),
+                      ),
+                      Row(
                         children: [
-                          Text(
-                            'Using your MoolSocial account',
-                            style: TextStyle(
-                              color: MoolColors.ink,
-                              fontWeight: FontWeight.w900,
+                          Expanded(
+                            child: OutlinedButton(
+                              key: const Key('work-change-alternate'),
+                              onPressed: () {
+                                widget.session.removeAlternateMobile();
+                                _alternate.clear();
+                                _otp.clear();
+                              },
+                              child: const Text('Change number'),
                             ),
                           ),
-                          Text(
-                            '+91 98••• ••321 · identity verified',
-                            style: TextStyle(
-                              color: MoolColors.muted,
-                              fontSize: 11,
+                          const SizedBox(width: MoolSpacing.xs),
+                          Expanded(
+                            child: FilledButton(
+                              key: const Key('work-verify-alternate'),
+                              onPressed: () =>
+                                  widget.session.verifyAlternateOtp(_otp.text),
+                              child: const Text('Confirm OTP'),
                             ),
                           ),
                         ],
                       ),
-                    ),
-                    WorkPill(label: 'Verified'),
+                    ],
                   ],
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              if (family == null) ...[
-                const WorkSectionTitle(
-                  title: 'What kind of work do you operate?',
-                  detail: 'Only profiles with a complete setup path are shown',
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                for (final familyId in widget.session.familyIds) ...[
-                  _FamilyCard(
-                    familyId: familyId,
-                    label: widget.session.familyLabel(familyId),
-                    onTap: () => widget.session.selectFamily(familyId),
-                  ),
-                  const SizedBox(height: MoolSpacing.xs),
-                ],
-                OutlinedButton.icon(
-                  key: const Key('work-profile-not-shown'),
-                  onPressed: () => _showUnsupportedRequest(context),
-                  icon: const Icon(Icons.add_comment_outlined),
-                  label: const Text('My work is not shown'),
-                ),
-              ] else ...[
-                Row(
-                  children: [
-                    Expanded(
-                      child: WorkSectionTitle(
-                        title: widget.session.familyLabel(family),
-                        detail: profile == null
-                            ? 'Choose the exact profile'
-                            : 'Selected workspace',
-                      ),
-                    ),
-                    TextButton(
-                      key: const Key('work-change-family'),
-                      onPressed: widget.session.changeFamily,
-                      child: const Text('Change'),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                if (profile == null)
-                  for (final option in widget.session.profilesForFamily(
-                    family,
-                  )) ...[
-                    _ProfileCard(
-                      option: option,
-                      selected: false,
-                      onTap: () => widget.session.selectProfile(option.id),
-                    ),
-                    const SizedBox(height: MoolSpacing.xs),
-                  ]
-                else ...[
-                  _ProfileCard(option: profile, selected: true),
-                  const SizedBox(height: MoolSpacing.md),
-                  const WorkSectionTitle(
-                    title: 'Workspace contact',
-                    detail: 'Your verified account contact is carried forward',
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  const WorkCard(
-                    child: _ContactRow(
-                      label: 'Primary contact',
-                      value: '+91 98••• ••321',
-                      state: 'Verified',
-                    ),
-                  ),
-                  const SizedBox(height: MoolSpacing.sm),
-                  TextField(
-                    key: const Key('work-alternate-mobile'),
-                    controller: _alternate,
-                    enabled: !widget.session.alternateVerified,
-                    keyboardType: TextInputType.phone,
-                    decoration: InputDecoration(
-                      labelText: 'Alternate work number · optional',
-                      prefixText: '+91 ',
-                      suffixIcon: widget.session.alternateVerified
-                          ? const Icon(
-                              Icons.verified_rounded,
-                              color: MoolColors.success,
-                            )
-                          : null,
-                    ),
-                  ),
-                  if (!widget.session.alternateOtpSent)
-                    TextButton(
-                      key: const Key('work-send-alternate-otp'),
-                      onPressed: widget.session.busy
-                          ? null
-                          : () => widget.session.sendAlternateOtp(
-                              _alternate.text,
-                            ),
-                      child: const Text('Send OTP'),
-                    )
-                  else if (!widget.session.alternateVerified) ...[
-                    const SizedBox(height: MoolSpacing.xs),
-                    TextField(
-                      key: const Key('work-alternate-otp'),
-                      controller: _otp,
-                      keyboardType: TextInputType.number,
-                      maxLength: 6,
-                      decoration: const InputDecoration(
-                        labelText: '6-digit OTP',
-                        counterText: '',
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: OutlinedButton(
-                            key: const Key('work-change-alternate'),
-                            onPressed: () {
-                              widget.session.removeAlternateMobile();
-                              _alternate.clear();
-                              _otp.clear();
-                            },
-                            child: const Text('Change'),
-                          ),
-                        ),
-                        const SizedBox(width: MoolSpacing.xs),
-                        Expanded(
-                          child: FilledButton(
-                            key: const Key('work-verify-alternate'),
-                            onPressed: () =>
-                                widget.session.verifyAlternateOtp(_otp.text),
-                            child: const Text('Verify'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ],
-              ],
-            ],
           ),
         );
       },
     );
   }
+}
 
-  Future<void> _showUnsupportedRequest(BuildContext context) {
-    final workspace = TextEditingController();
-    final area = TextEditingController();
-    var family = '';
-    return showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setSheetState) => Padding(
-          padding: EdgeInsets.fromLTRB(
-            MoolSpacing.lg,
-            0,
-            MoolSpacing.lg,
-            MediaQuery.viewInsetsOf(context).bottom + MoolSpacing.lg,
+class _WorkspaceEntryHero extends StatelessWidget {
+  const _WorkspaceEntryHero();
+  @override
+  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
+    tween: Tween(begin: 0, end: 1),
+    duration: MoolMotion.accessible(context, MoolMotion.standard),
+    builder: (context, value, child) => Opacity(opacity: value, child: child),
+    child: const Padding(
+      key: Key('workspace-chooser-hero'),
+      padding: EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Grow with MoolSocial',
+            style: TextStyle(
+              color: MoolColors.navy,
+              fontSize: 23,
+              fontWeight: FontWeight.w800,
+              height: 1.2,
+            ),
           ),
-          child: SingleChildScrollView(
+          SizedBox(height: 6),
+          Text(
+            'Bring customers back. Keep shelves stocked. Collect what is due.',
+            style: TextStyle(
+              color: MoolColors.muted,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
+class _WorkspaceOpportunityContext extends StatelessWidget {
+  const _WorkspaceOpportunityContext({required this.opportunity});
+
+  final WorkOpportunity opportunity;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('workspace-opportunity-context'),
+      padding: const EdgeInsets.all(MoolSpacing.sm),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF4E5),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: const Color(0xFFFFC37A)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.bolt_rounded, color: MoolColors.orange),
+          const SizedBox(width: MoolSpacing.xs),
+          Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Request a work profile',
+                  'Workspace required for your application',
                   style: TextStyle(
-                    color: MoolColors.ink,
-                    fontSize: 21,
+                    color: MoolColors.navy,
                     fontWeight: FontWeight.w900,
                   ),
                 ),
-                const Text(
-                  'Tell us what you operate. This request will not create a workspace.',
-                  style: TextStyle(color: MoolColors.muted),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-                TextField(
-                  key: const Key('work-request-profile-name'),
-                  controller: workspace,
-                  decoration: const InputDecoration(
-                    labelText: 'Workspace you need',
+                Text(
+                  opportunity.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
                   ),
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                DropdownButtonFormField<String>(
-                  key: const Key('work-request-family'),
-                  initialValue: family.isEmpty ? null : family,
-                  decoration: const InputDecoration(
-                    labelText: 'Closest work area',
-                  ),
-                  items:
-                      const [
-                            'Products & Trade',
-                            'Food Business',
-                            'Health & Medicine',
-                            'Services & Salon',
-                            'Ride & Transport',
-                            'Create & Work',
-                            'Other',
-                          ]
-                          .map(
-                            (value) => DropdownMenuItem(
-                              value: value,
-                              child: Text(value),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (value) =>
-                      setSheetState(() => family = value ?? ''),
-                ),
-                const SizedBox(height: MoolSpacing.sm),
-                TextField(
-                  key: const Key('work-request-area'),
-                  controller: area,
-                  decoration: const InputDecoration(
-                    labelText: 'Operating city or area',
-                  ),
-                ),
-                const SizedBox(height: MoolSpacing.md),
-                FilledButton(
-                  key: const Key('work-send-profile-request'),
-                  onPressed: () async {
-                    final sent = await widget.session.sendUnsupportedRequest(
-                      workspace: workspace.text,
-                      family: family,
-                      area: area.text,
-                    );
-                    if (sent && sheetContext.mounted) {
-                      Navigator.pop(sheetContext);
-                    }
-                  },
-                  child: const Text('Send request'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(sheetContext),
-                  child: const Text('Back to cards'),
                 ),
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FamilyCard extends StatelessWidget {
-  const _FamilyCard({
-    required this.familyId,
-    required this.label,
-    required this.onTap,
-  });
-
-  final String familyId;
-  final String label;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = switch (familyId) {
-      'products-trade' => Icons.inventory_2_outlined,
-      'food-business' => Icons.restaurant_outlined,
-      'health' => Icons.medical_services_outlined,
-      'services' => Icons.handyman_outlined,
-      'ride' => Icons.local_shipping_outlined,
-      _ => Icons.work_outline_rounded,
-    };
-    return WorkCard(
-      keyName: 'work-family-$familyId',
-      onTap: onTap,
-      child: Row(
-        children: [
-          CircleAvatar(
-            backgroundColor: const Color(0xFFEDEEFF),
-            foregroundColor: MoolColors.navy,
-            child: Icon(icon),
-          ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          const Icon(Icons.chevron_right_rounded),
         ],
       ),
     );
   }
 }
 
-class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({
-    required this.option,
-    required this.selected,
-    this.onTap,
-  });
+class _WorkspaceApplicationSummary extends StatelessWidget {
+  const _WorkspaceApplicationSummary({required this.session});
 
-  final WorkProfileOption option;
-  final bool selected;
-  final VoidCallback? onTap;
+  final WorkSession session;
 
   @override
   Widget build(BuildContext context) {
+    final status = session.remoteReviewStatus;
+    final rejected = status == WorkRemoteReviewStatus.rejected;
+    final suspended = status == WorkRemoteReviewStatus.suspended;
+    final clarification =
+        status == WorkRemoteReviewStatus.pending &&
+        session.reviewReason?.trim().isNotEmpty == true;
+    final accent = rejected || suspended
+        ? const Color(0xFFB42318)
+        : MoolColors.orange;
+    final title = session.reviewStatusNeedsRefresh
+        ? 'Application saved'
+        : rejected
+        ? 'Application declined'
+        : suspended
+        ? 'Workspace unavailable'
+        : clarification
+        ? 'Details requested'
+        : 'Under review';
+    final detail = session.reviewReason?.trim().isNotEmpty == true
+        ? session.reviewReason!.trim()
+        : session.submittedProfile?.name ?? 'Submitted for review';
+    return WorkCard(
+      keyName: 'workspace-application-summary',
+      color: accent.withValues(alpha: .09),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                rejected
+                    ? Icons.info_outline_rounded
+                    : suspended
+                    ? Icons.pause_circle_outline_rounded
+                    : clarification
+                    ? Icons.mark_unread_chat_alt_outlined
+                    : Icons.schedule_rounded,
+                color: accent,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  title,
+                  key: const Key('workspace-application-status-title'),
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  detail,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(color: MoolColors.muted, fontSize: 11),
+                ),
+              ),
+              TextButton(
+                key: const Key('workspace-check-review'),
+                onPressed: () => context.push('/app/work/workspace/proof'),
+                child: const Text('View'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _WorkspaceGroupPresentation {
+  const _WorkspaceGroupPresentation({
+    required this.accent,
+    required this.tint,
+    required this.examples,
+  });
+
+  final Color accent;
+  final Color tint;
+  final String examples;
+}
+
+_WorkspaceGroupPresentation _workspaceGroupPresentation(String familyId) =>
+    switch (familyId) {
+      'products-trade' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF0047AB),
+        tint: Color(0xFFEAF2FF),
+        examples: 'Retailer · Wholesaler · Manufacturer',
+      ),
+      'food-business' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFFA65A00),
+        tint: Color(0xFFFFF4E5),
+        examples: 'Restaurant · Café · Cloud kitchen',
+      ),
+      'health' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF007A4D),
+        tint: Color(0xFFE8F7F0),
+        examples: 'Doctor · Clinic · Pharmacy',
+      ),
+      'services' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF9C1C6B),
+        tint: Color(0xFFFFEDF7),
+        examples: 'Salon · Beauty · Wellness',
+      ),
+      'travel' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF006D77),
+        tint: Color(0xFFE8F7F8),
+        examples: 'Bike · Auto · Cab · Bus',
+      ),
+      'delivery' => const _WorkspaceGroupPresentation(
+        accent: Color(0xFFB54708),
+        tint: Color(0xFFFFF1E7),
+        examples: 'Quick delivery · Wholesale fleet · Bulk fleet',
+      ),
+      _ => const _WorkspaceGroupPresentation(
+        accent: Color(0xFF5B21B6),
+        tint: Color(0xFFF2EDFF),
+        examples: 'Creator · Freelancer · Job seeker',
+      ),
+    };
+
+class _SelectedProfileCard extends StatelessWidget {
+  const _SelectedProfileCard({required this.option});
+
+  final WorkProfileOption option;
+
+  @override
+  Widget build(BuildContext context) {
+    final presentation = _workspaceGroupPresentation(option.familyId);
     return WorkCard(
       keyName: 'work-profile-${option.id}',
-      onTap: onTap,
-      color: selected ? const Color(0xFFEDEEFF) : Colors.white,
+      color: presentation.tint,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
               CircleAvatar(
-                backgroundColor: selected
-                    ? MoolColors.navy
-                    : const Color(0xFFEDEEFF),
-                foregroundColor: selected ? Colors.white : MoolColors.navy,
+                backgroundColor: presentation.accent,
+                foregroundColor: Colors.white,
                 child: Icon(option.icon),
               ),
               const SizedBox(width: MoolSpacing.sm),
@@ -819,30 +1459,78 @@ class _ProfileCard extends StatelessWidget {
                   ),
                 ),
               ),
-              if (selected)
-                const Icon(
-                  Icons.check_circle_rounded,
-                  color: MoolColors.success,
-                )
-              else
-                const Icon(Icons.chevron_right_rounded),
+              const Icon(Icons.check_circle_rounded, color: MoolColors.success),
             ],
           ),
-          if (selected) ...[
-            const Divider(height: MoolSpacing.lg),
-            _PreviewRow(label: 'Sell / Serve', value: option.sellSide),
-            _PreviewRow(label: 'Buy / Procure', value: option.buySide),
-            _PreviewRow(label: 'Operate', value: option.tools),
-            const SizedBox(height: MoolSpacing.xs),
-            const Text(
-              'Proof is requested only after this exact profile is confirmed.',
-              style: TextStyle(
-                color: MoolColors.success,
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-              ),
+          const Divider(height: MoolSpacing.lg),
+          _PreviewRow(label: 'Reach customers', value: option.sellSide),
+          _PreviewRow(label: 'Source smarter', value: option.buySide),
+          _PreviewRow(label: 'Run your Workspace', value: option.tools),
+          const SizedBox(height: MoolSpacing.xs),
+          _BusinessIdentityNotice(profile: option),
+          const SizedBox(height: MoolSpacing.xs),
+          const Text(
+            'Next, add the documents for this Workspace. Verification begins after you submit them.',
+            style: TextStyle(
+              color: MoolColors.success,
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BusinessIdentityNotice extends StatelessWidget {
+  const _BusinessIdentityNotice({required this.profile});
+
+  final WorkProfileOption profile;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('workspace-business-identity-notice'),
+      padding: const EdgeInsets.all(MoolSpacing.xs),
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF7E8),
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        border: Border.all(color: const Color(0xFFB9DDB5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.verified_user_outlined,
+            color: MoolColors.success,
+            size: 19,
+          ),
+          const SizedBox(width: MoolSpacing.xs),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'GST registration check',
+                  style: TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  'Add a GST certificate when registration applies to your ${profile.label} Workspace. Applicability follows the current Central and State/UT GST rules.',
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10,
+                    height: 1.32,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -941,8 +1629,28 @@ class WorkProfileProofScreen extends StatefulWidget {
   State<WorkProfileProofScreen> createState() => _WorkProfileProofScreenState();
 }
 
-class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
+class _WorkProfileProofScreenState extends State<WorkProfileProofScreen>
+    with WidgetsBindingObserver {
+  final ScrollController _scroll = ScrollController();
+  Timer? _reviewTimer;
+  bool _redirectQueued = false;
+  bool _appActive = true;
+  int _reviewPolls = 0;
   int _step = 0;
+  bool _correctionMode = false;
+  bool _reviewEditMode = false;
+  bool _showDeclarationError = false;
+  bool _showDetailsErrors = false;
+  final _nameFocus = FocusNode();
+  final _areaFocus = FocusNode();
+  final _activityFocus = FocusNode();
+  final _nameDetailAnchor = GlobalKey();
+  final _areaDetailAnchor = GlobalKey();
+  final _activityDetailAnchor = GlobalKey();
+  final _proofAnchors = <String, GlobalKey>{};
+  bool _detailRevealQueued = false;
+  final GlobalKey _declarationAnchor = GlobalKey();
+  String? _correctionInstruction;
   late final TextEditingController _name = TextEditingController(
     text: widget.session.workName,
   );
@@ -954,10 +1662,46 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   );
 
   @override
+  void initState() {
+    super.initState();
+    if (widget.session.reviewCaseId != null) _step = 3;
+    if (widget.session.recoveredDocumentStep) {
+      _step = 1;
+      _correctionMode = widget.session.reviewCorrectionDraft;
+      _correctionInstruction = widget.session.reviewReason;
+      widget.session.recoveredDocumentStep = false;
+    }
+    WidgetsBinding.instance.addObserver(this);
+    for (final focus in [_nameFocus, _areaFocus, _activityFocus]) {
+      focus.addListener(_revealFocusedDetail);
+    }
+    widget.session.addListener(_onReviewChanged);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _refreshReview();
+    });
+    _scheduleReviewRefresh(const Duration(seconds: 30));
+  }
+
+  void _scheduleReviewRefresh(Duration interval) {
+    _reviewTimer?.cancel();
+    _reviewTimer = Timer.periodic(interval, (_) => _refreshReview());
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _reviewTimer?.cancel();
+    widget.session.removeListener(_onReviewChanged);
+    for (final focus in [_nameFocus, _areaFocus, _activityFocus]) {
+      focus.removeListener(_revealFocusedDetail);
+    }
+    _scroll.dispose();
     _name.dispose();
     _area.dispose();
     _activity.dispose();
+    _nameFocus.dispose();
+    _areaFocus.dispose();
+    _activityFocus.dispose();
     super.dispose();
   }
 
@@ -967,6 +1711,155 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
       area: _area.text,
       activity: _activity.text,
     );
+    _revealFocusedDetail();
+  }
+
+  void _revealFocusedDetail() {
+    if (_detailRevealQueued || !mounted || _step != 0 || !_showDetailsErrors) {
+      return;
+    }
+    _detailRevealQueued = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _detailRevealQueued = false;
+      if (!mounted || _step != 0) return;
+      for (final (focus, anchor) in [
+        (_nameFocus, _nameDetailAnchor),
+        (_areaFocus, _areaDetailAnchor),
+        (_activityFocus, _activityDetailAnchor),
+      ]) {
+        if (!focus.hasFocus) continue;
+        final target = anchor.currentContext;
+        if (target != null) {
+          Scrollable.ensureVisible(
+            target,
+            alignment: 1,
+            alignmentPolicy: ScrollPositionAlignmentPolicy.keepVisibleAtEnd,
+          );
+        }
+        return;
+      }
+    });
+  }
+
+  @override
+  void didChangeMetrics() => _revealFocusedDetail();
+
+  void _goBack() {
+    if (_step == 0) _saveFields();
+    FocusManager.instance.primaryFocus?.unfocus();
+    _resetScroll();
+    if (_step >= 3) {
+      context.go(
+        widget.session.hasVerifiedWorkspace
+            ? '/app/work/workspace/dashboard'
+            : '/app/work/workspace/choose',
+      );
+      return;
+    }
+    if (_reviewEditMode && (_step == 0 || _step == 1)) {
+      setState(() {
+        _step = 2;
+        _reviewEditMode = false;
+      });
+      return;
+    }
+    if (_correctionMode && (_step == 0 || _step == 1)) {
+      if (widget.session.reviewCaseId != null) {
+        setState(() {
+          _step = 3;
+          _correctionMode = false;
+        });
+      } else {
+        context.go('/app/work/workspace/choose');
+      }
+      return;
+    }
+    if (_step > 0) {
+      setState(() => _step -= 1);
+      return;
+    }
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/app/work/workspace/contact');
+    }
+  }
+
+  void _beginCorrection(int step) {
+    final instruction = widget.session.reviewReason?.trim();
+    if (!widget.session.beginReviewCorrection()) return;
+    setState(() {
+      _step = step;
+      _correctionMode = true;
+      _correctionInstruction = instruction?.isEmpty == true
+          ? null
+          : instruction;
+    });
+  }
+
+  void _resetScroll() {
+    FocusManager.instance.primaryFocus?.unfocus();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _scroll.hasClients) _scroll.jumpTo(0);
+    });
+  }
+
+  void _refreshReview() {
+    if (!mounted ||
+        !_appActive ||
+        _step != 3 ||
+        widget.session.busy ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    _onReviewChanged();
+    final status = widget.session.remoteReviewStatus;
+    if (!_redirectQueued &&
+        widget.session.reviewCaseId != null &&
+        (widget.session.reviewStatusNeedsRefresh ||
+            (status != WorkRemoteReviewStatus.rejected &&
+                status != WorkRemoteReviewStatus.suspended))) {
+      if (_reviewPolls < 20) {
+        _reviewPolls += 1;
+        if (_reviewPolls == 20) {
+          _scheduleReviewRefresh(const Duration(minutes: 5));
+        }
+      }
+      unawaited(widget.session.checkReview());
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appActive = state == AppLifecycleState.resumed;
+    if (_appActive) {
+      _reviewPolls = 0;
+      _scheduleReviewRefresh(const Duration(seconds: 30));
+      _refreshReview();
+    } else {
+      _reviewTimer?.cancel();
+    }
+  }
+
+  void _onReviewChanged() {
+    if (!mounted ||
+        _step != 3 ||
+        _redirectQueued ||
+        ModalRoute.of(context)?.isCurrent != true) {
+      return;
+    }
+    final session = widget.session;
+    if ((session.remoteReviewStatus == WorkRemoteReviewStatus.approved ||
+            session.remoteReviewStatus == WorkRemoteReviewStatus.live) &&
+        session.hasVerifiedWorkspace &&
+        session.activeWorkspace?.id == session.workspaceId) {
+      _redirectQueued = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+          context.go('/app/work/workspace/dashboard');
+        }
+      });
+    }
   }
 
   @override
@@ -975,49 +1868,136 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
       animation: widget.session,
       builder: (context, _) => WorkPageScaffold(
         session: widget.session,
-        title: 'Verify Your Work',
-        subtitle: widget.session.selectedProfile?.label ?? 'Work profile',
-        fallbackBackRoute: '/app/work/workspace/choose',
+        title: _step == 3 ? 'Application status' : 'Complete your Workspace',
+        subtitle:
+            widget.session.selectedProfile?.setupSubtitle ??
+            'Workspace details',
+        wrapHeader: true,
+        fallbackBackRoute: '/app/work/workspace/contact',
+        headerHeight:
+            _step == 0 &&
+                MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                MediaQuery.sizeOf(context).height -
+                        MediaQuery.viewInsetsOf(context).bottom <
+                    480
+            ? 56
+            : 88,
+        headerTitle:
+            _step == 0 &&
+                MediaQuery.viewInsetsOf(context).bottom > 0 &&
+                MediaQuery.sizeOf(context).height -
+                        MediaQuery.viewInsetsOf(context).bottom <
+                    480
+            ? const Text(
+                'Business details',
+                key: Key('work-page-title'),
+                style: TextStyle(
+                  color: MoolColors.navy,
+                  fontSize: 16,
+                  height: 1.1,
+                  fontWeight: FontWeight.w800,
+                ),
+              )
+            : null,
         activeLocalAction: 'workspace',
+        hideNavigationWhenKeyboardVisible: true,
+        showHeaderChat: false,
+        showTrailingAction: false,
+        onBack: _goBack,
         bottomAction: switch (_step) {
+          0 when MediaQuery.viewInsetsOf(context).bottom > 0 => null,
           0 => WorkPrimaryButton(
             keyName: 'work-details-continue',
-            label: 'Continue to proof',
+            label: _reviewEditMode
+                ? 'Save and return to review'
+                : 'Continue to documents',
             onPressed: () {
               _saveFields();
+              setState(() => _showDetailsErrors = true);
+              final invalidFocus = widget.session.detailsNameError != null
+                  ? _nameFocus
+                  : widget.session.detailsAreaError != null
+                  ? _areaFocus
+                  : widget.session.detailsActivityError != null
+                  ? _activityFocus
+                  : null;
+              if (invalidFocus != null) {
+                invalidFocus.requestFocus();
+                _revealFocusedDetail();
+                return;
+              }
               if (widget.session.validateDetails()) {
-                setState(() => _step = 1);
+                _resetScroll();
+                setState(() {
+                  _step = _reviewEditMode ? 2 : 1;
+                  _reviewEditMode = false;
+                  _showDetailsErrors = false;
+                });
               }
             },
           ),
           1 => WorkPrimaryButton(
             keyName: 'work-proof-review',
-            label: 'Review',
+            label: _reviewEditMode
+                ? 'Save and return to review'
+                : 'Review your information',
             onPressed: () {
-              if (!widget.session.requiredProofsAdded) {
-                widget.session.showError(
-                  'Add every required proof before review.',
-                );
-                return;
-              }
-              setState(() => _step = 2);
+              widget.session.clearMessages();
+              _resetScroll();
+              setState(() {
+                _step = 2;
+                _reviewEditMode = false;
+              });
             },
           ),
-          _ => WorkPrimaryButton(
+          2 => WorkPrimaryButton(
             keyName: 'work-submit-profile',
-            label: 'Submit for review',
+            label: widget.session.reviewCorrectionDraft
+                ? 'Send corrections for review'
+                : _correctionMode
+                ? 'Resubmit for review'
+                : 'Submit for review',
             busy: widget.session.busy,
             onPressed: () async {
+              if (!widget.session.declarationAccepted) {
+                widget.session.clearMessages();
+                setState(() => _showDeclarationError = true);
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final target = _declarationAnchor.currentContext;
+                  if (!mounted || target == null) return;
+                  Scrollable.ensureVisible(
+                    target,
+                    alignment: 1,
+                    duration: MoolMotion.accessible(
+                      context,
+                      MoolMotion.standard,
+                    ),
+                  );
+                });
+                return;
+              }
               final submitted = await widget.session.submitProfile();
-              if (submitted && context.mounted) {
-                context.go('/app/work/status');
+              if (submitted && mounted) {
+                _resetScroll();
+                setState(() {
+                  _step = 3;
+                  _correctionMode = false;
+                  _correctionInstruction = null;
+                });
+                _onReviewChanged();
               }
             },
             icon: Icons.send_rounded,
           ),
+          _ => _InlineReviewAction(
+            session: widget.session,
+            onUpdateDetails: () => _beginCorrection(0),
+          ),
         },
         body: ListView(
           key: const Key('work-proof-screen'),
+          controller: _scroll,
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
           padding: const EdgeInsets.fromLTRB(
             MoolSpacing.md,
             MoolSpacing.sm,
@@ -1027,132 +2007,366 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
           children: [
             _ProgressHeader(step: _step),
             const SizedBox(height: MoolSpacing.md),
-            if (_step == 0) ...[
-              const WorkSectionTitle(
-                title: 'Work details',
-                detail: 'Only information required for this workspace',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-name'),
-                controller: _name,
-                decoration: const InputDecoration(
-                  labelText: 'Work or business name',
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-area'),
-                controller: _area,
-                decoration: const InputDecoration(
-                  labelText: 'Operating city or PIN code',
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('work-activity'),
-                controller: _activity,
-                decoration: const InputDecoration(
-                  labelText: 'Primary activity',
-                ),
-              ),
+            if (_correctionMode && _correctionInstruction != null) ...[
+              _CorrectionInstructionCard(instruction: _correctionInstruction!),
               const SizedBox(height: MoolSpacing.md),
-              const WorkCard(
-                color: Color(0xFFEAF7E8),
-                child: _ContactRow(
-                  label: 'Account owner',
-                  value: '+91 98••• ••321',
-                  state: 'Verified',
-                ),
-              ),
-            ] else if (_step == 1) ...[
-              Row(
+            ],
+            if (_step == 0)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: const WorkSectionTitle(
-                      title: 'Proof',
-                      detail: 'India / Rajasthan · profile-specific',
+                  if (MediaQuery.textScalerOf(context).scale(20) <= 30) ...[
+                    const WorkSectionTitle(
+                      title: 'Business details',
+                      detail: 'Information needed to verify this Workspace',
+                    ),
+                    const SizedBox(height: MoolSpacing.sm),
+                  ],
+                  _WorkDetailField(
+                    key: _nameDetailAnchor,
+                    label: 'Business name (as per PAN card)',
+                    fieldKey: 'work-name',
+                    builder: (decoration) => TextField(
+                      key: const Key('work-name'),
+                      controller: _name,
+                      focusNode: _nameFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _areaFocus.requestFocus(),
+                      textCapitalization: TextCapitalization.words,
+                      onChanged: (_) => _saveFields(),
+                      decoration: decoration.copyWith(
+                        errorText: _showDetailsErrors
+                            ? widget.session.detailsNameError
+                            : null,
+                        errorMaxLines: 3,
+                        helperText:
+                            'Enter the name shown on the PAN used for this business.',
+                        helperMaxLines: 2,
+                      ),
                     ),
                   ),
-                  TextButton(
-                    key: const Key('work-proof-back-details'),
-                    onPressed: () => setState(() => _step = 0),
-                    child: const Text('Back'),
+                  const SizedBox(height: MoolSpacing.sm),
+                  _WorkDetailField(
+                    key: _areaDetailAnchor,
+                    label: 'Operating city or PIN code',
+                    fieldKey: 'work-area',
+                    builder: (decoration) => TextField(
+                      key: const Key('work-area'),
+                      controller: _area,
+                      focusNode: _areaFocus,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _activityFocus.requestFocus(),
+                      onChanged: (_) => _saveFields(),
+                      decoration: decoration.copyWith(
+                        errorText: _showDetailsErrors
+                            ? widget.session.detailsAreaError
+                            : null,
+                        errorMaxLines: 3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                  _WorkDetailField(
+                    key: _activityDetailAnchor,
+                    label: 'Primary activity',
+                    fieldKey: 'work-activity',
+                    builder: (decoration) => TextField(
+                      key: const Key('work-activity'),
+                      controller: _activity,
+                      focusNode: _activityFocus,
+                      textInputAction: TextInputAction.done,
+                      onSubmitted: (_) => _activityFocus.unfocus(),
+                      onChanged: (_) => _saveFields(),
+                      decoration: decoration.copyWith(
+                        errorText: _showDetailsErrors
+                            ? widget.session.detailsActivityError
+                            : null,
+                        errorMaxLines: 3,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: MoolSpacing.sm),
+                  _WorkDetailField(
+                    label: 'Your relationship with the business',
+                    fieldKey: 'work-business-relationship',
+                    alwaysShowLabel: true,
+                    builder: (decoration) => DropdownButtonFormField<String>(
+                      key: const Key('work-business-relationship'),
+                      initialValue: widget.session.businessRelationship.isEmpty
+                          ? null
+                          : widget.session.businessRelationship,
+                      isExpanded: true,
+                      isDense:
+                          MediaQuery.textScalerOf(context).scale(16) <= 20.8,
+                      itemHeight: null,
+                      decoration: decoration,
+                      items:
+                          const [
+                                'Owner',
+                                'Partner or director',
+                                'Authorized representative',
+                              ]
+                              .map(
+                                (value) => DropdownMenuItem(
+                                  value: value,
+                                  child: Text(value),
+                                ),
+                              )
+                              .toList(),
+                      onChanged: (value) =>
+                          widget.session.saveBusinessRelationship(value ?? ''),
+                    ),
                   ),
                 ],
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              for (final proof in workProofs) ...[
-                _ProofCard(
-                  proof: proof,
-                  added: widget.session.addedProofs.containsKey(proof.id),
-                  onAdd: () => _showProofSource(context, proof),
-                  onRemove: proof.id == 'personal-kyc'
-                      ? null
-                      : () => widget.session.removeProof(proof.id),
+              )
+            else if (_step == 1) ...[
+              if (widget.session.documentRecoveryMessage
+                  case final message?) ...[
+                Semantics(
+                  liveRegion: true,
+                  child: Text(
+                    message,
+                    key: const Key('work-document-recovery-guidance'),
+                    style: const TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 12,
+                      height: 1.4,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
                 ),
-                const SizedBox(height: MoolSpacing.xs),
+                const SizedBox(height: MoolSpacing.sm),
               ],
-            ] else ...[
-              Row(
-                children: [
-                  const Expanded(
-                    child: WorkSectionTitle(
-                      title: 'Review and submit',
-                      detail: 'Check profile, contacts and proof',
-                    ),
-                  ),
-                  TextButton(
-                    key: const Key('work-review-back-proof'),
-                    onPressed: () => setState(() => _step = 1),
-                    child: const Text('Back'),
-                  ),
-                ],
+              const WorkSectionTitle(
+                title: 'Documents',
+                detail: 'Add now or continue and provide them during review',
               ),
               const SizedBox(height: MoolSpacing.sm),
-              WorkCard(
-                child: Column(
+              const WorkCard(
+                color: Color(0xFFEDEEFF),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _ReviewRow(
-                      label: 'Workspace',
-                      value:
-                          widget.session.selectedProfile?.label ??
-                          'Not selected',
-                    ),
-                    _ReviewRow(label: 'Name', value: widget.session.workName),
-                    _ReviewRow(label: 'Area', value: widget.session.workArea),
-                    _ReviewRow(
-                      label: 'Activity',
-                      value: widget.session.primaryActivity,
-                    ),
-                    _ReviewRow(
-                      label: 'Proof',
-                      value: '${widget.session.addedProofs.length} items added',
+                    Icon(Icons.cloud_upload_outlined, color: MoolColors.navy),
+                    SizedBox(width: MoolSpacing.sm),
+                    Expanded(
+                      child: Text(
+                        'Add the documents you have. PDF, JPG, JPEG, PNG or WebP · up to 10 MB each. MoolSocial will review what is needed for approval.',
+                        style: TextStyle(
+                          color: MoolColors.ink,
+                          fontSize: 11,
+                          height: 1.35,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: MoolSpacing.md),
-              WorkCard(
-                color: const Color(0xFFFFF4E5),
-                child: CheckboxListTile(
-                  key: const Key('work-declaration'),
-                  value: widget.session.declarationAccepted,
-                  contentPadding: EdgeInsets.zero,
-                  controlAffinity: ListTileControlAffinity.leading,
-                  title: const Text(
-                    'I confirm these details and documents belong to me or I am authorized to operate this work profile.',
-                    style: TextStyle(
-                      color: MoolColors.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  onChanged: (value) =>
-                      widget.session.setDeclaration(value ?? false),
+              const SizedBox(height: MoolSpacing.sm),
+              for (final proof
+                  in widget.session.selectedWorkspaceDocuments) ...[
+                _ProofCard(
+                  key: _proofAnchors.putIfAbsent(proof.id, GlobalKey.new),
+                  proof: proof,
+                  added: widget.session.addedProofs.containsKey(proof.id),
+                  file: widget.session.pickedProofs[proof.id],
+                  onAdd: () => _showProofSource(context, proof),
+                  onView: () => _showDocument(context, proof),
+                  onRemove: () => widget.session.removeProof(proof.id),
+                  removedName: widget.session.removedProofName(proof.id),
+                  onUndo: widget.session.canUndoProofRemoval(proof.id)
+                      ? () => widget.session.undoProofRemoval(proof.id)
+                      : null,
                 ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+            ] else if (_step == 2) ...[
+              _ReviewStepMotion(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    if (MediaQuery.textScalerOf(context).scale(20) <= 30) ...[
+                      const WorkSectionTitle(
+                        title: 'Review and submit',
+                        detail: 'Check your Workspace details and documents',
+                      ),
+                      const SizedBox(height: MoolSpacing.sm),
+                    ],
+                    _buildReviewSummary(context),
+                    const SizedBox(height: MoolSpacing.sm),
+                    Column(
+                      key: _declarationAnchor,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        CheckboxListTile(
+                          key: const Key('work-declaration'),
+                          value: widget.session.declarationAccepted,
+                          contentPadding: EdgeInsets.zero,
+                          controlAffinity: ListTileControlAffinity.leading,
+                          title: const Text(
+                            'These details are correct and I am authorized to provide them.',
+                            style: TextStyle(
+                              color: MoolColors.ink,
+                              fontSize: 12,
+                              height: 1.4,
+                            ),
+                          ),
+                          onChanged: (value) {
+                            widget.session.setDeclaration(value ?? false);
+                            if (value == true) {
+                              setState(() => _showDeclarationError = false);
+                            }
+                          },
+                        ),
+                        if (_showDeclarationError)
+                          Semantics(
+                            liveRegion: true,
+                            child: const Padding(
+                              padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
+                              child: Text(
+                                'Confirm that these details are correct before submitting.',
+                                key: Key('work-review-declaration-guidance'),
+                                style: TextStyle(
+                                  color: MoolColors.ink,
+                                  fontSize: 12,
+                                  height: 1.4,
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              _InlineWorkspaceReviewStatus(
+                session: widget.session,
+                onAddDocuments: () => _beginCorrection(1),
+                onUpdateDetails: () => _beginCorrection(0),
+                onReviewChanges: () => _beginCorrection(2),
               ),
             ],
           ],
+        ),
+      ),
+    );
+  }
+
+  void _editReviewSection(int step) {
+    widget.session.setDeclaration(false);
+    _resetScroll();
+    setState(() {
+      _step = step;
+      _reviewEditMode = true;
+      _showDeclarationError = false;
+    });
+  }
+
+  Widget _buildReviewSummary(BuildContext context) {
+    final session = widget.session;
+    return Container(
+      key: const Key('work-review-corrections'),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: const Color(0x22000080)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _ReviewSection(
+            title: 'Business details',
+            editKey: 'work-review-edit-details',
+            onEdit: () => _editReviewSection(0),
+            children: [
+              _ReviewRow(
+                label: 'Workspace',
+                value: session.selectedProfile?.label ?? 'Not selected',
+              ),
+              _ReviewRow(label: 'Business name', value: session.workName),
+              if (session.businessRelationship.isNotEmpty)
+                _ReviewRow(
+                  label: 'Business relationship',
+                  value: session.businessRelationship,
+                ),
+              _ReviewRow(label: 'Area', value: session.workArea),
+              _ReviewRow(label: 'Activity', value: session.primaryActivity),
+            ],
+          ),
+          const Divider(height: 1),
+          _ReviewSection(
+            title: 'Contact details',
+            editKey: 'work-review-edit-contact',
+            onEdit: () {
+              session.setDeclaration(false);
+              setState(() => _showDeclarationError = false);
+              context.push('/app/work/workspace/contact?return=review');
+            },
+            children: [
+              _ReviewRow(
+                label: 'Your name',
+                value: session.authorizedPersonName,
+              ),
+              _ReviewRow(label: 'Contact', value: session.primaryMobile),
+              _ReviewRow(label: 'Email', value: session.contactEmail),
+              if (session.alternateMobile.isNotEmpty)
+                _ReviewRow(label: 'Alternate', value: session.alternateMobile),
+            ],
+          ),
+          const Divider(height: 1),
+          _ReviewSection(
+            title: 'Documents',
+            editKey: 'work-review-edit-documents',
+            onEdit: () => _editReviewSection(1),
+            children: [
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  session.addedProofs.isEmpty
+                      ? 'No documents added. You can add them later.'
+                      : '${session.addedProofs.length} attached',
+                  style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+                ),
+              ),
+              for (final proof in session.selectedWorkspaceDocuments)
+                if (session.addedProofs.containsKey(proof.id))
+                  _ReviewDocument(
+                    proof: proof,
+                    file: session.pickedProofs[proof.id],
+                    onView: () => _showDocument(context, proof),
+                  ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showDocument(BuildContext context, WorkProofRequirement proof) {
+    final bottomInset = _workViewBottomInset(context);
+    final file = widget.session.pickedProofs[proof.id];
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        minimum: EdgeInsets.only(bottom: bottomInset),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .75,
+          ),
+          child: WorkDocumentPreview(
+            label: proof.label,
+            file: file,
+            onClose: () => Navigator.of(sheetContext).pop(),
+            onReplace: () {
+              Navigator.of(sheetContext).pop();
+              _showProofSource(context, proof);
+            },
+          ),
         ),
       ),
     );
@@ -1161,59 +2375,320 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   Future<void> _showProofSource(
     BuildContext context,
     WorkProofRequirement proof,
-  ) {
-    return showModalBottomSheet<void>(
+  ) async {
+    final render = _proofAnchors[proof.id]?.currentContext?.findRenderObject();
+    final viewport = render == null
+        ? null
+        : RenderAbstractViewport.maybeOf(render);
+    final rowOffset = render == null
+        ? null
+        : viewport?.getOffsetToReveal(render, 0).offset;
+    final added = await showModalBottomSheet<bool>(
       context: context,
-      useSafeArea: true,
-      showDragHandle: true,
-      builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(
-          MoolSpacing.lg,
-          0,
-          MoolSpacing.lg,
-          MoolSpacing.lg,
+      isScrollControlled: true,
+      useSafeArea: false,
+      showDragHandle: false,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) =>
+          _ProofSourceSheet(session: widget.session, proof: proof),
+    );
+    if (added != true || !mounted || _step != 1 || rowOffset == null) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _step != 1 || !_scroll.hasClients) return;
+      _scroll.jumpTo(
+        rowOffset.clamp(
+          _scroll.position.minScrollExtent,
+          _scroll.position.maxScrollExtent,
         ),
+      );
+    });
+  }
+}
+
+class WorkDocumentPreview extends StatefulWidget {
+  const WorkDocumentPreview({
+    required this.label,
+    required this.file,
+    required this.onClose,
+    required this.onReplace,
+    super.key,
+  });
+
+  final String label;
+  final WorkPickedProof? file;
+  final VoidCallback onClose, onReplace;
+
+  @override
+  State<WorkDocumentPreview> createState() => _DocumentPreviewState();
+}
+
+class _DocumentPreviewState extends State<WorkDocumentPreview> {
+  final _transform = TransformationController();
+  final _viewportKey = GlobalKey();
+  final _pdf = WorkPdfPreview();
+  WorkPdfPage? _page;
+  String? _pdfError;
+  bool _loadingPage = false;
+  bool _closing = false;
+  int _requestedPage = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.file?.contentType == 'application/pdf') {
+      unawaited(_openPage(0));
+    }
+  }
+
+  Future<void> _openPage(int index) async {
+    final file = widget.file;
+    if (file == null || _loadingPage || _closing) return;
+    setState(() {
+      _requestedPage = index;
+      _loadingPage = true;
+      _pdfError = null;
+    });
+    try {
+      final page = await _pdf.render(file.bytes, page: index);
+      if (!mounted || _closing) return;
+      setState(() {
+        _page = page;
+        _transform.value = Matrix4.identity();
+      });
+    } on WorkPdfPreviewException catch (error) {
+      if (mounted && !_closing) setState(() => _pdfError = error.message);
+    } finally {
+      if (mounted && !_closing) setState(() => _loadingPage = false);
+    }
+  }
+
+  void _cancelPreview() {
+    _closing = true;
+    _pdf.dispose();
+  }
+
+  void _zoomIn() {
+    final viewport = _viewportKey.currentContext?.findRenderObject();
+    if (viewport is! RenderBox || !viewport.hasSize) return;
+    final currentScale = _transform.value.getMaxScaleOnAxis();
+    final nextScale = (currentScale + 1).clamp(1.0, 4.0);
+    if (nextScale == currentScale) return;
+    final centre = viewport.size.center(Offset.zero);
+    final focalPoint = _transform.toScene(centre);
+    _transform.value = Matrix4.diagonal3Values(nextScale, nextScale, 1)
+      ..setTranslationRaw(
+        centre.dx - focalPoint.dx * nextScale,
+        centre.dy - focalPoint.dy * nextScale,
+        0,
+      );
+  }
+
+  @override
+  void dispose() {
+    _cancelPreview();
+    _transform.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final file = widget.file;
+    final image = file?.contentType.startsWith('image/') ?? false;
+    final pdf = file?.contentType == 'application/pdf';
+    final visual = image || _page != null;
+    return PopScope<void>(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) _cancelPreview();
+      },
+      child: Padding(
+        key: const Key('work-document-preview'),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Add ${proof.label}',
+              'Document',
+              key: const Key('work-document-title'),
               style: const TextStyle(
-                color: MoolColors.ink,
-                fontSize: 21,
-                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                height: 1.2,
+                fontWeight: FontWeight.w800,
+                color: MoolColors.navy,
               ),
             ),
-            const Text(
-              'Choose the easiest available source.',
-              style: TextStyle(color: MoolColors.muted),
-            ),
-            const SizedBox(height: MoolSpacing.md),
-            for (final source in const [
-              ('camera', 'Camera', Icons.camera_alt_outlined),
-              ('upload', 'Upload', Icons.upload_file_outlined),
-              ('number', 'Verify number', Icons.phone_android_outlined),
-            ]) ...[
-              OutlinedButton.icon(
-                key: Key('work-proof-source-${source.$1}'),
-                onPressed: () async {
-                  final added = await widget.session.addProof(
-                    proof.id,
-                    source.$2,
-                  );
-                  if (added && sheetContext.mounted) {
-                    Navigator.pop(sheetContext);
-                  }
-                },
-                icon: Icon(source.$3),
-                label: Text(source.$2),
+            const SizedBox(height: 6),
+            Flexible(
+              flex: 3,
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      widget.label,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        height: 1.3,
+                        fontWeight: FontWeight.w700,
+                        color: MoolColors.ink,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      file?.fileName ?? 'Document attached',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    if (file != null)
+                      Text(
+                        '${image ? 'Image' : 'PDF'} · ${(file.bytes.length / 1024).ceil()} KB',
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                    if (file == null) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Preview unavailable. Choose the document again to view it.',
+                      ),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: MoolSpacing.xs),
+            ),
+            if (image || pdf) ...[
+              const SizedBox(height: 8),
+              Flexible(
+                flex: 5,
+                child: SizedBox(
+                  key: _viewportKey,
+                  height: _pdfError == null ? 360 : null,
+                  child: ClipRect(
+                    child: _loadingPage
+                        ? Center(
+                            child: Semantics(
+                              label: 'Opening PDF page',
+                              child: const SizedBox.square(
+                                dimension: 28,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          )
+                        : _pdfError != null
+                        ? Center(
+                            heightFactor: 1,
+                            child: SingleChildScrollView(
+                              child: Text(
+                                _pdfError!,
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          )
+                        : !visual
+                        ? const SizedBox.shrink()
+                        : InteractiveViewer(
+                            key: const Key('work-document-image'),
+                            transformationController: _transform,
+                            minScale: 1,
+                            maxScale: 4,
+                            child: Center(
+                              child: Image.memory(
+                                image ? file!.bytes : _page!.bytes,
+                                key: ValueKey(
+                                  image ? 'image' : 'pdf-${_page!.index}',
+                                ),
+                                fit: BoxFit.contain,
+                                semanticLabel: image
+                                    ? '${widget.label} preview'
+                                    : '${widget.label}, page ${_page!.index + 1} of ${_page!.pageCount}',
+                                errorBuilder: (_, _, _) =>
+                                    const SingleChildScrollView(
+                                      child: Text(
+                                        'Preview unavailable. Check the original or choose a replacement.',
+                                      ),
+                                    ),
+                              ),
+                            ),
+                          ),
+                  ),
+                ),
+              ),
             ],
-            TextButton(
-              onPressed: () => Navigator.pop(sheetContext),
-              child: const Text('Cancel'),
+            const SizedBox(height: 8),
+            if (pdf && _page != null)
+              Wrap(
+                key: const Key('work-document-pdf-pages'),
+                alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  IconButton(
+                    key: const Key('work-document-pdf-previous'),
+                    tooltip: 'Previous page',
+                    onPressed: _loadingPage || _page!.index == 0
+                        ? null
+                        : () => _openPage(_page!.index - 1),
+                    icon: const Icon(Icons.chevron_left),
+                  ),
+                  Text('Page ${_page!.index + 1} of ${_page!.pageCount}'),
+                  IconButton(
+                    key: const Key('work-document-pdf-next'),
+                    tooltip: 'Next page',
+                    onPressed:
+                        _loadingPage || _page!.index + 1 >= _page!.pageCount
+                        ? null
+                        : () => _openPage(_page!.index + 1),
+                    icon: const Icon(Icons.chevron_right),
+                  ),
+                ],
+              ),
+            const Divider(height: 1),
+            Wrap(
+              key: const Key('work-document-actions'),
+              alignment: WrapAlignment.end,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: [
+                if (_pdfError != null)
+                  TextButton(
+                    key: const Key('work-document-pdf-retry'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(64, 48),
+                    ),
+                    onPressed: () => _openPage(_requestedPage),
+                    child: const Text('Retry'),
+                  ),
+                if (visual) ...[
+                  IconButton(
+                    key: const Key('work-document-zoom'),
+                    tooltip: 'Zoom in',
+                    onPressed: _loadingPage || _pdfError != null
+                        ? null
+                        : _zoomIn,
+                    icon: const Icon(Icons.zoom_in),
+                  ),
+                  IconButton(
+                    key: const Key('work-document-fit'),
+                    tooltip: 'Fit document',
+                    onPressed: _loadingPage || _pdfError != null
+                        ? null
+                        : () => _transform.value = Matrix4.identity(),
+                    icon: const Icon(Icons.fit_screen),
+                  ),
+                ],
+                TextButton(
+                  key: const Key('work-document-close'),
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                  onPressed: widget.onClose,
+                  child: const Text('Close'),
+                ),
+                TextButton(
+                  key: const Key('work-document-replace'),
+                  style: TextButton.styleFrom(minimumSize: const Size(64, 48)),
+                  onPressed: widget.onReplace,
+                  child: const Text('Replace'),
+                ),
+              ],
             ),
           ],
         ),
@@ -1222,45 +2697,829 @@ class _WorkProfileProofScreenState extends State<WorkProfileProofScreen> {
   }
 }
 
-class _ProgressHeader extends StatelessWidget {
-  const _ProgressHeader({required this.step});
+class _ProofSourceSheet extends StatefulWidget {
+  const _ProofSourceSheet({required this.session, required this.proof});
 
-  final int step;
+  final WorkSession session;
+  final WorkProofRequirement proof;
+
+  @override
+  State<_ProofSourceSheet> createState() => _ProofSourceSheetState();
+}
+
+class _ProofSourceSheetState extends State<_ProofSourceSheet> {
+  String? _busySource;
+  String? _error;
+
+  Future<void> _pick(String id, WorkProofSource source) async {
+    if (_busySource != null) return;
+    setState(() {
+      _busySource = id;
+      _error = null;
+    });
+    final added = await widget.session.addProof(widget.proof.id, source);
+    if (!mounted) return;
+    if (added) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+    setState(() {
+      _busySource = null;
+      _error = widget.session.errorMessage;
+    });
+    if (_error != null) {
+      widget.session.clearMessages();
+      widget.session.notifyListeners();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    const labels = ['Details', 'Proof', 'Review'];
-    return Row(
-      children: [
-        for (var index = 0; index < labels.length; index += 1) ...[
-          Expanded(
+    final reportedBottom = _workViewBottomInset(context);
+    final safeBottom = reportedBottom < 24 ? 24.0 : reportedBottom;
+    const sources =
+        <({String id, String label, IconData icon, WorkProofSource source})>[
+          (
+            id: 'camera',
+            label: 'Camera',
+            icon: Icons.camera_alt_outlined,
+            source: WorkProofSource.camera,
+          ),
+          (
+            id: 'gallery',
+            label: 'Photo gallery',
+            icon: Icons.photo_library_outlined,
+            source: WorkProofSource.gallery,
+          ),
+          (
+            id: 'upload',
+            label: 'PDF or image',
+            icon: Icons.upload_file_outlined,
+            source: WorkProofSource.upload,
+          ),
+          (
+            id: 'cloud',
+            label: 'Cloud files',
+            icon: Icons.cloud_outlined,
+            source: WorkProofSource.cloudDrive,
+          ),
+        ];
+    return SafeArea(
+      key: const Key('work-proof-source-safe-area'),
+      top: false,
+      minimum: EdgeInsets.only(bottom: safeBottom + MoolSpacing.xs),
+      child: TweenAnimationBuilder<double>(
+        tween: Tween<double>(begin: 0, end: 1),
+        duration: MoolMotion.accessible(context, MoolMotion.standard),
+        curve: MoolMotion.enter,
+        builder: (context, value, child) => Opacity(
+          opacity: value,
+          child: Transform.translate(
+            offset: Offset(0, 16 * (1 - value)),
+            child: child,
+          ),
+        ),
+        child: Material(
+          color: Colors.white,
+          borderRadius: const BorderRadius.vertical(
+            top: Radius.circular(MoolRadii.sheet),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(
+              MoolSpacing.md,
+              MoolSpacing.sm,
+              MoolSpacing.md,
+              MoolSpacing.xs + 16,
+            ),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                AnimatedContainer(
-                  duration: MoolMotion.accessible(context, MoolMotion.quick),
-                  height: 5,
-                  decoration: BoxDecoration(
-                    color: index <= step
-                        ? MoolColors.navy
-                        : const Color(0xFFD8DAE8),
-                    borderRadius: BorderRadius.circular(MoolRadii.capsule),
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Center(
+                          child: Container(
+                            width: 42,
+                            height: 4,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD8DAE8),
+                              borderRadius: BorderRadius.circular(
+                                MoolRadii.capsule,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.sm),
+                        Text(
+                          'Add ${widget.proof.label}',
+                          style: const TextStyle(
+                            color: MoolColors.ink,
+                            fontSize: 19,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                        const Text(
+                          'PDF, JPG, JPEG, PNG or WebP · up to 10 MB. Cloud files shows the providers available on this device.',
+                          style: TextStyle(
+                            color: MoolColors.muted,
+                            fontSize: 10.5,
+                            height: 1.3,
+                          ),
+                        ),
+                        const SizedBox(height: MoolSpacing.md),
+                        if (_error case final message?) ...[
+                          Semantics(
+                            liveRegion: true,
+                            child: Text(
+                              message,
+                              key: const Key('work-proof-source-error'),
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                        ],
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final minTileWidth =
+                                MediaQuery.textScalerOf(context).scale(9.5) /
+                                    9.5 *
+                                    42 +
+                                8;
+                            final columns =
+                                constraints.maxWidth >= minTileWidth * 4 + 18
+                                ? 4
+                                : constraints.maxWidth >= minTileWidth * 2 + 6
+                                ? 2
+                                : 1;
+                            final tileWidth =
+                                (constraints.maxWidth - 6 * (columns - 1)) /
+                                columns;
+                            return Wrap(
+                              spacing: 6,
+                              runSpacing: 6,
+                              children: [
+                                for (final source in sources)
+                                  SizedBox(
+                                    width: tileWidth,
+                                    child: _ProofSourceTile(
+                                      keyName: 'work-proof-source-${source.id}',
+                                      label: source.label,
+                                      icon: source.icon,
+                                      busy: _busySource == source.id,
+                                      onTap: _busySource == null
+                                          ? () =>
+                                                _pick(source.id, source.source)
+                                          : null,
+                                    ),
+                                  ),
+                              ],
+                            );
+                          },
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                const SizedBox(height: MoolSpacing.xxs),
+                const SizedBox(height: MoolSpacing.sm),
+                TextButton(
+                  key: const Key('work-proof-source-cancel'),
+                  onPressed: _busySource == null
+                      ? () => Navigator.of(context).pop()
+                      : null,
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProofSourceTile extends StatelessWidget {
+  const _ProofSourceTile({
+    required this.keyName,
+    required this.label,
+    required this.icon,
+    required this.busy,
+    required this.onTap,
+  });
+
+  final String keyName;
+  final String label;
+  final IconData icon;
+  final bool busy;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: const Color(0xFFF4F4FA),
+      borderRadius: BorderRadius.circular(MoolRadii.control),
+      child: InkWell(
+        key: Key(keyName),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(MoolRadii.control),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 82),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 9),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                busy
+                    ? const SizedBox.square(
+                        dimension: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : Icon(icon, color: MoolColors.navy, size: 24),
+                const SizedBox(height: 5),
                 Text(
-                  labels[index],
-                  style: TextStyle(
-                    color: index == step ? MoolColors.navy : MoolColors.muted,
-                    fontSize: 10,
+                  label,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 9.5,
+                    height: 1.12,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ],
             ),
           ),
-          if (index < labels.length - 1) const SizedBox(width: MoolSpacing.xs),
+        ),
+      ),
+    );
+  }
+}
+
+class _InlineReviewAction extends StatelessWidget {
+  const _InlineReviewAction({
+    required this.session,
+    required this.onUpdateDetails,
+  });
+  final WorkSession session;
+  final VoidCallback onUpdateDetails;
+  @override
+  Widget build(BuildContext context) {
+    final status = session.remoteReviewStatus;
+    final needsHelp =
+        status == WorkRemoteReviewStatus.rejected ||
+        status == WorkRemoteReviewStatus.suspended ||
+        (session.reviewReason?.trim().isNotEmpty == true &&
+            session.gateway is! ReviewWorkGateway);
+    if (needsHelp) {
+      return WorkPrimaryButton(
+        keyName: 'work-inline-review-support',
+        label: 'Contact MoolSocial',
+        icon: Icons.chat_bubble_outline,
+        onPressed: () {
+          final caseId = session.reviewCaseId;
+          final business = session.submittedProfile?.name ?? session.workName;
+          context.push(
+            Uri(
+              path: '/app/chat/thread/workspace-support',
+              queryParameters: {
+                'return': '/app/work/workspace/proof',
+                'directReturn': 'true',
+                if (caseId != null && business.trim().isNotEmpty) ...{
+                  'workspaceApplication': caseId,
+                  'workspaceBusiness': business,
+                  'draft':
+                      'Please help me with application $caseId for $business.',
+                },
+              },
+            ).toString(),
+          );
+        },
+      );
+    }
+    if (session.errorMessage != null) {
+      return WorkPrimaryButton(
+        keyName: 'work-inline-review-check',
+        label: 'Retry update',
+        busy: session.busy,
+        onPressed: session.checkReview,
+      );
+    }
+    return const SizedBox.shrink();
+  }
+}
+
+class _CorrectionInstructionCard extends StatelessWidget {
+  const _CorrectionInstructionCard({required this.instruction});
+
+  final String instruction;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkCard(
+      keyName: 'work-correction-instruction',
+      color: const Color(0xFFFFF4E5),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Icon(
+            Icons.mark_unread_chat_alt_outlined,
+            color: MoolColors.orange,
+          ),
+          const SizedBox(width: MoolSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'What needs your attention',
+                  style: TextStyle(
+                    color: MoolColors.ink,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                Text(
+                  instruction,
+                  style: const TextStyle(
+                    color: MoolColors.muted,
+                    fontSize: 10.5,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ],
-      ],
+      ),
+    );
+  }
+}
+
+class _InlineWorkspaceReviewStatus extends StatelessWidget {
+  const _InlineWorkspaceReviewStatus({
+    required this.session,
+    required this.onAddDocuments,
+    required this.onUpdateDetails,
+    required this.onReviewChanges,
+  });
+  final WorkSession session;
+  final VoidCallback onAddDocuments, onUpdateDetails, onReviewChanges;
+  @override
+  Widget build(BuildContext context) {
+    final status = session.remoteReviewStatus;
+    final rejected = status == WorkRemoteReviewStatus.rejected;
+    final suspended = status == WorkRemoteReviewStatus.suspended;
+    final reason = session.reviewStatusNeedsRefresh
+        ? ''
+        : session.reviewReason?.trim() ?? '';
+    final clarification = !rejected && !suspended && reason.isNotEmpty;
+    final title = session.reviewStatusNeedsRefresh
+        ? session.errorMessage == null
+              ? 'Checking your application'
+              : 'Application update unavailable'
+        : rejected
+        ? 'Application not approved'
+        : suspended
+        ? 'Workspace unavailable'
+        : clarification
+        ? 'More information needed'
+        : 'Application received';
+    final detail = session.reviewStatusNeedsRefresh
+        ? 'Your saved application is safe. We will show the latest update here.'
+        : reason.isNotEmpty
+        ? reason
+        : rejected
+        ? 'Contact MoolSocial for the reason and the available next step.'
+        : suspended
+        ? 'Contact MoolSocial about access to this Workspace.'
+        : 'MoolSocial is reviewing your application. Expect an update within 24 working hours.';
+    return _ReviewStepMotion(
+      child: Column(
+        key: const Key('work-inline-review-status'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(
+                rejected || suspended
+                    ? Icons.info_outline
+                    : Icons.fact_check_outlined,
+                color: MoolColors.navy,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 16,
+                        height: 1.25,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      detail,
+                      style: const TextStyle(
+                        color: MoolColors.ink,
+                        fontSize: 13,
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (!session.reviewStatusNeedsRefresh &&
+              !rejected &&
+              !suspended &&
+              !clarification) ...[
+            const SizedBox(height: 12),
+            const Text(
+              'No action needed now. Review updates appear here automatically.',
+              style: TextStyle(color: MoolColors.muted, fontSize: 12),
+            ),
+          ],
+          if (clarification && session.gateway is ReviewWorkGateway) ...[
+            if (session.hasUnsubmittedReviewChanges) ...[
+              const SizedBox(height: 12),
+              Semantics(
+                liveRegion: true,
+                child: Wrap(
+                  key: const Key('work-review-unsent-changes'),
+                  spacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    const Text(
+                      'Changes not submitted',
+                      style: TextStyle(
+                        color: MoolColors.navy,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    TextButton.icon(
+                      key: const Key('work-review-resume-changes'),
+                      onPressed: session.busy ? null : onReviewChanges,
+                      icon: const Icon(Icons.edit_note_outlined, size: 20),
+                      label: const Text('Review changes'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 12,
+              runSpacing: 6,
+              children: [
+                TextButton.icon(
+                  key: const Key('work-inline-add-documents'),
+                  onPressed: onAddDocuments,
+                  icon: const Icon(Icons.upload_file),
+                  label: const Text('Add documents'),
+                ),
+                TextButton.icon(
+                  key: const Key('work-inline-update-details'),
+                  onPressed: onUpdateDetails,
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Update details'),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: 16),
+          if (session.submittedProfile case final submitted?) ...[
+            Container(
+              key: const Key('work-submitted-summary'),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0x22000080)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  const Text(
+                    'Submitted information',
+                    style: TextStyle(
+                      color: MoolColors.navy,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const Divider(),
+                  _ReviewRow(label: 'Business', value: submitted.name),
+                  _ReviewRow(
+                    label: 'Your name',
+                    value: submitted.authorizedPersonName,
+                  ),
+                  _ReviewRow(label: 'Contact', value: submitted.primaryMobile),
+                  _ReviewRow(label: 'Email', value: submitted.email),
+                  _ReviewRow(
+                    label: 'Documents',
+                    value: '${submitted.proofReferences.length} attached',
+                  ),
+                ],
+              ),
+            ),
+          ],
+          if (session.reviewCaseId case final caseId?)
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              title: const Text(
+                'Application reference',
+                style: TextStyle(fontSize: 13, color: MoolColors.muted),
+              ),
+              children: [
+                SelectableText(caseId),
+                const Text(
+                  'Share this reference if you contact MoolSocial about this application.',
+                  style: TextStyle(fontSize: 12, color: MoolColors.muted),
+                ),
+              ],
+            ),
+          if (session.gateway case final ReviewWorkGateway gateway)
+            if (session.reviewCaseId case final String caseId)
+              if (gateway.canSelectDeviceReviewCase(caseId))
+                _ReviewApkCaseControl(session: session, gateway: gateway),
+        ],
+      ),
+    );
+  }
+}
+
+class _ReviewApkCaseControl extends StatelessWidget {
+  const _ReviewApkCaseControl({required this.session, required this.gateway});
+
+  final WorkSession session;
+  final ReviewWorkGateway gateway;
+
+  Future<void> _choose(BuildContext context) async {
+    final caseId = session.reviewCaseId;
+    if (caseId == null ||
+        session.busy ||
+        !gateway.canSelectDeviceReviewCase(caseId)) {
+      return;
+    }
+    FocusManager.instance.primaryFocus?.unfocus();
+    final scenario = await showModalBottomSheet<WorkReviewTestCase>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      builder: (sheetContext) => SafeArea(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(sheetContext).height * .8,
+          ),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Text(
+                  'Review APK · Test application state',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Test data only. No real application, payment or approval is changed.',
+                ),
+                const SizedBox(height: 8),
+                for (final option in const [
+                  (WorkReviewTestCase.pending, 'Pending'),
+                  (WorkReviewTestCase.clarification, 'Clarification requested'),
+                  (WorkReviewTestCase.rejected, 'Rejected'),
+                  (WorkReviewTestCase.approved, 'Approved'),
+                ])
+                  ListTile(
+                    key: Key('work-review-test-${option.$1.name}'),
+                    title: Text(option.$2),
+                    onTap: () => Navigator.of(sheetContext).pop(option.$1),
+                  ),
+                TextButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(),
+                  child: const Text('Cancel'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+    if (!context.mounted ||
+        scenario == null ||
+        session.busy ||
+        session.reviewCaseId != caseId ||
+        !identical(session.gateway, gateway) ||
+        !gateway.canSelectDeviceReviewCase(caseId)) {
+      return;
+    }
+    gateway.selectDeviceReviewCase(caseId, scenario);
+    await session.checkReview();
+  }
+
+  @override
+  Widget build(BuildContext context) => TextButton.icon(
+    key: const Key('work-review-test-controls'),
+    onPressed: session.busy ? null : () => _choose(context),
+    icon: const Icon(Icons.science_outlined),
+    label: const Text('Review APK · Test application state'),
+  );
+}
+
+class _ReviewStepMotion extends StatelessWidget {
+  const _ReviewStepMotion({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(begin: 0, end: 1),
+      duration: MoolMotion.accessible(context, MoolMotion.standard),
+      curve: MoolMotion.enter,
+      builder: (context, value, child) => Opacity(
+        opacity: value,
+        child: Transform.translate(
+          offset: Offset(0, 14 * (1 - value)),
+          child: Transform.scale(
+            scale: .985 + (.015 * value),
+            alignment: Alignment.topCenter,
+            child: child,
+          ),
+        ),
+      ),
+      child: child,
+    );
+  }
+}
+
+class _WorkDetailField extends StatelessWidget {
+  const _WorkDetailField({
+    required this.label,
+    required this.fieldKey,
+    required this.builder,
+    this.alwaysShowLabel = false,
+    super.key,
+  });
+
+  final String label;
+  final String fieldKey;
+  final bool alwaysShowLabel;
+  final Widget Function(InputDecoration) builder;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      const style = TextStyle(
+        color: MoolColors.muted,
+        fontSize: 12,
+        height: 1.3,
+      );
+      final painter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: DefaultTextStyle.of(context).style.merge(style),
+        ),
+        textDirection: Directionality.of(context),
+        textScaler: MediaQuery.textScalerOf(context),
+      )..layout();
+      final needsWrapping =
+          alwaysShowLabel || painter.width > constraints.maxWidth - 24;
+      painter.dispose();
+      final decoration = InputDecoration(
+        labelText: needsWrapping ? null : label,
+        border: const UnderlineInputBorder(),
+      );
+      if (!needsWrapping) return builder(decoration);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ExcludeSemantics(
+            child: Text(
+              label,
+              key: Key('$fieldKey-full-label'),
+              style: style,
+              softWrap: true,
+            ),
+          ),
+          Semantics(label: label, child: builder(decoration)),
+        ],
+      );
+    },
+  );
+}
+
+class _ProgressHeader extends StatelessWidget {
+  const _ProgressHeader({required this.step});
+  final int step;
+  @override
+  Widget build(BuildContext context) {
+    final labels = step > 2
+        ? const ['Submitted', 'MoolSocial review']
+        : const ['Details', 'Documents', 'Review'];
+    final current = step > 2 ? 1 : step;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final labelWidth =
+            (constraints.maxWidth - (labels.length - 1) * 10) / labels.length;
+        final painter = TextPainter(
+          textDirection: Directionality.of(context),
+          textScaler: MediaQuery.textScalerOf(context),
+        );
+        var compactLabels = false;
+        for (var i = 0; i < labels.length; i++) {
+          painter.text = TextSpan(
+            text: labels[i],
+            style: DefaultTextStyle.of(context).style.merge(
+              TextStyle(
+                fontSize: 12,
+                fontWeight: i == current ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+          );
+          painter.layout();
+          if (painter.width > labelWidth) compactLabels = true;
+        }
+        painter.dispose();
+        return Semantics(
+          label: labels.join(', '),
+          child: Column(
+            key: const Key('work-workspace-progress'),
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              if (step <= 2 || compactLabels) ...[
+                Text(
+                  compactLabels
+                      ? step > 2
+                            ? labels[current]
+                            : '${labels[current]} · ${step + 1} of 3'
+                      : 'Step ${step + 1} of 3',
+                  key: const Key('work-progress-current'),
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (var i = 0; i < labels.length; i++) ...[
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          AnimatedContainer(
+                            duration: MoolMotion.accessible(
+                              context,
+                              MoolMotion.quick,
+                            ),
+                            height: 3,
+                            color: (step > 2 ? i == 0 : i <= step)
+                                ? MoolColors.navy
+                                : const Color(0xFFE2E4EE),
+                          ),
+                          if (!compactLabels) const SizedBox(height: 6),
+                          if (!compactLabels)
+                            Text(
+                              labels[i],
+                              key: Key('work-progress-label-$i'),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: (step > 2 ? i == 1 : i == step)
+                                    ? FontWeight.w700
+                                    : FontWeight.w500,
+                                color: MoolColors.navy,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                    if (i < labels.length - 1) const SizedBox(width: 10),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -1270,77 +3529,238 @@ class _ProofCard extends StatelessWidget {
     required this.proof,
     required this.added,
     required this.onAdd,
+    this.file,
+    this.onView,
     this.onRemove,
+    this.removedName,
+    this.onUndo,
+    super.key,
+  });
+  final WorkProofRequirement proof;
+  final bool added;
+  final WorkPickedProof? file;
+  final VoidCallback onAdd;
+  final VoidCallback? onView, onRemove;
+  final String? removedName;
+  final VoidCallback? onUndo;
+
+  @override
+  Widget build(BuildContext context) => Material(
+    color: Colors.white,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Icon(
+                Icons.description_outlined,
+                color: MoolColors.navy,
+                size: 22,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  proof.label,
+                  style: const TextStyle(
+                    color: MoolColors.navy,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 5),
+          Semantics(
+            liveRegion: added,
+            label: added
+                ? '${proof.label}: document attached. ${file?.fileName ?? ''}'
+                : null,
+            excludeSemantics: added,
+            child: Text(
+              added
+                  ? file?.fileName ?? 'Document attached'
+                  : removedName != null
+                  ? 'Removed: $removedName'
+                  : proof.detail,
+              style: const TextStyle(color: MoolColors.muted, fontSize: 12),
+            ),
+          ),
+          Wrap(
+            alignment: WrapAlignment.end,
+            spacing: 10,
+            children: [
+              if (added) ...[
+                TextButton(
+                  key: Key('work-view-proof-${proof.id}'),
+                  onPressed: onView,
+                  child: Text('View', semanticsLabel: 'View ${proof.label}'),
+                ),
+                TextButton(
+                  key: Key('work-replace-proof-${proof.id}'),
+                  onPressed: onAdd,
+                  child: Text(
+                    'Replace',
+                    semanticsLabel: 'Replace ${proof.label}',
+                  ),
+                ),
+                IconButton(
+                  key: Key('work-remove-proof-${proof.id}'),
+                  tooltip: 'Remove ${proof.label}',
+                  onPressed: onRemove,
+                  icon: const Icon(Icons.delete_outline, size: 20),
+                ),
+              ] else ...[
+                if (onUndo != null)
+                  TextButton.icon(
+                    key: Key('work-undo-proof-${proof.id}'),
+                    onPressed: onUndo,
+                    icon: const Icon(Icons.undo_rounded, size: 18),
+                    label: Text(
+                      'Undo',
+                      semanticsLabel: 'Restore ${proof.label}',
+                    ),
+                  ),
+                TextButton(
+                  key: Key('work-add-proof-${proof.id}'),
+                  onPressed: onAdd,
+                  child: Text(
+                    'Add document',
+                    semanticsLabel: 'Add ${proof.label}',
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const Divider(height: 1),
+        ],
+      ),
+    ),
+  );
+}
+
+class _ReviewSection extends StatelessWidget {
+  const _ReviewSection({
+    required this.title,
+    required this.editKey,
+    required this.onEdit,
+    required this.children,
+  });
+
+  final String title;
+  final String editKey;
+  final VoidCallback onEdit;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.only(bottom: 8),
+    child: Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            Tooltip(
+              message: 'Edit ${title.toLowerCase()}',
+              child: TextButton.icon(
+                key: Key(editKey),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(64, 48),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                onPressed: onEdit,
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Edit'),
+              ),
+            ),
+          ],
+        ),
+        ...children,
+      ],
+    ),
+  );
+}
+
+class _ReviewDocument extends StatelessWidget {
+  const _ReviewDocument({
+    required this.proof,
+    required this.file,
+    required this.onView,
   });
 
   final WorkProofRequirement proof;
-  final bool added;
-  final VoidCallback onAdd;
-  final VoidCallback? onRemove;
+  final WorkPickedProof? file;
+  final VoidCallback onView;
 
   @override
   Widget build(BuildContext context) {
-    return WorkCard(
-      color: added ? const Color(0xFFEAF7E8) : Colors.white,
-      child: Row(
+    final format = file?.contentType == 'application/pdf' ? 'PDF' : 'Image';
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          CircleAvatar(
-            backgroundColor: added
-                ? MoolColors.success
-                : const Color(0xFFEDEEFF),
-            foregroundColor: added ? Colors.white : MoolColors.navy,
-            child: Icon(
-              added
-                  ? Icons.check_rounded
-                  : proof.required
-                  ? Icons.priority_high_rounded
-                  : Icons.add_rounded,
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  proof.label,
+                  style: const TextStyle(
+                    color: MoolColors.ink,
+                    fontSize: 12,
+                    height: 1.4,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              if (file != null)
+                Tooltip(
+                  message: file?.contentType == 'application/pdf'
+                      ? '${proof.label} file details'
+                      : 'View ${proof.label.toLowerCase()}',
+                  child: TextButton(
+                    key: Key('work-review-view-${proof.id}'),
+                    style: TextButton.styleFrom(
+                      minimumSize: const Size(56, 48),
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                    ),
+                    onPressed: onView,
+                    child: const Text('View'),
+                  ),
+                ),
+            ],
+          ),
+          Text(
+            file?.fileName ?? 'Document attached',
+            key: Key('work-review-file-${proof.id}'),
+            softWrap: true,
+            style: const TextStyle(
+              color: MoolColors.ink,
+              fontSize: 12,
+              height: 1.4,
             ),
           ),
-          const SizedBox(width: MoolSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        proof.label,
-                        style: const TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                    ),
-                    WorkPill(
-                      label: proof.required ? 'Required' : 'Add later',
-                      color: proof.required
-                          ? MoolColors.navy
-                          : MoolColors.orange,
-                    ),
-                  ],
-                ),
-                Text(
-                  proof.detail,
-                  style: const TextStyle(color: MoolColors.muted, fontSize: 11),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: MoolSpacing.xs),
-          if (added && onRemove != null)
-            IconButton(
-              key: Key('work-remove-proof-${proof.id}'),
-              tooltip: 'Remove ${proof.label}',
-              onPressed: onRemove,
-              icon: const Icon(Icons.delete_outline_rounded),
-            )
-          else if (!added)
-            TextButton(
-              key: Key('work-add-proof-${proof.id}'),
-              onPressed: onAdd,
-              child: const Text('Add'),
+          if (file != null)
+            Text(
+              '$format · ${(file!.bytes.length / 1024).ceil()} KB',
+              style: const TextStyle(
+                color: MoolColors.muted,
+                fontSize: 11,
+                height: 1.4,
+              ),
             ),
         ],
       ),
@@ -1356,32 +3776,80 @@ class _ReviewRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    const labelStyle = TextStyle(
+      color: MoolColors.muted,
+      fontSize: 12,
+      height: 1.4,
+      fontWeight: FontWeight.w700,
+    );
+    const valueStyle = TextStyle(
+      color: MoolColors.ink,
+      fontSize: 13,
+      height: 1.4,
+      fontWeight: FontWeight.w700,
+    );
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: MoolSpacing.xs),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 90,
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: MoolColors.muted,
-                fontWeight: FontWeight.w700,
-              ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final painter = TextPainter(
+            text: TextSpan(
+              text: value,
+              style: DefaultTextStyle.of(context).style.merge(valueStyle),
             ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              textAlign: TextAlign.end,
-              style: const TextStyle(
-                color: MoolColors.ink,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+            maxLines: 2,
+          )..layout(maxWidth: (constraints.maxWidth - 12) * .6);
+          final labelPainter = TextPainter(
+            textDirection: Directionality.of(context),
+            textScaler: MediaQuery.textScalerOf(context),
+          );
+          var labelWordTooWide = false;
+          for (final word in label.split(' ')) {
+            labelPainter.text = TextSpan(
+              text: word,
+              style: DefaultTextStyle.of(context).style.merge(labelStyle),
+            );
+            labelPainter.layout();
+            if (labelPainter.width > (constraints.maxWidth - 12) * .4) {
+              labelWordTooWide = true;
+            }
+          }
+          labelPainter.dispose();
+          final needsFullWidth =
+              labelWordTooWide ||
+              painter.didExceedMaxLines ||
+              (!value.contains(RegExp(r'\s')) &&
+                  painter.computeLineMetrics().length > 1);
+          painter.dispose();
+          final labelText = Text(label, style: labelStyle);
+          final valueText = Text(
+            needsFullWidth && value.contains('@')
+                ? value.replaceFirst('@', '\u200b@')
+                : value,
+            semanticsLabel: value,
+            key: Key('work-review-value-$label'),
+            textAlign: TextAlign.start,
+            softWrap: true,
+            overflow: TextOverflow.clip,
+            style: valueStyle,
+          );
+          if (needsFullWidth) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [labelText, const SizedBox(height: 4), valueText],
+            );
+          }
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(flex: 4, child: labelText),
+              const SizedBox(width: 12),
+              Expanded(flex: 6, child: valueText),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1397,18 +3865,51 @@ class WorkVerificationStatusScreen extends StatelessWidget {
     return AnimatedBuilder(
       animation: session,
       builder: (context, _) {
-        final approved = session.reviewStage == WorkReviewStage.approved;
+        final approved = {
+          WorkReviewStage.approved,
+          WorkReviewStage.live,
+        }.contains(session.reviewStage);
+        final rejected =
+            session.remoteReviewStatus == WorkRemoteReviewStatus.rejected;
+        final suspended =
+            session.remoteReviewStatus == WorkRemoteReviewStatus.suspended;
         return WorkPageScaffold(
           session: session,
-          title: approved ? 'Work approved' : 'Work profile review',
+          title: approved
+              ? 'Work approved'
+              : rejected
+              ? 'Changes needed'
+              : suspended
+              ? 'Workspace unavailable'
+              : 'Work profile review',
           subtitle: session.reviewCaseId ?? 'Review status',
-          fallbackBackRoute: '/app/work/my-work',
+          fallbackBackRoute: '/app/work/workspace/choose',
           activeLocalAction: 'workspace',
+          showHeaderChat: false,
+          showTrailingAction: false,
           bottomAction: approved
               ? WorkPrimaryButton(
                   keyName: 'work-open-ready',
-                  label: 'Continue to workspace setup',
-                  onPressed: () => context.go('/app/work/ready'),
+                  label: 'Open Workspace dashboard',
+                  onPressed: () => context.go('/app/work/workspace/dashboard'),
+                )
+              : rejected
+              ? WorkPrimaryButton(
+                  keyName: 'work-revise-profile',
+                  label: 'Review and resubmit',
+                  onPressed: () {
+                    session.reviseRejectedProfile();
+                    context.go('/app/work/workspace/proof');
+                  },
+                  icon: Icons.edit_outlined,
+                )
+              : suspended
+              ? WorkPrimaryButton(
+                  keyName: 'work-suspended-support',
+                  label: 'Open support Chat',
+                  onPressed: () =>
+                      context.go('/app/chat/inbox?return=/app/work/status'),
+                  icon: Icons.support_agent_rounded,
                 )
               : WorkPrimaryButton(
                   keyName: 'work-check-review',
@@ -1417,7 +3918,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                   onPressed: () async {
                     final ready = await session.checkReview();
                     if (ready && context.mounted) {
-                      context.go('/app/work/ready');
+                      context.go('/app/work/workspace/dashboard');
                     }
                   },
                   icon: Icons.refresh_rounded,
@@ -1448,13 +3949,27 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                     Icon(
                       approved
                           ? Icons.verified_rounded
+                          : rejected
+                          ? Icons.edit_note_rounded
+                          : suspended
+                          ? Icons.pause_circle_outline_rounded
                           : Icons.hourglass_top_rounded,
                       size: 50,
-                      color: approved ? MoolColors.success : MoolColors.orange,
+                      color: approved
+                          ? MoolColors.success
+                          : rejected || suspended
+                          ? const Color(0xFFB42318)
+                          : MoolColors.orange,
                     ),
                     const SizedBox(height: MoolSpacing.xs),
                     Text(
-                      approved ? 'Review approved' : 'Review in progress',
+                      approved
+                          ? 'Review approved'
+                          : rejected
+                          ? 'Please update this profile'
+                          : suspended
+                          ? 'Workspace temporarily unavailable'
+                          : 'Review in progress',
                       style: const TextStyle(
                         color: MoolColors.ink,
                         fontSize: 21,
@@ -1469,20 +3984,29 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      session.reviewCaseId ?? 'Case pending',
+                      session.reviewCaseId ?? 'Review reference pending',
                       style: const TextStyle(
                         color: MoolColors.navy,
                         fontSize: 11,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
+                    if ((rejected || suspended) &&
+                        session.reviewReason?.isNotEmpty == true) ...[
+                      const SizedBox(height: MoolSpacing.xs),
+                      Text(
+                        session.reviewReason!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(color: MoolColors.muted),
+                      ),
+                    ],
                   ],
                 ),
               ),
               const SizedBox(height: MoolSpacing.md),
               const _StatusSteps(),
               const SizedBox(height: MoolSpacing.md),
-              if (!approved)
+              if (!approved && !rejected && !suspended)
                 WorkCard(
                   color: const Color(0xFFFFF4E5),
                   child: Column(
@@ -1536,7 +4060,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                   children: [
                     const WorkSectionTitle(
                       title: 'Review team',
-                      detail: 'Updates and exact corrections appear here',
+                      detail: 'Updates and requested changes appear here',
                       trailing: WorkPill(
                         label: 'Chat enabled',
                         icon: Icons.chat_bubble_outline_rounded,
@@ -1544,7 +4068,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                     const Text(
-                      'If a document is unclear or conditional approval applies, only that exact correction is requested. Your personal account stays active.',
+                      'If a document needs attention, you’ll see what to update here. Your personal account stays active.',
                       style: TextStyle(color: MoolColors.muted, height: 1.4),
                     ),
                     const SizedBox(height: MoolSpacing.sm),
@@ -1563,7 +4087,8 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                         Expanded(
                           child: OutlinedButton(
                             key: const Key('work-status-open-my-work'),
-                            onPressed: () => context.go('/app/work/my-work'),
+                            onPressed: () =>
+                                context.go('/app/work/workspace/choose'),
                             child: const Text('Open My Work'),
                           ),
                         ),
@@ -1622,7 +4147,7 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                 const SizedBox(height: MoolSpacing.sm),
                 OutlinedButton.icon(
                   key: const Key('work-attach-gst'),
-                  onPressed: session.attachGst,
+                  onPressed: () => _showGstProofSource(sheetContext),
                   icon: Icon(
                     session.gstAttachmentAdded
                         ? Icons.check_circle_rounded
@@ -1655,6 +4180,83 @@ class WorkVerificationStatusScreen extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showGstProofSource(BuildContext context) {
+    return showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      showDragHandle: true,
+      builder: (sourceContext) => SafeArea(
+        key: const Key('work-gst-source-safe-area'),
+        top: false,
+        minimum: EdgeInsets.only(
+          bottom: _workViewBottomInset(sourceContext) + 12,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(
+            MoolSpacing.lg,
+            0,
+            MoolSpacing.lg,
+            MoolSpacing.xs,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const Text(
+                'Add GST certificate',
+                style: TextStyle(
+                  color: MoolColors.ink,
+                  fontSize: 21,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: MoolSpacing.md),
+              for (final source in const [
+                (
+                  'camera',
+                  'Camera',
+                  Icons.camera_alt_outlined,
+                  WorkProofSource.camera,
+                ),
+                (
+                  'gallery',
+                  'Photo library',
+                  Icons.photo_library_outlined,
+                  WorkProofSource.gallery,
+                ),
+                (
+                  'upload',
+                  'Upload PDF or image',
+                  Icons.upload_file_outlined,
+                  WorkProofSource.upload,
+                ),
+              ]) ...[
+                OutlinedButton.icon(
+                  key: Key('work-gst-source-${source.$1}'),
+                  onPressed: () async {
+                    final added = await session.addGstProof(source.$4);
+                    if (added && sourceContext.mounted) {
+                      Navigator.pop(sourceContext);
+                    }
+                  },
+                  icon: Icon(source.$3),
+                  label: Text(source.$2),
+                ),
+                const SizedBox(height: MoolSpacing.xs),
+              ],
+              TextButton(
+                key: const Key('work-gst-source-cancel'),
+                onPressed: () => Navigator.pop(sourceContext),
+                child: const Text('Cancel'),
+              ),
+            ],
           ),
         ),
       ),
@@ -1857,7 +4459,7 @@ class WorkspaceReadyScreen extends StatelessWidget {
                       ),
                     ),
                     const Text(
-                      '3 steps · stock, price and fulfilment',
+                      '4 steps · product, price, fulfilment and publishing',
                       style: TextStyle(
                         color: Color(0xFFD9DAFF),
                         fontWeight: FontWeight.w700,
@@ -1865,7 +4467,7 @@ class WorkspaceReadyScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: MoolSpacing.sm),
                     const Text(
-                      'Customers see products only after every readiness step is complete and you approve going live.',
+                      'Customers see products only after every readiness step is complete and you choose to open the store.',
                       style: TextStyle(color: Color(0xFFD9DAFF), height: 1.4),
                     ),
                   ],
@@ -1962,9 +4564,7 @@ class _CompletedRow extends StatelessWidget {
 
 class RetailerSetupScreen extends StatefulWidget {
   const RetailerSetupScreen({required this.session, super.key});
-
   final WorkSession session;
-
   @override
   State<RetailerSetupScreen> createState() => _RetailerSetupScreenState();
 }
@@ -1985,7 +4585,6 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
         ? ''
         : '${widget.session.retailerSellPrice}',
   );
-
   @override
   void dispose() {
     _quantity.dispose();
@@ -1994,279 +4593,226 @@ class _RetailerSetupScreenState extends State<RetailerSetupScreen> {
     super.dispose();
   }
 
-  void _saveFields() {
-    widget.session.saveRetailerProduct(
-      quantity: int.tryParse(_quantity.text) ?? 0,
-      buyPrice: int.tryParse(_buy.text) ?? 0,
-      sellPrice: int.tryParse(_sell.text) ?? 0,
-    );
-  }
+  void _saveFields({bool updateCatalogue = true}) =>
+      widget.session.saveRetailerProduct(
+        quantity: int.tryParse(_quantity.text) ?? 0,
+        buyPrice: int.tryParse(_buy.text) ?? 0,
+        sellPrice: int.tryParse(_sell.text) ?? 0,
+        updateCatalogue: updateCatalogue,
+      );
 
   @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: widget.session,
-      builder: (context, _) {
-        final complete =
-            widget.session.reviewStage == WorkReviewStage.live &&
-            widget.session.retailerSetupSaved;
-        return WorkPageScaffold(
-          session: widget.session,
-          title: complete ? 'Shop ready' : 'Set up your shop',
-          subtitle: complete
-              ? 'Available products are now visible'
-              : 'Stock, price and fulfilment',
-          fallbackBackRoute: complete ? '/app/work/my-work' : '/app/work/ready',
-          activeLocalAction: 'workspace',
-          bottomAction: WorkPrimaryButton(
-            keyName: complete
-                ? 'retailer-setup-open-my-work'
-                : 'retailer-finish-setup',
-            label: complete
-                ? 'Open shop operations'
-                : 'Finish setup and go live',
-            busy: widget.session.busy,
-            onPressed: () async {
-              if (complete) {
-                context.go('/app/retailer/home');
-                return;
-              }
-              _saveFields();
-              await widget.session.finishRetailerSetup();
-            },
-            icon: complete
-                ? Icons.work_outline_rounded
-                : Icons.rocket_launch_rounded,
-          ),
-          body: ListView(
-            key: const Key('retailer-setup-screen'),
-            padding: const EdgeInsets.fromLTRB(
-              MoolSpacing.md,
-              MoolSpacing.sm,
-              MoolSpacing.md,
-              MoolSpacing.xl,
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.session,
+    builder: (context, _) {
+      final session = widget.session;
+      final product =
+          session.workspaceCatalogueItems.firstOrNull ??
+          workspaceMasterCatalogue.first;
+      void openSection(String section) {
+        FocusManager.instance.primaryFocus?.unfocus();
+        _saveFields(updateCatalogue: false);
+        context.go('/app/work/workspace/dashboard?section=$section');
+      }
+
+      return WorkPageScaffold(
+        session: session,
+        title: 'Set up your shop',
+        subtitle: session.activeWorkspace?.name ?? session.workName,
+        headerHeight: 68,
+        fallbackBackRoute: '/app/work/workspace/dashboard',
+        showHeaderChat: false,
+        showTrailingAction: false,
+        hideNavigationWhenKeyboardVisible: true,
+        contextualDestinationLabel: 'Store',
+        contextualActiveId: 'store',
+        contextualLocalActions: [
+          for (final entry in const [
+            ('store', 'Store', Icons.storefront_outlined),
+            ('orders', 'Orders', Icons.receipt_long_outlined),
+            ('sell', 'Sell', Icons.point_of_sale_outlined),
+            ('stock', 'Stock', Icons.inventory_2_outlined),
+          ])
+            MoolLocalNavigationAction(
+              keyName: 'work-setup-${entry.$1}',
+              id: entry.$1,
+              label: entry.$2,
+              icon: entry.$3,
+              onPressed: () => openSection(entry.$1),
             ),
-            children: [
-              WorkCard(
-                color: complete ? const Color(0xFFEAF7E8) : MoolColors.navy,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      complete ? 'Mahadev Fresh Mart is ready' : '3 steps',
-                      style: TextStyle(
-                        color: complete ? MoolColors.ink : Colors.white,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w900,
-                      ),
-                    ),
-                    Text(
-                      complete
-                          ? 'Customers see only available stock with the fulfilment you approved.'
-                          : 'Products remain private until all three checks pass and you approve going live.',
-                      style: TextStyle(
-                        color: complete
-                            ? MoolColors.muted
-                            : const Color(0xFFD9DAFF),
-                        height: 1.4,
-                      ),
-                    ),
-                  ],
-                ),
+        ],
+        bottomAction: MediaQuery.viewInsetsOf(context).bottom > 0
+            ? null
+            : WorkPrimaryButton(
+                keyName: 'retailer-finish-setup',
+                label: 'Finish setup',
+                busy: session.busy,
+                onPressed: () async {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  _saveFields();
+                  final saved = await session.finishRetailerSetup();
+                  if (saved && context.mounted) {
+                    context.go('/app/work/workspace/dashboard');
+                  }
+                },
               ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkSectionTitle(
-                title: '1. Add a product',
-                detail: 'Use the verified master catalogue',
+        body: ListView(
+          key: const Key('retailer-setup-screen'),
+          keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 20),
+          children: [
+            const Text(
+              'Your first product',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+                color: MoolColors.navy,
               ),
-              const SizedBox(height: MoolSpacing.sm),
-              if (!widget.session.retailerProductAdded)
-                WorkCard(
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.inventory_2_outlined, color: MoolColors.navy),
+                const SizedBox(width: 10),
+                Expanded(
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Icon(
-                        Icons.inventory_2_outlined,
-                        color: MoolColors.navy,
-                        size: 42,
-                      ),
-                      const SizedBox(height: MoolSpacing.xs),
-                      const Text(
-                        'Aashirvaad Whole Wheat Atta',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      const Text(
-                        '1 kg consumer pack · brand verified · barcode ready',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: MoolColors.muted),
-                      ),
-                      const SizedBox(height: MoolSpacing.sm),
-                      FilledButton.icon(
-                        key: const Key('retailer-add-catalog-product'),
-                        onPressed: widget.session.addRetailerProduct,
-                        icon: const Icon(Icons.add_rounded),
-                        label: const Text('Add to my shop'),
-                      ),
-                    ],
-                  ),
-                )
-              else
-                const WorkCard(
-                  color: Color(0xFFEAF7E8),
-                  child: Row(
-                    children: [
-                      CircleAvatar(
-                        backgroundColor: MoolColors.success,
-                        foregroundColor: Colors.white,
-                        child: Icon(Icons.check_rounded),
-                      ),
-                      SizedBox(width: MoolSpacing.sm),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Aashirvaad Whole Wheat Atta',
-                              style: TextStyle(
-                                color: MoolColors.ink,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            Text(
-                              '1 kg consumer pack · catalogue matched',
-                              style: TextStyle(color: MoolColors.muted),
-                            ),
-                          ],
-                        ),
-                      ),
-                      WorkPill(label: 'Added'),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkSectionTitle(
-                title: '2. Set stock and price',
-                detail: 'Consumer quantity only · wholesale stays separate',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              TextField(
-                key: const Key('retailer-product-quantity'),
-                controller: _quantity,
-                keyboardType: TextInputType.number,
-                decoration: const InputDecoration(
-                  labelText: 'Available consumer quantity',
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      key: const Key('retailer-product-buy-price'),
-                      controller: _buy,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Purchase ₹',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: MoolSpacing.xs),
-                  Expanded(
-                    child: TextField(
-                      key: const Key('retailer-product-sell-price'),
-                      controller: _sell,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Sell ₹'),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              const WorkSectionTitle(
-                title: '3. Choose fulfilment',
-                detail: 'Home delivery and store collection are distinct',
-              ),
-              const SizedBox(height: MoolSpacing.sm),
-              WorkCard(
-                child: Column(
-                  children: [
-                    SwitchListTile(
-                      key: const Key('retailer-home-delivery'),
-                      contentPadding: EdgeInsets.zero,
-                      value: widget.session.retailerHomeDelivery,
-                      title: const Text(
-                        'Home delivery',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Customer orders from home and receives delivery',
-                      ),
-                      onChanged: (value) =>
-                          widget.session.setRetailerFulfilment(
-                            homeDelivery: value,
-                            storeCollection:
-                                widget.session.retailerStoreCollection,
-                          ),
-                    ),
-                    const Divider(),
-                    SwitchListTile(
-                      key: const Key('retailer-store-collection'),
-                      contentPadding: EdgeInsets.zero,
-                      value: widget.session.retailerStoreCollection,
-                      title: const Text(
-                        'Store collection',
-                        style: TextStyle(
-                          color: MoolColors.ink,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      ),
-                      subtitle: const Text(
-                        'Customer explicitly chooses this shop and collects',
-                      ),
-                      onChanged: (value) =>
-                          widget.session.setRetailerFulfilment(
-                            homeDelivery: widget.session.retailerHomeDelivery,
-                            storeCollection: value,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: MoolSpacing.md),
-              WorkCard(
-                color: const Color(0xFFFFF4E5),
-                child: Row(
-                  children: [
-                    Icon(
-                      complete
-                          ? Icons.visibility_rounded
-                          : Icons.visibility_off_outlined,
-                      color: complete ? MoolColors.success : MoolColors.orange,
-                    ),
-                    const SizedBox(width: MoolSpacing.sm),
-                    Expanded(
-                      child: Text(
-                        complete
-                            ? 'This product is visible with current stock and fulfilment.'
-                            : 'Nothing is public until setup passes and you choose Finish setup and go live.',
+                      Text(
+                        product.title,
                         style: const TextStyle(
-                          color: MoolColors.ink,
+                          fontSize: 14,
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                    ),
-                  ],
+                      Text(
+                        product.pack,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: MoolColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                if (!session.retailerProductAdded)
+                  TextButton.icon(
+                    key: const Key('retailer-add-catalog-product'),
+                    onPressed: session.addRetailerProduct,
+                    icon: const Icon(Icons.add, size: 18),
+                    label: const Text('Add'),
+                  )
+                else
+                  const Padding(
+                    padding: EdgeInsets.all(8),
+                    child: Icon(
+                      Icons.check_circle_outline,
+                      color: MoolColors.navy,
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              key: const Key('retailer-product-quantity'),
+              controller: _quantity,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.next,
+              decoration: const InputDecoration(
+                labelText: 'Quantity available',
+                border: UnderlineInputBorder(),
+                isDense: true,
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('retailer-product-buy-price'),
+                    controller: _buy,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Cost price',
+                      prefixText: '₹ ',
+                      border: UnderlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: TextField(
+                    key: const Key('retailer-product-sell-price'),
+                    controller: _sell,
+                    keyboardType: TextInputType.number,
+                    textInputAction: TextInputAction.done,
+                    decoration: const InputDecoration(
+                      labelText: 'Sell price',
+                      prefixText: '₹ ',
+                      border: UnderlineInputBorder(),
+                      isDense: true,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'How customers receive orders',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('retailer-home-delivery'),
+              contentPadding: EdgeInsets.zero,
+              value: session.retailerHomeDelivery,
+              title: const Text(
+                'Home delivery',
+                style: TextStyle(fontSize: 14),
+              ),
+              onChanged: (value) => session.setRetailerFulfilment(
+                homeDelivery: value,
+                storeCollection: session.retailerStoreCollection,
+              ),
+            ),
+            SwitchListTile.adaptive(
+              key: const Key('retailer-store-collection'),
+              contentPadding: EdgeInsets.zero,
+              value: session.retailerStoreCollection,
+              title: const Text(
+                'Store collection',
+                style: TextStyle(fontSize: 14),
+              ),
+              onChanged: (value) => session.setRetailerFulfilment(
+                homeDelivery: session.retailerHomeDelivery,
+                storeCollection: value,
+              ),
+            ),
+            const Divider(),
+            SwitchListTile.adaptive(
+              key: const Key('retailer-publish-after-setup'),
+              contentPadding: EdgeInsets.zero,
+              value: session.retailerPublishAfterSetup,
+              title: const Text(
+                'Open store after setup',
+                style: TextStyle(fontSize: 14),
+              ),
+              onChanged: session.setRetailerPublishAfterSetup,
+            ),
+            Text(
+              session.retailerPublishAfterSetup
+                  ? 'Your available products will be public and ready for orders.'
+                  : 'Your store stays off and private. Open it later from your business profile.',
+              style: const TextStyle(
+                fontSize: 12,
+                height: 1.4,
+                color: MoolColors.muted,
+              ),
+            ),
+          ],
+        ),
+      );
+    },
+  );
 }
