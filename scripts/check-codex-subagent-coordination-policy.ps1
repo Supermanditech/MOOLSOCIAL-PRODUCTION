@@ -2357,76 +2357,64 @@ if ($ProductionLane -ceq 'baseline') {
     $r66OwnerAmendmentPending = $false
     $r665CollectionAdmissionPending = $false
     $r678PersistenceAdmissionPending = $false
-    # BEGIN founder QUALIFICATION admission 20260914
+    # BEGIN founder SUCCESSOR BUILD admission 20260914
     if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913') {
-      $qualificationParent = 'e65f341b690d4345fda29fa3609d02e6293b6d25'
-      $qualificationControls = @('config/codex-subagent-coordination-policy.json', 'scripts/check-codex-subagent-coordination-policy.ps1')
-      $qualificationOwners = @(
-        'apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart'
-      )
+      $successorParent = '9018535597239296871f9cf026e1e2a7328aca50'
+      $successorChecker = 'scripts/check-codex-subagent-coordination-policy.ps1'
+      $successorHashes = @{
+        'scripts/check-buy-data-egress-boundary.ps1' = 'DC677D76A758B10839D4A75889B8CE5EF100AEC674C2DBE29DB43F01C1730385'
+        'scripts/check-approved-ui-locks.ps1' = 'FE027B3B8D389A0166B109D4817C9CD7C74AC0872167AD6334C6EDBF9F50E583'
+        'scripts/check-buy-protected-baseline.ps1' = 'E2D1686F0CEF2DEF13EA0A6634ECEF0E053C13397CD1A29DDA7E2BF7E26B9DE4'
+        'scripts/check-buy-backend-contract-boundary.ps1' = '2192B9E15BBD43F32C1EF1D006557F7293E0651EBD770749919686BF8ED0F63F'
+      }
+      $successorControls = @($successorChecker) + @($successorHashes.Keys)
       Assert-Coordination ($AgentRole -ceq 'subagent' -and $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and
         $ProductionLane -ceq 'cursor_ui' -and $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
-        $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and $branch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') 'QUALIFICATION admission identity differs.'
-      $qualificationBeforeText = @(& git -C $root show "${qualificationParent}:config/codex-subagent-coordination-policy.json")
-      Assert-Coordination ($LASTEXITCODE -eq 0) 'QUALIFICATION admission parent policy missing.'
-      $qualificationExpected = ($qualificationBeforeText -join "`n") | ConvertFrom-Json
-      $qualificationExpectedRoot = @($qualificationExpected.activeClaims | Where-Object task -ceq '/root')
-      $qualificationExpectedClaim = @($qualificationExpected.activeClaims | Where-Object task -ceq '/root/cursor_redmi_v6_audit_20260913')
-      Assert-Coordination ($qualificationExpectedRoot.Count -eq 1 -and $qualificationExpectedClaim.Count -eq 1 -and $qualificationExpectedClaim[0].owners.Count -eq 37) 'QUALIFICATION original claims differ.'
-      Assert-Coordination (@($qualificationExpected.activeClaims.owners | Where-Object { $_ -cin $qualificationOwners }).Count -eq 0) 'Qualification owners already claimed.'
-      $qualificationExpectedClaim[0].owners = @($qualificationExpectedClaim[0].owners) + $qualificationOwners
-      Assert-Coordination (($qualificationExpected | ConvertTo-Json -Depth 100 -Compress) -ceq ($policy | ConvertTo-Json -Depth 100 -Compress)) 'QUALIFICATION admission permits only the exact nine-test-owner admission.'
-      $qualificationScript = [IO.File]::ReadAllText((Join-Path $root $qualificationControls[1])).Replace("`r`n", "`n")
-      $qualificationPriorLines = @(& git -C $root show "${qualificationParent}:scripts/check-codex-subagent-coordination-policy.ps1")
-      Assert-Coordination ($LASTEXITCODE -eq 0) 'QUALIFICATION prior checker missing.'
-      $qualificationPriorScript = ($qualificationPriorLines -join "`n") + "`n"
-      $qualificationPriorBlock = [regex]::Match($qualificationPriorScript, '(?ms)^    # BEGIN founder D020 admission 20260914\n.*?^    # END founder D020 admission 20260914\n')
-      Assert-Coordination $qualificationPriorBlock.Success 'QUALIFICATION prior admission checkpoint missing.'
-      $qualificationCurrentBlock = [regex]::Match($qualificationScript, '(?ms)^    # BEGIN founder QUALIFICATION admission 20260914\n.*?^    # END founder QUALIFICATION admission 20260914\n')
-      Assert-Coordination $qualificationCurrentBlock.Success 'QUALIFICATION exact admission block missing.'
-      $qualificationStripped = $qualificationScript.Substring(0, $qualificationCurrentBlock.Index) + $qualificationPriorBlock.Value + $qualificationScript.Substring($qualificationCurrentBlock.Index + $qualificationCurrentBlock.Length)
-      $qualificationAddedText = ",`n        'apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart'"
-      $qualificationStripped = $qualificationStripped.Replace($qualificationAddedText, '')
-      $qualificationHasher = [Security.Cryptography.SHA256]::Create()
-      try { $qualificationOriginalHash = [BitConverter]::ToString($qualificationHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($qualificationStripped))).Replace('-', '') } finally { $qualificationHasher.Dispose() }
-      Assert-Coordination ($qualificationOriginalHash -ceq '12F1D4D45F7289C12BABD685A71F7067782E21A0B63900B9065294794FCADCA7') 'QUALIFICATION admission changed another existing checker rule.'
-      if ($head -ceq $qualificationParent) {
-        $qualificationDirty = @(Get-ProductionChangedOwners $head $head)
-        Assert-Coordination ((@($qualificationDirty | Sort-Object) -join '|') -ceq (@($qualificationControls | Sort-Object) -join '|')) 'QUALIFICATION admission must contain only its two controls and no product edits.'
+        $ProductionTicketId -ceq 'UAW-CURSOR-REDMI-V6-AUDIT-20260913' -and $branch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') 'Successor admission identity differs.'
+      & git -C $root merge-base --is-ancestor $successorParent $head
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission requires qualified parent.'
+      & git -C $root diff --quiet $successorParent -- config/codex-subagent-coordination-policy.json
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission cannot change policy or ownership claims.'
+      $successorPriorLines = @(& git -C $root show "${successorParent}:$successorChecker")
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor prior checker missing.'
+      $successorPriorScript = ($successorPriorLines -join "`n") + "`n"
+      $successorScript = [IO.File]::ReadAllText((Join-Path $root $successorChecker)).Replace("`r`n", "`n")
+      $successorPriorBlock = [regex]::Match($successorPriorScript, '(?ms)^    # BEGIN founder QUALIFICATION admission 20260914\n.*?^    # END founder QUALIFICATION admission 20260914\n')
+      $successorCurrentBlock = [regex]::Match($successorScript, '(?ms)^    # BEGIN founder SUCCESSOR BUILD admission 20260914\n.*?^    # END founder SUCCESSOR BUILD admission 20260914\n')
+      Assert-Coordination ($successorPriorBlock.Success -and $successorCurrentBlock.Success) 'Successor preservation blocks missing.'
+      $successorRestored = $successorScript.Substring(0, $successorCurrentBlock.Index) + $successorPriorBlock.Value + $successorScript.Substring($successorCurrentBlock.Index + $successorCurrentBlock.Length)
+      $successorHasher = [Security.Cryptography.SHA256]::Create()
+      try {
+        $successorRestoredHash = [BitConverter]::ToString($successorHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($successorRestored))).Replace('-', '')
+        Assert-Coordination ($successorRestoredHash -ceq 'D74ED97ED1495017099BA32414022F961F061E3AC90112E9B6C39EF2497298E9') 'Successor admission changed another coordination rule.'
+        foreach ($successorOwner in $successorHashes.Keys) {
+          $successorText = [IO.File]::ReadAllText((Join-Path $root $successorOwner)).Replace("`r`n", "`n")
+          $successorHash = [BitConverter]::ToString($successorHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($successorText))).Replace('-', '')
+          Assert-Coordination ($successorHash -ceq $successorHashes[$successorOwner]) "Successor exact reviewed checker differs: $successorOwner"
+        }
+      } finally { $successorHasher.Dispose() }
+      & git -C $root diff --quiet $successorParent -- apps backend contracts packages package.json package-lock.json pubspec.yaml pubspec.lock
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission cannot change the qualified source.'
+      if ($head -ceq $successorParent) {
+        $successorDirty = @(Get-ProductionChangedOwners $head $head)
+        Assert-Coordination ((@($successorDirty | Sort-Object) -join '|') -ceq (@($successorControls | Sort-Object) -join '|')) 'Successor admission must contain exactly five reviewed checker owners.'
       } else {
-        & git -C $root merge-base --is-ancestor $qualificationParent $head
-        Assert-Coordination ($LASTEXITCODE -eq 0) 'QUALIFICATION checkpoint ancestry missing.'
-        $qualificationFollowing = @(& git -C $root rev-list --first-parent --reverse "${qualificationParent}..$head")
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and $qualificationFollowing.Count -gt 0) 'QUALIFICATION admission commit missing.'
-        $qualificationCommit = [string]$qualificationFollowing[0]
-        $qualificationParents = @(& git -C $root show -s --format=%P $qualificationCommit)
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and $qualificationParents.Count -eq 1 -and $qualificationParents[0] -ceq $qualificationParent) 'QUALIFICATION admission parent differs.'
-        $qualificationSubject = @(& git -C $root show -s --format=%s $qualificationCommit)
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and $qualificationSubject[0] -ceq 'ui(redmi-v6-audit-20260913): admit exact qualification test ownership') 'QUALIFICATION admission subject differs.'
-        $qualificationCommitted = @(& git -C $root diff-tree --no-commit-id --name-only -r $qualificationCommit)
-        Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($qualificationCommitted | Sort-Object) -join '|') -ceq (@($qualificationControls | Sort-Object) -join '|')) 'QUALIFICATION admission committed unrelated owners.'
-        & git -C $root diff --quiet $qualificationCommit -- @qualificationControls
-        Assert-Coordination ($LASTEXITCODE -eq 0) 'QUALIFICATION admission controls changed after sealing.'
+        $successorFollowing = @(& git -C $root rev-list --first-parent --reverse "${successorParent}..$head")
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $successorFollowing.Count -gt 0) 'Successor admission commit missing.'
+        $successorCommit = [string]$successorFollowing[0]
+        $successorParents = @(& git -C $root show -s --format=%P $successorCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $successorParents.Count -eq 1 -and $successorParents[0] -ceq $successorParent) 'Successor admission parent differs.'
+        $successorSubject = @(& git -C $root show -s --format=%s $successorCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and $successorSubject[0] -ceq 'ui(redmi-v6-audit-20260913): admit exact qualified successor review source') 'Successor admission subject differs.'
+        $successorChanged = @(& git -C $root diff-tree --no-commit-id --name-only -r $successorCommit)
+        Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($successorChanged | Sort-Object) -join '|') -ceq (@($successorControls | Sort-Object) -join '|')) 'Successor admission changed unrelated owners.'
+        & git -C $root diff --quiet $successorCommit -- @successorControls
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission controls changed after sealing.'
       }
-      $primaryEvidenceCoordinationOwnerKeys = @($qualificationControls | ForEach-Object { $_.ToLowerInvariant() })
+      # Preserve the already-sealed historical policy owner; current policy stays byte-bound above.
+      $primaryEvidenceCoordinationOwnerKeys = @('config/codex-subagent-coordination-policy.json') + @($successorControls | ForEach-Object { $_.ToLowerInvariant() })
     }
-    # END founder QUALIFICATION admission 20260914
+    # END founder SUCCESSOR BUILD admission 20260914
     if (
       $ProductionLane -ceq 'cursor_ui' -and
       $ProductionWorkId -ceq 'buy-redmi-fixes-v1-20260905' -and

@@ -175,13 +175,17 @@ function Get-CursorAccessibilityNativeProjection {
       'apps', 'backend', 'contracts', 'packages',
       'package.json', 'package-lock.json', 'pubspec.yaml', 'pubspec.lock'
     )
-    & git -C $root diff --quiet $redmiBaseline HEAD -- @redmiBoundaries
+    # Founder-authorized RV6-D001..D022 successor; all other sources remain rejected.
+    $redmiSource = $redmiBaseline
+    & git -C $root merge-base --is-ancestor '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' }
+    & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
     if ($LASTEXITCODE -ne 0) {
-      throw 'Redmi audit committed source differs from V6.'
+      throw 'Redmi audit committed source differs from its exact admitted source.'
     }
-    & git -C $root diff --quiet $redmiBaseline -- @redmiBoundaries
+    & git -C $root diff --quiet $redmiSource -- @redmiBoundaries
     if ($LASTEXITCODE -ne 0) {
-      throw 'Redmi audit working source differs from V6.'
+      throw 'Redmi audit working source differs from its exact admitted source.'
     }
     $redmiUntracked = @(& git -C $root ls-files --others --exclude-standard -- @redmiBoundaries)
     if ($LASTEXITCODE -ne 0 -or $redmiUntracked.Count -ne 0) {

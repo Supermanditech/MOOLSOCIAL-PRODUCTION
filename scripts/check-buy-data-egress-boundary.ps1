@@ -90,6 +90,10 @@ function Test-SealedBuyEgressClipboardAction {
   if ($redmiReviewQualified) {
     $branchAllowed = $true
     $overlayCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
+    if ($IntegratedReviewSourceCommit -ceq '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d') {
+      # Exact-source admission; existing copy action is unchanged from the prior overlay.
+      $overlayCommit = $IntegratedReviewSourceCommit
+    }
   }
   & git -C $RepositoryRoot diff --quiet $overlayCommit -- $owner
   $ownerBytesEqual = $LASTEXITCODE -eq 0
