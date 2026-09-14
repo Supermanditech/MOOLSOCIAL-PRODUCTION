@@ -222,10 +222,8 @@
     "authority": "Founder subsequently requested goal mode to close all 22 within remaining D005/C01 and D009/D010/D014 Redmi verification scope; this authorizes post-delivery device verification. Earlier narrow startup ownership admission remains recorded in UAT.md.",
     "historicalAudit": "Top-level audit, coverage, preservation and original requirements retain the frozen full-audit checkpoint; they are not current successor build status or an exhaustive production qualification.",
     "originalCount": 22,
-    "deviceClosedCount": 21,
-    "deviceOpen": [
-      "RV6-D014"
-    ],
+    "deviceClosedCount": 22,
+    "deviceOpen": [],
     "d014Correction": {
       "status": "implemented_locally_qualified_device_open",
       "cause": "Old temporary product route restores Shop browsing after a newer order route is applied.",
@@ -262,9 +260,7 @@
       },
       "successorBuilt": true
     },
-    "externalLinkDeliveryUnverified": [
-      "RV6-D014"
-    ],
+    "externalLinkDeliveryUnverified": [],
     "externalBlocker": null,
     "children": [
       {
@@ -276,8 +272,8 @@
         "limits": "Signed-out Redmi review lane: Hindi and English selected radios and summaries persist across separate cold processes; affected Personal profile returns checked; Hindi glyph and honest English-screen disclosure visually reviewed. Original English restored. No claim of Buy translation or production qualification."
       }
     ],
-    "currentInstalledVersion": "1.0.0-r66.23-cursorreview",
-    "currentInstalledVersionCode": 2026091404,
+    "currentInstalledVersion": "1.0.0-r66.24-cursorreview",
+    "currentInstalledVersionCode": 2026091405,
     "finalSuccessor": {
       "candidate": "UAW-CURSOR-REDMI-RV6-LANGUAGE-20260914",
       "sourceHead": "f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b",
@@ -291,7 +287,7 @@
       "childDeviceVerification": "D005-C01_closed_on_Redmi_20260914_under_subsequent_founder_goal",
       "evidence": "UAT.md final r66.22 delivery and subsequent device closure sections"
     },
-    "sourceBaseline": "Repeated-link source41412f56 locally qualified by25 D014 cases,340 screen tests,analysis,two2343-pass combined cycles and source/prebuild gates; r66.24 build/device acceptance pending.",
+    "sourceBaseline": "Source41412f56 locally qualified by25 D014 cases,340 screen tests,analysis,two2343-pass/27-inherited-skip combined cycles and source/prebuild gates; built at32630c34, installed checksum-equal r66.24, ten D014 Redmi cases passed. Historical commit-label handoff gate remains failed.",
     "integration": "not_authorized",
     "productionQualification": "not_established",
     "nativeApprovalResumption": {
@@ -301,7 +297,7 @@
       "limits": "No blanket permission inferred for later launches"
     },
     "d014RepeatedLinkCorrection": {
-      "status": "implemented_locally_qualified_device_open",
+      "status": "implemented_device_verified_closed",
       "deviceOccurrence": "r66.23 captures037/038 are identical after Android reports native delivery; capture039 shows product on Back rather than order",
       "cause": "Buy destination navigation changes session but retains the prior order URL, so repeated native delivery is treated as the current route",
       "correction": "Buy-owned destination navigation leaves the order URL when the customer selects Shop, Wholesale or Orders; retain Medicine and unrelated routes",
@@ -309,9 +305,9 @@
       "reproduction": "2 focused cases fail before correction at 100/200 percent text",
       "localQualification": "25 D014 matrix cases and340 affected screen tests pass (overlapping); full analysis no issues; four new actual Flutter captures visually reviewed",
       "visuals": "Four new Shop/Wholesale repeated-link Flutter captures at100/200 percent visually reviewed",
-      "installed": false,
-      "successorBuilt": false,
-      "requiredNext": "Seal clean live-remote-equal baseline, prepare exact manifest/machine state, pass unchanged wrapper preflight, build/verify/install one r66.24 corrective APK preserving Redmi data, then execute all required D014 native cases.",
+      "installed": true,
+      "successorBuilt": true,
+      "requiredNext": "Evidence commit/push/live readback and separate historical commit-label handoff disposition; no remaining original or child device verification.",
       "sourceSha256Normalized": "97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C",
       "testSha256Normalized": "5F3629A79FCC623CAF2670458D9FDCF4BFDE1190DF9DBFB0AEB46E92CBB18243",
       "sourceCommit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
@@ -326,16 +322,35 @@
       "combinedCycles": "both_passed_2343_tests_27_inherited_skips_each_source_equal",
       "successorCandidate": {
         "id": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
-        "versionName": "1.0.0-r66.24",
+        "versionName": "1.0.0-r66.24-cursorreview",
         "versionCode": 2026091405,
-        "status": "prebuild_source_qualified_not_built",
+        "status": "installed_checksum_equal_D014_device_closed",
         "sourceCommit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
-        "evidence": "PREBUILD.md D014 repeated-link corrective r66.24 baseline",
-        "buildAuthorization": "one_necessary_corrective_build_under_active_goal_after_machine_and_wrapper_gates",
+        "evidence": "UAT.md D014 r66.24 final Redmi device closure; rv6-d014-repeat-final-20260914/redmi-device-qualification-v1.json",
+        "buildAuthorization": "consumed_one_build",
         "device": "TG8HCYTGGQT885OF",
-        "finalHandoff": "historical_commit_label_failure_not_waived"
+        "finalHandoff": "historical_commit_label_failure_not_waived",
+        "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+        "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+        "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+        "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+        "deviceQualificationSha256": "3C4484F4A2367CF2F1A8D1341ECE228A73F2BD92F4D611C35756017BE636700E",
+        "deviceCaseCount": 10
       },
-      "wholesaleFixture": "Existing w-notebook opened through separately approved native product route on r66.23; required supplier/Other Store/full catalogue available; no source/backend mutation; history not cleared; successor persistence not yet verified."
+      "wholesaleFixture": "Existing notebook supplier fixture persisted after upgrade and was reached via Wholesale Recently viewed031; all four scoped supplier link states passed without fixture/source/backend changes."
+    },
+    "finalDeviceQualification": {
+      "status": "all22_originals_and_sole_child_device_closed",
+      "latestCandidate": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
+      "latestSourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "remainingOriginals": [],
+      "remainingChildren": [],
+      "preservedPriorOriginalClosures": 21,
+      "newOriginalClosure": "RV6-D014",
+      "child": "RV6-D005-C01_prior_r66.22_closure_preserved",
+      "evidence": "UAT.md D014 r66.24 final Redmi device closure; rv6-d014-repeat-final-20260914/redmi-device-qualification-v1.json",
+      "limits": "Scoped signed-out Redmi review fixtures only. Not all22 replayed on r66.24. No production/backend/provider/integration acceptance.",
+      "finalGitHandoff": "historical_commit_label_failure_not_waived"
     }
   }
 }

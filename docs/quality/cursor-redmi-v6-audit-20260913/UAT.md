@@ -3365,3 +3365,39 @@ Fresh build prerequisites pass. The initial incremental prebuild check was invok
 | repeat-prebuild-incremental.log | 8D689FFAB4F40B5871588B865DB7A224375404DBFCC0280EC7EE8C9E3D6A0D39 |
 | repeat-prebuild-incremental-pwsh7.log | 9BB0A43076D8CDC1F706973475B44BCDE644753834B0D600866CFE9FBBC905DD |
 | wholesale-fixture-preparation.json | 4909F1D886CDD0DAADF107D23502426491963C183BE312ECD25FE0AB2431B3C5 |
+
+
+## D014 r66.24 final Redmi device closure - 2026-09-14
+
+All22 original defects are now device-closed within this scoped review qualification. The sole deduplicated child RV6-D005-C01 remains implemented and device-closed on r66.22; no new child was reproduced. Earlier pending statements and failed r66.23 captures remain historical evidence. This does not mean all22 were replayed on r66.24 or that backend/provider/production acceptance is complete.
+
+Candidate UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914; package com.moolsocial.app.cursorreview; version1.0.0-r66.24-cursorreview/code2026091405. Build/source seal32630c34df17d52bb0ac74156fb1580177977d9d; application correction41412f56a4af4d75e2976dc04843dd293ae4869d; exact-source admissione52f60301c8d5bdd28895681d2888c9612ba6dd6. One authorized debug review build consumed. No new source, native, backend, dependency or test change in this device round.
+
+APK SHA256 E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8; signer SHA256 CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25. Installed on Redmi TG8HCYTGGQT885OF only with data-preserving upgrade. Installed base.apk checksum equals the verified artifact; original first-install timestamps retained. Installation receipt SHA25601502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885. No uninstall, clear-data, real transaction, provider action, message or OPPO action.
+
+All evidence below is under C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d014-repeat-final-20260914. Immutable redmi-device-qualification-v1.json SHA2563C4484F4A2367CF2F1A8D1341ECE228A73F2BD92F4D611C35756017BE636700E binds64 PNGs and62 complete capture records with installed APK/source identity, actual font scale and screenshot/XML/stderr hashes. device-qualified-machine-state.json SHA2562CE064A839D28804B919B23900BCF8108ACF4BAFB98E894011D0D492602ED442 retains final Git handoff as failed, separately from passed device gates. Prebuild/built/installation snapshots remain immutable.
+
+| D014 physical case | Before/link-result/return captures | Result |
+| --- | --- | --- |
+| Original normal: dog product, Pet Family Store, Other Store, Android Back | 005-008 /009 /010 | MS-240782 tracking stable; Orders selected; Shop return |
+| Original200% text, same nested journey | 043-052 /053 /054-055 | Readable order identity/actions; Orders then Shop return; scale restored |
+| Repeated same order URL after Shop and another Store | 011-013 /014 /015 | Exact r66.23 failure corrected; Store dismisses to requested order |
+| Shop Other Store still open | 016-017 /018 /019 | Correct order and safe return |
+| Shop full catalogue | 019-020 /021 /022 | Correct order and safe return |
+| Shop missing order from full catalogue | 023-029 /030 | Honest unavailable notice; Orders recovery, then Wholesale return |
+| Wholesale supplier after prior same order link | 030-033 /034 /035 | Correct order and safe return |
+| Wholesale Other Supplier still open | 035-036 /037 /038 | Correct order and safe return |
+| Wholesale Other Supplier then Android Back | 038-039 /040 /041 | Original supplier restored before link; correct order afterward |
+| Wholesale full catalogue | 041 /042 /043 | Correct order and Shop return |
+
+All native order deliveries used the unchanged declared HTTPS MS-240782 URL, except the explicit missing-order case. Each command was separately approved through require_escalated; Android reported Status ok and delivery to the running top-most app, native exit0. Report binds tool receipt IDs and WaitTime. Prior automatic denials are historical, not a current blocker. No alternate email/browser delivery or approval bypass was used.
+
+Missing-order evidence timing: capture024 settled on Orders after the2600ms notice expired. A450ms screenshot026 caught Store dismissal motion, not a settled failure. Approved1500ms screenshot029 visually proves "This order could not be found." with Orders recovery. Source openTracking sets the notice and returns catalogue; _noticeTimer clears it after2600ms. Capture027 preserves another settled recovery. These retained captures are not independent defect failures or extra cases.
+
+Preservation: Saved contains the same Stone-ground wheat atta2 only (011/056); Home and Work addresses retained with Work selected (062); English preference and standard text/motion verified (058); device font scale restored1.0 (055/064). Existing notebook fixture is available through Wholesale Recently viewed after upgrade (031), without another fixture mutation. No Add, quantity, checkout, order or message action occurred. Approved declared basket route (journey_router.dart /app/buy/basket) returns Quick catalogue064 with no Cart dock, matching the existing empty-cart openCart branch in buy_v2_session.dart. Final state Quick Shop, Saved1, Saved filter off, no additional filters. Global preferences Back traversal reached Mool main actions059; Open Shop060 restored Buy before normal Orders/address navigation. Capture filenames describe intent; XML establishes actual state.
+
+Actual images visually inspected:009,014,024,026,029,042,053,062,064. Other PNGs are retained with inspected native hierarchies where applicable, not claimed individually visually reviewed. Full XML equality establishes identical normal order semantics for009/014/018/021/034/037/040/042. Scoped local25-case/340-screen checks, two2343-pass/27-inherited-skip combined cycles and analysis remain qualified at41412f56; do not add overlapping counts or present local cases as extra physical runs.
+
+Operational readback limits: initial whole-document output truncation was followed by bounded reads; source filename discovery corrected absent guessed paths without source changes. A DEFECTS UTF8 write completed before default-cp1252 readback failed; explicit UTF8 readback then proved one intended current-status insertion and22 closed status lines. No write was blindly rerun. MIUI uiautomator theme stderr is preserved; every native dump exited0 and parsed successfully. No source or acceptance threshold was changed to accommodate tooling.
+
+Remaining final handoff: historical448d4a2c7c10ee195e711e49aa4cc69a593ff37b has an incorrect docs(redmi) subject instead of ui(redmi-v6-audit-20260913). The previously prepared exact-commit exception proposal is not applied. Device closure does not waive that separate Git gate, authorize integration or establish production readiness.
