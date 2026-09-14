@@ -9560,6 +9560,7 @@ class _StoreReceiptEditor extends StatefulWidget {
 class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
   bool _open = false, _loading = false, _restored = false;
   final _counts = <String, TextEditingController>{};
+  final _returns = <String, TextEditingController>{};
   final _problems = <String, WorkspaceReceiptProblem>{};
   final _note = TextEditingController();
   final _noteKey = GlobalKey();
@@ -9589,6 +9590,9 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
         _counts[line.id] = TextEditingController(
           text: draft.countedPacks[line.id] ?? '',
         );
+        _returns[line.id] = TextEditingController(
+          text: draft.returnedPacks[line.id] ?? '',
+        );
       }
       _problems.addAll(draft.problems);
       _note.text = draft.note;
@@ -9612,6 +9616,9 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
         (id, controller) => MapEntry(id, controller.text),
       ),
       problems: _problems,
+      returnedPacks: _returns.map(
+        (id, controller) => MapEntry(id, controller.text),
+      ),
       note: _note.text,
     );
     if (mounted) setState(() {});
@@ -9620,6 +9627,9 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
   @override
   void dispose() {
     for (final controller in _counts.values) {
+      controller.dispose();
+    }
+    for (final controller in _returns.values) {
       controller.dispose();
     }
     _note.dispose();
@@ -9631,7 +9641,14 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
     final session = widget.session;
     final purchase = widget.purchase;
     final draft = session.workspaceReceiptDraft(purchase);
-    final lines = _open && draft != null ? draft.lines : purchase.lines;
+    final ownReviewReceipt =
+        draft != null &&
+        session.canConfirmStoreReviewReceipt(purchase) &&
+        purchase.receiptReference?.startsWith('TEST-') == true &&
+        draft.matchesPurchasedItems(purchase);
+    final lines = _open && draft != null && !ownReviewReceipt
+        ? draft.lines
+        : purchase.lines;
     final message = session.workspaceReceiptDraftMessage(purchase);
     final enlarged = MediaQuery.textScalerOf(context).scale(14) > 21;
     return Column(
@@ -9690,7 +9707,9 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
               onPressed: () => _start(),
               child: const Text('Try again'),
             ),
-          if (draft != null && !draft.matchesSnapshot(purchase))
+          if (draft != null &&
+              !draft.matchesSnapshot(purchase) &&
+              !ownReviewReceipt)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 8),
               child: Text(
@@ -9746,6 +9765,21 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
                       unawaited(_save());
                     },
                   ),
+                  if (session.canConfirmStoreReviewReceipt(purchase))
+                    TextField(
+                      key: ValueKey('work-supplier-return-count-${line.id}'),
+                      controller: _returns[line.id],
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: 'Returned packs',
+                        helperText:
+                            'Include any packs already returned for this delivery.',
+                        helperMaxLines: 3,
+                      ),
+                      onChanged: (_) {
+                        unawaited(_save());
+                      },
+                    ),
                   const SizedBox(height: 8),
                   DropdownButtonFormField<String>(
                     key: ValueKey('work-receipt-problem-${line.id}'),
@@ -9798,10 +9832,49 @@ class _StoreReceiptEditorState extends State<_StoreReceiptEditor> {
               unawaited(_save());
             },
           ),
-          const Text(
-            'Sending this receipt is not available yet.',
-            style: TextStyle(fontSize: 12, color: MoolColors.muted),
-          ),
+          if (session.canConfirmStoreReviewReceipt(purchase))
+            FilledButton.tonal(
+              key: const Key('work-receipt-confirm-test'),
+              onPressed: _loading
+                  ? null
+                  : () async {
+                      setState(() => _loading = true);
+                      try {
+                        await _save();
+                        await session.confirmStoreReviewReceipt(purchase);
+                      } finally {
+                        if (mounted) {
+                          setState(() => _loading = false);
+                        }
+                      }
+                    },
+              child: const Text('Confirm test receipt'),
+            )
+          else
+            const Text(
+              'Sending this receipt is not available yet.',
+              style: TextStyle(fontSize: 12, color: MoolColors.muted),
+            ),
+          if (session.canConfirmStoreReviewReceipt(purchase))
+            TextButton(
+              key: const Key('work-supplier-return-confirm-test'),
+              onPressed: _loading
+                  ? null
+                  : () async {
+                      setState(() => _loading = true);
+                      try {
+                        await _save();
+                        await session.confirmStoreReviewSupplierReturn(
+                          purchase,
+                        );
+                      } finally {
+                        if (mounted) {
+                          setState(() => _loading = false);
+                        }
+                      }
+                    },
+              child: const Text('Confirm test return'),
+            ),
         ],
         if (_open && message != null)
           Text(
@@ -9962,6 +10035,32 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
                 ? 'Payment update unavailable'
                 : selected.paymentLabel,
           ),
+          _StoreSupplierLedgerSummary(
+            ledger: session.workspaceSupplierLedger(selected.supplierId),
+            orderId: selected.orderId,
+          ),
+          if (selected.paymentTermLabel?.isNotEmpty == true)
+            Text('Agreed terms · ${selected.paymentTermLabel}'),
+          if (selected.balanceDueLabel?.isNotEmpty == true)
+            Text('Balance terms · ${selected.balanceDueLabel}'),
+          if (selected.paymentMethod?.isNotEmpty == true)
+            Text('Order payment method · ${selected.paymentMethod}'),
+          if (selected.purchaseOrderReference?.isNotEmpty == true)
+            Text('Purchase order · ${selected.purchaseOrderReference}'),
+          if (session.canConfirmStoreReviewReceipt(selected) &&
+              session.supplierPaymentFormKey(selected) != null)
+            TextButton.icon(
+              key: const Key('supplier-payment-open'),
+              icon: const Icon(Icons.receipt_long_outlined),
+              label: const Text('Record test payment'),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) =>
+                    _StoreMoneyEntrySheet(session: session, purchase: selected),
+              ),
+            ),
           const SizedBox(height: 14),
           if (selected.stage.incoming &&
               selected.expectedArrival?.isNotEmpty == true)
@@ -10135,6 +10234,65 @@ class _StorePurchasesSurfaceState extends State<_StorePurchasesSurface> {
   }
 }
 
+class _StoreSupplierLedgerSummary extends StatelessWidget {
+  const _StoreSupplierLedgerSummary({
+    required this.ledger,
+    required this.orderId,
+  });
+  final WorkspaceSupplierLedger? ledger;
+  final String orderId;
+
+  @override
+  Widget build(BuildContext context) {
+    final current = ledger;
+    if (current == null) {
+      return const Text('Supplier account balance unavailable');
+    }
+    final credit = current.creditMinor;
+    final payable = current.payableMinor;
+    final entries = current.entries.where((entry) => entry.orderId == orderId);
+    return ExpansionTile(
+      key: ValueKey('supplier-ledger-${current.supplierId}-$orderId'),
+      tilePadding: EdgeInsets.zero,
+      title: const Text('Supplier account'),
+      subtitle: Text(
+        payable == null || credit == null
+            ? 'Full balance unavailable'
+            : credit > 0
+            ? 'Credit with supplier ${_purchaseAmount(credit)}'
+            : 'Amount payable ${_purchaseAmount(payable)}',
+      ),
+      children: [
+        if (!current.historyComplete || current.openingBalanceMinor == null)
+          const Text(
+            'Showing available entries. Full account history is unavailable.',
+          ),
+        const Text('Entries for this order'),
+        if (entries.isEmpty)
+          const Text('No confirmed financial entries available'),
+        for (final entry in entries)
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: Text(switch (entry.kind) {
+              WorkspaceSupplierEntryKind.bill => 'Supplier bill',
+              WorkspaceSupplierEntryKind.advance => 'Advance paid',
+              WorkspaceSupplierEntryKind.payment => 'Payment recorded',
+              WorkspaceSupplierEntryKind.creditNote => 'Supplier credit note',
+              WorkspaceSupplierEntryKind.refund => 'Refund received',
+            }),
+            subtitle: Text(
+              [
+                entry.reference,
+                if (entry.paymentMethod != null) entry.paymentMethod!,
+              ].join(' · '),
+            ),
+            trailing: Text(_purchaseAmount(entry.amountMinor)),
+          ),
+      ],
+    );
+  }
+}
+
 class _StoreStatementSurface extends StatefulWidget {
   const _StoreStatementSurface({required this.session});
   final WorkSession session;
@@ -10219,6 +10377,15 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
             )),
             child: _book == 'Purchases'
                 ? _StorePurchasesSurface(session: session, statement: true)
+                : _book == 'Money'
+                ? _StoreExpensesSurface(
+                    key: ValueKey((
+                      session.workspaceStockHistoryScope()?.key,
+                      'money',
+                    )),
+                    session: session,
+                    statement: true,
+                  )
                 : !session.workspaceFinanceUsesLegacyReview
                 ? _StoreFinanceSurface(
                     session: session,
@@ -10334,7 +10501,12 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      for (final book in ['Sales', 'Purchases', 'Expenses'])
+                      for (final book in [
+                        'Sales',
+                        'Purchases',
+                        'Expenses',
+                        'Money',
+                      ])
                         TextButton(
                           key: Key('work-statement-${book.toLowerCase()}'),
                           onPressed: _book == book
@@ -11032,11 +11204,11 @@ class _WorkspaceOperationSurface extends StatelessWidget {
               ).toString(),
             );
           } else {
-            final purchase = session.workspacePurchases.where(
-              (purchase) => purchase.receiptReference == movement.referenceId,
+            final purchase = session.workspacePurchaseForStockMovement(
+              movement,
             );
-            if (purchase.length == 1 &&
-                session.selectWorkspacePurchase(purchase.single.shipmentId)) {
+            if (purchase != null &&
+                session.selectWorkspacePurchase(purchase.shipmentId)) {
               onOpenOperation(_WorkspaceOperation.sourcing);
             } else {
               session.showNotice('This receipt is not available.');
@@ -13731,7 +13903,9 @@ class _StockMovementRow extends StatelessWidget {
               key: Key('work-stock-reference-${movement.id}'),
               onPressed: onOpenReference,
               child: Text(
-                '${movement.referenceKind == WorkspaceStockReferenceKind.order ? 'Order' : 'Receipt'} ${movement.referenceId}',
+                movement.referenceKind == WorkspaceStockReferenceKind.order
+                    ? 'Order ${movement.referenceId}'
+                    : 'View receipt',
               ),
             ),
           const Divider(height: 12),
@@ -18796,7 +18970,13 @@ class _StoreFinanceSurface extends StatelessWidget {
         ],
       );
     }
-    if (finance == null || section == 'expenses') {
+    if (finance != null && section == 'expenses') {
+      return _StoreExpensesSurface(
+        key: ValueKey((finance.accountScope, finance.workspaceId)),
+        session: session,
+      );
+    }
+    if (finance == null) {
       return ListView(
         key: const Key('work-finance-unavailable'),
         padding: const EdgeInsets.all(16),
@@ -18816,6 +18996,7 @@ class _StoreFinanceSurface extends StatelessWidget {
     final start = target == null && section == 'payments'
         ? session.workspaceMoneyPeriodStart
         : null;
+    final settlementCheck = finance.settlementPaidReconciliation;
     final payments =
         target != null
               ? [?exactPayment]
@@ -18952,6 +19133,26 @@ class _StoreFinanceSurface extends StatelessWidget {
                 ),
                 const Text(
                   'Settlement requests are not connected yet. No money will move from this screen.',
+                  style: TextStyle(fontSize: 12, color: MoolColors.muted),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  session.workspaceFinanceStale || settlementCheck == null
+                      ? 'Settlement reconciliation unavailable.'
+                      : settlementCheck.differenceMinor == null
+                      ? 'Full payout history is needed to reconcile this total.'
+                      : settlementCheck.differenceMinor == 0
+                      ? 'Paid-out total matches the supplied payout records.'
+                      : 'Paid-out total and payout records differ. Check the settlement update.',
+                  key: const Key('work-settlement-reconciliation'),
+                ),
+                if (settlementCheck != null)
+                  _MoneyDestinationLine(
+                    label: 'Recorded paid payouts',
+                    value: _purchaseAmount(settlementCheck.recordedMinor),
+                  ),
+                const Text(
+                  'Requests and processing payouts are excluded. These records do not show your bank account balance.',
                   style: TextStyle(fontSize: 12, color: MoolColors.muted),
                 ),
                 const Divider(height: 24),
@@ -19587,6 +19788,537 @@ class _LedgerFormAutosave extends ChangeNotifier {
     closed = true;
     super.dispose();
   }
+}
+
+class _StoreExpensesSurface extends StatefulWidget {
+  const _StoreExpensesSurface({
+    super.key,
+    required this.session,
+    this.statement = false,
+  });
+  final WorkSession session;
+  final bool statement;
+  @override
+  State<_StoreExpensesSurface> createState() => _StoreExpensesSurfaceState();
+}
+
+class _StoreExpensesSurfaceState extends State<_StoreExpensesSurface> {
+  bool loading = true, recovered = false;
+  @override
+  void initState() {
+    super.initState();
+    unawaited(recover());
+  }
+
+  Future<void> recover() async {
+    final result = await widget.session.recoverCustomerLedger();
+    if (mounted) {
+      setState(() {
+        loading = false;
+        recovered = result;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.statement) {
+      final statement = recovered
+          ? widget.session.workspaceMoneyStatement
+          : null;
+      return ListView.builder(
+        key: const Key('work-money-statement'),
+        padding: const EdgeInsets.all(16),
+        itemCount: 1 + (statement?.entries.length ?? 0),
+        itemBuilder: (context, index) {
+          if (index == 0) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Text(
+                  'Money activity',
+                  style: Theme.of(context).textTheme.titleLarge,
+                ),
+                if (loading)
+                  const Text('Opening saved money records…')
+                else if (statement == null) ...[
+                  const Text('Money records are unavailable.'),
+                  TextButton(
+                    onPressed: recover,
+                    child: const Text('Retry opening records'),
+                  ),
+                ] else ...[
+                  _MoneyDestinationLine(
+                    label: 'Recorded money in',
+                    value: _purchaseAmount(statement.recordedInMinor),
+                  ),
+                  _MoneyDestinationLine(
+                    label: 'Recorded money out',
+                    value: _purchaseAmount(statement.recordedOutMinor),
+                  ),
+                  const Text(
+                    'Available records for this period. Pending entries and settlement transfers are excluded from these subtotals.',
+                  ),
+                  if (widget.session.workspaceMoneyRegisters.isEmpty)
+                    const Text(
+                      'Cash/bank opening and closing balances are unavailable without their account history.',
+                    ),
+                  for (final register in widget.session.workspaceMoneyRegisters)
+                    _StoreMoneyRegisterSummary(
+                      key: ValueKey('work-register-${register.registerId}'),
+                      register: register,
+                      start: widget.session.workspaceMoneyPeriodStart,
+                      period: widget.session.workspaceMoneyPeriod,
+                      stale: widget.session.workspaceFinanceStale,
+                    ),
+                  if (statement.entries.isEmpty)
+                    const Text('No money activity recorded for this period.'),
+                ],
+              ],
+            );
+          }
+          final entry = statement!.entries[index - 1];
+          return Padding(
+            key: ValueKey('work-money-entry-${entry.id}'),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const Divider(),
+                _MoneyDestinationLine(
+                  label: entry.label,
+                  value: _purchaseAmount(entry.amountMinor),
+                ),
+                Text(
+                  entry.party,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                Text('${entry.status} · ${entry.method}'),
+                Text(entry.reference),
+                Text(
+                  MaterialLocalizations.of(
+                    context,
+                  ).formatShortDate(entry.occurredAt.toLocal()),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    }
+    final start = widget.session.workspaceMoneyPeriodStart;
+    final expenses = widget.session.workspaceExpenses
+        .where(
+          (expense) => start == null || !expense.occurredAt.isBefore(start),
+        )
+        .toList();
+    return ListView(
+      key: const Key('work-finance-expenses'),
+      padding: const EdgeInsets.all(16),
+      children: [
+        Text(
+          'Business expenses',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        if (loading)
+          const Text('Opening saved expenses…')
+        else if (!recovered) ...[
+          const Text('Saved expenses could not be opened.'),
+          TextButton(
+            onPressed: recover,
+            child: const Text('Retry opening expenses'),
+          ),
+        ] else ...[
+          Text(
+            'Recorded expenses ${_purchaseAmount(expenses.fold<int>(0, (sum, expense) => sum + expense.amountMinor))}',
+            key: const Key('work-expense-period-total'),
+          ),
+          if (widget.session.canRecordStoreReviewExpense)
+            TextButton.icon(
+              key: const Key('store-expense-open'),
+              icon: const Icon(Icons.add),
+              label: const Text('Record test expense'),
+              onPressed: () => showModalBottomSheet<void>(
+                context: context,
+                isScrollControlled: true,
+                useSafeArea: true,
+                builder: (_) => _StoreMoneyEntrySheet(session: widget.session),
+              ),
+            ),
+          const Text(
+            'Recorded entries for this Store and period. Purchases and settlements stay in their own records.',
+          ),
+          if (expenses.isEmpty)
+            const Text('No expense entries recorded for this period.'),
+          for (final expense in expenses)
+            Padding(
+              key: ValueKey('work-expense-${expense.operationId}'),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    expense.category,
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                  Text(_purchaseAmount(expense.amountMinor)),
+                  Text('${expense.method} · ${expense.reference}'),
+                  Text(
+                    '${expense.occurredAt.day}/${expense.occurredAt.month}/${expense.occurredAt.year}',
+                  ),
+                  if (expense.note.isNotEmpty) Text(expense.note),
+                  const Divider(),
+                ],
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StoreMoneyRegisterSummary extends StatelessWidget {
+  const _StoreMoneyRegisterSummary({
+    super.key,
+    required this.register,
+    required this.start,
+    required this.period,
+    required this.stale,
+  });
+  final WorkspaceMoneyRegisterSnapshot register;
+  final DateTime? start;
+  final String period;
+  final bool stale;
+  @override
+  Widget build(BuildContext context) {
+    final now = DateTime.now();
+    final end = register.asOf.isBefore(now) ? register.asOf : now;
+    final balance = stale
+        ? null
+        : register.balances(start ?? register.openingAt, end);
+    return ExpansionTile(
+      key: PageStorageKey((
+        'money-register-expanded',
+        register.accountScope,
+        register.workspaceId,
+        register.registerId,
+        period,
+      )),
+      title: Text(register.label),
+      subtitle: Text(
+        'Reported through ${MaterialLocalizations.of(context).formatShortDate(end.toLocal())} '
+        '${MaterialLocalizations.of(context).formatTimeOfDay(TimeOfDay.fromDateTime(end.toLocal()))}',
+      ),
+      children: [
+        if (balance == null)
+          const Text(
+            'Opening and complete movement history are needed for this period.',
+          )
+        else ...[
+          for (final fact in <(String, int)>[
+            ('Opening balance', balance.openingMinor),
+            ('Money in', balance.inMinor),
+            ('Money out', balance.outMinor),
+            ('Closing book balance', balance.closingMinor),
+          ])
+            _MoneyDestinationLine(
+              label: fact.$1,
+              value: _purchaseAmount(fact.$2),
+            ),
+          const Text(
+            'Recorded register balance; a cash count or bank statement is separate confirmation.',
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _StoreMoneyEntrySheet extends StatefulWidget {
+  const _StoreMoneyEntrySheet({required this.session, this.purchase});
+  final WorkSession session;
+  final WorkspacePurchaseRecord? purchase;
+  @override
+  State<_StoreMoneyEntrySheet> createState() => _StoreMoneyEntrySheetState();
+}
+
+class _StoreMoneyEntrySheetState extends State<_StoreMoneyEntrySheet> {
+  bool get expense => widget.purchase == null;
+  int? get billBalance {
+    final ledger = widget.session.workspaceSupplierLedger(
+      widget.purchase?.supplierId ?? '',
+    );
+    if (ledger == null || !ledger.historyComplete) {
+      return null;
+    }
+    return ledger.entries
+        .where((entry) => entry.orderId == widget.purchase?.orderId)
+        .fold<int>(0, (sum, entry) => sum + entry.payableDeltaMinor);
+  }
+
+  final amount = TextEditingController(), reference = TextEditingController();
+  final note = TextEditingController();
+  String category = 'Shop expense';
+  String method = 'Bank transfer';
+  bool saving = false;
+  String? error;
+  late final _LedgerFormAutosave draft;
+  Map<String, String> get fields => {
+    'amount': amount.text,
+    'reference': reference.text,
+    'channel': method,
+    if (expense) 'category': category,
+    if (expense) 'note': note.text,
+  };
+  @override
+  void initState() {
+    super.initState();
+    draft = _LedgerFormAutosave(
+      widget.session,
+      expense
+          ? widget.session.expenseFormKey()
+          : widget.session.supplierPaymentFormKey(widget.purchase!),
+    );
+    draft.addListener(refresh);
+    unawaited(load());
+  }
+
+  void refresh() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  Future<void> load() async {
+    final saved = await draft.load();
+    if (!mounted || saved == null) {
+      return;
+    }
+    amount.text = saved['amount'] ?? '';
+    reference.text = saved['reference'] ?? '';
+    method = saved['channel'] ?? (expense ? 'Cash' : 'Bank transfer');
+    category = saved['category'] ?? 'Shop expense';
+    note.text = saved['note'] ?? '';
+    setState(() {});
+  }
+
+  Future<void> submit() async {
+    if (saving || !await draft.flush() || !mounted) {
+      return;
+    }
+    final text = amount.text.trim();
+    if (!RegExp(r'^\d{1,10}(\.\d{1,2})?$').hasMatch(text) ||
+        reference.text.trim().isEmpty) {
+      setState(
+        () => error = 'Enter the amount paid and its payment reference.',
+      );
+      return;
+    }
+    final parts = text.split('.');
+    final minor =
+        int.parse(parts.first) * 100 +
+        (parts.length == 1 ? 0 : int.parse(parts.last.padRight(2, '0')));
+    final key = draft.key!;
+    setState(() {
+      saving = true;
+      error = null;
+    });
+    final saved = expense
+        ? await widget.session.recordStoreReviewExpense(
+            key: key,
+            amountMinor: minor,
+            category: category,
+            method: method,
+            reference: reference.text.trim(),
+            note: note.text.trim(),
+          )
+        : await widget.session.recordStoreReviewSupplierPayment(
+            widget.purchase!,
+            operationId: jsonEncode([
+              'supplier-payment',
+              key.account,
+              key.store,
+              key.customer,
+              key.invoice,
+              key.order,
+              key.ledgerRevision,
+            ]),
+            reference: reference.text.trim(),
+            paymentMethod: method,
+            amountMinor: minor,
+            expectedRevision: key.ledgerRevision,
+          );
+    if (!mounted) {
+      return;
+    }
+    if (saved) {
+      Navigator.pop(context);
+      return;
+    }
+    setState(() {
+      saving = false;
+      error = expense
+          ? 'Expense not confirmed. Recover saved status before retrying.'
+          : 'Payment not confirmed. Check the bill balance and saved status before retrying.';
+    });
+  }
+
+  @override
+  void dispose() {
+    draft.removeListener(refresh);
+    draft.dispose();
+    amount.dispose();
+    reference.dispose();
+    note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => PopScope(
+    canPop: !saving && !draft.busy && draft.error == null,
+    onPopInvokedWithResult: (didPop, result) async {
+      if (!didPop && !saving && await draft.flush() && context.mounted) {
+        Navigator.pop(context);
+      }
+    },
+    child: SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        16 + MediaQuery.viewInsetsOf(context).bottom,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            expense ? 'Record test expense' : 'Record test payment',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          Text(
+            expense
+                ? 'Business expense not already recorded elsewhere.'
+                : '${widget.purchase!.supplierName} · ${draft.key?.invoice ?? 'Bill unavailable'}',
+          ),
+          const Text('Test record only. No money is transferred.'),
+          if (!expense)
+            Text(
+              billBalance == null
+                  ? 'Bill balance unavailable'
+                  : 'Bill balance ${_purchaseAmount(billBalance!)}',
+            ),
+          TextField(
+            key: Key(
+              expense ? 'store-expense-amount' : 'supplier-payment-amount',
+            ),
+            controller: amount,
+            enabled: draft.ready && !saving,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(labelText: 'Paid (₹)'),
+            onChanged: (_) => draft.save(fields),
+          ),
+          DropdownButtonFormField<String>(
+            key: ValueKey('supplier-payment-method-$method'),
+            initialValue: method,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Method used'),
+            items: [
+              for (final value in {
+                'UPI',
+                'Cheque',
+                'Bank transfer',
+                'NEFT',
+                'RTGS',
+                'Cash',
+                method,
+              })
+                DropdownMenuItem(value: value, child: Text(value)),
+            ],
+            onChanged: !draft.ready || saving
+                ? null
+                : (value) {
+                    if (value != null) {
+                      setState(() => method = value);
+                      draft.save(fields);
+                    }
+                  },
+          ),
+          TextField(
+            key: Key(
+              expense
+                  ? 'store-expense-reference'
+                  : 'supplier-payment-reference',
+            ),
+            controller: reference,
+            enabled: draft.ready && !saving,
+            decoration: const InputDecoration(labelText: 'Payment reference'),
+            onChanged: (_) => draft.save(fields),
+          ),
+          if (expense) ...[
+            DropdownButtonFormField<String>(
+              key: ValueKey('store-expense-category-$category'),
+              initialValue: category,
+              isExpanded: true,
+              decoration: const InputDecoration(labelText: 'Category'),
+              items: [
+                for (final value in {
+                  'Shop expense',
+                  'Delivery',
+                  'Electricity',
+                  'Salary',
+                  'Repair',
+                  'Other',
+                  category,
+                })
+                  DropdownMenuItem(value: value, child: Text(value)),
+              ],
+              onChanged: !draft.ready || saving
+                  ? null
+                  : (value) {
+                      if (value != null) {
+                        setState(() => category = value);
+                        draft.save(fields);
+                      }
+                    },
+            ),
+            TextField(
+              key: const Key('store-expense-note'),
+              controller: note,
+              maxLength: 512,
+              enabled: draft.ready && !saving,
+              decoration: const InputDecoration(labelText: 'Expense note'),
+              onChanged: (_) => draft.save(fields),
+            ),
+          ],
+          if (error != null || draft.error != null) Text(error ?? draft.error!),
+          if (!draft.ready)
+            TextButton(
+              onPressed: load,
+              child: const Text('Retry opening saved input'),
+            ),
+          if (draft.error != null && draft.ready)
+            TextButton(
+              onPressed: () => draft.save(fields),
+              child: const Text('Retry saving input'),
+            ),
+          FilledButton(
+            onPressed:
+                draft.ready && !saving && !draft.busy && draft.error == null
+                ? submit
+                : null,
+            child: Text(
+              saving
+                  ? 'Recording…'
+                  : expense
+                  ? 'Record test expense'
+                  : 'Record test payment',
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _CustomerCollectionSheet extends StatefulWidget {

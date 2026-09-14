@@ -1102,17 +1102,19 @@ class SecureWorkReceiptDraftStore implements WorkReceiptDraftStore {
         'This delivery draft changed. Open the saved version first.',
       );
     }
-    // Counts/problem/note can change; purchased identity and its source
+    // Receipt/return counts, problems and note can change; purchased identity and its source
     // snapshot cannot silently follow today's refreshed supplier catalogue.
     if (current != null) {
       final previous = current.toJson()
         ..remove('revision')
         ..remove('countedPacks')
+        ..remove('returnedPacks')
         ..remove('problems')
         ..remove('note');
       final next = draft.toJson()
         ..remove('revision')
         ..remove('countedPacks')
+        ..remove('returnedPacks')
         ..remove('problems')
         ..remove('note');
       if (jsonEncode(previous) != jsonEncode(next)) {
@@ -3114,6 +3116,33 @@ class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore {
       }
       if (current != null) {
         final previous = current.finance;
+        if (current.moneyRegisters.entries.any(
+          (entry) =>
+              checkpoint.moneyRegisters[entry.key]?.canFollow(entry.value) !=
+              true,
+        )) {
+          throw const WorkGatewayException(
+            'Money register history cannot be replaced or discarded.',
+          );
+        }
+        if (current.expenses.entries.any(
+          (entry) =>
+              jsonEncode(checkpoint.expenses[entry.key]?.toJson()) !=
+              jsonEncode(entry.value.toJson()),
+        )) {
+          throw const WorkGatewayException(
+            'Recorded expenses cannot be replaced or discarded.',
+          );
+        }
+        if (current.supplierLedgers.entries.any(
+          (entry) =>
+              checkpoint.supplierLedgers[entry.key]?.canFollow(entry.value) !=
+              true,
+        )) {
+          throw const WorkGatewayException(
+            'Supplier ledger history cannot be replaced or discarded.',
+          );
+        }
         if (current.billedInvoices.entries.any(
           (entry) =>
               jsonEncode(
@@ -4197,6 +4226,49 @@ class StoreReviewSeed {
       ),
   ]);
 
+  /// Explicit synthetic invoice/payment facts for the existing review Store.
+  /// No production shipment status is converted into financial authority.
+  List<WorkspaceSupplierLedger> get supplierLedgers => List.unmodifiable([
+    for (var supplier = 0; supplier < 3; supplier++)
+      WorkspaceSupplierLedger(
+        accountScope: accountScope,
+        workspaceId: storeId,
+        supplierId: 'QA-SUPPLIER-$supplier',
+        supplierName:
+            'Test ${WorkspaceStockSupplierType.values[supplier].label}',
+        revision: 1,
+        asOf: now,
+        historyComplete: true,
+        openingBalanceMinor: 0,
+        entries: [
+          for (var i = 0; i < WorkspaceSupplyStage.values.length; i++)
+            if (i % 3 == supplier) ...[
+              WorkspaceSupplierLedgerEntry(
+                operationId: 'QA-SUPPLIER-BILL-$i',
+                orderId: 'QA-PURCHASE-$i',
+                billId: 'QA-BILL-$i',
+                reference: 'QA-BILL-$i',
+                kind: WorkspaceSupplierEntryKind.bill,
+                amountMinor: products.first.purchasePrice * 20 * 100,
+                postedAt: now.subtract(const Duration(days: 1)),
+              ),
+              WorkspaceSupplierLedgerEntry(
+                operationId: 'QA-SUPPLIER-PAYMENT-$i',
+                orderId: 'QA-PURCHASE-$i',
+                billId: 'QA-BILL-$i',
+                reference: 'QA-PAYMENT-$i',
+                kind: i.isEven
+                    ? WorkspaceSupplierEntryKind.payment
+                    : WorkspaceSupplierEntryKind.advance,
+                amountMinor:
+                    products.first.purchasePrice * (i.isEven ? 20 : 5) * 100,
+                postedAt: now,
+              ),
+            ],
+        ],
+      ),
+  ]);
+
   List<WorkspaceGroupOffer> get offers => List.unmodifiable([
     for (var i = 0; i < 3; i++)
       WorkspaceGroupOffer(
@@ -4240,6 +4312,230 @@ class StoreReviewSeed {
 /// In-memory response simulator. It proves UI handling, never backend security.
 /// A lost reply retains one result for reconciliation without replaying effects.
 enum StoreReviewOrderResponse { applied, rejected, lostReply }
+
+/// Synthetic receiving adapter for the existing labelled Store. No network,
+/// financial posting or production approval is performed by this adapter.
+class StoreReviewSupplierPaymentGateway {
+  const StoreReviewSupplierPaymentGateway();
+
+  WorkspaceSupplierLedger? record({
+    required WorkspaceSupplierLedger ledger,
+    required WorkspacePurchaseRecord purchase,
+    required String operationId,
+    required String reference,
+    required String paymentMethod,
+    required int amountMinor,
+    required int expectedRevision,
+  }) {
+    if (!ledger.valid ||
+        !purchase.valid ||
+        !ledger.historyComplete ||
+        ledger.accountScope != purchase.accountScope ||
+        ledger.workspaceId != purchase.workspaceId ||
+        ledger.supplierId != purchase.supplierId ||
+        operationId.trim().isEmpty ||
+        reference.trim().isEmpty ||
+        paymentMethod.trim().isEmpty ||
+        amountMinor <= 0 ||
+        expectedRevision <= 0 ||
+        expectedRevision > ledger.revision) {
+      return null;
+    }
+    final existing = ledger.entries.where(
+      (entry) => entry.operationId == operationId,
+    );
+    if (existing.isNotEmpty) {
+      final entry = existing.single;
+      return entry.orderId == purchase.orderId &&
+              entry.kind == WorkspaceSupplierEntryKind.payment &&
+              entry.reference == reference &&
+              entry.paymentMethod == paymentMethod &&
+              entry.amountMinor == amountMinor
+          ? ledger
+          : null;
+    }
+    if (expectedRevision != ledger.revision) {
+      return null;
+    }
+    final entries = ledger.entries
+        .where((entry) => entry.orderId == purchase.orderId)
+        .toList();
+    final bills = entries
+        .where((entry) => entry.kind == WorkspaceSupplierEntryKind.bill)
+        .toList();
+    // This MVP action allocates to one confirmed bill; it cannot silently spread
+    // one payment across suppliers or invent a bill from a purchase order.
+    if (bills.length != 1) {
+      return null;
+    }
+    final balance = entries.fold<int>(
+      0,
+      (sum, entry) => sum + entry.payableDeltaMinor,
+    );
+    if (amountMinor > balance) {
+      return null;
+    }
+    return ledger.appendConfirmed(
+      WorkspaceSupplierLedgerEntry(
+        operationId: operationId,
+        orderId: purchase.orderId,
+        billId: bills.single.billId,
+        reference: reference,
+        paymentMethod: paymentMethod,
+        kind: WorkspaceSupplierEntryKind.payment,
+        amountMinor: amountMinor,
+        postedAt: DateTime.now().toUtc(),
+      ),
+      expectedRevision: expectedRevision,
+    );
+  }
+}
+
+class StoreReviewReceiptGateway {
+  const StoreReviewReceiptGateway(this.seed);
+  final StoreReviewSeed seed;
+
+  WorkspaceSupplierReturnConfirmation? confirmReturn(
+    WorkspacePurchaseRecord purchase,
+    WorkspaceReceiptDraft draft,
+  ) {
+    // Reuse exact seeded identity/pack checks; issue notes do not themselves
+    // authorize a refund or determine the quantity physically returned.
+    if (confirm(
+          purchase,
+          draft.edit(
+            revision: draft.revision,
+            countedPacks: draft.countedPacks,
+            problems: const {},
+            note: draft.note,
+          ),
+        ) ==
+        null) {
+      return null;
+    }
+    final counts = <String, int>{};
+    for (final entry in draft.returnedPacks.entries) {
+      final text = entry.value.trim();
+      if (text.isEmpty) {
+        continue;
+      }
+      if (!RegExp(r'^\d+$').hasMatch(text)) {
+        return null;
+      }
+      final count = int.tryParse(text);
+      if (count == null || count < 0) {
+        return null;
+      }
+      counts[entry.key] = count;
+    }
+    if (counts.isEmpty || !counts.values.any((count) => count > 0)) {
+      return null;
+    }
+    return WorkspaceSupplierReturnConfirmation(
+      accountScope: purchase.accountScope,
+      workspaceId: purchase.workspaceId,
+      supplierId: purchase.supplierId,
+      orderId: purchase.orderId,
+      shipmentId: purchase.shipmentId,
+      reference: 'TEST-RETURN-${purchase.shipmentId}-${draft.revision}',
+      revision: draft.revision,
+      confirmedAt: DateTime.now().toUtc(),
+      returnedPacks: counts,
+    );
+  }
+
+  WorkspacePurchaseRecord? confirm(
+    WorkspacePurchaseRecord purchase,
+    WorkspaceReceiptDraft draft,
+  ) {
+    final originals = seed.purchases.where(
+      (item) => item.shipmentId == purchase.shipmentId,
+    );
+    if (originals.length != 1 ||
+        !purchase.valid ||
+        !draft.quantitiesComplete ||
+        !draft.belongsTo(purchase) ||
+        draft.problems.isNotEmpty ||
+        purchase.accountScope != seed.accountScope ||
+        purchase.workspaceId != seed.storeId) {
+      return null;
+    }
+    final original = originals.single;
+    if (purchase.supplierId != original.supplierId ||
+        purchase.orderId != original.orderId ||
+        draft.lines.length != original.lines.length ||
+        purchase.lines.length != original.lines.length) {
+      return null;
+    }
+    for (final line in original.lines) {
+      final observed = draft.lines.where((item) => item.id == line.id);
+      final current = purchase.lines.where((item) => item.id == line.id);
+      bool same(WorkspacePurchaseLine item) =>
+          item.productId == line.productId &&
+          item.pack == line.pack &&
+          item.orderedPacks == line.orderedPacks &&
+          item.unitPriceMinor == line.unitPriceMinor;
+      final count = draft.counted(line.id);
+      if (observed.length != 1 ||
+          current.length != 1 ||
+          !same(observed.single) ||
+          !same(current.single) ||
+          count == null ||
+          count > line.orderedPacks) {
+        return null;
+      }
+    }
+    final revision = purchase.revision > draft.revision
+        ? purchase.revision + 1
+        : draft.revision + 1;
+    return WorkspacePurchaseRecord(
+      accountScope: purchase.accountScope,
+      workspaceId: purchase.workspaceId,
+      supplierId: purchase.supplierId,
+      supplierName: purchase.supplierName,
+      orderId: purchase.orderId,
+      shipmentId: purchase.shipmentId,
+      purchaseId: purchase.purchaseId,
+      procurementContext: purchase.procurementContext,
+      revision: revision,
+      createdAt: purchase.createdAt,
+      updatedAt: DateTime.now().toUtc(),
+      stage: purchase.stage,
+      amountMinor: purchase.amountMinor,
+      itemSummary: purchase.itemSummary,
+      paymentLabel: purchase.paymentLabel,
+      paymentTermLabel: purchase.paymentTermLabel,
+      balanceDueLabel: purchase.balanceDueLabel,
+      paymentMethod: purchase.paymentMethod,
+      purchaseOrderReference: purchase.purchaseOrderReference,
+      expectedArrival: purchase.expectedArrival,
+      address: purchase.address,
+      deliveryPartner: purchase.deliveryPartner,
+      trackingReference: purchase.trackingReference,
+      invoiceReference: purchase.invoiceReference,
+      receiptState:
+          original.lines.every(
+            (line) => draft.counted(line.id) == line.orderedPacks,
+          )
+          ? WorkspaceReceiptState.confirmed
+          : WorkspaceReceiptState.partial,
+      receiptReference: 'TEST-${purchase.shipmentId}-${draft.revision}',
+      updateNote: 'Test receipt only. No supplier message or payment.',
+      lines: [
+        for (final line in purchase.lines)
+          WorkspacePurchaseLine(
+            id: line.id,
+            productId: line.productId,
+            name: line.name,
+            pack: line.pack,
+            orderedPacks: line.orderedPacks,
+            unitPriceMinor: line.unitPriceMinor,
+            receivedPacks: draft.counted(line.id),
+          ),
+      ],
+    );
+  }
+}
 
 class StoreReviewOrderGateway implements WorkOrderTimeCommandGateway {
   StoreReviewOrderGateway(this.seed) {

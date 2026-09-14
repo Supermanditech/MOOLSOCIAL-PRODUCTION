@@ -514,6 +514,1158 @@ WorkspaceReceiptDraft _receiptDraft({
 
 void main() {
   test(
+    'LEDGER02 supplier save failure and lost reply recover without another payment',
+    () async {
+      final at = DateTime.utc(2026, 9, 14);
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: at,
+      );
+      final storage = _OrderJournalStorage();
+      WorkSession openStore() {
+        final session = WorkSession(
+          gateway: ReviewWorkGateway(),
+          pendingProofStore: _CommandAccountStore(),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(session.dispose);
+        expect(session.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          session.bindCustomerCollectionGateway(
+            accountScope: 'account-A',
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: SecureWorkLedgerCheckpointStore(
+              accountScope: () => 'account-A',
+              storage: storage,
+            ),
+          ),
+          isTrue,
+        );
+        return session;
+      }
+
+      final supplier = WorkspaceSupplierLedger(
+        accountScope: 'account-A',
+        workspaceId: seed.storeId,
+        supplierId: 'supplier-A',
+        supplierName: 'Test supplier',
+        revision: 1,
+        asOf: at,
+        historyComplete: true,
+        openingBalanceMinor: 0,
+        entries: [
+          WorkspaceSupplierLedgerEntry(
+            operationId: 'bill-1',
+            orderId: 'purchase-1',
+            billId: 'bill-1',
+            reference: 'BILL-1',
+            kind: WorkspaceSupplierEntryKind.bill,
+            amountMinor: 200000,
+            postedAt: at,
+          ),
+          WorkspaceSupplierLedgerEntry(
+            operationId: 'advance-1',
+            orderId: 'purchase-1',
+            reference: 'ADVANCE-1',
+            kind: WorkspaceSupplierEntryKind.advance,
+            amountMinor: 50000,
+            postedAt: at,
+          ),
+        ],
+      );
+      final session = openStore();
+      final settlement = session.workspaceSettlementBalance;
+      storage.failWrite = true;
+      expect(await session.saveWorkspaceSupplierLedger(supplier), isFalse);
+      expect(session.workspaceSupplierLedger('supplier-A'), isNull);
+      storage.failWrite = false;
+      storage.loseWriteResponseOnce = true;
+      expect(await session.saveWorkspaceSupplierLedger(supplier), isFalse);
+      final reopened = openStore();
+      expect(await reopened.recoverCustomerLedger(), isTrue);
+      expect(
+        reopened.workspaceSupplierLedger('supplier-A')?.payableMinor,
+        150000,
+      );
+      expect(await reopened.saveWorkspaceSupplierLedger(supplier), isTrue);
+      expect(reopened.workspaceSupplierLedger('supplier-A')?.entries.length, 2);
+      expect(reopened.workspaceSettlementBalance, settlement);
+      expect(reopened.workspaceCatalogueItems, isEmpty);
+      expect(reopened.workspacePurchases, isEmpty);
+    },
+  );
+  test(
+    'LEDGER02 supplier feed stays separate from stock and account switches',
+    () {
+      final account = _CommandAccountStore();
+      final session =
+          WorkSession(gateway: ReviewWorkGateway(), pendingProofStore: account)
+            ..activeWorkspace = const WorkWorkspace(
+              id: 'store-A',
+              name: 'Test Store',
+              profileLabel: 'Grocery / Kirana Shop',
+              profileId: 'retailer-grocery',
+              area: 'Test area',
+              verified: true,
+            );
+      addTearDown(session.dispose);
+      final at = DateTime.utc(2026, 9, 14);
+      WorkspaceSupplierLedger snapshot({
+        String scope = 'account-A',
+        int revision = 1,
+      }) => WorkspaceSupplierLedger(
+        accountScope: scope,
+        workspaceId: 'store-A',
+        supplierId: 'supplier-A',
+        supplierName: 'Test supplier',
+        revision: revision,
+        asOf: at,
+        openingBalanceMinor: 0,
+        historyComplete: true,
+        entries: [
+          WorkspaceSupplierLedgerEntry(
+            operationId: 'bill-1',
+            orderId: 'purchase-1',
+            reference: 'BILL-1',
+            billId: 'bill-1',
+            kind: WorkspaceSupplierEntryKind.bill,
+            amountMinor: 200000,
+            postedAt: at,
+          ),
+          WorkspaceSupplierLedgerEntry(
+            operationId: 'advance-1',
+            orderId: 'purchase-1',
+            reference: 'ADVANCE-1',
+            kind: WorkspaceSupplierEntryKind.advance,
+            amountMinor: 50000,
+            postedAt: at,
+          ),
+        ],
+      );
+      final settlement = session.workspaceSettlementBalance;
+      expect(session.applyWorkspaceSupplierLedger(snapshot()), isTrue);
+      expect(
+        session.workspaceSupplierLedger('supplier-A')?.payableMinor,
+        150000,
+      );
+      expect(session.applyWorkspaceSupplierLedger(snapshot()), isTrue);
+      expect(session.workspaceSupplierLedger('supplier-A')?.entries.length, 2);
+      expect(session.workspacePurchases, isEmpty);
+      expect(session.workspaceCatalogueItems, isEmpty);
+      expect(session.workspaceSettlementBalance, settlement);
+      expect(
+        session.applyWorkspaceSupplierLedger(snapshot(scope: 'account-B')),
+        isFalse,
+      );
+      account.accountScope = 'account-B';
+      expect(session.workspaceSupplierLedger('supplier-A'), isNull);
+      expect(
+        session.applyWorkspaceSupplierLedger(snapshot(scope: 'account-B')),
+        isTrue,
+      );
+      account.accountScope = 'account-A';
+      expect(
+        session.workspaceSupplierLedger('supplier-A')?.accountScope,
+        'account-A',
+      );
+    },
+  );
+  test(
+    'LEDGER02 review bills and payments retain existing purchase identities',
+    () {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 14),
+      );
+      final purchases = seed.purchases;
+      final ledgers = seed.supplierLedgers;
+      expect(ledgers.every((ledger) => ledger.valid), isTrue);
+      for (final purchase in purchases) {
+        final ledger = ledgers.singleWhere(
+          (item) => item.supplierId == purchase.supplierId,
+        );
+        expect(ledger.accountScope, purchase.accountScope);
+        expect(ledger.workspaceId, purchase.workspaceId);
+        final entries = ledger.entries
+            .where((item) => item.orderId == purchase.orderId)
+            .toList();
+        expect(entries.length, 2);
+        final bill = entries.singleWhere(
+          (item) => item.kind == WorkspaceSupplierEntryKind.bill,
+        );
+        final paid = entries.singleWhere(
+          (item) => item.kind != WorkspaceSupplierEntryKind.bill,
+        );
+        expect(bill.amountMinor, purchase.amountMinor);
+        expect(paid.billId, bill.billId);
+        expect(paid.amountMinor, lessThanOrEqualTo(bill.amountMinor));
+      }
+      expect(
+        ledgers.expand((ledger) => ledger.entries).length,
+        purchases.length * 2,
+      );
+    },
+  );
+
+  test(
+    'LEDGER02 partial receipts persist only incremental stock, never money',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 14),
+      );
+      final storage = _OrderJournalStorage();
+      WorkSession openStore() {
+        final session = WorkSession(
+          gateway: ReviewWorkGateway(),
+          pendingProofStore: _CommandAccountStore(),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(session.dispose);
+        session.workspaceCatalogueItems.addAll(seed.products);
+        expect(session.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          session.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: SecureWorkLedgerCheckpointStore(
+              accountScope: () => seed.accountScope,
+              storage: storage,
+            ),
+          ),
+          isTrue,
+        );
+        return session;
+      }
+
+      WorkspacePurchaseRecord receipt(
+        int revision,
+        int count, {
+        WorkspaceReceiptState state = WorkspaceReceiptState.partial,
+      }) => WorkspacePurchaseRecord(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        supplierId: 'supplier-A',
+        supplierName: 'Test supplier',
+        orderId: 'purchase-1',
+        shipmentId: 'shipment-1',
+        revision: revision,
+        createdAt: seed.now,
+        updatedAt: seed.now.add(Duration(minutes: revision)),
+        stage: WorkspaceSupplyStage.delivered,
+        amountMinor: 200000,
+        itemSummary: 'Grocery packs',
+        paymentLabel: 'Payment pending',
+        receiptState: state,
+        receiptReference: 'receipt-$revision',
+        lines: [
+          WorkspacePurchaseLine(
+            id: 'line-1',
+            productId: 'supplier-sku',
+            name: 'Grocery packs',
+            pack: '2 units',
+            orderedPacks: 10,
+            receivedPacks: count,
+            unitPriceMinor: 20000,
+          ),
+        ],
+      );
+      void publish(WorkSession session, WorkspacePurchaseRecord record) {
+        expect(
+          session.applyWorkspacePurchases(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: record.revision,
+            records: [record],
+            complete: true,
+          ),
+          isTrue,
+        );
+      }
+
+      final session = openStore();
+      final productId = seed.products.first.id;
+      final opening = seed.products.first.stock;
+      Future<bool> post(
+        WorkSession target,
+        WorkspacePurchaseRecord record, {
+        int factor = 2,
+      }) => target.recordWorkspacePurchaseReceipt(
+        record,
+        stockProductIds: {'line-1': productId},
+        unitsPerPack: {'line-1': factor},
+      );
+      final first = receipt(1, 4);
+      publish(session, first);
+      expect(await post(session, first), isTrue);
+      expect(session.workspaceCatalogueItems.first.stock, opening + 8);
+      expect(await post(session, first), isTrue);
+      expect(session.workspaceStockMovements.length, 1);
+      final second = receipt(2, 10, state: WorkspaceReceiptState.confirmed);
+      publish(session, second);
+      expect(await post(session, second, factor: 3), isFalse);
+      expect(await post(session, second), isTrue);
+      expect(session.workspaceCatalogueItems.first.stock, opening + 20);
+      expect(session.workspaceStockMovements.length, 2);
+      expect(
+        WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: session.workspaceFinance!,
+        ).toJson(),
+        WorkspaceLedgerCheckpoint(revision: 1, finance: seed.finance).toJson(),
+      );
+      final reopened = openStore();
+      publish(reopened, second);
+      expect(await post(reopened, second), isTrue);
+      expect(reopened.workspaceCatalogueItems.first.stock, opening + 20);
+      expect(reopened.workspaceStockMovements.length, 2);
+      for (final movement in reopened.workspaceStockMovements) {
+        expect(
+          reopened.workspacePurchaseForStockMovement(movement),
+          same(second),
+        );
+      }
+      expect(
+        WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: reopened.workspaceFinance!,
+        ).toJson(),
+        WorkspaceLedgerCheckpoint(revision: 1, finance: seed.finance).toJson(),
+      );
+      WorkspaceSupplierReturnConfirmation returned(
+        int count, {
+        String account = 'account-A',
+        int revision = 1,
+      }) => WorkspaceSupplierReturnConfirmation(
+        accountScope: account,
+        workspaceId: seed.storeId,
+        supplierId: second.supplierId,
+        orderId: second.orderId,
+        shipmentId: second.shipmentId,
+        reference: 'return-$revision',
+        revision: revision,
+        confirmedAt: seed.now,
+        returnedPacks: {'line-1': count},
+      );
+      Future<bool> returnStock(
+        WorkspaceSupplierReturnConfirmation confirmation,
+      ) => reopened.recordWorkspaceSupplierReturn(
+        second,
+        confirmation: confirmation,
+        stockProductIds: {'line-1': productId},
+        unitsPerPack: {'line-1': 2},
+      );
+      expect(await returnStock(returned(2)), isTrue);
+      expect(reopened.workspaceCatalogueItems.first.stock, opening + 16);
+      expect(await returnStock(returned(2)), isTrue);
+      expect(reopened.workspaceStockMovements.length, 3);
+      // Re-reading the original receipt must not put returned goods back.
+      expect(await post(reopened, second), isTrue);
+      expect(reopened.workspaceCatalogueItems.first.stock, opening + 16);
+      expect(await returnStock(returned(11, revision: 2)), isFalse);
+      expect(
+        await returnStock(returned(3, account: 'other-account', revision: 2)),
+        isFalse,
+      );
+      expect(
+        WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: reopened.workspaceFinance!,
+        ).toJson(),
+        WorkspaceLedgerCheckpoint(revision: 1, finance: seed.finance).toJson(),
+      );
+      final unconfirmed = receipt(3, 10, state: WorkspaceReceiptState.awaiting);
+      publish(reopened, unconfirmed);
+      expect(await post(reopened, unconfirmed), isFalse);
+      expect(reopened.workspaceCatalogueItems.first.stock, opening + 16);
+    },
+  );
+
+  test(
+    'LEDGER02 review receiving adapter confirms counts without changing payment facts',
+    () {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 14),
+      );
+      final purchase = seed.purchases.first;
+      final line = purchase.lines.single;
+      WorkspaceReceiptDraft draft(
+        String count, {
+        String account = 'account-A',
+        Map<String, WorkspaceReceiptProblem> problems = const {},
+      }) => WorkspaceReceiptDraft(
+        key: (
+          account: account,
+          store: seed.storeId,
+          shipment: purchase.shipmentId,
+        ),
+        supplierId: purchase.supplierId,
+        orderId: purchase.orderId,
+        shipmentRevision: purchase.revision,
+        revision: 1,
+        lines: purchase.lines,
+        countedPacks: {line.id: count},
+        problems: problems,
+      );
+      final adapter = StoreReviewReceiptGateway(seed);
+      final partial = adapter.confirm(purchase, draft('4'))!;
+      expect(partial.receiptState, WorkspaceReceiptState.partial);
+      expect(partial.lines.single.receivedPacks, 4);
+      expect(partial.stage, purchase.stage);
+      expect(partial.amountMinor, purchase.amountMinor);
+      expect(partial.paymentLabel, purchase.paymentLabel);
+      expect(partial.orderId, purchase.orderId);
+      expect(partial.shipmentId, purchase.shipmentId);
+      expect(
+        adapter.confirm(purchase, draft('20'))!.receiptState,
+        WorkspaceReceiptState.confirmed,
+      );
+      expect(adapter.confirm(purchase, draft('21')), isNull);
+      expect(adapter.confirm(purchase, draft('')), isNull);
+      expect(
+        adapter.confirm(purchase, draft('4', account: 'other-account')),
+        isNull,
+      );
+      expect(
+        adapter.confirm(
+          purchase,
+          draft('4', problems: {line.id: WorkspaceReceiptProblem.other}),
+        ),
+        isNull,
+      );
+    },
+  );
+
+  const receiptReviewEnabled =
+      bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+  test(
+    receiptReviewEnabled
+        ? 'LEDGER02 connected test receipt survives retry and Store reopen'
+        : 'LEDGER02 receipt confirmation stays disabled outside review builds',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 14),
+      );
+      final native = _OrderJournalStorage();
+      WorkSession openStore() {
+        final session = WorkSession(
+          gateway: ReviewWorkGateway(),
+          pendingProofStore: _CommandAccountStore(),
+          contactDraftStore: _CommandAccountStore(),
+          receiptDraftStore: SecureWorkReceiptDraftStore(
+            accountScope: () => seed.accountScope,
+            storage: native,
+          ),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(session.dispose);
+        session.workspaceCatalogueItems.addAll(seed.products);
+        expect(session.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          session.applyWorkspacePurchases(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: 1,
+            records: seed.purchases,
+            complete: true,
+          ),
+          isTrue,
+        );
+        expect(
+          session.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: SecureWorkLedgerCheckpointStore(
+              accountScope: () => seed.accountScope,
+              storage: native,
+            ),
+          ),
+          isTrue,
+        );
+        expect(
+          session.bindWorkspaceOrderOperations(
+            WorkOrderOperations(
+              accountScope: seed.accountScope,
+              workspaceId: seed.storeId,
+              gateway: StoreReviewOrderGateway(seed),
+            ),
+          ),
+          isTrue,
+        );
+        return session;
+      }
+
+      final session = openStore();
+      final purchase = session.workspacePurchases.first;
+      expect(
+        session.canConfirmStoreReviewReceipt(purchase),
+        receiptReviewEnabled,
+      );
+      if (!receiptReviewEnabled) {
+        expect(await session.confirmStoreReviewReceipt(purchase), isFalse);
+        expect(session.workspaceStockMovements, isEmpty);
+        return;
+      }
+      await session.loadWorkspaceReceiptDraft(purchase);
+      await session.saveWorkspaceReceiptDraft(
+        purchase,
+        countedPacks: {purchase.lines.single.id: '4'},
+        problems: const {},
+        note: 'Four test packs counted',
+      );
+      expect(await session.confirmStoreReviewReceipt(purchase), isTrue);
+      final updated = session.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      expect(updated.receiptState, WorkspaceReceiptState.partial);
+      expect(
+        session.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 4,
+      );
+      expect(await session.confirmStoreReviewReceipt(updated), isTrue);
+      expect(session.workspaceStockMovements.length, 1);
+      final reopened = openStore();
+      final restoredPurchase = reopened.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      await reopened.loadWorkspaceReceiptDraft(restoredPurchase);
+      expect(
+        reopened
+            .workspaceReceiptDraft(restoredPurchase)!
+            .counted(purchase.lines.single.id),
+        4,
+      );
+      expect(
+        await reopened.confirmStoreReviewReceipt(restoredPurchase),
+        isTrue,
+      );
+      expect(
+        reopened.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 4,
+      );
+      expect(reopened.workspaceStockMovements.length, 1);
+      final received = reopened.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      await reopened.saveWorkspaceReceiptDraft(
+        received,
+        countedPacks: {purchase.lines.single.id: '4'},
+        returnedPacks: {purchase.lines.single.id: '1'},
+        problems: const {},
+        note: 'One test pack returned',
+      );
+      final returnSaved = await reopened.confirmStoreReviewSupplierReturn(
+        received,
+      );
+      expect(
+        returnSaved,
+        isTrue,
+        reason: reopened.workspaceReceiptDraftMessage(received),
+      );
+      expect(await reopened.confirmStoreReviewSupplierReturn(received), isTrue);
+      expect(
+        reopened.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 3,
+      );
+      expect(reopened.workspaceStockMovements.length, 2);
+      final afterReturn = openStore();
+      final returnPurchase = afterReturn.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      await afterReturn.loadWorkspaceReceiptDraft(returnPurchase);
+      final retained = afterReturn.workspaceReceiptDraft(returnPurchase)!;
+      expect(retained.counted(purchase.lines.single.id), 4);
+      expect(retained.returnedPacks[purchase.lines.single.id], '1');
+      expect(
+        await afterReturn.confirmStoreReviewReceipt(returnPurchase),
+        isTrue,
+      );
+      final latest = afterReturn.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      expect(
+        await afterReturn.confirmStoreReviewSupplierReturn(latest),
+        isTrue,
+      );
+      expect(
+        afterReturn.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 3,
+      );
+      expect(afterReturn.workspaceStockMovements.length, 2);
+      final expenseKey = afterReturn.expenseFormKey()!;
+      Future<bool> recordExpense({String reference = 'TEST-EXPENSE'}) =>
+          afterReturn.recordStoreReviewExpense(
+            key: expenseKey,
+            amountMinor: 1900,
+            category: 'Repair',
+            method: 'Cash',
+            reference: reference,
+            note: 'Test repair expense',
+          );
+      expect(await recordExpense(), isTrue);
+      expect(await recordExpense(), isTrue);
+      expect(await recordExpense(reference: 'changed-reference'), isFalse);
+      expect(afterReturn.workspaceExpenses.length, 1);
+      expect(
+        afterReturn.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 3,
+      );
+      final expenseRecovery = openStore();
+      expect(await expenseRecovery.recoverCustomerLedger(), isTrue);
+      expect(expenseRecovery.workspaceExpenses.single.amountMinor, 1900);
+      expect(
+        expenseRecovery.expenseFormKey()!.ledgerRevision,
+        expenseKey.ledgerRevision + 1,
+      );
+      expect(
+        WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: reopened.workspaceFinance!,
+        ).toJson(),
+        WorkspaceLedgerCheckpoint(revision: 1, finance: seed.finance).toJson(),
+      );
+    },
+  );
+
+  test(
+    'LEDGER02 supplier payment clears only its bill and retains method on replay',
+    () {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 14),
+      );
+      final purchase = seed.purchases[1];
+      final ledger = seed.supplierLedgers.singleWhere(
+        (item) => item.supplierId == purchase.supplierId,
+      );
+      final amount = purchase.amountMinor * 3 ~/ 4;
+      const adapter = StoreReviewSupplierPaymentGateway();
+      WorkspaceSupplierLedger? record(
+        WorkspaceSupplierLedger current, {
+        int? paid,
+        String reference = 'test-bank-reference',
+        String method = 'Bank transfer',
+        String operation = 'payment-remaining',
+      }) => adapter.record(
+        ledger: current,
+        purchase: purchase,
+        operationId: operation,
+        reference: reference,
+        paymentMethod: method,
+        amountMinor: paid ?? amount,
+        expectedRevision: ledger.revision,
+      );
+      expect(record(ledger, paid: amount + 1), isNull);
+      final paid = record(ledger)!;
+      expect(
+        paid.entries
+            .where((item) => item.orderId == purchase.orderId)
+            .fold<int>(0, (sum, item) => sum + item.payableDeltaMinor),
+        0,
+      );
+      expect(paid.entries.last.billId, 'QA-BILL-1');
+      expect(paid.entries.last.paymentMethod, 'Bank transfer');
+      expect(identical(record(paid), paid), isTrue);
+      expect(record(paid, method: 'Cash'), isNull);
+      expect(record(paid, reference: 'different-reference'), isNull);
+      expect(record(paid, operation: 'second-payment'), isNull);
+      final restored = WorkspaceSupplierLedger.fromJson(paid.toJson())!;
+      expect(restored.entries.last.paymentMethod, 'Bank transfer');
+      expect(restored.entries.last.reference, 'test-bank-reference');
+      expect(record(restored)!.entries.length, paid.entries.length);
+      expect(
+        paid.entries
+            .take(ledger.entries.length)
+            .map((item) => item.toJson())
+            .toList(),
+        ledger.entries.map((item) => item.toJson()).toList(),
+      );
+    },
+  );
+
+  test(
+    'LEDGER02 supplier payment draft retains input without posting or crossing bills',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 14),
+      );
+      final native = _OrderJournalStorage();
+      WorkSession openStore() {
+        final session = WorkSession(
+          pendingProofStore: _CommandAccountStore(),
+          contactDraftStore: _CommandAccountStore(),
+          ledgerFormDraftStore: SecureWorkLedgerFormDraftStore(
+            accountScope: () => seed.accountScope,
+            storage: native,
+          ),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(session.dispose);
+        expect(
+          session.applyWorkspacePurchases(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: 1,
+            records: seed.purchases,
+            complete: true,
+          ),
+          isTrue,
+        );
+        for (final ledger in seed.supplierLedgers) {
+          expect(session.applyWorkspaceSupplierLedger(ledger), isTrue);
+        }
+        return session;
+      }
+
+      final session = openStore();
+      final purchase = session.workspacePurchases.first;
+      final key = session.supplierPaymentFormKey(purchase)!;
+      final before = session
+          .workspaceSupplierLedger(purchase.supplierId)!
+          .toJson();
+      await session.saveLedgerForm(
+        WorkspaceLedgerFormDraft(
+          key: key,
+          revision: 1,
+          fields: const {
+            'amount': '12.',
+            'channel': 'UPI',
+            'reference': 'test reference',
+          },
+        ),
+        expectedRevision: null,
+      );
+      final reopened = openStore();
+      final retained = await reopened.readLedgerForm(key);
+      expect(retained!.fields, {
+        'amount': '12.',
+        'channel': 'UPI',
+        'reference': 'test reference',
+      });
+      expect(
+        reopened.workspaceSupplierLedger(purchase.supplierId)!.toJson(),
+        before,
+      );
+      expect(reopened.workspaceStockMovements, isEmpty);
+      final wrongBill = (
+        account: key.account,
+        store: key.store,
+        customer: key.customer,
+        invoice: 'another-bill',
+        order: key.order,
+        kind: key.kind,
+        ledgerRevision: key.ledgerRevision,
+      );
+      await expectLater(reopened.readLedgerForm(wrongBill), throwsStateError);
+      final wrongOrder = (
+        account: key.account,
+        store: key.store,
+        customer: key.customer,
+        invoice: key.invoice,
+        order: 'another-order',
+        kind: key.kind,
+        ledgerRevision: key.ledgerRevision,
+      );
+      await expectLater(reopened.readLedgerForm(wrongOrder), throwsStateError);
+    },
+  );
+
+  test(
+    'LEDGER03 expense save recovers once and survives later supplier updates',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'account-A',
+        orderCount: 12,
+        now: DateTime.utc(2026, 9, 14),
+      );
+      final native = _OrderJournalStorage();
+      WorkSession openStore() {
+        final session = WorkSession(
+          pendingProofStore: _CommandAccountStore(),
+          contactDraftStore: _CommandAccountStore(),
+        )..activeWorkspace = seed.workspace;
+        addTearDown(session.dispose);
+        expect(session.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          session.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: SecureWorkLedgerCheckpointStore(
+              accountScope: () => seed.accountScope,
+              storage: native,
+            ),
+          ),
+          isTrue,
+        );
+        return session;
+      }
+
+      WorkspaceExpenseRecord expense({
+        int amount = 1230,
+        String account = 'account-A',
+      }) => WorkspaceExpenseRecord(
+        accountScope: account,
+        workspaceId: seed.storeId,
+        operationId: 'expense-1',
+        amountMinor: amount,
+        category: 'Transport',
+        method: 'Cash',
+        reference: 'TEST-RECEIPT-1',
+        note: 'Test local transport',
+        occurredAt: seed.now,
+      );
+      final first = openStore();
+      native.loseWriteResponseOnce = true;
+      expect(await first.saveWorkspaceExpenseRecord(expense()), isFalse);
+      expect(first.workspaceExpenses, isEmpty);
+      final reopened = openStore();
+      expect(await reopened.recoverCustomerLedger(), isTrue);
+      expect(reopened.workspaceExpenses.single.amountMinor, 1230);
+      expect(await reopened.saveWorkspaceExpenseRecord(expense()), isTrue);
+      expect(
+        await reopened.saveWorkspaceExpenseRecord(expense(amount: 1250)),
+        isFalse,
+      );
+      expect(
+        await reopened.saveWorkspaceExpenseRecord(
+          expense(account: 'other-account'),
+        ),
+        isFalse,
+      );
+      final register = WorkspaceMoneyRegisterSnapshot(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        registerId: 'test-cash',
+        label: 'Test cash register',
+        revision: 1,
+        openingAt: seed.now,
+        asOf: seed.now.add(const Duration(minutes: 1)),
+        historyComplete: true,
+        openingMinor: 10000,
+        entries: [
+          WorkspaceMoneyRegisterEntry(
+            id: 'expense-1',
+            reference: 'TEST-RECEIPT-1',
+            occurredAt: seed.now,
+            deltaMinor: -1230,
+          ),
+        ],
+      );
+      native.loseWriteResponseOnce = true;
+      expect(await reopened.saveWorkspaceMoneyRegister(register), isFalse);
+      expect(reopened.workspaceMoneyRegisters, isEmpty);
+      expect(await reopened.recoverCustomerLedger(), isTrue);
+      expect(
+        reopened.workspaceMoneyRegisters.single.toJson(),
+        register.toJson(),
+      );
+      expect(await reopened.saveWorkspaceMoneyRegister(register), isTrue);
+      expect(
+        await reopened.saveWorkspaceSupplierLedger(seed.supplierLedgers.first),
+        isTrue,
+      );
+      final again = openStore();
+      expect(await again.recoverCustomerLedger(), isTrue);
+      expect(again.workspaceExpenses.single.toJson(), expense().toJson());
+      expect(again.workspaceMoneyRegisters.single.toJson(), register.toJson());
+      expect(
+        again.workspaceMoneyRegisters.single
+            .balances(seed.now, register.asOf)!
+            .closingMinor,
+        8770,
+      );
+      expect(again.workspaceStockMovements, isEmpty);
+      expect(
+        WorkspaceLedgerCheckpoint(
+          revision: 1,
+          finance: again.workspaceFinance!,
+        ).toJson(),
+        WorkspaceLedgerCheckpoint(revision: 1, finance: seed.finance).toJson(),
+      );
+      final journal = SecureWorkLedgerCheckpointStore(
+        accountScope: () => seed.accountScope,
+        storage: native,
+      );
+      final saved = (await journal.read(seed.accountScope, seed.storeId))!;
+      await expectLater(
+        journal.save(
+          WorkspaceLedgerCheckpoint(
+            revision: saved.revision + 1,
+            finance: saved.finance,
+            supplierLedgers: saved.supplierLedgers,
+            moneyRegisters: saved.moneyRegisters,
+          ),
+          expectedRevision: saved.revision,
+        ),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(
+        (await journal.read(seed.accountScope, seed.storeId))!.expenses.length,
+        1,
+      );
+      await expectLater(
+        journal.save(
+          WorkspaceLedgerCheckpoint(
+            revision: saved.revision + 1,
+            finance: saved.finance,
+            supplierLedgers: saved.supplierLedgers,
+            expenses: saved.expenses,
+          ),
+          expectedRevision: saved.revision,
+        ),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(
+        (await journal.read(
+          seed.accountScope,
+          seed.storeId,
+        ))!.moneyRegisters.length,
+        1,
+      );
+    },
+  );
+
+  group('LEDGER02 supplier balances', () {
+    final at = DateTime.utc(2026, 9, 14);
+    WorkspaceSupplierLedgerEntry entry(
+      String id,
+      WorkspaceSupplierEntryKind kind,
+      int amount, {
+      String? bill,
+    }) => WorkspaceSupplierLedgerEntry(
+      operationId: id,
+      orderId: 'purchase-1',
+      reference: id,
+      kind: kind,
+      amountMinor: amount,
+      postedAt: at,
+      billId: bill,
+    );
+    WorkspaceSupplierLedger ledger(
+      List<WorkspaceSupplierLedgerEntry> entries, {
+      int revision = 1,
+      bool complete = true,
+      int? opening = 0,
+      String account = 'account-1',
+      String store = 'store-1',
+      String supplier = 'supplier-1',
+    }) => WorkspaceSupplierLedger(
+      accountScope: account,
+      workspaceId: store,
+      supplierId: supplier,
+      supplierName: 'Grocery supplier',
+      revision: revision,
+      asOf: at,
+      entries: entries,
+      historyComplete: complete,
+      openingBalanceMinor: opening,
+    );
+
+    test(
+      'representable money rejects oversized entries openings and running balances',
+      () {
+        const max = 9007199254740991;
+        expect(
+          entry('too-large', WorkspaceSupplierEntryKind.payment, max + 1).valid,
+          isFalse,
+        );
+        expect(ledger([], opening: max + 1).valid, isFalse);
+        expect(ledger([], opening: -max - 1).valid, isFalse);
+        expect(
+          ledger([
+            entry('bill', WorkspaceSupplierEntryKind.bill, 1, bill: 'invoice'),
+          ], opening: max).valid,
+          isFalse,
+        );
+        expect(
+          ledger([
+            entry('payment', WorkspaceSupplierEntryKind.payment, 1),
+          ], opening: -max).valid,
+          isFalse,
+        );
+        expect(
+          ledger([
+            entry('bill', WorkspaceSupplierEntryKind.bill, 1, bill: 'invoice'),
+          ], opening: max - 1).balanceMinor,
+          max,
+        );
+      },
+    );
+
+    test('confirmed payment retry cannot duplicate or overwrite a posting', () {
+      final original = ledger([
+        entry(
+          'bill-1',
+          WorkspaceSupplierEntryKind.bill,
+          200000,
+          bill: 'invoice-1',
+        ),
+      ]);
+      final payment = entry(
+        'payment-1',
+        WorkspaceSupplierEntryKind.payment,
+        50000,
+      );
+      final posted = original.appendConfirmed(payment, expectedRevision: 1)!;
+      expect(posted.payableMinor, 150000);
+      expect(posted.revision, 2);
+      expect(
+        identical(posted.appendConfirmed(payment, expectedRevision: 1), posted),
+        isTrue,
+      );
+      expect(posted.entries.length, 2);
+      expect(
+        posted.appendConfirmed(
+          entry('payment-1', WorkspaceSupplierEntryKind.payment, 60000),
+          expectedRevision: 1,
+        ),
+        isNull,
+      );
+      final secondPayment = entry(
+        'payment-2',
+        WorkspaceSupplierEntryKind.payment,
+        25000,
+      );
+      expect(
+        posted.appendConfirmed(secondPayment, expectedRevision: 1),
+        isNull,
+      );
+      expect(
+        posted.appendConfirmed(secondPayment, expectedRevision: 3),
+        isNull,
+      );
+      final next = posted.appendConfirmed(secondPayment, expectedRevision: 2)!;
+      expect(next.payableMinor, 125000);
+      expect(next.entries.length, 3);
+      expect(
+        identical(next.appendConfirmed(payment, expectedRevision: 1), next),
+        isTrue,
+      );
+    });
+
+    test('bill 2000 less advance 500 leaves 1500 without shipment effects', () {
+      final advance = entry(
+        'advance-1',
+        WorkspaceSupplierEntryKind.advance,
+        50000,
+      );
+      final beforeBill = ledger([advance]);
+      expect(beforeBill.payableMinor, 0);
+      expect(beforeBill.creditMinor, 50000);
+      final billed = ledger([
+        advance,
+        entry(
+          'bill-1',
+          WorkspaceSupplierEntryKind.bill,
+          200000,
+          bill: 'invoice-1',
+        ),
+      ], revision: 2);
+      expect(billed.canFollow(beforeBill), isTrue);
+      expect(billed.payableMinor, 150000);
+      expect(billed.creditMinor, 0);
+      final paid = ledger([
+        ...billed.entries,
+        entry('payment-1', WorkspaceSupplierEntryKind.payment, 150000),
+      ], revision: 3);
+      expect(paid.canFollow(billed), isTrue);
+      expect(paid.balanceMinor, 0);
+      expect(() => paid.entries.clear(), throwsUnsupportedError);
+    });
+
+    test(
+      'supplier credit and refund are separate, missing history is unknown',
+      () {
+        final entries = [
+          entry(
+            'bill-1',
+            WorkspaceSupplierEntryKind.bill,
+            200000,
+            bill: 'invoice-1',
+          ),
+          entry('payment-1', WorkspaceSupplierEntryKind.payment, 200000),
+          entry(
+            'credit-1',
+            WorkspaceSupplierEntryKind.creditNote,
+            20000,
+            bill: 'invoice-1',
+          ),
+        ];
+        expect(ledger(entries).creditMinor, 20000);
+        expect(
+          ledger([
+            ...entries,
+            entry('refund-1', WorkspaceSupplierEntryKind.refund, 5000),
+          ]).creditMinor,
+          15000,
+        );
+        expect(ledger(entries, complete: false).balanceMinor, isNull);
+        expect(ledger(entries, opening: null).payableMinor, isNull);
+      },
+    );
+
+    test(
+      'duplicates, rewriting and account Store supplier switches are rejected',
+      () {
+        final bill = entry(
+          'bill-1',
+          WorkspaceSupplierEntryKind.bill,
+          200000,
+          bill: 'invoice-1',
+        );
+        final previous = ledger([bill]);
+        expect(ledger([bill, bill]).valid, isFalse);
+        expect(
+          ledger([
+            bill,
+            entry(
+              'bill-retry',
+              WorkspaceSupplierEntryKind.bill,
+              200000,
+              bill: 'invoice-1',
+            ),
+          ]).valid,
+          isFalse,
+        );
+        expect(
+          ledger([
+            entry(
+              'bill-1',
+              WorkspaceSupplierEntryKind.bill,
+              100000,
+              bill: 'invoice-1',
+            ),
+          ], revision: 2).canFollow(previous),
+          isFalse,
+        );
+        expect(ledger([], revision: 2).canFollow(previous), isFalse);
+        expect(
+          ledger([bill], revision: 2, account: 'other').canFollow(previous),
+          isFalse,
+        );
+        expect(
+          ledger([bill], revision: 2, store: 'other').canFollow(previous),
+          isFalse,
+        );
+        expect(
+          ledger([bill], revision: 2, supplier: 'other').canFollow(previous),
+          isFalse,
+        );
+      },
+    );
+  });
+  test(
     'LEDGER01 stock journal admits new SKUs without rebasing existing stock',
     () {
       final at = DateTime.utc(2026, 9, 14);
@@ -7400,6 +8552,8 @@ void main() {
     List<WorkspacePayoutRecord>? payouts,
     List<WorkspaceCustomerLedger> customerLedgers = const [],
     int available = 1000000000050,
+    int paidOut = 50000,
+    bool historyComplete = false,
   }) => WorkspaceFinanceSnapshot(
     accountScope: account,
     workspaceId: store,
@@ -7410,7 +8564,7 @@ void main() {
     availableMinor: available,
     heldMinor: 20025,
     requestedMinor: 10050,
-    paidOutMinor: 50000,
+    paidOutMinor: paidOut,
     feesMinor: 10025,
     deliveryAdjustmentsMinor: -525,
     refundsMinor: 27500,
@@ -7418,7 +8572,323 @@ void main() {
     payments: payments ?? [for (var i = 0; i < 25; i++) paymentFact(i)],
     payouts: payouts ?? [payoutFact()],
     customerLedgers: customerLedgers,
+    historyComplete: historyComplete,
   );
+
+  test('LEDGER03 settlement reconciliation excludes unsettled payouts', () {
+    for (final state in WorkspacePayoutState.values) {
+      final snapshot = financeFact(
+        1,
+        payouts: [payoutFact(state: state)],
+        paidOut: state == WorkspacePayoutState.paid ? 10050 : 0,
+        historyComplete: true,
+      );
+      final check = snapshot.settlementPaidReconciliation!;
+      expect(
+        check.recordedMinor,
+        state == WorkspacePayoutState.paid ? 10050 : 0,
+      );
+      expect(check.differenceMinor, 0);
+      expect(snapshot.salesTodayMinor, 1000000000050);
+      expect(snapshot.availableMinor, 1000000000050);
+    }
+    final partial = financeFact(
+      1,
+      payouts: [payoutFact(state: WorkspacePayoutState.paid)],
+      paidOut: 10050,
+    );
+    expect(partial.settlementPaidReconciliation!.recordedMinor, 10050);
+    expect(partial.settlementPaidReconciliation!.differenceMinor, isNull);
+    final mismatch = financeFact(
+      1,
+      payouts: [payoutFact(state: WorkspacePayoutState.paid)],
+      paidOut: 10051,
+      historyComplete: true,
+    );
+    expect(mismatch.settlementPaidReconciliation!.differenceMinor, 1);
+    final duplicate = financeFact(
+      1,
+      payouts: [
+        payoutFact(state: WorkspacePayoutState.paid),
+        payoutFact(state: WorkspacePayoutState.paid),
+      ],
+      paidOut: 20100,
+      historyComplete: true,
+    );
+    expect(duplicate.settlementPaidReconciliation, isNull);
+  });
+
+  test('LEDGER03 register UTC recovery uses the same instants', () {
+    final localTime = DateTime(2026, 9, 14);
+    final local = WorkspaceMoneyRegisterSnapshot(
+      accountScope: 'account-A',
+      workspaceId: 'store-A',
+      registerId: 'cash',
+      label: 'Test cash',
+      revision: 1,
+      openingAt: localTime,
+      asOf: localTime.add(const Duration(days: 1)),
+      openingMinor: 10000,
+      historyComplete: true,
+      entries: [
+        WorkspaceMoneyRegisterEntry(
+          id: 'receipt-A',
+          reference: 'TEST-A',
+          occurredAt: localTime.add(const Duration(hours: 1)),
+          deltaMinor: 1230,
+        ),
+      ],
+    );
+    final restored = WorkspaceMoneyRegisterSnapshot.fromJson(
+      jsonDecode(jsonEncode(local.toJson())),
+    )!;
+    expect(local.openingAt.isUtc, isFalse);
+    expect(restored.openingAt.isUtc, isTrue);
+    expect(restored.canFollow(local), isTrue);
+    expect(local.canFollow(restored), isTrue);
+    expect(restored.balances(local.openingAt, local.asOf)!.closingMinor, 11230);
+  });
+
+  test(
+    'LEDGER03 register opening closing boundaries and immutable recovery',
+    () {
+      final day = DateTime.utc(2026, 9, 14);
+      WorkspaceMoneyRegisterEntry movement(String id, int hour, int delta) =>
+          WorkspaceMoneyRegisterEntry(
+            id: id,
+            reference: 'REF-$id',
+            occurredAt: day.add(Duration(hours: hour)),
+            deltaMinor: delta,
+          );
+      final entries = [
+        movement('collection', 8, 60000),
+        movement('expense', 9, -2500),
+        movement('supplier', 10, -10000),
+      ];
+      WorkspaceMoneyRegisterSnapshot register({
+        String account = 'account-A',
+        String store = 'store-A',
+        String id = 'cash-register',
+        int revision = 1,
+        int? opening = 10000,
+        bool complete = true,
+        List<WorkspaceMoneyRegisterEntry>? rows,
+        DateTime? end,
+      }) => WorkspaceMoneyRegisterSnapshot(
+        accountScope: account,
+        workspaceId: store,
+        registerId: id,
+        label: 'Test cash register',
+        revision: revision,
+        openingAt: day,
+        asOf: end ?? day.add(const Duration(days: 1)),
+        historyComplete: complete,
+        openingMinor: opening,
+        entries: rows ?? entries,
+      );
+      final snapshot = register();
+      expect(snapshot.valid, isTrue);
+      final balance = snapshot.balances(day, day.add(const Duration(days: 1)))!;
+      expect(balance, (
+        openingMinor: 10000,
+        inMinor: 60000,
+        outMinor: 12500,
+        closingMinor: 57500,
+      ));
+      expect(
+        snapshot.balances(
+          day.add(const Duration(hours: 9)),
+          day.add(const Duration(hours: 10)),
+        ),
+        (openingMinor: 70000, inMinor: 0, outMinor: 2500, closingMinor: 67500),
+      );
+      expect(
+        snapshot.balances(day.subtract(const Duration(seconds: 1)), day),
+        isNull,
+      );
+      expect(snapshot.balances(day, day.add(const Duration(days: 2))), isNull);
+      expect(
+        register(
+          opening: null,
+          complete: false,
+        ).balances(day, day.add(const Duration(days: 1))),
+        isNull,
+      );
+      final restored = WorkspaceMoneyRegisterSnapshot.fromJson(
+        jsonDecode(jsonEncode(snapshot.toJson())),
+      )!;
+      expect(restored.toJson(), snapshot.toJson());
+      expect(restored.canFollow(snapshot), isTrue);
+      expect(
+        register(revision: 2, opening: 10001).canFollow(snapshot),
+        isFalse,
+      );
+      expect(
+        register(revision: 2, account: 'account-B').canFollow(snapshot),
+        isFalse,
+      );
+      expect(
+        register(revision: 2, store: 'store-B').canFollow(snapshot),
+        isFalse,
+      );
+      expect(
+        register(revision: 2, id: 'bank-register').canFollow(snapshot),
+        isFalse,
+      );
+      expect(
+        register(revision: 2, complete: false).canFollow(snapshot),
+        isFalse,
+      );
+      expect(
+        register(
+          revision: 2,
+          rows: entries.take(2).toList(),
+        ).canFollow(snapshot),
+        isFalse,
+      );
+      expect(register(rows: [...entries, entries.last]).valid, isFalse);
+      expect(
+        register(rows: [...entries, movement('end-boundary', 24, 500)]).valid,
+        isFalse,
+      );
+      expect(
+        register(
+          revision: 2,
+          end: day.add(const Duration(days: 2)),
+          rows: [...entries, movement('backdated', 12, 500)],
+        ).canFollow(snapshot),
+        isFalse,
+      );
+      final successor = register(
+        revision: 2,
+        end: day.add(const Duration(days: 2)),
+        rows: [...entries, movement('next-day', 24, 500)],
+      );
+      expect(successor.canFollow(snapshot), isTrue);
+      expect(
+        successor.balances(
+          day.add(const Duration(days: 1)),
+          day.add(const Duration(days: 2)),
+        ),
+        (openingMinor: 57500, inMinor: 500, outMinor: 0, closingMinor: 58000),
+      );
+      expect(register(opening: 9007199254740991).valid, isFalse);
+    },
+  );
+
+  test('LEDGER03 unified money excludes bills pending money and transfers', () {
+    final customer = WorkspaceCustomerLedger(
+      accountScope: 'account-A',
+      workspaceId: 'store-A',
+      customerId: 'customer-A',
+      customerName: 'Test customer',
+      revision: 1,
+      asOf: financeTime,
+      openingBalanceMinor: 0,
+      historyComplete: true,
+      entries: [
+        for (var i = 0; i < 3; i++)
+          WorkspaceCustomerLedgerEntry(
+            id: 'entry-$i',
+            operationId: 'customer-operation-$i',
+            invoiceId: 'invoice-A',
+            orderId: 'order-A',
+            sequence: i + 1,
+            occurredAt: financeTime,
+            kind: i == 0
+                ? WorkspaceLedgerEntryKind.invoice
+                : WorkspaceLedgerEntryKind.collection,
+            state: i == 2
+                ? WorkspaceLedgerPostingState.pending
+                : WorkspaceLedgerPostingState.posted,
+            amountMinor: [100000, 60000, 40000][i],
+            channel: WorkspacePaymentChannel.cash,
+          ),
+      ],
+    );
+    final supplier = WorkspaceSupplierLedger(
+      accountScope: 'account-A',
+      workspaceId: 'store-A',
+      supplierId: 'supplier-A',
+      supplierName: 'Test supplier',
+      revision: 1,
+      asOf: financeTime,
+      openingBalanceMinor: 0,
+      historyComplete: true,
+      entries: [
+        for (var i = 0; i < 3; i++)
+          WorkspaceSupplierLedgerEntry(
+            operationId: 'supplier-operation-$i',
+            orderId: 'purchase-A',
+            reference: 'SUP-$i',
+            billId: 'bill-A',
+            kind: [
+              WorkspaceSupplierEntryKind.bill,
+              WorkspaceSupplierEntryKind.advance,
+              WorkspaceSupplierEntryKind.payment,
+            ][i],
+            amountMinor: [200000, 50000, 10000][i],
+            postedAt: financeTime,
+            paymentMethod: 'Bank transfer',
+          ),
+      ],
+    );
+    WorkspaceExpenseRecord expense({String account = 'account-A'}) =>
+        WorkspaceExpenseRecord(
+          accountScope: account,
+          workspaceId: 'store-A',
+          operationId: 'expense-A',
+          amountMinor: 2500,
+          category: 'Shop expense',
+          method: 'Cash',
+          reference: 'receipt-A',
+          note: '',
+          occurredAt: financeTime,
+        );
+    final finance = financeFact(
+      1,
+      customerLedgers: [customer],
+      payouts: [payoutFact(state: WorkspacePayoutState.paid)],
+    );
+    WorkspaceMoneyStatement? statement({
+      List<WorkspaceExpenseRecord>? expenses,
+      DateTime? start,
+    }) => WorkspaceMoneyStatement.fromLedgers(
+      finance: finance,
+      suppliers: [supplier],
+      expenses: expenses ?? [expense()],
+      start: start,
+      end: financeTime,
+    );
+    final money = statement()!;
+    expect(money.recordedInMinor, 60000);
+    expect(money.recordedOutMinor, 62500);
+    expect(money.entries, hasLength(6));
+    expect(money.entries.where((e) => e.transfer).single.amountMinor, 10050);
+    expect(money.entries.where((e) => !e.posted).single.amountMinor, 40000);
+    expect(money.entries.map((e) => e.id).toSet(), hasLength(6));
+    expect(
+      statement()!.recordedOutMinor,
+      62500,
+      reason: 'Opening again cannot post twice',
+    );
+    expect(statement(expenses: [expense(account: 'account-B')]), isNull);
+    expect(statement(expenses: [expense(), expense()]), isNull);
+    expect(
+      statement(start: financeTime.add(const Duration(seconds: 1))),
+      isNull,
+    );
+    final before = WorkspaceMoneyStatement.fromLedgers(
+      finance: finance,
+      suppliers: [supplier],
+      expenses: [expense()],
+      end: financeTime.subtract(const Duration(seconds: 1)),
+    )!;
+    expect(before.entries, isEmpty);
+    expect(before.recordedInMinor, 0);
+    expect(customer.closingBalanceMinor, 40000);
+    expect(supplier.balanceMinor, 140000);
+  });
 
   test(
     'LEDGER01 checkpoint retains existing payment payout and signed adjustment fields',
@@ -7438,6 +8908,74 @@ void main() {
       );
       expect(recovered.finance.deliveryAdjustmentsMinor, -525);
       expect(recovered.finance.availableMinor, 1000000000050);
+    },
+  );
+
+  test(
+    'LEDGER02 encrypted checkpoint preserves supplier history and scope',
+    () async {
+      final ledger = WorkspaceSupplierLedger(
+        accountScope: 'account-A',
+        workspaceId: 'store-A',
+        supplierId: 'supplier-A',
+        supplierName: 'Test grocery supplier',
+        revision: 1,
+        asOf: financeTime,
+        historyComplete: true,
+        openingBalanceMinor: 0,
+        entries: [
+          WorkspaceSupplierLedgerEntry(
+            operationId: 'supplier-bill-1',
+            orderId: 'purchase-1',
+            reference: 'BILL-1',
+            billId: 'bill-1',
+            kind: WorkspaceSupplierEntryKind.bill,
+            amountMinor: 200000,
+            postedAt: financeTime,
+          ),
+          WorkspaceSupplierLedgerEntry(
+            operationId: 'supplier-advance-1',
+            orderId: 'purchase-1',
+            reference: 'ADVANCE-1',
+            kind: WorkspaceSupplierEntryKind.advance,
+            amountMinor: 50000,
+            postedAt: financeTime,
+          ),
+        ],
+      );
+      final original = WorkspaceLedgerCheckpoint(
+        revision: 1,
+        finance: financeFact(1),
+        supplierLedgers: {'supplier-A': ledger},
+      );
+      final restored = WorkspaceLedgerCheckpoint.fromJson(
+        jsonDecode(jsonEncode(original.toJson())),
+      )!;
+      expect(restored.toJson(), original.toJson());
+      expect(restored.supplierLedgers['supplier-A']!.payableMinor, 150000);
+      expect(() => restored.supplierLedgers.clear(), throwsUnsupportedError);
+      final storage = _OrderJournalStorage();
+      final journal = SecureWorkLedgerCheckpointStore(
+        accountScope: () => 'account-A',
+        storage: storage,
+      );
+      await journal.save(original, expectedRevision: null);
+      await journal.save(original, expectedRevision: null);
+      await expectLater(
+        journal.save(
+          WorkspaceLedgerCheckpoint(revision: 2, finance: financeFact(1)),
+          expectedRevision: 1,
+        ),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(
+        (await journal.read('account-A', 'store-A'))!.toJson(),
+        original.toJson(),
+      );
+      final wrongScope = original.toJson();
+      final suppliers = wrongScope['supplierLedgers'] as Map;
+      (suppliers['supplier-A'] as Map)['accountScope'] = 'another-account';
+      expect(WorkspaceLedgerCheckpoint.fromJson(wrongScope), isNull);
     },
   );
 
@@ -7963,6 +9501,10 @@ void main() {
       buyerName: 'Store A',
       buyerType: 'Business',
       receiptReference: 'receipt-reference',
+      paymentTermLabel: '25% advance',
+      balanceDueLabel: 'Balance on delivery',
+      paymentMethod: 'Bank transfer',
+      purchaseOrderReference: 'PO-TEST-1',
     );
     WorkspacePurchaseRecord project(BuyV2Order order) =>
         WorkspacePurchaseRecord.fromBuyOrder(
@@ -7978,6 +9520,10 @@ void main() {
     final record = project(buy(BuyV2Destination.wholesale));
     expect(record.valid, isTrue);
     expect(record.amountMinor, 15500);
+    expect(record.paymentTermLabel, '25% advance');
+    expect(record.balanceDueLabel, 'Balance on delivery');
+    expect(record.paymentMethod, 'Bank transfer');
+    expect(record.purchaseOrderReference, 'PO-TEST-1');
     expect(record.paymentLabel, 'Payment update unavailable');
     expect(record.receiptState, WorkspaceReceiptState.unavailable);
     expect(record.invoiceReference, isNull);

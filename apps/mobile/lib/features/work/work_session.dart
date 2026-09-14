@@ -342,6 +342,11 @@ class _StoreOperationalData {
   bool purchasesComplete = false;
   String? purchasesNextCursor;
   final Map<String, WorkspacePurchaseRecord> purchases = {};
+  final Map<(String, String), WorkspaceSupplierLedger> supplierLedgers = {};
+  final Map<(String, String), WorkspaceExpenseRecord> expenses = {};
+  final Map<(String, String), WorkspaceMoneyRegisterSnapshot> moneyRegisters =
+      {};
+  final Set<(String, String)> staleSupplierLedgers = {};
   final Map<String, WorkspacePurchaseRecord> purchaseLastRecords = {};
   String? focusedPurchaseId;
   WorkOrderOperations? orderOperations;
@@ -601,15 +606,59 @@ class WorkSession extends ChangeNotifier {
     );
   }
 
-  bool _ledgerFormScopeCurrent(WorkspaceLedgerFormKey key) =>
-      !_disposed &&
-      key.account == _contactAccountScope &&
-      key.store == activeWorkspace?.id &&
-      workspaceFinance?.customerLedgers
-              .where((l) => l.customerId == key.customer)
-              .firstOrNull
-              ?.revision ==
-          key.ledgerRevision;
+  WorkspaceLedgerFormKey? supplierPaymentFormKey(
+    WorkspacePurchaseRecord purchase,
+  ) {
+    if (!_receiptCurrent(purchase)) {
+      return null;
+    }
+    final ledger = workspaceSupplierLedger(purchase.supplierId);
+    final bills = ledger?.entries
+        .where(
+          (entry) =>
+              entry.orderId == purchase.orderId &&
+              entry.kind == WorkspaceSupplierEntryKind.bill,
+        )
+        .toList();
+    if (ledger == null || bills == null || bills.length != 1) {
+      return null;
+    }
+    return (
+      account: ledger.accountScope,
+      store: ledger.workspaceId,
+      customer: ledger.supplierId,
+      invoice: bills.single.billId!,
+      order: purchase.orderId,
+      kind: 'supplierPayment',
+      ledgerRevision: ledger.revision,
+    );
+  }
+
+  bool _ledgerFormScopeCurrent(WorkspaceLedgerFormKey key) {
+    if (_disposed ||
+        key.account != _contactAccountScope ||
+        key.store != activeWorkspace?.id) {
+      return false;
+    }
+    if (key.kind == 'expense') {
+      return key == expenseFormKey();
+    }
+    if (key.kind == 'supplierPayment') {
+      final ledger = workspaceSupplierLedger(key.customer);
+      return ledger?.revision == key.ledgerRevision &&
+          ledger!.entries.any(
+            (entry) =>
+                entry.kind == WorkspaceSupplierEntryKind.bill &&
+                entry.billId == key.invoice &&
+                entry.orderId == key.order,
+          );
+    }
+    return workspaceFinance?.customerLedgers
+            .where((l) => l.customerId == key.customer)
+            .firstOrNull
+            ?.revision ==
+        key.ledgerRevision;
+  }
 
   Future<WorkspaceLedgerFormDraft?> readLedgerForm(
     WorkspaceLedgerFormKey key,
@@ -2369,6 +2418,9 @@ class WorkSession extends ChangeNotifier {
         inventory: _captureLedgerInventory(data),
         billedOrders: Map.unmodifiable(bills),
         billedInvoices: Map.unmodifiable(invoices),
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
       );
       if (reply.revision < data.finance!.revision ||
           (reply.revision == data.finance!.revision &&
@@ -2537,6 +2589,44 @@ class WorkSession extends ChangeNotifier {
         }
         data.ledgerBilledOrders = saved.billedOrders;
         data.ledgerBilledInvoices = saved.billedInvoices;
+        for (final register in saved.moneyRegisters.values) {
+          final key = (register.accountScope, register.registerId);
+          final current = data.moneyRegisters[key];
+          if (current != null && current.canFollow(register)) {
+            continue;
+          }
+          if (current != null && !register.canFollow(current)) {
+            throw StateError('Saved register conflicts with current history.');
+          }
+          data.moneyRegisters[key] = register;
+        }
+        for (final expense in saved.expenses.values) {
+          final key = (expense.accountScope, expense.operationId);
+          final current = data.expenses[key];
+          if (current != null &&
+              jsonEncode(current.toJson()) != jsonEncode(expense.toJson())) {
+            throw StateError(
+              'Saved expense identity conflicts with current history.',
+            );
+          }
+          data.expenses[key] = expense;
+        }
+        for (final ledger in saved.supplierLedgers.values) {
+          final key = (ledger.accountScope, ledger.supplierId);
+          final current = data.supplierLedgers[key];
+          if (current != null && current.canFollow(ledger)) {
+            continue;
+          }
+          if (current != null && !ledger.canFollow(current)) {
+            throw StateError(
+              'Saved supplier history conflicts with current records.',
+            );
+          }
+          data.supplierLedgers[key] = ledger;
+          if (adapter is! StoreReviewCustomerCollectionGateway) {
+            data.staleSupplierLedgers.add(key);
+          }
+        }
         if (adapter is StoreReviewCustomerCollectionGateway) {
           for (final order in saved.billedOrders.values) {
             if (!data.workspaceOrders.any((o) => o.id == order.id)) {
@@ -2735,6 +2825,9 @@ class WorkSession extends ChangeNotifier {
           inventory: inventory,
           billedOrders: data.ledgerBilledOrders,
           billedInvoices: data.ledgerBilledInvoices,
+          supplierLedgers: _supplierLedgerCheckpointEntries(data),
+          moneyRegisters: _moneyRegisterCheckpointEntries(data),
+          expenses: _expenseCheckpointEntries(data),
         );
         await journal.save(
           pending,
@@ -2802,6 +2895,9 @@ class WorkSession extends ChangeNotifier {
         inventory: nextInventory,
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
       );
       await journal.save(
         completed,
@@ -2925,6 +3021,9 @@ class WorkSession extends ChangeNotifier {
           inventory: data.ledgerInventory,
           billedOrders: data.ledgerBilledOrders,
           billedInvoices: data.ledgerBilledInvoices,
+          supplierLedgers: _supplierLedgerCheckpointEntries(data),
+          moneyRegisters: _moneyRegisterCheckpointEntries(data),
+          expenses: _expenseCheckpointEntries(data),
           pendingRefund: request,
         );
         await journal.save(
@@ -2998,6 +3097,9 @@ class WorkSession extends ChangeNotifier {
         inventory: data.ledgerInventory,
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
       );
       await journal.save(
         completed,
@@ -3120,6 +3222,9 @@ class WorkSession extends ChangeNotifier {
           inventory: data.ledgerInventory,
           billedOrders: data.ledgerBilledOrders,
           billedInvoices: data.ledgerBilledInvoices,
+          supplierLedgers: _supplierLedgerCheckpointEntries(data),
+          moneyRegisters: _moneyRegisterCheckpointEntries(data),
+          expenses: _expenseCheckpointEntries(data),
           pending: request,
         );
         await journal.save(
@@ -3194,6 +3299,9 @@ class WorkSession extends ChangeNotifier {
         inventory: data.ledgerInventory,
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
       );
       await journal.save(
         completed,
@@ -3314,6 +3422,456 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
+  /// Supplier money updates are independent of shipment/receipt projections.
+  WorkspaceLedgerFormKey? expenseFormKey() {
+    final finance = workspaceFinance;
+    if (finance == null || workspaceFinanceStale) {
+      return null;
+    }
+    return (
+      account: finance.accountScope,
+      store: finance.workspaceId,
+      customer: 'store-expenses',
+      invoice: 'manual-expenses',
+      order: 'manual-expenses',
+      kind: 'expense',
+      ledgerRevision: workspaceExpenses.length + 1,
+    );
+  }
+
+  bool get canRecordStoreReviewExpense {
+    final adapter = _scopedOrderOperations?.gateway;
+    return canLoadStoreReviewSeed &&
+        adapter is StoreReviewOrderGateway &&
+        adapter.seed.accountScope == _contactAccountScope &&
+        adapter.seed.storeId == activeWorkspace?.id;
+  }
+
+  Future<bool> recordStoreReviewExpense({
+    required WorkspaceLedgerFormKey key,
+    required int amountMinor,
+    required String category,
+    required String method,
+    required String reference,
+    required String note,
+  }) async {
+    if (!canRecordStoreReviewExpense ||
+        !await recoverCustomerLedger() ||
+        !canRecordStoreReviewExpense ||
+        key.account != _contactAccountScope ||
+        key.store != activeWorkspace?.id ||
+        key.kind != 'expense' ||
+        key.customer != 'store-expenses' ||
+        key.invoice != 'manual-expenses' ||
+        key.order != 'manual-expenses') {
+      return false;
+    }
+    final id = jsonEncode([
+      'expense',
+      key.account,
+      key.store,
+      key.ledgerRevision,
+    ]);
+    final existing = workspaceExpenses
+        .where((expense) => expense.operationId == id)
+        .firstOrNull;
+    if (existing != null) {
+      return existing.amountMinor == amountMinor &&
+          existing.category == category &&
+          existing.method == method &&
+          existing.reference == reference &&
+          existing.note == note;
+    }
+    if (key != expenseFormKey()) {
+      return false;
+    }
+    return saveWorkspaceExpenseRecord(
+      WorkspaceExpenseRecord(
+        accountScope: key.account,
+        workspaceId: key.store,
+        operationId: id,
+        amountMinor: amountMinor,
+        category: category,
+        method: method,
+        reference: reference,
+        note: note,
+        occurredAt: DateTime.now().toUtc(),
+      ),
+    );
+  }
+
+  List<WorkspaceExpenseRecord> get workspaceExpenses => List.unmodifiable(
+    _storeData.expenses.values
+        .where(
+          (expense) =>
+              expense.accountScope == _contactAccountScope &&
+              expense.workspaceId == activeWorkspace?.id,
+        )
+        .toList()
+      ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt)),
+  );
+
+  WorkspaceMoneyStatement? get workspaceMoneyStatement {
+    final finance = workspaceFinance;
+    if (finance == null ||
+        workspaceFinanceStale ||
+        _storeData.staleSupplierLedgers.any(
+          (key) => key.$1 == finance.accountScope,
+        )) {
+      return null;
+    }
+    return WorkspaceMoneyStatement.fromLedgers(
+      finance: finance,
+      suppliers: _storeData.supplierLedgers.values
+          .where(
+            (ledger) =>
+                ledger.accountScope == finance.accountScope &&
+                ledger.workspaceId == finance.workspaceId,
+          )
+          .toList(),
+      expenses: workspaceExpenses,
+      start: workspaceMoneyPeriodStart,
+      end: DateTime.now(),
+    );
+  }
+
+  Future<bool> saveWorkspaceExpenseRecord(
+    WorkspaceExpenseRecord expense,
+  ) async {
+    final data = _storeData;
+    bool current() =>
+        !_disposed &&
+        identical(data, _storeData) &&
+        expense.accountScope == _contactAccountScope &&
+        expense.workspaceId == activeWorkspace?.id;
+    if (!current() ||
+        !expense.valid ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        !current() ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    final key = (expense.accountScope, expense.operationId);
+    final existing = data.expenses[key];
+    if (existing != null) {
+      return jsonEncode(existing.toJson()) == jsonEncode(expense.toJson());
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: _captureLedgerInventory(data),
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: Map.unmodifiable({
+          ..._expenseCheckpointEntries(data),
+          expense.operationId: expense,
+        }),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      data.ledgerInventory = checkpoint.inventory;
+      if (!current()) {
+        return false;
+      }
+      data.expenses[key] = expense;
+      return true;
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        showNotice(
+          'Expense save unconfirmed. Recover its saved status before retrying.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  List<WorkspaceMoneyRegisterSnapshot> get workspaceMoneyRegisters =>
+      List.unmodifiable(
+        _storeData.moneyRegisters.values.where(
+          (register) =>
+              register.accountScope == _contactAccountScope &&
+              register.workspaceId == activeWorkspace?.id,
+        ),
+      );
+
+  Future<bool> saveWorkspaceMoneyRegister(
+    WorkspaceMoneyRegisterSnapshot register,
+  ) async {
+    final data = _storeData;
+    bool current() =>
+        !_disposed &&
+        identical(data, _storeData) &&
+        register.accountScope == _contactAccountScope &&
+        register.workspaceId == activeWorkspace?.id;
+    if (!current() ||
+        !register.valid ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        !current() ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    final key = (register.accountScope, register.registerId);
+    final previous = data.moneyRegisters[key];
+    if (previous != null) {
+      if (!register.canFollow(previous)) {
+        return false;
+      }
+      if (register.revision == previous.revision) {
+        return true;
+      }
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: _captureLedgerInventory(data),
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+        moneyRegisters: Map.unmodifiable({
+          ..._moneyRegisterCheckpointEntries(data),
+          register.registerId: register,
+        }),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      data.ledgerInventory = checkpoint.inventory;
+      if (!current()) {
+        return false;
+      }
+      data.moneyRegisters[key] = register;
+      return true;
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        showNotice(
+          'Register save unconfirmed. Recover its saved status before retrying.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Map<String, WorkspaceExpenseRecord> _expenseCheckpointEntries(
+    _StoreOperationalData data,
+  ) => Map.unmodifiable({
+    for (final expense in data.expenses.values)
+      if (expense.accountScope == data.finance?.accountScope)
+        expense.operationId: expense,
+  });
+
+  Map<String, WorkspaceMoneyRegisterSnapshot> _moneyRegisterCheckpointEntries(
+    _StoreOperationalData data,
+  ) => Map.unmodifiable({
+    for (final register in data.moneyRegisters.values)
+      if (register.accountScope == data.finance?.accountScope &&
+          register.workspaceId == data.finance?.workspaceId)
+        register.registerId: register,
+  });
+
+  Map<String, WorkspaceSupplierLedger> _supplierLedgerCheckpointEntries(
+    _StoreOperationalData data,
+  ) => Map.unmodifiable({
+    for (final ledger in data.supplierLedgers.values)
+      if (ledger.accountScope == data.finance?.accountScope)
+        ledger.supplierId: ledger,
+  });
+
+  bool applyWorkspaceSupplierLedger(WorkspaceSupplierLedger ledger) {
+    if (_disposed ||
+        !ledger.valid ||
+        ledger.accountScope != _contactAccountScope) {
+      return false;
+    }
+    final data = ledger.workspaceId == activeWorkspace?.id
+        ? _storeData
+        : _storeDataById[ledger.workspaceId];
+    if (data == null) {
+      return false;
+    }
+    final key = (ledger.accountScope, ledger.supplierId);
+    final previous = data.supplierLedgers[key];
+    if (previous != null && !ledger.canFollow(previous)) {
+      return false;
+    }
+    data.supplierLedgers[key] = ledger;
+    data.staleSupplierLedgers.remove(key);
+    if (identical(data, _storeData)) {
+      notifyListeners();
+    }
+    return true;
+  }
+
+  /// Persist a confirmed supplier projection using the same Store journal.
+  /// This records evidence supplied by an adapter; it does not transfer money.
+  Future<bool> saveWorkspaceSupplierLedger(
+    WorkspaceSupplierLedger ledger,
+  ) async {
+    final data = _storeData;
+    if (_disposed ||
+        !ledger.valid ||
+        ledger.accountScope != _contactAccountScope ||
+        ledger.workspaceId != activeWorkspace?.id ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        _disposed ||
+        !identical(data, _storeData) ||
+        ledger.accountScope != _contactAccountScope ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    final previous =
+        data.supplierLedgers[(ledger.accountScope, ledger.supplierId)];
+    if (previous != null && !ledger.canFollow(previous)) {
+      return false;
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: _captureLedgerInventory(data),
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        supplierLedgers: Map.unmodifiable({
+          ..._supplierLedgerCheckpointEntries(data),
+          ledger.supplierId: ledger,
+        }),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      data.ledgerInventory = checkpoint.inventory;
+      if (_disposed ||
+          !identical(data, _storeData) ||
+          ledger.accountScope != _contactAccountScope ||
+          ledger.workspaceId != activeWorkspace?.id) {
+        return false;
+      }
+      return applyWorkspaceSupplierLedger(ledger);
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (!_disposed &&
+          identical(data, _storeData) &&
+          ledger.accountScope == _contactAccountScope) {
+        showNotice(
+          'Supplier update not saved. Recover its saved status before trying again.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<bool> recordStoreReviewSupplierPayment(
+    WorkspacePurchaseRecord purchase, {
+    required String operationId,
+    required String reference,
+    required String paymentMethod,
+    required int amountMinor,
+    required int expectedRevision,
+  }) async {
+    if (!canConfirmStoreReviewReceipt(purchase) ||
+        !await recoverCustomerLedger() ||
+        !canConfirmStoreReviewReceipt(purchase)) {
+      return false;
+    }
+    final adapter = _scopedOrderOperations!.gateway as StoreReviewOrderGateway;
+    if (!adapter.seed.purchases.any(
+      (item) =>
+          item.orderId == purchase.orderId &&
+          item.shipmentId == purchase.shipmentId &&
+          item.supplierId == purchase.supplierId,
+    )) {
+      return false;
+    }
+    final ledger = workspaceSupplierLedger(purchase.supplierId);
+    if (ledger == null) {
+      return false;
+    }
+    final next = const StoreReviewSupplierPaymentGateway().record(
+      ledger: ledger,
+      purchase: purchase,
+      operationId: operationId,
+      reference: reference,
+      paymentMethod: paymentMethod,
+      amountMinor: amountMinor,
+      expectedRevision: expectedRevision,
+    );
+    return next != null && await saveWorkspaceSupplierLedger(next);
+  }
+
+  WorkspaceSupplierLedger? workspaceSupplierLedger(String supplierId) {
+    final account = _contactAccountScope;
+    if (account == null || _disposed) {
+      return null;
+    }
+    final key = (account, supplierId);
+    return _storeData.staleSupplierLedgers.contains(key)
+        ? null
+        : _storeData.supplierLedgers[key];
+  }
+
   bool get workspacePurchasesConnected =>
       _contactAccountScope != null &&
       _storeData.purchaseAccountScope == _contactAccountScope;
@@ -3346,9 +3904,399 @@ class WorkSession extends ChangeNotifier {
     return true;
   }
 
+  WorkspacePurchaseRecord? workspacePurchaseForStockMovement(
+    WorkspaceStockMovement movement,
+  ) {
+    if (movement.referenceKind != WorkspaceStockReferenceKind.supplierReceipt ||
+        !workspacePurchasesConnected) {
+      return null;
+    }
+    try {
+      final link = jsonDecode(movement.referenceId ?? '');
+      if (link is List &&
+          link.length == 7 &&
+          link.first == 'purchase-receipt') {
+        if (link[1] != _contactAccountScope || link[2] != activeWorkspace?.id) {
+          return null;
+        }
+        final purchase = _storeData.purchases[link[5]];
+        return purchase != null &&
+                purchase.supplierId == link[3] &&
+                purchase.orderId == link[4] &&
+                purchase.lines.any((line) => line.id == link[6])
+            ? purchase
+            : null;
+      }
+    } catch (_) {
+      // Older movements contain a display receipt reference, not a linked key.
+    }
+    final matches = workspacePurchases.where(
+      (purchase) =>
+          purchase.receiptReference != null &&
+          purchase.receiptReference == movement.referenceId,
+    );
+    return matches.length == 1 ? matches.single : null;
+  }
+
   void clearWorkspacePurchaseSelection() {
     _storeData.focusedPurchaseId = null;
     notifyListeners();
+  }
+
+  /// Apply separately confirmed cumulative receipt facts, never draft counts or
+  /// delivery status. The adapter supplies explicit Store SKU/pack mappings.
+  /// Receiving stock leaves supplier bills, payments and settlement unchanged.
+  Future<bool> recordWorkspacePurchaseReceipt(
+    WorkspacePurchaseRecord purchase, {
+    required Map<String, String> stockProductIds,
+    required Map<String, int> unitsPerPack,
+  }) => _recordWorkspacePurchaseStock(
+    purchase,
+    stockProductIds: stockProductIds,
+    unitsPerPack: unitsPerPack,
+  );
+
+  Future<bool> recordWorkspaceSupplierReturn(
+    WorkspacePurchaseRecord purchase, {
+    required WorkspaceSupplierReturnConfirmation confirmation,
+    required Map<String, String> stockProductIds,
+    required Map<String, int> unitsPerPack,
+  }) => _recordWorkspacePurchaseStock(
+    purchase,
+    returned: confirmation,
+    stockProductIds: stockProductIds,
+    unitsPerPack: unitsPerPack,
+  );
+
+  Future<bool> _recordWorkspacePurchaseStock(
+    WorkspacePurchaseRecord purchase, {
+    required Map<String, String> stockProductIds,
+    required Map<String, int> unitsPerPack,
+    WorkspaceSupplierReturnConfirmation? returned,
+  }) async {
+    final data = _storeData;
+    bool current() =>
+        !_disposed &&
+        identical(data, _storeData) &&
+        _receiptCurrent(purchase) &&
+        identical(data.purchases[purchase.shipmentId], purchase);
+    if (!current() ||
+        (returned != null && !returned.belongsTo(purchase)) ||
+        !{
+          WorkspaceReceiptState.partial,
+          WorkspaceReceiptState.confirmed,
+        }.contains(purchase.receiptState) ||
+        purchase.receiptReference?.trim().isNotEmpty != true ||
+        data.ledgerCheckpointStore == null ||
+        data.customerCollectionBusy) {
+      return false;
+    }
+    if (!await recoverCustomerLedger() ||
+        !current() ||
+        data.finance == null ||
+        data.financeStale ||
+        data.customerCollectionBusy ||
+        data.pendingCustomerCollection != null ||
+        data.pendingCustomerReturn != null ||
+        data.pendingCustomerRefund != null) {
+      return false;
+    }
+    data.customerCollectionBusy = true;
+    try {
+      final now = DateTime.now().toUtc();
+      final inventory =
+          _captureLedgerInventory(data) ??
+          WorkspaceInventoryLedger(
+            accountScope: purchase.accountScope,
+            workspaceId: purchase.workspaceId,
+            revision: 1,
+            asOf: now,
+            openingQuantities: {
+              for (final product in data.workspaceCatalogueItems)
+                if (product.stockMode == WorkspaceStockMode.exactQuantity)
+                  product.id: product.stock,
+            },
+            movements: const [],
+          );
+      final movements = <WorkspaceStockMovement>[];
+      if (purchase.lines.isEmpty) {
+        return false;
+      }
+      for (final line in purchase.lines) {
+        final packs = returned == null
+            ? line.receivedPacks
+            : returned.returnedPacks[line.id];
+        if (returned != null && packs == null) {
+          continue;
+        }
+        final productId = stockProductIds[line.id];
+        final factor = unitsPerPack[line.id];
+        if (packs == null ||
+            packs < 0 ||
+            packs > line.orderedPacks ||
+            factor == null ||
+            factor <= 0 ||
+            productId == null ||
+            !inventory.openingQuantities.containsKey(productId)) {
+          return false;
+        }
+        final reference = jsonEncode([
+          'purchase-receipt',
+          purchase.accountScope,
+          purchase.workspaceId,
+          purchase.supplierId,
+          purchase.orderId,
+          purchase.shipmentId,
+          line.id,
+        ]);
+        final prior = inventory.movements
+            .where(
+              (movement) =>
+                  movement.referenceKind ==
+                      WorkspaceStockReferenceKind.supplierReceipt &&
+                  movement.referenceId == reference,
+            )
+            .toList();
+        // Never remap already received supplier packs onto another Store SKU.
+        if (prior.any(
+          (movement) =>
+              movement.productId != productId ||
+              !movement.reason.endsWith('packs × $factor units'),
+        )) {
+          return false;
+        }
+        final receivedUnits = prior
+            .where(
+              (item) => item.kind == WorkspaceStockMovementKind.goodsReceived,
+            )
+            .fold<int>(0, (sum, item) => sum + item.quantityDelta);
+        final returnedUnits = -prior
+            .where(
+              (item) => item.kind == WorkspaceStockMovementKind.supplierReturn,
+            )
+            .fold<int>(0, (sum, item) => sum + item.quantityDelta);
+        if (returned != null && packs * factor > receivedUnits) {
+          return false;
+        }
+        final delta =
+            packs * factor - (returned == null ? receivedUnits : returnedUnits);
+        final id = returned == null
+            ? jsonEncode([reference, purchase.revision])
+            : jsonEncode([reference, 'supplier-return', returned.revision]);
+        final reason = returned == null
+            ? 'Supplier receipt ${purchase.receiptReference}: $packs packs × $factor units'
+            : 'Supplier return ${returned.reference}: $packs packs × $factor units';
+        final replay = prior.where((movement) => movement.id == id);
+        if (replay.isNotEmpty) {
+          if (replay.single.reason != reason) {
+            return false;
+          }
+          continue;
+        }
+        if (delta < 0 ||
+            (returned != null &&
+                prior.any((movement) {
+                  if (movement.kind !=
+                      WorkspaceStockMovementKind.supplierReturn) {
+                    return false;
+                  }
+                  final previousKey = jsonDecode(movement.id) as List;
+                  return (previousKey.last as int) >= returned.revision;
+                }))) {
+          return false;
+        }
+        if (delta == 0) {
+          continue;
+        }
+        final product = data.workspaceCatalogueItems.singleWhere(
+          (item) => item.id == productId,
+        );
+        movements.add(
+          WorkspaceStockMovement(
+            id: id,
+            productId: productId,
+            productLabel: product.title,
+            kind: returned == null
+                ? WorkspaceStockMovementKind.goodsReceived
+                : WorkspaceStockMovementKind.supplierReturn,
+            quantityDelta: returned == null ? delta : -delta,
+            reason: reason,
+            occurredAt: returned?.confirmedAt ?? purchase.updatedAt,
+            referenceKind: WorkspaceStockReferenceKind.supplierReceipt,
+            referenceId: reference,
+          ),
+        );
+      }
+      if (movements.isEmpty) {
+        return true;
+      }
+      final next = inventory.post(movements, at: now);
+      if (next == null) {
+        return false;
+      }
+      final checkpoint = WorkspaceLedgerCheckpoint(
+        revision: (data.ledgerCheckpointRevision ?? 0) + 1,
+        finance: data.finance!,
+        inventory: next,
+        billedOrders: data.ledgerBilledOrders,
+        billedInvoices: data.ledgerBilledInvoices,
+        supplierLedgers: _supplierLedgerCheckpointEntries(data),
+        moneyRegisters: _moneyRegisterCheckpointEntries(data),
+        expenses: _expenseCheckpointEntries(data),
+      );
+      await data.ledgerCheckpointStore!.save(
+        checkpoint,
+        expectedRevision: data.ledgerCheckpointRevision,
+      );
+      data.ledgerCheckpointRevision = checkpoint.revision;
+      if (!current()) {
+        return false;
+      }
+      _restoreLedgerInventory(data, next);
+      return true;
+    } catch (_) {
+      data.ledgerRecovered = false;
+      data.ledgerRecovery = null;
+      if (current()) {
+        showNotice(
+          'Receipt stock update unconfirmed. Recover its saved status before retrying.',
+        );
+      }
+      return false;
+    } finally {
+      data.customerCollectionBusy = false;
+      if (!_disposed && identical(data, _storeData)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  final Set<WorkspaceReceiptDraftKey> _reviewReceiptsBusy = {};
+
+  bool canConfirmStoreReviewReceipt(WorkspacePurchaseRecord purchase) =>
+      canLoadStoreReviewSeed &&
+      _receiptCurrent(purchase) &&
+      _scopedOrderOperations?.gateway is StoreReviewOrderGateway;
+
+  Future<bool> confirmStoreReviewReceipt(
+    WorkspacePurchaseRecord purchase,
+  ) async {
+    if (!canConfirmStoreReviewReceipt(purchase)) {
+      return false;
+    }
+    final key = _receiptKey(purchase);
+    if (!_reviewReceiptsBusy.add(key)) {
+      return false;
+    }
+    try {
+      final writing = _receiptWrites[key];
+      if (writing != null) {
+        await writing;
+      }
+      if (!canConfirmStoreReviewReceipt(purchase)) {
+        return false;
+      }
+      final draft = _receiptDrafts[key];
+      if (draft == null ||
+          _receiptSavedRevisions[key] != draft.revision ||
+          _receiptUnconfirmedWrites.containsKey(key)) {
+        _receiptMessages[key] = 'Save the delivery counts before confirming.';
+        return false;
+      }
+      final adapter =
+          _scopedOrderOperations!.gateway as StoreReviewOrderGateway;
+      final confirmed = StoreReviewReceiptGateway(
+        adapter.seed,
+      ).confirm(purchase, draft);
+      if (confirmed == null) {
+        _receiptMessages[key] =
+            'Check the pack counts. Delivery issues need review before stock confirmation.';
+        return false;
+      }
+      if (!applyWorkspacePurchases(
+        accountScope: confirmed.accountScope,
+        storeId: confirmed.workspaceId,
+        feedRevision: _storeData.purchaseFeedRevision + 1,
+        records: [confirmed],
+      )) {
+        return false;
+      }
+      final saved = await recordWorkspacePurchaseReceipt(
+        confirmed,
+        // The fixture explicitly defines one purchased pack as one Store unit.
+        stockProductIds: {
+          for (final line in confirmed.lines) line.id: line.productId,
+        },
+        unitsPerPack: {for (final line in confirmed.lines) line.id: 1},
+      );
+      if (_receiptCurrent(confirmed)) {
+        _receiptMessages[key] = saved
+            ? 'Test receipt confirmed. Stock updated; no payment or message sent.'
+            : 'Stock update unconfirmed. Retry to recover the saved receipt.';
+      }
+      return saved;
+    } finally {
+      _reviewReceiptsBusy.remove(key);
+      if (!_disposed && _receiptCurrent(purchase)) {
+        notifyListeners();
+      }
+    }
+  }
+
+  Future<bool> confirmStoreReviewSupplierReturn(
+    WorkspacePurchaseRecord purchase,
+  ) async {
+    if (!canConfirmStoreReviewReceipt(purchase)) {
+      return false;
+    }
+    final key = _receiptKey(purchase);
+    if (!_reviewReceiptsBusy.add(key)) {
+      return false;
+    }
+    try {
+      final writing = _receiptWrites[key];
+      if (writing != null) {
+        await writing;
+      }
+      if (!canConfirmStoreReviewReceipt(purchase)) {
+        return false;
+      }
+      final draft = _receiptDrafts[key];
+      if (draft == null ||
+          _receiptSavedRevisions[key] != draft.revision ||
+          _receiptUnconfirmedWrites.containsKey(key)) {
+        return false;
+      }
+      final adapter =
+          _scopedOrderOperations!.gateway as StoreReviewOrderGateway;
+      final confirmation = StoreReviewReceiptGateway(
+        adapter.seed,
+      ).confirmReturn(purchase, draft);
+      if (confirmation == null) {
+        _receiptMessages[key] =
+            'Enter the total packs returned for this delivery.';
+        return false;
+      }
+      final saved = await recordWorkspaceSupplierReturn(
+        purchase,
+        confirmation: confirmation,
+        stockProductIds: {
+          for (final line in purchase.lines) line.id: line.productId,
+        },
+        unitsPerPack: {for (final line in purchase.lines) line.id: 1},
+      );
+      if (_receiptCurrent(purchase)) {
+        _receiptMessages[key] = saved
+            ? 'Test return recorded in stock. Supplier credit or refund remains separate.'
+            : 'Return not confirmed. Check received packs and available stock; recover saved status before retrying.';
+      }
+      return saved;
+    } finally {
+      _reviewReceiptsBusy.remove(key);
+      if (!_disposed && _receiptCurrent(purchase)) {
+        notifyListeners();
+      }
+    }
   }
 
   late final WorkReceiptDraftStore _receiptDraftStorage =
@@ -3438,6 +4386,7 @@ class WorkSession extends ChangeNotifier {
     required Map<String, String> countedPacks,
     required Map<String, WorkspaceReceiptProblem> problems,
     required String note,
+    Map<String, String>? returnedPacks,
   }) async {
     if (!_receiptCurrent(purchase) ||
         !workspaceReceiptDraftLoaded(purchase) ||
@@ -3463,6 +4412,7 @@ class WorkSession extends ChangeNotifier {
     final draft = base.edit(
       revision: base.revision,
       countedPacks: countedPacks,
+      returnedPacks: returnedPacks,
       problems: problems,
       note: note,
     );
@@ -8934,7 +9884,7 @@ class WorkSession extends ChangeNotifier {
         storeId: seed.storeId,
         adapter: StoreReviewCustomerCollectionGateway(seed.finance),
       );
-      unawaited(recoverCustomerLedger());
+      unawaited(_recoverReviewSupplierLedgers(seed));
       final operations = WorkOrderOperations(
         accountScope: seed.accountScope,
         workspaceId: seed.storeId,
@@ -8951,6 +9901,25 @@ class WorkSession extends ChangeNotifier {
     }
     notifyListeners();
     return true;
+  }
+
+  Future<void> _recoverReviewSupplierLedgers(StoreReviewSeed seed) async {
+    final data = _storeData;
+    if (!await recoverCustomerLedger() ||
+        _disposed ||
+        !identical(data, _storeData) ||
+        _contactAccountScope != seed.accountScope ||
+        activeWorkspace?.id != seed.storeId) {
+      return;
+    }
+    // Recover saved transactions before introducing missing review fixtures.
+    // A relaunch must never replace an existing supplier's ledger history.
+    for (final ledger in seed.supplierLedgers) {
+      final key = (ledger.accountScope, ledger.supplierId);
+      if (!data.supplierLedgers.containsKey(key)) {
+        applyWorkspaceSupplierLedger(ledger);
+      }
+    }
   }
 
   bool setStoreReviewOrderResponse(StoreReviewOrderResponse response) {

@@ -1075,6 +1075,29 @@ class WorkspaceFinanceSnapshot {
   final List<WorkspacePaymentRecord> payments;
   final List<WorkspacePayoutRecord> payouts;
   final List<WorkspaceCustomerLedger> customerLedgers;
+
+  /// Compares the supplied paid-out total with its confirmed payout records.
+  /// Requests, holds and processing states never count as received money.
+  /// This is a projection consistency check, not a bank account balance or
+  /// independent bank confirmation. Partial history cannot reconcile a total.
+  ({int recordedMinor, int reportedMinor, int? differenceMinor})?
+  get settlementPaidReconciliation {
+    if (!valid) {
+      return null;
+    }
+    final recorded = payouts
+        .where((payout) => payout.state == WorkspacePayoutState.paid)
+        .fold<int>(0, (sum, payout) => sum + payout.amountMinor);
+    if (!_financeAmountValid(recorded)) {
+      return null;
+    }
+    return (
+      recordedMinor: recorded,
+      reportedMinor: paidOutMinor,
+      differenceMinor: historyComplete ? paidOutMinor - recorded : null,
+    );
+  }
+
   bool get _customerIdentitiesValid {
     final ids = <String>{};
     final invoiceCustomers = <String, String>{};
@@ -1124,6 +1147,370 @@ class WorkspaceFinanceSnapshot {
       ) &&
       customerLedgers.map((l) => l.customerId).toSet().length ==
           customerLedgers.length;
+}
+
+/// Read-only rows for the Store's existing money statement. Invoice, bill and
+/// stock facts are deliberately not money movements. A payout is an internal
+/// transfer, so it cannot increase the Store's recorded receipts a second time.
+class WorkspaceMoneyStatementEntry {
+  const WorkspaceMoneyStatementEntry({
+    required this.id,
+    required this.label,
+    required this.party,
+    required this.reference,
+    required this.method,
+    required this.occurredAt,
+    required this.amountMinor,
+    required this.incoming,
+    required this.posted,
+    this.transfer = false,
+    required this.status,
+  });
+  final String id, label, party, reference, method, status;
+  final DateTime occurredAt;
+  final int amountMinor;
+  final bool incoming, posted, transfer;
+}
+
+/// One confirmed movement in an explicitly identified cash/bank register.
+/// The supplying adapter must map the original operation to this register;
+/// a payment-method label alone cannot identify a particular bank account.
+class WorkspaceMoneyRegisterEntry {
+  const WorkspaceMoneyRegisterEntry({
+    required this.id,
+    required this.reference,
+    required this.occurredAt,
+    required this.deltaMinor,
+  });
+  final String id, reference;
+  final DateTime occurredAt;
+  final int deltaMinor;
+  bool get valid =>
+      id.trim().isNotEmpty &&
+      reference.trim().isNotEmpty &&
+      deltaMinor != 0 &&
+      _financeAmountValid(deltaMinor, signed: true);
+  Object get identity => (id, reference, occurredAt.toUtc(), deltaMinor);
+  Map<String, Object?> toJson() => {
+    'id': id,
+    'reference': reference,
+    'occurredAt': occurredAt.toUtc().toIso8601String(),
+    'deltaMinor': deltaMinor,
+  };
+}
+
+/// Read-only register projection. The opening and complete event interval come
+/// from the same scoped source. This does not infer a cash count or bank balance
+/// from sales, payment-method names, settlement requests or partial history.
+class WorkspaceMoneyRegisterSnapshot {
+  WorkspaceMoneyRegisterSnapshot({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.registerId,
+    required this.label,
+    required this.revision,
+    required this.openingAt,
+    required this.asOf,
+    required this.historyComplete,
+    required List<WorkspaceMoneyRegisterEntry> entries,
+    this.openingMinor,
+  }) : entries = List.unmodifiable(entries);
+  final String accountScope, workspaceId, registerId, label;
+  final int revision;
+  final DateTime openingAt, asOf;
+  final bool historyComplete;
+  final int? openingMinor;
+  final List<WorkspaceMoneyRegisterEntry> entries;
+  bool get valid {
+    if ([
+          accountScope,
+          workspaceId,
+          registerId,
+          label,
+        ].any((v) => v.trim().isEmpty) ||
+        revision < 1 ||
+        openingAt.isAfter(asOf) ||
+        (historyComplete && openingMinor == null) ||
+        (openingMinor != null &&
+            !_financeAmountValid(openingMinor!, signed: true)) ||
+        entries.map((e) => e.id).toSet().length != entries.length) {
+      return false;
+    }
+    var balance = openingMinor ?? 0;
+    DateTime? previous;
+    for (final entry in entries) {
+      if (!entry.valid ||
+          entry.occurredAt.isBefore(openingAt) ||
+          !entry.occurredAt.isBefore(asOf) ||
+          (previous != null && entry.occurredAt.isBefore(previous))) {
+        return false;
+      }
+      balance += entry.deltaMinor;
+      if (!_financeAmountValid(balance, signed: true)) {
+        return false;
+      }
+      previous = entry.occurredAt;
+    }
+    return true;
+  }
+
+  /// start is inclusive, end exclusive. A period beyond the supplied source
+  /// coverage stays unavailable; an absent opening is never replaced with zero.
+  ({int openingMinor, int inMinor, int outMinor, int closingMinor})? balances(
+    DateTime start,
+    DateTime end,
+  ) {
+    if (!valid ||
+        !historyComplete ||
+        start.isBefore(openingAt) ||
+        end.isAfter(asOf) ||
+        !start.isBefore(end)) {
+      return null;
+    }
+    var opening = openingMinor!, incoming = 0, outgoing = 0;
+    for (final entry in entries) {
+      if (entry.occurredAt.isBefore(start)) {
+        opening += entry.deltaMinor;
+      } else if (entry.occurredAt.isBefore(end)) {
+        if (entry.deltaMinor > 0) {
+          incoming += entry.deltaMinor;
+        } else {
+          outgoing -= entry.deltaMinor;
+        }
+      }
+    }
+    if (!_financeAmountValid(incoming) || !_financeAmountValid(outgoing)) {
+      return null;
+    }
+    return (
+      openingMinor: opening,
+      inMinor: incoming,
+      outMinor: outgoing,
+      closingMinor: opening + incoming - outgoing,
+    );
+  }
+
+  bool canFollow(WorkspaceMoneyRegisterSnapshot old) {
+    if (!valid ||
+        !old.valid ||
+        accountScope != old.accountScope ||
+        workspaceId != old.workspaceId ||
+        registerId != old.registerId ||
+        label != old.label ||
+        !openingAt.isAtSameMomentAs(old.openingAt) ||
+        (old.openingMinor != null && openingMinor != old.openingMinor) ||
+        revision < old.revision ||
+        asOf.isBefore(old.asOf) ||
+        (old.historyComplete && !historyComplete) ||
+        entries.length < old.entries.length) {
+      return false;
+    }
+    for (var i = 0; i < old.entries.length; i++) {
+      if (entries[i].identity != old.entries[i].identity) {
+        return false;
+      }
+    }
+    if (old.historyComplete &&
+        entries
+            .skip(old.entries.length)
+            .any((entry) => entry.occurredAt.isBefore(old.asOf))) {
+      return false;
+    }
+    return revision > old.revision ||
+        (asOf.isAtSameMomentAs(old.asOf) &&
+            openingMinor == old.openingMinor &&
+            historyComplete == old.historyComplete &&
+            entries.length == old.entries.length);
+  }
+
+  Map<String, Object?> toJson() => {
+    'accountScope': accountScope,
+    'workspaceId': workspaceId,
+    'registerId': registerId,
+    'label': label,
+    'revision': revision,
+    'openingAt': openingAt.toUtc().toIso8601String(),
+    'asOf': asOf.toUtc().toIso8601String(),
+    'historyComplete': historyComplete,
+    'openingMinor': openingMinor,
+    'entries': entries.map((entry) => entry.toJson()).toList(),
+  };
+  static WorkspaceMoneyRegisterSnapshot? fromJson(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+    try {
+      final result = WorkspaceMoneyRegisterSnapshot(
+        accountScope: value['accountScope'] as String,
+        workspaceId: value['workspaceId'] as String,
+        registerId: value['registerId'] as String,
+        label: value['label'] as String,
+        revision: value['revision'] as int,
+        openingAt: DateTime.parse(value['openingAt'] as String),
+        asOf: DateTime.parse(value['asOf'] as String),
+        historyComplete: value['historyComplete'] as bool,
+        openingMinor: value['openingMinor'] as int?,
+        entries: [
+          for (final entry in value['entries'] as List)
+            WorkspaceMoneyRegisterEntry(
+              id: entry['id'] as String,
+              reference: entry['reference'] as String,
+              occurredAt: DateTime.parse(entry['occurredAt'] as String),
+              deltaMinor: entry['deltaMinor'] as int,
+            ),
+        ],
+      );
+      return result.valid ? result : null;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
+class WorkspaceMoneyStatement {
+  WorkspaceMoneyStatement._(List<WorkspaceMoneyStatementEntry> entries)
+    : entries = List.unmodifiable(entries);
+  final List<WorkspaceMoneyStatementEntry> entries;
+  int get recordedInMinor => entries
+      .where((e) => e.posted && e.incoming && !e.transfer)
+      .fold<int>(0, (sum, e) => sum + e.amountMinor);
+  int get recordedOutMinor => entries
+      .where((e) => e.posted && !e.incoming && !e.transfer)
+      .fold<int>(0, (sum, e) => sum + e.amountMinor);
+
+  /// No opening balance is inferred from these possibly partial activity rows.
+  /// The source lists must all belong to the same authenticated Store scope.
+  static WorkspaceMoneyStatement? fromLedgers({
+    required WorkspaceFinanceSnapshot finance,
+    required List<WorkspaceSupplierLedger> suppliers,
+    required List<WorkspaceExpenseRecord> expenses,
+    required DateTime end,
+    DateTime? start,
+  }) {
+    if (!finance.valid ||
+        (start != null && start.isAfter(end)) ||
+        suppliers.map((s) => s.supplierId).toSet().length != suppliers.length ||
+        expenses.map((e) => e.operationId).toSet().length != expenses.length ||
+        suppliers.any(
+          (s) =>
+              !s.valid ||
+              s.accountScope != finance.accountScope ||
+              s.workspaceId != finance.workspaceId,
+        ) ||
+        expenses.any(
+          (e) =>
+              !e.valid ||
+              e.accountScope != finance.accountScope ||
+              e.workspaceId != finance.workspaceId,
+        )) {
+      return null;
+    }
+    final rows = <WorkspaceMoneyStatementEntry>[];
+    for (final customer in finance.customerLedgers) {
+      for (final entry in customer.entries) {
+        if (entry.kind != WorkspaceLedgerEntryKind.collection &&
+            entry.kind != WorkspaceLedgerEntryKind.refund) {
+          continue;
+        }
+        final incoming = entry.kind == WorkspaceLedgerEntryKind.collection;
+        rows.add(
+          WorkspaceMoneyStatementEntry(
+            id: jsonEncode(['customer', customer.customerId, entry.id]),
+            label: incoming ? 'Customer payment' : 'Customer refund',
+            party: customer.customerName,
+            reference: '${entry.invoiceId} · ${entry.orderId}',
+            method: entry.channel.label,
+            occurredAt: entry.occurredAt,
+            amountMinor: entry.amountMinor,
+            incoming: incoming,
+            posted: entry.state == WorkspaceLedgerPostingState.posted,
+            status: switch (entry.state) {
+              WorkspaceLedgerPostingState.posted => 'Recorded',
+              WorkspaceLedgerPostingState.pending => 'Pending confirmation',
+              WorkspaceLedgerPostingState.failed => 'Failed',
+            },
+          ),
+        );
+      }
+    }
+    for (final supplier in suppliers) {
+      for (final entry in supplier.entries) {
+        if (entry.kind == WorkspaceSupplierEntryKind.bill ||
+            entry.kind == WorkspaceSupplierEntryKind.creditNote) {
+          continue;
+        }
+        rows.add(
+          WorkspaceMoneyStatementEntry(
+            id: jsonEncode([
+              'supplier',
+              supplier.supplierId,
+              entry.operationId,
+            ]),
+            label: switch (entry.kind) {
+              WorkspaceSupplierEntryKind.advance => 'Supplier advance',
+              WorkspaceSupplierEntryKind.refund => 'Supplier refund',
+              _ => 'Supplier payment',
+            },
+            party: supplier.supplierName,
+            reference: '${entry.reference} · ${entry.orderId}',
+            method: entry.paymentMethod ?? 'Payment method unavailable',
+            occurredAt: entry.postedAt,
+            amountMinor: entry.amountMinor,
+            incoming: entry.kind == WorkspaceSupplierEntryKind.refund,
+            posted: true,
+            status: 'Recorded',
+          ),
+        );
+      }
+    }
+    for (final expense in expenses) {
+      rows.add(
+        WorkspaceMoneyStatementEntry(
+          id: jsonEncode(['expense', expense.operationId]),
+          label: 'Expense',
+          party: expense.category,
+          reference: expense.reference,
+          method: expense.method,
+          occurredAt: expense.occurredAt,
+          amountMinor: expense.amountMinor,
+          incoming: false,
+          posted: true,
+          status: 'Recorded',
+        ),
+      );
+    }
+    for (final payout in finance.payouts) {
+      rows.add(
+        WorkspaceMoneyStatementEntry(
+          id: jsonEncode(['payout', payout.operationId]),
+          label: 'Settlement transfer',
+          party: payout.bankLabel ?? 'Bank',
+          reference: payout.id,
+          method: 'MoolSocial to bank',
+          occurredAt: payout.updatedAt,
+          amountMinor: payout.amountMinor,
+          incoming: true,
+          posted: payout.state == WorkspacePayoutState.paid,
+          transfer: true,
+          status: payout.state.label,
+        ),
+      );
+    }
+    rows.removeWhere(
+      (e) =>
+          e.occurredAt.isAfter(end) ||
+          (start != null && e.occurredAt.isBefore(start)),
+    );
+    rows.sort((a, b) {
+      final date = b.occurredAt.compareTo(a.occurredAt);
+      return date == 0 ? a.id.compareTo(b.id) : date;
+    });
+    final result = WorkspaceMoneyStatement._(rows);
+    return _financeAmountValid(result.recordedInMinor) &&
+            _financeAmountValid(result.recordedOutMinor)
+        ? result
+        : null;
+  }
 }
 
 /// Device recovery of a validated projection and its one unresolved collection.
@@ -1202,6 +1589,74 @@ class WorkspacePendingCustomerReturn {
   }
 }
 
+/// One recorded business expense, separate from purchases and settlements.
+class WorkspaceExpenseRecord {
+  const WorkspaceExpenseRecord({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.operationId,
+    required this.amountMinor,
+    required this.category,
+    required this.method,
+    required this.reference,
+    required this.note,
+    required this.occurredAt,
+  });
+  final String accountScope,
+      workspaceId,
+      operationId,
+      category,
+      method,
+      reference,
+      note;
+  final int amountMinor;
+  final DateTime occurredAt;
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        operationId,
+        category,
+        method,
+        reference,
+      ].every((value) => value.trim().isNotEmpty && value.length <= 512) &&
+      amountMinor > 0 &&
+      _financeAmountValid(amountMinor) &&
+      note.length <= 2000;
+  Map<String, Object?> toJson() => {
+    'account': accountScope,
+    'store': workspaceId,
+    'operationId': operationId,
+    'amountMinor': amountMinor,
+    'category': category,
+    'method': method,
+    'reference': reference,
+    'note': note,
+    'occurredAt': occurredAt.toUtc().toIso8601String(),
+  };
+  static WorkspaceExpenseRecord? fromJson(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+    try {
+      final record = WorkspaceExpenseRecord(
+        accountScope: value['account'] as String,
+        workspaceId: value['store'] as String,
+        operationId: value['operationId'] as String,
+        amountMinor: value['amountMinor'] as int,
+        category: value['category'] as String,
+        method: value['method'] as String,
+        reference: value['reference'] as String,
+        note: value['note'] as String,
+        occurredAt: DateTime.parse(value['occurredAt'] as String),
+      );
+      return record.valid ? record : null;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
 class WorkspaceLedgerCheckpoint {
   const WorkspaceLedgerCheckpoint({
     required this.revision,
@@ -1212,18 +1667,45 @@ class WorkspaceLedgerCheckpoint {
     this.inventory,
     this.billedOrders = const {},
     this.billedInvoices = const {},
+    this.supplierLedgers = const {},
+    this.expenses = const {},
+    this.moneyRegisters = const {},
   });
   final int revision;
   final WorkspaceFinanceSnapshot finance;
   final WorkspaceInventoryLedger? inventory;
   final Map<String, WorkspaceOrderRecord> billedOrders;
   final Map<String, WorkspaceCustomerInvoice> billedInvoices;
+  final Map<String, WorkspaceSupplierLedger> supplierLedgers;
+  final Map<String, WorkspaceExpenseRecord> expenses;
+  final Map<String, WorkspaceMoneyRegisterSnapshot> moneyRegisters;
   final WorkspaceCustomerCollection? pending;
   final WorkspacePendingCustomerReturn? pendingReturn;
   final WorkspaceCustomerRefund? pendingRefund;
   bool get valid =>
       revision > 0 &&
       finance.valid &&
+      moneyRegisters.entries.every(
+        (entry) =>
+            entry.key == entry.value.registerId &&
+            entry.value.valid &&
+            entry.value.accountScope == finance.accountScope &&
+            entry.value.workspaceId == finance.workspaceId,
+      ) &&
+      expenses.entries.every(
+        (entry) =>
+            entry.key == entry.value.operationId &&
+            entry.value.valid &&
+            entry.value.accountScope == finance.accountScope &&
+            entry.value.workspaceId == finance.workspaceId,
+      ) &&
+      supplierLedgers.entries.every(
+        (entry) =>
+            entry.key == entry.value.supplierId &&
+            entry.value.valid &&
+            entry.value.accountScope == finance.accountScope &&
+            entry.value.workspaceId == finance.workspaceId,
+      ) &&
       billedInvoices.length == billedOrders.length &&
       billedInvoices.entries.every(
         (entry) =>
@@ -1337,6 +1819,16 @@ class WorkspaceLedgerCheckpoint {
   Map<String, Object?> toJson() => {
     'version': 1,
     if (inventory != null) 'inventory': inventory!.toJson(),
+    if (expenses.isNotEmpty)
+      'expenses': expenses.map((id, expense) => MapEntry(id, expense.toJson())),
+    if (moneyRegisters.isNotEmpty)
+      'moneyRegisters': moneyRegisters.map(
+        (id, register) => MapEntry(id, register.toJson()),
+      ),
+    if (supplierLedgers.isNotEmpty)
+      'supplierLedgers': supplierLedgers.map(
+        (id, ledger) => MapEntry(id, ledger.toJson()),
+      ),
     if (billedOrders.isNotEmpty)
       'billedOrders': {
         for (final entry in billedOrders.entries)
@@ -1456,6 +1948,22 @@ class WorkspaceLedgerCheckpoint {
       final pending = root['pending'] as Map?;
       final result = WorkspaceLedgerCheckpoint(
         revision: root['revision'] as int,
+        moneyRegisters: Map.unmodifiable({
+          for (final entry
+              in ((root['moneyRegisters'] as Map?) ?? const {}).entries)
+            entry.key as String:
+                WorkspaceMoneyRegisterSnapshot.fromJson(entry.value) ??
+                (throw const FormatException('Invalid money register')),
+        }),
+        expenses: Map.unmodifiable({
+          for (final entry in ((root['expenses'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceExpenseRecord.fromJson(entry.value)!,
+        }),
+        supplierLedgers: Map.unmodifiable({
+          for (final entry
+              in ((root['supplierLedgers'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceSupplierLedger.fromJson(entry.value)!,
+        }),
         billedOrders: Map.unmodifiable({
           for (final entry
               in ((root['billedOrders'] as Map?) ?? const {}).entries)
@@ -1679,10 +2187,12 @@ class WorkspaceReceiptDraft {
     required List<WorkspacePurchaseLine> lines,
     required Map<String, String> countedPacks,
     required Map<String, WorkspaceReceiptProblem> problems,
+    Map<String, String> returnedPacks = const {},
     this.purchaseId,
     this.note = '',
   }) : lines = List.unmodifiable(lines),
        countedPacks = Map.unmodifiable(countedPacks),
+       returnedPacks = Map.unmodifiable(returnedPacks),
        problems = Map.unmodifiable(problems);
 
   final WorkspaceReceiptDraftKey key;
@@ -1693,6 +2203,7 @@ class WorkspaceReceiptDraft {
   // Preserve incomplete/invalid typed values for correction after relaunch.
   // Empty is unknown, never an inferred zero or the ordered quantity.
   final Map<String, String> countedPacks;
+  final Map<String, String> returnedPacks;
   final Map<String, WorkspaceReceiptProblem> problems;
   final String note;
 
@@ -1701,6 +2212,7 @@ class WorkspaceReceiptDraft {
     required Map<String, String> countedPacks,
     required Map<String, WorkspaceReceiptProblem> problems,
     required String note,
+    Map<String, String>? returnedPacks,
   }) => WorkspaceReceiptDraft(
     key: key,
     supplierId: supplierId,
@@ -1710,6 +2222,7 @@ class WorkspaceReceiptDraft {
     revision: revision,
     lines: lines,
     countedPacks: countedPacks,
+    returnedPacks: returnedPacks ?? this.returnedPacks,
     problems: problems,
     note: note,
   );
@@ -1729,6 +2242,7 @@ class WorkspaceReceiptDraft {
       lines.every((line) => line.valid) &&
       lines.map((line) => line.id).toSet().length == lines.length &&
       countedPacks.keys.every((id) => lines.any((line) => line.id == id)) &&
+      returnedPacks.keys.every((id) => lines.any((line) => line.id == id)) &&
       problems.keys.every((id) => lines.any((line) => line.id == id)) &&
       WorkspaceIssueDraft.acceptsNote(note);
 
@@ -1756,6 +2270,19 @@ class WorkspaceReceiptDraft {
       jsonEncode(lines.map(_lineJson).toList()) ==
           jsonEncode(record.lines.map(_lineJson).toList());
 
+  bool matchesPurchasedItems(WorkspacePurchaseRecord record) =>
+      belongsTo(record) &&
+      jsonEncode(
+            lines
+                .map((line) => _lineJson(line)..remove('receivedPacks'))
+                .toList(),
+          ) ==
+          jsonEncode(
+            record.lines
+                .map((line) => _lineJson(line)..remove('receivedPacks'))
+                .toList(),
+          );
+
   static Map<String, Object?> _lineJson(WorkspacePurchaseLine line) => {
     'id': line.id,
     'productId': line.productId,
@@ -1778,6 +2305,7 @@ class WorkspaceReceiptDraft {
     'revision': revision,
     'lines': lines.map(_lineJson).toList(),
     'countedPacks': countedPacks,
+    if (returnedPacks.isNotEmpty) 'returnedPacks': returnedPacks,
     'problems': problems.map((id, value) => MapEntry(id, value.name)),
     'note': note,
   };
@@ -1829,6 +2357,19 @@ class WorkspaceReceiptDraft {
       counts[entry.key as String] = entry.value as String;
     }
     final problems = <String, WorkspaceReceiptProblem>{};
+    final returns = <String, String>{};
+    final rawReturns = value['returnedPacks'];
+    if (rawReturns != null) {
+      if (rawReturns is! Map) {
+        return null;
+      }
+      for (final entry in rawReturns.entries) {
+        if (entry.key is! String || entry.value is! String) {
+          return null;
+        }
+        returns[entry.key as String] = entry.value as String;
+      }
+    }
     for (final entry in (value['problems'] as Map).entries) {
       if (entry.key is! String || entry.value is! String) return null;
       final matches = WorkspaceReceiptProblem.values.where(
@@ -1850,10 +2391,252 @@ class WorkspaceReceiptDraft {
       revision: value['revision'] as int,
       lines: lines,
       countedPacks: counts,
+      returnedPacks: returns,
       problems: problems,
       note: value['note'] as String,
     );
     return draft.valid ? draft : null;
+  }
+}
+
+enum WorkspaceSupplierEntryKind { bill, advance, payment, creditNote, refund }
+
+/// Confirmed supplier money facts. Orders and receipts are deliberately not
+/// financial entries; receiving a shipment cannot create another bill/payment.
+class WorkspaceSupplierLedgerEntry {
+  const WorkspaceSupplierLedgerEntry({
+    required this.operationId,
+    required this.orderId,
+    required this.reference,
+    required this.kind,
+    required this.amountMinor,
+    required this.postedAt,
+    this.billId,
+    this.paymentMethod,
+  });
+
+  final String operationId, orderId, reference;
+  final String? billId, paymentMethod;
+  final WorkspaceSupplierEntryKind kind;
+  final int amountMinor;
+  final DateTime postedAt;
+
+  bool get valid =>
+      [
+        operationId,
+        orderId,
+        reference,
+      ].every((value) => value.trim().isNotEmpty) &&
+      amountMinor > 0 &&
+      _financeAmountValid(amountMinor) &&
+      (paymentMethod == null || paymentMethod!.trim().isNotEmpty) &&
+      (billId == null || billId!.trim().isNotEmpty) &&
+      (kind != WorkspaceSupplierEntryKind.bill || billId != null);
+
+  int get payableDeltaMinor => switch (kind) {
+    WorkspaceSupplierEntryKind.bill ||
+    WorkspaceSupplierEntryKind.refund => amountMinor,
+    WorkspaceSupplierEntryKind.advance ||
+    WorkspaceSupplierEntryKind.payment ||
+    WorkspaceSupplierEntryKind.creditNote => -amountMinor,
+  };
+
+  Map<String, Object?> toJson() => {
+    'operationId': operationId,
+    'orderId': orderId,
+    'reference': reference,
+    'billId': billId,
+    if (paymentMethod != null) 'paymentMethod': paymentMethod,
+    'kind': kind.name,
+    'amountMinor': amountMinor,
+    'postedAt': postedAt.toUtc().toIso8601String(),
+  };
+}
+
+/// A supplier-scoped projection, supplied independently of fulfilment facts.
+/// A positive balance is payable; a negative balance is credit with the supplier.
+/// Missing opening/history evidence must never be presented as a zero balance.
+class WorkspaceSupplierLedger {
+  WorkspaceSupplierLedger({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.supplierId,
+    required this.supplierName,
+    required this.revision,
+    required this.asOf,
+    required List<WorkspaceSupplierLedgerEntry> entries,
+    required this.historyComplete,
+    this.openingBalanceMinor,
+  }) : entries = List.unmodifiable(entries);
+
+  final String accountScope, workspaceId, supplierId, supplierName;
+  final int revision;
+  final DateTime asOf;
+  final List<WorkspaceSupplierLedgerEntry> entries;
+  final bool historyComplete;
+  final int? openingBalanceMinor;
+
+  Map<String, Object?> toJson() => {
+    'accountScope': accountScope,
+    'workspaceId': workspaceId,
+    'supplierId': supplierId,
+    'supplierName': supplierName,
+    'revision': revision,
+    'asOf': asOf.toUtc().toIso8601String(),
+    'openingBalanceMinor': openingBalanceMinor,
+    'historyComplete': historyComplete,
+    'entries': entries.map((entry) => entry.toJson()).toList(),
+  };
+
+  static WorkspaceSupplierLedger? fromJson(Object? value) {
+    if (value is! Map) {
+      return null;
+    }
+    try {
+      final result = WorkspaceSupplierLedger(
+        accountScope: value['accountScope'] as String,
+        workspaceId: value['workspaceId'] as String,
+        supplierId: value['supplierId'] as String,
+        supplierName: value['supplierName'] as String,
+        revision: value['revision'] as int,
+        asOf: DateTime.parse(value['asOf'] as String),
+        openingBalanceMinor: value['openingBalanceMinor'] as int?,
+        historyComplete: value['historyComplete'] as bool,
+        entries: [
+          for (final entry in value['entries'] as List)
+            WorkspaceSupplierLedgerEntry(
+              operationId: entry['operationId'] as String,
+              orderId: entry['orderId'] as String,
+              reference: entry['reference'] as String,
+              billId: entry['billId'] as String?,
+              paymentMethod: entry['paymentMethod'] as String?,
+              kind: WorkspaceSupplierEntryKind.values.byName(
+                entry['kind'] as String,
+              ),
+              amountMinor: entry['amountMinor'] as int,
+              postedAt: DateTime.parse(entry['postedAt'] as String),
+            ),
+        ],
+      );
+      return result.valid ? result : null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        supplierId,
+        supplierName,
+      ].every((value) => value.trim().isNotEmpty) &&
+      revision > 0 &&
+      _amountsValid &&
+      entries.every((entry) => entry.valid && !entry.postedAt.isAfter(asOf)) &&
+      entries.map((entry) => entry.operationId).toSet().length ==
+          entries.length &&
+      entries
+              .where((entry) => entry.kind == WorkspaceSupplierEntryKind.bill)
+              .map((entry) => entry.billId)
+              .toSet()
+              .length ==
+          entries
+              .where((entry) => entry.kind == WorkspaceSupplierEntryKind.bill)
+              .length;
+
+  bool get _amountsValid {
+    if (openingBalanceMinor != null &&
+        !_financeAmountValid(openingBalanceMinor!, signed: true)) {
+      return false;
+    }
+    var balance = openingBalanceMinor ?? 0;
+    for (final entry in entries) {
+      balance += entry.payableDeltaMinor;
+      if (!_financeAmountValid(balance, signed: true)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  int? get balanceMinor =>
+      !valid || !historyComplete || openingBalanceMinor == null
+      ? null
+      : entries.fold<int>(
+          openingBalanceMinor!,
+          (total, entry) => total + entry.payableDeltaMinor,
+        );
+
+  int? get payableMinor {
+    final balance = balanceMinor;
+    return balance == null ? null : (balance > 0 ? balance : 0);
+  }
+
+  int? get creditMinor {
+    final balance = balanceMinor;
+    return balance == null ? null : (balance < 0 ? -balance : 0);
+  }
+
+  WorkspaceSupplierLedger? appendConfirmed(
+    WorkspaceSupplierLedgerEntry entry, {
+    required int expectedRevision,
+  }) {
+    if (!valid ||
+        !entry.valid ||
+        expectedRevision <= 0 ||
+        expectedRevision > revision) {
+      return null;
+    }
+    final existing = entries.where(
+      (item) => item.operationId == entry.operationId,
+    );
+    if (existing.isNotEmpty) {
+      return jsonEncode(existing.single.toJson()) == jsonEncode(entry.toJson())
+          ? this
+          : null;
+    }
+    if (expectedRevision != revision) {
+      return null;
+    }
+    final next = WorkspaceSupplierLedger(
+      accountScope: accountScope,
+      workspaceId: workspaceId,
+      supplierId: supplierId,
+      supplierName: supplierName,
+      revision: revision + 1,
+      asOf: entry.postedAt.isAfter(asOf) ? entry.postedAt : asOf,
+      entries: [...entries, entry],
+      historyComplete: historyComplete,
+      openingBalanceMinor: openingBalanceMinor,
+    );
+    return next.valid && next.canFollow(this) ? next : null;
+  }
+
+  bool canFollow(WorkspaceSupplierLedger previous) {
+    if (!valid ||
+        !previous.valid ||
+        accountScope != previous.accountScope ||
+        workspaceId != previous.workspaceId ||
+        supplierId != previous.supplierId ||
+        revision < previous.revision ||
+        asOf.isBefore(previous.asOf) ||
+        openingBalanceMinor != previous.openingBalanceMinor ||
+        (previous.historyComplete && !historyComplete) ||
+        entries.length < previous.entries.length) {
+      return false;
+    }
+    for (var i = 0; i < previous.entries.length; i++) {
+      if (jsonEncode(entries[i].toJson()) !=
+          jsonEncode(previous.entries[i].toJson())) {
+        return false;
+      }
+    }
+    return revision > previous.revision ||
+        (entries.length == previous.entries.length &&
+            historyComplete == previous.historyComplete &&
+            asOf == previous.asOf &&
+            supplierName == previous.supplierName);
   }
 }
 
@@ -1908,6 +2691,10 @@ class WorkspacePurchaseRecord {
     this.receiptState = WorkspaceReceiptState.unavailable,
     this.receiptReference,
     this.updateNote,
+    this.paymentTermLabel,
+    this.balanceDueLabel,
+    this.paymentMethod,
+    this.purchaseOrderReference,
   }) : lines = List.unmodifiable(lines);
 
   final String accountScope,
@@ -1920,6 +2707,10 @@ class WorkspacePurchaseRecord {
   final DateTime createdAt, updatedAt;
   final WorkspaceSupplyStage stage;
   final String itemSummary, paymentLabel;
+  final String? paymentTermLabel,
+      balanceDueLabel,
+      paymentMethod,
+      purchaseOrderReference;
   final List<WorkspacePurchaseLine> lines;
   final String? purchaseId,
       expectedArrival,
@@ -1995,6 +2786,10 @@ class WorkspacePurchaseRecord {
       amountMinor: order.total * 100,
       itemSummary: order.itemSummary,
       paymentLabel: order.paymentStatusLabel ?? 'Payment update unavailable',
+      paymentTermLabel: order.paymentTermLabel,
+      balanceDueLabel: order.balanceDueLabel,
+      paymentMethod: order.paymentMethod,
+      purchaseOrderReference: order.purchaseOrderReference,
       expectedArrival: order.updatedDeliveryEstimate ?? order.promise,
       address: order.addressLine,
       deliveryPartner: order.deliveryPartnerName,
@@ -2670,6 +3465,45 @@ class WorkspaceStoreOffer {
 
 enum WorkspaceStockMode { availabilityOnly, exactQuantity }
 
+/// Confirmed cumulative returned packs for one exact supplier shipment.
+/// A return confirmation is not a credit note, refund or payment instruction.
+class WorkspaceSupplierReturnConfirmation {
+  WorkspaceSupplierReturnConfirmation({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.supplierId,
+    required this.orderId,
+    required this.shipmentId,
+    required this.reference,
+    required this.revision,
+    required this.confirmedAt,
+    required Map<String, int> returnedPacks,
+  }) : returnedPacks = Map.unmodifiable(returnedPacks);
+  final String accountScope,
+      workspaceId,
+      supplierId,
+      orderId,
+      shipmentId,
+      reference;
+  final int revision;
+  final DateTime confirmedAt;
+  final Map<String, int> returnedPacks;
+
+  bool belongsTo(WorkspacePurchaseRecord purchase) =>
+      revision > 0 &&
+      reference.trim().isNotEmpty &&
+      accountScope == purchase.accountScope &&
+      workspaceId == purchase.workspaceId &&
+      supplierId == purchase.supplierId &&
+      orderId == purchase.orderId &&
+      shipmentId == purchase.shipmentId &&
+      returnedPacks.isNotEmpty &&
+      returnedPacks.keys.every(
+        (id) => purchase.lines.any((line) => line.id == id),
+      ) &&
+      returnedPacks.values.every((count) => count >= 0);
+}
+
 enum WorkspaceStockMovementKind {
   reserved,
   released,
@@ -2679,6 +3513,7 @@ enum WorkspaceStockMovementKind {
   adjustment,
   damageOrExpiry,
   openingStock,
+  supplierReturn,
 }
 
 enum WorkspaceStockReferenceKind { order, supplierReceipt }
@@ -2714,10 +3549,24 @@ class WorkspaceLedgerFormDraft {
         key.invoice,
         key.order,
       ].every((value) => value.trim().isNotEmpty && value.length <= 512) &&
-      const ['collection', 'refund', 'return'].contains(key.kind) &&
+      const [
+        'collection',
+        'refund',
+        'return',
+        'supplierPayment',
+        'expense',
+      ].contains(key.kind) &&
       fields.keys.every(
         (field) =>
-            (key.kind == 'return'
+            (key.kind == 'expense'
+                    ? const [
+                        'amount',
+                        'channel',
+                        'reference',
+                        'category',
+                        'note',
+                      ]
+                    : key.kind == 'return'
                     ? const ['product', 'quantity', 'sellable', 'reason']
                     : const ['amount', 'channel', 'reference'])
                 .contains(field),
@@ -2806,6 +3655,7 @@ class WorkspaceStockMovement {
       (switch (kind) {
         WorkspaceStockMovementKind.reserved ||
         WorkspaceStockMovementKind.sale ||
+        WorkspaceStockMovementKind.supplierReturn ||
         WorkspaceStockMovementKind.damageOrExpiry => quantityDelta < 0,
         WorkspaceStockMovementKind.released ||
         WorkspaceStockMovementKind.returned ||
@@ -2835,6 +3685,7 @@ class WorkspaceStockMovement {
     WorkspaceStockMovementKind.adjustment => 'Counted adjustment',
     WorkspaceStockMovementKind.damageOrExpiry => 'Damage or expiry',
     WorkspaceStockMovementKind.openingStock => 'Opening quantity',
+    WorkspaceStockMovementKind.supplierReturn => 'Returned to supplier',
   };
   static int compareNewest(WorkspaceStockMovement a, WorkspaceStockMovement b) {
     final date = b.occurredAt.compareTo(a.occurredAt);

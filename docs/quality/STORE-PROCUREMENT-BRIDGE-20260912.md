@@ -1352,3 +1352,177 @@ and fabricated new baseline rejection. Initial analysis identified a braces-only
 formatting issue; the original log is retained. After adding braces,
 ledger-sku-growth-verified-analysis.log reports no issues. This remains local
 frontend evidence, not device or production stock-authority qualification.
+
+## Ledger MVP combined delivery amendment
+
+Founder changed the delivery sequence: implement the three approved Ledger MVP
+scopes locally before one combined APK and OPPO review. Keep ticket evidence
+separate, but do not require an intermediate ticket 01 installation or founder
+acceptance before local ticket 02/03 implementation. Final OPPO technical checks
+and founder screen-by-screen approval remain required for every delivered screen.
+V20 remains the immutable ticket 01 candidate; no intermediate APK is requested.
+
+Ticket 02 begins in the existing Store models with supplier-scoped confirmed bill,
+advance, payment, credit-note and refund entries. Shipment/receipt state is not a
+financial entry. Missing opening/history evidence leaves balances unavailable.
+Duplicate operation/bill identities, history rewriting and account/Store/supplier
+switches are rejected. Local focused tests and analysis are pending at this note;
+this model is not yet connected to persistence, receiving or the Store UI and is
+not ticket completion or backend authority.
+
+Ticket 02 local progress: supplier history now uses the existing encrypted Store
+checkpoint, with save-failure/lost-reply recovery and immutable prior history.
+Purchase details show the supplier balance and order-linked entries. Review
+fixtures recover saved supplier history before adding missing seeded histories.
+Confirmed partial/full receipts can post incremental stock through the existing
+inventory journal using explicit Store SKU and pack-unit mappings; drafts and
+delivery status alone cannot post. Retry and relaunch retain the same movements,
+and bill/payment/settlement facts remain unchanged. This receipt method is not yet
+wired to a receiving action/adapter; supplier returns and remaining payment-entry
+connections still need implementation before ticket completion.
+
+Latest evidence: outputs/store-ledger-mvp/ledger02-receipt-checkpoint-analysis.log
+has zero issues and ledger02-receipt-checkpoint-tests.jsonl ends success=true.
+Earlier ledger02-receipt-analysis.log retains the test-only missing serializer
+failure, corrected using the existing checkpoint codec without reducing checks.
+No ticket 02 commit, APK, OPPO qualification or founder visual acceptance yet.
+
+Receiving follow-up: the existing receipt editor now offers an explicitly labelled
+test confirmation only for the review Store/order gateway. Its adapter validates
+the seeded supplier/order/line identities and pack limits, rejects unresolved
+item issues, and keeps payment/fulfilment facts unchanged. Saved draft counts feed
+the stock journal; production sending remains unavailable without its service.
+Stock-history receipt links now resolve the scoped purchase/shipment identity
+instead of displaying or matching the internal composite key as receipt text.
+ledger02-review-receiving-analysis.log reports zero issues and the corresponding
+tests.jsonl ends success=true. These are focused local checks; controller/UI
+confirmation, Back/relaunch and current Flutter visual coverage still need to be
+completed, along with supplier returns and remaining payment-entry connections.
+
+Ledger 02/03 combined local checkpoint: supplier payment recording and confirmed
+review receipt/return actions are now connected to the existing persisted Store
+ledger and stock journal. The purchase screen retains agreed supplier terms;
+receipt/return actions do not create bills or payments. Expense entries share the
+money-entry form, retain their input on Back, and use scoped stable identities in
+the same checkpoint. This supersedes the earlier implementation-pending notes;
+it does not establish ticket acceptance or production service authority.
+
+ledger03-money-forms-r6.jsonl ends success=true for the four supplier/expense
+Flutter journeys at 412x915/100% and 320x568/200%. They check input retention,
+single payment/expense recording, partial receiving and supplier returns.
+Current captures are in the external audit folder store-ledger-mvp-ledger03-r6.
+The compact expense recorded capture shows Today moving from INR12.30 to INR37.30
+after one INR25 entry. Original r3/r4/r5 failures remain preserved: r3 also ran
+normal-profile customer tests under review flags without their native preferences
+fixtures; isolated r4/r5 exposed test navigation scrolling down for controls above
+the current expense entry. The test now scrolls upward in that same list; no
+assertions, app checks or exceptions were removed or relaxed.
+
+Ledger 03 money registers, unified statement and opening/closing/settlement
+reconciliation still require completion. Platform settlement totals are not cash
+or bank balances. Missing opening/history evidence must remain unavailable.
+Combined source/candidate qualification, one APK, OPPO technical testing and
+founder screen-by-screen visual acceptance remain pending. No intermediate V20
+APK, device action, live payment or Cursor/Redmi change is claimed here.
+
+Ledger 03 follow-up: settlement reconciliation now compares the supplied paid-out
+total only with paid payout records. Requests/processing/failed/held states do not
+become received money; partial history cannot report a reconciled total. Analysis,
+focused tests and DASH08 Flutter checks pass (ledger03-settlement-analysis.log,
+ledger03-settlement-tests.jsonl, ledger03-settlement-ui-r1.jsonl). The compact
+reconciliation capture was inspected. This compares source records, not a bank
+statement or an independently confirmed bank balance.
+
+The existing statement now has a Money view derived from customer collection/
+refund entries, supplier advances/payments/refunds, expenses and payout records.
+It uses the selected period and exact account/Store scope. Bills, invoices and
+goods movements do not post money; pending rows and internal settlement transfers
+are excluded from recorded in/out subtotals. Duplicate expense/supplier identities
+and cross-scope inputs reject the projection. Missing cash/bank opening history
+remains explicit, so recorded net activity is not presented as a closing balance.
+ledger03-money-analysis.log has zero issues and ledger03-money-tests.jsonl ends
+success=true. ledger03-money-ui-r1.jsonl also ends success=true for both screen
+sizes. Normal Money summary and compact expense-entry captures were inspected
+under store-ledger-mvp-ledger03-money-r1 in the external audit folder.
+Ledger 03 opening/closing register support and full combined qualification remain
+incomplete; these local changes are uncommitted and are not a qualified APK.
+
+Register follow-up: the frontend now accepts an exact account/Store/register
+projection with an opening, complete coverage interval and immutable confirmed
+movement identities. Period calculation uses inclusive start/exclusive end,
+preserves next-day opening, and leaves missing/partial coverage unavailable.
+The existing encrypted checkpoint retains these projections through other
+ledger saves. Lost-response recovery and later supplier saves preserve the same
+register without a second posting. Source adapters must identify the register;
+a payment-method name does not identify a bank account. This does not create
+backend authority, a physical cash count or bank-statement verification.
+
+ledger03-register-analysis.log and ledger03-register-connected-analysis.log have
+zero issues; their focused tests.jsonl logs end success=true. The Money view now
+expands supplied registers to show opening, money in/out and closing book balance
+through their reported time. The first compact Flutter run caught a real
+ExpansionTile/PageStorage type collision (double scroll position versus bool
+expansion state), preserved in ledger03-register-ui-r1.jsonl. The tile now owns
+an explicit account/Store/register/period PageStorageKey. The regression also
+switches Money to Expenses and back; r2 analysis is clean and its UI run is
+pending at this checkpoint. Combined source/candidate/APK/OPPO qualification
+and founder visual acceptance remain outstanding.
+
+Register UI successor: r2 removed the type collision but retained a compact-test
+tap miss beneath the fixed header. The test now brings the actual register title
+into view and asserts it is hit-testable. ledger03-register-ui-r3.jsonl ends
+success=true at both sizes, including switching Expenses/Money and retaining the
+expanded closing balance. The inspected compact r3 capture shows INR62.70 from a
+labelled INR100 opening and INR37.30 expense movements. All r1/r2 failure evidence
+remains preserved. No checker or assertion was weakened. Full combined regression,
+source/candidate review, build, OPPO checks and founder visual acceptance are next;
+register inputs are still source projections, not independent cash/bank authority.
+
+Combined source review found three further bounded corrections before sealing:
+register canFollow compares DateTime zones rather than instants across UTC
+serialization; the register expansion key uses the changing Week start timestamp;
+supplier monetary fields lack the same representable-range guard used by customer
+entries. These remain pending at this checkpoint even if the existing tests pass.
+The running 45-file source regression is preserved as
+ledger-combined-source-regression-r1.jsonl; full source analysis has zero issues.
+Its six changed source/test owners are captured in ledger-combined-source-r1-source.patch
+(SHA256 77B196C72640B8BAB5F3CD1BE9F88295DCCA1F40B4C027F93CEF18F1F39E8D09)
+and ledger-combined-source-r1-source-hashes.json. No app/test source changes occur
+while that run reads this revision. Add regression cases and correct these facts
+after terminal completion, then validate the successor; no APK acceptance yet.
+
+The preserved combined source run completed with 2605 passed, 83 skipped, zero
+failures and native exit0. It does not cover the subsequent corrections. New
+ledger-audit-model-red.jsonl reproduces UTC recovery rejecting unchanged history
+and oversized supplier money being accepted; ledger-audit-week-red.jsonl
+reproduces lost expansion after a Week-view tab return at both text sizes.
+Register timestamps now compare instants across zones, the expansion key uses
+the stable period name, and supplier entry/opening/running amounts use the same
+representable range as customer money. These are application fixes with retained
+assertions and original failures. ledger-audit-corrected-analysis.log has zero
+issues and ledger-audit-corrected-atomic.jsonl ends success=true. Corrected Flutter
+checks also end success=true in ledger-audit-corrected-ui.jsonl, covering supplier
+and register journeys at both sizes. The corrected full 45-file source suite is
+running in ledger-combined-source-regression-r2.jsonl. Candidate/APK/OPPO/founder
+qualification still remain required; no source seal or APK is claimed.
+
+Corrected combined source qualification completed: ledger-combined-source-regression-r2.jsonl
+reports 2607 passed, 83 skipped, zero failures and terminal success/native exit0.
+ledger-combined-r2-results.json verifies all six tested source/test hashes are
+unchanged, the same 83 excluded cases and all 56 named active replacement passes.
+Full analysis is clean. The r2 source patch is preserved externally with SHA256
+78712AA0194B8674DDD6FEA850613F28373706223D640D82F1185C303011BAA6.
+
+Changed-owner review for the bounded Ledger 02/03 batch: Work models define
+supplier entries, expense records, money activity and supplied register balances;
+Work services retain immutable checkpoint history and explicit review adapters;
+Work session connects scoped persistence, receipt/return stock and money records;
+the existing dashboard file connects purchase, expense and statement controls.
+Two existing Store test files cover these changes, with this bridge as the sole
+documentation owner. No consumer Buy owner, backend, dependency, Android config,
+ownership record or checker is changed in this implementation batch. Ticket 01's
+existing source remains ancestral; V20 remains preserved. Source sealing and
+fresh successor admission follow; combined candidate checks, one APK, OPPO and
+founder visual approval are still outstanding. Local fixtures/projections do not
+qualify authenticated backend enforcement, live payments, storage/privacy or
+independent cash/bank authority.

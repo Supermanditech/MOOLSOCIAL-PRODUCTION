@@ -866,11 +866,13 @@ void main() {
     WorkIssueCommandStore? issueCommandStore,
     WorkStockHistoryGateway? stockHistoryGateway,
     WorkReceiptDraftStore? receiptDraftStore,
+    WorkPendingProofStore? pendingProofStore,
   ]) {
     final work =
         WorkSession(
             gateway: gateway,
             contactDraftStore: contactStore,
+            pendingProofStore: pendingProofStore,
             counterDraftStore: _CounterDraftFixtureStore(),
             ledgerFormDraftStore: _LedgerFormFixtureStore(),
             issueDraftStore: issueDraftStore ?? _IssueDraftFixtureStore(),
@@ -22315,6 +22317,437 @@ void main() {
     }
 
     testWidgets(
+      'LEDGER03 expenses show scoped entries for the selected period $scale',
+      (tester) async {
+        final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+        SharedPreferencesAsyncPlatform.instance =
+            InMemorySharedPreferencesAsync.empty();
+        addTearDown(
+          () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+        );
+        final work = storeViewFixture(
+          null,
+          _ContactDraftFixtureStore(),
+          null,
+          null,
+          null,
+          null,
+          null,
+          _ContactDraftFixtureStore(),
+        );
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        expect(
+          work.bindWorkspaceOrderOperations(
+            WorkOrderOperations(
+              accountScope: seed.accountScope,
+              workspaceId: seed.storeId,
+              gateway: StoreReviewOrderGateway(seed),
+            ),
+          ),
+          isTrue,
+        );
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        for (final old in [false, true]) {
+          expect(
+            await work.saveWorkspaceExpenseRecord(
+              WorkspaceExpenseRecord(
+                accountScope: seed.accountScope,
+                workspaceId: seed.storeId,
+                operationId: old ? 'expense-old' : 'expense-today',
+                amountMinor: old ? 50000 : 1230,
+                category: old ? 'Earlier transport' : 'Local transport',
+                method: 'Cash',
+                reference: old ? 'TEST-OLD' : 'TEST-TODAY',
+                note: 'Labelled Store test expense',
+                occurredAt: old
+                    ? seed.now.subtract(const Duration(days: 2))
+                    : seed.now,
+              ),
+            ),
+            isTrue,
+          );
+        }
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        final statement = find.byKey(const Key('work-pulse-sales'));
+        await reveal(tester, statement);
+        await tester.tap(statement);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Expenses'));
+        await tester.pumpAndSettle();
+        expect(find.text('Recorded expenses ₹12.30'), findsOneWidget);
+        await captureStoreView(tester, 'ledger03-expenses-summary-$scale');
+        await reveal(tester, find.text('Local transport'));
+        expect(find.text('Local transport'), findsOneWidget);
+        expect(find.text('Earlier transport'), findsNothing);
+        expect(work.workspaceStockMovements, isEmpty);
+        await captureStoreView(tester, 'ledger03-expenses-$scale');
+        const reviewEnabled =
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+        expect(work.canRecordStoreReviewExpense, reviewEnabled);
+        if (reviewEnabled) {
+          final open = find.byKey(const Key('store-expense-open'));
+          // The entry capture scrolled below the action on compact screens.
+          // Return upward through the same expense list before opening it.
+          await tester.scrollUntilVisible(
+            open,
+            -220,
+            scrollable: find.descendant(
+              of: find.byKey(const Key('work-finance-expenses')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await reveal(tester, open);
+          await tester.tap(open);
+          await tester.pumpAndSettle();
+          await captureStoreView(tester, 'ledger03-expense-form-$scale');
+          final amount = find.byKey(const Key('store-expense-amount'));
+          final reference = find.byKey(const Key('store-expense-reference'));
+          final note = find.byKey(const Key('store-expense-note'));
+          await reveal(tester, amount);
+          await tester.enterText(amount, '25.00');
+          await reveal(tester, reference);
+          await tester.enterText(reference, 'TEST-EXPENSE-NEW');
+          await reveal(tester, note);
+          await tester.enterText(note, 'Packaging supplies');
+          await tester.pumpAndSettle();
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(amount, findsNothing);
+          expect(work.workspaceExpenses.length, 2);
+          await reveal(tester, open);
+          await tester.tap(open);
+          await tester.pumpAndSettle();
+          expect(tester.widget<TextField>(amount).controller!.text, '25.00');
+          expect(
+            tester.widget<TextField>(note).controller!.text,
+            'Packaging supplies',
+          );
+          final record = find.widgetWithText(
+            FilledButton,
+            'Record test expense',
+          );
+          await reveal(tester, record);
+          await tester.tap(record);
+          await tester.pumpAndSettle();
+          expect(amount, findsNothing);
+          expect(work.workspaceExpenses.length, 3);
+          expect(
+            work.workspaceExpenses
+                .where((expense) => expense.reference == 'TEST-EXPENSE-NEW')
+                .single
+                .amountMinor,
+            2500,
+          );
+          await tester.scrollUntilVisible(
+            find.byKey(const Key('work-expense-period-total')),
+            -220,
+            scrollable: find.descendant(
+              of: find.byKey(const Key('work-finance-expenses')),
+              matching: find.byType(Scrollable),
+            ),
+          );
+          await reveal(
+            tester,
+            find.byKey(const Key('work-expense-period-total')),
+          );
+          expect(find.text('Recorded expenses ₹37.30'), findsOneWidget);
+          await captureStoreView(tester, 'ledger03-expense-recorded-$scale');
+        } else {
+          expect(find.byKey(const Key('store-expense-open')), findsNothing);
+        }
+        final registerEnd = DateTime.now();
+        final registerStart = DateTime(
+          registerEnd.year,
+          registerEnd.month,
+          registerEnd.day,
+        );
+        final recordedExpenses =
+            work.workspaceExpenses
+                .where((expense) => !expense.occurredAt.isBefore(registerStart))
+                .toList()
+              ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
+        expect(
+          await work.saveWorkspaceMoneyRegister(
+            WorkspaceMoneyRegisterSnapshot(
+              accountScope: seed.accountScope,
+              workspaceId: seed.storeId,
+              registerId: 'test-cash-register',
+              label: 'Test cash register',
+              revision: 1,
+              openingAt: registerStart,
+              asOf: registerEnd,
+              openingMinor: 10000,
+              historyComplete: true,
+              entries: [
+                for (final expense in recordedExpenses)
+                  WorkspaceMoneyRegisterEntry(
+                    id: expense.operationId,
+                    reference: expense.reference,
+                    occurredAt: expense.occurredAt,
+                    deltaMinor: -expense.amountMinor,
+                  ),
+              ],
+            ),
+          ),
+          isTrue,
+        );
+        final moneyTab = find.byKey(const Key('work-statement-money'));
+        await tester.ensureVisible(moneyTab);
+        await tester.tap(moneyTab);
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('work-money-statement')), findsOneWidget);
+        expect(
+          work.workspaceMoneyStatement!.recordedOutMinor,
+          reviewEnabled ? 3730 : 1230,
+        );
+        expect(
+          work.workspaceMoneyStatement!.entries.any(
+            (entry) => entry.reference == 'TEST-OLD',
+          ),
+          isFalse,
+        );
+        await captureStoreView(tester, 'ledger03-money-summary-$scale');
+        await reveal(tester, find.text('Local transport'));
+        expect(find.text('Local transport'), findsOneWidget);
+        await captureStoreView(tester, 'ledger03-money-expense-$scale');
+        final registerTile = find.byKey(
+          const ValueKey('work-register-test-cash-register'),
+        );
+        await tester.scrollUntilVisible(
+          registerTile,
+          -220,
+          scrollable: find.descendant(
+            of: find.byKey(const Key('work-money-statement')),
+            matching: find.byType(Scrollable),
+          ),
+        );
+        final registerTitle = find.text('Test cash register');
+        await tester.ensureVisible(registerTitle);
+        await tester.pumpAndSettle();
+        expect(registerTitle.hitTestable(), findsOneWidget);
+        await tester.tap(registerTitle);
+        await tester.pumpAndSettle();
+        await reveal(tester, find.text('Closing book balance'));
+        expect(find.text(reviewEnabled ? '₹62.70' : '₹87.70'), findsOneWidget);
+        await captureStoreView(tester, 'ledger03-register-closing-$scale');
+        final expensesTab = find.byKey(const Key('work-statement-expenses'));
+        await tester.ensureVisible(expensesTab);
+        await tester.tap(expensesTab);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(moneyTab);
+        await tester.tap(moneyTab);
+        await tester.pumpAndSettle();
+        await reveal(tester, find.text('Closing book balance'));
+        expect(find.text(reviewEnabled ? '₹62.70' : '₹87.70'), findsOneWidget);
+        await tester.tap(find.byKey(const Key('work-statement-period')));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Week').last);
+        await tester.pumpAndSettle();
+        await reveal(tester, registerTitle);
+        expect(registerTitle.hitTestable(), findsOneWidget);
+        await tester.tap(registerTitle);
+        await tester.pumpAndSettle();
+        final incomplete = find.text(
+          'Opening and complete movement history are needed for this period.',
+        );
+        await reveal(tester, incomplete);
+        expect(incomplete, findsOneWidget);
+        await tester.ensureVisible(expensesTab);
+        await tester.tap(expensesTab);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(moneyTab);
+        await tester.tap(moneyTab);
+        await tester.pumpAndSettle();
+        await reveal(tester, incomplete);
+        expect(incomplete, findsOneWidget);
+        expect(tester.takeException(), isNull);
+      },
+    );
+
+    if (const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+        const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY')) {
+      testWidgets('LEDGER02 purchase payment and receiving screens $scale', (
+        tester,
+      ) async {
+        final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+        SharedPreferencesAsyncPlatform.instance =
+            InMemorySharedPreferencesAsync.empty();
+        addTearDown(
+          () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+        );
+        final work = storeViewFixture(
+          null,
+          _ContactDraftFixtureStore(),
+          null,
+          null,
+          null,
+          null,
+          null,
+          _ContactDraftFixtureStore(),
+        );
+        final seed = StoreReviewSeed(
+          accountScope: 'review-draft-account',
+          orderCount: 12,
+          now: DateTime.now().subtract(const Duration(minutes: 1)),
+        );
+        work.activeWorkspace = seed.workspace;
+        work.workspaceCatalogueItems.addAll(seed.products);
+        expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+        expect(
+          work.applyWorkspacePurchases(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            feedRevision: 1,
+            records: seed.purchases,
+            complete: true,
+          ),
+          isTrue,
+        );
+        for (final ledger in seed.supplierLedgers) {
+          expect(work.applyWorkspaceSupplierLedger(ledger), isTrue);
+        }
+        expect(
+          work.bindCustomerCollectionGateway(
+            accountScope: seed.accountScope,
+            storeId: seed.storeId,
+            adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+            checkpointStore: _LedgerCheckpointFixtureStore(),
+          ),
+          isTrue,
+        );
+        expect(
+          work.bindWorkspaceOrderOperations(
+            WorkOrderOperations(
+              accountScope: seed.accountScope,
+              workspaceId: seed.storeId,
+              gateway: StoreReviewOrderGateway(seed),
+            ),
+          ),
+          isTrue,
+        );
+        final purchase = seed.purchases[1];
+        expect(work.selectWorkspacePurchase(purchase.shipmentId), isTrue);
+        await mount(
+          tester,
+          route: '/app/work/workspace/dashboard',
+          work: work,
+          uiReviewOnly: true,
+          viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+          textScale: scale,
+        );
+        final incoming = find.byKey(const Key('work-incoming-purchases'));
+        await captureStoreView(tester, 'ledger02-dashboard-entry-$scale');
+        await reveal(tester, incoming);
+        await tester.tap(incoming);
+        await tester.pumpAndSettle();
+        final payment = find.byKey(const Key('supplier-payment-open'));
+        await reveal(tester, payment);
+        await captureStoreView(tester, 'ledger02-purchase-$scale');
+        await tester.tap(payment);
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'ledger02-payment-empty-$scale');
+        final amount = find.byKey(const Key('supplier-payment-amount'));
+        final reference = find.byKey(const Key('supplier-payment-reference'));
+        await reveal(tester, amount);
+        await tester.enterText(amount, '12.30');
+        await reveal(tester, reference);
+        await tester.enterText(reference, 'TEST-BANK-123');
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'ledger02-payment-input-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(amount, findsNothing);
+        await reveal(tester, payment);
+        await tester.tap(payment);
+        await tester.pumpAndSettle();
+        expect(tester.widget<TextField>(amount).controller!.text, '12.30');
+        expect(
+          tester.widget<TextField>(reference).controller!.text,
+          'TEST-BANK-123',
+        );
+        final recordPayment = find.widgetWithText(
+          FilledButton,
+          'Record test payment',
+        );
+        await reveal(tester, recordPayment);
+        await tester.tap(recordPayment);
+        await tester.pumpAndSettle();
+        expect(amount, findsNothing);
+        final posted = work
+            .workspaceSupplierLedger(purchase.supplierId)!
+            .entries
+            .where((entry) => entry.reference == 'TEST-BANK-123')
+            .toList();
+        expect(posted, hasLength(1));
+        expect(posted.single.orderId, purchase.orderId);
+        expect(posted.single.amountMinor, 1230);
+        expect(posted.single.paymentMethod, 'Bank transfer');
+        final receive = find.byKey(const Key('work-receipt-start'));
+        await reveal(tester, receive);
+        await tester.tap(receive);
+        await tester.pumpAndSettle();
+        final count = find.byKey(
+          Key('work-receipt-count-${purchase.lines.single.id}'),
+        );
+        await reveal(tester, count);
+        await tester.enterText(count, '4');
+        await tester.pumpAndSettle();
+        await captureStoreView(tester, 'ledger02-receiving-$scale');
+        final confirm = find.byKey(const Key('work-receipt-confirm-test'));
+        await reveal(tester, confirm);
+        await tester.tap(confirm);
+        await tester.pumpAndSettle();
+        expect(
+          work.workspaceCatalogueItems.first.stock,
+          seed.products.first.stock + 4,
+        );
+        final returned = find.byKey(
+          Key('work-supplier-return-count-${purchase.lines.single.id}'),
+        );
+        await reveal(tester, returned);
+        await tester.enterText(returned, '1');
+        await tester.pumpAndSettle();
+        final confirmReturn = find.byKey(
+          const Key('work-supplier-return-confirm-test'),
+        );
+        await reveal(tester, confirmReturn);
+        await tester.tap(confirmReturn);
+        await tester.pumpAndSettle();
+        expect(
+          work.workspaceCatalogueItems.first.stock,
+          seed.products.first.stock + 3,
+        );
+        await captureStoreView(tester, 'ledger02-return-confirmed-$scale');
+        expect(
+          find.text('Ordered 20 packs · Received 4 packs'),
+          findsOneWidget,
+        );
+        expect(find.byKey(const Key('work-receipt-stale')), findsNothing);
+        expect(tester.takeException(), isNull);
+      });
+    }
+    testWidgets(
       'LEDGER01 return sheet confirms original bill and stock $scale',
       (tester) async {
         final work = storeViewFixture(null, _ContactDraftFixtureStore());
@@ -23124,6 +23557,18 @@ void main() {
                 )
                 .onPressed,
             isNull,
+          );
+          await reveal(
+            tester,
+            find.byKey(const Key('work-settlement-reconciliation')),
+          );
+          expect(
+            find.text('Full payout history is needed to reconcile this total.'),
+            findsOneWidget,
+          );
+          await captureStoreView(
+            tester,
+            'ledger03-settlement-reconciliation-$scale',
           );
           await reveal(tester, find.text('−₹5.25'));
           await captureStoreView(tester, 'finance-signed-adjustment-$scale');
