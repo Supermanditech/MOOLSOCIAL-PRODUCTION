@@ -237,11 +237,13 @@ Reproduction: public Buy -> Chat -> More -> Chat settings -> Privacy and spam ->
 Redmi acceptance2026-09-14: captures140-146 show complete final explanation above Android navigation and unchanged Everyone after dismissal. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md; supersedes historical local-only pending status for this reproduction. No child.
 
 ## RV6-D021 - Empty-cart catalogue retains expanded quantity space until Shop reentry
-Status: open. Severity: minor catalogue visual density/state refresh. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
+Status: closed; r66.20 Redmi quantity and compact-grid restoration passed. Severity: minor catalogue visual density/state refresh. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
 Reproduction: Scheduled Shop empty cart1037 -> Add wheat2 -> quantity edit/update/cancel round150 -> remove both units using minus. Capture1043 shows Add restored, but first-row bottom remains about880 rather than initial792. Settled1044 retains the same extra88 physical pixels per row. Switch to Wholesale and back to Shop:1045 restores row bottom792 and the compact image area without changing cart or saved state. Expected: restore compact empty-cart layout when quantity controls disappear, without requiring module reentry. Customer impact: fewer products/actions visible while browsing after cart removal. No clipped content, lost item or broken Add claim. Source catalogue8801-8864 conditionally adds quantity-label height; exact stale width/state cause remains unproven. This promotes round150 QTY-ROUND150-03 observation to confirmed minor defect; it is not a second independent finding. Original Saved1, empty cart and Scheduled mode preserved. No implementation.
 
 
 **Local implementation disposition (14 September 2026):** D021 corrected by resetting retained grid quantity width when all displayed quantities are zero. Focused2 and connected408 checks passed (overlap); final analysis zero issues; four actual Flutter captures reviewed. See UAT.md for baseline limitations and hashed evidence. Remains open pending successor-APK Redmi1037-1045 quantity workflow; no host-only closure.
+
+Redmi acceptance2026-09-14: captures147-162 verify original quantity edit/update/cancel/removal and directly affected Wholesale/Offers restoration. APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md. No child; all test items removed.
 
 ## RV6-D022 - Shopping area chooser does not identify the selected area
 Status: open. Severity: minor selection/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; APK SHA256 97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7.
