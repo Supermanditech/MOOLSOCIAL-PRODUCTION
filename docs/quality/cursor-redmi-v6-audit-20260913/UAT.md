@@ -2705,3 +2705,38 @@ Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d021
 | qualified/rv6-d021-before-text-2.0.png | 9184339A4CAB92D597E79DCC5252952D52B763114FE7BB5181BF47AD50C991A9 |
 | qualified/rv6-d021-empty-text-1.0.png | CC8BE196EB6B5FFEC04C0BE9263C19CA8D5C061F4F15609E6085CEF79C848740 |
 | qualified/rv6-d021-empty-text-2.0.png | 97F3F29834BC9CB43F7FC64B7609570FE3317754796AB7320FBC049E28F82CA5 |
+
+
+## RV6-D022 local qualification - 14 September 2026
+
+Locally qualified; original remains open pending successor Redmi acceptance. Parent7e811a753a9896947f514a209f50138d21ea9544. Changed owners: catalogue source and Buy screen test, this evidence, DEFECTS.md and scope-state.json. No new ownership admission.
+
+Hash-verified original1090 area-reopen capture visually confirms Jaipur is unmarked. Add a Current area summary from session.catalogueAreaLabel and selected/checkmark feedback to the matching catalogue city or Any area row. Existing area choices, Google lookup, regional/national selection, filtering and delivery-address behavior are unchanged. The summary also names retained areas not present in the local city list; provider verification remains separate.
+
+Final focused2 pass: actual chooser taps select Jaipur then Any area at normal/200% text, reopen verifies summary/selected row/checkmark, Android Back retains selected region and delivery address. Connected area tests26 pass, including India lookup/search/keyboard/retry/Back and Android final-row visibility. Total28 distinct checks. Final analysis zero issues. Four qualified actual Flutter captures reviewed; summary and checkmark readable. At200% the capture is scrolled to expose the chosen row, so the header is partly above the viewport. No claim that the full list fits without scrolling.
+
+Earlier baseline.log hit a reused widget-key type mismatch, corrected.log lacked a lazily built row, and selection.log matched nested scrollables; these are retained test-setup failures, not product repro passes. Unique summary key, explicit Jodhpur/Jaipur fixture and outer area-list scroll corrected them. The physical evidence establishes the original failure. Initial area-regression invocation used a pipe-containing regex that the Windows batch launcher misinterpreted (exit255); corrected area-name invocation completed26 checks, session49930 terminal930bbd exit0. No unsupported baseline-green claim.
+
+Original1087-1091 Redmi workflow remains required on the successor APK, including supplier change and restored Any-area catalogue with Saved/cart preserved. No device closure or new APK. All22 local dispositions now available:21 corrected/local-qualified, D019 evidence-reconciled without product change. Required combined local/build qualification still pending.
+
+Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d022-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | 128449F8A393F620158E7A3AC7B004C562E7BD4581066BEC3DA8A9B3AC59D529 |
+| area-regression-v2.log | 2DE90904E703A2EC2AF17BC007C3B668B60D98F5C54341C79B13FFAAC59D6A3C |
+| area-regression.log | F2059426286CDA03D5AA375CBD138E26D32D8189EB6BC1A223D9CF3ACB305E78 |
+| baseline.log | D3CABCA9B983598A1910252E6D3008E056B3A0FE625EE405A02FE4A270EAD891 |
+| corrected.log | 676ADBA95475847B841A9BAE5DDB7F337756ABBD944EE742944B5D08947DE983 |
+| final-analysis.log | D3F4445E3EEB1D919B9250CE6326762B1CB464CD31E834510492C7E009F7CCDD |
+| final-focused.log | 523401BF4705521EA831828B6FEE1663FEE1D1C40C724B598B68E2BE252717A7 |
+| qualified/rv6-d022-any-text-1.0.png | B3B7F55D450B919FBD31690BDFC89796F2152A5FFA4B48B2D4264D6602CBCFFD |
+| qualified/rv6-d022-any-text-2.0.png | C2A031CF20AF22CAD72DC23B8B95A6795F02FC8272899B82856A37C5D9EE2747 |
+| qualified/rv6-d022-jaipur-text-1.0.png | 3ACA7CBBC885878BA0A47C8DCF4F5BBBA96ECAB3DB7F3385F5B8FDD33509962B |
+| qualified/rv6-d022-jaipur-text-2.0.png | 71027E3446EA79757E254E0EE6E10852DF05FF2A68C9BF0FA3DBF3C5441645E7 |
+| selection-v2/rv6-d022-any-text-1.0.png | B3B7F55D450B919FBD31690BDFC89796F2152A5FFA4B48B2D4264D6602CBCFFD |
+| selection-v2/rv6-d022-any-text-2.0.png | C2A031CF20AF22CAD72DC23B8B95A6795F02FC8272899B82856A37C5D9EE2747 |
+| selection-v2/rv6-d022-jaipur-text-1.0.png | 3ACA7CBBC885878BA0A47C8DCF4F5BBBA96ECAB3DB7F3385F5B8FDD33509962B |
+| selection-v2/rv6-d022-jaipur-text-2.0.png | 71027E3446EA79757E254E0EE6E10852DF05FF2A68C9BF0FA3DBF3C5441645E7 |
+| selection-v2.log | DAB8E89A359A8BD12DA7A2239932BE4C09A303263CAC38AF86B5AE1AD67E9F18 |
+| selection.log | 133C52A17B8419565C45217482452A4819B2ECEB1ABAAD739ACB5B87F837C227 |

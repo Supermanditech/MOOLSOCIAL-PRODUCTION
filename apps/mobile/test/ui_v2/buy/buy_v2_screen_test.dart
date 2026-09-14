@@ -10032,6 +10032,101 @@ void main() {
     });
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('RV6 D022 area chooser retains visible selection $scale', (
+      tester,
+    ) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(390, 844);
+      addTearDown(tester.view.reset);
+      final session = BuyV2Session(
+        core: BuySession(),
+        reviewDataEnabled: true,
+        initialCatalogueRegionId: 'jodhpur',
+        catalogueAreas: const {'jodhpur': 'Jodhpur', 'jaipur': 'Jaipur'},
+        cataloguePageSource: BuyV2DevelopmentCatalogueSource(
+          destination: BuyV2Destination.shop,
+          providerCount: 10,
+          skusPerStore: 5000,
+        ),
+      );
+      addTearDown(session.dispose);
+      await tester.pumpWidget(app(session, textScale: scale));
+      await tester.pumpAndSettle();
+      final address = session.selectedAddress.id;
+      for (final id in ['jaipur', null]) {
+        unawaited(
+          showBuyV2CatalogueArea(
+            tester.element(find.byType(BuyV2Screen)),
+            session,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final choice = find.byKey(
+          ValueKey(
+            id == null ? 'buy-catalogue-any-area' : 'buy-catalogue-area-$id',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          choice,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.tap(choice);
+        await tester.pumpAndSettle();
+        expect(session.catalogueRegionId, id);
+        unawaited(
+          showBuyV2CatalogueArea(
+            tester.element(find.byType(BuyV2Screen)),
+            session,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final summary = find.byKey(
+          const ValueKey('buy-area-selection-summary'),
+        );
+        expect(summary, findsOneWidget);
+        expect(
+          tester.widget<Text>(summary).data,
+          'Current area: ${session.catalogueAreaLabel}',
+        );
+        final row = find.byKey(
+          ValueKey(
+            id == null ? 'buy-catalogue-any-area' : 'buy-catalogue-area-$id',
+          ),
+        );
+        await tester.scrollUntilVisible(
+          row,
+          180,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const ValueKey('buy-catalogue-area-list')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        await tester.ensureVisible(row);
+        await tester.pumpAndSettle();
+        expect(tester.widget<ListTile>(row).selected, isTrue);
+        expect(
+          find.descendant(of: row, matching: find.byIcon(Icons.check_circle)),
+          findsOneWidget,
+        );
+        await captureR66Visual(tester, 'rv6-d022-${id ?? 'any'}-text-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.selectedAddress.id, address);
+        expect(session.catalogueRegionId, id);
+      }
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   final d018Cases = [
     for (final scale in [1.0, 2.0])
       for (final systemBack in [true, false])

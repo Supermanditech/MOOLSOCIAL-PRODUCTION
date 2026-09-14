@@ -1593,6 +1593,12 @@ Future<void> showBuyV2CatalogueArea(
                         ),
                       ],
                     ),
+                    Text(
+                      'Current area: ${session.catalogueAreaLabel}',
+                      key: const ValueKey('buy-area-selection-summary'),
+                      style: context.buyMeta,
+                    ),
+                    const SizedBox(height: 8),
                     TextField(
                       key: const ValueKey('buy-catalogue-area-search'),
                       controller: searchController,
@@ -1721,6 +1727,12 @@ Future<void> showBuyV2CatalogueArea(
                     ListTile(
                       key: const ValueKey('buy-catalogue-any-area'),
                       title: const Text('Any area'),
+                      selected: session.catalogueAreaScope ==
+                          BuyV2CatalogueAreaScope.allAreas,
+                      trailing: session.catalogueAreaScope ==
+                              BuyV2CatalogueAreaScope.allAreas
+                          ? const Icon(Icons.check_circle, color: BuyV2Colors.navy)
+                          : null,
                       subtitle: const Text('Find stores in other areas.'),
                       onTap: () {
                         session.chooseCatalogueArea(
@@ -1734,6 +1746,14 @@ Future<void> showBuyV2CatalogueArea(
                       ListTile(
                         key: ValueKey('buy-catalogue-area-${area.key}'),
                         title: Text(area.value),
+                        selected: session.catalogueAreaScope !=
+                                BuyV2CatalogueAreaScope.allAreas &&
+                            session.catalogueRegionId == area.key,
+                        trailing: session.catalogueAreaScope !=
+                                    BuyV2CatalogueAreaScope.allAreas &&
+                                session.catalogueRegionId == area.key
+                            ? const Icon(Icons.check_circle, color: BuyV2Colors.navy)
+                          : null,
                         onTap: () {
                           session.chooseCatalogueArea(
                             area.key,
