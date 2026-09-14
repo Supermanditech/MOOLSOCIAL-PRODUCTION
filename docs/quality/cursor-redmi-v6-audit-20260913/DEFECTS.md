@@ -48,7 +48,7 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Successor acceptance: UAT.md r66.20 Redmi D003 acceptance, captures023-046 and actual downloaded invoice PDF/render. Installed SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Chat, historical invoice/PDF and alert preserve freshness and exact order identity; Back verified. Provider timestamps remain unqualified. No child found.
 
 ## RV6-D004 - Display-name validation sentence is clipped at normal text size
-- Status: open; implemented and locally qualified on 2026-09-14; successor Redmi acceptance pending. Severity: minor.
+- Status: closed; r66.20 Redmi acceptance passed on 2026-09-14. Severity: minor.
 - Journey: Buy account drawer > Personal profile > Display name > submit whitespace-only draft. Validation rejects it; Android Back hides keyboard.
 - Actual: error remains one truncated line, Enter a display name from 2 to 60 cha..., with and without keyboard at Redmi font scale1.0. The allowed numeric range remains visible; this is not a validation bypass or data-loss claim.
 - Expected: complete validation guidance fits or wraps, including characters, without requiring inference from clipped content.
@@ -58,6 +58,9 @@ Provider and test-data limitations are recorded separately in BLOCKERS.md and ar
 - Local qualification: all 11 profile tests pass (four new D004 cases at 390x844/320x568 and 100%/200% text, each with 220px keyboard inset then hidden); eight themed Flutter PNGs reviewed; analysis of both changed Dart owners reports zero issues. Existing name retained after rejection; Profile return checked. Test insets are not physical Android keyboard evidence.
 - Ownership admission: 41c5e36cfd2950521c918271afb56dcff2e02354 transfers only the shared profile source and existing test in this worktree. Source/test: apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart and apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart. Detailed evidence and initial failed/superseded runs are recorded in UAT.md.
 - Redmi closure remains pending exact successor APK reproduction of captures198/199. No device action or valid real profile save occurred during local qualification.
+
+
+- Successor acceptance: captures rv620-047 through054 and UAT.md D004 acceptance. Exact installed APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Complete guidance visible with/without keyboard; rejected whitespace; Back retained original profile. No child.
 
 ## RV6-D005 - Hindi preference changes its value but observed Buy and preference UI remain English
 - Status: open; unavailable-coverage disclosure implemented and locally qualified; successor Redmi acceptance pending. Severity: moderate for Hindi-dependent users.

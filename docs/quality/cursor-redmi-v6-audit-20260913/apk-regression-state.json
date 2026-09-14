@@ -205,9 +205,10 @@
     "closed": [
       "RV6-D001",
       "RV6-D002",
-      "RV6-D003"
+      "RV6-D003",
+      "RV6-D004"
     ],
-    "remainingDispositions": 19,
+    "remainingDispositions": 18,
     "newChildren": [],
     "installedApkSha256": "7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8",
     "device": "TG8HCYTGGQT885OF"
