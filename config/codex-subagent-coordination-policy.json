@@ -374,7 +374,16 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
         "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
-        "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart"
+        "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
+        "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart"
       ]
     }
   ],
