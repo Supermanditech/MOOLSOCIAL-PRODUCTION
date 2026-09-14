@@ -3328,3 +3328,20 @@ The device defect count remains21/22 closed; D005-C01 is the sole deduplicated c
 | repeat-qualified-matrix.log | 558A0DF94DA6B9A3ADBFAA1339478699F87C3B53583291B773DB959C4FE6DC51 |
 | repeat-qualified-screen.log | C459E451281505B8EF1324027262DDC693662FFE35B54E2871FF88D8CDE8F71D |
 | repeat-qualified-analysis.log | F3878A80F2E2A73800E39B64B88978F2E39FF2C193A852E400374CFCE16E839E |
+
+
+### D014 repeated-link source admission
+
+Correction41412f56a4af4d75e2976dc04843dd293ae4869d is committed, pushed and verified clean against the exact live remote. Four source-boundary checks now admit that exact source: approved UI locks, protected Buy baseline, backend boundary and data egress. Each actual check completed exit0 (runner94139). Existing root/branch/complete-source/native/content checks remain. The backend arrival-sound allowance is bound to both this source SHA and normalized screen hash97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C; no import or transport permission is generalized. Four exact checker hashes were refreshed inside the existing successor-admission block, with no other coordination-rule change; unchanged49-owner/registry4584 implementation gate passed.
+
+The actual backend function accepted the exact source and rejected wrong SHA, changed bytes, wrong owner, absent review qualification and an added network client. Existing backend seven-mobile/one-backend and egress seven-forbidden/two-safe self-tests passed. No app/device mutation occurred in these admission tests. Source admission does not close D014, qualify an APK or resolve historical448d4a2c. Both required combined cycles are running against unchanged41412f56 source with separate receipt files; no combined pass is claimed yet.
+
+| Evidence | SHA256 |
+| --- | --- |
+| repeat-local-qualification.json | D4888ACA867C01AAC99D0E52BB40D527D3C08BE70646A8243C12A6B7DCF75695 |
+| repeat-admission-check-approved-ui-locks.log | 3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68 |
+| repeat-admission-check-buy-protected-baseline.log | 48B6BBA0C2AB64C51A61718692F797BF19D54427CABFC91C80A5B74F30DB432F |
+| repeat-admission-check-buy-backend-contract-boundary.log | 8932532467D3BFE2DDF4D39236F6A2E7D070E6F1A5A5EDFE20BD66875D3B754C |
+| repeat-admission-check-buy-data-egress-boundary.log | 6584726EDC8AB1E76C363CEFF0FDC9CF318610AD6522AC32A3F72882AEF91FD3 |
+| repeat-admission-negative.log | 7A57E005F89D31C4DD4D4343FF4B03CD1C7753301BEA562F7B420957153417F8 |
+| repeat-admission-negative.result.json | A4363AAF735D826645ADE9F7F75F94A174915174CDC9BB4A43E49E19452A39B1 |

@@ -311,9 +311,18 @@
       "visuals": "Four new Shop/Wholesale repeated-link Flutter captures at100/200 percent visually reviewed",
       "installed": false,
       "successorBuilt": false,
-      "requiredNext": "Finish local qualification, exact source admission, combined cycles and existing gates; only then uniquely identify a corrective successor and perform remaining Redmi native checks",
+      "requiredNext": "Complete both running combined cycles and existing prebuild gates; establish clean live-remote-equal source baseline; build one uniquely identified corrective successor and complete remaining Redmi native checks.",
       "sourceSha256Normalized": "97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C",
-      "testSha256Normalized": "5F3629A79FCC623CAF2670458D9FDCF4BFDE1190DF9DBFB0AEB46E92CBB18243"
+      "testSha256Normalized": "5F3629A79FCC623CAF2670458D9FDCF4BFDE1190DF9DBFB0AEB46E92CBB18243",
+      "sourceCommit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+      "sourceAdmission": {
+        "status": "four_actual_checks_passed",
+        "negativeCases": "exact accepted; five invalid cases rejected; existing backend and egress self-tests passed",
+        "coordination": "same49 owners and registry4584; only four checker hashes refreshed in existing admission block",
+        "historicalCommitLabelExceptionApplied": false,
+        "evidence": "UAT.md D014 repeated-link source admission"
+      },
+      "combinedCycles": "running_same41412f56_source_not_yet_qualified"
     }
   }
 }
