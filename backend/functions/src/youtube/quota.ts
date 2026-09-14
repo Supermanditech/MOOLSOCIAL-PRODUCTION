@@ -63,6 +63,30 @@ export interface YouTubeQuotaReserveResult {
   readonly limit: number;
 }
 
+export interface YouTubeQuotaMeasurementRequest {
+  readonly principal: string;
+  readonly bucket: YouTubeQuotaBucket;
+  readonly units: number;
+  readonly operation: string;
+  readonly requestId: string;
+  readonly accepted: boolean;
+  readonly local: boolean;
+  readonly windowId: string;
+  readonly occurredAt: string;
+}
+
+export interface YouTubeQuotaMeasurementIdentity {
+  readonly principal: string;
+  readonly operation: string;
+  readonly requestId: string;
+  readonly local: true;
+}
+
+export interface YouTubeQuotaMeasuredReserveRequest
+  extends YouTubeQuotaReserveRequest, YouTubeQuotaMeasurementIdentity {
+  readonly occurredAt: string;
+}
+
 /**
  * Implementations must make `reserve` atomic across every function instance
  * sharing the same quota ledger. A read followed by a separate write does not
@@ -71,6 +95,12 @@ export interface YouTubeQuotaReserveResult {
 export interface YouTubeQuotaStore {
   reserve(
     request: YouTubeQuotaReserveRequest,
+  ): Promise<YouTubeQuotaReserveResult>;
+}
+
+export interface YouTubeQuotaMeasurementStore extends YouTubeQuotaStore {
+  reserveMeasured(
+    request: YouTubeQuotaMeasuredReserveRequest,
   ): Promise<YouTubeQuotaReserveResult>;
 }
 
@@ -349,6 +379,41 @@ export class YouTubeQuotaGovernor {
     this.caps = resolveCaps(options.caps);
   }
 
+  private request(
+    bucket: YouTubeQuotaBucket,
+    units: number,
+    now: Date,
+  ): YouTubeQuotaReserveRequest {
+    if (!Number.isSafeInteger(units) || units <= 0) {
+      throw new TypeError("Quota units must be a positive safe integer.");
+    }
+    const window = youtubePacificDailyQuotaWindow(now);
+    return {
+      bucket,
+      windowId: window.id,
+      resetAt: window.resetAt,
+      units,
+      limit: this.caps[bucket],
+    };
+  }
+
+  private accepted(
+    result: YouTubeQuotaReserveResult,
+    request: YouTubeQuotaReserveRequest,
+  ): YouTubeQuotaReserveResult {
+    assertReserveResult(result, request);
+    if (!result.allowed) {
+      throw new YouTubeProviderError(
+        "quota_exhausted",
+        `YouTube ${request.bucket} capacity is unavailable until ${result.resetAt}.`,
+        429,
+        false,
+        "localDevHardCap",
+      );
+    }
+    return result;
+  }
+
   /**
    * Reserves capacity before the provider call. Exhaustion fails closed and
    * is deliberately non-retryable; callers must wait for the next window or
@@ -358,31 +423,32 @@ export class YouTubeQuotaGovernor {
     bucket: YouTubeQuotaBucket,
     units = 1,
   ): Promise<YouTubeQuotaReserveResult> {
-    if (!Number.isSafeInteger(units) || units <= 0) {
-      throw new TypeError("Quota units must be a positive safe integer.");
-    }
+    const now = this.clock.now();
+    const request = this.request(bucket, units, now);
+    return this.accepted(await this.store.reserve(request), request);
+  }
 
-    const window = youtubePacificDailyQuotaWindow(this.clock.now());
-    const request: YouTubeQuotaReserveRequest = {
-      bucket,
-      windowId: window.id,
-      resetAt: window.resetAt,
-      units,
-      limit: this.caps[bucket],
-    };
-    const result = await this.store.reserve(request);
-    assertReserveResult(result, request);
-
-    if (!result.allowed) {
-      throw new YouTubeProviderError(
-        "quota_exhausted",
-        `YouTube ${bucket} capacity is unavailable until ${result.resetAt}.`,
-        429,
-        false,
-        "localDevHardCap",
+  async reserveMeasured(
+    bucket: YouTubeQuotaBucket,
+    units: number,
+    measurement: YouTubeQuotaMeasurementIdentity,
+  ): Promise<YouTubeQuotaReserveResult> {
+    const measurementStore = this.store as YouTubeQuotaStore &
+      Partial<YouTubeQuotaMeasurementStore>;
+    if (typeof measurementStore.reserveMeasured !== "function") {
+      throw new TypeError(
+        "YouTube quota measurement store is unavailable.",
       );
     }
-
-    return result;
+    const now = this.clock.now();
+    const request = this.request(bucket, units, now);
+    return this.accepted(
+      await measurementStore.reserveMeasured({
+        ...request,
+        ...measurement,
+        occurredAt: now.toISOString(),
+      }),
+      request,
+    );
   }
 }

@@ -2,6 +2,8 @@
 param(
   [string]$RepositoryRoot
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 $ErrorActionPreference = 'Stop'
 
@@ -44,7 +46,7 @@ function Get-C30KFix1SourceTree {
   $bytes = [Text.Encoding]::UTF8.GetBytes(($rows -join "`n") + "`n")
   $sha = [Security.Cryptography.SHA256]::Create()
   try {
-    $aggregate = [Convert]::ToHexString($sha.ComputeHash($bytes))
+    $aggregate = (ConvertTo-MoolSocialPortableHex -Bytes ($sha.ComputeHash($bytes)))
   } finally {
     $sha.Dispose()
   }
