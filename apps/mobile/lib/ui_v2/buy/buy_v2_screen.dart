@@ -2288,6 +2288,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
             ),
           );
         });
+        // Route completion can occur after the final animation frame. Ensure
+        // the retained origin restoration receives a frame of its own.
+        WidgetsBinding.instance.scheduleFrame();
       }),
     );
   }

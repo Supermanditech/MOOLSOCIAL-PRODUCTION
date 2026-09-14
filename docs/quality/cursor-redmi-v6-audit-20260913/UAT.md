@@ -2740,3 +2740,32 @@ Evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d022
 | selection-v2/rv6-d022-jaipur-text-2.0.png | 71027E3446EA79757E254E0EE6E10852DF05FF2A68C9BF0FA3DBF3C5441645E7 |
 | selection-v2.log | DAB8E89A359A8BD12DA7A2239932BE4C09A303263CAC38AF86B5AE1AD67E9F18 |
 | selection.log | 133C52A17B8419565C45217482452A4819B2ECEB1ABAAD739ACB5B87F837C227 |
+
+
+## Successor combined qualification and D014 retained-origin follow-up - 2026-09-14
+
+Source base4eb257d146fa656b63d7e0fe003cc8898ee8cd09. Combined run terminal exit1:2294 passed,27 skipped,30 failures. Full analysis terminal exit0,zero issues. These results supersede any implication that slice passes establish successor readiness. UI-lock failed unchanged at its committed-source-equals-V6 requirement; no checker changes or APK.
+
+Six failures reproduce product-origin scroll loss after related/nested Store Cart returns. D014 modal completion can finish after the final animation frame, leaving its existing post-frame restoration unscheduled. The Buy screen requests a frame after queuing that guarded restoration. No test assertions, route identities, controller-disposal rules or shared owners changed. Initial depth-guard experiment still failed4/8 and was removed; its log is retained. Corrected unchanged suites: R5 007 eight passed; R66 nested Store Cart22 passed; D014 warm links19 passed;49 distinct checks. Focused analysis zero issues. Two visual invocations repeat one of those49, not additional distinct coverage. First used the wrong capture define and produced no images; second used the existing BUY_R664_VISUAL_DIRECTORY contract and passed with5 captures. Origin and product-return images inspected, confirming the same seller/details viewport; other3 retained but not claimed inspected. No device test or closure.
+
+The other24 failures from the original combined run remain unreconciled, not24 confirmed product defects. Includes route/commerce fixtures, changed content/height expectations and supplier continuity. No failing case silently excluded; no full combined rerun claimed. Required ownership and V6 source-lock compatibility remain explicit before build.
+
+Evidence root: C:\GUARANTEED OUTCOME\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\rv6-successor-qualification-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| combined-regression.log | 65ED1DE49E825A54EB247611AC65307B460CC5535C7499DEA3A952BD31673A46 |
+| full-analysis.log | 8017F324D8CD335AB0CD5E37BA22D112277BC0C0CA8812BD8267C4642E57B0DF |
+| ui-locks.log | E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855 |
+| store-return-guard.log | 3B66A660549FBBAAA0CF53B21D93E5D741D2B58B7DA1A6CF49B794570998BBD0 |
+| store-return-frame.log | DE943CFE67E8F5FD163F240F533B34728268E3B82E36864C12D8EE08601C91F9 |
+| nested-store-return-frame.log | 372E236D54B44D016E6CA94CE39554C54F46F392052EBFA2C2C963AC059B9A22 |
+| d014-return-regression.log | 999E1E3C8A93C9E9C7625791BD6E7F01313268955E83789C41CA0D89A098FB4E |
+| return-frame-analysis.log | A4187CEB299AFFDCC4A0BAFAF09A2C48AE876D96341D9D46AEAE031C9F36DE36 |
+| return-frame-visual.log | 20E21495461BD31705FE334A5EBBDAF5663EB04DF01D1B1D92F488F219926EF6 |
+| return-frame-visual-v2.log | 20E21495461BD31705FE334A5EBBDAF5663EB04DF01D1B1D92F488F219926EF6 |
+| return-frame-visuals/r5-related-shop-360-1.0-final.png | E1A9AA727C0A0C2B3A8274C900ED0665138C4334D803F669EF00FF8759370AE6 |
+| return-frame-visuals/r5-related-shop-360-1.0-origin.png | A923B2AC8B447F5FC99B1035C2AA85C4E8FDBEC0ED88CE71CBA276C5ACFF1975 |
+| return-frame-visuals/r5-related-shop-360-1.0-product-return.png | A923B2AC8B447F5FC99B1035C2AA85C4E8FDBEC0ED88CE71CBA276C5ACFF1975 |
+| return-frame-visuals/r5-related-shop-360-1.0-related-return.png | E8050ACE155EF3777D06FCB5DFE4324E5E4096ED31702C23EC67E827A2C48EC7 |
+| return-frame-visuals/r5-related-shop-360-1.0-related.png | E8050ACE155EF3777D06FCB5DFE4324E5E4096ED31702C23EC67E827A2C48EC7 |
