@@ -91,8 +91,8 @@
     }
   ],
   "nextWork": [
-    "Publish qualified source baseline: two2337pass/27skip/zero-failure combined cycles, zero-issue analysis and required source gates passed; application source3c30ba11521db6bb1a1ec6995b181a81df1a6b34.",
-    "Build one uniquely identified final Cursor Review successor and install preserving data on Redmi TG8HCYTGGQT885OF only; report remaining device acceptance then stop. New-APK child testing requires a subsequent instruction."
+    "Seal delivery evidence and verify clean Git/live remote equality; source baselinef1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b and r66.22 Redmi installation are complete.",
+    "Stop at the authorized APK-delivery boundary. D005/C01 new-APK device testing requires a subsequent instruction; D009/D010/D014 native-link delivery remains externally blocked."
   ],
   "preservation": {
     "cart": "1175 original Scheduled Shop Saved1 emptycart restored;no cart changes in round169",
@@ -205,9 +205,21 @@
     "externalLinkDeliveryUnverified": ["RV6-D009", "RV6-D010", "RV6-D014"],
     "externalBlocker": "Declared native-link launches rejected by automatic approval review; no equivalent alternate launch or bypass attempted.",
     "children": [{"id": "RV6-D005-C01", "parent": "RV6-D005", "status": "implemented_locally_qualified_device_open", "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34", "evidence": "UAT.md", "limits": "Host adapter/session checks and English Flutter captures; host Hindi glyph qualification unavailable; no successor Redmi process-restart closure."}],
-    "currentInstalledVersion": "1.0.0-r66.21-cursorreview",
-    "currentInstalledVersionCode": 2026091402,
-    "finalSuccessor": "not_yet_built",
+    "currentInstalledVersion": "1.0.0-r66.22-cursorreview",
+    "currentInstalledVersionCode": 2026091403,
+    "finalSuccessor": {
+      "candidate": "UAW-CURSOR-REDMI-RV6-LANGUAGE-20260914",
+      "sourceHead": "f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b",
+      "status": "built_installed_checksum_equal",
+      "packageId": "com.moolsocial.app.cursorreview",
+      "apkSha256": "4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16",
+      "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+      "manifestSha256": "6364AD7D65BD1A6DC85C2E073B143274700125DB8C89067ED5B1B43A068B83D0",
+      "buildAuthorization": "consumed_one_build",
+      "dataClearPerformed": false,
+      "childDeviceVerification": "not_performed_requires_subsequent_instruction",
+      "evidence": "UAT.md final r66.22 delivery section"
+    },
     "sourceBaseline": "locally_qualified_two_combined_cycles_analysis_and_source_gates_passed_see_PREBUILD.md",
     "integration": "not_authorized",
     "productionQualification": "not_established"

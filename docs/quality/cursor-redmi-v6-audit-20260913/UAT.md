@@ -3193,3 +3193,36 @@ Final candidate reserved after no matching record in the current lane's quality/
 Both required current-source combined cycles completed2337passes/27inherited capture skips/zero failures each, terminal sessions80756 and30369 exit0. Full final analysis completed with zero issues (session21751 exit0), format3files/0changes. PREBUILD.md records exact command, source equality and SHA256 evidence. Product/test tree is unchanged from3c30ba11521db6bb1a1ec6995b181a81df1a6b34; the intervening43548137 commit contains only source admission and evidence reconciliation. Existing positive, negative, compatibility, build-profile, clean-support, memory and incremental pre_build checks pass. A log inventory attempted to hash the still-running analysis log; its sharing violation was retained as an operational observation and the hash was accepted only after terminal completion. No partial log was counted as a pass.
 
 This establishes the scoped local source baseline, with full22-original traceability, one locally corrected/device-open child,18 preserved device closures and three external link-delivery blockers. It does not establish production readiness. Remaining work at this source seal: commit/push/clean live equality, materialize exact326-owner candidate inputs, real wrapper preflight, one final APK build, signature/identity checks and data-preserving Redmi install. New-APK child checks remain subsequent-instruction-only.
+
+## Final r66.22 delivery and remaining device qualification - 2026-09-14
+
+The authorized final successor is built and installed on RedmiTG8HCYTGGQT885OF only. Source baselinef1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b was clean and exactly live remote-equal immediately before the build. Application/test correction remains3c30ba11521db6bb1a1ec6995b181a81df1a6b34; source admission43548137e445457b84587547edbab4195e50cba9 and qualification seal are preserved in its ancestry. Later delivery-evidence commits do not change the recorded build source.
+
+| Identity | Verified value |
+| --- | --- |
+| Candidate | UAW-CURSOR-REDMI-RV6-LANGUAGE-20260914 |
+| Package | com.moolsocial.app.cursorreview |
+| Installed version | 1.0.0-r66.22-cursorreview /2026091403 |
+| Configuration | debug CursorUiReview; UI_REVIEW_ONLY=true; DEVICE_REVIEW=true; USE_EMULATORS=true; exact candidate ID; non-promotable |
+| Source HEAD | f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b |
+| Runtime source manifest | 326owners; SHA2566364AD7D65BD1A6DC85C2E073B143274700125DB8C89067ED5B1B43A068B83D0 |
+| APK bytes / SHA256 | 210808137 /4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16 |
+| Signer SHA256 | CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25; matches preserved installed review signer |
+| Device / installation | TG8HCYTGGQT885OF; adb install -r returned Success; terminal session35419 exit0 |
+| Installed APK equality | Physical device base.apk SHA256 equals the verified APK SHA256 above |
+| Data-preserving evidence | Original first-install timestamp2026-08-27 15:09:48 retained; no uninstall, downgrade, data clear or real transaction/message; no full persisted-field audit claimed |
+
+Real wrapper preflight passed all13 registered prebuild gates (session28366 exit0); actual single wrapper build passed (session69021 exit0), including existing APK production-plugin integrity under the debug-only review allowance. The Kotlin-plugin warning concerns future Flutter compatibility; it was not a terminal build failure and no plugin/dependency upgrade was made. The one-build authorization is consumed. Exact prebuild state was preserved before recording built/install states; no second APK was built.
+
+Delivery directory: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-language-final-20260914/delivery. It contains the APK, source manifest, build provenance, signer and artifact identity, prebuild/built/installed states, installation receipt and hash-verified copied evidence. Installation receipt SHA2569F0C4CAEBFD1DE0B9DBBFE23FD8EAC4997833B17DE01969A62ACECE0B323E58A; provenance SHA2569C5F7BAD865D2678D722ACF649707A45CC8F452E53A61B8AE04FD5DFC5921F4D; original prebuild state SHA25641D24C952F1E7831AD8F9992695346581EB20E63F0F6A4842613C719BA629432. Local gate/test evidence and raw APK metadata are retained in the parent directory. The final Git handoff receipt is recorded there after the delivery-evidence seal.
+
+Remaining acceptance is explicit:
+
+- 18 original closures are preserved from their recorded r66.20/r66.21 results. No unrelated passed device journeys were replayed and no closure is relabelled as an r66.22 device test.
+- RV6-D005 and RV6-D005-C01 remain device-open. The isolated saved-language correction is implemented and locally qualified; its r66.22 Redmi cold-relaunch verification has not run and requires a subsequent instruction. Host Hindi-glyph limitations remain recorded.
+- RV6-D009, D010 and D014 remain unverified on the required native-link-delivery path because automatic approval review rejected the necessary declared-link launches. This external blocker was not bypassed by fixture navigation, alternate launchers or a real transaction.
+- Broader frozen audit, authentication/provider/payment/backend acceptance remains incomplete or excluded. This is a qualified scoped source baseline and isolated review APK delivery, not production readiness or branch integration.
+
+Operational evidence retained: an extra coordination call used integration-only candidate_preflight and correctly failed for cursor_ui; the unchanged valid Cursor handoff invocation passed. The external APK metadata helper initially rejected command-echo scaffolding joined to scalar metadata; the SDK's actual package/version/code were correct. Its parser was corrected to require one typed output and exact expected values, preserving raw output. No source/checker change, second build or premature install resulted. All earlier failed logs and frozen evidence remain preserved.
+
+The workflow stops at delivery. New-APK child verification, new build, integration and OPPO actions are not part of this handoff.
