@@ -668,3 +668,76 @@ Correct only the source registry line endings to the existing attribute and its 
 ### Complete successor identity inventory: V18 UI-lock failure preserved
 V18 UI-lock check rejected at line153: Approved UI Accessibility projection requires its exact isolated native owner. The existing combined native projection still named V16; app/native owner bytes and approved projection hashes were unchanged. Failure preserved in v18-ui-lock-original.log. Audited all active V14–V18 successor references in scripts/config: only coordination, protected-review and this UI-lock destination mapping required synchronization. Backend source pin remains qualified04208634; no exception operation, native owner permission, projection hash, assertion or registry entry is changed.
 V18 remains preserved unqualified for APK. Advance the three existing exact destination mappings together to V19, maintaining their exact branch/root checks and all source/native ancestry and hash predicates. Its application/test/backend/contracts remain byte-identical in Git to04208634 and V18. Ongoing V18 candidate regressions may finish on their immutable original HEAD; preserve that execution identity and use equality only where existing candidate evidence requirements permit. V19 still requires real admission, all current release/visual/mandatory navigation/device gates. No new APK or data operation occurred.
+
+## Mandatory Store regression prevention after V19 OPPO qualification
+
+Founder directive, 2026-09-14: keep every confirmed failure and its prevention in
+source so successor work does not depend on this chat. This is a continuing
+acceptance requirement, not authorization to build, deploy or perform live actions.
+
+V19 `7bb89a10585859cf7288d39db1dd6815a9e5ce45` completed the bounded OPPO
+frontend review goal. APK `1.0.0-r66.25-runtime` / `2026091402`, package
+`com.moolsocial.app.runtime`, SHA-256
+`9953FF19D65C803991FAE537FE47A2B62A10501A2B60C70B2A2469CF4B3A6C1E`
+matched the installed OPPO artifact. The final DeviceQualification gate passed.
+Historical pending statements in REG4614-4616 describe their incident-time state;
+this closure supplements them and never deletes their original failure evidence.
+
+Evidence directory:
+`C:/Users/jisal/Documents/Codex/2026-09-12/the-evidence-supports-the-concern-codex/outputs/store-latest-apk-qualification-20260913`.
+Read `v19-final-handoff.md`, `v19-device-qualification.log`,
+`v19-evidence-content-identity.json`, `v18-skip-disposition.md`,
+`v19-replay-complete-monitor.log` and `v19-cold-restore.log` there.
+Original failures include `v16-direct-recurrence-exception-7.json`,
+`store-return-audit-before.log`, `dashboard-overlap-audit-seeded-before.log`,
+`store-search-overlap-normal-before.log`, `store-supplier-overlap-before.log`,
+`v17-registry-checkout-failure.json` and `v18-ui-lock-original.log`.
+
+| Stage | Mandatory requirement and rejection condition |
+| --- | --- |
+| Source work | Read applicable permanent registry entries and run regression-memory and exact-owner admission. Register new confirmed failures before retry. Preserve original-versus-modified checker results; an ownership change cannot establish product/security safety. |
+| Source/candidate byte identity | REG4617: registry uses the existing LF checkout contract without BOM. Build preflight rejects empty, CRLF, mixed or BOM bytes. Bind count/hash only after canonicalization; independently verify candidate checkout hash. JSON equality is insufficient. |
+| Integration admission | REG4618: run actual coordination, protected-baseline and approved-UI-lock gates against the exact new root before expensive cycles. Audit all destination mappings together. Preserve exact parents, merge tree, accepted ancestry and changed-owner review; never widen hashes or permissions to pass. |
+| Each Store review APK | REG4614-4616/4619: the wrapper runs STOREBACK01-06, seven exact tests including both STOREBACK03 variants. Require candidate runtime defines, native exit zero, one successful terminal event and every named test successful and non-skipped. Missing, skipped and failed supplier/search cases have negative gate tests. Source passes cannot replace this replay. |
+| Host coverage | STOREBACK01 covers connected Restock/Bulk/native Back timing and focus; 02 SKU loading/count overlap; 03 failed-save styling, retry, pending-write serialization and cart retention; 04 workload count overlap; 05 supplier delivery toggle overlap; 06 repeated empty/results search overlap. Keep the two full affected regression cycles, analysis, dependency lock and actual Flutter visual checks required by candidate admission. |
+| OPPO acceptance | Run check-apk-regression-gate-state.ps1 with Phase DeviceQualification. All eleven device gates require hashed evidence. Verify installed package/version/signer/file hash, selected Orders filter, truthful signed-in state, Security return, labelled Restock and retained Store cart, IME/search/Clear/Bulk/native Back, warm and cold relaunch, error-free full replay, Dashboard and clean live-remote equality. No screenshot, host test or manual tap substitutes for this entire boundary. |
+| Device evidence collection | Wait for a fresh nonempty hierarchy after launch. Resolve controls from current complete XML labels or inspected bounds, never truncated output or stale semantics. Record interrupted attempts as incomplete. Error observation must span the full tested sequence and restore normal VM exception mode. Preserve zero-match results explicitly instead of assuming a missing output file means success. |
+| Skips and visual acceptance | All83 skips remain enumerated, with replacement coverage or unresolved disposition; they are not passes. Optional captures are not founder approval. Do not broaden a narrow test result into full-app coverage. |
+| Toward go-live | Carry these regression cases into the eventual production-profile journey checks; review-profile execution alone is insufficient. Real supplier/backend authority, storage/privacy, authenticated account/Store isolation, provider/payment failures and production session/persistence require separate genuine evidence and existing production gates. Keep review exceptions disclosed and non-promotable. Never enable fixtures, weaken assertions, expand exclusions or suppress Flutter errors to obtain release acceptance. |
+
+V19 warm and cold restart preserved the Store cart (2 items / INR1160), after
+supported local review sign-in. Review authority remains in memory and reopening
+the existing synthetic Store scenario restarts fixture timers. This is explicitly
+not production authentication durability or proof that every business record has
+production persistence. Future qualification must state that distinction.
+
+This bounded prevention update changes no application runtime, installed APK,
+supplier permissions, native ownership, security exception or Cursor/Redmi work.
+The registry gains REG4617-4619 and retains every predecessor entry. Its generation
+binding changes only to the new count and canonical checksum.
+
+REG4619 validation also exposed the previously documented host-storage setup
+class: moving supplier/search cases into the review-defined subset required an
+isolated SharedPreferencesAsyncPlatform for each case. The initial
+`permanent-gates-seven-tests.jsonl` failure is preserved. Both cases now install
+the existing in-memory platform and restore its predecessor at teardown; no
+production storage or behavior assertion is changed. This is harness setup,
+not a newly reproduced product defect. Retry evidence uses a new filename.
+The second run isolated a review-router entry mismatch in the search fixture.
+The failed second run remains `permanent-gates-seven-tests-after.jsonl`; the
+attempt to reuse the full-app entry for that different fixture is preserved in
+`permanent-gates-seven-tests-verified.jsonl`. STOREBACK06 now mounts the actual
+Store dashboard with the same injected procurement fixture as the passing
+workload/supplier cases and keeps every search assertion. Full-app routing
+remains separately mandatory in STOREBACK01; this test asserts transitions.
+The next compile caught a fixture constant referenced before its declaration;
+`permanent-gates-seven-tests-final.jsonl` preserves that failure. The unchanged
+review-mode constant is now declared at the start of main, before every user.
+Run analysis before the subsequent behavioral replay.
+
+Final technical validation: `permanent-gates-seven-tests-ready.jsonl` completed
+all seven review-defined cases successfully; `permanent-gates-normal-tests-ready.jsonl`
+completed both supplier/search cases without review defines. The actual changed
+build-gate/selftest blocks passed 21 rejection cases and two positive controls,
+recorded with source hashes in `permanent-gates-control-results.json`. No full
+APK build or device run is claimed for this test-only prevention update.

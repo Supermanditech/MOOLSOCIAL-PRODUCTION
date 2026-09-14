@@ -45,11 +45,25 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
+function Assert-StoreRegistryCanonicalBytes([byte[]]$Bytes) {
+  # The registry is pinned by raw SHA-256 and tracked with text/eol=lf.
+  # Reject checkout-changing bytes before any candidate evidence is authored.
+  $null = [Text.UTF8Encoding]::new($false, $true).GetString($Bytes)
+  if ($Bytes.Length -eq 0 -or [Array]::IndexOf($Bytes, [byte]13) -ge 0 -or
+      ($Bytes.Length -ge 3 -and $Bytes[0] -eq 239 -and
+       $Bytes[1] -eq 187 -and $Bytes[2] -eq 191)) {
+    throw 'Regression registry must use canonical UTF-8 without BOM and LF; preserve the original bytes before correcting its binding.'
+  }
+}
+
 $repositoryRoot = [IO.Path]::GetFullPath(
   (Split-Path -Parent $PSScriptRoot)
 ).TrimEnd([char[]]@(
   [IO.Path]::DirectorySeparatorChar,
   [IO.Path]::AltDirectorySeparatorChar
+))
+Assert-StoreRegistryCanonicalBytes ([IO.File]::ReadAllBytes(
+  (Join-Path $repositoryRoot 'config/codex-development-regression-registry.json')
 ))
 $mobileRoot = Join-Path $repositoryRoot 'apps\mobile'
 $flutterSupportGuard = Join-Path `
@@ -628,7 +642,7 @@ try {
         & flutter test --no-pub --reporter json `
           --dart-define-from-file $runtimeDefineFile `
           test/work_workspace_layout_safety_test.dart `
-          --name '^STOREBACK0[1-4] ' `
+          --name '^STOREBACK0[1-6] ' `
           1> $navigationLog
         if ($LASTEXITCODE -ne 0) {
           throw "Exact-candidate Store navigation replay failed: $navigationLog"
@@ -641,7 +655,9 @@ try {
           'STOREBACK02 SKU count overlapping loading transitions and exit',
           'STOREBACK03 return failure retry and repeated Back delayed=false',
           'STOREBACK03 return failure retry and repeated Back delayed=true',
-          'STOREBACK04 dashboard workload count overlap and exit'
+          'STOREBACK04 dashboard workload count overlap and exit',
+          'STOREBACK05 supplier delivery toggle overlapping transitions',
+          'STOREBACK06 search repeated empty results transition and exit'
         )) {
         $navigationTests = @($navigationEvents | Where-Object {
           $_.type -ceq 'testStart' -and

@@ -103514,7 +103514,7 @@
   ],
   "mistake": "The existing OPPO APK showed a purchase-return save failure with success styling. Host audit also reproduced duplicate return saves after repeated Back and duplicate keys in overlapping Dashboard workload counts, Dashboard search empty/results states and supplier delivery toggle icons.",
   "rootCause": "The return method used showNotice for failure and had no pending-return guard. Default keyed workload fades reused count identity across overlapping outgoing transitions. STOREBACK03 failed on error classification and two writes, then passed after using showError, clearing the specific error on successful retry and serializing the UI return. STOREBACK04 failed with duplicate249 keys, then passed with an unkeyed fade root. Initial unseeded workload harness had no counters and was corrected; that setup failure remains separate.",
-  "prevention": "Require STOREBACK01 through STOREBACK04 with all five exact test names, successful non-skipped terminal results and actual candidate defines before successor review builds. Preserve failed evidence, test return retry/cart retention and uneven repeated count transitions; final exact APK OPPO proof remains mandatory. Do not claim all related transition risks resolved before their audit.",
+  "prevention": "Require STOREBACK01 through STOREBACK06 with all seven exact test names, successful non-skipped terminal results and actual candidate defines before successor review builds. This strengthens the original five-test prevention with supplier-delivery and search transition cases. Preserve failed evidence, test return retry/cart retention and uneven repeated count transitions; final exact APK OPPO proof remains mandatory. Do not claim all related transition risks resolved before their audit.",
   "gates": [
     "scripts/build-buy-device-review.ps1",
     "scripts/test-public-auth-sideload-build-controls.ps1"
@@ -103522,6 +103522,36 @@
   "evidence": [
     "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
   ]
+},
+{
+  "id": "REG-20260914-4617-REGISTRY-CHECKOUT-BYTE-STABILITY",
+  "status": "registered_prevention_active",
+  "appliesTo": ["primary", "implementation", "build", "coordination", "evidence"],
+  "mistake": "V17 candidate registry binding failed after checkout normalized 45 CRLF lines to LF.",
+  "rootCause": "The source raw SHA was bound before verifying the registry's existing text/eol=lf checkout contract; JSON semantic equality did not establish byte equality.",
+  "prevention": "Require canonical nonempty UTF-8 without BOM and LF before build, exercise LF/CRLF/mixed/BOM/empty controls, and verify exact raw registry count/hash at source and candidate admission. Preserve original bytes and rejection; never modify the comparison rule to accept a mismatched binding.",
+  "gates": ["scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/check-codex-subagent-coordination-policy.ps1"],
+  "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+},
+{
+  "id": "REG-20260914-4618-SUCCESSOR-NATIVE-ADMISSION-COMPLETENESS",
+  "status": "registered_prevention_active",
+  "appliesTo": ["primary", "implementation", "build", "coordination", "evidence"],
+  "mistake": "V18 remained pinned to the older V16 native owner path in the approved UI-lock checker although other successor identities had advanced.",
+  "rootCause": "Admission changed only part of the destination mappings. Unchanged application and native bytes were incorrectly treated as sufficient for a new isolated path.",
+  "prevention": "Before expensive candidate cycles run coordination, protected baseline and actual approved-UI-lock checks on the exact candidate root. Verify all destination mappings together without widening native hashes, owner permissions or assertions. Preserve failed candidates and original checker results; use an exact successor when required.",
+  "gates": ["scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-buy-protected-baseline.ps1", "scripts/check-approved-ui-locks.ps1"],
+  "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+},
+{
+  "id": "REG-20260914-4619-STORE-SUCCESSOR-COVERAGE-AND-DEVICE-PROOF",
+  "status": "registered_prevention_active",
+  "appliesTo": ["primary", "implementation", "build", "device", "evidence"],
+  "mistake": "Confirmed search and supplier delivery transition regressions were covered by broad tests but omitted from the mandatory per-APK replay; prior registry entries still described device qualification as pending after V19 passed.",
+  "rootCause": "The five-test build subset did not include every confirmed related transition, and historical incident text was not accompanied by a durable final evidence index.",
+  "prevention": "Require all seven STOREBACK01-06 results and negative omission/skip/failure tests before every Store review APK. Preserve historical descriptions and read the appended V19 closure. Device qualification requires exact installed hash/version, retained cart, signed-in status, Security return, IME/search/Bulk/native Back, warm and cold relaunch, complete error observation and Dashboard. Host, fixture and review passes never establish production storage, payment or authenticated backend acceptance.",
+  "gates": ["scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/check-apk-regression-gate-state.ps1"],
+  "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
 }
 ]
 }

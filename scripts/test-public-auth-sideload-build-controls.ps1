@@ -499,7 +499,7 @@ $nativeExitCheckPatterns = @(
   '\$branch = git -C \$repositoryRoot branch --show-current\s+if \(\$LASTEXITCODE',
   '\$accessToken = \(& \$gcloudSource auth print-access-token --quiet\)\.Trim\(\)\s+if \(\$LASTEXITCODE',
   '& flutter pub get --enforce-lockfile\s+if \(\$LASTEXITCODE',
-  '& flutter test --no-pub --reporter json `\r?\n\s+--dart-define-from-file \$runtimeDefineFile `\r?\n\s+test/work_workspace_layout_safety_test\.dart `\r?\n\s+--name ''\^STOREBACK0\[1-4\] '' `\r?\n\s+1> \$navigationLog\s+if \(\$LASTEXITCODE',
+  '& flutter test --no-pub --reporter json `\r?\n\s+--dart-define-from-file \$runtimeDefineFile `\r?\n\s+test/work_workspace_layout_safety_test\.dart `\r?\n\s+--name ''\^STOREBACK0\[1-6\] '' `\r?\n\s+1> \$navigationLog\s+if \(\$LASTEXITCODE',
   '\$head = git -C \$repositoryRoot rev-parse HEAD\s+if \(\$LASTEXITCODE'
 )
 $nativeExitChecksBound = @($nativeExitCheckPatterns | Where-Object {
@@ -983,6 +983,33 @@ Assert-SideloadControl (
 $navigationAst = [Management.Automation.Language.Parser]::ParseInput(
   $wrapper, [ref]$null, [ref]$null
 )
+$canonicalFunctions = @($navigationAst.FindAll({
+  param($node)
+  $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+  $node.Name -ceq 'Assert-StoreRegistryCanonicalBytes'
+}, $true))
+Assert-SideloadControl ($canonicalFunctions.Count -eq 1 -and
+  $wrapper.Contains('Assert-StoreRegistryCanonicalBytes ([IO.File]::ReadAllBytes(')) `
+  'Checkout-stable registry preflight is missing or duplicated.'
+& {
+  . ([scriptblock]::Create($canonicalFunctions[0].Extent.Text))
+  Assert-StoreRegistryCanonicalBytes ([IO.File]::ReadAllBytes(
+    (Join-Path $RepositoryRoot 'config/codex-development-regression-registry.json')
+  ))
+  foreach ($sample in @(
+    @{name='lf';bytes=[byte[]]@(123,10,125);reject=$false},
+    @{name='crlf';bytes=[byte[]]@(123,13,10,125);reject=$true},
+    @{name='mixed';bytes=[byte[]]@(123,10,13,10,125);reject=$true},
+    @{name='bom';bytes=[byte[]]@(239,187,191,123,10,125);reject=$true},
+    @{name='invalid-utf8';bytes=[byte[]]@(255,123,10,125);reject=$true},
+    @{name='empty';bytes=[byte[]]@();reject=$true}
+  )) {
+    $rejected = $false
+    try { Assert-StoreRegistryCanonicalBytes $sample.bytes } catch { $rejected = $true }
+    Assert-SideloadControl ($rejected -eq $sample.reject) `
+      "Registry canonical-byte fixture '$($sample.name)' had the wrong outcome."
+  }
+}
 $navigationBlocks = @($navigationAst.FindAll({
   param($node)
   $node -is [Management.Automation.Language.IfStatementAst] -and
@@ -1026,6 +1053,17 @@ $navigationProbe = [scriptblock]::Create($navigationBlocks[0].Extent.Text)
           ConvertTo-Json -Compress
       }
     }
+    foreach ($transition in @(
+      @{id=6;name='STOREBACK05 supplier delivery toggle overlapping transitions';suffix='supplier'},
+      @{id=7;name='STOREBACK06 search repeated empty results transition and exit';suffix='search'}
+    )) {
+      if ($case -cne ('missing-' + $transition.suffix)) {
+        @{type='testStart';test=@{id=$transition.id;name=$transition.name}} | ConvertTo-Json -Compress
+        @{type='testDone';testID=$transition.id;
+          result=$(if ($case -ceq ('failed-' + $transition.suffix)) {'error'} else {'success'});
+          skipped=($case -ceq ('skipped-' + $transition.suffix))} | ConvertTo-Json -Compress
+      }
+    }
     if ($case -cne 'missing-terminal') {
       @{type='done';success=$true} | ConvertTo-Json -Compress
     }
@@ -1036,7 +1074,9 @@ $navigationProbe = [scriptblock]::Create($navigationBlocks[0].Extent.Text)
   foreach ($case in @('passed','process-failed','wrong-test','skipped',
       'missing-terminal','duplicate-terminal','stale-evidence',
       'missing-sku-test','skipped-sku-test',
-      'missing-return-counter-tests','skipped-return-counter-tests')) {
+      'missing-return-counter-tests','skipped-return-counter-tests',
+      'missing-supplier','skipped-supplier','failed-supplier',
+      'missing-search','skipped-search','failed-search')) {
     $artifactRoot = Join-Path ([IO.Path]::GetTempPath()) (
       'moolsocial-store-navigation-probe-' + [guid]::NewGuid().ToString('N')
     )

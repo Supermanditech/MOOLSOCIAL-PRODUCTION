@@ -439,6 +439,9 @@ class _StorePaymentTermsProbe implements BuyV2CommercialPaymentTermsAdapter {
 }
 
 void main() {
+  const storeReviewRuntime =
+      bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+      bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
   test(
     'RESTOCK01 review catalogue uses exact existing Store and refuses external actions',
     () async {
@@ -10742,9 +10745,15 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
-  testWidgets('Store supplier delivery toggle overlapping transitions', (
+  testWidgets('STOREBACK05 supplier delivery toggle overlapping transitions', (
     tester,
   ) async {
+    final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    addTearDown(
+      () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+    );
     final work = liveStore();
     final controller = WorkProcurementController(
       currentAccountId: () => 'fixture-purchaser',
@@ -10795,11 +10804,29 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('Store search repeated empty results transition and exit', (
+  testWidgets('STOREBACK06 search repeated empty results transition and exit', (
     tester,
   ) async {
+    final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+    addTearDown(
+      () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+    );
     final work = storeViewFixture();
-    await mount(tester, route: '/app/work/workspace/dashboard', work: work);
+    final controller = WorkProcurementController(
+      currentAccountId: () => 'fixture-purchaser',
+      currentStoreId: () => work.activeWorkspace?.id,
+      storeApproved: () => work.activeWorkspace?.verified == true,
+      bookmarks: _StorePurchaseBookmarks(),
+      stateStoreFactory: _StorePurchaseState.new,
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      procurementFactory: () => controller,
+    );
     await tester.tap(find.byKey(const Key('work-dashboard-search')));
     await tester.pumpAndSettle();
     final field = find.byKey(const Key('work-dashboard-search-field'));
@@ -17413,9 +17440,6 @@ void main() {
 
   // The APK wrapper requires the exact review-runtime test name below. Normal
   // builds instead verify that the review seed is unavailable; no test is skipped.
-  const storeReviewRuntime =
-      bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
-      bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
   if (!storeReviewRuntime) {
     test('STOREBACK01 non-review runtime refuses the review Store', () {
       final work = WorkSession(contactDraftStore: _ContactDraftFixtureStore())
