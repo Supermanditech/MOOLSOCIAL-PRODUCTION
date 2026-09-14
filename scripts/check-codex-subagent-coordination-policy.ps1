@@ -2393,8 +2393,27 @@ if ($ProductionLane -ceq 'baseline') {
           Assert-Coordination ($successorHash -ceq $successorHashes[$successorOwner]) "Successor exact reviewed checker differs: $successorOwner"
         }
       } finally { $successorHasher.Dispose() }
-      & git -C $root diff --quiet $successorParent -- apps backend contracts packages package.json package-lock.json pubspec.yaml pubspec.lock
-      Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission cannot change the qualified source.'
+      # Founder-approved RV6 fixture prerequisite: exact two-file delta only.
+      # This admits local qualification, not a build or device acceptance.
+      $fixtureHashes = @{
+        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = '72B6B01072F107F70E20034F2FE136109453A3D7A5E57E28A44327C8393B38E6'
+        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = '62C3C58D450451B766801EF662093DB68423957C986E7D3A45C2B2473D83C44A'
+      }
+      $fixtureDelta = @(& git -C $root diff --name-only $successorParent -- apps backend contracts packages package.json package-lock.json pubspec.yaml pubspec.lock)
+      Assert-Coordination ($LASTEXITCODE -eq 0) 'Fixture source inventory failed.'
+      if ($fixtureDelta.Count -gt 0) {
+        & git -C $root merge-base --is-ancestor 'b437a216b3c61db9a7ef67968828b71ef7243474' $head
+        Assert-Coordination ($LASTEXITCODE -eq 0) 'Fixture admission requires the preserved Redmi checkpoint.'
+        Assert-Coordination ((@($fixtureDelta | Sort-Object) -join '|') -ceq (@($fixtureHashes.Keys | Sort-Object) -join '|')) 'Fixture admission changed an unrelated source owner.'
+        foreach ($fixtureOwner in $fixtureHashes.Keys) {
+          $fixtureText = [IO.File]::ReadAllText((Join-Path $root $fixtureOwner)).Replace("`r`n", "`n")
+          $fixtureHasher = [Security.Cryptography.SHA256]::Create()
+          try {
+            $fixtureHash = [BitConverter]::ToString($fixtureHasher.ComputeHash([Text.Encoding]::UTF8.GetBytes($fixtureText))).Replace('-', '')
+          } finally { $fixtureHasher.Dispose() }
+          Assert-Coordination ($fixtureHash -ceq $fixtureHashes[$fixtureOwner]) "Fixture admission source hash differs: $fixtureOwner"
+        }
+      }
       if ($head -ceq $successorParent) {
         $successorDirty = @(Get-ProductionChangedOwners $head $head)
         Assert-Coordination ((@($successorDirty | Sort-Object) -join '|') -ceq (@($successorControls | Sort-Object) -join '|')) 'Successor admission must contain exactly five reviewed checker owners.'
@@ -2408,7 +2427,10 @@ if ($ProductionLane -ceq 'baseline') {
         Assert-Coordination ($LASTEXITCODE -eq 0 -and $successorSubject[0] -ceq 'ui(redmi-v6-audit-20260913): admit exact qualified successor review source') 'Successor admission subject differs.'
         $successorChanged = @(& git -C $root diff-tree --no-commit-id --name-only -r $successorCommit)
         Assert-Coordination ($LASTEXITCODE -eq 0 -and (@($successorChanged | Sort-Object) -join '|') -ceq (@($successorControls | Sort-Object) -join '|')) 'Successor admission changed unrelated owners.'
-        & git -C $root diff --quiet $successorCommit -- @successorControls
+        # The enclosing block is the sole founder-authorized amendment; the
+        # restored prior checker hash above still binds every other rule.
+        $fixtureUnchangedControls = @($successorControls | Where-Object { $_ -cne $successorChecker })
+        & git -C $root diff --quiet $successorCommit -- @fixtureUnchangedControls
         Assert-Coordination ($LASTEXITCODE -eq 0) 'Successor admission controls changed after sealing.'
       }
       # Preserve the already-sealed historical policy owner; current policy stays byte-bound above.

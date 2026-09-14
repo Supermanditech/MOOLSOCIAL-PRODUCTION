@@ -8,6 +8,7 @@ import 'package:moolsocial/core/design/mool_theme.dart';
 import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
@@ -15,7 +16,93 @@ import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 
 import 'buy_v2_screen_test.dart' show captureR66Visual, r66VisualCaptureRoot;
 
+class _FixtureCustomerStore implements BuyV2CustomerStateStore {
+  BuyV2CustomerStateSnapshot? snapshot;
+  @override
+  String get ownerScope => 'rv6-fixture-test';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => snapshot;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot value) async {
+    snapshot = value;
+    return true;
+  }
+}
+
 void main() {
+  for (final id in ['s-dog-food', 's-shampoo']) {
+    for (final scale in [1.0, 2.0]) {
+      testWidgets('RV6 fixture access $id text $scale', (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          customerStateStore: _FixtureCustomerStore(),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await tester.pumpWidget(_app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        await tester.tap(find.byKey(const ValueKey('buy-filter-button')));
+        await tester.pumpAndSettle();
+        final scroll = find
+            .descendant(
+              of: find.byKey(const ValueKey('buy-discovery-refinement-list')),
+              matching: find.byType(Scrollable),
+            )
+            .first;
+        final tools = find.byKey(const ValueKey('buy-refine-section-tools'));
+        await tester.scrollUntilVisible(tools, 160, scrollable: scroll);
+        final title = find.descendant(
+          of: tools,
+          matching: find.text('Shopping tools'),
+        );
+        await Scrollable.ensureVisible(tester.element(title), alignment: .5);
+        await tester.pumpAndSettle();
+        await tester.tap(title);
+        await tester.pumpAndSettle();
+        final action = find.byKey(ValueKey('buy-rv6-review-fixture-$id'));
+        const enabled =
+            bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            String.fromEnvironment('MOOLSOCIAL_CANDIDATE_ID') ==
+                'UAW-CURSOR-REDMI-RV6-FIXTURE-20260914';
+        if (!enabled) {
+          expect(action, findsNothing);
+          expect(session.view, BuyV2View.catalogue);
+          return;
+        }
+        await tester.scrollUntilVisible(action, 100, scrollable: scroll);
+        await Scrollable.ensureVisible(tester.element(action), alignment: .5);
+        await tester.pumpAndSettle();
+        await captureR66Visual(tester, 'rv6-fixture-$id-tools-$scale');
+        await tester.tap(action);
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.product);
+        expect(session.selectedProductId, id);
+        expect(session.quantityFor(id), 0);
+        expect(
+          session.addProduct(id),
+          isFalse,
+          reason: 'Fixture access must preserve original orderability',
+        );
+        expect(session.quantityFor(id), 0);
+        expect(
+          session
+              .recentlyViewedProductsFor(BuyV2Destination.shop)
+              .any((product) => product.id == id),
+          isTrue,
+        );
+        await captureR66Visual(tester, 'rv6-fixture-$id-product-$scale');
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.catalogue);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
   for (final id in ['s-eggs', 'w-notebook']) {
     for (final scale in [1.0, 2.0]) {
       testWidgets(

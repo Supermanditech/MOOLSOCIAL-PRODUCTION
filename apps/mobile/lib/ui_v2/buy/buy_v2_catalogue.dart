@@ -1,6 +1,6 @@
 import 'dart:async';
 
-import 'package:flutter/foundation.dart' show immutable, listEquals;
+import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -4205,6 +4205,27 @@ class _CatalogueToolsMenu extends StatelessWidget {
         context,
         session,
         actions: [
+          // Explicit, non-production access to the original RV6 reproductions.
+          // Use the normal visit callback so restrictions, history and Back
+          // remain owned by the application rather than a parallel harness.
+          if (kDebugMode &&
+              const bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+              const bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+              const String.fromEnvironment('MOOLSOCIAL_CANDIDATE_ID') ==
+                  'UAW-CURSOR-REDMI-RV6-FIXTURE-20260914' &&
+              session.reviewDataEnabled &&
+              session.procurementContext == null &&
+              session.destination == BuyV2Destination.shop &&
+              onVisitProduct != null)
+            for (final id in ['s-dog-food', 's-shampoo'])
+              if (session.findProduct(id) case final product?)
+                BuyV2FilterSheetAction(
+                  keyName: 'buy-rv6-review-fixture-$id',
+                  icon: Icons.science_outlined,
+                  title: 'Review fixture: ${product.title}',
+                  detail: 'RV6 original test data · not live inventory',
+                  onTap: () => onVisitProduct!(product, 'RV6 review fixture'),
+                ),
           if (order case final activeOrder?)
             BuyV2FilterSheetAction(
               keyName: 'buy-active-orders-button',
