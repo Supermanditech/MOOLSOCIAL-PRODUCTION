@@ -185,6 +185,9 @@ function Get-CursorAccessibilityNativeProjection {
     # Exact founder-authorized D005-C01 review preference correction.
     & git -C $root merge-base --is-ancestor '3c30ba11521db6bb1a1ec6995b181a81df1a6b34' HEAD
     if ($LASTEXITCODE -eq 0) { $redmiSource = '3c30ba11521db6bb1a1ec6995b181a81df1a6b34' }
+    # Exact reproduced D014 nested product-return correction.
+    & git -C $root merge-base --is-ancestor '4221158fead95a89047e3408aaeb11c9a12dd135' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '4221158fead95a89047e3408aaeb11c9a12dd135' }
     & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
     if ($LASTEXITCODE -ne 0) {
       throw 'Redmi audit committed source differs from its exact admitted source.'

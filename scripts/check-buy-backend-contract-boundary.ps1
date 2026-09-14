@@ -168,6 +168,10 @@ function Get-MobileBoundaryViolations {
           # Same V6 arrival-sound/import prefix; exact successor source only.
           $IntegratedReviewSourceCommit -cin @('9b7e5aa7fddc08517432f9b3932da5a36ef7a92d', '11b6562e7bf382afeb11e1801a0a390477fcae8f', '3c30ba11521db6bb1a1ec6995b181a81df1a6b34') -and
           $soundSourceHash -ceq '94B7A6AE4F5B24CAE5B14795310E1A5DAE5D13147C6FCFC02CB1F034640BCDF6'
+        ) -or (
+          # D014 changes only nested return handling; preserve exact sound source binding.
+          $IntegratedReviewSourceCommit -ceq '4221158fead95a89047e3408aaeb11c9a12dd135' -and
+          $soundSourceHash -ceq 'C00636022B4C0AEC1CB662F4D2FE28C0B20366358BE9E1E19CE7329848BE4CCA'
         )) {
         $Content = $Content.Replace("import 'dart:io';", '')
       }

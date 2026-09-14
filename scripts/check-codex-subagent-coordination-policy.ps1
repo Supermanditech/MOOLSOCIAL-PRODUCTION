@@ -2372,10 +2372,10 @@ if ($ProductionLane -ceq 'baseline') {
       $successorParent = '9018535597239296871f9cf026e1e2a7328aca50'
       $successorChecker = 'scripts/check-codex-subagent-coordination-policy.ps1'
       $successorHashes = @{
-        'scripts/check-buy-data-egress-boundary.ps1' = 'B98099965E0BBD7B4BD259A5A7804D4888C4D882E11A90ED35B8EB556334982A'
-        'scripts/check-approved-ui-locks.ps1' = 'AEFCCDB30576A59F7E2C6DF1A1AB6F8FCA3288D4061D57DB508ABEAB0675952F'
-        'scripts/check-buy-protected-baseline.ps1' = '54454E827D700CFB41EA2D15CF0318127E64786CE8578B00F9EA45FFC1596E20'
-        'scripts/check-buy-backend-contract-boundary.ps1' = '4B6302F7236D3825C3022DA5461B65E3275CD88EC0FCF91369182D40DC5B08B5'
+        'scripts/check-buy-data-egress-boundary.ps1' = '51A65FEF2FD8F4B43C41E2A3C8B3B0CDDEDAD40F7510C98AE0D033E7FF6913EA'
+        'scripts/check-approved-ui-locks.ps1' = '23D7177138F7F1F802BDF2D1AEAE0D5AD05CC6A681863693FB4697C5EEA96B12'
+        'scripts/check-buy-protected-baseline.ps1' = '0C4AC550593A7B220BF7804C2BC2C0BAF1C6C106E471EE5503C832775CBA38F9'
+        'scripts/check-buy-backend-contract-boundary.ps1' = '89226FC880F18E0A31E1B8C78484AD66C119D4B059DC5DE0091080FF3DE3EB76'
       }
       $successorControls = @($successorChecker) + @($successorHashes.Keys)
       Assert-Coordination ($AgentRole -ceq 'subagent' -and $AgentTask -ceq '/root/cursor_redmi_v6_audit_20260913' -and

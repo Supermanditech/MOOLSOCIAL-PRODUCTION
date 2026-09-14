@@ -209,6 +209,15 @@
       "sourceSha256Normalized": "C00636022B4C0AEC1CB662F4D2FE28C0B20366358BE9E1E19CE7329848BE4CCA",
       "testSha256Normalized": "D62D9770DCE5F7075BF141AAF56202A5270AE54E1C030FCCE437F605076963B8",
       "qualification": "336 screen tests pass; 21 D014 matrix cases overlap; two new Flutter captures reviewed; full analysis no issues. UAT.md records reproduction and retained failed attempt.",
+      "sourceAdmission": {
+        "sourceCommit": "4221158fead95a89047e3408aaeb11c9a12dd135",
+        "status": "four_source_boundary_checks_passed",
+        "focusedAdmissionTests": "exact source accepted; five negative cases rejected; existing backend and egress self-tests passed",
+        "coordination": "49-owner claim and outside-admission preservation passed; four checker hashes updated",
+        "evidence": "UAT.md D014 source admission qualification; rv622-device-qualification-20260914/d014-admission-check-*.log and d014-admission-negative.result.json",
+        "combinedCycles": "cycle_1_passed_2339_tests_27_inherited_skips_cycle_2_running",
+        "historicalCommitLabelExceptionApplied": false
+      },
       "successorBuilt": false
     },
     "externalLinkDeliveryUnverified": [],
