@@ -219,11 +219,13 @@ Capture904 after explicitly reopening the search field restores range41-80 and m
 **Local implementation disposition (14 September 2026):** D018 corrected in Buy screen/test owners. Eight focused checks and 379 connected checks passed (overlapping counts); analysis zero issues; five actual Flutter captures reviewed. Search page/query/offset return is retained for Android/content Back and cart roundtrip; stale account/query/mode context is rejected. See UAT.md D018 qualification and hashed evidence. Remains open pending successor-APK Redmi acceptance of 898-904; host results are not device closure.
 
 ## RV6-D019 - Minimized delivery rail retains collapse chevron instead of delivery identity
-Status: evidence-reconciled; no product change justified; successor Redmi check retained. Severity: minor visual/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+Status: closed; evidence-reconciled and successor Redmi135-139 confirmed. No product change justified. Severity: minor visual/state feedback. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913.
 From Scheduled Shop908 with bike9+ rail, open delivery909 (12 deliveries;MS-NEW-09). Tap panel Minimize chevron643,1162. Panel closes910;settled911 retains only downward collapse chevron in rail, with bike/count absent. Tap rail reopens912 same order. Repeat Minimize913 shows same result. Reopen914 then Hide915 restores bike9+ correctly. Expected: minimized status remains identifiable as deliveries with the appropriate icon/count and show affordance. Actual functional reopen works; no claim of lost order data or inaccessible tracking. Source screen1381-1423 chooses collapse icon only when expanded; screen1584 and2766-2768 bind Minimize to expanded=false. Exact cause of stale displayed state is unproven; no implementation. Hide restores observed initial rail appearance; sound off and Keep off unchanged.
 
 
 **Evidence correction (14 September 2026):** The original narrative above is preserved for traceability but is contradicted by the original images. Captures910/911 and913 show bike +9+ after Minimize; hashes exactly match EVIDENCE.csv. Full-app normal/200% local checks pass on unchanged product code. See UAT.md D019 reconciliation. Do not count as an implemented fix or new device closure. Retain the bounded successor-APK confirmation; no broad retesting.
+
+Redmi acceptance2026-09-14: Minimize and Hide retain bike9+; reopen preserves MS-NEW-09 and12 deliveries. Captures135-139, APK SHA256 7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. See UAT.md. No child.
 
 ## RV6-D020 - Message audience sheet clips final privacy explanation
 Status: open. Severity: minor visual/content accessibility. Redmi TG8HCYTGGQT885OF; UAW-CURSOR-REDMI-V6-REVIEW-20260913; font_scale1.0 confirmed.
