@@ -2925,3 +2925,27 @@ External evidence root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905
 | proposed-source-admission-validation.log | E0A73ED12EC84D94FB61A8BF89D565E5202DAEF3673E51FB97CDE2B765965CD8 |
 | proposed-source-admission-validation-v2.log | 7784E021D54643E9DB1599BE7EAFBF1EBF7A52FF0B52E3672DF38A26EB340CB0 |
 | successor-admission-validation-plan.md | 883E140C3BB0894ED045C7A67528A259952CF44767259A2BD1900C5BB23AB5A2 |
+
+
+## RV6 successor APK built and verified
+
+Candidate UAW-CURSOR-REDMI-RV6-FIXES-20260914; exact build source32ebd7361fedf2224dae9cd89bb02337ca53286a, application/test source9b7e5aa7fddc08517432f9b3932da5a36ef7a92d. Two cycles2325passed/27inherited capture skips/zero failures each; analysis zero issues. Build admission242a1b87c21389d3bc65e694d4a3cc8f28a26d05; evidence seal32ebd736. Build started clean/live remote-equal; postbuild Git digest remains empty(42d886).
+
+Existing wrapper preflight passed13gates and actual locked dependency/resource checks. First preflight stopped because REG3955's historical zero-byte preimage was not in live worktrees. Found the actual preserved artifact under MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904/MOOLSOCIAL-WORKTREE-CURSOR-buy-cart-safe-clear-v1-20260901/untracked/artifacts/quality/registry-disk-full-recovery-20260902/codex-development-regression-registry.zero-byte-preimage.json; zero bytes/SHA256E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855 match archive CSV and metadata exists. Used wrapper's existing EvidenceArchiveRoot parameter; no archive copy into worktree, registry edit, reconstruction or gate bypass. Retry preflight exit0(f138ac); exact gate summary recovered in bounded read de4b18 after dependency-output truncation. First failure remains recorded in tool receipt b6fd5d.
+
+One authorized wrapper build completed exit0(213cac), source32ebd7361fedf2224dae9cd89bb02337ca53286a. Candidate APK210801229bytes; SHA2567734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8. Generated app-debug.apk, candidate artifact and external archived copy all match. Runtime profile CursorUiReview: UI_REVIEW_ONLY=true,DEVICE_REVIEW=true,USE_EMULATORS=true,candidate ID as above; debug packagecom.moolsocial.app.cursorreview. Non-promotable; no provider/backend/payment qualification.
+
+Independent aapt: packagecom.moolsocial.app.cursorreview; versionCode2026091401; versionName1.0.0-r66.20-cursorreview; launchablecom.moolsocial.app.MainActivity. apksigner verify exit0; certificateSHA256CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25 matches independently verified predecessor. Wrapper APK plugin-integrity check passed before artifact receipt. Future Kotlin-plugin compatibility warning recorded; no dependency change made. Installed predecessor stillr66.19/SHA25697750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7; no new installation or ticket closure yet.
+
+Retained candidate:apps/mobile/build/cursor-review-r66.20/apk/uaw-cursor-redmi-rv6-fixes-20260914-device-review-debug.apk. Durable archive:external evidence root/uaw-cursor-redmi-rv6-fixes-20260914-device-review-debug.apk. Exact generated build input and wrapper provenance retained externally. One-build authorization is consumed; do not invoke another build under this goal. Next: data-preserving adb install-r on RedmiTG8HCYTGGQT885OF only, installed-checksum readback, then scoped22verification. All device gates remain pending.
+
+| Artifact (external evidence root) | SHA256 |
+| --- | --- |
+| successor-apk-build.log | B49CC0C68EF1B6FCC67AAD4FF85BC9349BFC0A8CBA289B4B51D5BBA4AD0F404D |
+| successor-apk-build.exit.json | B9963776AE60975FBE077B266837B6A838A5CEF31F75EDFF62AB9CA820EAD298 |
+| successor-build-machine-state.json | D146F7F71CC99B52B0B0553887E4C984F785745AC4F99ED4B722061E273B0687 |
+| uaw-cursor-redmi-rv6-fixes-20260914-build-provenance.txt | AAC8E3665F300291C0D31D0C6DE9991DD260AE7C18D5217E467DBC5829C0B986 |
+| successor-apk-signer.log | DF32B0258C96DAD5939EEE4D72314434AEABE920199912E9976876C51166EE7D |
+| successor-apk-badging.log | A49512E1313AC297AA45FF60FE4A223AE512268BF6D691EC345DD7824FD2550D |
+| predecessor-apk-signer.log | DF32B0258C96DAD5939EEE4D72314434AEABE920199912E9976876C51166EE7D |
+| successor-wrapper-preflight-v2.log | 057A2B63C38ADE9687EC3E5AE558BB5A1B8C1D54854A5C98743C079C03ABCC1B |

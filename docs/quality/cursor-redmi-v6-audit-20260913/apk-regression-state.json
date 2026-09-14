@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "contractId": "APK-BUILD-REGRESSION-GATES-001",
-  "machineState": "built_installed_audit_pending",
+  "machineState": "built_pending_scoped_redmi",
   "buildAuthorization": "consumed",
   "preBuildValidation": {
     "evidence": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
@@ -9,23 +9,23 @@
   },
   "candidate": {
     "gateProfile": "uaw_cursor_ui_review_debug",
-    "versionCode": 2026091301,
-    "id": "UAW-CURSOR-REDMI-V6-REVIEW-20260913",
-    "versionName": "1.0.0-r66.19",
+    "versionCode": 2026091401,
+    "id": "UAW-CURSOR-REDMI-RV6-FIXES-20260914",
+    "versionName": "1.0.0-r66.20",
     "branch": "work/cursor-ui/redmi-v6-audit-20260913",
     "buildMode": "debug",
-    "head": "ae084c5ea03b569c4746c651b7f6f6d7b545beca"
+    "head": "32ebd7361fedf2224dae9cd89bb02337ca53286a"
   },
   "source": {
     "fileCount": 325,
     "manifestPath": "docs/quality/cursor-redmi-v6-audit-20260913/source-manifest.txt",
-    "manifestSha256": "3C71822A4E8051AA469D0F07D3C406BB314A46F883E99D322973A6066F87F797"
+    "manifestSha256": "97AB0C61A9B73F7E35E3C25DCA608AE38F373EAC59836B29AA60AA748B3794EB"
   },
   "requiredRuntimeDefines": {
     "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
     "MOOLSOCIAL_DEVICE_REVIEW": "true",
     "MOOLSOCIAL_USE_EMULATORS": "true",
-    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CURSOR-REDMI-V6-REVIEW-20260913"
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CURSOR-REDMI-RV6-FIXES-20260914"
   },
   "promotion": {
     "state": "forbidden_non_promotable"
@@ -127,18 +127,20 @@
     "policy": "config/buy-premium-motion-policy.json",
     "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
     "reused": [
-      "V6_UI_and_motion_unchanged"
+      "existing_finite_transitions_and_reduced_motion"
     ],
-    "applied": [],
-    "state": "existing_V6_reused_device_audit_pending",
+    "applied": [
+      "D014_route_completion_and_retained_scroll_lifetime_correction"
+    ],
+    "state": "scoped_local_checks_passed_Redmi_pending",
     "candidateContract": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
     "disposition": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
     "dependencyHeld": [
-      "Redmi_physical_motion_and_accessibility",
+      "scoped_Redmi_physical_motion_and_accessibility",
       "provider_backend_authority"
     ],
     "inapplicable": [
-      "new_motion_design"
+      "new_decorative_motion_design"
     ]
   },
   "postBuildGates": [
@@ -151,35 +153,26 @@
     },
     {
       "id": "installed-apk-checksum-equality",
-      "state": "passed",
-      "evidence": [
-        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
-      ]
+      "state": "pending",
+      "evidence": []
     },
     {
       "id": "redmi-data-preserving-upgrade",
-      "state": "passed",
-      "evidence": [
-        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
-      ]
-    },
-    {
-      "id": "redmi-cold-start-retained-state",
       "state": "pending",
       "evidence": []
     },
     {
-      "id": "redmi-public-buy-journeys",
+      "id": "redmi-RV6-D001-through-D022-recorded-reproductions",
       "state": "pending",
       "evidence": []
     },
     {
-      "id": "redmi-navigation-recovery-accessibility",
+      "id": "redmi-directly-affected-return-restoration",
       "state": "pending",
       "evidence": []
     },
     {
-      "id": "public-data-authority-mapping",
+      "id": "child-defects-and-original-disposition",
       "state": "pending",
       "evidence": []
     },
@@ -190,8 +183,17 @@
     }
   ],
   "qualificationLimits": [
-    "inherited_exact_V6_host_regressions_not_new_device_passes",
-    "83_skips_and_additional_reference_exclusions",
-    "privacy_payment_and_provider_limits_remain"
-  ]
+    "21_code_corrections_D019_evidence_reconciliation_all22_device_acceptance_pending",
+    "27_inherited_capture_skips_not_passes",
+    "privacy_payment_provider_backend_limits_remain",
+    "no_broad_retest_of_frozen514_passes",
+    "no_children_implementation_or_second_APK_authorized"
+  ],
+  "artifact": {
+    "sha256": "7734E316D215809C012FCB961204E46B49C3514DFACBC478600D507D33DC89B8",
+    "bytes": 210801229,
+    "package": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r66.20-cursorreview",
+    "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25"
+  }
 }
