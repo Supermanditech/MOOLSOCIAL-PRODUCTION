@@ -2412,12 +2412,13 @@ void main() {
           );
           await tester.ensureVisible(add);
           await tester.pumpAndSettle();
+          final card = find.byKey(ValueKey('buy-product-$id'));
+          final compactSize = tester.getSize(card);
           expect(add.hitTestable(), findsOneWidget);
           await tester.tap(add);
           await tester.pumpAndSettle();
           final product = session.product(id);
           expect(session.quantityFor(id), product.minimumOrder);
-          final card = find.byKey(ValueKey('buy-product-$id'));
           final plus = find.descendant(
             of: card,
             matching: find.byTooltip('Add one'),
@@ -2455,8 +2456,18 @@ void main() {
           expect(session.view, BuyV2View.catalogue);
           expect(offers, findsOneWidget);
           expect(state.mounted, isTrue);
-          expect(state.position.pixels, closeTo(offset, .1));
-          expect(tester.getTopLeft(card).dy, closeTo(cardTop, .1));
+          // Compaction may reduce the scroll range at its end. Require only
+          // the normal extent clamp, never an unrelated scroll reset.
+          expect(
+            state.position.pixels,
+            closeTo(offset.clamp(state.position.minScrollExtent,
+                state.position.maxScrollExtent), .1),
+          );
+          expect(tester.getSize(card), compactSize);
+          expect(
+            tester.getTopLeft(card).dy + state.position.pixels,
+            closeTo(cardTop + offset, .1),
+          );
           expect(add.hitTestable(), findsOneWidget);
           expect(
             find.byKey(const ValueKey('buy-mini-cart-drag-handle')),

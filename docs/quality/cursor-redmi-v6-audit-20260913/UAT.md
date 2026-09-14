@@ -2878,3 +2878,22 @@ Five cart checks plus five supplier checks pass; all4 prior Wholesale failures r
 | wholesale-subtotal-regression.log | 12A6A81125E84B7DDC97D8D2E8253E19B9B427AFF8C7154E900E641F09492F98 |
 | wholesale-supplier-identity.log | C90ADD917103F4BAE30719A83D49E2E38B579FA330E604C78C5A01082612BC82 |
 | wholesale-contract-analysis.log | B07C8539600EE0AC72232BC73584852B77F1FB1EAD42C5DB4A02058E8F00CF6F |
+
+
+## D021 Offers compact-grid return qualification - 2026-09-14
+
+Parent84101a16083b065bd822ec09c35a6ef22d5dc732. Test-only reconciliation in scoped_cart_checkout_dock_continuity_test. The two failures were scroll-offset clamping after D021 removes quantity-control height, not a missing product or broken Add. The old assertions required an offset beyond the compact grid maximum and an unchanged viewport top simultaneously. Final test requires exact original empty-card size, exact min/max extent clamping of the previous scroll offset, unchanged card origin in scroll-content coordinates, same product/Add hit target, Offers destination and successful re-add with exact quantity. No application change or free positional tolerance.
+
+First retained attempt incorrectly addressed viewport top before scroll clamp; second proved clamp but still expected unchanged viewport top. Both logs retained as failed test reconciliation attempts. Final12 cases pass across320/430/640 sizes and100/200% text. Separate visual replay2pass overlaps12; four actual Flutter before/after captures inspected, compact Add visible and readable for tomato and notebook at320x700/200%. Missing-media fallback in local fixture is visible; no provider-media qualification claimed. Focused analysis zero issues. All30 original combined failures now have focused reconciliation passes (six through D014 product correction, remaining24 through recorded contract/fixture corrections); the final full combined run is still required. No APK or device closures.
+
+| Artifact | SHA256 |
+| --- | --- |
+| offers-compact-continuity.log | F01E1163981D45BA4A7F74B9D710CAE2CC363CFC9F2F746E2386F2168B8F0534 |
+| offers-compact-continuity-v2.log | 758DDA447FBC548C260790986A04BE3B68D6F5373A0870CAAE726DDB3D19F5B6 |
+| offers-compact-continuity-v3.log | EA00A3EA41F2390A6C54AED7C47174FBFA445D658197581B8AD773892B5C6035 |
+| offers-compact-analysis.log | 35A681DEACFCF03ABFBD1FF3D12EBB19D3E619F1175935C45ACF896835B4D2F8 |
+| offers-compact-visuals.log | E17C97B314C6089CE9F9F5CB29ADFE497E01A586730626797A842B5A99835522 |
+| offers-compact-visuals/r5-offers-s-tomato-320-700-2.0-after.png | 7DD065FC9DDC6FE4FA58C150489D9A8EE1DC4DC639750FAF9E192038B8671E2B |
+| offers-compact-visuals/r5-offers-s-tomato-320-700-2.0-before.png | F821615CED38A0425DFADD9260ACF09E50A12700E67BAB428D2334F0BB3E8BC2 |
+| offers-compact-visuals/r5-offers-w-notebook-320-700-2.0-after.png | ACF41E6D398ADD3404D8A670FE80702BDED0681445BC675C253DF7BF58A82BA5 |
+| offers-compact-visuals/r5-offers-w-notebook-320-700-2.0-before.png | D5EA03CD291078254B137AFA063B97B84B414B646EA9D2F307F3098976BFA492 |
