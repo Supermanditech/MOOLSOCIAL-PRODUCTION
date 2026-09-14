@@ -1526,3 +1526,25 @@ fresh successor admission follow; combined candidate checks, one APK, OPPO and
 founder visual approval are still outstanding. Local fixtures/projections do not
 qualify authenticated backend enforcement, live payments, storage/privacy or
 independent cash/bank authority.
+
+### Exact V21 Ledger successor admission pins
+
+The combined Ledger implementation is sealed and remote-equal at
+7273cb4a650b9b6cb0c865f2adfe9d07559961c4. Its apps tree is
+a953dd7387ccba300e00227f3ba006da2b4f8a48. Under the founder's standing authorization
+for necessary bounded admission, only fifteen literal candidate/source pin lines
+advance in the three existing admission scripts: coordination, protected Buy
+review source and approved native UI locks. No assertion, ownership record,
+native implementation hash, ancestry or unchanged-boundary check is relaxed.
+Original checker copies/hashes, the exact diff check, positive checks and rejected
+wrong-source check are preserved in outputs/store-ledger-mvp/v21-admission.
+Approved UI locks and exact-source protected review checks pass; the latter still
+reports acceptedBaseline=false, productionPromotion=false, backendQualified=false.
+
+Fresh destination: integration/moolsocial/store-buy-final-v21-20260914 at
+C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v21-20260914.
+It starts from unchanged work-start c2a65ac51ed58174754b9b07f2223583c48500b3 and
+admits the pin-only source successor through the existing two-parent merge process.
+V20 and its tested source/candidate evidence remain preserved. No new application,
+backend, contract or test change is included in this admission-only checkpoint.
+The new candidate, APK, OPPO and founder acceptance remain pending.
