@@ -10261,6 +10261,14 @@ void main() {
   }
 
   final d014Cases = [
+    for (final id in ['s-dog-food', 'w-notebook'])
+      for (final scale in [1.0, 2.0])
+        (
+          id: id,
+          overlay: 'repeat-store',
+          scale: scale,
+          orderId: 'MS-240782',
+        ),
     for (final scale in [1.0, 2.0])
       (
         id: 's-dog-food',
@@ -10320,6 +10328,40 @@ void main() {
         expect(session.addProduct('s-milk'), isTrue);
         session.toggleSaved('s-milk');
         final addressId = session.selectedAddress.id;
+        if (entry.overlay == 'repeat-store') {
+          var firstReplyReceived = false;
+          final firstDelivery = tester.binding.defaultBinaryMessenger
+              .handlePlatformMessage(
+                SystemChannels.navigation.name,
+                SystemChannels.navigation.codec.encodeMethodCall(
+                  MethodCall('pushRouteInformation', {
+                    'location':
+                        'https://moolsocial.com/app/buy/order/${entry.orderId}',
+                    'state': null,
+                  }),
+                ),
+                (_) => firstReplyReceived = true,
+              );
+          await tester.pumpAndSettle();
+          await firstDelivery;
+          expect(firstReplyReceived, isTrue);
+          expect(session.view, BuyV2View.tracking);
+          await tester.tap(
+            find.byKey(
+              ValueKey(
+                shop
+                    ? 'moolsocial-family-root-buy-tap'
+                    : 'buy-local-tab-wholesale',
+              ),
+            ),
+          );
+          await tester.pumpAndSettle();
+          expect(session.view, BuyV2View.catalogue);
+          expect(
+            session.destination,
+            shop ? BuyV2Destination.shop : BuyV2Destination.wholesale,
+          );
+        }
         if (entry.overlay == 'recent-other-return') {
           // Recently viewed opens a temporary product route. Its pending
           // return must not restore browsing over a newer platform link.
@@ -10446,7 +10488,8 @@ void main() {
           unorderedEquals(savedIds),
         );
         expect(session.selectedAddress.id, addressId);
-        if ((shop && entry.overlay.endsWith('other-return')) ||
+        if (entry.overlay == 'repeat-store' ||
+            (shop && entry.overlay.endsWith('other-return')) ||
             missingOrder ||
             (!shop && entry.overlay == 'full')) {
           await captureR66Visual(

@@ -1945,6 +1945,18 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     } else {
       widget.session.openDestination(destination);
     }
+    final router = GoRouter.maybeOf(context);
+    if (widget.orderId != null &&
+        destination != BuyV2Destination.medicine &&
+        router?.routeInformationProvider.value.uri.path.startsWith(
+              '/app/buy/order/',
+            ) ==
+            true) {
+      // Leaving an order must also leave its URL. Otherwise another native
+      // delivery of that same order URL is treated as the current route while
+      // the customer is browsing a product or Store over it.
+      router!.replace('/app/buy?sub=${destination.name}');
+    }
   }
 
   void _openOffers() {

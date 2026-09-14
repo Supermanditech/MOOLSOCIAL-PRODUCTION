@@ -2430,8 +2430,8 @@ if ($ProductionLane -ceq 'baseline') {
       # exact seven-file source delta within the existing owner claim only.
       # This admits local qualification, not a build or device acceptance.
       $fixtureHashes = @{
-        'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' = 'C00636022B4C0AEC1CB662F4D2FE28C0B20366358BE9E1E19CE7329848BE4CCA'
-        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = 'D62D9770DCE5F7075BF141AAF56202A5270AE54E1C030FCCE437F605076963B8'
+        'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' = '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
+        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = '5F3629A79FCC623CAF2670458D9FDCF4BFDE1190DF9DBFB0AEB46E92CBB18243'
         'apps/mobile/lib/main.dart' = '5FE1A6762CBB516D4935AACABF5DA0A81D0307ABD78EA96026335659AEB196EB'
         'apps/mobile/lib/app/ui_review_language_store.dart' = '30816600AEDA842CBE06BBF38B11F6EA79D41679A03D3F8CF31BF9C975372A74'
         'apps/mobile/test/app/ui_review_language_store_test.dart' = '921F901A32EE5A5BEB905CF07F8E05E1C7B9ED97D38A912B96631E0D17494A3F'

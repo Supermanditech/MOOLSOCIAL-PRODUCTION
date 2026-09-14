@@ -150,7 +150,29 @@
       "RV6-D021",
       "RV6-D022"
     ],
-    "deviceQualified": ["RV6-D001", "RV6-D002", "RV6-D003", "RV6-D004", "RV6-D005", "RV6-D006", "RV6-D007", "RV6-D008", "RV6-D009", "RV6-D010", "RV6-D011", "RV6-D012", "RV6-D013", "RV6-D015", "RV6-D016", "RV6-D017", "RV6-D018", "RV6-D019", "RV6-D020", "RV6-D021", "RV6-D022"],
+    "deviceQualified": [
+      "RV6-D001",
+      "RV6-D002",
+      "RV6-D003",
+      "RV6-D004",
+      "RV6-D005",
+      "RV6-D006",
+      "RV6-D007",
+      "RV6-D008",
+      "RV6-D009",
+      "RV6-D010",
+      "RV6-D011",
+      "RV6-D012",
+      "RV6-D013",
+      "RV6-D015",
+      "RV6-D016",
+      "RV6-D017",
+      "RV6-D018",
+      "RV6-D019",
+      "RV6-D020",
+      "RV6-D021",
+      "RV6-D022"
+    ],
     "remainingLocal": [],
     "newApkBuilt": true,
     "deviceTestingStarted": true,
@@ -201,7 +223,9 @@
     "historicalAudit": "Top-level audit, coverage, preservation and original requirements retain the frozen full-audit checkpoint; they are not current successor build status or an exhaustive production qualification.",
     "originalCount": 22,
     "deviceClosedCount": 21,
-    "deviceOpen": ["RV6-D014"],
+    "deviceOpen": [
+      "RV6-D014"
+    ],
     "d014Correction": {
       "status": "implemented_locally_qualified_device_open",
       "cause": "Old temporary product route restores Shop browsing after a newer order route is applied.",
@@ -222,7 +246,7 @@
         "id": "UAW-CURSOR-REDMI-RV6-D014-20260914",
         "versionName": "1.0.0-r66.23",
         "versionCode": 2026091404,
-        "status": "built_installed_checksum_equal_native_device_acceptance_blocked",
+        "status": "installed_original_native_case_passed_repeated_link_device_failure",
         "sourceHead": "1d5c4be97dc13874af1f4348156782339ecacf60",
         "apkSha256": "D59EADBB5A57568F91FED9319602BBC84E3B04831CF756534C3526EC0EDF512F",
         "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
@@ -233,13 +257,25 @@
         "dataClearPerformed": false,
         "ordinaryDeviceChecks": "Store/product/Recently viewed returns pass; original saved wheat product and Home/Work addresses with Work selected remain; Quick Shop and font scale 1.0 restored; language and Cart not changed",
         "evidence": "PREBUILD.md D014 corrective r66.23 prebuild qualification",
-        "finalHandoff": "historical_commit_label_failure_not_waived"
+        "finalHandoff": "historical_commit_label_failure_not_waived",
+        "nativeDeviceResult": "Original nested Store return passes; same URL delivered after returning to Shop and opening Store leaves Store visible. Other planned native cases pending."
       },
       "successorBuilt": true
     },
-    "externalLinkDeliveryUnverified": ["RV6-D014"],
-    "externalBlocker": "r66.23 D014 ACTION_VIEW launch was rejected before process creation with blocked by policy. Earlier r66.22 approval-capable native executions remain valid but do not permit bypassing this new denial; current tools prohibit sandbox_permissions. No alternate launcher/email/browser/tool used. Exact action and evidence are in UAT.md and rv6-d014-final-20260914/native-01-original-approval-denial.txt. Separate historical commit-label handoff failure remains unresolved.",
-    "children": [{"id": "RV6-D005-C01", "parent": "RV6-D005", "status": "implemented_device_verified_closed", "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34", "evidence": "UAT.md r66.22 device closure section; EVIDENCE.csv rv622 captures", "limits": "Signed-out Redmi review lane: Hindi and English selected radios and summaries persist across separate cold processes; affected Personal profile returns checked; Hindi glyph and honest English-screen disclosure visually reviewed. Original English restored. No claim of Buy translation or production qualification."}],
+    "externalLinkDeliveryUnverified": [
+      "RV6-D014"
+    ],
+    "externalBlocker": null,
+    "children": [
+      {
+        "id": "RV6-D005-C01",
+        "parent": "RV6-D005",
+        "status": "implemented_device_verified_closed",
+        "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34",
+        "evidence": "UAT.md r66.22 device closure section; EVIDENCE.csv rv622 captures",
+        "limits": "Signed-out Redmi review lane: Hindi and English selected radios and summaries persist across separate cold processes; affected Personal profile returns checked; Hindi glyph and honest English-screen disclosure visually reviewed. Original English restored. No claim of Buy translation or production qualification."
+      }
+    ],
     "currentInstalledVersion": "1.0.0-r66.23-cursorreview",
     "currentInstalledVersionCode": 2026091404,
     "finalSuccessor": {
@@ -255,8 +291,29 @@
       "childDeviceVerification": "D005-C01_closed_on_Redmi_20260914_under_subsequent_founder_goal",
       "evidence": "UAT.md final r66.22 delivery and subsequent device closure sections"
     },
-    "sourceBaseline": "locally_qualified_two_combined_cycles_analysis_and_source_gates_passed_see_PREBUILD.md",
+    "sourceBaseline": "Prior r66.23 baseline remains preserved in PREBUILD.md; repeated-link correction has focused qualification only, with combined source baseline pending.",
     "integration": "not_authorized",
-    "productionQualification": "not_established"
+    "productionQualification": "not_established",
+    "nativeApprovalResumption": {
+      "status": "two_declared_actions_approved_and_executed",
+      "evidence": "rv6-d014-final-20260914/native-approved-resume-receipts.json",
+      "priorDenial": "preserved; superseded by supported require_escalated review after environment change",
+      "limits": "No blanket permission inferred for later launches"
+    },
+    "d014RepeatedLinkCorrection": {
+      "status": "implemented_locally_qualified_device_open",
+      "deviceOccurrence": "r66.23 captures037/038 are identical after Android reports native delivery; capture039 shows product on Back rather than order",
+      "cause": "Buy destination navigation changes session but retains the prior order URL, so repeated native delivery is treated as the current route",
+      "correction": "Buy-owned destination navigation leaves the order URL when the customer selects Shop, Wholesale or Orders; retain Medicine and unrelated routes",
+      "scope": "Additional occurrence of RV6-D014; no new child or owner expansion",
+      "reproduction": "2 focused cases fail before correction at 100/200 percent text",
+      "localQualification": "25 D014 matrix cases and340 affected screen tests pass (overlapping); full analysis no issues; four new actual Flutter captures visually reviewed",
+      "visuals": "Four new Shop/Wholesale repeated-link Flutter captures at100/200 percent visually reviewed",
+      "installed": false,
+      "successorBuilt": false,
+      "requiredNext": "Finish local qualification, exact source admission, combined cycles and existing gates; only then uniquely identify a corrective successor and perform remaining Redmi native checks",
+      "sourceSha256Normalized": "97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C",
+      "testSha256Normalized": "5F3629A79FCC623CAF2670458D9FDCF4BFDE1190DF9DBFB0AEB46E92CBB18243"
+    }
   }
 }
