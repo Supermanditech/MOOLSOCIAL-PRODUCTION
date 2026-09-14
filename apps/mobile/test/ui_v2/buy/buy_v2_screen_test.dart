@@ -10261,6 +10261,13 @@ void main() {
   }
 
   final d014Cases = [
+    for (final scale in [1.0, 2.0])
+      (
+        id: 's-dog-food',
+        overlay: 'recent-other-return',
+        scale: scale,
+        orderId: 'MS-240782',
+      ),
     for (final id in ['s-dog-food', 'w-notebook'])
       for (final overlay in ['store', 'other-open', 'other-return', 'full'])
         for (final scale in [1.0, 2.0])
@@ -10313,7 +10320,16 @@ void main() {
         expect(session.addProduct('s-milk'), isTrue);
         session.toggleSaved('s-milk');
         final addressId = session.selectedAddress.id;
-        expect(session.openProduct(entry.id), isTrue);
+        if (entry.overlay == 'recent-other-return') {
+          // Recently viewed opens a temporary product route. Its pending
+          // return must not restore browsing over a newer platform link.
+          final visit = tester
+              .widget<BuyV2CatalogueView>(find.byType(BuyV2CatalogueView))
+              .onVisitProduct!;
+          unawaited(visit(session.product(entry.id), 'Recently viewed'));
+        } else {
+          expect(session.openProduct(entry.id), isTrue);
+        }
         await tester.pumpAndSettle();
         final storeAction = find.byKey(
           ValueKey(
@@ -10343,7 +10359,7 @@ void main() {
         final storeSheet = find.byKey(ValueKey('$prefix-sheet-${entry.id}'));
         expect(storeSheet, findsOneWidget);
         final visitedStoreIds = <String>{entry.id};
-        if (entry.overlay.startsWith('other-')) {
+        if (entry.overlay.contains('other-')) {
           final other = session
               .otherStorePreviewsFor(session.product(entry.id))
               .first;
@@ -10364,7 +10380,7 @@ void main() {
             find.byKey(ValueKey('$prefix-sheet-${other.id}')),
             findsOneWidget,
           );
-          if (entry.overlay == 'other-return') {
+          if (entry.overlay.endsWith('other-return')) {
             await tester.binding.handlePopRoute();
             await tester.pumpAndSettle();
             expect(storeSheet, findsOneWidget);
@@ -10430,7 +10446,7 @@ void main() {
           unorderedEquals(savedIds),
         );
         expect(session.selectedAddress.id, addressId);
-        if ((shop && entry.overlay == 'other-return') ||
+        if ((shop && entry.overlay.endsWith('other-return')) ||
             missingOrder ||
             (!shop && entry.overlay == 'full')) {
           await captureR66Visual(

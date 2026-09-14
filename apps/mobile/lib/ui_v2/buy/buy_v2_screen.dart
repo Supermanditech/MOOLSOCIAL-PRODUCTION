@@ -2322,6 +2322,12 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
     final generation = _storeNavigationGeneration;
     final navigation = MoolGlobalNavigationController();
     final routeDepth = ++_storeProductRouteDepth;
+    // A platform link can replace the Buy route while its old State is still
+    // mounted. Invalidate this temporary return at the router boundary too.
+    final routeInformation = GoRouter.maybeOf(context)?.routeInformationProvider;
+    var routeChanged = false;
+    void onRouteChanged() => routeChanged = true;
+    routeInformation?.addListener(onRouteChanged);
     final openCart = await Navigator.of(context).push<bool>(
       PageRouteBuilder<bool>(
         settings: const RouteSettings(name: 'buy-store-product'),
@@ -2528,11 +2534,13 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
           );
         },
       ),
-    );
+    ).whenComplete(() => routeInformation?.removeListener(onRouteChanged));
     _storeProductRouteDepth--;
     if (!mounted) return openCart ?? false;
     setState(() {});
-    if (generation != _storeNavigationGeneration || widget.session != session) {
+    if (routeChanged ||
+        generation != _storeNavigationGeneration ||
+        widget.session != session) {
       return false;
     }
     restoreOrigin();
