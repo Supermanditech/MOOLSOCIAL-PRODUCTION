@@ -2810,3 +2810,13 @@ Eight formerly failing cases pass at320/360/430 widths and640x360, each100/200% 
 | distinct-description-regression.log | E72CF672BA6DA3E5FA28F87AF8E00A797B38B0D899619877F3A6302CEB13C80D |
 | distinct-description-analysis.log | 8C74C00C01DE74A2B98D3635A1F9D87316168732D58E0223101BA68B964C936C |
 | description-helper-continuity.log | D421AF186999DE9A50850C59E5A19358D3544EEEED3E76D254E8767CCE33C082 |
+
+
+## D003 order-address estimate regression reconciliation - 2026-09-14
+
+Test-only correction on parentd67d269d25cfc3376cc95447f7849b7735e1428f. The three-order-family test now explicitly requires Last recorded estimate before the stored promise and rejects the bare unqualified promise. This matches approved D003 freshness semantics without calling the UI formatter under test. All immutable order/address/recipient, accessibility, future-only address editing and return assertions remain. Full file10passed/1skipped; skip is the existing optional founder-capture case, not a functional pass. Focused analysis zero issues. No application change or device closure. Fifteen original combined failures remain to reconcile before final combined qualification.
+
+| Artifact | SHA256 |
+| --- | --- |
+| order-address-estimate-regression.log | A948746353817A909F5B3577A0567DFDF4BC686A926F6F2EFF8A61584D68A9F7 |
+| order-address-estimate-analysis.log | 085C7C220F1922063D981ACC68BE09658BA7912CDF66424C0BC18031F7E366A6 |
