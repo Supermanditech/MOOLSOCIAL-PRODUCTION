@@ -9578,6 +9578,121 @@ void main() {
     }
   }
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'RV6 D016 real app offer alert opens Offers and returns text $scale',
+      (tester) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = const Size(390, 844);
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.view.reset);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final journey = JourneySession(
+          store: MemoryJourneyStore(
+            snapshot: const JourneySnapshot(
+              languageCode: 'en',
+              areaMode: 'manual',
+              areaLabel: 'Sardarpura',
+              setupComplete: true,
+            ),
+          ),
+          otpGateway: ReviewOtpGateway(signedIn: true),
+        );
+        addTearDown(journey.dispose);
+        await journey.start();
+        await tester.pumpWidget(
+          r66VisualCaptureRoot(
+            MoolSocialApp(
+              session: journey,
+              initialLocation: '/app/buy?sub=shop',
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final session = tester
+            .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+            .session;
+        expect(session.addProduct('s-milk'), isTrue);
+        final saved = session
+            .savedProductsFor(BuyV2Destination.shop)
+            .map((p) => p.id)
+            .toList();
+        final address = session.selectedAddress.id;
+        unawaited(
+          showBuyV2ShoppingAlerts(
+            tester.element(find.byType(BuyV2Screen)),
+            session,
+          ),
+        );
+        await tester.pumpAndSettle();
+        final alerts = find.byKey(const ValueKey('buy-shopping-alerts'));
+        final alert = find.byKey(
+          const ValueKey('buy-shopping-alert-offers-shop'),
+        );
+        final scroll = find
+            .descendant(of: alerts, matching: find.byType(Scrollable))
+            .first;
+        await tester.scrollUntilVisible(alert, 160, scrollable: scroll);
+        await tester.pumpAndSettle();
+        for (var visit = 0; visit < 2; visit++) {
+          await Scrollable.ensureVisible(tester.element(alert), alignment: .5);
+          await tester.pumpAndSettle();
+          expect(alert.hitTestable(), findsOneWidget);
+          await tester.tap(alert);
+          await tester.pumpAndSettle();
+          expect(find.byType(BuyV2OffersView), findsOneWidget);
+          expect(
+            find.byKey(const ValueKey('buy-offers-publisher-summary')),
+            findsOneWidget,
+          );
+          expect(session.quantityFor('s-milk'), 1);
+          if (visit == 0) {
+            await captureR66Visual(tester, 'rv6-d016-offers-text-$scale');
+          }
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(alerts, findsOneWidget);
+          expect(alert.hitTestable(), findsOneWidget);
+          expect(session.quantityFor('s-milk'), 1);
+          expect(session.selectedAddress.id, address);
+          expect(
+            session.savedProductsFor(BuyV2Destination.shop).map((p) => p.id),
+            saved,
+          );
+        }
+        await captureR66Visual(tester, 'rv6-d016-alert-return-text-$scale');
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
+  for (final offers in [true, false]) {
+    testWidgets(
+      'RV6 D016 initial Offers flag renders before session notification $offers',
+      (tester) async {
+        final session = BuyV2Session(core: BuySession());
+        addTearDown(session.dispose);
+        await tester.pumpWidget(
+          MaterialApp(
+            theme: MoolTheme.light(),
+            home: BuyV2Screen(session: session, initialOffersActive: offers),
+          ),
+        );
+        expect(
+          find.byType(BuyV2OffersView),
+          offers ? findsOneWidget : findsNothing,
+        );
+        await tester.pumpAndSettle();
+        expect(
+          find.byType(BuyV2OffersView),
+          offers ? findsOneWidget : findsNothing,
+        );
+        expect(session.cartLines, isEmpty);
+        expect(tester.takeException(), isNull);
+      },
+    );
+  }
+
   final d014Cases = [
     for (final id in ['s-dog-food', 'w-notebook'])
       for (final overlay in ['store', 'other-open', 'other-return', 'full'])

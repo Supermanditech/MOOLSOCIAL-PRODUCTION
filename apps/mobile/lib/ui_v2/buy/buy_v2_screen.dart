@@ -387,6 +387,9 @@ class _BuyV2ScreenState extends State<BuyV2Screen> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    // Render the requested Offers surface on the first frame. Deferred session
+    // restoration may not notify when its catalogue state is already current.
+    _offersActive = widget.initialOffersActive;
     WidgetsBinding.instance.addObserver(this);
     _foreground =
         WidgetsBinding.instance.lifecycleState == null ||

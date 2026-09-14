@@ -2518,3 +2518,26 @@ Retained capture inventory, relative to `C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR
 | qualified/rv6-d015-w-notebook-row-text-1.0.png | 59ECCF8D064F0F8A6894F50FFC0490EB129B0D25F09196BEAE2774D135AF97F2 |
 | qualified/rv6-d015-w-notebook-row-text-2.0.png | E88AE70A28AD9AF4A0BAB5FF2CC9F6D3915EB0AA18B50C6BD83560D9D1B466B4 |
 | visual-focused.log | A0E31B0F627B54614CB033A447022649C43CF5B8A4146FD63F7B417DBF67B1E6 |
+
+## RV6-D016 local qualification - 2026-09-14
+
+- Scope: original510,516-518 New Shop offers alert opened ordinary catalogue instead of Offers; return to alerts already worked. Start0c10682b9c5e6955e5cf845de8897090b95f60d4 after D015 commit/push, clean exact live remote equality and handoff pass. Existing36-owner implementation gate passed7088c9 terminal0; no admission or governance work.
+- Source inspection confirmed buyV2ShoppingAlertLocation already generates /app/buy?sub=offers and journey_router already passes initialOffersActive. No route parameter or shared router change needed. BuyV2Screen initialized _offersActive=false, rendered, then assigned the explicit flag in a post-frame callback without guaranteeing another build when restored session catalogue state was unchanged. The new real MoolSocialApp alert test reproduced no BuyV2OffersView at normal text, while200% passed; baseline-reproduction.log,28483 terminal1/656469. That differing result is retained, not represented as two baseline failures.
+- Minimal source owner apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart: initialize _offersActive from widget.initialOffersActive in initState before the first build. Existing deferred session restoration, route updates, Offers UI, catalogue data, price/eligibility rules and alert-return context remain unchanged. No session/router/backend/native/policy/checker change.
+- Test owner apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: two real-app390x844 cases at100/200% use the actual New Shop offers alert twice, assert the actual Offers widget and publisher content, Android Back to the same visible alert, retained Cart quantity, exact Saved IDs and selected address. Two first-frame tests directly assert explicit Offers=true and ordinary Shop=false both before session notifications and after settling. Test setup opens the existing alert sheet directly; physical Shopping settings entry516 remains part of the scoped successor device verification. No test claims live offer/provider validity from review fixtures.
+- Initial source fix2passed (70139 terminal0/8e2801). Final4focused cases passed (69016 terminal0/694150,final-focused.log). Four actual Flutter captures inspected: Offers destination and alert return at100/200%. Scope is correct destination/return and readable fit; missing supplier-media placeholders at200% are not evidence of provider delivery. A test-only missing-braces lint was corrected; original analysis.log retained. Final analysis of both owners: zero issues (9eb34a terminal0,final-analysis.log).
+- Final connected regression: flutter test --no-pub test/ui_v2/buy/buy_v2_screen_test.dart test/ui_v2/buy/buy_v2_shopping_alerts_test.dart --reporter expanded;327passed/0failures (90040 terminal0/a5f9f0; result output3d7980). Includes the four focused cases, prior Buy corrections, alert identity/return paths and compact fit. Counts overlap. Diff check passed; unrelated formatter changes removed, prior test bodies preserved.
+- No APK/device action or closure. D016 remains open pending checksum-bound successor Redmi510,516-518 and directly affected Offers entry/return. Frozen514 records/1177 artifacts unchanged; no broad audit, backend, OPPO, integration or child implementation. Artifact root: C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/rv6-d016-local-20260914.
+
+| Artifact | SHA256 |
+| --- | --- |
+| analysis.log | 29DD516F334704E52022AD4738163B04BD7311D1E4A8EAE7A330E26B50D68DE7 |
+| baseline-reproduction.log | 69B306AAD4F2E91F93E9CF320E48F6A5A1CA2F64EBAFFFFBD8350B18883E0E75 |
+| connected-regression.log | 8F127DCF5106008B0246CE40A3908371834939C681F4E6AB4CDF7B0845D20713 |
+| final/rv6-d016-alert-return-text-1.0.png | A3A1D3298A206E652951B475111D66891E406CCD79CE3BBD2D5EB01117725F6D |
+| final/rv6-d016-alert-return-text-2.0.png | E7A4BEFF5B5050165E8ABE64A98FF9E2A8DAC267F8F6123E112430361E28EB83 |
+| final/rv6-d016-offers-text-1.0.png | 58688DE62E5A9358E58EFB50BC085A21EB9E9C944593DC5A4FF27CEB0E68D3C9 |
+| final/rv6-d016-offers-text-2.0.png | 7D5A6CDA9CD9CC89D7220B22EEAECAC9874D00B5B38FE57FBD45BC23F7BDD665 |
+| final-analysis.log | 0AAAC678E2EC6742F989EFF375243869EA2A4299C4E378008E0E70A592E8E838 |
+| final-focused.log | D8010A2415776CFC12237F1F89D5416D5AB936078CB12EB5C4DE48ADF65BD273 |
+| initial-offers-fix.log | 940D784FA6E82F1321EFF44F573CAD3113F164AF589CC116D8AC869E90F4D0A3 |
