@@ -91,7 +91,7 @@
     }
   ],
   "nextWork": [
-    "Finish combined regressions, analysis and unchanged release gates for committed D005-C01 source 3c30ba11521db6bb1a1ec6995b181a81df1a6b34; seal qualified source baseline and exact remote equality.",
+    "Publish qualified source baseline: two2337pass/27skip/zero-failure combined cycles, zero-issue analysis and required source gates passed; application source3c30ba11521db6bb1a1ec6995b181a81df1a6b34.",
     "Build one uniquely identified final Cursor Review successor and install preserving data on Redmi TG8HCYTGGQT885OF only; report remaining device acceptance then stop. New-APK child testing requires a subsequent instruction."
   ],
   "preservation": {
@@ -208,6 +208,7 @@
     "currentInstalledVersion": "1.0.0-r66.21-cursorreview",
     "currentInstalledVersionCode": 2026091402,
     "finalSuccessor": "not_yet_built",
+    "sourceBaseline": "locally_qualified_two_combined_cycles_analysis_and_source_gates_passed_see_PREBUILD.md",
     "integration": "not_authorized",
     "productionQualification": "not_established"
   }
