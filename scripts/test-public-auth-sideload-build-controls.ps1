@@ -499,7 +499,7 @@ $nativeExitCheckPatterns = @(
   '\$branch = git -C \$repositoryRoot branch --show-current\s+if \(\$LASTEXITCODE',
   '\$accessToken = \(& \$gcloudSource auth print-access-token --quiet\)\.Trim\(\)\s+if \(\$LASTEXITCODE',
   '& flutter pub get --enforce-lockfile\s+if \(\$LASTEXITCODE',
-  '& flutter test --no-pub --reporter json `\r?\n\s+--dart-define-from-file \$runtimeDefineFile `\r?\n\s+test/work_workspace_layout_safety_test\.dart `\r?\n\s+--plain-name ''STOREBACK01 full app Restock Bulk native Back lifecycle'' `\r?\n\s+1> \$navigationLog\s+if \(\$LASTEXITCODE',
+  '& flutter test --no-pub --reporter json `\r?\n\s+--dart-define-from-file \$runtimeDefineFile `\r?\n\s+test/work_workspace_layout_safety_test\.dart `\r?\n\s+--name ''\^STOREBACK0\[12\] '' `\r?\n\s+1> \$navigationLog\s+if \(\$LASTEXITCODE',
   '\$head = git -C \$repositoryRoot rev-parse HEAD\s+if \(\$LASTEXITCODE'
 )
 $nativeExitChecksBound = @($nativeExitCheckPatterns | Where-Object {
@@ -1007,6 +1007,12 @@ $navigationProbe = [scriptblock]::Create($navigationBlocks[0].Extent.Text)
     @{type='testStart'; test=@{id=1;name=$name}} | ConvertTo-Json -Compress
     @{type='testDone';testID=1;result='success';skipped=($case -ceq 'skipped')} |
       ConvertTo-Json -Compress
+    if ($case -cne 'missing-sku-test') {
+      @{type='testStart';test=@{id=2;name='STOREBACK02 SKU count overlapping loading transitions and exit'}} |
+        ConvertTo-Json -Compress
+      @{type='testDone';testID=2;result='success';skipped=($case -ceq 'skipped-sku-test')} |
+        ConvertTo-Json -Compress
+    }
     if ($case -cne 'missing-terminal') {
       @{type='done';success=$true} | ConvertTo-Json -Compress
     }
@@ -1015,7 +1021,8 @@ $navigationProbe = [scriptblock]::Create($navigationBlocks[0].Extent.Text)
     }
   }
   foreach ($case in @('passed','process-failed','wrong-test','skipped',
-      'missing-terminal','duplicate-terminal','stale-evidence')) {
+      'missing-terminal','duplicate-terminal','stale-evidence',
+      'missing-sku-test','skipped-sku-test')) {
     $artifactRoot = Join-Path ([IO.Path]::GetTempPath()) (
       'moolsocial-store-navigation-probe-' + [guid]::NewGuid().ToString('N')
     )

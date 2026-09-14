@@ -17289,131 +17289,290 @@ void main() {
       expect(work.loadStoreReviewSeed(1000), isFalse);
     });
   } else {
+    testWidgets(
+      'STOREBACK02 SKU count overlapping loading transitions and exit',
+      (tester) async {
+        final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+        SharedPreferencesAsyncPlatform.instance =
+            InMemorySharedPreferencesAsync.empty();
+        addTearDown(
+          () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+        );
+        const storageChannel = MethodChannel(
+          'plugins.it_nomads.com/flutter_secure_storage',
+        );
+        final stored = <String, String>{};
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+          storageChannel,
+          (call) async {
+            final arguments = Map<String, dynamic>.from(call.arguments as Map);
+            final key = arguments['key'] as String?;
+            switch (call.method) {
+              case 'read':
+                return stored[key];
+              case 'write':
+                stored[key!] = arguments['value'] as String;
+                return null;
+              case 'delete':
+                stored.remove(key);
+                return null;
+              case 'readAll':
+                return stored;
+              default:
+                return null;
+            }
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            storageChannel,
+            null,
+          ),
+        );
+        final work = WorkSession(contactDraftStore: _ContactDraftFixtureStore())
+          ..seedVerifiedWorkspace()
+          ..retailerSetupSaved = true
+          ..reviewStage = WorkReviewStage.live
+          ..workspaceStoreState = WorkspaceStoreState.open;
+        expect(work.loadStoreReviewSeed(1000), isTrue);
+        await mount(tester, route: '/app/buy', work: work, uiReviewOnly: true);
+        final router = GoRouter.of(tester.element(find.byType(BuyV2Screen)));
+        unawaited(router.push('/app/work/workspace/dashboard'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Restock'));
+        await tester.pumpAndSettle();
+        final indicator = find.byWidgetPredicate(
+          (widget) =>
+              widget is Semantics &&
+              (widget.properties.label ?? '').startsWith('Catalogue products:'),
+        );
+        final transition = tester.widget<AnimatedSwitcher>(
+          find.descendant(
+            of: indicator,
+            matching: find.byType(AnimatedSwitcher),
+          ),
+        );
+        // Exercise the real indicator's transition configuration. Repeated
+        // loading states can overlap while search and sale type change.
+        for (final (state, elapsed) in [
+          ('69-false', 220),
+          ('null-true', 150),
+          ('0-false', 16),
+          ('null-true', 16),
+          ('3-false', 16),
+        ]) {
+          await tester.pumpWidget(
+            MaterialApp(
+              home: AnimatedSwitcher(
+                duration: transition.duration,
+                reverseDuration: transition.reverseDuration,
+                switchInCurve: transition.switchInCurve,
+                switchOutCurve: transition.switchOutCurve,
+                transitionBuilder: transition.transitionBuilder,
+                layoutBuilder: transition.layoutBuilder,
+                child: Text(state, key: ValueKey(state)),
+              ),
+            ),
+          );
+          await tester.pump(Duration(milliseconds: elapsed));
+          expect(
+            tester.takeException(),
+            isNull,
+            reason: 'Count transition $state',
+          );
+        }
+        // Back removes the indicator before all outgoing fades have completed.
+        await tester.pumpWidget(const MaterialApp(home: Text('Dashboard')));
+        await tester.pumpAndSettle();
+        expect(tester.takeException(), isNull);
+        expect(find.text('Dashboard'), findsOneWidget);
+      },
+    );
     testWidgets('STOREBACK01 full app Restock Bulk native Back lifecycle', (
       tester,
     ) async {
-      final previousPreferences = SharedPreferencesAsyncPlatform.instance;
-      SharedPreferencesAsyncPlatform.instance =
-          InMemorySharedPreferencesAsync.empty();
-      addTearDown(
-        () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
-      );
-      const storageChannel = MethodChannel(
-        'plugins.it_nomads.com/flutter_secure_storage',
-      );
-      final stored = <String, String>{};
-      var delayBookmarkWrites = false;
-      tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
-        storageChannel,
-        (call) async {
-          final arguments = Map<String, dynamic>.from(call.arguments as Map);
-          final key = arguments['key'] as String?;
-          switch (call.method) {
-            case 'read':
-              return stored[key];
-            case 'write':
-              if (delayBookmarkWrites) {
-                await Future<void>.delayed(const Duration(milliseconds: 250));
-              }
-              stored[key!] = arguments['value'] as String;
-              return null;
-            case 'delete':
-              stored.remove(key);
-              return null;
-            case 'readAll':
-              return stored;
-            default:
-              return null;
-          }
-        },
-      );
-      addTearDown(
-        () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      final semantics = tester.ensureSemantics();
+      try {
+        final previousPreferences = SharedPreferencesAsyncPlatform.instance;
+        SharedPreferencesAsyncPlatform.instance =
+            InMemorySharedPreferencesAsync.empty();
+        addTearDown(
+          () => SharedPreferencesAsyncPlatform.instance = previousPreferences,
+        );
+        const storageChannel = MethodChannel(
+          'plugins.it_nomads.com/flutter_secure_storage',
+        );
+        final stored = <String, String>{};
+        var delayBookmarkWrites = false;
+        tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
           storageChannel,
-          null,
-        ),
-      );
-      final work = WorkSession(contactDraftStore: _ContactDraftFixtureStore())
-        ..seedVerifiedWorkspace()
-        ..retailerSetupSaved = true
-        ..reviewStage = WorkReviewStage.live
-        ..workspaceStoreState = WorkspaceStoreState.open;
-      expect(work.loadStoreReviewSeed(1000), isTrue);
-      await mount(tester, route: '/app/buy', work: work, uiReviewOnly: true);
-      final router = GoRouter.of(tester.element(find.byType(BuyV2Screen)));
-      unawaited(router.push('/app/work/workspace/dashboard'));
-      await tester.pumpAndSettle();
-      String? retainedProductId;
-      int? retainedQuantity;
-      for (final delay in [0, 1, 16, 50, 150, 650]) {
-        for (var repeat = 0; repeat < 3; repeat++) {
-          await tester.tap(find.text('Restock'));
-          await tester.pumpAndSettle();
-          expect(
-            find.byKey(const Key('work-store-procurement-screen')),
-            findsOneWidget,
-          );
-          final buy = tester
-              .widget<BuyV2Screen>(find.byType(BuyV2Screen))
-              .session;
-          if (retainedProductId == null) {
-            final product = buy.visibleProducts.first;
-            retainedProductId = product.id;
-            final add = find.byKey(ValueKey('buy-add-${product.id}'));
-            await tester.ensureVisible(add);
-            await tester.tap(add);
+          (call) async {
+            final arguments = Map<String, dynamic>.from(call.arguments as Map);
+            final key = arguments['key'] as String?;
+            switch (call.method) {
+              case 'read':
+                return stored[key];
+              case 'write':
+                if (delayBookmarkWrites) {
+                  await Future<void>.delayed(const Duration(milliseconds: 250));
+                }
+                stored[key!] = arguments['value'] as String;
+                return null;
+              case 'delete':
+                stored.remove(key);
+                return null;
+              case 'readAll':
+                return stored;
+              default:
+                return null;
+            }
+          },
+        );
+        addTearDown(
+          () => tester.binding.defaultBinaryMessenger.setMockMethodCallHandler(
+            storageChannel,
+            null,
+          ),
+        );
+        final work = WorkSession(contactDraftStore: _ContactDraftFixtureStore())
+          ..seedVerifiedWorkspace()
+          ..retailerSetupSaved = true
+          ..reviewStage = WorkReviewStage.live
+          ..workspaceStoreState = WorkspaceStoreState.open;
+        expect(work.loadStoreReviewSeed(1000), isTrue);
+        await mount(tester, route: '/app/buy', work: work, uiReviewOnly: true);
+        final router = GoRouter.of(tester.element(find.byType(BuyV2Screen)));
+        unawaited(router.push('/app/work/workspace/dashboard'));
+        await tester.pumpAndSettle();
+        String? retainedProductId;
+        int? retainedQuantity;
+        for (final stackCase in [0, 1, 2]) {
+          final replaceSignInStack = stackCase == 1;
+          final oppoMetrics = stackCase == 2;
+          if (oppoMetrics) {
+            // OPPO CPH2375: measured physical viewport, system bars and IME.
+            tester.view.devicePixelRatio = 2;
+            tester.view.physicalSize = const Size(720, 1612);
+            tester.view.viewPadding = const FakeViewPadding(
+              top: 82,
+              bottom: 88,
+            );
+            tester.platformDispatcher.textScaleFactorTestValue = 1;
             await tester.pumpAndSettle();
-            retainedQuantity = buy.quantityFor(product.id);
-            expect(retainedQuantity, greaterThan(0));
           }
-          expect(buy.quantityFor(retainedProductId), retainedQuantity);
-          final opener = find.byKey(const Key('work-dashboard-search'));
-          if (opener.evaluate().isNotEmpty) {
-            await tester.tap(opener);
+          if (replaceSignInStack) {
+            // Authentication returns through go(), replacing the pushed Store
+            // stack. Exercise the same return after all original stack cases.
+            await tester.tap(find.byKey(const Key('work-dashboard-profile')));
             await tester.pumpAndSettle();
+            final security = find.byKey(const Key('global-profile-security'));
+            await tester.ensureVisible(security);
+            await tester.tap(security);
+            await tester.pumpAndSettle();
+            final securityLocation = GoRouterState.of(
+              tester.element(find.byType(GlobalSecurityV2)),
+            ).uri;
+            expect(securityLocation.path, '/app/account/security');
+            router.go(securityLocation.toString());
+            await tester.pumpAndSettle();
+            await tester.tap(find.byKey(const Key('global-security-back')));
+            await tester.pumpAndSettle();
+            expect(find.byType(BuyV2Screen, skipOffstage: false), findsNothing);
+            expect(tester.takeException(), isNull);
           }
-          final search = find.byKey(const Key('work-dashboard-search-field'));
-          await tester.tap(search);
-          await tester.enterText(search, 'zzqav12');
-          tester.view.viewInsets = const FakeViewPadding(bottom: 220);
-          await tester.pumpAndSettle();
-          tester.testTextInput.hide();
-          tester.view.viewInsets = const FakeViewPadding();
-          await tester.pump(Duration(milliseconds: delay));
-          await tester.tap(
-            find.byKey(const Key('work-dashboard-search-clear')),
-          );
-          await tester.pump(Duration(milliseconds: delay));
-          await tester.tap(find.text('Bulk'));
-          await tester.pump(Duration(milliseconds: delay));
-          expect(tester.takeException(), isNull, reason: 'Bulk $delay/$repeat');
-          final searchFocus = tester.widget<TextField>(search).focusNode!;
-          expect(searchFocus.hasFocus, isTrue);
-          delayBookmarkWrites = true;
-          await tester.binding.handlePopRoute();
-          await tester.pump();
-          expect(
-            searchFocus.hasFocus,
-            isFalse,
-            reason:
-                'Back must release search focus before native storage completes.',
-          );
-          for (var frame = 0; frame < 20; frame++) {
-            await tester.pump(const Duration(milliseconds: 16));
+          for (final delay in [0, 1, 16, 50, 150, 650]) {
+            for (var repeat = 0; repeat < 5; repeat++) {
+              final nativeConnectionClosed = repeat == 3;
+              await tester.tap(find.text('Restock'));
+              await tester.pumpAndSettle();
+              expect(
+                find.byKey(const Key('work-store-procurement-screen')),
+                findsOneWidget,
+              );
+              final buy = tester
+                  .widget<BuyV2Screen>(find.byType(BuyV2Screen))
+                  .session;
+              if (retainedProductId == null) {
+                final product = buy.visibleProducts.first;
+                retainedProductId = product.id;
+                final add = find.byKey(ValueKey('buy-add-${product.id}'));
+                await tester.ensureVisible(add);
+                await tester.tap(add);
+                await tester.pumpAndSettle();
+                retainedQuantity = buy.quantityFor(product.id);
+                expect(retainedQuantity, greaterThan(0));
+              }
+              expect(buy.quantityFor(retainedProductId), retainedQuantity);
+              final opener = find.byKey(const Key('work-dashboard-search'));
+              if (opener.evaluate().isNotEmpty) {
+                await tester.tap(opener);
+                await tester.pumpAndSettle();
+              }
+              final search = find.byKey(
+                const Key('work-dashboard-search-field'),
+              );
+              await tester.tap(search);
+              await tester.enterText(search, 'zzqav12');
+              tester.view.viewInsets = FakeViewPadding(
+                bottom: oppoMetrics ? 656 : 220,
+              );
+              await tester.pumpAndSettle();
+              tester.testTextInput.hide();
+              if (nativeConnectionClosed) {
+                tester.testTextInput.closeConnection();
+              }
+              tester.view.viewInsets = const FakeViewPadding();
+              await tester.pump(Duration(milliseconds: delay));
+              await tester.tap(
+                find.byKey(const Key('work-dashboard-search-clear')),
+              );
+              await tester.pump(Duration(milliseconds: delay));
+              await tester.tap(find.text('Bulk'));
+              await tester.pump(Duration(milliseconds: delay));
+              expect(
+                tester.takeException(),
+                isNull,
+                reason: 'Bulk $delay/$repeat',
+              );
+              final searchFocus = tester.widget<TextField>(search).focusNode!;
+              if (!nativeConnectionClosed) {
+                expect(searchFocus.hasFocus, isTrue);
+              }
+              // Preserve the delayed native-write cases and also exercise a
+              // completed write before another frame can settle focus changes.
+              delayBookmarkWrites = repeat != 4;
+              await tester.binding.handlePopRoute();
+              await tester.pump();
+              expect(
+                searchFocus.hasFocus,
+                isFalse,
+                reason:
+                    'Back must release search focus before native storage completes.',
+              );
+              for (var frame = 0; frame < 20; frame++) {
+                await tester.pump(const Duration(milliseconds: 16));
+              }
+              await tester.pumpAndSettle();
+              delayBookmarkWrites = false;
+              expect(
+                tester.takeException(),
+                isNull,
+                reason: 'Back $delay/$repeat',
+              );
+              expect(buy.quantityFor(retainedProductId), retainedQuantity);
+              expect(
+                find.byKey(const Key('work-store-procurement-screen')),
+                findsNothing,
+              );
+              expect(
+                find.byKey(const Key('work-workspace-dashboard')),
+                findsOneWidget,
+              );
+            }
           }
-          await tester.pumpAndSettle();
-          delayBookmarkWrites = false;
-          expect(tester.takeException(), isNull, reason: 'Back $delay/$repeat');
-          expect(buy.quantityFor(retainedProductId), retainedQuantity);
-          expect(
-            find.byKey(const Key('work-store-procurement-screen')),
-            findsNothing,
-          );
-          expect(
-            find.byKey(const Key('work-workspace-dashboard')),
-            findsOneWidget,
-          );
         }
+      } finally {
+        semantics.dispose();
       }
     });
   }

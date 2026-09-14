@@ -3140,6 +3140,12 @@ class _SearchProductResults extends StatelessWidget {
 }
 
 class _CatalogueToolbar extends StatelessWidget {
+  // Let AnimatedSwitcher assign its per-transition child counter. Keying the
+  // FadeTransition by the count can collide when a loading state repeats
+  // before an earlier fade has finished (for example, search then Bulk).
+  static Widget _countTransition(Widget child, Animation<double> animation) =>
+      FadeTransition(opacity: animation, child: child);
+
   const _CatalogueToolbar({
     required this.session,
     required this.savedOnly,
@@ -3217,6 +3223,7 @@ class _CatalogueToolbar extends StatelessWidget {
                               borderRadius: BorderRadius.circular(5),
                             ),
                             child: AnimatedSwitcher(
+                              transitionBuilder: _countTransition,
                               duration: MediaQuery.disableAnimationsOf(context)
                                   ? Duration.zero
                                   : const Duration(milliseconds: 220),

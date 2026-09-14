@@ -103480,6 +103480,27 @@
   "evidence": [
     "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
   ]
+},
+{
+  "id": "REG-20260914-4615-STORE-SKU-TRANSITION-IDENTITY",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "build",
+    "device",
+    "evidence"
+  ],
+  "mistake": "V16 OPPO search, clear, Bulk and native Back produced duplicate animated SKU-count keys followed by inherited-widget deactivation assertions.",
+  "rootCause": "Live VM exception capture identified duplicate null-true keys in the count AnimatedSwitcher Stack. The default keyed FadeTransition caused KeyedSubtree.wrap to reuse the loading-state key while an earlier transition was still outgoing. Equal-delay host cases missed the uneven loading/count overlap. STOREBACK02 reproduces the duplicate keys before correction and passes using an unkeyed fade so the switcher owns distinct transition identities. Exact successor OPPO verification remains pending.",
+  "prevention": "Keep both full-app STOREBACK01 and overlapping-count STOREBACK02 mandatory for each RuntimeUiReview successor with exact defines and non-skipped successful terminal evidence. Preserve original failures and animation/reduced-motion behavior; do not suppress assertions. Initial targeted harness setup failures are retained separately from the reproduced product defect.",
+  "gates": [
+    "scripts/build-buy-device-review.ps1",
+    "scripts/test-public-auth-sideload-build-controls.ps1"
+  ],
+  "evidence": [
+    "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
+  ]
 }
 ]
 }
