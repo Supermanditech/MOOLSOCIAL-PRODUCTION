@@ -2757,7 +2757,7 @@ enum _WorkspaceOperation {
 extension on _WorkspaceOperation {
   String get title => switch (this) {
     _WorkspaceOperation.orders => 'Customer orders',
-    _WorkspaceOperation.counterOrder => 'Create customer order',
+    _WorkspaceOperation.counterOrder => 'Counter sale',
     _WorkspaceOperation.catalogue => 'Catalogue and stock',
     _WorkspaceOperation.stockStatement => 'Stock statement',
     _WorkspaceOperation.delivery => 'Delivery desk',
@@ -6492,11 +6492,33 @@ Future<void> _showWorkspaceInvoiceSheet(
   WorkSession session,
   WorkspaceCustomerInvoice invoice,
 ) async {
+  final invoiceAccount = session.workspaceFinance?.accountScope;
+  final invoiceStore = session.activeWorkspace?.id;
   final returnRoute = GoRouterState.of(context).uri.toString();
   final router = GoRouter.of(context);
-  final message =
-      '${invoice.id} from ${session.activeWorkspace?.name ?? session.workName}\n'
-      '${invoice.items}\nTotal ₹${invoice.amount} · ${invoice.payment}';
+  final invoiceStoreName = session.activeWorkspace?.name ?? session.workName;
+  String invoiceMessage() {
+    final finance = session.workspaceFinance;
+    final payment =
+        finance?.accountScope == invoiceAccount &&
+            finance?.workspaceId == invoiceStore &&
+            session.activeWorkspace?.id == invoiceStore
+        ? finance?.payments
+              .where(
+                (p) =>
+                    p.invoiceId == invoice.id &&
+                    p.orderId == invoice.orderId &&
+                    p.valid,
+              )
+              .firstOrNull
+        : null;
+    final status = payment == null
+        ? 'Payment status unavailable'
+        : '${payment.label} · Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}';
+    return '${invoice.id} from $invoiceStoreName\n'
+        '${invoice.items}\nTotal ₹${invoice.amount} · Payment method: ${invoice.payment}\n$status';
+  }
+
   String? shareError;
   var openingWhatsApp = false;
   ModalRoute<bool>? invoiceSheetRoute;
@@ -6564,11 +6586,18 @@ Future<void> _showWorkspaceInvoiceSheet(
                         ),
                         Text(invoice.items),
                         Text(
-                          invoice.payment,
+                          'Payment method: ${invoice.payment}',
                           style: const TextStyle(color: MoolColors.muted),
                         ),
                       ],
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  _InvoiceCollectionSummary(
+                    session: session,
+                    invoice: invoice,
+                    accountScope: invoiceAccount,
+                    storeId: invoiceStore,
                   ),
                   const SizedBox(height: 12),
                   const Text(
@@ -6620,7 +6649,7 @@ Future<void> _showWorkspaceInvoiceSheet(
                             try {
                               final opened = await launchUrl(
                                 Uri.https('wa.me', '/$mobile', {
-                                  'text': message,
+                                  'text': invoiceMessage(),
                                 }),
                                 mode: LaunchMode.externalApplication,
                               );
@@ -6672,7 +6701,7 @@ Future<void> _showWorkspaceInvoiceSheet(
         'type': 'business',
         'return': returnRoute,
         'recipient': invoice.customer,
-        'draft': message,
+        'draft': invoiceMessage(),
       },
     ).toString(),
   );
@@ -23169,6 +23198,93 @@ class _WorkspaceDeliverySurface extends StatelessWidget {
   }
 }
 
+class _InvoiceCollectionSummary extends StatelessWidget {
+  const _InvoiceCollectionSummary({
+    required this.session,
+    required this.invoice,
+    required this.accountScope,
+    required this.storeId,
+  });
+
+  final WorkSession session;
+  final WorkspaceCustomerInvoice invoice;
+  final String? accountScope, storeId;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: session,
+    builder: (context, _) {
+      final finance = session.workspaceFinance;
+      final sameScope =
+          finance != null &&
+          accountScope != null &&
+          storeId != null &&
+          finance.accountScope == accountScope &&
+          finance.workspaceId == storeId &&
+          session.activeWorkspace?.id == storeId;
+      final payment = sameScope
+          ? finance.payments
+                .where(
+                  (record) =>
+                      record.invoiceId == invoice.id &&
+                      record.orderId == invoice.orderId,
+                )
+                .firstOrNull
+          : null;
+      if (payment == null || !payment.valid) {
+        return const Text(
+          'Payment status unavailable. Creating an invoice does not confirm payment.',
+          key: Key('work-invoice-payment-unavailable'),
+          style: TextStyle(color: MoolColors.muted),
+        );
+      }
+      final canRecord =
+          session.customerCollectionAvailable &&
+          payment.dueMinor > 0 &&
+          finance!.customerLedgers.any(
+            (ledger) =>
+                ledger.customerId == payment.customerId &&
+                ledger.historyComplete,
+          );
+      return Column(
+        key: const Key('work-invoice-payment-summary'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(payment.label),
+          Text(
+            'Received ${_purchaseAmount(payment.paidMinor)} · Due ${_purchaseAmount(payment.dueMinor)}',
+          ),
+          if (payment.dueMinor > 0)
+            OutlinedButton.icon(
+              key: const Key('work-invoice-record-payment'),
+              onPressed: !canRecord
+                  ? null
+                  : () async {
+                      // The existing collection sheet rechecks Store, account and
+                      // invoice revision; reopening it never creates another sale.
+                      await showModalBottomSheet<void>(
+                        context: context,
+                        isScrollControlled: true,
+                        useSafeArea: true,
+                        isDismissible: false,
+                        enableDrag: false,
+                        builder: (_) => _CustomerCollectionSheet(
+                          session: session,
+                          payment: payment,
+                          accountScope: accountScope!,
+                          storeId: storeId!,
+                        ),
+                      );
+                    },
+              icon: const Icon(Icons.payments_outlined),
+              label: const Text('Record payment received'),
+            ),
+        ],
+      );
+    },
+  );
+}
+
 class _CounterOrderSurface extends StatefulWidget {
   const _CounterOrderSurface({
     required this.session,
@@ -24395,7 +24511,7 @@ class _OrderCompletionChoices extends StatelessWidget {
         key: ValueKey('work-review-fulfilment-$fulfilment'),
         initialValue: fulfilment,
         isExpanded: true,
-        decoration: const InputDecoration(labelText: 'Receive order'),
+        decoration: const InputDecoration(labelText: 'Customer receives'),
         items: [
           for (final mode in const [
             'At the shop',
@@ -24451,6 +24567,15 @@ class _OrderCompletionChoices extends StatelessWidget {
         'Confirm payment separately. Recording this bill does not collect payment.',
         style: TextStyle(color: MoolColors.muted, fontSize: 12, height: 1.4),
       ),
+      if (payment == 'UPI' || payment == 'Pay request') ...[
+        const SizedBox(height: 8),
+        const Text(
+          'UPI QR and payment links are not available for this Store yet. '
+          'Record a payment only after you have confirmed receiving it.',
+          key: Key('work-sale-payment-request-unavailable'),
+          style: TextStyle(color: MoolColors.muted, fontSize: 12, height: 1.4),
+        ),
+      ],
       if (fulfilment == 'Mool delivery')
         const Padding(
           padding: EdgeInsets.only(top: 8),

@@ -7519,6 +7519,208 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  for (final scale in [1.0, 2.0]) {
+    testWidgets('COUNTERD01 invoice collection reuses exact ledger $scale', (
+      tester,
+    ) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final seed = StoreReviewSeed(
+        accountScope: 'review-draft-account',
+        orderCount: 12,
+        now: DateTime.now().subtract(const Duration(minutes: 1)),
+      );
+      work.activeWorkspace = seed.workspace;
+      expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+      expect(
+        work.bindCustomerCollectionGateway(
+          accountScope: seed.accountScope,
+          storeId: seed.storeId,
+          adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+          checkpointStore: _LedgerCheckpointFixtureStore(),
+        ),
+        isTrue,
+      );
+      final payment = seed.finance.payments.first;
+      work.workspaceOrders.clear();
+      work.currentWorkspaceOrderId = null;
+      work.workspaceOrderStage = 'Completed';
+      work.workspaceInvoices.add(
+        WorkspaceCustomerInvoice(
+          id: payment.invoiceId!,
+          orderId: payment.orderId,
+          customer: payment.customerName,
+          items: 'Test grocery purchase',
+          amount: payment.amountMinor ~/ 100,
+          payment: 'Cash',
+          issuedAt: seed.finance.asOf,
+        ),
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: scale == 1 ? const Size(412, 915) : const Size(320, 568),
+        textScale: scale,
+      );
+      final open = find.byKey(const Key('work-invoice-open'));
+      await reveal(tester, open);
+      await tester.tap(open);
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-invoice-payment-summary')),
+        findsOneWidget,
+      );
+      final collect = find.byKey(const Key('work-invoice-record-payment'));
+      await reveal(tester, collect);
+      await captureStoreView(tester, 'counter-d01-invoice-before-$scale');
+      await tester.tap(collect);
+      await tester.pumpAndSettle();
+      final amount = payment.dueMinor ~/ 2;
+      await tester.enterText(
+        find.byKey(const Key('collection-amount')),
+        (amount / 100).toStringAsFixed(2),
+      );
+      await reveal(tester, find.text('Confirm collection'));
+      await captureStoreView(tester, 'counter-d01-record-cash-$scale');
+      await tester.tap(find.text('Confirm collection'));
+      await tester.pumpAndSettle();
+      expect(work.workspaceFinance!.duesMinor, seed.finance.duesMinor - amount);
+      expect(
+        work.workspaceFinance!.salesTodayMinor,
+        seed.finance.salesTodayMinor,
+      );
+      expect(work.workspaceInvoices, hasLength(1));
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.workspaceStockMovements, isEmpty);
+      expect(
+        find.byKey(const Key('work-invoice-payment-summary')),
+        findsOneWidget,
+      );
+      await captureStoreView(tester, 'counter-d01-invoice-after-$scale');
+      await reveal(tester, collect);
+      await tester.tap(collect);
+      await tester.pumpAndSettle();
+      expect(work.workspaceFinance!.duesMinor, seed.finance.duesMinor - amount);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
+  Future<void> enterSaleCustomer(WidgetTester tester, String phone) async {
+    await tester.tap(find.byKey(const Key('work-sale-customer')));
+    await tester.pumpAndSettle();
+    await tester.enterText(find.byKey(const Key('work-order-customer')), phone);
+    await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
+    await tester.pumpAndSettle();
+  }
+
+  for (final entry in ['work-quick-counter-sale', 'work-store-sell']) {
+    testWidgets('COUNTERD01 full cash sale through $entry', (tester) async {
+      final work = storeViewFixture(null, _ContactDraftFixtureStore());
+      final seed = StoreReviewSeed(
+        accountScope: 'review-draft-account',
+        orderCount: 12,
+        now: DateTime.now().subtract(const Duration(minutes: 1)),
+      );
+      work.activeWorkspace = seed.workspace;
+      work.workspaceCatalogueItems.addAll(
+        workspaceMasterCatalogue.map((product) => product.copyWith(stock: 24)),
+      );
+
+      expect(work.applyWorkspaceFinance(seed.finance), isTrue);
+      expect(
+        work.bindCustomerCollectionGateway(
+          accountScope: seed.accountScope,
+          storeId: seed.storeId,
+          adapter: StoreReviewCustomerCollectionGateway(seed.finance),
+          checkpointStore: _LedgerCheckpointFixtureStore(),
+        ),
+        isTrue,
+      );
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+      );
+      final stock = work.workspaceCatalogueItems
+          .firstWhere((p) => p.id == 'oil-fortune-1l')
+          .stock;
+      await tester.tap(find.byKey(Key(entry)));
+      await tester.pumpAndSettle();
+      await enterSaleCustomer(tester, '9829012345');
+      await captureStoreView(tester, 'counter-d01-customer-$entry');
+      await tester.tap(find.byKey(const Key('work-order-add-oil-fortune-1l')));
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'counter-d01-basket-$entry');
+      await tester.tap(find.byKey(const Key('work-order-review')));
+      await tester.pumpAndSettle();
+      await captureStoreView(tester, 'counter-d01-review-$entry');
+      final amountMinor = work.workspaceOrderTotal * 100;
+      await tester.tap(find.byKey(const Key('work-order-save')));
+      await tester.pumpAndSettle();
+      expect(work.workspaceInvoices, hasLength(1));
+      final invoice = work.workspaceInvoices.single;
+      expect(
+        work.workspaceFinance!.payments
+            .where((p) => p.invoiceId == invoice.id)
+            .single
+            .dueMinor,
+        amountMinor,
+      );
+      final collect = find.byKey(const Key('work-invoice-record-payment'));
+      await reveal(tester, collect);
+      await tester.tap(collect);
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byKey(const Key('collection-amount')),
+        (amountMinor / 100).toStringAsFixed(2),
+      );
+      await reveal(tester, find.text('Confirm collection'));
+      await tester.tap(find.text('Confirm collection'));
+      await tester.pumpAndSettle();
+      final paid = work.workspaceFinance!.payments
+          .where((p) => p.invoiceId == invoice.id)
+          .single;
+      expect(paid.paidMinor, amountMinor);
+      expect(paid.dueMinor, 0);
+      expect(work.workspaceFinance!.duesMinor, seed.finance.duesMinor);
+      expect(
+        work.workspaceFinance!.salesTodayMinor,
+        seed.finance.salesTodayMinor + amountMinor,
+      );
+      expect(
+        work.workspaceCatalogueItems
+            .firstWhere((p) => p.id == 'oil-fortune-1l')
+            .stock,
+        stock - 1,
+      );
+      expect(
+        find.byKey(const Key('work-invoice-record-payment')),
+        findsNothing,
+      );
+      await captureStoreView(tester, 'counter-d01-paid-invoice-$entry');
+      work.activeWorkspace = const WorkWorkspace(
+        id: 'counter-d01-other-store',
+        name: 'Other test Store',
+        profileLabel: 'Grocery',
+        area: 'Test area',
+        verified: true,
+      );
+      work.notifyListeners();
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-invoice-record-payment')),
+        findsNothing,
+      );
+      expect(
+        find.byKey(const Key('work-invoice-payment-summary')),
+        findsNothing,
+      );
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('Store View v2 - zero tap working centre', (tester) async {
     await mount(
       tester,
@@ -9955,14 +10157,6 @@ void main() {
     await tester.tap(find.byKey(const Key('work-sale-delivery')));
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const Key('work-order-receive-mool-delivery')));
-    await tester.pumpAndSettle();
-  }
-
-  Future<void> enterSaleCustomer(WidgetTester tester, String phone) async {
-    await tester.tap(find.byKey(const Key('work-sale-customer')));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byKey(const Key('work-order-customer')), phone);
-    await tester.tap(find.byKey(const Key('work-sale-customer-confirm')));
     await tester.pumpAndSettle();
   }
 
