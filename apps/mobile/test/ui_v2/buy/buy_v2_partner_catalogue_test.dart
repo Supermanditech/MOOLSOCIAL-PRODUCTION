@@ -395,32 +395,9 @@ void main() {
             source.updatedProviderName =
                 'hanumana ram beniwal sardarpura jodhpure store regional distribution and delivery centre';
             final refresh = find.byKey(
-              ValueKey('buy-page-refresh-catalogue-${destination.name}'),
+              ValueKey('buy-page-status-catalogue-${destination.name}'),
             );
-            final catalogueScroll = find
-                .descendant(
-                  of: find.byKey(
-                    ValueKey('buy-paged-scroll-catalogue-${destination.name}'),
-                  ),
-                  matching: find.byType(Scrollable),
-                )
-                .first;
-            // Scroll from the exposed list edge, not its centre where the
-            // floating Cart control may receive the gesture.
-            for (
-              var attempt = 0;
-              refresh.hitTestable().evaluate().isEmpty && attempt < 60;
-              attempt++
-            ) {
-              final bounds = tester.getRect(catalogueScroll);
-              await tester.dragFrom(
-                Offset(bounds.left + 4, bounds.top + 60),
-                const Offset(0, 300),
-              );
-              await tester.pumpAndSettle();
-            }
-            expect(refresh.hitTestable(), findsOneWidget);
-            await tester.tap(refresh);
+            await _performCatalogueAction(tester, refresh, 'Refresh products');
             await tester.pumpAndSettle();
             expect(source.pages.length, greaterThan(1));
             expect(source.pages.last.items.first.id, firstProduct.id);
@@ -519,6 +496,26 @@ void main() {
           }
 
           await expectStart(0);
+          final topGrid = find.byKey(
+            ValueKey('buy-paged-vertical-grid-$scope'),
+          );
+          expect(
+            tester.getRect(topGrid).top - tester.getRect(scroll).top,
+            closeTo(6, 1),
+          );
+          await _performCatalogueAction(tester, status, 'Next products');
+          await expectStart(40);
+          await _performCatalogueAction(tester, status, 'Previous products');
+          await expectStart(0);
+          final beforePull = source.requests.length;
+          final pullRect = tester.getRect(scroll);
+          await tester.dragFrom(
+            Offset(pullRect.center.dx, pullRect.top + 30),
+            const Offset(0, 300),
+          );
+          await tester.pumpAndSettle();
+          expect(source.requests.length, beforePull + 1);
+          await expectStart(0);
           final initialRequests = source.requests.length;
           await swipe(170);
           expect(source.requests.length, initialRequests);
@@ -575,21 +572,32 @@ void main() {
           );
           controller.jumpTo(controller.position.maxScrollExtent);
           await tester.pumpAndSettle();
-          final bottom = find.byKey(ValueKey('buy-page-next-$scope-bottom'));
-          await tester.ensureVisible(bottom);
-          await tester.pumpAndSettle();
-          expect(bottom.hitTestable(), findsOneWidget);
+          for (final suffix in ['', '-bottom']) {
+            for (final control in ['next', 'previous', 'refresh', 'range']) {
+              expect(
+                find.byKey(ValueKey('buy-page-$control-$scope$suffix')),
+                findsNothing,
+              );
+            }
+          }
+          final grid = find.byKey(ValueKey('buy-paged-vertical-grid-$scope'));
+          final listRect = tester.getRect(scroll);
           expect(
-            tester
-                .getSize(find.byKey(ValueKey('buy-page-status-$scope-bottom')))
-                .height,
-            lessThanOrEqualTo(52),
+            tester.getRect(grid).bottom,
+            lessThanOrEqualTo(listRect.bottom),
+          );
+          expect(
+            listRect.bottom - tester.getRect(grid).bottom,
+            lessThanOrEqualTo(20),
           );
           await captureR66Visual(
             tester,
             'sku-swipe-${destination.name}-$scale-bottom',
           );
-          await tester.tap(bottom);
+          await tester.dragFrom(
+            Offset(listRect.right - 70, listRect.bottom - 80),
+            const Offset(-170, 0),
+          );
           await tester.pumpAndSettle();
           await expectStart(40);
         },
@@ -637,14 +645,22 @@ void main() {
         expect(session.itemCount, 0);
         expect(session.view, BuyV2View.catalogue);
       }
+      final actions = tester
+          .widget<Semantics>(find.byKey(ValueKey('buy-page-status-$scope')))
+          .properties
+          .customSemanticsActions!;
+      expect(
+        actions.keys.any((action) => action.label == 'Next products'),
+        isFalse,
+      );
+      expect(
+        actions.keys.any((action) => action.label == 'Previous products'),
+        isFalse,
+      );
       for (final direction in ['next', 'previous']) {
         expect(
-          tester
-              .widget<IconButton>(
-                find.byKey(ValueKey('buy-page-$direction-$scope')),
-              )
-              .onPressed,
-          isNull,
+          find.byKey(ValueKey('buy-page-$direction-$scope')),
+          findsNothing,
         );
       }
       expect(tester.takeException(), isNull);
@@ -1750,7 +1766,7 @@ void main() {
         await tester.pumpAndSettle();
         const scope = 'published-offers';
         final range = find.byKey(const ValueKey('buy-page-status-$scope'));
-        final next = find.byKey(const ValueKey('buy-page-next-$scope'));
+        final next = find.byKey(const ValueKey('buy-page-status-$scope'));
         final vertical = find.byKey(const ValueKey('buy-paged-scroll-$scope'));
         Future<void> reveal(Finder target) async {
           // Both pagination bars share state; explicitly return to the top
@@ -1929,7 +1945,7 @@ void main() {
         await capture('products');
         await reveal(next);
         published.failNext = true;
-        await tester.tap(next);
+        await _performCatalogueAction(tester, next, 'Next products');
         await tester.pumpAndSettle();
         final retry = find.widgetWithText(TextButton, 'Try again');
         await reveal(next);
@@ -2357,10 +2373,10 @@ void main() {
           expect(source.productQueries.last.categoryId, 'all');
           await captureR66Visual(tester, 'r5-store-$profile-full');
 
-          final next = find.byKey(ValueKey('buy-page-next-$storeScope'));
+          final next = find.byKey(ValueKey('buy-page-status-$storeScope'));
           await _revealPagedHeader(tester, storeScope, next);
           source.failStorePage = true;
-          await tester.tap(next);
+          await _performCatalogueAction(tester, next, 'Next products');
           await tester.pumpAndSettle();
           expect(find.text('Results could not refresh'), findsOneWidget);
           await captureR66Visual(tester, 'r5-store-$profile-retry');
@@ -2682,11 +2698,11 @@ void main() {
           await tester.pumpAndSettle();
           expect(session.quantityFor(first.id), first.minimumOrder);
 
-          final next = find.byKey(ValueKey('buy-page-next-$scope'));
+          final next = find.byKey(ValueKey('buy-page-status-$scope'));
           await revealControls(next);
           await captureR66Visual(tester, 'r669-page-controls-$profile-first');
           source.failNext = true;
-          await tester.tap(next);
+          await _performCatalogueAction(tester, next, 'Next products');
           await tester.pumpAndSettle();
           expect(find.text('Results could not refresh'), findsOneWidget);
           expectPage(0);
@@ -2749,15 +2765,23 @@ void main() {
 
           await revealControls(next);
           expectPage(40);
-          final previous = find.byKey(ValueKey('buy-page-previous-$scope'));
-          await tester.tap(previous);
+          final previous = find.byKey(ValueKey('buy-page-status-$scope'));
+          await _performCatalogueAction(tester, previous, 'Previous products');
           await tester.pumpAndSettle();
           await revealControls(next);
           expectPage(0);
-          expect(tester.widget<IconButton>(previous).onPressed, isNull);
-          final refresh = find.byKey(ValueKey('buy-page-refresh-$scope'));
+          expect(
+            tester
+                .widget<Semantics>(previous)
+                .properties
+                .customSemanticsActions!
+                .keys
+                .any((action) => action.label == 'Previous products'),
+            isFalse,
+          );
+          final refresh = find.byKey(ValueKey('buy-page-status-$scope'));
           final beforeRefresh = source.requests.length;
-          await tester.tap(refresh);
+          await _performCatalogueAction(tester, refresh, 'Refresh products');
           await tester.pumpAndSettle();
           expect(source.requests.length, beforeRefresh + 1);
           await revealControls(next);
@@ -2767,26 +2791,19 @@ void main() {
           final controller = tester.widget<ListView>(vertical).controller!;
           controller.jumpTo(controller.position.maxScrollExtent);
           await tester.pumpAndSettle();
-          final bottomNext = find.byKey(
-            ValueKey('buy-page-next-$scope-bottom'),
-          );
-          await tester.ensureVisible(bottomNext);
-          await tester.pumpAndSettle();
-          expect(bottomNext.hitTestable(), findsOneWidget);
           expect(
-            tester
-                .widget<Semantics>(
-                  find.byKey(ValueKey('buy-page-status-$scope-bottom')),
-                )
-                .properties
-                .label,
-            startsWith('1\u201340 of '),
+            find.byKey(ValueKey('buy-page-next-$scope-bottom')),
+            findsNothing,
           );
-          await tester.tap(bottomNext);
+          expect(
+            find.byKey(ValueKey('buy-page-status-$scope-bottom')),
+            findsNothing,
+          );
+          await _performCatalogueAction(tester, range, 'Next products');
           await tester.pumpAndSettle();
           await revealControls(previous);
           expectPage(40);
-          await tester.tap(previous);
+          await _performCatalogueAction(tester, previous, 'Previous products');
           await tester.pumpAndSettle();
           await revealControls(next);
           expectPage(0);
@@ -3877,6 +3894,9 @@ void main() {
       final related = find.byKey(
         const ValueKey('buy-shop-seller-other-store-s-tomato'),
       );
+      await Scrollable.ensureVisible(tester.element(related), alignment: .4);
+      await tester.pumpAndSettle();
+      expect(related.hitTestable(), findsOneWidget);
       await tester.tap(related);
       await tester.pumpAndSettle();
       expect(
@@ -4389,4 +4409,27 @@ Future<void> _revealProductAction(
   await tester.scrollUntilVisible(action, 220, scrollable: scrollable);
   await tester.pumpAndSettle();
   expect(action, findsOneWidget);
+}
+
+Future<void> _performCatalogueAction(
+  WidgetTester tester,
+  Finder catalogue,
+  String label,
+) async {
+  final handle = tester.ensureSemantics();
+  try {
+    await tester.pump();
+    final semantics = tester.widget<Semantics>(catalogue);
+    final actions = semantics.properties.customSemanticsActions!;
+    final action = actions.keys.singleWhere((action) => action.label == label);
+    final node = tester.getSemantics(catalogue);
+    node.owner!.performAction(
+      node.id,
+      SemanticsAction.customAction,
+      CustomSemanticsAction.getIdentifier(action),
+    );
+    await tester.pumpAndSettle();
+  } finally {
+    handle.dispose();
+  }
 }

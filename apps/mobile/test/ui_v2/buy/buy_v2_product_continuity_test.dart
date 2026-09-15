@@ -6,6 +6,7 @@ import 'package:moolsocial/features/buy/buy_session.dart';
 import 'package:moolsocial/features/buy/buy_v2_content_contracts.dart';
 import 'package:moolsocial/features/buy/buy_v2_models.dart';
 import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/ui_v2/buy/buy_v2_design.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_screen.dart';
 import 'package:moolsocial/ui_v2/buy/buy_v2_catalogue.dart'
     show
@@ -261,8 +262,17 @@ void main() {
             await tester.pumpAndSettle();
           }
           final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
-          await tester.ensureVisible(sourceCard);
-          await tester.tap(sourceCard);
+          final sourceTitle = find.descendant(
+            of: sourceCard,
+            matching: find.text(session.product(sourceId).customerTitle),
+          );
+          await Scrollable.ensureVisible(
+            tester.element(sourceTitle),
+            alignment: .4,
+          );
+          await tester.pumpAndSettle();
+          expect(sourceTitle.hitTestable(), findsOneWidget);
+          await tester.tap(sourceTitle);
           await tester.pumpAndSettle();
           expect(session.selectedProductId, sourceId);
           final product = session.product(sourceId);
@@ -952,11 +962,27 @@ void main() {
     expect(session.selectedProductId, selected.id);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.text('Saved in Shop'), findsOneWidget);
+    expect(session.showingSavedProducts, isTrue);
     expect(
       tester.state<ScrollableState>(lane).position.pixels,
       closeTo(before, 1),
     );
+    // The heading can be outside the lazy list's retained viewport. First
+    // prove exact return position, then reveal and verify the Saved heading.
+    for (
+      var attempt = 0;
+      attempt < 10 && tester.state<ScrollableState>(lane).position.pixels > 0;
+      attempt++
+    ) {
+      final bounds = tester.getRect(lane);
+      await tester.dragFrom(
+        Offset(bounds.left + 4, bounds.top + 60),
+        const Offset(0, 600),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(tester.state<ScrollableState>(lane).position.pixels, 0);
+    expect(find.text('Saved in Shop'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 

@@ -422,3 +422,24 @@ Six actual gesture cases passed (sku-swipe-test-03.log, terminal e1a4da): Shop/W
 ### Twelve-record source qualification completed
 
 Current-source-qualification-03.json SHA256 2A66A12B206DD5B071CEF4C08223B8DB9C2D29BC80704C9F4125152AF101D337 binds all twelve records to unchanged current application/test source, final analysis with no issues, and both required combined runs at 2429 passes, 27 inherited skips, zero failures each. All 3044 tracked source-owner bytes and the tracked path set were independently verified after both runs. Source-stage focused/visual evidence and earlier failures remain preserved. This completes local source qualification; it does not close device acceptance or claim provider-backend integration. Source commit, successor APK, affected Redmi verification and final handoff remain.
+
+
+### SKU-M05-C05 founder rejection on r66.27 - current acceptance
+
+The founder rejected r66.27's remaining top and bottom arrow/refresh rows and their vacant space. Numeric-only removal was incomplete against the intended screen-space outcome. This is the existing C05 occurrence, not a thirteenth ticket. Current status: open, correction required. Preserved installed APK A218E31C209305FD709AEF4FCAC70DB10452C46B93B248B9E5E8AED3DF273EE9 and captures 001/005 show both remaining rows.
+
+Definitive acceptance now requires no dedicated visible pagination/control row or reserved row height at either end of every shared product catalogue. Keep actual horizontal next/previous page swipes, vertical browsing and state restoration. Expose next/previous/refresh through accessibility actions without a painted toolbar; use native pull-to-refresh and retain visible recovery actions only when loading/empty/error requires them. Existing header area selection remains. Check actual Flutter first-card/top and final-card/bottom geometry at normal/enlarged text, absent old control widgets at both ends, physical and accessible paging, refresh/retry and preserved query/category/cart/return state. Qualify the correction before a uniquely versioned Redmi successor. Earlier compact-row passes remain historical and do not satisfy this revised acceptance.
+
+
+### SKU-M01 media-impact occurrence: photo obscured by tile controls
+
+Founder requested an impact audit of the pre-existing media work after the SKU redesign. Actual Flutter capture sku-media-grid-visual-03/sku-media-grid-shop-1.0-store-true.png shows the Save control covering the upper-right of a square decoded supplier photo. Narrow grid image width increased from 78 to 96 logical pixels during the SKU changes; preserve the earlier exact-SKU/media contract while correcting the visual overlap. This is an occurrence of existing SKU-M01 (twelve current acceptance records), not a new independent product ticket.
+
+Definitive acceptance: the complete photo frame and its Illustration/unavailable disclosure must be spatially separate from Save and product badges; preserve decoded aspect ratio, thumbnail memory bounds, exact SKU/variant association, three normal-scale columns and adaptive long-text rows. Verify portrait/landscape/square photos in Shop/Wholesale and store-context grids at 320/360/390 widths and 1x/2x text, then inspect the applicable successor Redmi presentations. Do not claim the unimplemented provider publication service or actual device video playback from local fixtures. Current state: reproduced visually, non-overlap regression assertions added; runtime correction and device verification pending.
+
+
+### SKU-M01 Saved/provider badge measurement correction - 2026-09-16
+
+The retained red regression sku-saved-media-red-10 proves a 430px Saved-grid photo shrank to22px instead of the required70px: row measurement reserved42px while the rendered full Remove control needed68px. Measurement now receives Saved context and shares the rendered badge geometry. Long provider badges use the card width below the44px action, avoiding a narrow column of broken words; complete text and the70px photo are retained without overlap. This remains an existing SKU-M01/provider-metadata occurrence, not a thirteenth record.
+
+Final analysis12 and30 focused cases pass:25 actual decoded photo profiles,4 Saved badge profiles and the unchanged340px Store-density check. Actual normal Store, enlarged Wholesale and long-provider Saved PNGs were inspected. Evidence: sku-rows-media-focused-02.json SHA2567BEE9E84D8324081E32ECD2AE1A6429B6D9EF92E57541BC83A8388D9A3D65B18. Full combined qualification and successor Redmi acceptance remain pending.

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
@@ -1145,173 +1146,188 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
         widget.query.storeId == null &&
         widget.query.areaScope != BuyV2CatalogueAreaScope.allAreas &&
         widget.query.regionId == null;
-    Widget pageControls({bool bottom = false}) => _CataloguePageControls(
-      scopeKey: bottom ? '${widget.scopeKey}-bottom' : widget.scopeKey,
-      noun: widget.publishedOffers ? 'offers' : 'products',
-      start: publicationCurrent ? page?.startIndex : null,
-      count: products.length,
-      total: publicationCurrent ? page?.totalCount : null,
-      loading: loading,
-      showRange: false,
-      areaLabel: !widget.storeContext
-          ? widget.session.catalogueAreaLabel
-          : null,
-      onArea: widget.showAreaControl
-          ? () => showBuyV2CatalogueArea(context, widget.session)
-          : null,
-      onPrevious: !loading && publicationCurrent && page?.previousCursor != null
-          ? _pager.previous
-          : null,
-      onNext: !loading && publicationCurrent && page?.nextCursor != null
-          ? _pager.next
-          : null,
-      onRefresh: loading ? null : _pager.refresh,
-    );
-    return BuyV2VerticalScrollIndicator(
-      child: ListView(
-        key: ValueKey('buy-paged-scroll-${widget.scopeKey}'),
-        controller: _vertical,
-        keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
-        padding: const EdgeInsets.only(bottom: 12),
-        children: [
-          if (widget.header != null) widget.header!,
-          pageControls(),
-          if (loading) const LinearProgressIndicator(minHeight: 2),
-          if (publicationCurrent &&
-              offers.isNotEmpty &&
-              widget.publicationFacts != null)
-            widget.publicationFacts!(offers),
-          if (needsArea)
-            _CataloguePageNotice(
-              title: 'Where are you shopping?',
-              detail: 'Choose an area, or browse stores in any area.',
-              action: 'Choose area',
-              onAction: () => showBuyV2CatalogueArea(context, widget.session),
-            )
-          else if (!publicationCurrent)
-            _CataloguePageNotice(
-              title: 'Offers need refreshing',
-              detail: 'The published details have changed or expired.',
-              action: 'Refresh offers',
-              onAction: loading ? null : _pager.refresh,
-            )
-          else if (message != null)
-            _CataloguePageNotice(
-              title: 'Results could not refresh',
-              detail: message,
-              action: 'Try again',
-              onAction: _pager.retry,
-            )
-          else if (!loading && products.isEmpty && message == null)
-            _CataloguePageNotice(
-              title: widget.publishedOffers
-                  ? 'No matching offers'
-                  : 'No matching products',
-              detail: widget.showAreaControl
-                  ? 'Try another search, category or area.'
-                  : 'Try another search or category.',
-            ),
-          if (products.isNotEmpty)
-            _QuantityAwareGridLayout(
-              session: widget.session,
-              products: products,
-              builder: (context, constraints, quantityWidth) {
-                final scale = MediaQuery.textScalerOf(context).scale(1);
-                final layout = _resolveCompactProductGridLayout(
-                  context: context,
+    final noun = widget.publishedOffers ? 'offers' : 'products';
+    final range = page == null || !publicationCurrent
+        ? (loading ? 'Loading $noun' : 'Results')
+        : products.isEmpty
+        ? '0 $noun'
+        : '${_catalogueCount(page.startIndex + 1)}–${_catalogueCount(page.startIndex + products.length)}'
+              '${page.totalCount == null ? '' : ' of ${_catalogueCount(page.totalCount!)}'}'
+              '${widget.publishedOffers ? ' offers' : ''}';
+    final canPrevious =
+        !loading && publicationCurrent && page?.previousCursor != null;
+    final canNext = !loading && publicationCurrent && page?.nextCursor != null;
+    return Semantics(
+      key: ValueKey('buy-page-status-${widget.scopeKey}'),
+      container: true,
+      explicitChildNodes: true,
+      label: range,
+      customSemanticsActions: {
+        if (canPrevious)
+          const CustomSemanticsAction(label: 'Previous products'):
+              _pager.previous,
+        if (canNext)
+          const CustomSemanticsAction(label: 'Next products'): _pager.next,
+        if (!loading)
+          const CustomSemanticsAction(label: 'Refresh products'):
+              _pager.refresh,
+      },
+      child: RefreshIndicator(
+        onRefresh: _pager.refresh,
+        child: BuyV2VerticalScrollIndicator(
+          child: ListView(
+            key: ValueKey('buy-paged-scroll-${widget.scopeKey}'),
+            controller: _vertical,
+            physics: const AlwaysScrollableScrollPhysics(),
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: const EdgeInsets.only(bottom: 12),
+            children: [
+              if (widget.header != null) widget.header!,
+              if (loading) const LinearProgressIndicator(minHeight: 2),
+              if (publicationCurrent &&
+                  offers.isNotEmpty &&
+                  widget.publicationFacts != null)
+                widget.publicationFacts!(offers),
+              if (needsArea)
+                _CataloguePageNotice(
+                  title: 'Where are you shopping?',
+                  detail: 'Choose an area, or browse stores in any area.',
+                  action: 'Choose area',
+                  onAction: () =>
+                      showBuyV2CatalogueArea(context, widget.session),
+                )
+              else if (!publicationCurrent)
+                _CataloguePageNotice(
+                  title: 'Offers need refreshing',
+                  detail: 'The published details have changed or expired.',
+                  action: 'Refresh offers',
+                  onAction: loading ? null : _pager.refresh,
+                )
+              else if (message != null)
+                _CataloguePageNotice(
+                  title: 'Results could not refresh',
+                  detail: message,
+                  action: 'Try again',
+                  onAction: _pager.retry,
+                )
+              else if (!loading && products.isEmpty && message == null)
+                _CataloguePageNotice(
+                  title: widget.publishedOffers
+                      ? 'No matching offers'
+                      : 'No matching products',
+                  detail: widget.showAreaControl
+                      ? 'Try another search, category or area.'
+                      : 'Try another search or category.',
+                ),
+              if (products.isNotEmpty)
+                _QuantityAwareGridLayout(
                   session: widget.session,
                   products: products,
-                  constraints: constraints,
-                  accessibleText: scale > 1.25,
-                  textScale: scale,
-                  cartQuantityWidth: quantityWidth,
-                  denseStore: widget.storeContext,
-                  scrollIndicatorInset: true,
-                );
-                final rowHeights = _productGridRowHeights(
-                  context,
-                  widget.session,
-                  products,
-                  columns: layout.columns,
-                  cardWidth: layout.cardWidth,
-                  storeContext: widget.storeContext,
-                );
-                final canPrevious =
-                    !loading &&
-                    publicationCurrent &&
-                    page?.previousCursor != null;
-                final canNext =
-                    !loading && publicationCurrent && page?.nextCursor != null;
-                return Semantics(
-                  onScrollLeft: canNext ? _pager.next : null,
-                  onScrollRight: canPrevious ? _pager.previous : null,
-                  child: GestureDetector(
-                    key: ValueKey('buy-page-swipe-${widget.scopeKey}'),
-                    behavior: HitTestBehavior.opaque,
-                    onHorizontalDragStart: (_) => _pageDrag = 0,
-                    onHorizontalDragUpdate: (details) {
-                      _pageDrag += details.primaryDelta ?? 0;
-                    },
-                    onHorizontalDragCancel: () => _pageDrag = 0,
-                    onHorizontalDragEnd: (_) {
-                      final distance = _pageDrag;
-                      _pageDrag = 0;
-                      if (_pager.loading ||
-                          _pager.query != widget.query ||
-                          distance.abs() < 48) {
-                        return;
-                      }
-                      if (distance < 0 && canNext) {
-                        _pager.next();
-                      } else if (distance > 0 && canPrevious) {
-                        _pager.previous();
-                      }
-                    },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      child: Wrap(
-                        key: ValueKey(
-                          'buy-paged-vertical-grid-${widget.scopeKey}',
-                        ),
-                        spacing: 7,
-                        runSpacing: 10,
-                        children: [
-                          for (final (index, product) in products.indexed)
-                            SizedBox(
-                              width: layout.cardWidth,
-                              height: rowHeights[index ~/ layout.columns],
-                              child: BuyV2ProductCard(
-                                key: ValueKey('buy-paged-card-${product.id}'),
-                                session: widget.session,
-                                product: product,
-                                compact: true,
-                                storeContext: widget.storeContext,
-                                onOpenProduct: widget.onOpenProduct,
-                              ),
+                  builder: (context, constraints, quantityWidth) {
+                    final scale = MediaQuery.textScalerOf(context).scale(1);
+                    final layout = _resolveCompactProductGridLayout(
+                      context: context,
+                      session: widget.session,
+                      products: products,
+                      constraints: constraints,
+                      accessibleText: scale > 1.25,
+                      textScale: scale,
+                      cartQuantityWidth: quantityWidth,
+                      denseStore: widget.storeContext,
+                      scrollIndicatorInset: true,
+                    );
+                    final rowHeights = _productGridRowHeights(
+                      context,
+                      widget.session,
+                      products,
+                      columns: layout.columns,
+                      cardWidth: layout.cardWidth,
+                      storeContext: widget.storeContext,
+                    );
+                    final canPrevious =
+                        !loading &&
+                        publicationCurrent &&
+                        page?.previousCursor != null;
+                    final canNext =
+                        !loading &&
+                        publicationCurrent &&
+                        page?.nextCursor != null;
+                    return Semantics(
+                      onScrollLeft: canNext ? _pager.next : null,
+                      onScrollRight: canPrevious ? _pager.previous : null,
+                      child: GestureDetector(
+                        key: ValueKey('buy-page-swipe-${widget.scopeKey}'),
+                        behavior: HitTestBehavior.opaque,
+                        onHorizontalDragStart: (_) => _pageDrag = 0,
+                        onHorizontalDragUpdate: (details) {
+                          _pageDrag += details.primaryDelta ?? 0;
+                        },
+                        onHorizontalDragCancel: () => _pageDrag = 0,
+                        onHorizontalDragEnd: (_) {
+                          final distance = _pageDrag;
+                          _pageDrag = 0;
+                          if (_pager.loading ||
+                              _pager.query != widget.query ||
+                              distance.abs() < 48) {
+                            return;
+                          }
+                          if (distance < 0 && canNext) {
+                            _pager.next();
+                          } else if (distance > 0 && canPrevious) {
+                            _pager.previous();
+                          }
+                        },
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 6,
+                          ),
+                          child: Wrap(
+                            key: ValueKey(
+                              'buy-paged-vertical-grid-${widget.scopeKey}',
                             ),
-                        ],
+                            spacing: 7,
+                            runSpacing: 10,
+                            children: [
+                              for (final (index, product) in products.indexed)
+                                SizedBox(
+                                  width: layout.cardWidth,
+                                  height: rowHeights[index ~/ layout.columns],
+                                  child: BuyV2ProductCard(
+                                    key: ValueKey(
+                                      'buy-paged-card-${product.id}',
+                                    ),
+                                    session: widget.session,
+                                    product: product,
+                                    compact: true,
+                                    storeContext: widget.storeContext,
+                                    onOpenProduct: widget.onOpenProduct,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       ),
-                    ),
+                    );
+                  },
+                ),
+              if (!loading &&
+                  page != null &&
+                  products.isNotEmpty &&
+                  page.nextCursor == null)
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 6,
                   ),
-                );
-              },
-            ),
-          pageControls(bottom: true),
-          if (!loading &&
-              page != null &&
-              products.isNotEmpty &&
-              page.nextCursor == null)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              child: Text(
-                'All matching ${widget.publishedOffers ? 'offers' : 'products'} are on this or earlier pages.',
-                style: context.buyMeta,
-              ),
-            ),
-        ],
+                  child: Text(
+                    'All matching ${widget.publishedOffers ? 'offers' : 'products'} are on this or earlier pages.',
+                    style: context.buyMeta,
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1329,26 +1345,20 @@ class _CataloguePageControls extends StatelessWidget {
     required this.count,
     required this.total,
     required this.loading,
-    this.areaLabel,
-    this.onArea,
     this.onPrevious,
     this.onNext,
     this.onRefresh,
     this.noun = 'products',
-    this.showRange = true,
   });
   final String scopeKey;
   final int? start;
   final int count;
   final int? total;
   final bool loading;
-  final String? areaLabel;
-  final VoidCallback? onArea;
   final VoidCallback? onPrevious;
   final VoidCallback? onNext;
   final VoidCallback? onRefresh;
   final String noun;
-  final bool showRange;
 
   @override
   Widget build(BuildContext context) {
@@ -1372,7 +1382,6 @@ class _CataloguePageControls extends StatelessWidget {
             key: ValueKey('buy-page-range-$scopeKey'),
             style: rangeStyle,
           ),
-          if (areaLabel != null) Text(areaLabel!, style: context.buyMeta),
         ],
       ),
     );
@@ -1394,30 +1403,6 @@ class _CataloguePageControls extends StatelessWidget {
       onPressed: onRefresh,
       icon: const Icon(Icons.refresh_rounded, size: 20),
     );
-    final area = onArea == null
-        ? null
-        : IconButton(
-            key: ValueKey('buy-page-area-$scopeKey'),
-            tooltip: 'Choose shopping area',
-            onPressed: onArea,
-            icon: const Icon(Icons.location_on_outlined, size: 20),
-          );
-    if (!showRange) {
-      return BuyV2CartAvoidanceRegion(
-        key: ValueKey('buy-page-controls-protection-$scopeKey'),
-        child: Semantics(
-          key: ValueKey('buy-page-status-$scopeKey'),
-          label: range,
-          liveRegion: true,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-            child: Row(
-              children: [previous, next, const Spacer(), refresh, ?area],
-            ),
-          ),
-        ),
-      );
-    }
     return BuyV2CartAvoidanceRegion(
       key: ValueKey('buy-page-controls-protection-$scopeKey'),
       child: Padding(
@@ -1431,8 +1416,7 @@ class _CataloguePageControls extends StatelessWidget {
               maxWidth: double.infinity,
               maxLines: 1,
             ).width;
-            final inlineWidth =
-                constraints.maxWidth - (area == null ? 144 : 192);
+            final inlineWidth = constraints.maxWidth - 144;
             if (labelWidth > inlineWidth) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1441,9 +1425,7 @@ class _CataloguePageControls extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: summary,
                   ),
-                  Row(
-                    children: [previous, next, const Spacer(), refresh, ?area],
-                  ),
+                  Row(children: [previous, next, const Spacer(), refresh]),
                 ],
               );
             }
@@ -1453,7 +1435,6 @@ class _CataloguePageControls extends StatelessWidget {
                 Expanded(child: summary),
                 next,
                 refresh,
-                ?area,
               ],
             );
           },
@@ -8876,6 +8857,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
           accessibleText: accessibleText,
           textScale: textScale,
           denseStore: storeContext,
+          savedContext: savedContext,
           cartQuantityWidth: quantityWidth,
         );
         if (vertical) {
@@ -8886,6 +8868,7 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
             columns: layout.columns,
             cardWidth: layout.cardWidth,
             storeContext: storeContext,
+            savedContext: savedContext,
           );
           return Semantics(
             key: ValueKey('buy-vertical-product-summary-$storageKey'),
@@ -8979,6 +8962,7 @@ _resolveCompactProductGridLayout({
   required bool accessibleText,
   required double textScale,
   bool denseStore = false,
+  bool savedContext = false,
   bool scrollIndicatorInset = false,
   double cartQuantityWidth = 0,
 }) {
@@ -8999,6 +8983,7 @@ _resolveCompactProductGridLayout({
       product,
       cardWidth,
       denseStore,
+      savedContext: savedContext,
     );
     if (height > tileHeight) tileHeight = height;
   }
@@ -9023,6 +9008,7 @@ List<double> _productGridRowHeights(
   required int columns,
   required double cardWidth,
   required bool storeContext,
+  bool savedContext = false,
 }) {
   final heights = <double>[];
   for (var start = 0; start < products.length; start += columns) {
@@ -9035,6 +9021,7 @@ List<double> _productGridRowHeights(
         product,
         cardWidth,
         storeContext,
+        savedContext: savedContext,
       );
       if (measured > height) height = measured;
     }
@@ -9091,9 +9078,26 @@ double _productGlanceCardHeight(
   BuyV2Session session,
   BuyV2Product product,
   double cardWidth,
-  bool storeContext,
-) {
-  var height = 78.0 + 12 + BuyV2Metrics.minimumTap + 8 + 4;
+  bool storeContext, {
+  bool savedContext = false,
+}) {
+  final compactSavedAction =
+      savedContext &&
+      cardWidth < 130 &&
+      MediaQuery.textScalerOf(context).scale(1) <= 1.25;
+  final reservedActionWidth = savedContext && !compactSavedAction ? 68.0 : 42.0;
+  var height =
+      _compactProductVisualLayout(
+        context,
+        product,
+        cardWidth - 2,
+        reservedActionWidth,
+      ).photoInset +
+      70 +
+      12 +
+      BuyV2Metrics.minimumTap +
+      8 +
+      4;
   for (final (index, field) in _productGlanceFields(
     session,
     product,
@@ -11027,7 +11031,7 @@ class BuyV2ProductCard extends StatelessWidget {
                   ],
                 ),
                 Positioned(
-                  top: 2,
+                  top: compact ? 0 : 2,
                   right: 2,
                   child: _ProductSaveButton(
                     session: session,
@@ -11422,6 +11426,47 @@ class _ProductSaveButton extends StatelessWidget {
   }
 }
 
+({double photoInset, double badgeTop, double badgeRight, double badgeMaxWidth})
+_compactProductVisualLayout(
+  BuildContext context,
+  BuyV2Product product,
+  double width,
+  double reservedActionWidth,
+) {
+  var controlsBottom = 44.0; // Reserve the complete Save touch target.
+  var badgeTop = 6.0;
+  var badgeRight = reservedActionWidth + 6;
+  var badgeMaxWidth = 96.0;
+  if (product.badge.trim().isNotEmpty) {
+    final painter = TextPainter(
+      text: TextSpan(
+        text: _compactProductBadge(product.badge),
+        style: DefaultTextStyle.of(context).style.merge(
+          const TextStyle(fontSize: 8, fontWeight: FontWeight.w900),
+        ),
+      ),
+      textDirection: Directionality.of(context),
+      textScaler: MediaQuery.textScalerOf(context),
+    )..layout(maxWidth: (width - 6 - badgeRight).clamp(5, 96) - 4);
+    // Long provider facts read across the card, below the Save control.
+    if (badgeTop + painter.height.ceilToDouble() + 4 > controlsBottom) {
+      badgeTop = controlsBottom + 2;
+      badgeRight = 6;
+      badgeMaxWidth = (width - 12).clamp(5, double.infinity);
+      painter.layout(maxWidth: badgeMaxWidth - 4);
+    }
+    final badgeBottom = badgeTop + painter.height.ceilToDouble() + 4;
+    if (badgeBottom > controlsBottom) controlsBottom = badgeBottom;
+    painter.dispose();
+  }
+  return (
+    photoInset: controlsBottom + 2,
+    badgeTop: badgeTop,
+    badgeRight: badgeRight,
+    badgeMaxWidth: badgeMaxWidth,
+  );
+}
+
 class _ProductVisual extends StatelessWidget {
   const _ProductVisual({
     required this.product,
@@ -11434,10 +11479,19 @@ class _ProductVisual extends StatelessWidget {
   final double reservedActionWidth;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context) => LayoutBuilder(builder: _buildVisual);
+
+  Widget _buildVisual(BuildContext context, BoxConstraints constraints) {
     final colors = _productVisualColors(product);
+    final visualLayout = _compactProductVisualLayout(
+      context,
+      product,
+      constraints.maxWidth,
+      reservedActionWidth,
+    );
+    final photoInset = compact ? visualLayout.photoInset : 0.0;
     return SizedBox(
-      height: compact ? 78 : 110,
+      height: compact ? photoInset + 70 : 110,
       child: Stack(
         children: [
           Positioned.fill(
@@ -11451,17 +11505,22 @@ class _ProductVisual extends StatelessWidget {
               ),
             ),
           ),
-          Align(
-            alignment: const Alignment(0, .35),
-            child: SizedBox(
-              key: ValueKey('buy-grid-packshot-${product.id}'),
-              width: compact
-                  ? (MediaQuery.textScalerOf(context).scale(1) > 1.6 ? 130 : 96)
-                  : 96,
-              height: compact ? 70 : 86,
-              child: BuyV2ProductPackshot(
-                product: product,
-                borderRadius: compact ? 8 : 12,
+          Padding(
+            padding: EdgeInsets.only(top: photoInset),
+            child: Align(
+              alignment: compact ? Alignment.center : const Alignment(0, .35),
+              child: SizedBox(
+                key: ValueKey('buy-grid-packshot-${product.id}'),
+                width: compact
+                    ? (MediaQuery.textScalerOf(context).scale(1) > 1.6
+                          ? 130
+                          : 96)
+                    : 96,
+                height: compact ? 70 : 86,
+                child: BuyV2ProductPackshot(
+                  product: product,
+                  borderRadius: compact ? 8 : 12,
+                ),
               ),
             ),
           ),
@@ -11469,15 +11528,17 @@ class _ProductVisual extends StatelessWidget {
             Positioned(
               key: ValueKey('buy-product-card-badge-${product.id}'),
               left: 6,
-              top: 6,
-              right: compact ? reservedActionWidth : 6,
+              top: compact ? visualLayout.badgeTop : 6,
+              right: compact ? visualLayout.badgeRight : 6,
               child: Align(
                 alignment: Alignment.topLeft,
                 child: BuyV2CartAvoidanceRegion(
                   child: Container(
-                    constraints: BoxConstraints(maxWidth: compact ? 96 : 120),
+                    constraints: BoxConstraints(
+                      maxWidth: compact ? visualLayout.badgeMaxWidth : 120,
+                    ),
                     padding: EdgeInsets.symmetric(
-                      horizontal: compact ? 4 : 6,
+                      horizontal: compact ? 2 : 6,
                       vertical: compact ? 2 : 4,
                     ),
                     decoration: BoxDecoration(

@@ -483,7 +483,7 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "twelve_records_source_committed_prebuild_passed_candidate_pending",
+    "state": "final_rows_media_source_qualified_commit_gates_and_redmi_pending",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
@@ -510,8 +510,10 @@
     "redmiRedesignVerified": false,
     "newApkBuilt": true,
     "remaining": [
-      "Commit and push prebuild evidence, verify clean exact live equality, then build/install r66.27 on Redmi preserving data",
-      "Verify affected navigation and M02 correction on Redmi, reconcile twelve records and final Git evidence"
+      "Run the two required combined regressions on current row-removal and media-overlap source; preserve existing skips and exclusions",
+      "Commit and push scoped source/evidence, verify clean Git and exact live remote equality, then required exact-source prebuild gates",
+      "Build one uniquely identified successor Cursor Review APK, install preserving data on Redmi TG8HCYTGGQT885OF only",
+      "Verify current C05 top/bottom removal and gestures, M01 media separation, pending M02/Search/supplier occurrences and reconcile all twelve records with prior evidence"
     ],
     "registryEntryCount": 4589,
     "registrySha256": "A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB",
@@ -762,6 +764,95 @@
       "versionCode": 2026091503,
       "buildCompleted": false,
       "deviceVerified": false
+    },
+    "currentRowRemoval": {
+      "ticket": "SKU-M05-C05",
+      "sourceCommitted": false,
+      "bothVisibleRowsRemoved": true,
+      "focusedGestureAndAccessibilityPasses": 6,
+      "focusedReceipt": "sku-row-removal-focused-05.result.json",
+      "focusedReceiptSha256": "FD57A43BA65A00A9666E001EB61C168A3F3D3670E0C3F7AFEB78070BD436F369",
+      "deviceVerified": false,
+      "focusedPassed": 6,
+      "receiptSha256": "0138E59FC4B04C3E98439F94577032F3A821BB42821322BC2FE0B4BB34F4908E"
+    },
+    "mediaImpactAudit": {
+      "founderRequested": true,
+      "priorFixes": [
+        "81f049e8",
+        "08820cce"
+      ],
+      "scope": "Existing supplier photo/variant/media behavior across shared product grids and detail surfaces",
+      "status": "final_source_qualified_successor_redmi_pending",
+      "newProductTicket": false,
+      "providerPublication": "existing separate dependency, no backend work",
+      "existingOccurrence": "SKU-M01",
+      "auditReceiptSha256": "752302AC73908BBEF2EBDE0E427F8A7E2DF4E76EDCE7EA3C2BE7E5486C9E7B25",
+      "currentGridPassed": 25,
+      "preCorrectionMediaSuitePassed": 146,
+      "deviceVerified": false,
+      "finalFocusedReceipt": "sku-rows-media-focused-02.json",
+      "finalFocusedReceiptSha256": "7BEE9E84D8324081E32ECD2AE1A6429B6D9EF92E57541BC83A8388D9A3D65B18"
+    },
+    "installedNavigationCandidate": {
+      "versionName": "1.0.0-r66.27-cursorreview",
+      "versionCode": 2026091503,
+      "apkSha256": "A218E31C209305FD709AEF4FCAC70DB10452C46B93B248B9E5E8AED3DF273EE9",
+      "source": "64ca4d757cffc1cc1fa575b84004cd827e6695ab",
+      "seal": "f3403f9ad14a709e0bee9b37d2c5aa03a72c5a5a",
+      "installationReceiptSha256": "149994F73C65DB0810BD449C7165F7F41ADFF6E2CE3B7DB3FF3B4841FE32D69C",
+      "deviceDisposition": "C05 rejected; partial navigation observations preserved; no full closure"
+    },
+    "currentFinalLocalQualification": {
+      "analysis": "sku-final-analysis-12",
+      "returnPassed": 5,
+      "savedBadgePassed": 4,
+      "landscapeStorePassed": 7,
+      "mediaPassed": 25,
+      "sourceCommitted": false,
+      "fullCombinedPassed": true,
+      "redmiVerified": false,
+      "interruptedCombined01": "retained_failed",
+      "completeCombined03": {
+        "passed": 2448,
+        "skipped": 27,
+        "failed": 5,
+        "state": "retained_failed_not_qualification"
+      },
+      "nextRunner": "run-sku-rows-media-prebuild.py",
+      "priorFocused08": {
+        "analysis": "sku-final-analysis-08",
+        "returnPassed": 5,
+        "savedBadgePassed": 4,
+        "landscapeStorePassed": 7,
+        "mediaPassed": 24
+      },
+      "storeDensityPassed": 1,
+      "finalSourceFocusedCases": 30,
+      "relatedStorePriorSourcePassed": 3,
+      "completeCombined05": {
+        "passed": 2450,
+        "skipped": 27,
+        "failed": 3,
+        "state": "retained_failed_not_qualification"
+      },
+      "savedMediaRed10": "retained_failed_22px_photo_corrected_to_at_least_70px",
+      "qualifiedReceipt": "current-source-qualification-04.json",
+      "qualifiedReceiptSha256": "C8F598EE3007D1486F66433731257C90B74A1B9FC99281DFC3470EB18B0E30B6",
+      "combinedRuns": [
+        {
+          "stage": "sku-rows-media-combined-07",
+          "passed": 2454,
+          "skipped": 27,
+          "failed": 0
+        },
+        {
+          "stage": "sku-rows-media-combined-08",
+          "passed": 2454,
+          "skipped": 27,
+          "failed": 0
+        }
+      ]
     }
   }
 }

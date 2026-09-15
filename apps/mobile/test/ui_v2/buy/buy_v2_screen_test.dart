@@ -8071,16 +8071,37 @@ void main() {
             tester.getRect(miniCart).top,
             greaterThanOrEqualTo(tester.getRect(catalogue).top),
           );
-          final neighbours = session.visibleProducts.where((candidate) {
-            if (candidate.id == product.id) return false;
-            final control = find.byKey(ValueKey('buy-add-${candidate.id}'));
-            if (control.evaluate().isEmpty) return false;
-            final rect = tester.getRect(control);
-            return rect.left >= 0 &&
-                rect.right <= 800 &&
-                rect.top >= tester.getRect(scrollable).top &&
-                rect.bottom <= dockTop;
-          }).toList();
+          List<BuyV2Product> visibleNeighbours() =>
+              session.visibleProducts.where((candidate) {
+                if (candidate.id == product.id) return false;
+                final control = find.byKey(ValueKey('buy-add-${candidate.id}'));
+                if (control.evaluate().isEmpty) return false;
+                final rect = tester.getRect(control);
+                return rect.left >= 0 &&
+                    rect.right <= 800 &&
+                    rect.top >= tester.getRect(scrollable).top &&
+                    rect.bottom <= dockTop;
+              }).toList();
+          var neighbours = visibleNeighbours();
+          if (neighbours.isEmpty) {
+            final nextProduct = session.visibleProducts.firstWhere(
+              (candidate) =>
+                  candidate.id != product.id &&
+                  find
+                      .byKey(ValueKey('buy-add-${candidate.id}'))
+                      .evaluate()
+                      .isNotEmpty,
+            );
+            final nextAction = find.byKey(
+              ValueKey('buy-add-${nextProduct.id}'),
+            );
+            await Scrollable.ensureVisible(
+              tester.element(nextAction),
+              alignment: .4,
+            );
+            await tester.pumpAndSettle();
+            neighbours = visibleNeighbours();
+          }
           expect(neighbours, isNotEmpty);
           final neighbour = neighbours.first;
           final neighbourAdd = find.byKey(ValueKey('buy-add-${neighbour.id}'));
@@ -10393,14 +10414,18 @@ void main() {
         await tester.pumpAndSettle();
         final search = find.byType(BuyV2SearchResultsView);
         expect(search, findsOneWidget);
-        final next = find.byKey(const ValueKey('buy-page-next-search-shop'));
-        await tester.ensureVisible(next);
-        await tester.pumpAndSettle();
-        await tester.tap(next);
-        await tester.pumpAndSettle();
         final rangeFinder = find.byKey(
           const ValueKey('buy-page-status-search-shop'),
         );
+        final actions = tester
+            .widget<Semantics>(rangeFinder)
+            .properties
+            .customSemanticsActions!;
+        final next = actions.keys.singleWhere(
+          (action) => action.label == 'Next products',
+        );
+        actions[next]!();
+        await tester.pumpAndSettle();
         final range = tester.widget<Semantics>(rangeFinder).properties.label!;
         expect(range, startsWith('41'));
         final card = find
@@ -11184,6 +11209,12 @@ void main() {
         findsOneWidget,
       );
 
+      await Scrollable.ensureVisible(
+        tester.element(relatedStore),
+        alignment: .4,
+      );
+      await tester.pumpAndSettle();
+      expect(relatedStore.hitTestable(), findsOneWidget);
       await tester.tap(relatedStore);
       await tester.pumpAndSettle();
       expect(
@@ -11194,6 +11225,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(originalStore, findsOneWidget);
 
+      expect(relatedStore.hitTestable(), findsOneWidget);
       await tester.tap(relatedStore);
       await tester.pumpAndSettle();
       final nestedStore = find.byKey(
@@ -11252,6 +11284,9 @@ void main() {
       const ValueKey('buy-shop-seller-other-store-s-tomato'),
     );
     await tester.scrollUntilVisible(relatedStore, 180, scrollable: storeScroll);
+    await Scrollable.ensureVisible(tester.element(relatedStore), alignment: .4);
+    await tester.pumpAndSettle();
+    expect(relatedStore.hitTestable(), findsOneWidget);
     await tester.tap(relatedStore);
     await tester.pumpAndSettle();
 
@@ -11261,12 +11296,14 @@ void main() {
     final nestedRoute = find.byKey(
       const ValueKey('buy-shop-seller-route-s-tomato'),
     );
-    await tester.tap(
-      find.descendant(
-        of: nestedStore,
-        matching: find.byKey(const ValueKey('buy-add-s-tomato')),
-      ),
+    final nestedAdd = find.descendant(
+      of: nestedStore,
+      matching: find.byKey(const ValueKey('buy-add-s-tomato')),
     );
+    await Scrollable.ensureVisible(tester.element(nestedAdd), alignment: .4);
+    await tester.pumpAndSettle();
+    expect(nestedAdd.hitTestable(), findsOneWidget);
+    await tester.tap(nestedAdd);
     await tester.pumpAndSettle();
     expect(session.quantityFor('s-tomato'), 1);
     final nestedCart = find.descendant(
