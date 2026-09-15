@@ -174,15 +174,16 @@ void main() {
       find.byKey(const ValueKey('buy-product-m-metformin-500')),
       findsOneWidget,
     );
-    expect(
-      find.byKey(const ValueKey('buy-horizontal-product-grid')),
-      findsOneWidget,
+    final pharmacyGrid = find.byWidgetPredicate(
+      (widget) =>
+          widget.key is ValueKey<String> &&
+          (widget.key! as ValueKey<String>).value.startsWith(
+            'buy-vertical-product-grid-',
+          ),
     );
+    expect(pharmacyGrid, findsOneWidget);
     expect(
-      find.descendant(
-        of: find.byKey(const ValueKey('buy-horizontal-product-grid')),
-        matching: find.text('Pain relief gel'),
-      ),
+      find.descendant(of: pharmacyGrid, matching: find.text('Pain relief gel')),
       findsNothing,
     );
 

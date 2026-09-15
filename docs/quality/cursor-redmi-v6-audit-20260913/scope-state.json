@@ -433,7 +433,7 @@
         "Required local and two combined regressions; unique APK gate and Redmi qualification"
       ],
       "manifestPath": "docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md",
-      "manifestSha256": "5184AD1E7AE46C3678C315ADEE593B5A2F40C9097EDAFED41C03BD64B161998B",
+      "manifestSha256": "BCCC3BCF4632267C3D516E597580AA211D7AC6D54383CEE6B7E7764A7986FBB0",
       "timelineImpactDays": 1,
       "reuseInventoryComplete": true,
       "duplicateSearchComplete": true,
@@ -483,34 +483,39 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "qualified_source_and_admission_prebuild_seal_in_progress",
+    "state": "local_source_qualified_source_commit_and_successor_gates_pending",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
       "SKU-M02",
       "SKU-M03",
       "SKU-M04",
-      "SKU-M05"
+      "SKU-M05",
+      "SKU-M01-C01",
+      "SKU-M01-C02",
+      "SKU-M05-C01",
+      "SKU-M05-C02",
+      "SKU-M05-C03"
     ],
     "device": "TG8HCYTGGQT885OF",
     "evidenceRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/sku-metadata-redmi-20260914",
     "prior22OriginalAndSoleChildClosuresPreserved": true,
-    "sourceCommitted": true,
+    "sourceCommitted": false,
     "localChecksPassed": 20,
     "localFlutterImages": 68,
     "manuallyReviewedImages": 2,
     "qualificationReportSha256": "A5D824A5599815784675E067B57D3A7E178B2F7FEA4AE7376A0939C42609BDC0",
     "redmiRedesignVerified": false,
-    "newApkBuilt": false,
+    "newApkBuilt": true,
     "remaining": [
-      "Commit and push exact-source admission/prebuild evidence; verify clean live remote seal",
-      "Prepare and pass fresh r66.25 machine state and unchanged wrapper preflight/build",
-      "Verify APK and data-preserving Redmi install",
-      "Qualify all five SKU tickets on Redmi and final clean live Git handoff"
+      "Commit qualified corrections and verify live Git equality",
+      "Pass exact-source prebuild gates and seal",
+      "Build one uniquely identified successor and install data-preserving on Redmi TG8HCYTGGQT885OF",
+      "Verify ten existing SKU acceptance records on Redmi and record final Git handoff"
     ],
-    "registryEntryCount": 4587,
-    "registrySha256": "CB8C61F0457D313C54602A4D79C1DEDA897A2E6889600F3974E19F61096422E2",
-    "qualificationAppliesTo": "Current analysis and two full combined runs passed with 3044 tracked source/reference owners preserved. Focused visual reports remain case/source-specific; device closure is pending.",
+    "registryEntryCount": 4589,
+    "registrySha256": "A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB",
+    "qualificationAppliesTo": "Current uncommitted correction bytes in current-source-qualification-02.json are locally qualified. Existing applicationSource/newApkBuilt and prior reports retain r66.25 history; the corrective successor is not built.",
     "latestFullScreenRun": {
       "passed": 325,
       "failed": 15,
@@ -545,25 +550,32 @@
       "terminal": "e6eb1b",
       "currentSourceQualification": "Verified by current-source-qualification-01.json; both current runs pass; 27 inherited skips and 10 frozen-reference exclusions remain separately disclosed."
     },
-    "implementationStatus": "All five tickets implemented and locally qualified; successor APK and actual Redmi verification pending.",
+    "implementationStatus": "All ten existing SKU acceptance records implemented and locally qualified; no successor device closure. Complete source commit/live equality, exact-source prebuild gates and one successor APK, then ten-ticket Redmi verification.",
     "successorAuthorization": {
       "basis": "Current founder goal explicitly requests necessary unique successor APK and data-preserving Redmi qualification after local checks.",
-      "candidatePlan": "UAW-CURSOR-SKU-METADATA-20260915",
+      "candidatePlan": "UAW-CURSOR-SKU-METADATA-CORRECTION-20260915",
       "device": "TG8HCYTGGQT885OF",
       "buildReady": false,
-      "qualificationPrerequisitesRemainRequired": true
+      "qualificationPrerequisitesRemainRequired": true,
+      "lastCandidatePlan": "UAW-CURSOR-SKU-METADATA-20260915"
     },
     "currentCombinedProcess": {
-      "session": 72812,
-      "analysis": "analysis-06.log",
-      "cycles": [
-        "combined-behavior-05.log",
-        "combined-behavior-06.log"
-      ],
       "state": "completed_exit_zero_support_restored",
-      "terminal": "e6eb1b"
+      "analysis": "analysis-13.log",
+      "cycles": [
+        "combined-correction-test-04.log",
+        "combined-correction-test-05.log"
+      ],
+      "terminalChunks": [
+        "e063ef",
+        "a8e417"
+      ],
+      "passedPerCycle": 2419,
+      "skippedPerCycle": 27,
+      "failedPerCycle": 0,
+      "preservedOwnerCount": 3044
     },
-    "sourceQualificationReceiptSha256": "665EA731666C43789C44E606BE4AF47E21B4A503C3F9203ACBD405397B03928A",
+    "sourceQualificationReceiptSha256": "0CA65EDD285A58210D1A88413A2B603FC480942A5421BD55970B4D6739F2CAEA",
     "applicationSource": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
     "implementationGitCheckpoint": {
       "state": "clean_live_remote_equal",
@@ -580,6 +592,112 @@
       "state": "source_gates_passed",
       "receiptSha256": "B5D8B6B0F64B70CDB68A599280AA74DD1092489F1C36CDB11020C5D3010122AB",
       "candidateMachinePreflight": "pending"
+    },
+    "redmiQualification": {
+      "state": "corrections_required",
+      "version": "1.0.0-r66.25-cursorreview",
+      "versionCode": 2026091501,
+      "apkSha256": "209E51297A64D52A7C20E5B8E662EAFE0CE88D78A6A1F3C4D4B618F6D14A377E",
+      "installationReceiptSha256": "B4F4FA801FEDCA85BBE90D3C166975B900109C5ED95195CCB9E8972BB4DD6139",
+      "reportSha256": "010DAD3F623409B4180DC06135723ABB96CB21DA40245AE314876299C9BB61ED",
+      "capturedFrames": 33,
+      "explicitlyReviewedFrames": 19,
+      "correctionTickets": [
+        "SKU-M02",
+        "SKU-M05"
+      ],
+      "occurrences": 3,
+      "ticketsClosed": 0,
+      "temporaryCartQuantityRestored": 0,
+      "savedCountPreserved": 1,
+      "fontScaleRestored": "1.0",
+      "deviceCheckpoint": "Shop"
+    },
+    "correctiveImplementation": {
+      "state": "implemented_locally_qualified_successor_device_pending",
+      "regression": "REG-20260915-4617-SKU-DEVICE-METADATA-COMPLETENESS",
+      "newRuntimeOwners": [],
+      "correctiveSuccessorBuilt": false
+    },
+    "founderReviewAmendment": {
+      "date": "2026-09-15",
+      "children": [
+        "SKU-M01-C01",
+        "SKU-M01-C02",
+        "SKU-M05-C01",
+        "SKU-M05-C02",
+        "SKU-M05-C03"
+      ],
+      "parentCount": 5,
+      "childCount": 5,
+      "totalAcceptanceRecords": 10,
+      "closed": 0,
+      "columnsConfirmed": 3,
+      "direction": "vertical product/category discovery; pagination at top and bottom",
+      "pricing": "remove broad blue panel; optional single yellow highlight fitted to price digits",
+      "state": "shared_grid_pricing_vertical_rows_and_dual_paging_implemented_partial_focused_qualification",
+      "evidence": "successor-captures/034-founder-price-grid-review.png",
+      "currentDeviceState": "Saved 1; 9+ is confirmed delivery tracker for 12 existing deliveries, not Cart. No user data changed.",
+      "manifestSha256": "BCCC3BCF4632267C3D516E597580AA211D7AC6D54383CEE6B7E7764A7986FBB0",
+      "focusedGridEvidence": {
+        "report": "founder-grid-qualification-01.json",
+        "passes": 18,
+        "failures": 0,
+        "captures": 18,
+        "explicitVisualReviews": 2,
+        "deviceVerified": false
+      }
+    },
+    "unexpectedCartInvestigation": {
+      "state": "disputed_indicator_identified_no_cart_defect_established",
+      "founderStatement": "Founder did not add products; Cart indicator 9+ was already present.",
+      "evidence": "successor-captures/034-founder-price-grid-review.png",
+      "requirements": [
+        "Inspect current installed Redmi actual Cart contents and badge before clearing or changing anything",
+        "Compare recorded pre/post-install state and review startup/restoration behavior",
+        "Register any confirmed distinct defect without assuming founder actions",
+        "Correct and locally qualify any confirmed in-scope issue alongside nine SKU acceptance records before successor build",
+        "Preserve user data and evidence; no real checkout, payment or message"
+      ],
+      "confirmedDefect": false,
+      "finding": "9+ opens Deliveries (12); earlier assistant Cart attribution incorrect",
+      "evidenceReport": "delivery-indicator-investigation-result-01.json",
+      "reportSha256": "AB7C2A33E8323811E17B5ABCA7BCDDC9B14098222B9BBDF1AAE784AF850A9A40",
+      "remaining": "Cart continuity qualification remains required; no basis to clear Cart or add a phantom-item defect."
+    },
+    "effectiveGoalScope": "Complete all five SKU parent tickets and five founder review children (ten open acceptance records), including real provider metadata adaptive to length and runtime updates. Preserve data and closed evidence; required local/visual/regression gates, unique Redmi-only successor, device verification and clean live remote Git handoff remain mandatory.",
+    "providerMetadataAcceptance": {
+      "ticket": "SKU-M05-C03",
+      "state": "static_and_dynamic_provider_names_focused_pass_remaining_cross_surface_acceptance",
+      "authoritativeFields": [
+        "product name",
+        "pack size",
+        "quantity",
+        "store/supplier name",
+        "delivery",
+        "freight"
+      ],
+      "founderTestStoreNames": [
+        "supermandi tech priate limited",
+        "hanumana ram beniwal sardarpura jodhpure store"
+      ],
+      "normalPhoneColumns": 3,
+      "layout": "Full essential text wraps; height grows per row; enlarged text adapts; provider names remain verbatim",
+      "backendImplementationAuthorized": false,
+      "appliesTo": "Every provider and product displayed in existing consumer presentations",
+      "providerTypes": [
+        "stores",
+        "retailers",
+        "wholesalers",
+        "suppliers/manufacturers",
+        "delivery providers",
+        "freight providers"
+      ],
+      "evidence": "provider-metadata-progress-01.json",
+      "dynamicFailure": "Corrected through existing validated facts-refresh API on accepted catalogue page changes; failed evidence preserved.",
+      "latestEvidence": "provider-refresh-qualified-01.json",
+      "focusedPasses": 4,
+      "deviceVerified": false
     }
   }
 }

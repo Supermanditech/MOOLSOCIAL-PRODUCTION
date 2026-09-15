@@ -882,7 +882,7 @@ void main() {
     }
   }
 
-  testWidgets('R66 Saved return retains the horizontal browsing position', (
+  testWidgets('R66 Saved return retains the vertical browsing position', (
     tester,
   ) async {
     tester.view.devicePixelRatio = 1;
@@ -901,21 +901,55 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(find.byKey(const ValueKey('buy-saved-products-button')));
     await tester.pumpAndSettle();
+    final grid = find.byKey(
+      ValueKey(
+        'buy-vertical-product-grid-buy-products-shop-${session.selectedCategoryId}-saved',
+      ),
+    );
     final lane = find
-        .byWidgetPredicate(
-          (widget) =>
-              widget is Scrollable &&
-              widget.axisDirection == AxisDirection.right,
+        .ancestor(
+          of: grid,
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                widget.axisDirection == AxisDirection.down,
+          ),
         )
-        .last;
-    final tile = find.byKey(ValueKey('buy-product-${products[2].id}'));
-    await tester.scrollUntilVisible(tile, 200, scrollable: lane);
-    await tester.pumpAndSettle();
+        .first;
+    final selected = products[3];
+    final image = find.descendant(
+      of: find.byKey(ValueKey('buy-product-${selected.id}')),
+      matching: find.byKey(ValueKey('buy-grid-packshot-${selected.id}')),
+    );
+    const imagePoint = Alignment(-.5, .55);
+    for (
+      var attempt = 0;
+      attempt < 100 &&
+          (image.hitTestable(at: imagePoint).evaluate().isEmpty ||
+              tester.state<ScrollableState>(lane).position.pixels <= 0);
+      attempt++
+    ) {
+      final point =
+          const [
+            Alignment(-.85, 0),
+            Alignment(.85, 0),
+            Alignment(-.85, -.5),
+            Alignment(.85, -.5),
+          ].firstWhere(
+            (point) => lane.hitTestable(at: point).evaluate().isNotEmpty,
+          );
+      await tester.dragFrom(
+        point.withinRect(tester.getRect(lane)),
+        const Offset(0, -120),
+      );
+      await tester.pumpAndSettle();
+    }
+    expect(image.hitTestable(at: imagePoint), findsOneWidget);
     final before = tester.state<ScrollableState>(lane).position.pixels;
     expect(before, greaterThan(0));
-    await tester.tap(tile);
+    await tester.tapAt(imagePoint.withinRect(tester.getRect(image)));
     await tester.pumpAndSettle();
-    expect(session.selectedProductId, products[2].id);
+    expect(session.selectedProductId, selected.id);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
     expect(find.text('Saved in Shop'), findsOneWidget);

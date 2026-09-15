@@ -1506,6 +1506,8 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-W
         'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart',
         'apps/mobile/lib/main.dart',
         'apps/mobile/lib/app/ui_review_language_store.dart',
         'apps/mobile/test/app/ui_review_language_store_test.dart',
@@ -1514,7 +1516,8 @@ if ($root.Replace('\','/').TrimEnd('/') -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-W
         'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart',
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart',
-        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart',
+        'apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart'
   )
   Assert-Coordination ($redmiClaim.Count -eq 1 -and $redmiClaim[0].role -ceq 'subagent' -and
     ((@($redmiClaim[0].owners | Sort-Object) -join '|') -ceq (@($redmiEvidenceOwners | Sort-Object) -join '|'))) 'Redmi operational claim changed.'
@@ -2460,26 +2463,29 @@ if ($ProductionLane -ceq 'baseline') {
       $languageAddedOwners = @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
       # Founder SKU metadata scope includes these exact regression-test prerequisites.
       $skuAddedTestOwners = @(
+        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart'
         'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'
         'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart'
         'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart'
         'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart'
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart'
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'
+        'apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart'
       )
       $languagePolicyBefore = Get-R66Utf8GitJson $successorParent 'config/codex-subagent-coordination-policy.json'
       $languagePolicyAfter = Get-Content -Raw -Encoding UTF8 -LiteralPath $policyPath | ConvertFrom-Json
       $languageClaim = @($languagePolicyAfter.activeClaims | Where-Object task -CEQ '/root/cursor_redmi_v6_audit_20260913')
-      Assert-Coordination ($languageClaim.Count -eq 1 -and $languageClaim[0].owners.Count -eq 55) 'SKU and language admission requires exactly55 owners.'
+      Assert-Coordination ($languageClaim.Count -eq 1 -and $languageClaim[0].owners.Count -eq 58) 'SKU and language admission requires exactly58 owners including pharmacy and Delivered-order continuity qualification.'
       foreach ($languageOwner in ($languageAddedOwners + $skuAddedTestOwners)) {
         Assert-Coordination (@($languageClaim[0].owners | Where-Object { $_ -ceq $languageOwner }).Count -eq 1) "Language owner absent or duplicated: $languageOwner"
       }
       $languageClaim[0].owners = @($languageClaim[0].owners | Where-Object { $_ -cnotin ($languageAddedOwners + $skuAddedTestOwners) })
-      # Founder SKU-M01..M05 scope adds only the six named tests above.
+      # Founder SKU-M01..M05 scope adds only the eight named tests above.
       # Bind the exact primary regression generation, then compare
       # the rest of the policy against the original authority unchanged.
-      Assert-Coordination ($languagePolicyAfter.registryBinding.entryCount -eq 4587 -and
-        $languagePolicyAfter.registryBinding.sha256 -ceq 'CB8C61F0457D313C54602A4D79C1DEDA897A2E6889600F3974E19F61096422E2') 'SKU regression generation differs.'
+      Assert-Coordination ($languagePolicyAfter.registryBinding.entryCount -eq 4589 -and
+        $languagePolicyAfter.registryBinding.sha256 -ceq 'A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB') 'SKU regression generation differs.'
       $languagePolicyAfter.registryBinding = $languagePolicyBefore.registryBinding
       Assert-Coordination (($languagePolicyBefore | ConvertTo-Json -Depth 100 -Compress) -ceq ($languagePolicyAfter | ConvertTo-Json -Depth 100 -Compress)) 'Language admission changed unrelated policy.'
       $successorPriorLines = @(& git -C $root show "${successorParent}:$successorChecker")
@@ -2504,14 +2510,18 @@ if ($ProductionLane -ceq 'baseline') {
       )
 '@).Replace("`r`n", "`n") + "`n", '')
       $successorRestored = $successorRestored.Replace(' -or $redmiLanguageOwner', '')
-      # Remove only the six exact SKU test-claim additions for preservation comparison.
+      # Remove the exact additional pharmacy test claim before baseline comparison.
+      $successorRestored = $successorRestored.Replace("        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart',`n", '')
+      $successorRestored = $successorRestored.Replace("        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart',`n", '')
+      # Remove only the seven exact SKU test-claim additions for preservation comparison.
       $successorRestored = $successorRestored.Replace((',
         ''apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart'',
         ''apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart'',
         ''apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart'',
         ''apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart'',
         ''apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart'',
-        ''apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart''').Replace("`r`n", "`n"), '')
+        ''apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart'',
+        ''apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart''').Replace("`r`n", "`n"), '')
       # Verify exact admitted label code, then restore it before the unchanged
       # outside-admission digest. Arbitrary code inside these markers fails.
       $rv6LabelBlock = [regex]::Matches($successorRestored, '(?ms)^# BEGIN founder RV6 historical evidence label exception 20260914\n.*?^# END founder RV6 historical evidence label exception 20260914\n\n')
@@ -2538,24 +2548,29 @@ if ($ProductionLane -ceq 'baseline') {
       # This admits local qualification, not a build or device acceptance.
       $fixtureHashes = @{
         'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' = '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
-        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = '873881B0F3CB66E855DB2DDEDF82AD80D20FAB4781FDDB4D69268A5D22F75CF2'
+        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = 'A103E497181F013D7F816A2BEF81FCEDC7FE322E87982BBABD91465691F5FC8D'
         'apps/mobile/lib/main.dart' = '5FE1A6762CBB516D4935AACABF5DA0A81D0307ABD78EA96026335659AEB196EB'
         'apps/mobile/lib/app/ui_review_language_store.dart' = '30816600AEDA842CBE06BBF38B11F6EA79D41679A03D3F8CF31BF9C975372A74'
         'apps/mobile/test/app/ui_review_language_store_test.dart' = '921F901A32EE5A5BEB905CF07F8E05E1C7B9ED97D38A912B96631E0D17494A3F'
-        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = '99054262369CDC1923B953D5B2BA04A06493B8A18CE2C6E146E95ACD50DA4A56'
-        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = '59D73F7E184B3181CDF6EDA39369A7C983E70EF030B82AE9B85306F10666244C'
+        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = 'E3D1EFB60F50EE9692FDB64C8B032189CB8BC8A74E41DCE9B90CA1EBF1BF1C5C'
+        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = 'B9741D55642ADA4B493C84F19F4B547AAD2D3497233B5A4798B5FC3FA8B02B2C'
       }
-      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'] = '45A72138CD0C7052F83B30DF10E993F8F0423FADA34A7ABE10881F5FE777A5C6'
-      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'] = '9DF9080A0E95FA6C3BB88C3A853F2EA11025CBB327976F2912D6A993469E6DF5'
+      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'] = '761A5F4BB1A4C5EB3EAA56C139D969E86BF3796CB4311E66CBD04A31C4CFCA60'
+      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'] = 'AAD3C214174CB9905D2434BEB67F2565057B2974750321DD0B2BA5CB82A54E54'
       $skuRegressionHashes = @{
-        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart' = '35C03A8BBAA21FAD3E07211D876D557C6FC97F0301783B9E8AD251590DEC0E13'
-        'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart' = 'EB874B8BDDEFC10B9C974B1E9957026BE743DDB67F9AEA92E5B41622C4311DFD'
+        'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart' = '51D79606E60CBF5AEC889BF5D0835FE5F1969A54BDA9EA9A8A93F8F734F86201'
+        'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart' = '5B01679CEBFED7076F3419F827ADBEEA95B007C3AC8B4E3CB04ECF3DE36B5A79'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart' = '85B196CD57C7C3C7B26BEC41B9F480599EBC8A25FE51FB474E4D49B2F9B410E3'
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart' = 'A6C8C7DFA1952EFB8982CE4D291480415B6CA44E289CAA4BB92FBED24AC0630D'
+        'apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart' = 'FBB49DF8E52F40914ABBF7B1F05FDBCF129E91674E5C846BA9199E3338DC9E11'
+        'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart' = 'C25112CB171E1C0DF2E4BC67E02052079E71A8B642B3A3D7C83D05C8B040DB72'
+        'apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart' = 'AAEB5EC44802A1610B553477B318C336E94B586EB84909144EBB78B2ECFCDF00'
         'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart' = '4CD127B1D11B95AE1B457A569406ED958973F8AF77DC3BD6E5CA222E7A1DF74C'
-        'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart' = '6ADC4C8A4AC1B3BFCC87A443AFE6AA94162A36176F75331724AB0C921505421B'
+        'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart' = 'C6E00B5159AE0E5075D28C11A0B86607CE5FC630DEAB7B6E3DAECD9A2F7D0DBE'
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart' = '0D4A54A2B44C6E842C8B53E9821B2CF5C9C56057D1B95B575EA274C9708B7BB6'
-        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart' = 'CFC85720CC4B9DA01677BFB52641ADAC2009AAEA4AEA1995FB5ED74637803E71'
-        'apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart' = '8DF332AF3C05C4761A2A6F367F8E32AE3D159DA6CF18D4766822254020440799'
-        'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart' = 'AE37BB5237F50904D1CC50EAB34328B4614F9C495F6A54FD2BD64D7C46BB136A'
+        'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart' = '9DD977762A59981BAF01496A88E13925917097E8553284BB9EAED4F183E32177'
+        'apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart' = 'B4A86F91743FFD459543858589B756DF3C33B2DB4C82E85446939DE547E8ED64'
+        'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart' = 'F033EB7252AA6B0C3BF750F66BA6A8F357E53688660D6B75FF95DACE9D1D495E'
         'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart' = '5EBE92844E92D559FBE45D3C0FF57DDE514F2F92CB47018CE228353BED1672CD'
       }
       $fixtureDelta = @(& git -C $root diff --name-only $successorParent -- apps backend contracts packages package.json package-lock.json pubspec.yaml pubspec.lock)

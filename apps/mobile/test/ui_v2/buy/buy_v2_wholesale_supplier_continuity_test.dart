@@ -104,7 +104,10 @@ void main() {
       );
       await revealSupplierAction(tester, supplier);
       expect(supplier, findsOneWidget);
-      expect(find.textContaining(session.product('w-oil').seller), findsWidgets);
+      expect(
+        find.textContaining(session.product('w-oil').seller),
+        findsWidgets,
+      );
       expect(find.text('Surya Oils India · Manufacturer'), findsWidgets);
       expect(find.textContaining('Surya Oils India'), findsWidgets);
       await tester.tap(supplier);
@@ -114,7 +117,16 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.byKey(const ValueKey('buy-horizontal-product-grid')),
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-wholesale-supplier-sheet-w-oil')),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget.key is ValueKey<String> &&
+                (widget.key! as ValueKey<String>).value.startsWith(
+                  'buy-vertical-product-grid-',
+                ),
+          ),
+        ),
         findsOneWidget,
       );
       expect(find.byKey(const ValueKey('buy-product-w-oil')), findsOneWidget);

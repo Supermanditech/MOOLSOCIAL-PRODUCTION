@@ -1580,7 +1580,16 @@ void main() {
     );
     expect(find.text('Store products'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+      find.descendant(
+        of: find.byKey(ValueKey('buy-shop-seller-sheet-${product.id}')),
+        matching: find.byWidgetPredicate(
+          (widget) =>
+              widget.key is ValueKey<String> &&
+              (widget.key! as ValueKey<String>).value.startsWith(
+                'buy-vertical-product-grid-',
+              ),
+        ),
+      ),
       findsOneWidget,
     );
     final continuation = session.sellerContinuationsFor(product).first;

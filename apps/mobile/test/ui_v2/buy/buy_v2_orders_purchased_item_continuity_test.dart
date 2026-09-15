@@ -142,6 +142,9 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(action, findsOneWidget);
+      await Scrollable.ensureVisible(tester.element(action), alignment: .4);
+      await tester.pumpAndSettle();
+      expect(action.hitTestable(), findsOneWidget);
       expect(tester.getSize(action).height, greaterThanOrEqualTo(44));
       final layoutException = tester.takeException();
       expect(

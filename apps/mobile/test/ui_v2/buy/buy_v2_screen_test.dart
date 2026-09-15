@@ -520,10 +520,25 @@ void main() {
             .first;
         for (
           var step = 0;
-          step < 12 && find.byType(BuyV2ProductCard).evaluate().isEmpty;
+          step < 100 && find.byType(BuyV2ProductCard).evaluate().isEmpty;
           step++
         ) {
-          await tester.drag(catalogueScroll, const Offset(0, -160));
+          final touchPoint =
+              const [
+                Alignment(-.85, 0),
+                Alignment(.85, 0),
+                Alignment(-.85, -.5),
+                Alignment(.85, -.5),
+              ].firstWhere(
+                (point) => catalogueScroll
+                    .hitTestable(at: point)
+                    .evaluate()
+                    .isNotEmpty,
+              );
+          await tester.dragFrom(
+            touchPoint.withinRect(tester.getRect(catalogueScroll)),
+            const Offset(0, -160),
+          );
           await tester.pumpAndSettle();
         }
         await tester.pumpAndSettle();
@@ -2092,82 +2107,100 @@ void main() {
     },
   );
 
-  testWidgets(
-    'discovery hierarchy leads with one horizontal product-image collection',
-    (tester) async {
-      addTearDown(() {
-        tester.view.resetPhysicalSize();
-        tester.view.resetDevicePixelRatio();
-      });
-      tester.view.devicePixelRatio = 1;
-      tester.view.physicalSize = const Size(360, 800);
-      final session = BuyV2Session(core: BuySession());
-      await tester.pumpWidget(app(session));
-      await tester.pumpAndSettle();
+  testWidgets('discovery hierarchy leads with three-column product rows', (
+    tester,
+  ) async {
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(360, 800);
+    final session = BuyV2Session(core: BuySession());
+    await tester.pumpWidget(app(session));
+    await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const ValueKey('buy-featured-products')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const ValueKey('buy-featured-product-list')),
-        findsOneWidget,
-      );
-      final products = session.catalogueSaleTypeProducts.take(2).toList();
-      final rects = [
-        for (final product in products)
-          tester.getRect(find.byKey(ValueKey('buy-product-${product.id}'))),
-      ];
-      expect(
-        rects[0].top,
-        lessThanOrEqualTo(304),
-        reason: 'the expanded motion stage must remain compact',
-      );
-      expect(rects[1].top, rects[0].top);
-      expect(rects[0].left, lessThan(rects[1].left));
-      final featuredPhoto = find.byKey(
-        ValueKey('buy-featured-packshot-${products.first.id}'),
-      );
-      expect(tester.getSize(featuredPhoto).width, greaterThanOrEqualTo(145));
-      final addRect = tester.getRect(
-        find.byKey(ValueKey('buy-add-${products.first.id}')),
-      );
-      final photoRect = tester.getRect(featuredPhoto);
-      expect(photoRect.height, greaterThan(addRect.height));
-      expect(photoRect.bottom, lessThanOrEqualTo(addRect.top));
-      expect(
-        find.byKey(const ValueKey('buy-more-products-heading')),
-        findsOneWidget,
-      );
+    expect(find.byKey(const ValueKey('buy-featured-products')), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-featured-product-list')),
+      findsOneWidget,
+    );
+    final products = session.catalogueSaleTypeProducts.take(3).toList();
+    final rects = [
+      for (final product in products)
+        tester.getRect(find.byKey(ValueKey('buy-product-${product.id}'))),
+    ];
+    expect(
+      rects[0].top,
+      lessThanOrEqualTo(304),
+      reason: 'the expanded motion stage must remain compact',
+    );
+    expect(rects[1].top, rects[0].top);
+    expect(rects[2].top, rects[0].top);
+    expect(rects[2].left, greaterThan(rects[1].right));
+    expect(rects[0].left, lessThan(rects[1].left));
+    final featuredPhoto = find.byKey(
+      ValueKey('buy-featured-packshot-${products.first.id}'),
+    );
+    expect(tester.getSize(featuredPhoto).width, greaterThanOrEqualTo(44));
+    expect(
+      tester.getRect(featuredPhoto).right,
+      lessThanOrEqualTo(
+        tester
+            .getRect(find.byKey(ValueKey('buy-product-${products.first.id}')))
+            .right,
+      ),
+    );
+    final addRect = tester.getRect(
+      find.byKey(ValueKey('buy-add-${products.first.id}')),
+    );
+    final photoRect = tester.getRect(featuredPhoto);
+    expect(photoRect.height, greaterThan(addRect.height));
+    expect(photoRect.bottom, lessThanOrEqualTo(addRect.top));
+    final moreHeading = find.byKey(const ValueKey('buy-more-products-heading'));
+    final discoveryScroll = scrollableWithin(
+      PageStorageKey(
+        'buy-${session.destination.name}-${session.selectedCategoryId}-${session.saleTypeSignature}-all',
+      ),
+    );
+    for (
+      var attempt = 0;
+      attempt < 100 && moreHeading.hitTestable().evaluate().isEmpty;
+      attempt++
+    ) {
+      await tester.drag(discoveryScroll, const Offset(0, -160));
+      await tester.pumpAndSettle();
+    }
+    expect(moreHeading.hitTestable(), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey('buy-more-products-heading')),
+      findsOneWidget,
+    );
 
-      final category = session.categories[1];
-      expect(find.byKey(const ValueKey('buy-category-rail')), findsNothing);
-      await tester.tap(find.byKey(const ValueKey('buy-category-picker')));
-      await tester.pumpAndSettle();
-      expect(find.byKey(const ValueKey('buy-category-grid')), findsOneWidget);
-      final categoryLabel = find.byKey(
-        ValueKey('buy-category-label-${category.id}'),
-      );
-      expect(categoryLabel, findsOneWidget);
-      expect(tester.getSize(categoryLabel).width, greaterThanOrEqualTo(70));
-      expect(tester.widget<Text>(categoryLabel).textAlign, TextAlign.center);
-      expect(
-        find.byKey(ValueKey('buy-category-${category.id}')),
-        findsOneWidget,
-      );
-      await tester.tap(find.byKey(ValueKey('buy-category-${category.id}')));
-      await tester.pumpAndSettle();
-      expect(session.selectedCategoryId, category.id);
-      expect(find.byKey(const ValueKey('buy-category-picker')), findsOneWidget);
-      expect(find.byKey(const ValueKey('buy-category-grid')), findsNothing);
-      expect(
-        find.byKey(const ValueKey('buy-catalogue-promotions')),
-        findsNothing,
-      );
-      expect(find.byKey(const ValueKey('buy-featured-products')), findsNothing);
-      expect(find.byType(BuyV2ProductCard), findsWidgets);
-    },
-  );
+    final category = session.categories[1];
+    expect(find.byKey(const ValueKey('buy-category-rail')), findsNothing);
+    await tester.tap(find.byKey(const ValueKey('buy-category-picker')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const ValueKey('buy-category-grid')), findsOneWidget);
+    final categoryLabel = find.byKey(
+      ValueKey('buy-category-label-${category.id}'),
+    );
+    expect(categoryLabel, findsOneWidget);
+    expect(tester.getSize(categoryLabel).width, greaterThanOrEqualTo(70));
+    expect(tester.widget<Text>(categoryLabel).textAlign, TextAlign.center);
+    expect(find.byKey(ValueKey('buy-category-${category.id}')), findsOneWidget);
+    await tester.tap(find.byKey(ValueKey('buy-category-${category.id}')));
+    await tester.pumpAndSettle();
+    expect(session.selectedCategoryId, category.id);
+    expect(find.byKey(const ValueKey('buy-category-picker')), findsOneWidget);
+    expect(find.byKey(const ValueKey('buy-category-grid')), findsNothing);
+    expect(
+      find.byKey(const ValueKey('buy-catalogue-promotions')),
+      findsNothing,
+    );
+    expect(find.byKey(const ValueKey('buy-featured-products')), findsNothing);
+    expect(find.byType(BuyV2ProductCard), findsWidgets);
+  });
 
   testWidgets('search expands into a dedicated responsive results owner', (
     tester,
@@ -3251,7 +3284,7 @@ void main() {
   );
 
   testWidgets(
-    'catalogue keeps vertical discovery and lazy horizontal products',
+    'catalogue exposes complete vertical product rows and its last product',
     (tester) async {
       addTearDown(() {
         tester.view.resetPhysicalSize();
@@ -3271,74 +3304,57 @@ void main() {
         find.byKey(const ValueKey('buy-featured-products')),
         findsOneWidget,
       );
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey('buy-horizontal-product-grid')),
-        220,
-        scrollable: scrollableWithin(
-          PageStorageKey(
-            'buy-${session.destination.name}-'
-            '${session.selectedCategoryId}-'
-            '${session.saleTypeSignature}-all',
-          ),
+      final grid = find.byKey(
+        ValueKey(
+          'buy-vertical-product-grid-buy-products-${session.destination.name}-${session.selectedCategoryId}-all',
         ),
       );
-      await tester.pumpAndSettle();
-
-      final horizontalGrid = find.byKey(
-        const ValueKey('buy-horizontal-product-grid'),
+      final scroll = scrollableWithin(
+        PageStorageKey(
+          'buy-${session.destination.name}-${session.selectedCategoryId}-${session.saleTypeSignature}-all',
+        ),
       );
-      final horizontalScrollable = find.descendant(
-        of: horizontalGrid,
-        matching: find.byType(Scrollable),
-      );
-      expect(horizontalScrollable, findsNWidgets(2));
-      final upperLane = find.byKey(
-        const ValueKey('buy-horizontal-product-lane-0'),
-      );
-      final lowerLane = find.byKey(
-        const ValueKey('buy-horizontal-product-lane-1'),
-      );
-      final upperScrollable = find.descendant(
-        of: upperLane,
-        matching: find.byType(Scrollable),
-      );
-      final lowerScrollable = find.descendant(
-        of: lowerLane,
-        matching: find.byType(Scrollable),
-      );
-      final upperState = tester.state<ScrollableState>(upperScrollable);
-      final lowerState = tester.state<ScrollableState>(lowerScrollable);
-      expect(upperState.position.axis, Axis.horizontal);
-      expect(lowerState.position.axis, Axis.horizontal);
-      expect(upperState.position.pixels, 0);
-      expect(lowerState.position.pixels, 0);
-
-      final dockTop = tester
-          .getRect(find.byKey(const Key('moolsocial-compact-destination-rail')))
-          .top;
-      expect(tester.getRect(horizontalGrid).top, lessThan(dockTop));
-      await tester.drag(upperLane, const Offset(-520, 0));
-      await tester.pumpAndSettle();
-      expect(upperState.position.pixels, greaterThan(0));
-      expect(lowerState.position.pixels, 0);
-      await tester.drag(lowerLane, const Offset(-520, 0));
-      await tester.pumpAndSettle();
-      expect(upperState.position.pixels, greaterThan(0));
-      expect(lowerState.position.pixels, greaterThan(0));
+      final remaining = session.catalogueSaleTypeProducts.skip(6).toList();
+      expect(remaining.length, greaterThan(3));
+      final last = find.byKey(ValueKey('buy-product-${remaining.last.id}'));
+      for (
+        var attempt = 0;
+        attempt < 200 && last.hitTestable().evaluate().isEmpty;
+        attempt++
+      ) {
+        await tester.drag(scroll, const Offset(0, -240));
+        await tester.pumpAndSettle();
+      }
+      expect(last.hitTestable(), findsOneWidget);
+      expect(grid, findsOneWidget);
       expect(
-        find.byWidgetPredicate(
-          (widget) =>
-              widget is ListView &&
-              widget.scrollDirection == Axis.horizontal &&
-              widget.childrenDelegate is SliverChildBuilderDelegate,
-        ),
-        findsWidgets,
+        tester.state<ScrollableState>(scroll).position.pixels,
+        greaterThan(0),
       );
+      for (final product in remaining) {
+        expect(
+          find.descendant(
+            of: grid,
+            matching: find.byKey(ValueKey('buy-product-${product.id}')),
+          ),
+          findsOneWidget,
+        );
+      }
+      final rects = [
+        for (final product in remaining.take(4))
+          tester.getRect(find.byKey(ValueKey('buy-product-${product.id}'))),
+      ];
+      expect(rects[1].top, closeTo(rects[0].top, .1));
+      expect(rects[2].top, closeTo(rects[0].top, .1));
+      expect(rects[1].left, greaterThan(rects[0].right));
+      expect(rects[2].left, greaterThan(rects[1].right));
+      expect(rects[3].top, greaterThan(rects[0].bottom));
+      expect(rects[2].right, lessThanOrEqualTo(360));
       expect(tester.takeException(), isNull);
     },
   );
 
-  testWidgets('single-product results reserve only one horizontal lane', (
+  testWidgets('single-product results show one complete vertical result', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -3350,13 +3366,23 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(session.visibleProducts, hasLength(1));
+    final product = session.visibleProducts.single;
+    expect(find.byType(BuyV2ProductCard), findsOneWidget);
+    final card = find.byKey(ValueKey('buy-product-${product.id}'));
+    expect(card, findsOneWidget);
     expect(
-      find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
+      find.descendant(of: card, matching: find.text(product.customerTitle)),
       findsOneWidget,
     );
     expect(
-      find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
-      findsNothing,
+      find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'buy-vertical-product-grid-',
+            ),
+      ),
+      findsOneWidget,
     );
     expect(tester.takeException(), isNull);
   });
@@ -4413,7 +4439,7 @@ void main() {
   );
 
   testWidgets(
-    'featured products lead with a dominant photo and readable filtered cards',
+    'featured products keep compact photos and readable filtered cards',
     (tester) async {
       tester.view.devicePixelRatio = 1;
       tester.view.physicalSize = const Size(360, 800);
@@ -4425,7 +4451,15 @@ void main() {
       final product = session.visibleProducts.first;
       final photo = find.byKey(ValueKey('buy-featured-packshot-${product.id}'));
       expect(photo, findsOneWidget);
-      expect(tester.getSize(photo).width, greaterThanOrEqualTo(145));
+      expect(tester.getSize(photo).width, greaterThanOrEqualTo(44));
+      expect(
+        tester.getRect(photo).right,
+        lessThanOrEqualTo(
+          tester
+              .getRect(find.byKey(ValueKey('buy-product-${product.id}')))
+              .right,
+        ),
+      );
       final addRect = tester.getRect(
         find.byKey(ValueKey('buy-add-${product.id}')),
       );
@@ -4741,7 +4775,7 @@ void main() {
     },
   );
 
-  testWidgets('each Buy vertical category uses lazy horizontal products', (
+  testWidgets('each Buy category exposes products through vertical scrolling', (
     tester,
   ) async {
     final session = BuyV2Session(core: BuySession());
@@ -4760,27 +4794,28 @@ void main() {
       session.chooseCategory(category.id);
       await tester.pumpAndSettle();
 
-      final horizontalGrid = find.byKey(
-        const ValueKey('buy-horizontal-product-grid'),
+      final grid = find.byKey(
+        ValueKey(
+          'buy-vertical-product-grid-buy-products-${destination.name}-${category.id}-all',
+        ),
       );
-      expect(horizontalGrid, findsOneWidget, reason: destination.name);
-      final scrollable = find.descendant(
-        of: horizontalGrid,
-        matching: find.byType(Scrollable),
+      expect(grid, findsOneWidget, reason: destination.name);
+      final scrollable = find
+          .ancestor(of: grid, matching: find.byType(Scrollable))
+          .first;
+      expect(
+        tester.state<ScrollableState>(scrollable).position.axis,
+        Axis.vertical,
+        reason: destination.name,
       );
-      expect(scrollable, findsWidgets, reason: destination.name);
-      for (final element in scrollable.evaluate()) {
+      for (final product in session.catalogueSaleTypeProducts) {
         expect(
-          tester
-              .state<ScrollableState>(
-                find.byElementPredicate(
-                  (candidate) => identical(candidate, element),
-                ),
-              )
-              .position
-              .axis,
-          Axis.horizontal,
-          reason: destination.name,
+          find.descendant(
+            of: grid,
+            matching: find.byKey(ValueKey('buy-product-${product.id}')),
+          ),
+          findsOneWidget,
+          reason: '${destination.name}/${product.id}',
         );
       }
       expect(tester.takeException(), isNull, reason: destination.name);
@@ -7071,6 +7106,9 @@ void main() {
           200,
           scrollable: scrollableWithin(const PageStorageKey('buy-orders')),
         );
+        await Scrollable.ensureVisible(tester.element(action), alignment: .4);
+        await tester.pumpAndSettle();
+        expect(action.hitTestable(), findsOneWidget);
         await tester.tap(action);
         await tester.pumpAndSettle();
         expect(find.byType(BuyV2InvoicePage), findsNothing);
@@ -7999,7 +8037,36 @@ void main() {
             const ValueKey('buy-compact-cart-indicator'),
           );
           expect(miniCart.hitTestable(), findsOneWidget);
-          expect(tester.getRect(miniCart).bottom, lessThanOrEqualTo(dockTop));
+          final navigationCart = find.byKey(
+            const ValueKey('buy-cart-navigation-button'),
+          );
+          if (navigationCart.evaluate().isNotEmpty) {
+            expect(
+              find.descendant(of: miniCart, matching: navigationCart),
+              findsOneWidget,
+            );
+            expect(navigationCart.hitTestable(), findsOneWidget);
+            final cartBounds = tester.getRect(navigationCart);
+            expect(cartBounds.width, greaterThanOrEqualTo(44));
+            expect(cartBounds.height, greaterThanOrEqualTo(44));
+            expect(cartBounds.top, greaterThanOrEqualTo(dockTop));
+            expect(cartBounds.bottom, lessThanOrEqualTo(360 - 32));
+            expect(cartBounds.right, lessThanOrEqualTo(800));
+            final navigationScroll = find.byKey(
+              const PageStorageKey('buy-compact-cart-local-navigation-scroll'),
+            );
+            expect(navigationScroll, findsOneWidget);
+            expect(
+              cartBounds.left,
+              greaterThanOrEqualTo(tester.getRect(navigationScroll).right),
+            );
+            expect(
+              cartBounds.overlaps(tester.getRect(navigationScroll)),
+              isFalse,
+            );
+          } else {
+            expect(tester.getRect(miniCart).bottom, lessThanOrEqualTo(dockTop));
+          }
           expect(
             tester.getRect(miniCart).top,
             greaterThanOrEqualTo(tester.getRect(catalogue).top),
@@ -8912,7 +8979,9 @@ void main() {
       findsNothing,
     );
     final grid = tester.widget<Semantics>(
-      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+      find.byKey(
+        const ValueKey('buy-vertical-product-summary-buy-offers-products'),
+      ),
     );
     expect(grid.properties.label, contains('Showing 1 of 1'));
     expect(grid.properties.label, contains('Showing 1 of 1 product.'));
@@ -9202,61 +9271,106 @@ void main() {
     expect(session.itemCount, 3);
   });
 
-  testWidgets('Shop Wholesale Orders and Offers page product grids', (
-    tester,
-  ) async {
-    final session = BuyV2Session(core: BuySession());
-    await tester.pumpWidget(app(session));
-    await tester.pumpAndSettle();
+  testWidgets(
+    'Shop Wholesale Orders and Offers expose vertical product discovery',
+    (tester) async {
+      final session = BuyV2Session(core: BuySession());
+      await tester.pumpWidget(app(session));
+      await tester.pumpAndSettle();
 
-    expect(find.byKey(const ValueKey('buy-featured-products')), findsOneWidget);
-    expect(
-      find.byKey(
-        ValueKey('buy-featured-product-${session.visibleProducts.first.id}'),
-      ),
-      findsOneWidget,
-    );
+      expect(
+        find.byKey(const ValueKey('buy-featured-products')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey('buy-featured-product-${session.visibleProducts.first.id}'),
+        ),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
-    await tester.pumpAndSettle();
-    expect(find.byKey(const ValueKey('buy-featured-products')), findsOneWidget);
-    expect(
-      find.byKey(
-        ValueKey('buy-featured-product-${session.visibleProducts.first.id}'),
-      ),
-      findsOneWidget,
-    );
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-wholesale')));
+      await tester.pumpAndSettle();
+      expect(
+        find.byKey(const ValueKey('buy-featured-products')),
+        findsOneWidget,
+      );
+      expect(
+        find.byKey(
+          ValueKey('buy-featured-product-${session.visibleProducts.first.id}'),
+        ),
+        findsOneWidget,
+      );
 
-    await tester.tap(find.byKey(const ValueKey('buy-local-tab-orders')));
-    await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.byKey(
-        const ValueKey('buy-progressive-product-count-buy-orders-products'),
-      ),
-      240,
-      scrollable: scrollableWithin(const PageStorageKey('buy-orders')),
-    );
-    String progressLabel() => tester
-        .widget<Semantics>(
-          find.byKey(const ValueKey('buy-horizontal-product-grid')),
-        )
-        .properties
-        .label!;
-    expect(progressLabel(), contains('Showing 8 of 18'));
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-orders')));
+      await tester.pumpAndSettle();
+      Future<void> verifyVerticalProducts(
+        String storageKey,
+        Finder scroll,
+        List<BuyV2Product> products,
+      ) async {
+        final summary = find.byKey(
+          ValueKey('buy-vertical-product-summary-$storageKey'),
+        );
+        final grid = find.byKey(
+          ValueKey('buy-vertical-product-grid-$storageKey'),
+        );
+        final last = find.descendant(
+          of: grid,
+          matching: find.byKey(ValueKey('buy-product-${products.last.id}')),
+        );
+        for (
+          var attempt = 0;
+          attempt < 200 && last.hitTestable().evaluate().isEmpty;
+          attempt++
+        ) {
+          await tester.drag(scroll, const Offset(0, -180));
+          await tester.pumpAndSettle();
+        }
+        expect(last.hitTestable(), findsOneWidget);
+        final label = tester.widget<Semantics>(summary).properties.label!;
+        expect(
+          label,
+          contains('Showing ${products.length} of ${products.length}'),
+        );
+        expect(label, contains('Scroll up or down'));
+        final position = tester.state<ScrollableState>(scroll).position;
+        expect(position.axis, Axis.vertical);
+        expect(position.pixels, greaterThan(0));
+        for (final product in products) {
+          expect(
+            find.descendant(
+              of: grid,
+              matching: find.byKey(ValueKey('buy-product-${product.id}')),
+            ),
+            findsOneWidget,
+          );
+        }
+      }
 
-    await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
-    await tester.pumpAndSettle();
-    expect(progressLabel(), contains('Showing 8 of 24'));
-    await tester.fling(
-      find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
-      const Offset(-1200, 0),
-      2200,
-    );
-    await tester.pumpAndSettle();
-    expect(progressLabel(), isNot(contains('Showing 8 of 24')));
-    expect(progressLabel(), contains('of 24'));
-    expect(tester.takeException(), isNull);
-  });
+      final orderProducts = session.visibleProducts.toList();
+      expect(orderProducts, hasLength(18));
+      await verifyVerticalProducts(
+        'buy-orders-products',
+        scrollableWithin(const PageStorageKey('buy-orders')),
+        orderProducts,
+      );
+
+      await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
+      await tester.pumpAndSettle();
+      final offerProducts = const BuyV2CataloguePublishedOffersSource()
+          .publishedOffers
+          .map((offer) => session.product(offer.productId))
+          .toList();
+      expect(offerProducts, hasLength(24));
+      await verifyVerticalProducts(
+        'buy-offers-products',
+        scrollableWithin(const PageStorageKey('buy-offers')),
+        offerProducts,
+      );
+      expect(tester.takeException(), isNull);
+    },
+  );
 
   testWidgets('Offers search stays inside the published mixed catalogue', (
     tester,
@@ -9395,8 +9509,21 @@ void main() {
       );
 
       final chicken = find.byKey(const ValueKey('buy-product-s-chicken'));
-      await tester.ensureVisible(chicken);
-      await tester.tap(chicken);
+      final chickenTitle = find.descendant(
+        of: chicken,
+        matching: find.text(
+          BuyV2Catalogue.products
+              .firstWhere((p) => p.id == 's-chicken')
+              .customerTitle,
+        ),
+      );
+      await Scrollable.ensureVisible(
+        tester.element(chickenTitle),
+        alignment: .4,
+      );
+      await tester.pumpAndSettle();
+      expect(chickenTitle.hitTestable(), findsOneWidget);
+      await tester.tap(chickenTitle);
       await tester.pumpAndSettle();
       expect(session.selectedProductId, 's-chicken');
       expect(
@@ -11009,6 +11136,23 @@ void main() {
       final relatedCard = tester.widget<Container>(
         find.byKey(const ValueKey('buy-related-store-card-s-tomato')),
       );
+      final priceHighlight = find.byKey(
+        const ValueKey('buy-related-store-price-s-tomato'),
+      );
+      final priceText = find.descendant(
+        of: priceHighlight,
+        matching: find.byType(Text),
+      );
+      expect(
+        (tester.widget<Container>(priceHighlight).decoration! as BoxDecoration)
+            .color,
+        const Color(0xFFFFE082),
+      );
+      expect(
+        tester.getSize(priceHighlight).width,
+        closeTo(tester.getSize(priceText).width + 8, .1),
+      );
+      expect(tester.widget<Text>(priceText).style!.color, BuyV2Colors.ink);
       final relatedDecoration = relatedCard.decoration! as BoxDecoration;
       expect(relatedDecoration.gradient, isNull);
       expect(relatedDecoration.color, Colors.white);
@@ -11022,7 +11166,7 @@ void main() {
             .decoration,
         isNull,
       );
-      expect(tester.getSize(relatedStore).width, lessThanOrEqualTo(208));
+      expect(tester.getSize(relatedStore).width, inInclusiveRange(208, 390));
       expect(tester.getSize(relatedStore).height, lessThan(170));
       expect(
         find.descendant(
@@ -11155,7 +11299,7 @@ void main() {
           final media = MediaQuery.of(context);
           return MediaQuery(
             data: media.copyWith(textScaler: const TextScaler.linear(1.4)),
-            child: child!,
+            child: r66VisualCaptureRoot(child!),
           );
         },
         home: Scaffold(
@@ -11189,12 +11333,48 @@ void main() {
       find.byKey(const ValueKey('buy-shop-seller-other-stores')),
       findsOneWidget,
     );
-    expect(
-      tester.widget(find.byKey(const ValueKey('buy-shop-seller-other-stores'))),
-      isA<SingleChildScrollView>(),
+    final stores = find.byKey(const ValueKey('buy-shop-seller-other-stores'));
+    expect(tester.widget(stores), isA<Column>());
+    expect(tester.getSize(relatedStore).height, greaterThanOrEqualTo(44));
+    expect(tester.getSize(relatedStore).width, tester.getSize(stores).width);
+    expect(tester.getSize(relatedStore).width, lessThanOrEqualTo(320));
+    final storeCards = find.descendant(
+      of: stores,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'buy-related-store-card-',
+            ),
+      ),
     );
-    expect(tester.getSize(relatedStore).height, inInclusiveRange(140, 210));
-    expect(tester.getSize(relatedStore).width, 208);
+    Rect? previous;
+    for (final element in storeCards.evaluate()) {
+      final card = find.byElementPredicate(
+        (candidate) => identical(candidate, element),
+      );
+      final bounds = tester.getRect(card);
+      if (previous != null) expect(bounds.top, greaterThan(previous.bottom));
+      previous = bounds;
+      for (final textElement
+          in find
+              .descendant(of: card, matching: find.byType(RichText))
+              .evaluate()) {
+        final paragraph = textElement.renderObject;
+        if (paragraph is RenderParagraph) {
+          expect(paragraph.didExceedMaxLines, isFalse);
+          final textFinder = find.byElementPredicate(
+            (candidate) => identical(candidate, textElement),
+          );
+          expect(bounds.contains(tester.getRect(textFinder).topLeft), isTrue);
+          expect(
+            bounds.contains(tester.getRect(textFinder).bottomRight),
+            isTrue,
+          );
+        }
+      }
+    }
+    await captureR66Visual(tester, 'sku-related-stores-320-1.4');
     expect(tester.takeException(), isNull);
   });
 
@@ -11614,7 +11794,16 @@ void main() {
       find.byKey(const ValueKey('buy-public-store-fulfilment-details')),
       findsNothing,
     );
-    final grid = find.byKey(const ValueKey('buy-horizontal-product-grid'));
+    final grid = find.descendant(
+      of: route,
+      matching: find.byWidgetPredicate(
+        (widget) =>
+            widget.key is ValueKey<String> &&
+            (widget.key! as ValueKey<String>).value.startsWith(
+              'buy-vertical-product-grid-',
+            ),
+      ),
+    );
     expect(grid, findsOneWidget);
     expect(
       tester.getTopLeft(grid).dy - tester.getBottomLeft(truth).dy,
@@ -11627,7 +11816,7 @@ void main() {
           productCard,
           150,
           scrollable: find
-              .descendant(of: grid, matching: find.byType(Scrollable))
+              .ancestor(of: grid, matching: find.byType(Scrollable))
               .first,
         );
         await tester.pumpAndSettle();

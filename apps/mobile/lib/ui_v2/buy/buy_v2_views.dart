@@ -1005,11 +1005,12 @@ class BuyV2ProductView extends StatelessWidget {
                       title: shop ? 'Purchase protection' : 'Product details',
                       children: [
                         if (!shop) ...[
-                          _DecisionRow(
-                            icon: Icons.sell_outlined,
-                            label: 'Brand',
-                            value: product.brandLabel,
-                          ),
+                          if (product.brand.trim().isNotEmpty)
+                            _DecisionRow(
+                              icon: Icons.sell_outlined,
+                              label: 'Brand',
+                              value: product.brandLabel,
+                            ),
                           _DecisionRow(
                             icon: Icons.tune_rounded,
                             label: 'Variant',
@@ -2516,22 +2517,8 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     final minimumTotal = facts.price * product.minimumOrder;
     final largeText = MediaQuery.textScalerOf(context).scale(1) > 1.2;
-    return Container(
+    return SizedBox(
       key: ValueKey('buy-wholesale-price-summary-${product.id}'),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF070773), BuyV2Colors.royal],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x22000080),
-            blurRadius: 18,
-            offset: Offset(0, 7),
-          ),
-        ],
-      ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final stacked = largeText || constraints.maxWidth < 300;
@@ -2542,75 +2529,75 @@ class _WholesaleTradePriceSummary extends StatelessWidget {
               const Text(
                 'WHOLESALE PRICE',
                 style: TextStyle(
-                  color: Color(0xFFBFC3FF),
+                  color: BuyV2Colors.muted,
                   fontSize: 9,
                   fontWeight: FontWeight.w900,
                   letterSpacing: .8,
                 ),
               ),
               const SizedBox(height: 3),
-              Text(
-                buyV2Money(facts.price),
-                key: ValueKey('buy-product-hero-price-${product.id}'),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 28,
-                  height: 1,
-                  fontWeight: FontWeight.w900,
+              Container(
+                key: ValueKey('buy-wholesale-price-highlight-${product.id}'),
+                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFE082),
+                  borderRadius: BorderRadius.circular(5),
+                ),
+                child: Text(
+                  buyV2Money(facts.price),
+                  key: ValueKey('buy-product-hero-price-${product.id}'),
+                  style: const TextStyle(
+                    color: BuyV2Colors.ink,
+                    fontSize: 28,
+                    height: 1,
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
               ),
               const SizedBox(height: 4),
               Text(
                 '${product.pack} · ${product.unitPrice}',
                 style: const TextStyle(
-                  color: Colors.white,
+                  color: BuyV2Colors.ink,
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
                 ),
               ),
             ],
           );
-          final order = Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: .12),
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(color: Colors.white.withValues(alpha: .18)),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  'Minimum order ${_packCountLabel(product.minimumOrder)}',
-                  style: const TextStyle(
-                    color: Color(0xFFFFD29F),
-                    fontSize: 10,
-                    fontWeight: FontWeight.w900,
-                  ),
+          final order = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Minimum order ${_packCountLabel(product.minimumOrder)}',
+                style: const TextStyle(
+                  color: BuyV2Colors.ink,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  '${buyV2Money(minimumTotal)} minimum total',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
+              ),
+              const SizedBox(height: 3),
+              Text(
+                '${buyV2Money(minimumTotal)} minimum total',
+                style: const TextStyle(
+                  color: BuyV2Colors.ink,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  decision.statusLabel,
-                  style: TextStyle(
-                    color: decision.canAdd
-                        ? const Color(0xFFBDEBB8)
-                        : const Color(0xFFFFD29F),
-                    fontSize: 9,
-                    fontWeight: FontWeight.w800,
-                  ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                decision.statusLabel,
+                style: TextStyle(
+                  color: decision.canAdd
+                      ? BuyV2Colors.green
+                      : BuyV2Colors.orange,
+                  fontSize: 9,
+                  fontWeight: FontWeight.w800,
                 ),
-              ],
-            ),
+              ),
+            ],
           );
           if (stacked) {
             return Column(
@@ -2805,8 +2792,6 @@ class _WholesaleTradeActionDock extends StatelessWidget {
           quantity > 0
               ? '${_packCountLabel(quantity)} in Cart'
               : 'Minimum ${_packCountLabel(product.minimumOrder)} · ${product.pack} each',
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
           style: context.buyMeta.copyWith(
             color: BuyV2Colors.ink,
             fontWeight: FontWeight.w800,
@@ -2818,8 +2803,6 @@ class _WholesaleTradeActionDock extends StatelessWidget {
         Text(
           deliveryDecision,
           key: ValueKey('buy-wholesale-dock-delivery-${product.id}'),
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
           style: context.buyMeta.copyWith(
             color: BuyV2Colors.green,
             fontWeight: FontWeight.w800,
@@ -2918,7 +2901,7 @@ class _WholesaleTradeActionDock extends StatelessWidget {
                     ],
                   );
                 }
-                final stacked = largeText || constraints.maxWidth < 330;
+                final stacked = largeText || constraints.maxWidth < 480;
                 if (stacked) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -3883,21 +3866,38 @@ class _ProductContentSections extends StatelessWidget {
       'variant': product.customerVariant,
     };
     final highlights = content.highlights
+        .map(product.customerContent)
         .where((value) => !deduplicateSummary || !summaryValues.contains(value))
         .toList(growable: false);
     final specifications = content.specifications
+        .where(
+          (value) =>
+              value.label.toLowerCase() != 'brand' ||
+              product.brand.trim().isNotEmpty ||
+              value.value != product.brandLabel,
+        )
+        .map(
+          (value) => BuyV2ProductSpecification(
+            label: value.label,
+            value: product.customerContent(value.value),
+          ),
+        )
         .where(
           (value) =>
               !deduplicateSummary ||
               summarySpecifications[value.label.toLowerCase()] != value.value,
         )
         .toList(growable: false);
+    final rawDescription = content.description;
+    final customerDescription = rawDescription == null
+        ? null
+        : product.customerContent(rawDescription);
     final description =
         deduplicateSummary &&
-            content.description ==
+            customerDescription ==
                 '${product.customerTitle} · ${product.customerVariant}. ${product.pack} at ${product.unitPrice}.'
         ? null
-        : content.description;
+        : customerDescription;
 
     return Column(
       key: ValueKey('buy-product-content-ready-${product.id}'),
@@ -18724,13 +18724,28 @@ class _CartLine extends StatelessWidget {
                   ),
                 ),
               ].any(
-                (field) => field.text
-                    .split(RegExp(r'\s+'))
-                    .any(
-                      (word) =>
-                          buyV2ValueTextSize(context, word, field.style).width >
-                          inlineTitleWidth,
-                    ),
+                (field) =>
+                    inlineTitleWidth <= 0 ||
+                    field.text
+                        .split(RegExp(r'\s+'))
+                        .any(
+                          (word) =>
+                              buyV2ValueTextSize(
+                                context,
+                                word,
+                                field.style,
+                              ).width >
+                              inlineTitleWidth,
+                        ) ||
+                    buyV2ValueTextSize(
+                          context,
+                          field.text,
+                          field.style,
+                          maxWidth: math.max(1, inlineTitleWidth),
+                          maxLines: null,
+                        ).height >
+                        buyV2ValueTextSize(context, 'Ag', field.style).height *
+                            2,
               );
           final compactDetails =
               (wholesale && constraints.maxWidth < 340) ||
@@ -19292,7 +19307,7 @@ class _OrderCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     '${order.partner} · ${order.partnerType}',
-                    style: context.buyMeta.copyWith(fontSize: 8),
+                    style: context.buyMeta.copyWith(fontSize: 11),
                   ),
                   const SizedBox(height: 6),
                   LayoutBuilder(

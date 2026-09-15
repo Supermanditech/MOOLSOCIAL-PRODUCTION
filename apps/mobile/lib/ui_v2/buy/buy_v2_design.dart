@@ -57,6 +57,19 @@ extension BuyV2CustomerProductCopy on BuyV2Product {
         : title;
   }
 
+  /// Normalize only complete, known generated field values, never substrings
+  /// inside supplier prose or genuine model numbers.
+  String customerContent(String value) {
+    if (_developmentSku == null) return value;
+    if (value == title) return customerTitle;
+    if (value == variant) return customerVariant;
+    final generatedDescription = '$title \u00b7 $variant. $pack at $unitPrice.';
+    if (value == generatedDescription) {
+      return '$customerTitle \u00b7 $customerVariant. $pack at $unitPrice.';
+    }
+    return customerSeller(value);
+  }
+
   String get customerVariant {
     final sku = _developmentSku;
     final suffix = ' · SKU $sku';

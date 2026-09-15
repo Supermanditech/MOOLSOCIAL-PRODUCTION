@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -30,127 +31,425 @@ class _FixtureCustomerStore implements BuyV2CustomerStateStore {
 }
 
 void main() {
-  for (final scale in [1.0, 2.0]) {
-    for (final withLines in [true, false]) {
-      for (final largeTotal in [false, true]) {
+  setUpAll(() async {
+    const fontPath = String.fromEnvironment('BUY_SKU_DEVANAGARI_FONT');
+    if (fontPath.isEmpty) return;
+    final loader = FontLoader('NotoSansDevanagari')
+      ..addFont(
+        File(fontPath).readAsBytes().then((bytes) => bytes.buffer.asByteData()),
+      );
+    await loader.load();
+  });
+  for (final width in [320.0, 360.0, 390.0]) {
+    for (final scale in [1.0, 1.3, 2.0]) {
+      testWidgets('SKU prescription metadata complete $width $scale', (
+        tester,
+      ) async {
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = Size(width, 800);
+        addTearDown(tester.view.reset);
+        final ids = [
+          'm-telmisartan-40',
+          'm-atorvastatin-10',
+          'm-metformin-500',
+        ];
+        final names = [
+          'Long provider medicine name with exact model 40 and extended release product information',
+          'हनुमाना Pharmacy दवा product model 500 preserved exactly',
+          'PROVIDERPRODUCTIDENTIFIERABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        ];
+        final products = [
+          for (var index = 0; index < ids.length; index++)
+            BuyV2Catalogue.allProducts
+                .firstWhere((product) => product.id == ids[index])
+                .copyWith(
+                  title: names[index],
+                  pack:
+                      'Three individually sealed strips of ten tablets in each pack',
+                ),
+        ];
+        final core = BuySession();
+        final session = BuyV2Session(
+          core: core,
+          reviewDataEnabled: false,
+          commerceAdapter: _CollectionHeaderCommerce(products),
+        );
+        addTearDown(session.dispose);
+        addTearDown(core.dispose);
+        await session.restoreCommerce();
+        session.openDestination(BuyV2Destination.medicine);
+        expect(session.approveSavedPrescription('meera'), isTrue);
+        expect(session.approveSavedPrescription('arvind'), isTrue);
+        expect(session.matchedPrescriptionProducts, hasLength(3));
+        await tester.pumpWidget(_app(session, textScale: scale));
+        await tester.pumpAndSettle();
+        final links = [
+          for (final product in products)
+            find.byKey(ValueKey('buy-prescription-match-action-${product.id}')),
+        ];
+        for (var index = 0; index < products.length; index++) {
+          final link = links[index];
+          expect(link, findsOneWidget);
+          expect(tester.getSize(link).width, greaterThanOrEqualTo(44));
+          expect(tester.getSize(link).height, greaterThanOrEqualTo(44));
+          for (final content in [
+            products[index].title,
+            products[index].pack,
+            buyV2Money(products[index].price),
+          ]) {
+            final field = find.descendant(
+              of: link,
+              matching: find.text(content),
+            );
+            expect(field, findsOneWidget);
+            final paragraph = tester.renderObject<RenderParagraph>(field);
+            expect(paragraph.didExceedMaxLines, isFalse);
+            final natural = TextPainter(
+              text: paragraph.text,
+              textDirection: paragraph.textDirection,
+              textScaler: paragraph.textScaler,
+            )..layout(maxWidth: paragraph.size.width);
+            expect(
+              paragraph.size.height + 1,
+              greaterThanOrEqualTo(natural.height),
+            );
+            natural.dispose();
+            expect(
+              tester.getRect(link).contains(tester.getRect(field).topLeft),
+              isTrue,
+            );
+            expect(
+              tester.getRect(link).contains(tester.getRect(field).bottomRight),
+              isTrue,
+            );
+          }
+        }
+        final bounds = links.map(tester.getRect).toList();
+        for (var index = 1; index < bounds.length; index++) {
+          if (scale == 1.0) {
+            expect(bounds[index].top, closeTo(bounds.first.top, 1));
+            expect(bounds[index].left, greaterThan(bounds[index - 1].right));
+          } else {
+            expect(bounds[index].top, greaterThan(bounds[index - 1].bottom));
+          }
+        }
+        expect(bounds.last.right, lessThanOrEqualTo(width));
+        final firstTitle = find.descendant(
+          of: links.first,
+          matching: find.text(names.first),
+        );
+        await tester.ensureVisible(firstTitle);
+        await tester.pumpAndSettle();
+        expect(firstTitle.hitTestable(), findsOneWidget);
+        await captureR66Visual(
+          tester,
+          'sku-prescription-${width.toInt()}-$scale',
+        );
+        await tester.tap(firstTitle);
+        await tester.pumpAndSettle();
+        expect(session.selectedProductId, ids.first);
+        expect(session.view, BuyV2View.product);
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(session.view, BuyV2View.catalogue);
+        expect(session.itemCount, 0);
+        expect(tester.takeException(), isNull);
+      });
+    }
+  }
+  for (final width in [320.0, 360.0, 390.0]) {
+    for (final scale in [1.0, 1.3, 2.0]) {
+      for (final withLines in [true, false]) {
+        for (final largeTotal in [false, true]) {
+          testWidgets(
+            'SKU order snapshot preview $width $scale lines $withLines large $largeTotal',
+            (tester) async {
+              tester.view.devicePixelRatio = 1;
+              tester.view.physicalSize = Size(width, 800);
+              addTearDown(tester.view.reset);
+              final base = BuyV2Catalogue.allProducts
+                  .firstWhere((p) => p.id == 's-eggs')
+                  .copyWith(price: largeTotal ? 16666666 : null);
+              final archived = base.copyWith(
+                title:
+                    'Original हनुमाना free-range eggs family selection model 30 preserved',
+                pack:
+                    'Tray of 30 individually protected eggs in reusable family packaging',
+              );
+              final order = BuyV2Order(
+                id: 'MS-SKU-TEST',
+                destination: BuyV2Destination.shop,
+                title: 'Shop order',
+                itemSummary: '3 products',
+                total: withLines || largeTotal ? base.price * 6 : 1234,
+                partner: 'hanumana ram beniwal sardarpura jodhpure store',
+                partnerType: 'Retailer',
+                promise:
+                    'Delivery after all packages have been checked and accepted by the regional freight provider',
+                destinationLabel: 'Home',
+                progress: .4,
+                status: BuyV2OrderStatus.preparing,
+                lines: withLines
+                    ? [
+                        BuyV2CartLine(product: archived, quantity: 2),
+                        BuyV2CartLine(
+                          product: base.copyWith(
+                            id: 'snapshot-b',
+                            title: 'Second original product',
+                          ),
+                          quantity: 3,
+                        ),
+                        BuyV2CartLine(
+                          product: base.copyWith(
+                            id: 'snapshot-c',
+                            title: 'Third original product',
+                          ),
+                          quantity: 1,
+                        ),
+                      ]
+                    : const [],
+              );
+              final core = BuySession();
+              final session = BuyV2Session(
+                core: core,
+                reviewDataEnabled: false,
+                commerceAdapter: _SkuSnapshotCommerce(
+                  order,
+                  base.copyWith(title: 'Changed live catalogue name'),
+                ),
+              );
+              addTearDown(session.dispose);
+              addTearDown(core.dispose);
+              await session.restoreCommerce();
+              session.openOrders();
+              await tester.pumpWidget(_app(session, textScale: scale));
+              await tester.pumpAndSettle();
+              final card = find.byKey(
+                const ValueKey('buy-order-card-MS-SKU-TEST'),
+              );
+              expect(card, findsOneWidget);
+              if (withLines) {
+                expect(
+                  find.descendant(
+                    of: card,
+                    matching: find.text(archived.title),
+                  ),
+                  findsOneWidget,
+                );
+                expect(
+                  find.descendant(
+                    of: card,
+                    matching: find.textContaining('Quantity 2'),
+                  ),
+                  findsOneWidget,
+                );
+                expect(
+                  find.descendant(
+                    of: card,
+                    matching: find.text('+ 1 more product'),
+                  ),
+                  findsOneWidget,
+                );
+                expect(
+                  find.descendant(
+                    of: card,
+                    matching: find.text('Changed live catalogue name'),
+                  ),
+                  findsNothing,
+                );
+                expect(order.lines.first.product.title, archived.title);
+              } else {
+                expect(
+                  find.descendant(of: card, matching: find.text('Shop order')),
+                  findsOneWidget,
+                );
+                expect(
+                  find.descendant(
+                    of: card,
+                    matching: find.textContaining('Quantity'),
+                  ),
+                  findsNothing,
+                );
+              }
+              for (final element
+                  in find
+                      .descendant(of: card, matching: find.byType(RichText))
+                      .evaluate()) {
+                final render = element.renderObject;
+                if (render is RenderParagraph) {
+                  expect(render.didExceedMaxLines, isFalse);
+                  final natural = TextPainter(
+                    text: render.text,
+                    textDirection: render.textDirection,
+                    textScaler: render.textScaler,
+                  )..layout(maxWidth: render.size.width);
+                  expect(
+                    render.size.height + 1,
+                    greaterThanOrEqualTo(natural.height),
+                    reason: render.text.toPlainText(),
+                  );
+                  natural.dispose();
+                }
+              }
+              expect(tester.takeException(), isNull);
+              await captureR66Visual(
+                tester,
+                'sku-orders-$width-$scale-$withLines-$largeTotal',
+              );
+              final provider = find.descendant(
+                of: card,
+                matching: find.text('${order.partner} · ${order.partnerType}'),
+              );
+              expect(provider, findsOneWidget);
+              await tester.ensureVisible(provider);
+              await tester.pumpAndSettle();
+              expect(provider.hitTestable(), findsOneWidget);
+              await captureR66Visual(
+                tester,
+                'sku-orders-provider-$width-$scale-$withLines-$largeTotal',
+              );
+              expect(tester.takeException(), isNull);
+            },
+          );
+        }
+      }
+    }
+  }
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
+    for (final width in [320.0, 360.0, 390.0]) {
+      for (final scale in [1.0, 1.3, 2.0]) {
         testWidgets(
-          'SKU order snapshot preview $scale lines $withLines large $largeTotal',
+          'SKU provider names adaptive ${destination.name} $width $scale',
           (tester) async {
             tester.view.devicePixelRatio = 1;
-            tester.view.physicalSize = const Size(360, 800);
+            tester.view.physicalSize = Size(width, 800);
             addTearDown(tester.view.reset);
-            final base = BuyV2Catalogue.allProducts
-                .firstWhere((p) => p.id == 's-eggs')
-                .copyWith(price: largeTotal ? 16666666 : null);
-            final archived = base.copyWith(
-              title: 'Original free-range eggs family pack',
-              pack: 'Tray of 30 eggs',
-            );
-            final order = BuyV2Order(
-              id: 'MS-SKU-TEST',
-              destination: BuyV2Destination.shop,
-              title: 'Shop order',
-              itemSummary: '3 products',
-              total: withLines || largeTotal ? base.price * 6 : 1234,
-              partner: 'Original neighbourhood store',
-              partnerType: 'Retailer',
-              promise: 'Delivery in 12 min',
-              destinationLabel: 'Home',
-              progress: .4,
-              status: BuyV2OrderStatus.preparing,
-              lines: withLines
-                  ? [
-                      BuyV2CartLine(product: archived, quantity: 2),
-                      BuyV2CartLine(
-                        product: base.copyWith(
-                          id: 'snapshot-b',
-                          title: 'Second original product',
-                        ),
-                        quantity: 3,
-                      ),
-                      BuyV2CartLine(
-                        product: base.copyWith(
-                          id: 'snapshot-c',
-                          title: 'Third original product',
-                        ),
-                        quantity: 1,
-                      ),
-                    ]
-                  : const [],
-            );
             final core = BuySession();
+            final source = _PagedWidgetSource(
+              destination,
+              providerMetadata: true,
+            );
             final session = BuyV2Session(
               core: core,
-              reviewDataEnabled: false,
-              commerceAdapter: _SkuSnapshotCommerce(
-                order,
-                base.copyWith(title: 'Changed live catalogue name'),
-              ),
-            );
+              reviewDataEnabled: true,
+              cataloguePageSource: source,
+              initialCatalogueRegionId: 'jodhpur',
+            )..destination = destination;
             addTearDown(session.dispose);
             addTearDown(core.dispose);
-            await session.restoreCommerce();
-            session.openOrders();
             await tester.pumpWidget(_app(session, textScale: scale));
             await tester.pumpAndSettle();
-            final card = find.byKey(
-              const ValueKey('buy-order-card-MS-SKU-TEST'),
+            for (final product in source.pages.first.items.take(3)) {
+              final card = find.byKey(ValueKey('buy-product-${product.id}'));
+              final seller = find.descendant(
+                of: card,
+                matching: find.text(product.seller),
+              );
+              expect(seller, findsOneWidget);
+              final paragraph = tester.renderObject<RenderParagraph>(seller);
+              expect(paragraph.didExceedMaxLines, isFalse);
+              final natural = TextPainter(
+                text: paragraph.text,
+                textDirection: paragraph.textDirection,
+                textScaler: paragraph.textScaler,
+              )..layout(maxWidth: paragraph.size.width);
+              expect(
+                paragraph.size.height + 1,
+                greaterThanOrEqualTo(natural.height),
+              );
+              natural.dispose();
+              expect(
+                tester
+                    .getRect(card)
+                    .contains(tester.getRect(seller).bottomRight),
+                isTrue,
+              );
+              await tester.ensureVisible(seller);
+              await tester.pumpAndSettle();
+              await captureR66Visual(
+                tester,
+                'provider-name-${destination.name}-$width-$scale-${product.id}',
+              );
+            }
+            if (scale == 1.0 && destination == BuyV2Destination.shop) {
+              final products = source.pages.first.items;
+              final first = tester.getSize(
+                find.byKey(ValueKey('buy-product-${products.first.id}')),
+              );
+              final next = tester.getSize(
+                find.byKey(ValueKey('buy-product-${products[3].id}')),
+              );
+              expect(
+                first.height,
+                greaterThan(next.height),
+                reason:
+                    'Long first-row provider does not pad later product rows',
+              );
+            }
+            final firstProduct = source.pages.first.items.first;
+            expect(session.addProduct(firstProduct.id), isTrue);
+            final quantity = session.quantityFor(firstProduct.id);
+            source.updatedProviderName =
+                'hanumana ram beniwal sardarpura jodhpure store regional distribution and delivery centre';
+            final refresh = find.byKey(
+              ValueKey('buy-page-refresh-catalogue-${destination.name}'),
             );
-            expect(card, findsOneWidget);
-            if (withLines) {
-              expect(
-                find.descendant(of: card, matching: find.text(archived.title)),
-                findsOneWidget,
+            final catalogueScroll = find
+                .descendant(
+                  of: find.byKey(
+                    ValueKey('buy-paged-scroll-catalogue-${destination.name}'),
+                  ),
+                  matching: find.byType(Scrollable),
+                )
+                .first;
+            // Scroll from the exposed list edge, not its centre where the
+            // floating Cart control may receive the gesture.
+            for (
+              var attempt = 0;
+              refresh.hitTestable().evaluate().isEmpty && attempt < 60;
+              attempt++
+            ) {
+              final bounds = tester.getRect(catalogueScroll);
+              await tester.dragFrom(
+                Offset(bounds.left + 4, bounds.top + 60),
+                const Offset(0, 300),
               );
-              expect(
-                find.descendant(
-                  of: card,
-                  matching: find.textContaining('Quantity 2'),
-                ),
-                findsOneWidget,
-              );
-              expect(
-                find.descendant(
-                  of: card,
-                  matching: find.text('+ 1 more product'),
-                ),
-                findsOneWidget,
-              );
-              expect(
-                find.descendant(
-                  of: card,
-                  matching: find.text('Changed live catalogue name'),
-                ),
-                findsNothing,
-              );
-              expect(order.lines.first.product.title, archived.title);
-            } else {
-              expect(
-                find.descendant(of: card, matching: find.text('Shop order')),
-                findsOneWidget,
-              );
-              expect(
-                find.descendant(
-                  of: card,
-                  matching: find.textContaining('Quantity'),
-                ),
-                findsNothing,
-              );
+              await tester.pumpAndSettle();
             }
-            for (final element
-                in find
-                    .descendant(of: card, matching: find.byType(RichText))
-                    .evaluate()) {
-              final render = element.renderObject;
-              if (render is RenderParagraph) {
-                expect(render.didExceedMaxLines, isFalse);
-              }
-            }
-            expect(tester.takeException(), isNull);
+            expect(refresh.hitTestable(), findsOneWidget);
+            await tester.tap(refresh);
+            await tester.pumpAndSettle();
+            expect(source.pages.length, greaterThan(1));
+            expect(source.pages.last.items.first.id, firstProduct.id);
+            final updatedCard = find.byKey(
+              ValueKey('buy-product-${firstProduct.id}'),
+            );
+            final updatedName = find.descendant(
+              of: updatedCard,
+              matching: find.text(source.updatedProviderName!),
+            );
+            expect(updatedName, findsOneWidget);
+            expect(session.quantityFor(firstProduct.id), quantity);
+            final updatedParagraph = tester.renderObject<RenderParagraph>(
+              updatedName,
+            );
+            expect(updatedParagraph.didExceedMaxLines, isFalse);
+            expect(
+              tester
+                  .getRect(updatedCard)
+                  .contains(tester.getRect(updatedName).bottomRight),
+              isTrue,
+            );
+            await tester.ensureVisible(updatedName);
+            await tester.pumpAndSettle();
             await captureR66Visual(
               tester,
-              'sku-orders-$scale-$withLines-$largeTotal',
+              'provider-update-${destination.name}-$width-$scale',
             );
+            expect(tester.takeException(), isNull);
           },
         );
       }
@@ -169,6 +468,24 @@ void main() {
     );
     expect(fixture.customerTitle, 'Phone 15 Pro');
     expect(fixture.customerVariant, '256 GB');
+    expect(fixture.customerContent(fixture.variant), '256 GB');
+    expect(fixture.customerContent('Phone 15 Pro 81'), 'Phone 15 Pro');
+    expect(
+      fixture.customerContent('Compatible with SKU 81'),
+      'Compatible with SKU 81',
+    );
+    expect(fixture.customerContent('Mool Market 000001'), 'Mool Market 1');
+    final description =
+        '${fixture.title} \u00b7 ${fixture.variant}. '
+        '${fixture.pack} at ${fixture.unitPrice}.';
+    expect(
+      fixture.customerContent(description),
+      'Phone 15 Pro \u00b7 256 GB. ${fixture.pack} at ${fixture.unitPrice}.',
+    );
+    expect(
+      fixture.customerContent('$description Supplier note SKU 81'),
+      '$description Supplier note SKU 81',
+    );
     expect(fixture.title, 'Phone 15 Pro 81');
     expect(fixture.customerSeller('Mool Market 000001'), 'Mool Market 1');
     expect(fixture.customerSeller('Real Store 000001'), 'Real Store 000001');
@@ -194,6 +511,8 @@ void main() {
     ]) {
       expect(invalid.customerTitle, invalid.title);
       expect(invalid.customerVariant, invalid.variant);
+      expect(invalid.customerContent(invalid.variant), invalid.variant);
+      expect(invalid.customerContent(description), description);
     }
     expect(
       fixture.copyWith(title: 'Phone 81 Pro').customerTitle,
@@ -257,6 +576,34 @@ void main() {
             }
           }
           final cardRect = tester.getRect(card);
+          final priceHighlight = find.byKey(
+            ValueKey('buy-price-highlight-${product.id}'),
+          );
+          final highlight = tester.widget<Container>(priceHighlight);
+          final decoration = highlight.decoration! as BoxDecoration;
+          expect(decoration.gradient, isNull);
+          expect(decoration.color, const Color(0xFFFFE082));
+          expect(
+            tester.getSize(priceHighlight).width,
+            lessThanOrEqualTo(cardRect.width - 12),
+          );
+          if (scale == 1.0) {
+            final firstProducts = source.pages.first.items.take(4).toList();
+            expect(firstProducts.length, 4);
+            final rects = firstProducts
+                .map(
+                  (item) => tester.getRect(
+                    find.byKey(ValueKey('buy-product-${item.id}')),
+                  ),
+                )
+                .toList();
+            expect(rects[1].top, closeTo(rects[0].top, 1));
+            expect(rects[2].top, closeTo(rects[0].top, 1));
+            expect(rects[1].left, greaterThan(rects[0].right));
+            expect(rects[2].left, greaterThan(rects[1].right));
+            expect(rects[2].right, lessThanOrEqualTo(width));
+            expect(rects[3].top, greaterThan(rects[0].bottom));
+          }
           expect(cardRect.contains(tester.getRect(title).topLeft), isTrue);
           expect(cardRect.contains(tester.getRect(title).bottomRight), isTrue);
           for (final element
@@ -337,6 +684,58 @@ void main() {
             );
           }
         }
+        final price = find.descendant(
+          of: card,
+          matching: find.text('\u20b91 crore'),
+        );
+        expect(price, findsOneWidget);
+        expect(product.price, 10000000);
+        expect(
+          find
+              .ancestor(of: price, matching: find.byType(Semantics))
+              .evaluate()
+              .any(
+                (element) =>
+                    (element.widget as Semantics).properties.label?.contains(
+                      buyV2Money(product.price),
+                    ) ??
+                    false,
+              ),
+          isTrue,
+          reason:
+              'The exact full amount remains available to assistive technology.',
+        );
+        expect(
+          tester.widget<Text>(price).style!.fontSize,
+          greaterThanOrEqualTo(12),
+        );
+        expect(
+          find.ancestor(of: price, matching: find.byType(FittedBox)),
+          findsNothing,
+        );
+        final priceParagraph = tester.renderObject<RenderParagraph>(price);
+        final measuredPrice = TextPainter(
+          text: priceParagraph.text,
+          textDirection: priceParagraph.textDirection,
+          textScaler: priceParagraph.textScaler,
+        )..layout(maxWidth: priceParagraph.size.width);
+        expect(
+          priceParagraph.size.height + .1,
+          greaterThanOrEqualTo(measuredPrice.height),
+        );
+        expect(
+          measuredPrice.computeLineMetrics(),
+          hasLength(1),
+          reason:
+              'The exact large fixture amount must not split its digit groups.',
+        );
+        measuredPrice.dispose();
+        await tester.ensureVisible(price);
+        await tester.pumpAndSettle();
+        await captureR66Visual(
+          tester,
+          'sku-long-price-${destination.name}-$scale',
+        );
         final add = find.byKey(ValueKey('buy-add-${product.id}'));
         await tester.ensureVisible(add);
         await tester.pumpAndSettle();
@@ -780,6 +1179,10 @@ void main() {
             matching: find.byKey(ValueKey('buy-add-$id')),
           );
           await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          await tester.ensureVisible(add);
+          await tester.pumpAndSettle();
+          expect(add.hitTestable(), findsOneWidget);
           await tester.tap(add);
           await tester.pumpAndSettle();
           expect(session.quantityFor(id), product.minimumOrder);
@@ -869,23 +1272,20 @@ void main() {
                   widget.axisDirection == AxisDirection.right,
             ),
           );
-          expect(horizontal, findsWidgets);
           expect(
-            horizontal.evaluate().length,
-            lessThanOrEqualTo(products.length),
+            horizontal,
+            findsNothing,
+            reason: 'Every SKU is reached through the outer vertical list.',
           );
-          // Before ensureVisible can move an inner scroller, prove no SKU is
-          // hidden horizontally. Only the outer vertical journey is needed.
-          for (final element in horizontal.evaluate()) {
-            final state = tester.state<ScrollableState>(
-              find.byWidget(element.widget),
-            );
-            expect(state.position.maxScrollExtent, lessThanOrEqualTo(.5));
-            expect(state.position.pixels, 0);
-          }
           final grid = find.descendant(
             of: full,
-            matching: find.byKey(const ValueKey('buy-horizontal-product-grid')),
+            matching: find.byWidgetPredicate(
+              (widget) =>
+                  widget is Semantics &&
+                  widget.key.toString().contains(
+                    'buy-vertical-product-summary-',
+                  ),
+            ),
           );
           final label = tester.widget<Semantics>(grid).properties.label!;
           expect(label, contains('Showing 4 of 4 products.'));
@@ -1069,10 +1469,14 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
         await tester.pumpAndSettle();
         const scope = 'published-offers';
-        final range = find.byKey(const ValueKey('buy-page-status-$scope'));
+        final range = find.byKey(const ValueKey('buy-page-range-$scope'));
         final next = find.byKey(const ValueKey('buy-page-next-$scope'));
         final vertical = find.byKey(const ValueKey('buy-paged-scroll-$scope'));
-        Future<void> reveal(Finder target, {bool header = false}) async {
+        Future<void> reveal(Finder target) async {
+          // Both pagination bars share state; explicitly return to the top
+          // before finding a header or traversing down to a product action.
+          tester.widget<ListView>(vertical).controller!.jumpTo(0);
+          await tester.pumpAndSettle();
           // The floating Cart can cover the viewport centre. Drag the visible
           // left gutter and verify movement instead of sending a missed hit.
           for (
@@ -1085,7 +1489,7 @@ void main() {
             final before = controller.offset;
             await tester.dragFrom(
               Offset(bounds.left + 4, bounds.center.dy),
-              Offset(0, header ? 100 : -100),
+              const Offset(0, -100),
             );
             await tester.pumpAndSettle();
             expect(
@@ -1164,7 +1568,7 @@ void main() {
         await capture('header');
         expect(
           find.byKey(const ValueKey('buy-page-range-$scope')),
-          findsNothing,
+          findsOneWidget,
         );
         expect(
           find.byKey(const ValueKey('buy-offers-filter-manufacturer')),
@@ -1186,10 +1590,7 @@ void main() {
           findsOneWidget,
         );
         await reveal(next);
-        expect(
-          tester.widget<Semantics>(range).properties.label,
-          '1–40 of 20,000,000 offers',
-        );
+        expect(tester.widget<Text>(range).data, '1–40 of 20,000,000 offers');
         expect(published.pages.single.items.length, 40);
         await capture('initial');
         final original = published.pages.single.items;
@@ -1207,10 +1608,7 @@ void main() {
         final retailOffer = original.firstWhere(
           (offer) => offer.product.id == retailProduct.id,
         );
-        await reveal(
-          find.byKey(const ValueKey('buy-published-offer-facts')),
-          header: true,
-        );
+        await reveal(find.byKey(const ValueKey('buy-published-offer-facts')));
         expect(find.text(retailOffer.headline), findsOneWidget);
         final retailCta = find.byKey(
           ValueKey('buy-offer-promotion-cta-${retailProduct.id}'),
@@ -1228,12 +1626,9 @@ void main() {
         expect(published.queries.length, retailRequests);
         expect(session.itemCount, 0);
         for (final product in [retailProduct, tradeProduct]) {
-          final lane = find.byKey(
-            ValueKey(
-              'buy-paged-lane-$scope-${product.destination == BuyV2Destination.shop ? 0 : 1}',
-            ),
+          await reveal(
+            find.byKey(const ValueKey('buy-paged-vertical-grid-$scope')),
           );
-          await reveal(lane);
           final add = find.byKey(ValueKey('buy-add-${product.id}'));
           await tester.ensureVisible(add);
           await tester.pumpAndSettle();
@@ -1255,10 +1650,7 @@ void main() {
         await tester.pumpAndSettle();
         final retry = find.widgetWithText(TextButton, 'Try again');
         await reveal(next);
-        expect(
-          tester.widget<Semantics>(range).properties.label,
-          '1–40 of 20,000,000 offers',
-        );
+        expect(tester.widget<Text>(range).data, '1–40 of 20,000,000 offers');
         await reveal(retry);
         expect(find.text('Results could not refresh'), findsOneWidget);
         await capture('retry');
@@ -1266,14 +1658,10 @@ void main() {
         await tester.tap(retry);
         await tester.pumpAndSettle();
         await reveal(next);
-        expect(
-          tester.widget<Semantics>(range).properties.label,
-          '41–80 of 20,000,000 offers',
-        );
+        expect(tester.widget<Text>(range).data, '41–80 of 20,000,000 offers');
         final pageProduct = published.pages.last.items.first.product;
         await reveal(
-          find.byKey(const ValueKey('buy-paged-lane-$scope-0')),
-          header: true,
+          find.byKey(const ValueKey('buy-paged-vertical-grid-$scope')),
         );
         final packshot = find.byKey(
           ValueKey('buy-grid-packshot-${pageProduct.id}'),
@@ -1305,7 +1693,7 @@ void main() {
           const ValueKey('buy-offer-promotion-next'),
         );
         final promotionRequests = published.queries.length;
-        await reveal(promotionNext, header: true);
+        await reveal(promotionNext);
         for (var index = 0; index < makerIndex; index++) {
           await tester.ensureVisible(promotionNext);
           await tester.pumpAndSettle();
@@ -1322,10 +1710,7 @@ void main() {
           makerPublication.publicationId,
         );
         final makerName = makerPublication.publisherName;
-        await reveal(
-          find.byKey(const ValueKey('buy-published-offer-facts')),
-          header: true,
-        );
+        await reveal(find.byKey(const ValueKey('buy-published-offer-facts')));
         expect(
           find.textContaining(
             'From ${makerPublication.product.customerSeller(makerName)}',
@@ -1403,7 +1788,7 @@ void main() {
         final categoryControl = find.byKey(
           const ValueKey('buy-offers-category-control'),
         );
-        await reveal(categoryControl, header: true);
+        await reveal(categoryControl);
         final originalCategory = session.selectedCategoryId;
         await tester.tap(categoryControl);
         await tester.pumpAndSettle();
@@ -1437,7 +1822,7 @@ void main() {
           isTrue,
         );
         expect(session.selectedCategoryId, originalCategory);
-        await reveal(categoryControl, header: true);
+        await reveal(categoryControl);
         await tester.tap(categoryControl);
         await tester.pumpAndSettle();
         await tester.tap(find.byKey(const ValueKey('buy-offers-category-all')));
@@ -1478,7 +1863,9 @@ void main() {
           ),
           isTrue,
         );
-        await reveal(find.byKey(const ValueKey('buy-paged-lane-$scope-0')));
+        await reveal(
+          find.byKey(const ValueKey('buy-paged-vertical-grid-$scope')),
+        );
         expect(find.byType(BuyV2ProductCard), findsWidgets);
         expect(
           session.quantityFor(retailProduct.id),
@@ -1879,7 +2266,7 @@ void main() {
               )
               .first;
           await tester.scrollUntilVisible(
-            find.byKey(ValueKey('buy-paged-lane-$storeScope-0')),
+            find.byKey(ValueKey('buy-paged-vertical-grid-$storeScope')),
             100,
             scrollable: productScroll,
           );
@@ -1952,56 +2339,30 @@ void main() {
           addTearDown(() => tester.pumpWidget(const SizedBox.shrink()));
           final scope = 'catalogue-${destination.name}';
           final range = find.byKey(ValueKey('buy-page-range-$scope'));
-          final shop = destination == BuyV2Destination.shop;
           void expectPage(int start) {
             expect(source.pages.last.startIndex, start);
-            if (shop) {
-              expect(range, findsNothing);
-            } else {
-              expect(
-                tester.widget<Text>(range).data,
-                startsWith('${start + 1}–${start + 40} of '),
-              );
-            }
+            expect(
+              tester.widget<Text>(range).data,
+              startsWith('${start + 1}\u2013${start + 40} of '),
+            );
           }
 
           Future<void> revealControls(Finder target) async {
-            if (!shop) {
-              await _revealPagedHeader(tester, scope, target);
-              return;
-            }
-            final scrollable = find
-                .descendant(
-                  of: find.byKey(ValueKey('buy-paged-scroll-$scope')),
-                  matching: find.byType(Scrollable),
-                )
-                .first;
-            await tester.scrollUntilVisible(
-              target,
-              100,
-              scrollable: scrollable,
-            );
+            final viewport = find.byKey(ValueKey('buy-paged-scroll-$scope'));
+            final controller = tester.widget<ListView>(viewport).controller!;
+            controller.jumpTo(0);
+            await tester.pumpAndSettle();
             await tester.ensureVisible(target);
             await tester.pumpAndSettle();
             expect(target.hitTestable(), findsOneWidget);
-            final status = find.byKey(ValueKey('buy-page-status-$scope'));
-            expect(
-              tester.widget<Semantics>(status).properties.label,
-              startsWith('${source.pages.last.startIndex + 1}–'),
-            );
-            expect(range, findsNothing);
           }
 
           expectPage(0);
-          if (shop) {
-            final lane = find.byKey(ValueKey('buy-paged-lane-$scope-0'));
-            final viewport = find.byKey(ValueKey('buy-paged-scroll-$scope'));
-            expect(
-              tester.getTopLeft(lane).dy - tester.getTopLeft(viewport).dy,
-              closeTo(6, 1),
-              reason: 'Shop products begin immediately without the count row',
-            );
-          }
+          expect(
+            find.byKey(ValueKey('buy-paged-vertical-grid-$scope')),
+            findsOneWidget,
+          );
+          expect(find.byKey(ValueKey('buy-paged-lane-$scope-0')), findsNothing);
           expect(source.requests.length, 1);
           expect(tester.takeException(), isNull);
           await captureR66Visual(tester, 'r5-paged-$profile-initial');
@@ -2043,9 +2404,9 @@ void main() {
           expect(session.isSaved(first.id), isTrue);
           expect(session.quantityFor(first.id), first.minimumOrder);
 
-          final lane = find.byKey(ValueKey('buy-paged-lane-$scope-0'));
+          final grid = find.byKey(ValueKey('buy-paged-vertical-grid-$scope'));
           final packshots = find.descendant(
-            of: lane,
+            of: grid,
             matching: find.byWidgetPredicate(
               (widget) =>
                   widget.key is ValueKey<String> &&
@@ -2054,19 +2415,9 @@ void main() {
                   ),
             ),
           );
-          await tester.ensureVisible(packshots.first);
+          await tester.ensureVisible(packshots.at(3));
           await tester.pumpAndSettle();
-          // Use the uncovered image below the badge and Save hit area. A tall
-          // card's centre can sit outside the short landscape viewport.
           const imageAction = Alignment(-.5, .55);
-          expect(packshots.first.hitTestable(at: imageAction), findsOneWidget);
-          await tester.dragFrom(
-            imageAction.withinRect(tester.getRect(packshots.first)),
-            const Offset(-330, 0),
-          );
-          await tester.pumpAndSettle();
-          final laneOffset = tester.widget<ListView>(lane).controller!.offset;
-          expect(laneOffset, greaterThan(0));
           final visibleImage = packshots.hitTestable(at: imageAction).first;
           final visible = find.ancestor(
             of: visibleImage,
@@ -2078,6 +2429,7 @@ void main() {
               .widget<ListView>(vertical)
               .controller!
               .offset;
+          expect(verticalOffset, greaterThan(0));
           final requestCount = source.requests.length;
           await captureR66Visual(tester, 'r5-paged-$profile-page2');
           await tester.tapAt(
@@ -2093,10 +2445,6 @@ void main() {
           expect(
             tester.widget<ListView>(vertical).controller!.offset,
             closeTo(verticalOffset, 1),
-          );
-          expect(
-            tester.widget<ListView>(lane).controller!.offset,
-            closeTo(laneOffset, 1),
           );
           expect(session.quantityFor(first.id), first.minimumOrder);
           await captureR66Visual(tester, 'r5-paged-$profile-return');
@@ -2118,6 +2466,33 @@ void main() {
           expectPage(0);
           expect(session.quantityFor(first.id), first.minimumOrder);
           expect(session.isSaved(first.id), isTrue);
+          final controller = tester.widget<ListView>(vertical).controller!;
+          controller.jumpTo(controller.position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          final bottomNext = find.byKey(
+            ValueKey('buy-page-next-$scope-bottom'),
+          );
+          await tester.ensureVisible(bottomNext);
+          await tester.pumpAndSettle();
+          expect(bottomNext.hitTestable(), findsOneWidget);
+          expect(
+            tester
+                .widget<Text>(
+                  find.byKey(ValueKey('buy-page-range-$scope-bottom')),
+                )
+                .data,
+            startsWith('1\u201340 of '),
+          );
+          await tester.tap(bottomNext);
+          await tester.pumpAndSettle();
+          await revealControls(previous);
+          expectPage(40);
+          await tester.tap(previous);
+          await tester.pumpAndSettle();
+          await revealControls(next);
+          expectPage(0);
+          expect(session.isSaved(first.id), isTrue);
+          expect(session.quantityFor(first.id), first.minimumOrder);
           final area = find.byKey(const ValueKey('buy-change-location'));
           await _revealPagedHeader(tester, scope, area);
           await tester.tap(area);
@@ -2579,7 +2954,7 @@ void main() {
                 .first;
             await tester.ensureVisible(horizontal);
             await tester.pumpAndSettle();
-            await tester.scrollUntilVisible(card, 140, scrollable: horizontal);
+            await tester.ensureVisible(card);
             await tester.pumpAndSettle();
           }
           final unitPrice = find.descendant(
@@ -2983,7 +3358,11 @@ void main() {
     expect(find.text('Safe Protein Store'), findsWidgets);
     expect(find.text('Store products'), findsOneWidget);
     expect(
-      find.byKey(const ValueKey('buy-horizontal-product-grid')),
+      find.byWidgetPredicate(
+        (widget) =>
+            widget is Semantics &&
+            widget.key.toString().contains('buy-vertical-product-summary-'),
+      ),
       findsOneWidget,
     );
     expect(find.byKey(const ValueKey('buy-product-s-eggs')), findsOneWidget);
@@ -3180,7 +3559,7 @@ void main() {
           )
           .first;
       expect(fullEggs, findsOneWidget);
-      expect(tester.getSize(fullEggs).width, greaterThanOrEqualTo(134));
+      expect(tester.getSize(fullEggs).width, inInclusiveRange(90, 390 / 3));
       expect(tester.getSize(fullEggs).width, lessThanOrEqualTo(390));
 
       await tester.tap(
@@ -3241,19 +3620,19 @@ void main() {
       final products = session.partnerCatalogueFor(session.product('s-curd'));
       expect(products.length, 4);
       final sheet = find.byKey(const ValueKey('buy-shop-seller-sheet-s-curd'));
+      final previewCards = [
+        for (final product in products)
+          find.descendant(
+            of: sheet,
+            matching: find.byKey(ValueKey('buy-product-${product.id}')),
+          ),
+      ];
+      final firstRow = previewCards.take(3).map(tester.getRect).toList();
+      expect(firstRow[1].top, closeTo(firstRow[0].top, .5));
+      expect(firstRow[2].top, closeTo(firstRow[0].top, .5));
       expect(
-        find.descendant(
-          of: sheet,
-          matching: find.byKey(const ValueKey('buy-horizontal-product-lane-0')),
-        ),
-        findsOneWidget,
-      );
-      expect(
-        find.descendant(
-          of: sheet,
-          matching: find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
-        ),
-        findsNothing,
+        tester.getRect(previewCards[3]).top,
+        greaterThan(firstRow[0].bottom),
       );
       for (final product in products.take(2)) {
         final card = find
@@ -3265,37 +3644,41 @@ void main() {
         expect(card, findsOneWidget);
         expect(tester.getRect(card).right, lessThanOrEqualTo(378));
       }
-      final horizontal = find
+      final vertical = find
           .descendant(
             of: sheet,
             matching: find.byWidgetPredicate(
               (widget) =>
                   widget is Scrollable &&
-                  widget.axisDirection == AxisDirection.right,
+                  widget.axisDirection == AxisDirection.down,
             ),
           )
           .first;
-      await tester.ensureVisible(horizontal);
-      await tester.pumpAndSettle();
+      expect(vertical, findsOneWidget);
       for (final product in products) {
         final card = find.descendant(
           of: sheet,
           matching: find.byKey(ValueKey('buy-product-${product.id}')),
         );
-        await tester.scrollUntilVisible(card, 140, scrollable: horizontal);
+        await tester.ensureVisible(card);
         await tester.pumpAndSettle();
         expect(card, findsOneWidget);
-        expect(tester.getSize(card).width, greaterThanOrEqualTo(134));
+        expect(tester.getSize(card).width, inInclusiveRange(90, 390 / 3));
         final title = find.descendant(
           of: card,
           matching: find.text(product.customerTitle),
         );
         expect(title, findsOneWidget);
       }
-      expect(
-        find.byKey(const ValueKey('buy-shop-seller-view-more-s-curd')),
-        findsOneWidget,
+      final viewMore = find.byKey(
+        const ValueKey('buy-shop-seller-view-more-s-curd'),
       );
+      tester.state<ScrollableState>(vertical).position.jumpTo(0);
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(viewMore, 140, scrollable: vertical);
+      await tester.ensureVisible(viewMore);
+      await tester.pumpAndSettle();
+      expect(viewMore.hitTestable(), findsOneWidget);
       expect(tester.takeException(), isNull);
     },
   );
@@ -3573,9 +3956,14 @@ class _StoreJourneySource extends BuyV2DevelopmentCatalogueSource {
 }
 
 class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {
-  _PagedWidgetSource(BuyV2Destination destination, {this.longMetadata = false})
-    : super(destination: destination, providerCount: 40);
+  _PagedWidgetSource(
+    BuyV2Destination destination, {
+    this.longMetadata = false,
+    this.providerMetadata = false,
+  }) : super(destination: destination, providerCount: 40);
   final bool longMetadata;
+  final bool providerMetadata;
+  String? updatedProviderName;
   bool failNext = false;
   final requests = <BuyV2CatalogueQuery>[];
   final pages = <BuyV2CataloguePage<BuyV2Product>>[];
@@ -3615,14 +4003,61 @@ class _PagedWidgetSource extends BuyV2DevelopmentCatalogueSource {
         ),
       );
     }
+    if (providerMetadata) {
+      page = BuyV2CataloguePage(
+        queryKey: page.queryKey,
+        snapshotId: page.snapshotId,
+        startIndex: page.startIndex,
+        totalCount: page.totalCount,
+        previousCursor: page.previousCursor,
+        nextCursor: page.nextCursor,
+        items: page.items.indexed.map((entry) {
+          final (index, product) = entry;
+          if (index > 2) return product;
+          return product.copyWith(
+            seller:
+                updatedProviderName ??
+                (index == 0
+                    ? 'supermandi tech priate limited'
+                    : index == 1
+                    ? 'hanumana ram beniwal sardarpura jodhpure store'
+                    : 'हनुमाना Wholesale दुकान PROVIDERIDENTIFIERABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'),
+          );
+        }),
+      );
+    }
     pages.add(page);
     return page;
   }
 }
 
+ThemeData _skuFixtureTheme() {
+  final theme = MoolTheme.light();
+  if (const String.fromEnvironment('BUY_SKU_DEVANAGARI_FONT').isEmpty) {
+    return theme;
+  }
+  return theme.copyWith(
+    textTheme: theme.textTheme.apply(
+      fontFamilyFallback: const ['NotoSansDevanagari'],
+    ),
+    primaryTextTheme: theme.primaryTextTheme.apply(
+      fontFamilyFallback: const ['NotoSansDevanagari'],
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: theme.outlinedButtonTheme.style!.copyWith(
+        textStyle: WidgetStateProperty.resolveWith(
+          (states) => theme.outlinedButtonTheme.style!.textStyle!
+              .resolve(states)!
+              .copyWith(fontFamilyFallback: const ['NotoSansDevanagari']),
+        ),
+      ),
+    ),
+  );
+}
+
 Widget _app(BuyV2Session session, {double textScale = 1}) => MaterialApp(
   debugShowCheckedModeBanner: false,
-  theme: MoolTheme.light(),
+  theme: _skuFixtureTheme(),
   builder: (context, child) => MediaQuery(
     data: MediaQuery.of(
       context,

@@ -334,6 +334,12 @@ void main() {
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
     final viewports = <({Size size, double scale, EdgeInsets padding})>[
+      for (final scale in [1.0, 2.0])
+        (
+          size: const Size(360, 800),
+          scale: scale,
+          padding: const EdgeInsets.only(top: 24, bottom: 24),
+        ),
       (
         size: const Size(320, 568),
         scale: 1.4,
@@ -388,6 +394,46 @@ void main() {
         reason: '${viewport.size} bottom inset',
       );
       expect(tester.takeException(), isNull, reason: '${viewport.size}');
+
+      if (viewport.size.width < viewport.size.height) {
+        final delivery = find.byKey(
+          ValueKey('buy-wholesale-dock-delivery-${product.id}'),
+        );
+        await captureR66Visual(
+          tester,
+          'sku-dock-complete-${viewport.size.width}-${viewport.scale}',
+        );
+        final paragraph = tester.renderObject<RenderParagraph>(delivery);
+        expect(paragraph.didExceedMaxLines, isFalse);
+        final text = tester.widget<Text>(delivery).data!;
+        // A selection including a line-end space may extend beyond the
+        // paragraph even when all painted glyphs fit. Check every visible word
+        // and the unrestricted paragraph height instead of trailing whitespace.
+        final natural = TextPainter(
+          text: paragraph.text,
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout(maxWidth: paragraph.size.width);
+        expect(natural.height, lessThanOrEqualTo(paragraph.size.height + 1));
+        natural.dispose();
+        for (final match in RegExp(r'\S+').allMatches(text)) {
+          final wordBoxes = paragraph.getBoxesForSelection(
+            TextSelection(baseOffset: match.start, extentOffset: match.end),
+          );
+          expect(wordBoxes, isNotEmpty);
+          expect(
+            wordBoxes.map((box) => box.top).toSet(),
+            hasLength(1),
+            reason: 'Keep ${match.group(0)} intact',
+          );
+          for (final box in wordBoxes) {
+            expect(box.left, greaterThanOrEqualTo(-1));
+            expect(box.right, lessThanOrEqualTo(paragraph.size.width + 1));
+            expect(box.bottom, lessThanOrEqualTo(paragraph.size.height + 1));
+          }
+        }
+        expect(add.hitTestable(), findsOneWidget);
+      }
 
       if (viewport.size.width > viewport.size.height) {
         expect(add.hitTestable(), findsOneWidget);

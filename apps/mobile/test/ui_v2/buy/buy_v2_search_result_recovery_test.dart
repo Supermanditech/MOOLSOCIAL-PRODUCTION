@@ -169,8 +169,12 @@ void main() {
           }
           expect(secondRect.right, lessThanOrEqualTo(width));
           expect(
-            find.byKey(const ValueKey('buy-horizontal-product-lane-1')),
-            scale > 1.6 ? findsOneWidget : findsNothing,
+            find.byKey(
+              ValueKey(
+                'buy-vertical-product-grid-buy-search-${session.destination.name}-tomato',
+              ),
+            ),
+            findsOneWidget,
           );
           expect(tester.takeException(), isNull);
           if (const bool.fromEnvironment('BUY_R66_SPARSE_CAPTURE')) {

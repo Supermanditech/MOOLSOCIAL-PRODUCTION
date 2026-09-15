@@ -1272,22 +1272,44 @@ void main() {
             const ValueKey('buy-recently-viewed-heading'),
           );
           final clear = find.byKey(const ValueKey('buy-recently-viewed-clear'));
-          await tester.scrollUntilVisible(
-            clear,
-            140,
-            scrollable: find
-                .descendant(
-                  of: find.byType(BuyV2CatalogueView),
-                  matching: find.byWidgetPredicate(
-                    (widget) =>
-                        widget is Scrollable &&
-                        widget.axisDirection == AxisDirection.down,
-                  ),
-                )
-                .first,
-          );
-          await tester.ensureVisible(clear);
-          await tester.pumpAndSettle();
+          final catalogueScroll = find
+              .descendant(
+                of: find.byType(BuyV2CatalogueView),
+                matching: find.byWidgetPredicate(
+                  (widget) =>
+                      widget is Scrollable &&
+                      widget.axisDirection == AxisDirection.down,
+                ),
+              )
+              .first;
+          Future<void> revealClear(double delta) async {
+            for (
+              var attempt = 0;
+              attempt < 100 && clear.hitTestable().evaluate().isEmpty;
+              attempt++
+            ) {
+              final start =
+                  const [
+                    Alignment(-.85, 0),
+                    Alignment(.85, 0),
+                    Alignment(-.85, -.5),
+                    Alignment(.85, -.5),
+                  ].firstWhere(
+                    (alignment) => catalogueScroll
+                        .hitTestable(at: alignment)
+                        .evaluate()
+                        .isNotEmpty,
+                  );
+              await tester.dragFrom(
+                start.withinRect(tester.getRect(catalogueScroll)),
+                Offset(0, delta),
+              );
+              await tester.pumpAndSettle();
+            }
+            expect(clear.hitTestable(), findsOneWidget);
+          }
+
+          await revealClear(-140);
           final cart = find.byKey(const ValueKey('buy-mini-cart-drag-handle'));
           for (final target in [heading, clear]) {
             expect(
@@ -1295,9 +1317,20 @@ void main() {
               isFalse,
             );
           }
-          final facts = find.byKey(
-            const ValueKey('buy-recently-viewed-facts-s-tomato'),
+          final recentCard = find.byKey(
+            const ValueKey('buy-recently-viewed-product-s-tomato'),
           );
+          final facts = find
+              .ancestor(
+                of: find.descendant(
+                  of: recentCard,
+                  matching: find.text(
+                    session.product('s-tomato').customerTitle,
+                  ),
+                ),
+                matching: find.byType(BuyV2CartAvoidanceRegion),
+              )
+              .first;
           await tester.ensureVisible(facts);
           await tester.pumpAndSettle();
           final viewport = tester.getRect(
@@ -1309,10 +1342,14 @@ void main() {
           await tester.pumpAndSettle();
           expect(tester.getRect(cart).overlaps(visibleFacts), isFalse);
           await capture(tester, 'r664-recent-facts-$size-$scale');
-          await tester.ensureVisible(clear);
-          await tester.pumpAndSettle();
-          expect(clear.hitTestable(), findsOneWidget);
+          await revealClear(120);
           await capture(tester, 'r664-recent-clear-$size-$scale');
+          expect(
+            clear.hitTestable(),
+            findsOneWidget,
+            reason:
+                'Clear ${clear.evaluate().isEmpty ? 'unmounted' : tester.getRect(clear)}; Cart ${tester.getRect(cart)}; viewport ${tester.getRect(find.byKey(const ValueKey("buy-cart-content-viewport")))}',
+          );
           await tester.tap(clear);
           await tester.pumpAndSettle();
           expect(
@@ -1361,21 +1398,27 @@ void main() {
   }
 
   void expectWordsFit(WidgetTester tester, Finder textFinder) {
-    final text = tester.widget<Text>(textFinder);
-    final paragraph = tester.renderObject<RenderParagraph>(textFinder);
-    expect(paragraph.didExceedMaxLines, isFalse);
-    for (final word in text.data!.split(RegExp(r'\s+'))) {
-      final measure = TextPainter(
-        text: TextSpan(text: word, style: paragraph.text.style),
-        textDirection: TextDirection.ltr,
-        textScaler: paragraph.textScaler,
-      )..layout();
-      expect(
-        paragraph.size.width + .5,
-        greaterThanOrEqualTo(measure.width),
-        reason: 'Complete word: $word',
+    expect(textFinder, findsWidgets);
+    for (final element in textFinder.evaluate()) {
+      final exact = find.byElementPredicate(
+        (candidate) => identical(candidate, element),
       );
-      measure.dispose();
+      final text = tester.widget<Text>(exact);
+      final paragraph = tester.renderObject<RenderParagraph>(exact);
+      expect(paragraph.didExceedMaxLines, isFalse);
+      for (final word in text.data!.split(RegExp(r'\s+'))) {
+        final measure = TextPainter(
+          text: TextSpan(text: word, style: paragraph.text.style),
+          textDirection: paragraph.textDirection,
+          textScaler: paragraph.textScaler,
+        )..layout();
+        expect(
+          paragraph.size.width + .5,
+          greaterThanOrEqualTo(measure.width),
+          reason: 'Complete word: $word',
+        );
+        measure.dispose();
+      }
     }
   }
 
@@ -1976,6 +2019,12 @@ void main() {
         final badge = find.descendant(of: tile, matching: find.text('Lowest'));
         expectWordsFit(tester, badge);
         final remove = find.byKey(const ValueKey('buy-save-s-tomato'));
+        expectWordsFit(
+          tester,
+          find.descendant(of: remove, matching: find.text('Remove')),
+        );
+        expect(tester.getSize(remove).width, greaterThanOrEqualTo(44));
+        expect(tester.getSize(remove).height, greaterThanOrEqualTo(44));
         expect(tester.getRect(badge).overlaps(tester.getRect(remove)), isFalse);
         expect(remove.hitTestable(), findsOneWidget);
         await capture(tester, 'r664-saved-badge-$width-$scale');

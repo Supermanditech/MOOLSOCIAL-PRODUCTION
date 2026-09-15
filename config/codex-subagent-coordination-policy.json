@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4587,
-    "sha256": "CB8C61F0457D313C54602A4D79C1DEDA897A2E6889600F3974E19F61096422E2"
+    "entryCount": 4589,
+    "sha256": "A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -384,6 +384,8 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart",
         "apps/mobile/lib/main.dart",
         "apps/mobile/lib/app/ui_review_language_store.dart",
         "apps/mobile/test/app/ui_review_language_store_test.dart",
@@ -392,7 +394,8 @@
         "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart"
       ]
     }
   ],
@@ -2379,15 +2382,15 @@
         "preMergeCoordinationOwners": [
           "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
         ],
-      "maximumPostMergeClosureCommits": 3,
-      "postMergeClosureOwners": [
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
-        "config/codex-development-regression-registry.json",
-        "config/codex-subagent-coordination-policy.json",
-        "scripts/check-codex-development-regression-memory.ps1",
-        "scripts/check-codex-subagent-coordination-policy.ps1",
-        "scripts/test-codex-integration-repair-coordination-policy.ps1"
-      ],
+        "maximumPostMergeClosureCommits": 3,
+        "postMergeClosureOwners": [
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-development-regression-memory.ps1",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        ],
         "directSourceCommitsAllowed": false,
         "conflictResolutionAllowed": true,
         "exactConflictOwners": [
@@ -2396,11 +2399,11 @@
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "remoteRepairBranchMustEqualHeadBeforeAdmission": true,
-      "freshIntegrationWorkId": "work-store-buy-v4-20260904",
-      "freshIntegrationTicketId": "UAW-INTEGRATION-WORK-STORE-BUY-V4-20260904",
-      "freshIntegrationBranch": "integration/moolsocial/work-store-buy-v4-20260904",
-      "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v4-20260904",
-      "freshIntegrationMergeSubject": "merge(work-store-buy-v4-20260904): integrate corrected Store Chat and Buy"
+        "freshIntegrationWorkId": "work-store-buy-v4-20260904",
+        "freshIntegrationTicketId": "UAW-INTEGRATION-WORK-STORE-BUY-V4-20260904",
+        "freshIntegrationBranch": "integration/moolsocial/work-store-buy-v4-20260904",
+        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v4-20260904",
+        "freshIntegrationMergeSubject": "merge(work-store-buy-v4-20260904): integrate corrected Store Chat and Buy"
       }
     },
     "promotion": {

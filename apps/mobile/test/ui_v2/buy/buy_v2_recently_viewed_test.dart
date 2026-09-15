@@ -38,52 +38,80 @@ void main() {
     ),
   );
 
-  for (final destination in [BuyV2Destination.shop, BuyV2Destination.wholesale]) {
+  for (final destination in [
+    BuyV2Destination.shop,
+    BuyV2Destination.wholesale,
+  ]) {
     for (final scale in [1.0, 2.0]) {
-      testWidgets('R669 Recent last Add clears Android navigation ${destination.name} $scale', (tester) async {
-        tester.view.devicePixelRatio = 1;
-        tester.view.physicalSize = const Size(320, 568);
-        tester.view.viewPadding = const FakeViewPadding(bottom: 48);
-        tester.view.padding = const FakeViewPadding(bottom: 48);
-        tester.platformDispatcher.textScaleFactorTestValue = scale;
-        addTearDown(tester.view.reset);
-        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
-        final core = BuySession();
-        final session = BuyV2Session(core: core);
-        addTearDown(session.dispose);
-        addTearDown(core.dispose);
-        session.openDestination(destination);
-        final products = BuyV2Catalogue.products.where((p) => p.destination == destination).take(3).toList();
-        expect(products.length, 3);
-        for (final product in products) {
-          session.openProduct(product.id);
-          session.goBack();
-        }
-        await tester.pumpWidget(app(session));
-        await tester.pumpAndSettle();
-        final last = session.recentlyViewedProductsFor(destination).last;
-        unawaited(showBuyV2RecentlyViewed(tester.element(find.byType(BuyV2Screen)), session));
-        await tester.pumpAndSettle();
-        final sheet = find.byKey(const ValueKey('buy-recently-viewed-info-sheet'));
-        final scroll = find.descendant(of: sheet, matching: find.byType(Scrollable)).last;
-        final position = tester.state<ScrollableState>(scroll).position;
-        position.jumpTo(position.maxScrollExtent);
-        await tester.pumpAndSettle();
-        final add = find.byKey(ValueKey('buy-recently-viewed-add-${last.id}'));
-        expect(add, findsOneWidget);
-        expect(tester.getRect(add).bottom, lessThanOrEqualTo(520), reason: 'The complete last action must be above the Android navigation area.');
-        await captureR66Visual(tester, 'r669-recent-last-add-${destination.name}-$scale');
-        await tester.tap(add);
-        await tester.pumpAndSettle();
-        expect(session.quantityFor(last.id), greaterThan(0));
-        await tester.binding.handlePopRoute();
-        await tester.pumpAndSettle();
-        expect(sheet, findsNothing);
-        expect(session.destination, destination);
-        expect(session.quantityFor(last.id), greaterThan(0));
-        expect(tester.takeException(), isNull);
-        await tester.pumpWidget(const SizedBox.shrink());
-      });
+      testWidgets(
+        'R669 Recent last Add clears Android navigation ${destination.name} $scale',
+        (tester) async {
+          tester.view.devicePixelRatio = 1;
+          tester.view.physicalSize = const Size(320, 568);
+          tester.view.viewPadding = const FakeViewPadding(bottom: 48);
+          tester.view.padding = const FakeViewPadding(bottom: 48);
+          tester.platformDispatcher.textScaleFactorTestValue = scale;
+          addTearDown(tester.view.reset);
+          addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+          final core = BuySession();
+          final session = BuyV2Session(core: core);
+          addTearDown(session.dispose);
+          addTearDown(core.dispose);
+          session.openDestination(destination);
+          final products = BuyV2Catalogue.products
+              .where((p) => p.destination == destination)
+              .take(3)
+              .toList();
+          expect(products.length, 3);
+          for (final product in products) {
+            session.openProduct(product.id);
+            session.goBack();
+          }
+          await tester.pumpWidget(app(session));
+          await tester.pumpAndSettle();
+          final last = session.recentlyViewedProductsFor(destination).last;
+          unawaited(
+            showBuyV2RecentlyViewed(
+              tester.element(find.byType(BuyV2Screen)),
+              session,
+            ),
+          );
+          await tester.pumpAndSettle();
+          final sheet = find.byKey(
+            const ValueKey('buy-recently-viewed-info-sheet'),
+          );
+          final scroll = find
+              .descendant(of: sheet, matching: find.byType(Scrollable))
+              .last;
+          final position = tester.state<ScrollableState>(scroll).position;
+          position.jumpTo(position.maxScrollExtent);
+          await tester.pumpAndSettle();
+          final add = find.byKey(
+            ValueKey('buy-recently-viewed-add-${last.id}'),
+          );
+          expect(add, findsOneWidget);
+          expect(
+            tester.getRect(add).bottom,
+            lessThanOrEqualTo(520),
+            reason:
+                'The complete last action must be above the Android navigation area.',
+          );
+          await captureR66Visual(
+            tester,
+            'r669-recent-last-add-${destination.name}-$scale',
+          );
+          await tester.tap(add);
+          await tester.pumpAndSettle();
+          expect(session.quantityFor(last.id), greaterThan(0));
+          await tester.binding.handlePopRoute();
+          await tester.pumpAndSettle();
+          expect(sheet, findsNothing);
+          expect(session.destination, destination);
+          expect(session.quantityFor(last.id), greaterThan(0));
+          expect(tester.takeException(), isNull);
+          await tester.pumpWidget(const SizedBox.shrink());
+        },
+      );
     }
   }
 
@@ -153,7 +181,13 @@ void main() {
         }
       }
       expect(
-        tester.getRect(find.byWidget(element.widget)).bottom,
+        tester
+            .getRect(
+              find.byElementPredicate(
+                (candidate) => identical(candidate, element),
+              ),
+            )
+            .bottom,
         lessThanOrEqualTo(tester.getRect(owner).bottom + .1),
         reason: label,
       );
@@ -184,18 +218,10 @@ void main() {
       session.goBack();
       await tester.pumpAndSettle();
       expect(session.view, BuyV2View.catalogue);
-      final facts = find.byKey(
-        ValueKey('buy-recently-viewed-facts-${product.id}'),
-      );
-      await tester.ensureVisible(facts);
-      await tester.pumpAndSettle();
+      final facts = await _revealRecentCard(tester, product.id);
       expectCompleteText(tester, facts, wordsFit: true);
       await captureR66Visual(tester, 'r664-recent-deadline-$source');
-      final target = find.byKey(
-        ValueKey('buy-recently-viewed-product-${product.id}'),
-      );
-      await tester.tap(target);
-      await tester.pumpAndSettle();
+      await _openRecentProduct(tester, product.id);
       expect(session.selectedProductId, product.id);
       expect(session.view, BuyV2View.product);
       expect(tester.takeException(), isNull);
@@ -383,7 +409,7 @@ void main() {
           );
           expectCompleteText(
             tester,
-            find.byKey(ValueKey('buy-recently-viewed-facts-$productId')),
+            find.byKey(ValueKey('buy-recently-viewed-product-$productId')),
           );
           expectCompleteText(
             tester,
@@ -400,10 +426,37 @@ void main() {
           expect(tester.getSize(card).height, greaterThanOrEqualTo(44));
           final media = BuyV2ProductPackshot.resolveMedia(product)!;
           final png = await rootBundle.load(media.assetPath);
-          final sourceCellRatio =
-              (png.getUint32(16) / 4) / (png.getUint32(20) / 3);
+          final pngWidth = png.getUint32(16).toDouble();
+          final pngHeight = png.getUint32(20).toDouble();
+          final crop = media.sourceRect;
+          expect(crop.left, greaterThanOrEqualTo(0));
+          expect(crop.top, greaterThanOrEqualTo(0));
+          expect(crop.right, lessThanOrEqualTo(pngWidth));
+          expect(crop.bottom, lessThanOrEqualTo(pngHeight));
+          final sourceCellRatio = crop.width / crop.height;
+          final renderedAtlas = tester.getSize(
+            find.descendant(
+              of: card,
+              matching: find.byWidgetPredicate(
+                (widget) =>
+                    widget is Image &&
+                    widget.image is AssetImage &&
+                    (widget.image as AssetImage).assetName == media.assetPath,
+              ),
+            ),
+          );
+          expect(
+            renderedAtlas.width / renderedAtlas.height,
+            closeTo(pngWidth / pngHeight, .001),
+          );
           final packshot = tester.getSize(
-            find.byKey(ValueKey('buy-recently-viewed-packshot-$productId')),
+            find.descendant(
+              of: find.descendant(
+                of: card,
+                matching: find.byType(BuyV2ProductPackshot),
+              ),
+              matching: find.byType(AspectRatio),
+            ),
           );
           expect(
             packshot.width / packshot.height,
@@ -411,8 +464,7 @@ void main() {
           );
           expect(tester.takeException(), isNull);
           await capture(tester, '$productId-$width-text2');
-          await tester.tap(card);
-          await tester.pumpAndSettle();
+          await _openRecentProduct(tester, productId);
           expect(session.selectedProductId, productId);
         },
       );
@@ -525,11 +577,7 @@ void main() {
       expect(find.text('Recently viewed'), findsOneWidget);
       expect(find.text('2 × 1 L pouches'), findsWidgets);
 
-      final exactVariant = find.byKey(
-        const ValueKey('buy-recently-viewed-product-s-milk-2l'),
-      );
-      await tester.tap(exactVariant);
-      await tester.pumpAndSettle();
+      await _openRecentProduct(tester, 's-milk-2l');
       expect(session.selectedProductId, 's-milk-2l');
       expect(session.view, BuyV2View.product);
 
@@ -546,13 +594,60 @@ void main() {
             )
             .first,
       );
-      await tester.tap(find.byKey(const ValueKey('buy-recently-viewed-clear')));
+      final clear = find.byKey(const ValueKey('buy-recently-viewed-clear'));
+      await tester.ensureVisible(clear);
+      await tester.pumpAndSettle();
+      expect(clear.hitTestable(), findsOneWidget);
+      await tester.tap(clear);
       await tester.pumpAndSettle();
       expect(find.byKey(const ValueKey('buy-recently-viewed')), findsNothing);
       expect(session.view, BuyV2View.catalogue);
       expect(tester.takeException(), isNull);
     },
   );
+}
+
+Future<Finder> _revealRecentCard(WidgetTester tester, String id) async {
+  final card = find.byKey(ValueKey('buy-recently-viewed-product-$id'));
+  if (card.evaluate().isEmpty) {
+    final scrollable = find
+        .descendant(
+          of: find.byType(BuyV2CatalogueView),
+          matching: find.byWidgetPredicate(
+            (widget) =>
+                widget is Scrollable &&
+                (widget.axisDirection == AxisDirection.down ||
+                    widget.axisDirection == AxisDirection.up),
+          ),
+        )
+        .first;
+    tester.state<ScrollableState>(scrollable).position.jumpTo(0);
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      card,
+      220,
+      scrollable: scrollable,
+      maxScrolls: 100,
+    );
+  }
+  await tester.ensureVisible(card);
+  await tester.pumpAndSettle();
+  return card;
+}
+
+Future<void> _openRecentProduct(WidgetTester tester, String id) async {
+  final card = await _revealRecentCard(tester, id);
+  final image = find.descendant(
+    of: card,
+    matching: find.byKey(ValueKey('buy-grid-packshot-$id')),
+  );
+  expect(image, findsOneWidget);
+  await tester.ensureVisible(image);
+  await tester.pumpAndSettle();
+  const point = Alignment(-.5, .55);
+  expect(image.hitTestable(at: point), findsOneWidget);
+  await tester.tapAt(point.withinRect(tester.getRect(image)));
+  await tester.pumpAndSettle();
 }
 
 final class _MemoryCustomerStateStore implements BuyV2CustomerStateStore {
