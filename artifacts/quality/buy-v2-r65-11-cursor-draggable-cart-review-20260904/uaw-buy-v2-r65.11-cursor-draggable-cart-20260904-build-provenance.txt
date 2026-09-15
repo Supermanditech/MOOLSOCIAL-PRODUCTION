@@ -1,0 +1,15 @@
+CandidateId=UAW-BUY-V2-R65.11-CURSOR-DRAGGABLE-CART-20260904
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-BUY-V2-R65.11-CURSOR-DRAGGABLE-CART-20260904;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r65.11
+VersionCode=2026090327
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-11-cursor-draggable-cart-review-20260904\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-11-cursor-draggable-cart-review-20260904\apk-regression-state.json
+Branch=work/cursor-ui/buy-mvp-ticket14-v1-20260902
+HEAD=557957471df255e448bf6a8820d3efbf8b598f90
+SourceFingerprint=1C6658338B4550118AA107708192D40657C1E3AE2C3C76D352181625429D3A62
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-buy-mvp-ticket14-v1-20260902\artifacts\quality\buy-v2-r65-11-cursor-draggable-cart-review-20260904\uaw-buy-v2-r65.11-cursor-draggable-cart-20260904-device-review-debug.apk
+Bytes=208718361
+SHA256=F9D131C0A784FA6FE0E1B629A6D5DF9E83D4731C848A03CB73752E5CFC4DA8BD
+BuiltAt=2026-09-04T12:15:54.9644781+05:30

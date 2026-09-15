@@ -3,6 +3,8 @@ param(
   [Parameter(Mandatory)][string]$OutputPath,
   [string]$RepositoryRoot
 )
+. (Join-Path $PSScriptRoot 'windows-powershell-portable-api.ps1')
+
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
@@ -44,9 +46,7 @@ function Get-C30UFingerprint {
   $payload = (@($Records | Sort-Object path | ForEach-Object {
     "$($_.path)|$($_.bytes)|$($_.sha256)"
   }) -join "`n") + "`n"
-  [Convert]::ToHexString(
-    [Security.Cryptography.SHA256]::HashData([Text.Encoding]::UTF8.GetBytes($payload))
-  )
+  (ConvertTo-MoolSocialPortableHex -Bytes ((Get-MoolSocialPortableSha256Bytes -Bytes ([Text.Encoding]::UTF8.GetBytes($payload)))))
 }
 
 $branch = (& git -C $root rev-parse --abbrev-ref HEAD).Trim()

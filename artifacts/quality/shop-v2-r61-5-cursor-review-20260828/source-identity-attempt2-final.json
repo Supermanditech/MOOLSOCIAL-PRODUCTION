@@ -1,0 +1,12 @@
+{
+  "schema": "shop_source_identity_v1",
+  "attempt": 2,
+  "branch": "work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
+  "head": "9a05a49a5979671e4d7a21f4fb572b57dfb0b847",
+  "manifestPath": "artifacts/quality/shop-v2-r61-5-cursor-review-20260828/source-manifest-attempt2.txt",
+  "manifestSha256": "6F339A05D63B13F09C3B09F29795FC61E4713FC9A784F536D3C16183680D5E52",
+  "fileCount": 636,
+  "cursorGoogleServicesTaskDisabled": true,
+  "runtimeAndReleaseUnchanged": true,
+  "recordedAt": "2026-08-28T22:58:32.4128759+05:30"
+}
