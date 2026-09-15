@@ -483,7 +483,7 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "final_rows_media_source_qualified_commit_gates_and_redmi_pending",
+    "state": "rows_media_source_committed_eleven_prebuild_gates_passed_successor_pending",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
@@ -809,7 +809,7 @@
       "savedBadgePassed": 4,
       "landscapeStorePassed": 7,
       "mediaPassed": 25,
-      "sourceCommitted": false,
+      "sourceCommitted": true,
       "fullCombinedPassed": true,
       "redmiVerified": false,
       "interruptedCombined01": "retained_failed",
@@ -852,7 +852,19 @@
           "skipped": 27,
           "failed": 0
         }
-      ]
+      ],
+      "applicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+      "prebuildChecksPassed": 11,
+      "prebuildReceiptSha256": "1D9F6DC2A13DB311CA424E8D4F3B90C2A4A54763F1352672C1D2657EC4083C9C"
+    },
+    "rowsMediaSuccessor": {
+      "candidate": "UAW-CURSOR-SKU-ROWS-MEDIA-20260916",
+      "versionName": "1.0.0-r66.28",
+      "versionCode": 2026091601,
+      "applicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+      "built": false,
+      "installed": false,
+      "deviceQualified": false
     }
   }
 }

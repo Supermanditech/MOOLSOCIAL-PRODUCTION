@@ -90,7 +90,7 @@ function Test-SealedBuyEgressClipboardAction {
   if ($redmiReviewQualified) {
     $branchAllowed = $true
     $overlayCommit = 'f94cfd4752dd73b58a69568475803d6cf25cb8d0'
-    if ($IntegratedReviewSourceCommit -cin @('9b7e5aa7fddc08517432f9b3932da5a36ef7a92d', '11b6562e7bf382afeb11e1801a0a390477fcae8f', '3c30ba11521db6bb1a1ec6995b181a81df1a6b34', '4221158fead95a89047e3408aaeb11c9a12dd135', '41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c', 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc', '64ca4d757cffc1cc1fa575b84004cd827e6695ab')) {
+    if ($IntegratedReviewSourceCommit -cin @('9b7e5aa7fddc08517432f9b3932da5a36ef7a92d', '11b6562e7bf382afeb11e1801a0a390477fcae8f', '3c30ba11521db6bb1a1ec6995b181a81df1a6b34', '4221158fead95a89047e3408aaeb11c9a12dd135', '41412f56a4af4d75e2976dc04843dd293ae4869d', '253cbe16da07f069c878bed8f0f5722b8c4aa29c', 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc', '64ca4d757cffc1cc1fa575b84004cd827e6695ab', 'f0fc06a92bb43627ec4ca952e8996a888ec96ac2')) {
       # Exact-source admission; existing copy action is unchanged from the prior overlay.
       $overlayCommit = $IntegratedReviewSourceCommit
     }

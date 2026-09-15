@@ -204,3 +204,28 @@ All eleven fresh prebuild checks passed. navigation-prebuild-checks.json SHA256 
 After this admission/evidence slice is committed, pushed and clean/live remote-equal, prepare candidate UAW-CURSOR-SKU-NAVIGATION-20260915, BuildName 1.0.0-r66.27, BuildNumber 2026091503, debug CursorUiReview, in fresh apps/mobile/build/cursor-review-r66.27. Preserve 326 runtime owners, with exactly catalogue/views changed from r66.26. Preserve MOOLSOCIAL_UI_REVIEW_ONLY=true, MOOLSOCIAL_DEVICE_REVIEW=true, MOOLSOCIAL_USE_EMULATORS=true, MOOLSOCIAL_CANDIDATE_ID=UAW-CURSOR-SKU-NAVIGATION-20260915. The unchanged machine gate and build-buy-device-review.ps1 preflight/one-build wrapper remain mandatory.
 
 Verify package com.moolsocial.app.cursorreview, version 1.0.0-r66.27-cursorreview/2026091503, source/configuration, APK SHA256 and signer CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25. Capture fresh before-state, upgrade only Redmi TG8HCYTGGQT885OF preserving data, and verify installed byte equality. DEVICE-QUALIFICATION-PLAN-r66.27.md targets M02, both new navigation children, missing category/Search paging evidence and affected presentation/return checks. Preserve r66.26's 54 captures and earlier provider-length Flutter evidence with their actual source provenance; do not repeat unrelated passed journeys. All twelve device dispositions and final Git handoff remain pending. No production/backend/integration acceptance is implied.
+
+
+## UAW-CURSOR-SKU-ROWS-MEDIA-20260916 - r66.28
+
+Exact application source f0fc06a92bb43627ec4ca952e8996a888ec96ac2. Candidate1.0.0-r66.28, versionCode2026091601, packagecom.moolsocial.app.cursorreview; RedmiTG8HCYTGGQT885OF only. Founder-authorized successor completes existing twelve SKU records, removing both product control rows and correcting photo/badge/Save separation with adaptive provider text. No backend/OPPO/integration/production scope.
+
+Source qualification current-source-qualification-04.json SHA256C8F598EE3007D1486F66433731257C90B74A1B9FC99281DFC3470EB18B0E30B6: analysis clean, both full combined runs2454 passes/27 inherited skips/zero failures, all3044 source owners preserved. Ten protected-reference exclusions remain excluded. Final30 focused cases and manually inspected actual Flutter media captures are bound by sku-rows-media-focused-02.json SHA2567BEE9E84D8324081E32ECD2AE1A6429B6D9EF92E57541BC83A8388D9A3D65B18; prior failed runs and source-specific evidence remain retained.
+
+All11 existing prebuild gates passed. Receipt rows-media-prebuild-checks.json SHA2561D9F6DC2A13DB311CA424E8D4F3B90C2A4A54763F1352672C1D2657EC4083C9C. Exact source admission adds only this qualified SHA; source/native/backend/egress checks remain. Six admission cases accepted the exact source and rejected all five negatives. Existing backend/egress self-tests passed.
+
+| Gate evidence | SHA256 |
+| --- | --- |
+| rows-media-admission-check-approved-ui-locks.log | 3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68 |
+| rows-media-admission-check-buy-protected-baseline.log | 3E68F029704A44A57DDF4F9AD5650AC8C7A09CE0D44207F3ACD7B6333E8335A3 |
+| rows-media-admission-check-buy-backend-contract-boundary.log | 8932532467D3BFE2DDF4D39236F6A2E7D070E6F1A5A5EDFE20BD66875D3B754C |
+| rows-media-admission-check-buy-data-egress-boundary.log | 6584726EDC8AB1E76C363CEFF0FDC9CF318610AD6522AC32A3F72882AEF91FD3 |
+| rows-media-admission-negative.log | 73EC4C6C3CFAA7EFE6F07432FBF0D9DAFF55E47621DEAD2A857B45CE0BC3F0DB |
+| rows-media-prebuild-profile.log | C337E4A1B5695870264C6AB2D0CC66EABA156EF1C936FE084D3ACAE7D63D9A7C |
+| rows-media-prebuild-brand.log | E341B22E21DC52E37C1E715BF599CA66A5D86EE475663AA49616839293F9A517 |
+| rows-media-prebuild-clean-support.log | 5A35C632098FB6FABDB678D17DA4E9D9A9F91A10321230CE9171430F8D78EBF9 |
+| rows-media-prebuild-windows-compatibility.log | E419737DC0967569615034E500D21A5BCA96D77D0579C69CBBBE245CBD5DF1B1 |
+| rows-media-prebuild-incremental.log | 24A1C03727DA0BAE821513575D6249009F2D4324AA553101A80B7D759B2F992D |
+| rows-media-prebuild-memory.log | DD9DF3EF98AC9C50DAD6206F20A475BD1512CAFA91E7C934C9BB6FA3E5954771 |
+
+Prepare one unique candidate through the existing review wrapper after this evidence is committed, pushed, clean and live-remote-equal. Four review-only runtime defines; unchanged signer/package/isolation. Verify326-owner source manifest, APK identity/checksum and installed checksum, upgrade with data preserved, then execute DEVICE-QUALIFICATION-PLAN-r66.28.md. No current successor device closure is claimed by these local gates. Provider publication R668-AUDIT-MEDIA-002 remains the separate unimplemented backend dependency.
