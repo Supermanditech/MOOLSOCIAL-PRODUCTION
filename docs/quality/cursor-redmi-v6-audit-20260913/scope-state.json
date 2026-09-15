@@ -483,7 +483,7 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "source_committed_prebuild_checks_passed_evidence_seal_pending",
+    "state": "twelve_records_locally_qualified_source_commit_pending",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
@@ -495,12 +495,14 @@
       "SKU-M01-C02",
       "SKU-M05-C01",
       "SKU-M05-C02",
-      "SKU-M05-C03"
+      "SKU-M05-C03",
+      "SKU-M05-C04",
+      "SKU-M05-C05"
     ],
     "device": "TG8HCYTGGQT885OF",
     "evidenceRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/sku-metadata-redmi-20260914",
     "prior22OriginalAndSoleChildClosuresPreserved": true,
-    "sourceCommitted": true,
+    "sourceCommitted": false,
     "localChecksPassed": 20,
     "localFlutterImages": 68,
     "manuallyReviewedImages": 2,
@@ -508,9 +510,9 @@
     "redmiRedesignVerified": false,
     "newApkBuilt": true,
     "remaining": [
-      "Seal prebuild evidence and verify clean live Git equality",
-      "Build one uniquely identified r66.26 successor and install data-preserving on Redmi TG8HCYTGGQT885OF",
-      "Verify ten existing SKU acceptance records on Redmi and record final Git handoff"
+      "Commit qualified twelve-record source, push and verify clean exact live remote equality",
+      "Run required successor source/prebuild gates and build/install uniquely identified Redmi-only APK preserving data",
+      "Verify affected navigation and M02 correction on Redmi, reconcile twelve records and final Git evidence"
     ],
     "registryEntryCount": 4589,
     "registrySha256": "A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB",
@@ -559,22 +561,18 @@
       "lastCandidatePlan": "UAW-CURSOR-SKU-METADATA-20260915"
     },
     "currentCombinedProcess": {
-      "state": "completed_exit_zero_support_restored",
-      "analysis": "analysis-13.log",
-      "cycles": [
-        "combined-correction-test-04.log",
-        "combined-correction-test-05.log"
+      "state": "completed",
+      "sessionId": 59954,
+      "terminal": "9e40a6",
+      "exitCode": 0,
+      "stages": [
+        "sku-navigation-final-analysis-01",
+        "sku-navigation-combined-01",
+        "sku-navigation-combined-02"
       ],
-      "terminalChunks": [
-        "e063ef",
-        "a8e417"
-      ],
-      "passedPerCycle": 2419,
-      "skippedPerCycle": 27,
-      "failedPerCycle": 0,
-      "preservedOwnerCount": 3044
+      "sourceOwnersPreserved": 3044
     },
-    "sourceQualificationReceiptSha256": "0CA65EDD285A58210D1A88413A2B603FC480942A5421BD55970B4D6739F2CAEA",
+    "sourceQualificationReceiptSha256": "2A66A12B206DD5B071CEF4C08223B8DB9C2D29BC80704C9F4125152AF101D337",
     "applicationSource": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
     "implementationGitCheckpoint": {
       "state": "clean_live_remote_equal",
@@ -613,17 +611,32 @@
       "deviceCheckpoint": "Shop"
     },
     "correctiveImplementation": {
-      "state": "implemented_locally_qualified_successor_device_pending",
+      "state": "r66_26_installed_device_round_m02_failed_correction_locally_passed",
       "regression": "REG-20260915-4617-SKU-DEVICE-METADATA-COMPLETENESS",
       "newRuntimeOwners": [],
-      "correctiveSuccessorBuilt": false,
+      "correctiveSuccessorBuilt": true,
       "applicationSource": "d6d9890fa7754a38a05b183bc8ca6e89eccf22cc",
       "sourceCleanLiveRemoteVerified": true,
       "prebuildChecks": "correction-prebuild-checks.json",
       "prebuildChecksSha256": "A6014D3495AF80D1F3D0E5A391878A4A8D22329EF639C43F65D3EC214BDFC317",
       "candidateId": "UAW-CURSOR-SKU-CORRECTION-20260915",
       "versionName": "1.0.0-r66.26",
-      "versionCode": 2026091502
+      "versionCode": 2026091502,
+      "installedVersionName": "1.0.0-r66.26-cursorreview",
+      "buildSeal": "dad26da0365006d16891203e45839db40b9ed8d6",
+      "apkSha256": "769296EC3CE6AD5DB6B34A9A93021BC3B3E2EE7826EF572202AC9754199169AC",
+      "installationReceiptSha256": "3FE4DCF6BDA86A4DBDA01149A33248689D9D953D574659B34633959000E73339",
+      "deviceRoundReceipt": "r66.26-ten-ticket-device-round-01.json",
+      "deviceRoundReceiptSha256": "17C4DA6E0036BB37592F41D77A689488D3CCEC450934F798247818000EC7F7E1",
+      "m02Followup": {
+        "state": "implemented_focused_tests_and_analysis_passed_successor_pending",
+        "newTicket": false,
+        "runtimeNormalizedSha256": "9AFD18E028F175E45E30885E9473EBC605AC79CC8063711730C8D31FBB0E66BA",
+        "focusedTestsPassed": 4,
+        "focusedTerminal": "fcd567",
+        "analysisTerminal": "9f23ee",
+        "sourceCommitted": false
+      }
     },
     "founderReviewAmendment": {
       "date": "2026-09-15",
@@ -632,16 +645,18 @@
         "SKU-M01-C02",
         "SKU-M05-C01",
         "SKU-M05-C02",
-        "SKU-M05-C03"
+        "SKU-M05-C03",
+        "SKU-M05-C04",
+        "SKU-M05-C05"
       ],
       "parentCount": 5,
-      "childCount": 5,
-      "totalAcceptanceRecords": 10,
+      "childCount": 7,
+      "totalAcceptanceRecords": 12,
       "closed": 0,
       "columnsConfirmed": 3,
-      "direction": "vertical product/category discovery; pagination at top and bottom",
+      "direction": "vertical product/category discovery plus horizontal page swipes; remove visible top/bottom numeric range/total displays; preserve compact accessible navigation",
       "pricing": "remove broad blue panel; optional single yellow highlight fitted to price digits",
-      "state": "shared_grid_pricing_vertical_rows_and_dual_paging_implemented_partial_focused_qualification",
+      "state": "horizontal_page_swipes_and_compact_numeric_free_controls_implemented_focused_qualified",
       "evidence": "successor-captures/034-founder-price-grid-review.png",
       "currentDeviceState": "Saved 1; 9+ is confirmed delivery tracker for 12 existing deliveries, not Cart. No user data changed.",
       "manifestSha256": "BCCC3BCF4632267C3D516E597580AA211D7AC6D54383CEE6B7E7764A7986FBB0",
@@ -652,7 +667,8 @@
         "captures": 18,
         "explicitVisualReviews": 2,
         "deviceVerified": false
-      }
+      },
+      "pageSwipesExplicitlyAgreed": true
     },
     "unexpectedCartInvestigation": {
       "state": "disputed_indicator_identified_no_cart_defect_established",
@@ -671,7 +687,7 @@
       "reportSha256": "AB7C2A33E8323811E17B5ABCA7BCDDC9B14098222B9BBDF1AAE784AF850A9A40",
       "remaining": "Cart continuity qualification remains required; no basis to clear Cart or add a phantom-item defect."
     },
-    "effectiveGoalScope": "Complete all five SKU parent tickets and five founder review children (ten open acceptance records), including real provider metadata adaptive to length and runtime updates. Preserve data and closed evidence; required local/visual/regression gates, unique Redmi-only successor, device verification and clean live remote Git handoff remain mandatory.",
+    "effectiveGoalScope": "Complete five SKU parent tickets and seven founder review children (twelve acceptance records). Preserve full adaptive provider metadata, three normal-scale columns and vertical discovery; add horizontal page swipes and remove bulky top/bottom numeric pagination displays. Qualify locally, build a unique Redmi-only successor, verify affected device behavior and clean live remote Git handoff. Preserve data, prior evidence and original ownership boundaries.",
     "providerMetadataAcceptance": {
       "ticket": "SKU-M05-C03",
       "state": "static_and_dynamic_provider_names_focused_pass_remaining_cross_surface_acceptance",
@@ -704,6 +720,39 @@
       "latestEvidence": "provider-refresh-qualified-01.json",
       "focusedPasses": 4,
       "deviceVerified": false
+    },
+    "navigationAmendmentQualification": {
+      "receipt": "sku-twelve-navigation-focused-01.json",
+      "sha256": "41845DD97F08223B3197A8F00EB1E29987E54F45DFAB04C467A91B12971B8C2A",
+      "focusedSwipePasses": 6,
+      "expandedJourneyPasses": 22,
+      "storeRerunPasses": 8,
+      "searchReturnPasses": 8,
+      "deviceVerified": false,
+      "runtimeSourceCommitted": false
+    },
+    "currentQualifiedSource": {
+      "receipt": "current-source-qualification-03.json",
+      "recordCount": 12,
+      "analysis": "no issues",
+      "combinedPassesPerRun": 2429,
+      "inheritedSkipsPerRun": 27,
+      "failuresPerRun": 0,
+      "preservedSourceOwners": 3044,
+      "commit": null,
+      "deviceVerified": false
+    },
+    "interruptedM02CombinedProcess": {
+      "state": "cancelled_due_to_founder_navigation_amendment",
+      "stage": "m02-combined-01",
+      "sessionId": 43107,
+      "terminal": "8ac996",
+      "exitCode": 1,
+      "logSha256": "7994A0054010AB1786CC6DC1EE53F467D8E0DEF31F5BB6F7E438ED1D17C46A20",
+      "receiptSha256": "AB67C069ABD5EAF7D030A136A9D522D20E0CCE745E97A06EF5A80A3EAF61B691",
+      "sourceOwnersPreserved": 3044,
+      "secondRunStarted": false,
+      "countsAreNotFullRunPass": true
     }
   }
 }

@@ -2548,15 +2548,15 @@ if ($ProductionLane -ceq 'baseline') {
       # This admits local qualification, not a build or device acceptance.
       $fixtureHashes = @{
         'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' = '97FF4C892D383A8B35DF5067107F20EF912811EE3A71041211618D5806D7104C'
-        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = 'A103E497181F013D7F816A2BEF81FCEDC7FE322E87982BBABD91465691F5FC8D'
+        'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart' = 'A56375D7AF7823CBC19E764C02C5EC39F50D80F462C8B1DCC20949E382323CA0'
         'apps/mobile/lib/main.dart' = '5FE1A6762CBB516D4935AACABF5DA0A81D0307ABD78EA96026335659AEB196EB'
         'apps/mobile/lib/app/ui_review_language_store.dart' = '30816600AEDA842CBE06BBF38B11F6EA79D41679A03D3F8CF31BF9C975372A74'
         'apps/mobile/test/app/ui_review_language_store_test.dart' = '921F901A32EE5A5BEB905CF07F8E05E1C7B9ED97D38A912B96631E0D17494A3F'
-        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = 'E3D1EFB60F50EE9692FDB64C8B032189CB8BC8A74E41DCE9B90CA1EBF1BF1C5C'
-        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = 'B9741D55642ADA4B493C84F19F4B547AAD2D3497233B5A4798B5FC3FA8B02B2C'
+        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = 'D41B14C5D56B207AE74AF981F55575BEF3376072D47603BEF35BE926E1823B97'
+        'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = 'DA8EBBB4218DC835BC808F6560DE041E9533E2130207EB915062E1E449C9949D'
       }
       $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'] = '761A5F4BB1A4C5EB3EAA56C139D969E86BF3796CB4311E66CBD04A31C4CFCA60'
-      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'] = 'AAD3C214174CB9905D2434BEB67F2565057B2974750321DD0B2BA5CB82A54E54'
+      $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_views.dart'] = '9AFD18E028F175E45E30885E9473EBC605AC79CC8063711730C8D31FBB0E66BA'
       $skuRegressionHashes = @{
         'apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart' = '51D79606E60CBF5AEC889BF5D0835FE5F1969A54BDA9EA9A8A93F8F734F86201'
         'apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart' = '5B01679CEBFED7076F3419F827ADBEEA95B007C3AC8B4E3CB04ECF3DE36B5A79'

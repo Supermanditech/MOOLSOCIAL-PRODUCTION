@@ -4320,7 +4320,7 @@ class _MarketplaceTrustPanel extends StatelessWidget {
             icon: Icons.storefront_outlined,
             label: 'Seller',
             value:
-                '${trust.partnerName} · ${_sellerTypeLabel(product.sellerType)}',
+                '${product.customerSeller(trust.partnerName)} · ${_sellerTypeLabel(product.sellerType)}',
           ),
         if (partnerRating case final rating?)
           _DecisionRow(

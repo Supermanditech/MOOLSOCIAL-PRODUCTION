@@ -900,6 +900,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   Timer? _publicationExpiry;
   bool _restoring = false;
   int _openSequence = 0;
+  double _pageDrag = 0;
 
   @override
   void initState() {
@@ -1151,7 +1152,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
       count: products.length,
       total: publicationCurrent ? page?.totalCount : null,
       loading: loading,
-      showRange: true,
+      showRange: false,
       areaLabel: !widget.storeContext
           ? widget.session.catalogueAreaLabel
           : null,
@@ -1235,30 +1236,65 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                   cardWidth: layout.cardWidth,
                   storeContext: widget.storeContext,
                 );
-                return Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 6,
-                  ),
-                  child: Wrap(
-                    key: ValueKey('buy-paged-vertical-grid-${widget.scopeKey}'),
-                    spacing: 7,
-                    runSpacing: 10,
-                    children: [
-                      for (final (index, product) in products.indexed)
-                        SizedBox(
-                          width: layout.cardWidth,
-                          height: rowHeights[index ~/ layout.columns],
-                          child: BuyV2ProductCard(
-                            key: ValueKey('buy-paged-card-${product.id}'),
-                            session: widget.session,
-                            product: product,
-                            compact: true,
-                            storeContext: widget.storeContext,
-                            onOpenProduct: widget.onOpenProduct,
-                          ),
+                final canPrevious =
+                    !loading &&
+                    publicationCurrent &&
+                    page?.previousCursor != null;
+                final canNext =
+                    !loading && publicationCurrent && page?.nextCursor != null;
+                return Semantics(
+                  onScrollLeft: canNext ? _pager.next : null,
+                  onScrollRight: canPrevious ? _pager.previous : null,
+                  child: GestureDetector(
+                    key: ValueKey('buy-page-swipe-${widget.scopeKey}'),
+                    behavior: HitTestBehavior.opaque,
+                    onHorizontalDragStart: (_) => _pageDrag = 0,
+                    onHorizontalDragUpdate: (details) {
+                      _pageDrag += details.primaryDelta ?? 0;
+                    },
+                    onHorizontalDragCancel: () => _pageDrag = 0,
+                    onHorizontalDragEnd: (_) {
+                      final distance = _pageDrag;
+                      _pageDrag = 0;
+                      if (_pager.loading ||
+                          _pager.query != widget.query ||
+                          distance.abs() < 48) {
+                        return;
+                      }
+                      if (distance < 0 && canNext) {
+                        _pager.next();
+                      } else if (distance > 0 && canPrevious) {
+                        _pager.previous();
+                      }
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 6,
+                      ),
+                      child: Wrap(
+                        key: ValueKey(
+                          'buy-paged-vertical-grid-${widget.scopeKey}',
                         ),
-                    ],
+                        spacing: 7,
+                        runSpacing: 10,
+                        children: [
+                          for (final (index, product) in products.indexed)
+                            SizedBox(
+                              width: layout.cardWidth,
+                              height: rowHeights[index ~/ layout.columns],
+                              child: BuyV2ProductCard(
+                                key: ValueKey('buy-paged-card-${product.id}'),
+                                session: widget.session,
+                                product: product,
+                                compact: true,
+                                storeContext: widget.storeContext,
+                                onOpenProduct: widget.onOpenProduct,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
                 );
               },

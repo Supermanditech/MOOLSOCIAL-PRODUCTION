@@ -10399,9 +10399,9 @@ void main() {
         await tester.tap(next);
         await tester.pumpAndSettle();
         final rangeFinder = find.byKey(
-          const ValueKey('buy-page-range-search-shop'),
+          const ValueKey('buy-page-status-search-shop'),
         );
-        final range = tester.widget<Text>(rangeFinder).data!;
+        final range = tester.widget<Semantics>(rangeFinder).properties.label!;
         expect(range, startsWith('41'));
         final card = find
             .descendant(of: search, matching: find.byType(BuyV2ProductCard))
@@ -10459,7 +10459,7 @@ void main() {
         if (entry.change == 'none' || entry.change == 'cart') {
           expect(search, findsOneWidget);
           expect(tester.testTextInput.isVisible, isFalse);
-          expect(tester.widget<Text>(rangeFinder).data, range);
+          expect(tester.widget<Semantics>(rangeFinder).properties.label, range);
           expect(
             find.byKey(ValueKey('buy-paged-card-${product.id}')),
             findsOneWidget,
