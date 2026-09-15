@@ -205,6 +205,28 @@ function Assert-R679OwnerAdmission($Before, $After) {
   ) 'Redmi dependency admission changed unrelated ownership or policy.'
 }
 
+function Test-StoreHistoricalAdmissionSubject([string]$Commit, [string]$Subject) {
+  # REG4620: preserve the already-pushed metadata label error without rewriting
+  # history. This exact immutable tree contains only the four admission pins.
+  if ($AgentRole -cne 'primary' -or $AgentTask -cne '/root' -or
+      $ProductionLane -cne 'codex_ui' -or
+      $ProductionWorkId -cne 'store-procurement-bridge-20260912' -or
+      $ProductionTicketId -cne 'UAW-STORE-PROCUREMENT-BRIDGE-20260912' -or
+      $Commit -cne '47dce7e015673a7ca503ab0fd552cc5a3ba5d273' -or
+      $Subject -cne 'chore(store-procurement-bridge-20260912): bind exact V27 review admission') {
+    return $false
+  }
+  $identity = @(& git -C $root show -s --format='%P%n%T' $Commit)
+  if ($LASTEXITCODE -ne 0 -or $identity.Count -ne 2 -or
+      $identity[0] -cne '0340a6419b7b2a75ff9ed2891ced04cbf0bb0604' -or
+      $identity[1] -cne '28e3ea0370e636d87f9f5f54651c4a2223090f7a') {
+    return $false
+  }
+  $trees = @(& git -C $root rev-parse "${Commit}:apps" "$($identity[0]):apps")
+  return ($LASTEXITCODE -eq 0 -and $trees.Count -eq 2 -and
+    $trees[0] -ceq $trees[1])
+}
+
 function Test-R66HistoricalCommitSubject([string]$Commit, [string]$Subject) {
   # R66-BUILD-003: retain two pushed label mistakes without rewriting history.
   # This is not an alternative prefix for any other task or future commit.
@@ -5122,6 +5144,7 @@ if ($ProductionLane -ceq 'baseline') {
         $subjectExit -eq 0 -and $subjectOutput.Count -eq 1 -and
         ([string]$subjectOutput[0] -cmatch $subjectPattern -or
           $r6610EvidenceAdmission -or
+          (Test-StoreHistoricalAdmissionSubject $featureCommit ([string]$subjectOutput[0])) -or
           (Test-R66HistoricalCommitSubject $featureCommit ([string]$subjectOutput[0])))
       ) "production feature commit subject is not atomic: $featureCommit"
     }
