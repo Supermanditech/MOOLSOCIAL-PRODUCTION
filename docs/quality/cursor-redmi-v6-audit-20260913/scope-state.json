@@ -483,7 +483,7 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "twelve_records_locally_qualified_source_commit_pending",
+    "state": "twelve_records_source_committed_prebuild_passed_candidate_pending",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
@@ -502,7 +502,7 @@
     "device": "TG8HCYTGGQT885OF",
     "evidenceRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/sku-metadata-redmi-20260914",
     "prior22OriginalAndSoleChildClosuresPreserved": true,
-    "sourceCommitted": false,
+    "sourceCommitted": true,
     "localChecksPassed": 20,
     "localFlutterImages": 68,
     "manuallyReviewedImages": 2,
@@ -510,8 +510,7 @@
     "redmiRedesignVerified": false,
     "newApkBuilt": true,
     "remaining": [
-      "Commit qualified twelve-record source, push and verify clean exact live remote equality",
-      "Run required successor source/prebuild gates and build/install uniquely identified Redmi-only APK preserving data",
+      "Commit and push prebuild evidence, verify clean exact live equality, then build/install r66.27 on Redmi preserving data",
       "Verify affected navigation and M02 correction on Redmi, reconcile twelve records and final Git evidence"
     ],
     "registryEntryCount": 4589,
@@ -729,7 +728,7 @@
       "storeRerunPasses": 8,
       "searchReturnPasses": 8,
       "deviceVerified": false,
-      "runtimeSourceCommitted": false
+      "runtimeSourceCommitted": true
     },
     "currentQualifiedSource": {
       "receipt": "current-source-qualification-03.json",
@@ -739,7 +738,7 @@
       "inheritedSkipsPerRun": 27,
       "failuresPerRun": 0,
       "preservedSourceOwners": 3044,
-      "commit": null,
+      "commit": "64ca4d757cffc1cc1fa575b84004cd827e6695ab",
       "deviceVerified": false
     },
     "interruptedM02CombinedProcess": {
@@ -753,6 +752,16 @@
       "sourceOwnersPreserved": 3044,
       "secondRunStarted": false,
       "countsAreNotFullRunPass": true
+    },
+    "navigationPrebuild": {
+      "receipt": "navigation-prebuild-checks.json",
+      "sha256": "0718C9C8EFCA33ACC3CBF61B3802502178F8331C5AB5D172A4EEA8408132E4E5",
+      "passed": 11,
+      "candidate": "UAW-CURSOR-SKU-NAVIGATION-20260915",
+      "versionName": "1.0.0-r66.27",
+      "versionCode": 2026091503,
+      "buildCompleted": false,
+      "deviceVerified": false
     }
   }
 }

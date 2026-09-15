@@ -3943,3 +3943,15 @@ Final current-source analysis passed without issues. Both required complete comb
 Current-source-qualification-03.json SHA256 2A66A12B206DD5B071CEF4C08223B8DB9C2D29BC80704C9F4125152AF101D337 independently rechecks both receipts/logs, all 3044 tracked source bytes, tracked path-set preservation and twelve current record IDs. Previous provider/geometry visual evidence is linked as source-stage evidence from r66.26, not relabeled as a new device run. New gesture and M02 Flutter captures remain in their explicit focused receipts.
 
 No SDK process remains from these runs. This is the qualified local baseline for the necessary successor; source commit/push/live equality, prebuild gates and actual Redmi qualification remain. No new APK or device closure is inferred from local passes.
+
+
+## Successor prebuild host execution correction
+
+The four exact-source boundary checks passed for 64ca4d757cffc1cc1fa575b84004cd827e6695ab. The first navigation-admission-negative helper invocation under powershell completed the existing backend/egress self-tests and reached receipt construction, then failed because Get-FileHash was unavailable in that host. navigation-admission-negative.log SHA256 9B2C673ED4B60D3F75C1BD4E26DD2C5BBBCFEC6891A275B1C52A26B480AF3078 and navigation-admission-negative.execution.json preserve the exit-1 attempt (terminal 3250cd); it is not recorded as a passed gate. No negative receipt was written.
+
+PowerShell 7 resolves Get-FileHash (f41665). Retry the unchanged helper with pwsh under a new log/execution receipt; its exact-source acceptance, five rejection cases and both existing self-tests remain unchanged. Reuse the four already-passed boundary receipts only after verifying their hashes and source preservation. This is a host execution correction, not an additional product ticket or permission exception.
+
+
+### r66.27 prebuild completion
+
+The unchanged negative-case helper passed in PowerShell 7 (navigation-admission-negative-02.log). All eleven source/profile/brand/support/compatibility/incremental/memory checks completed successfully; resumed session 49055 exited zero, terminal a33b90. navigation-prebuild-checks.json SHA256 0718C9C8EFCA33ACC3CBF61B3802502178F8331C5AB5D172A4EEA8408132E4E5 binds the results. Independent source/log verification 9a2057 confirms all 3044 qualified source owners unchanged. PREBUILD.md records the exact r66.27 candidate and pending device qualification. No APK was built by these checks.

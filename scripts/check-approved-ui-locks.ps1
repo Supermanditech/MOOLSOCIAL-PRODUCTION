@@ -197,6 +197,9 @@ function Get-CursorAccessibilityNativeProjection {
     # Exact ten-ticket SKU correction source; retain complete source and native boundaries.
     & git -C $root merge-base --is-ancestor 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc' HEAD
     if ($LASTEXITCODE -eq 0) { $redmiSource = 'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc' }
+    # Exact twelve-record SKU page-swipe and seller correction; source/native checks retained.
+    & git -C $root merge-base --is-ancestor '64ca4d757cffc1cc1fa575b84004cd827e6695ab' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '64ca4d757cffc1cc1fa575b84004cd827e6695ab' }
     & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
     if ($LASTEXITCODE -ne 0) {
       throw 'Redmi audit committed source differs from its exact admitted source.'
