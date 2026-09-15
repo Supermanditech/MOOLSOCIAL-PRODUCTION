@@ -54,12 +54,14 @@ PublicAuthHttpResponse _failure(String code) {
 
 Uri _authorizationUri({
   String scope = 'instagram_business_basic',
+  String? forceReauth = 'true',
   Uri? endpoint,
   Map<String, String> extras = const {},
 }) {
   return (endpoint ?? _authorizationEndpoint).replace(
     queryParameters: <String, String>{
       'response_type': 'code',
+      'force_reauth': ?forceReauth,
       'client_id': 'synthetic-instagram-public-client',
       'redirect_uri': _callbackBase.toString(),
       'scope': scope,
@@ -131,6 +133,8 @@ void main() {
             _authorizationUri(extras: const <String, String>{'email': '1'}),
           ),
         ),
+        _success(_beginData(_authorizationUri(forceReauth: 'false'))),
+        _success(_beginData(_authorizationUri(forceReauth: null))),
       ];
       for (final response in responses) {
         var launchCalls = 0;
@@ -191,40 +195,42 @@ void main() {
     },
   );
 
-  test('hosted return bridge is normalized to the exact HTTPS callback', () async {
-    final providerCallback = Uri.parse(
-      'https://moolsocial.com/app/auth/instagram',
-    );
-    final deliveryCallback = Uri.parse(
-      'moolsocial://auth/instagram?code=synthetic-code&state=$_state',
-    );
-    Map<String, Object?>? postedBody;
-    final adapter = InstagramOAuthNetworkAdapter(
-      authApiBaseUri: _apiBase,
-      callbackUri: providerCallback,
-      authorizationEndpoint: _authorizationEndpoint,
-      appCheckTokenSupplier: () async => 'synthetic-app-check-token',
-      postTransport: (_, {required headers, required body}) async {
-        postedBody = body;
-        return _success(<String, Object?>{'firebaseCustomToken': _customToken});
-      },
-      externalUrlLauncher: (_) async => true,
-      firebaseCustomTokenSignIn: (_) async => _userId,
-      clock: () => _now,
-    );
+  test(
+    'hosted return bridge is normalized to the exact HTTPS callback',
+    () async {
+      final providerCallback = Uri.parse(
+        'https://moolsocial.com/app/auth/instagram',
+      );
+      final deliveryCallback = Uri.parse(
+        'moolsocial://auth/instagram?code=synthetic-code&state=$_state',
+      );
+      Map<String, Object?>? postedBody;
+      final adapter = InstagramOAuthNetworkAdapter(
+        authApiBaseUri: _apiBase,
+        callbackUri: providerCallback,
+        authorizationEndpoint: _authorizationEndpoint,
+        appCheckTokenSupplier: () async => 'synthetic-app-check-token',
+        postTransport: (_, {required headers, required body}) async {
+          postedBody = body;
+          return _success(<String, Object?>{
+            'firebaseCustomToken': _customToken,
+          });
+        },
+        externalUrlLauncher: (_) async => true,
+        firebaseCustomTokenSignIn: (_) async => _userId,
+        clock: () => _now,
+      );
 
-    expect(adapter.recognizesCallback(deliveryCallback), isTrue);
-    final result = await adapter.completeForegroundCallback(deliveryCallback);
+      expect(adapter.recognizesCallback(deliveryCallback), isTrue);
+      final result = await adapter.completeForegroundCallback(deliveryCallback);
 
-    expect(result.outcome, BrokeredPublicAuthOutcome.authenticated);
-    expect(
-      postedBody,
-      <String, Object?>{
+      expect(result.outcome, BrokeredPublicAuthOutcome.authenticated);
+      expect(postedBody, <String, Object?>{
         'callbackUri':
             'https://moolsocial.com/app/auth/instagram?code=synthetic-code&state=$_state',
-      },
-    );
-  });
+      });
+    },
+  );
 
   test(
     'ineligible professional account receives truthful sanitized recovery',
