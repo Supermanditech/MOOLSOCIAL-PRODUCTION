@@ -6771,9 +6771,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
       MaterialPageRoute<void>(
         builder: (_) => WorkInvoicePdfScreen(
           request: request,
-          source: const bool.fromEnvironment('MOOL_LOCAL_INVOICE_PDF_REVIEW')
-              ? const LocalReviewWorkInvoicePdfSource()
-              : const UnavailableWorkInvoicePdfSource(),
+          source: createWorkInvoicePdfSource(),
           scopeChanges: session,
           isCurrent: () =>
               session.activeWorkspace?.id == invoiceStore &&

@@ -1,8 +1,20 @@
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
 import 'work_models.dart';
+
+/// Local documents are available only in an explicitly opted-in review build.
+const workInvoiceLocalPdfReview =
+    kDebugMode &&
+    (bool.fromEnvironment('MOOL_LOCAL_INVOICE_PDF_REVIEW') ||
+        (bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY') &&
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW')));
+
+WorkInvoicePdfSource createWorkInvoicePdfSource() => workInvoiceLocalPdfReview
+    ? const LocalReviewWorkInvoicePdfSource()
+    : const UnavailableWorkInvoicePdfSource();
 
 /// Immutable request; a future backend adapter must use the scoped invoice ID
 /// to retrieve authoritative records, not trust these local preview values.

@@ -129,6 +129,22 @@ Future<void> tap(WidgetTester tester, String key) async {
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+  testWidgets('APK source selection exposes only the requested review mode', (
+    tester,
+  ) async {
+    final source = createWorkInvoicePdfSource();
+    if (const bool.fromEnvironment('EXPECT_REVIEW_PDF')) {
+      final result = await tester.runAsync(() => source.load(request()));
+      expect(result, isNotNull);
+      expect(result!.reviewOnly, isTrue);
+      expect(result.fileName, request().invoice.pdfFileName);
+    } else {
+      await expectLater(
+        source.load(request()),
+        throwsA(isA<WorkInvoicePdfException>()),
+      );
+    }
+  });
   testWidgets(
     'unsupported text fails clearly rather than losing customer characters',
     (tester) async {
