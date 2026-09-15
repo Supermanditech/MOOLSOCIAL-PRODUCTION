@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
+  FirebaseAdminXTokenIssuer,
   FetchXProviderTransport,
   HmacXSubjectProjector,
   parseXPublicAuthRequest,
@@ -21,6 +22,31 @@ import {
 const NOW_MS = Date.UTC(2026, 7, 18, 0, 0, 0);
 const REDIRECT_URI = "moolsocial://auth/x/callback";
 const CLIENT_ID = "syntheticPublicClient";
+
+test("Firebase token claim contains only provider and public X handle", async () => {
+  let captured: { uid: string; claims: object | undefined } | undefined;
+  const issuer = new FirebaseAdminXTokenIssuer({
+    createCustomToken: async (uid, claims) => {
+      captured = { uid, claims };
+      return "synthetic-custom-token";
+    },
+  });
+  assert.equal(
+    await issuer.issue("x_projected_identity", "@vetonewsline"),
+    "synthetic-custom-token",
+  );
+  assert.deepEqual(captured, {
+    uid: "x_projected_identity",
+    claims: {
+      auth_provider: "x",
+      auth_provider_account: "@vetonewsline",
+    },
+  });
+  assert.throws(
+    () => issuer.issue("x_projected_identity", "private token"),
+    /handle is invalid/u,
+  );
+});
 
 class MemoryAttemptStore implements XAttemptStore {
   attempt: XPendingAttempt | undefined;
@@ -81,10 +107,10 @@ class RecordingTransport implements XProviderTransport {
     return this.grant;
   }
 
-  async readSubject(accessToken: string): Promise<string> {
+  async readIdentity(accessToken: string) {
     assert.equal(accessToken, this.grant.accessToken);
     if (this.identityError) throw new Error("provider-authored-private-detail");
-    return this.subject;
+    return { subject: this.subject, username: "vetonewsline" };
   }
 
   async revokeAccessToken(
@@ -107,10 +133,12 @@ class RecordingProjector implements XSubjectProjector {
 
 class RecordingIssuer implements XFirebaseTokenIssuer {
   uid: string | undefined;
+  accountHandle: string | undefined;
   shouldFail = false;
 
-  async issue(firebaseUid: string): Promise<string> {
+  async issue(firebaseUid: string, accountHandle: string): Promise<string> {
     this.uid = firebaseUid;
+    this.accountHandle = accountHandle;
     if (this.shouldFail) throw new Error("firebase-private-detail");
     return "synthetic-firebase-custom-material";
   }
@@ -218,6 +246,7 @@ test("complete exchanges as a public client, verifies identity, mints and revoke
   });
   assert.equal(rig.projector.subject, rig.transport.subject);
   assert.equal(rig.issuer.uid, "x_projected_identity");
+  assert.equal(rig.issuer.accountHandle, "@vetonewsline");
   assert.deepEqual(rig.transport.revokedInput, {
     clientId: CLIENT_ID,
     accessToken: "synthetic-access-material",
@@ -452,7 +481,9 @@ test("fetch transport uses exact public-client exchange, identity and revocation
       });
     }
     if (url.endsWith("/2/users/me")) {
-      return Response.json({ data: { id: "123456789012345" } });
+      return Response.json({
+        data: { id: "123456789012345", username: "vetonewsline" },
+      });
     }
     return Response.json({ revoked: true });
   }) as typeof fetch;
@@ -463,12 +494,15 @@ test("fetch transport uses exact public-client exchange, identity and revocation
     code: "synthetic-code",
     codeVerifier: "v".repeat(43),
   });
-  const subject = await transport.readSubject(grant.accessToken);
+  const providerIdentity = await transport.readIdentity(grant.accessToken);
   await transport.revokeAccessToken({
     clientId: CLIENT_ID,
     accessToken: grant.accessToken,
   });
-  assert.equal(subject, "123456789012345");
+  assert.deepEqual(providerIdentity, {
+    subject: "123456789012345",
+    username: "vetonewsline",
+  });
   assert.equal(calls.length, 3);
 
   const exchange = calls[0];
