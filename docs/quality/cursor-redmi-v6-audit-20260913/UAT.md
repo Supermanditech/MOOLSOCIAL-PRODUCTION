@@ -4016,3 +4016,70 @@ Focused receipt sku-rows-media-focused-02.json SHA2567BEE9E84D8324081E32ECD2AE1A
 Both final combined runs passed on identical3044 source-owner hashes: combined07 at37:06 and combined08 at36:56, each2454 passes,27 inherited skips,zero failures. Ten protected-reference exclusions remain excluded. Analysis12 reports no issues. Qualified receipt current-source-qualification-04.json SHA256C8F598EE3007D1486F66433731257C90B74A1B9FC99281DFC3470EB18B0E30B6 binds all twelve records, final source hashes, analysis and both raw logs/receipts.
 
 Combined07 logF5AC09D77C15A16FD779A9ED1428E86396DFF61013A12F30F06C6818F2FAA657; receiptFD6CF18162460A42A1C194623C0C8437A9F120DF64E8912E81C80F602556CC0B. Combined08 logDB58A44DC128EE26862DFA7AAB3DBA60E2A9CD0DAF95061F49737385F0AB240F; receiptDC74488599D0A51B80E8E531EAC8B4B13AD22A242CF68020024F842874E3BC83. Prior failed runs remain preserved. Source commit/build gates/successor Redmi qualification remain; installedr66.27 does not satisfy the revised C05 acceptance.
+
+## Final r66.28 build, installation and scoped qualification - 16 September 2026
+
+
+All 12 scoped UI records are qualified for Cursor Review. This is not a production release.
+
+Application source: `f0fc06a92bb43627ec4ca952e8996a888ec96ac2`. Build seal: `e450af636f61e86abbcbb9fd3acb1fe34d2696dc`.
+Installed only on Redmi `TG8HCYTGGQT885OF`: `1.0.0-r66.28-cursorreview` / `2026091601`.
+APK SHA256: `B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8`.
+
+Two final combined runs: **2454 passed, 27 inherited skips, 0 failures each**. Analysis and eleven prebuild gates passed; ten protected-reference exclusions are not passes. 3044 source hashes preserved.
+
+| Ticket | Disposition and evidence |
+|---|---|
+| SKU-M01 | Closed for scoped Review UI: Current normal/enlarged catalogue, full image/control separation; final local 25 media profiles. Captures: 002,011,015,019,020,023,025,058. |
+| SKU-M02 | Closed for scoped Review UI: Customer product/seller wording; lower manufacturer Seller fixed at normal and 2x. Captures: 032,042,047,049. |
+| SKU-M03 | Closed for scoped Review UI: Offer selection, conditions and product/Back preserved; prior enlarged Offer proof retained. Captures: 040,042,050; r66.26:018,019,020,033. |
+| SKU-M04 | Closed for scoped Review UI: Prior actual normal/enlarged Order and Track/Back evidence retained with unchanged Orders runtime and final combined tests. Captures: r66.26:014,015,016,017. |
+| SKU-M05 | Closed for scoped Review UI: Affected Saved/Search/Store/Supplier current-device checks; unchanged Cart/Recent evidence retained. Captures: 023,025,027,031,032,035,037,038,039,058,059,061,062; r66.26:003,005,006,008,010,024,025,031,038,040,046,048. |
+| SKU-M01-C01 | Closed for scoped Review UI: Yellow emphasis fits price only, without vacant blue panel. Captures: 002,011,015,025,035,058. |
+| SKU-M01-C02 | Closed for scoped Review UI: Three columns at normal scale; adaptive readable enlarged layout. Captures: 002,011,015,019,020,023. |
+| SKU-M05-C01 | Closed for scoped Review UI: Same page state reachable by gestures at top/bottom and local accessibility actions; visible controls superseded by C05. Captures: 002,005,006,008,009,030,031. |
+| SKU-M05-C02 | Closed for scoped Review UI: Vertical products and category selection/discovery. Captures: 008,014,038,053,054,055,062. |
+| SKU-M05-C03 | Closed for scoped Review UI: Available provider facts readable on device; extreme names/badges/prices qualified with local fixtures; publication dependency separate. Captures: 019,023,024,047,049,058; current-source-qualification-04.json. |
+| SKU-M05-C04 | Closed for scoped Review UI: Next/previous on Shop, Wholesale, Bulk, Search, Store and Supplier; query/context retained. Captures: 002/005/006;011/012/013;015/016/018;020/021/022;027/028/031;035/036/037;059/060/061. |
+| SKU-M05-C05 | Closed for scoped Review UI: Both complete product control rows and their reserved height absent; accessibility ranges retained without painted rows. Captures: 002,008,011,014,027,030,035,038,059,062. |
+
+The current device round retains 62 complete hash-verified capture receipts; only the listed manually reviewed images and confirmed transitions constitute acceptance evidence. Inconclusive attempts and the partial first capture remain preserved. Final screen 063 restores Shop / For You at normal font.
+
+Media correction: photo area follows the complete Save/Remove and badge area; long badges use full card width; minimum photo frame remains 70px. Exact media identity, contain fit and bounded caching remain protected. Current decoded fixtures and actual device illustration checks passed.
+
+The first wrapper preflight failed under Windows PowerShell 5 on its existing ZipArchiveMode fixture. The same unchanged wrapper passed under PowerShell 7, then built one APK. No gate was bypassed.
+
+Data-preserving install; UID/dataDir/first install and language/preferences unchanged. Saved atta remains 1, font restored 1.0, no quantity changes, transactions or messages; browsing history retained. Final Shop For You restored at 063.
+
+### Qualification limits
+
+- Review-only debug APK; no production promotion or whole-app readiness claim.
+- R668-AUDIT-MEDIA-002 provider media publication remains OPEN with separate backend owner. Device illustration assets and local decoded photo fixtures do not prove live provider photo/video publication or playback.
+- Orders/Cart/Recent prior device evidence explicitly reused because corresponding runtime owners are unchanged; not represented as newly replayed r66.28 journeys.
+- 27 inherited skips and ten protected-reference exclusions are not passes; frozen reference drift remains separately disclosed.
+- Prior 22 RV6 originals and D005-C01 closures preserved.
+- Final Git handoff is proven separately by r66.28-final-git-handoff.json; no integration or founder production acceptance implied.
+
+Full machine evidence: `r66.28-final-qualification.json`, SHA256 `D8A4A26B26F3165048C6D1AEAA9763A2601324F07C8B8DCB03F4E03EF4296873`.
+Final clean/live remote proof: `r66.28-final-git-handoff.json`.
+
+Evidence root: `C:\GUARANTEED OUTCOME\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\sku-metadata-redmi-20260914`. Full report SHA256 `D8A4A26B26F3165048C6D1AEAA9763A2601324F07C8B8DCB03F4E03EF4296873`.
+
+| Receipt | SHA256 |
+|---|---|
+| current-source-qualification-04.json | `C8F598EE3007D1486F66433731257C90B74A1B9FC99281DFC3470EB18B0E30B6` |
+| sku-rows-media-focused-02.json | `7BEE9E84D8324081E32ECD2AE1A6429B6D9EF92E57541BC83A8388D9A3D65B18` |
+| rows-media-prebuild-checks.json | `1D9F6DC2A13DB311CA424E8D4F3B90C2A4A54763F1352672C1D2657EC4083C9C` |
+| rows-media-wrapper-preflight.result.json | `A5ED7632305173D86C40F4875488AD3D5AE00F9543B91B71C224DCFDCD344160` |
+| rows-media-wrapper-preflight-02.result.json | `135BACAFFDF5996FE986574DE84EC0DE03FDEB3AEC1562E880C78116B19BA7D9` |
+| rows-media-wrapper-build.result.json | `1981CCE5E6F6A539693D26D0DDF86EF5730A0483C0F3988F9FEEF5E5DE57681D` |
+| r66.28-installation-receipt.json | `A566539242CA94960635B651C3B8E5BE0DD93783F399D2ED00F8B4776AF50066` |
+| r66.26-ten-ticket-device-round-01.json | `17C4DA6E0036BB37592F41D77A689488D3CCEC450934F798247818000EC7F7E1` |
+
+Package `com.moolsocial.app.cursorreview`; signer SHA256 `CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25`; artifact size 210821145 bytes. Source manifest: 326 owners, SHA256 `3146E3ED92EC4810B2BDBB62D1C1A0A9B5A281CCED741E95743E9B5D17BE2224`. Installed APK checksum equals the built artifact. Four review-only runtime defines and debug configuration retained; non-promotable.
+
+Confirmed page sequences: Shop 002/005/006; Wholesale 011/012/013; Bulk 015/016/018; enlarged Shop 020/021/022; Search 027/028/031; Store 035/036/037; Supplier 059/060/061. Search comparison differs only by EditText focus after keyboard dismissal, not query/page/product geometry. Both product toolbar rows are absent at the top and footer; semantic result ranges remain available to accessibility. Unpaged Store/Supplier previews are not fabricated as paged catalogues. The separate Store-directory pager is outside the rejected product rows.
+
+Current runtime versus r66.26 changes only catalogue and the single customerSeller line in views; Orders, Cart, Recent, media models/contracts and other runtime owners remain unchanged. Earlier actual device evidence for unchanged surfaces is retained and distinguished from this round. Current affected grids, Saved, Search, Store and Supplier were replayed. Physical pull-to-refresh was exercised at 052 without claiming a measured network response. Final current-app error log from 03:12 is empty; bounded evidence only.
+
+No further implementation or device action is pending in this scope. This evidence-only handoff is complete only with the external final clean/live-remote receipt; no source rebuild is required for documentation changes.
