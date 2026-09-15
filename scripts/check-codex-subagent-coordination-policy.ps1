@@ -1834,6 +1834,12 @@ if ($ProductionLane -ceq 'baseline') {
         [string]$selectedContinuationBinding.id -ceq 'store_procurement_bridge_20260912' -and
         [string]$selectedContinuationBinding.baselineHead -ceq '35b97857f3635c01aa283635fda32ad43c608a1e' -and
         $effectiveOwner -cin @(
+          'apps/mobile/.dart_tool/package_config.json',
+          'apps/mobile/.dart_tool/package_graph.json',
+          'apps/mobile/.flutter-plugins-dependencies',
+          'apps/mobile/lib/features/work/work_invoice_pdf.dart',
+          'apps/mobile/lib/features/work/screens/work_invoice_pdf_screen.dart',
+          'apps/mobile/test/work_invoice_pdf_test.dart',
           'scripts/check-apk-regression-gate-state.ps1',
           'apps/mobile/pubspec.yaml',
           'apps/mobile/pubspec.lock',
@@ -1848,6 +1854,7 @@ if ($ProductionLane -ceq 'baseline') {
           'apps/mobile/lib/features/buy/buy_v2_session.dart',
           'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
           'apps/mobile/lib/features/work/screens/work_workspace_dashboard_screen.dart',
+          'apps/mobile/lib/features/work/widgets/work_widgets.dart',
           'apps/mobile/lib/features/work/work_services.dart',
           'apps/mobile/lib/features/work/work_models.dart',
           'apps/mobile/lib/features/work/work_session.dart',

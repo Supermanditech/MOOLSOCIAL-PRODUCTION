@@ -385,6 +385,8 @@ class _StoreOperationalData {
   String workspaceOrderFulfilment = 'At the shop';
   String workspaceOrderPayment = 'Cash';
   String workspaceOrderAddress = '';
+  WorkspaceBillingDetails workspaceOrderBillingDetails =
+      const WorkspaceBillingDetails();
   String workspaceOrderStage = 'No order';
   int workspaceOrderExtraMinutes = 0;
   DateTime? workspaceOrderActionDeadline;
@@ -746,6 +748,7 @@ class WorkSession extends ChangeNotifier {
       activeWorkspace?.id,
       currentWorkspaceOrderId,
       workspaceOrderCustomer,
+      workspaceOrderBillingDetails.toJson(),
       for (final id in ids)
         [
           id,
@@ -870,6 +873,7 @@ class WorkSession extends ChangeNotifier {
           workspaceOrderFulfilment = record.fulfilment;
           workspaceOrderPayment = record.payment;
           workspaceOrderAddress = record.address;
+          workspaceOrderBillingDetails = record.billingDetails;
           workspaceOrderNeedsDelivery = record.fulfilment != 'At the shop';
           workspaceOrderQuantities
             ..clear()
@@ -936,6 +940,7 @@ class WorkSession extends ChangeNotifier {
       revision: revision,
       stage: stage,
       customer: counterCustomerInput ?? workspaceOrderCustomer,
+      billingDetails: workspaceOrderBillingDetails,
       source: workspaceOrderSource,
       fulfilment: workspaceOrderFulfilment,
       payment: workspaceOrderPayment,
@@ -957,6 +962,7 @@ class WorkSession extends ChangeNotifier {
     revision: revision,
     stage: stage ?? draft.stage,
     customer: draft.customer,
+    billingDetails: draft.billingDetails,
     source: draft.source,
     fulfilment: draft.fulfilment,
     payment: draft.payment,
@@ -1016,6 +1022,7 @@ class WorkSession extends ChangeNotifier {
 
   void updateWorkspaceCounterDetails({
     String? customer,
+    WorkspaceBillingDetails? billingDetails,
     String? source,
     String? fulfilment,
     String? payment,
@@ -1025,6 +1032,7 @@ class WorkSession extends ChangeNotifier {
         !_canEditCounterOrder(allowCompletedInvoice: false)) {
       return;
     }
+    if (billingDetails != null) workspaceOrderBillingDetails = billingDetails;
     if (customer != null) {
       workspaceOrderCustomer = customer;
       _counterRecovery?.customerInput = customer;
@@ -4757,6 +4765,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderFulfilment = order.fulfilment;
     workspaceOrderPayment = order.payment;
     workspaceOrderAddress = order.address;
+    workspaceOrderBillingDetails = order.billingDetails;
     workspaceOrderStage = order.stage;
     workspaceOrderNeedsDelivery = order.needsDelivery;
     workspaceOrderActionDeadline = order.actionDeadline;
@@ -5142,6 +5151,10 @@ class WorkSession extends ChangeNotifier {
   String get workspaceOrderPayment => _storeData.workspaceOrderPayment;
   set workspaceOrderPayment(String value) =>
       _storeData.workspaceOrderPayment = value;
+  WorkspaceBillingDetails get workspaceOrderBillingDetails =>
+      _storeData.workspaceOrderBillingDetails;
+  set workspaceOrderBillingDetails(WorkspaceBillingDetails value) =>
+      _storeData.workspaceOrderBillingDetails = value;
   String get workspaceOrderAddress => _storeData.workspaceOrderAddress;
   set workspaceOrderAddress(String value) =>
       _storeData.workspaceOrderAddress = value;
@@ -5763,6 +5776,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderFulfilment = order.fulfilment;
     workspaceOrderPayment = order.payment;
     workspaceOrderAddress = order.address;
+    workspaceOrderBillingDetails = order.billingDetails;
     workspaceOrderStage = order.stage;
     workspaceOrderNeedsDelivery = order.needsDelivery;
     workspaceOrderExtraMinutes = order.extraMinutes;
@@ -6374,6 +6388,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderNeedsDelivery = source.needsDelivery;
     workspaceOrderCustomer = source.customer;
     workspaceOrderAddress = source.address;
+    workspaceOrderBillingDetails = source.billingDetails;
     workspaceOrderQuantities.addAll(repeatQuantities);
     noticeMessage = unavailableLines == 0
         ? 'Previous basket added. Confirm quantities before completing the sale.'
@@ -6751,6 +6766,8 @@ class WorkSession extends ChangeNotifier {
       id: 'INV-${order.id}',
       orderId: order.id,
       customer: order.customer,
+      sellerName: activeWorkspace?.name ?? workName,
+      billingDetails: order.billingDetails,
       items: order.items,
       amount: order.amount,
       payment: order.payment,
@@ -6912,6 +6929,7 @@ class WorkSession extends ChangeNotifier {
     final record = WorkspaceOrderRecord(
       id: orderId,
       customer: workspaceOrderCustomer,
+      billingDetails: workspaceOrderBillingDetails,
       items: workspaceOrderItems,
       quantities: Map<String, int>.from(workspaceOrderQuantities),
       itemSnapshots: _counterPurchasedItems(),
@@ -7559,6 +7577,7 @@ class WorkSession extends ChangeNotifier {
     workspaceOrderFulfilment = 'At the shop';
     workspaceOrderPayment = 'Cash';
     workspaceOrderAddress = '';
+    workspaceOrderBillingDetails = const WorkspaceBillingDetails();
     workspaceOrderStage = 'No order';
     workspaceOrderExtraMinutes = 0;
     workspaceOrderActionDeadline = null;

@@ -1313,36 +1313,38 @@ class WorkEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkCard(
       keyName: keyName,
-      child: Column(
-        children: [
-          const Icon(
-            Icons.search_off_rounded,
-            color: MoolColors.muted,
-            size: 36,
-          ),
-          const SizedBox(height: MoolSpacing.xs),
-          Text(
-            title,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              color: MoolColors.ink,
-              fontSize: 17,
-              fontWeight: FontWeight.w900,
+      child: SingleChildScrollView(
+        child: Column(
+          children: [
+            const Icon(
+              Icons.search_off_rounded,
+              color: MoolColors.muted,
+              size: 36,
             ),
-          ),
-          const SizedBox(height: MoolSpacing.xxs),
-          Text(
-            detail,
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: MoolColors.muted),
-          ),
-          const SizedBox(height: MoolSpacing.sm),
-          OutlinedButton(
-            key: Key('$keyName-action'),
-            onPressed: onAction,
-            child: Text(actionLabel),
-          ),
-        ],
+            const SizedBox(height: MoolSpacing.xs),
+            Text(
+              title,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: MoolColors.ink,
+                fontSize: 17,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: MoolSpacing.xxs),
+            Text(
+              detail,
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: MoolColors.muted),
+            ),
+            const SizedBox(height: MoolSpacing.sm),
+            OutlinedButton(
+              key: Key('$keyName-action'),
+              onPressed: onAction,
+              child: Text(actionLabel),
+            ),
+          ],
+        ),
       ),
     );
   }

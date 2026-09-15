@@ -14,13 +14,13 @@ if (-not $RepositoryRoot) {
 $RepositoryRoot = [System.IO.Path]::GetFullPath($RepositoryRoot)
 $redmiReviewQualified = $false
 if (-not [string]::IsNullOrWhiteSpace($IntegratedReviewSourceCommit)) {
-  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+  & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
     -RepositoryRoot $RepositoryRoot -IntegratedReviewSourceCommit $IntegratedReviewSourceCommit `
     -RedmiReviewSourceCommit $RedmiReviewSourceCommit
   $redmiReviewQualified = $true
 }
 if (-not [string]::IsNullOrWhiteSpace($RedmiReviewSourceCommit)) {
-  $null = & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
+  & (Join-Path $PSScriptRoot 'check-buy-protected-baseline.ps1') `
     -RepositoryRoot $RepositoryRoot -RedmiReviewSourceCommit $RedmiReviewSourceCommit
   $redmiReviewQualified = $true
 }
@@ -271,6 +271,14 @@ function Get-BackendBoundaryViolations {
 }
 
 if ($SelfTest) {
+  foreach ($review in @($false, $true)) {
+    $rejected = @(Get-MobileBoundaryViolations `
+      -Label 'apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart' `
+      -Content "import 'dart:io';" -QualifiedRedmiReview:$review)
+    if ($rejected.Count -eq 0) {
+      throw 'An unpinned dart:io import must fail in strict and review modes.'
+    }
+  }
   $mobileCases = @(
     @{
       Name = "HTTP import"
@@ -427,15 +435,24 @@ if ($mobileFiles.Count -eq 0) {
 }
 
 $violations = [System.Collections.Generic.List[string]]::new()
+$reviewExcludedFindings = [System.Collections.Generic.List[string]]::new()
 foreach ($file in $mobileFiles) {
   $relative = Get-PortableRelativePath `
     -BasePath $RepositoryRoot `
     -Path $file.FullName
   $content = Get-Content -LiteralPath $file.FullName -Raw -Encoding UTF8
-  foreach ($finding in Get-MobileBoundaryViolations `
+  $effectiveFindings = @(Get-MobileBoundaryViolations `
     -Label $relative `
     -Content $content `
-    -QualifiedRedmiReview:$redmiReviewQualified) {
+    -QualifiedRedmiReview:$redmiReviewQualified)
+  if ($redmiReviewQualified) {
+    foreach ($original in @(Get-MobileBoundaryViolations -Label $relative -Content $content)) {
+      if ($effectiveFindings -cnotcontains $original) {
+        $reviewExcludedFindings.Add($original)
+      }
+    }
+  }
+  foreach ($finding in $effectiveFindings) {
     $violations.Add($finding)
   }
 }
@@ -491,6 +508,15 @@ foreach ($file in $contractFiles) {
   }
 }
 
+if ($redmiReviewQualified) {
+  foreach ($excluded in $reviewExcludedFindings) {
+    Write-Output "REVIEW EXCEPTION (original finding retained): $excluded"
+  }
+  Write-Output ('Review mode: backendQualified=false; productionPromotion=false; ' +
+    "mobileFindingsExcluded=$($reviewExcludedFindings.Count). " +
+    'Existing backend-owner projections also remain review exceptions, not production acceptance.')
+}
+
 if ($violations.Count -gt 0) {
   foreach ($violation in $violations) {
     Write-Output $violation
@@ -503,9 +529,13 @@ if ($violations.Count -gt 0) {
   )
 }
 
-Write-Output (
+if ($redmiReviewQualified) {
+  Write-Output 'Buy backend review check passed with existing exceptions; production qualification remains unresolved.'
+} else {
+  Write-Output (
   "Buy backend contract boundary passed: $($mobileFiles.Count) native V2 " +
   "files contain no invented transport/mock path; $($backendFiles.Count) " +
   "backend files and $($contractFiles.Count) contract files expose no " +
   "unapproved Buy owner."
 )
+}

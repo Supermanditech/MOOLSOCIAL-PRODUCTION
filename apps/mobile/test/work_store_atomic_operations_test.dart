@@ -4490,6 +4490,71 @@ void main() {
     });
   });
   group('DASH15 counter session', () {
+    test(
+      'invoice file names use saved names and safely omit phone fallback',
+      () {
+        WorkspaceCustomerInvoice bill({
+          String seller = 'Sharma Mart',
+          WorkspaceBillingDetails details = const WorkspaceBillingDetails(),
+        }) => WorkspaceCustomerInvoice(
+          id: 'INV-1042',
+          orderId: '1042',
+          sellerName: seller,
+          customer: '9829012345',
+          billingDetails: details,
+          items: 'Grocery',
+          amount: 125,
+          payment: 'Cash',
+          issuedAt: DateTime.utc(2026, 9, 15),
+        );
+        expect(bill().pdfFileName, 'Sharma-Mart_INV-1042.pdf');
+        expect(
+          bill(
+            details: const WorkspaceBillingDetails(name: 'Rahul'),
+          ).pdfFileName,
+          'Sharma-Mart_Rahul_INV-1042.pdf',
+        );
+        expect(
+          bill(
+            details: const WorkspaceBillingDetails(
+              business: true,
+              name: 'Rahul',
+              businessName: 'Gupta Traders',
+            ),
+          ).pdfFileName,
+          'Sharma-Mart_Gupta-Traders_INV-1042.pdf',
+        );
+        expect(
+          bill(
+            details: const WorkspaceBillingDetails(
+              business: true,
+              name: 'Rahul',
+            ),
+          ).pdfFileName,
+          'Sharma-Mart_Rahul_INV-1042.pdf',
+        );
+        expect(
+          bill(
+            seller: '../Sharma/ Mart:*',
+            details: const WorkspaceBillingDetails(name: 'Ra\\hul\n'),
+          ).pdfFileName,
+          'Sharma-Mart_Ra-hul_INV-1042.pdf',
+        );
+        final legacy = bill().toLedgerJson()..remove('sellerName');
+        expect(
+          WorkspaceCustomerInvoice.fromLedgerJson(legacy).pdfFileName,
+          'MoolSocial_INV-1042.pdf',
+        );
+        expect(
+          bill(
+            seller: 'दुकान',
+            details: const WorkspaceBillingDetails(name: 'राहुल'),
+          ).pdfFileName,
+          'दुकान_राहुल_INV-1042.pdf',
+        );
+      },
+    );
+
     late _CommandAccountStore account;
     late _OrderJournalStorage storage;
     late _CounterDraftBoundaryStore journal;
@@ -4526,6 +4591,72 @@ void main() {
       );
       expect(await work.saveWorkspaceCounterDraft(), isTrue);
     }
+
+    test(
+      'POSCENTRAL billing details survive recovery and stay on original invoice',
+      () async {
+        final work = session();
+        await fill(work);
+        const details = WorkspaceBillingDetails(
+          business: true,
+          name: 'Test contact',
+          businessName: 'Test business',
+          gst: 'TEST-ONLY',
+          address: 'Test billing address',
+        );
+        work.updateWorkspaceCounterDetails(billingDetails: details);
+        expect(await work.saveWorkspaceCounterDraft(), isTrue);
+        final restored = session();
+        await restored.loadWorkspaceCounterDraft();
+        expect(
+          restored.workspaceOrderBillingDetails.toJson(),
+          details.toJson(),
+        );
+        final result = await restored.submitWorkspaceCounterBill();
+        expect(result?.invoice, isNotNull);
+        final invoice = result!.invoice!;
+        expect(invoice.billingDetails.toJson(), details.toJson());
+        expect(invoice.sellerName, _commandStore.name);
+        final savedFileName = invoice.pdfFileName;
+        expect(savedFileName, contains('_Test-business_INV-'));
+        expect(savedFileName, isNot(contains(invoice.customer)));
+        expect(
+          invoice.copyWith(sharedChannels: {'Chat'}).pdfFileName,
+          savedFileName,
+        );
+        expect(
+          WorkspaceCustomerInvoice.fromLedgerJson(
+            invoice.toLedgerJson(),
+          ).pdfFileName,
+          savedFileName,
+        );
+        expect(
+          WorkspaceCustomerInvoice.fromLedgerJson(
+            invoice.toLedgerJson(),
+          ).billingDetails.toJson(),
+          details.toJson(),
+        );
+        final order = restored.workspaceOrders.firstWhere(
+          (o) => o.id == invoice.orderId,
+        );
+        expect(
+          WorkspaceOrderRecord.fromLedgerJson(
+            order.copyWith(stage: 'Completed').toLedgerJson(),
+          )!.billingDetails.toJson(),
+          details.toJson(),
+        );
+        expect(restored.startNewWorkspaceOrder(), isTrue);
+        expect(restored.workspaceOrderBillingDetails.isEmpty, isTrue);
+        expect(invoice.billingDetails.toJson(), details.toJson());
+        final legacy = invoice.toLedgerJson()..remove('billingDetails');
+        expect(
+          WorkspaceCustomerInvoice.fromLedgerJson(
+            legacy,
+          ).billingDetails.isEmpty,
+          isTrue,
+        );
+      },
+    );
 
     for (final returnFailure in [
       'none',

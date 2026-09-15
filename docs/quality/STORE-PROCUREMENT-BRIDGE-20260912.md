@@ -1810,3 +1810,51 @@ V25 creation, candidate checks, APK build, retained-data OPPO verification and
 founder visual approval are still required. In particular, recover the existing
 19-pack receipt without reposting or adding stock, verify direct supplier return,
 and complete the remaining overlapping Store Ledger journeys on the device.
+
+### Mandatory production blocker — review checker exceptions (2026-09-15)
+
+Founder decision: proceed with local Flutter visual review first. The unresolved
+backend/security boundary findings are NOT waived and must be resolved before
+claiming a production-qualified build, production release/upload, deployment,
+or enabling live Store payments, messages or authenticated backend operations.
+Local fixture-based visual review is allowed; it is not production acceptance.
+
+The strict backend boundary currently reports 18 findings. Its unchanged strict
+before/after results and original checker are preserved in the task outputs under
+pos-checker-reconciliation. Historical review exclusions, including the exact-file
+dart:io fingerprint, do not establish production safety. Do not advance exception
+hashes or admission values merely to obtain a production pass.
+
+Before that production boundary: review every original finding against the exact
+candidate, correct confirmed code defects, provide independently reviewable
+evidence for any legitimate capability, run the strict checks without review
+projection parameters, and verify storage/privacy, payment and authenticated
+backend requirements with real authority. Unresolved findings block production;
+fixture/host/visual passes cannot replace those checks. This is a release blocker,
+not an instruction to implement backend capabilities during the current POS UI task.
+
+Any concrete frontend data-loss, cross-Store exposure, unsafe payment handoff or
+unreachable required control discovered during local work must be fixed in that
+work; it must not be deferred under this production-only qualification blocker.
+
+### Counter-sale reliability and PDF frontend review — 2026-09-15
+
+The five interrupted invoice failures are resolved: the customer-reset assertion
+now follows the approved receipt-to-next-sale lifecycle; the four WhatsApp cases
+retain their outcome assertions after the compact Sales header overflow fix.
+All 12 focused journey checks and 60 counter-sale session checks pass.
+
+The new invoice PDF source interface is scoped by account, Store and saved
+invoice. Normal builds explicitly report PDF unavailability until a backend
+source is connected. The opt-in MOOL_LOCAL_INVOICE_PDF_REVIEW define generates
+marked local review PDFs from saved identities and item snapshots, with approved
+filenames, embedded font, pagination and Generated with MoolSocial footer.
+The viewer supports save/native file share, paging, zoom, cancellation and retry;
+Store/account changes clear the document and late results are discarded.
+Missing font characters fail clearly rather than silently changing invoice text.
+
+Actual generated single- and six-page PDF samples, rendered images, lifecycle
+test logs and review limitations are retained in the active task outputs under
+invoice-pdf-review. These frontend checks do not establish backend issuance,
+storage, message delivery, payment acceptance or physical-device qualification.
+The production blockers above remain in force.

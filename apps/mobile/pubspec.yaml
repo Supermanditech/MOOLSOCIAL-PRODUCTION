@@ -62,6 +62,7 @@ dependencies:
   firebase_messaging: ^16.6.0
   firebase_data_connect: ^0.3.0+7
   flutter_svg: ^2.3.0
+  pdf: 3.13.0
 
 dev_dependencies:
   shared_preferences_platform_interface: 2.4.2

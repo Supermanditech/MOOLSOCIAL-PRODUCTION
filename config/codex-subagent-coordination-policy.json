@@ -34,6 +34,11 @@
       "task": "/root",
       "role": "primary",
       "owners": [
+        "apps/mobile/.dart_tool/package_config.json",
+        "apps/mobile/.dart_tool/package_graph.json",
+        "apps/mobile/lib/features/work/work_invoice_pdf.dart",
+        "apps/mobile/lib/features/work/screens/work_invoice_pdf_screen.dart",
+        "apps/mobile/test/work_invoice_pdf_test.dart",
         "scripts/check-apk-regression-gate-state.ps1",
         "apps/mobile/pubspec.yaml",
         "apps/mobile/pubspec.lock",

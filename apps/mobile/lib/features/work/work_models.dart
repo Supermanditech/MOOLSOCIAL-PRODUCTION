@@ -3119,6 +3119,53 @@ class WorkspaceOrderItemSnapshot {
 /// Local composer recovery only. These stages grant no order/payment authority.
 enum WorkspaceCounterDraftStage { editing, submitting, reviewRequired, retired }
 
+/// Optional billing identity; phone remains the sale's customer identity.
+/// This does not grant delivery, tax validation or payment authority.
+class WorkspaceBillingDetails {
+  const WorkspaceBillingDetails({
+    this.business = false,
+    this.name = '',
+    this.businessName = '',
+    this.gst = '',
+    this.address = '',
+  });
+  final bool business;
+  final String name, businessName, gst, address;
+  bool get isEmpty =>
+      !business &&
+      name.isEmpty &&
+      businessName.isEmpty &&
+      gst.isEmpty &&
+      address.isEmpty;
+  Map<String, Object?> toJson() => {
+    'business': business,
+    'name': name,
+    'businessName': businessName,
+    'gst': gst,
+    'address': address,
+  };
+  static WorkspaceBillingDetails fromJson(Object? value) {
+    if (value == null) return const WorkspaceBillingDetails();
+    if (value is! Map ||
+        value['business'] is! bool ||
+        ![
+          'name',
+          'businessName',
+          'gst',
+          'address',
+        ].every((key) => value[key] is String)) {
+      throw const FormatException('Invalid billing details');
+    }
+    return WorkspaceBillingDetails(
+      business: value['business'] as bool,
+      name: value['name'] as String,
+      businessName: value['businessName'] as String,
+      gst: value['gst'] as String,
+      address: value['address'] as String,
+    );
+  }
+}
+
 class WorkspaceCounterDraft {
   WorkspaceCounterDraft({
     required this.account,
@@ -3127,6 +3174,7 @@ class WorkspaceCounterDraft {
     required this.revision,
     required this.stage,
     required this.customer,
+    this.billingDetails = const WorkspaceBillingDetails(),
     required this.source,
     required this.fulfilment,
     required this.payment,
@@ -3135,6 +3183,7 @@ class WorkspaceCounterDraft {
     this.submissionOrderId,
   }) : lines = List.unmodifiable(lines);
 
+  final WorkspaceBillingDetails billingDetails;
   final String account,
       store,
       id,
@@ -3195,6 +3244,7 @@ class WorkspaceCounterDraft {
     'revision': revision,
     'stage': stage.name,
     'customer': customer,
+    'billingDetails': billingDetails.toJson(),
     'source': source,
     'fulfilment': fulfilment,
     'payment': payment,
@@ -3263,6 +3313,12 @@ class WorkspaceCounterDraft {
         ),
       );
     }
+    WorkspaceBillingDetails billing;
+    try {
+      billing = WorkspaceBillingDetails.fromJson(value['billingDetails']);
+    } on FormatException {
+      return null;
+    }
     final draft = WorkspaceCounterDraft(
       account: value['account'] as String,
       store: value['store'] as String,
@@ -3270,6 +3326,7 @@ class WorkspaceCounterDraft {
       revision: value['revision'] as int,
       stage: stage,
       customer: value['customer'] as String,
+      billingDetails: billing,
       source: value['source'] as String,
       fulfilment: value['fulfilment'] as String,
       payment: value['payment'] as String,
@@ -3285,6 +3342,7 @@ class WorkspaceOrderRecord {
   const WorkspaceOrderRecord({
     required this.id,
     required this.customer,
+    this.billingDetails = const WorkspaceBillingDetails(),
     required this.items,
     required this.quantities,
     required this.amount,
@@ -3304,6 +3362,7 @@ class WorkspaceOrderRecord {
     this.rejectionReason,
   });
 
+  final WorkspaceBillingDetails billingDetails;
   final String id;
   final String customer;
   final String items;
@@ -3331,6 +3390,7 @@ class WorkspaceOrderRecord {
   Map<String, Object?> toLedgerJson() => {
     'id': id,
     'customer': customer,
+    'billingDetails': billingDetails.toJson(),
     'items': items,
     'quantities': quantities,
     'amount': amount,
@@ -3368,6 +3428,7 @@ class WorkspaceOrderRecord {
       final order = WorkspaceOrderRecord(
         id: map['id'] as String,
         customer: map['customer'] as String,
+        billingDetails: WorkspaceBillingDetails.fromJson(map['billingDetails']),
         items: map['items'] as String,
         quantities: Map.unmodifiable(
           (map['quantities'] as Map).cast<String, int>(),
@@ -3475,6 +3536,7 @@ class WorkspaceOrderRecord {
   }) => WorkspaceOrderRecord(
     id: id,
     customer: customer ?? this.customer,
+    billingDetails: billingDetails,
     items: items ?? this.items,
     quantities: Map<String, int>.unmodifiable(quantities ?? this.quantities),
     amount: amount ?? this.amount,
@@ -3619,6 +3681,8 @@ class WorkspaceCustomerInvoice {
     required this.id,
     required this.orderId,
     required this.customer,
+    this.sellerName = '',
+    this.billingDetails = const WorkspaceBillingDetails(),
     required this.items,
     required this.amount,
     required this.payment,
@@ -3626,19 +3690,55 @@ class WorkspaceCustomerInvoice {
     this.sharedChannels = const <String>{},
   });
 
+  final WorkspaceBillingDetails billingDetails;
   final String id;
   final String orderId;
   final String customer;
+
+  /// Seller identity at issue time; never substitute a later Store rename.
+  final String sellerName;
   final String items;
   final int amount;
   final String payment;
   final DateTime issuedAt;
   final Set<String> sharedChannels;
 
+  String get pdfFileName {
+    String component(String value, int limit) {
+      final safe = value
+          .replaceAll(
+            RegExp(r'[\x00-\x1F\x7F<>:"/\\|?*\u202A-\u202E\u2066-\u2069]'),
+            ' ',
+          )
+          .replaceAll(RegExp(r'[\s._-]+'), '-')
+          .replaceAll(RegExp(r'^-+|-+$'), '');
+      return String.fromCharCodes(
+        safe.runes.take(limit),
+      ).replaceAll(RegExp(r'-+$'), '');
+    }
+
+    final seller = component(sellerName, 48);
+    final buyer = component(
+      billingDetails.business && billingDetails.businessName.trim().isNotEmpty
+          ? billingDetails.businessName
+          : billingDetails.name,
+      48,
+    );
+    final number = component(id, 64);
+    final baseName = [
+      seller.isEmpty ? 'MoolSocial' : seller,
+      if (buyer.isNotEmpty) buyer,
+      number.isEmpty ? 'Invoice' : number,
+    ].join('_');
+    return '$baseName.pdf';
+  }
+
   Map<String, Object?> toLedgerJson() => {
     'id': id,
     'orderId': orderId,
     'customer': customer,
+    'sellerName': sellerName,
+    'billingDetails': billingDetails.toJson(),
     'items': items,
     'amount': amount,
     'payment': payment,
@@ -3651,6 +3751,8 @@ class WorkspaceCustomerInvoice {
       id: map['id'] as String,
       orderId: map['orderId'] as String,
       customer: map['customer'] as String,
+      sellerName: map['sellerName'] as String? ?? '',
+      billingDetails: WorkspaceBillingDetails.fromJson(map['billingDetails']),
       items: map['items'] as String,
       amount: map['amount'] as int,
       payment: map['payment'] as String,
@@ -3668,6 +3770,8 @@ class WorkspaceCustomerInvoice {
         id: id,
         orderId: orderId,
         customer: customer,
+        sellerName: sellerName,
+        billingDetails: billingDetails,
         items: items,
         amount: amount,
         payment: payment,
