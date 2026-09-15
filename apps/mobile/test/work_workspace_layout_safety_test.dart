@@ -7492,6 +7492,7 @@ void main() {
       );
       expect(find.byKey(const Key('work-store-reach-strip')), findsNothing);
       for (final key in ['work-quick-counter-sale', 'work-quick-store-link']) {
+        await reveal(tester, find.byKey(Key(key)));
         expect(find.byKey(Key(key)).hitTestable(), findsOneWidget);
       }
       await captureStoreView(
@@ -20368,6 +20369,11 @@ void main() {
       expect(find.text('Send customer invoice'), findsOneWidget);
       expect(work.workspaceInvoices.single.id, invoiceId);
       await captureStoreView(tester, 'counter-recovered-invoice-$scale');
+      await reveal(tester, find.byKey(const Key('work-sale-next')));
+      expect(
+        find.byKey(const Key('work-sale-next')).hitTestable(),
+        findsOneWidget,
+      );
       await tester.tap(find.byKey(const Key('work-sale-next')));
       await tester.pumpAndSettle();
       expect(work.workspaceOrderQuantities, isEmpty);

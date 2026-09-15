@@ -1873,3 +1873,10 @@ Repair15 completed: static analysis no issues; combined original51 plus seven CO
 
 
 V27 source admission rejected pushed metadata commit47dce7e0 because its label used chore rather than ui. History is preserved. An exact historical disposition now binds that commit, parent0340a641, tree28e3ea03, unchanged application tree and primary Store task context; one positive and seven negative checks passed in wh/work/v27-label-disposition-test.log. This is an admission-only correction, not feature approval or permission for other labels. The earlier16-only identity diff was independently verified after a scratch counter mistakenly expected19. Rejection logs remain preserved. Full successor qualification remains mandatory.
+
+
+V27 full regression found an additional DASHRAIL320x568/text2 stale initial-visibility assumption. The test now reveals each top action using the existing helper before requiring it to be touchable; its later action loop already did this. Runtime code is unchanged. The complete failure evidence is retained at wh/work/v27-validation-published; V27 cannot build. Connected61-case repair coverage and fresh successor cycles are required.
+
+V27 completed with two failures: DASHRAIL text2 initial visibility and DASH15 text2 Next sale touchability. Both test navigation corrections preserve all state, financial, geometry and reset expectations. No APK was built. Final pass/skip counts and exact original logs are preserved in wh/work/v27-validation-published; connected63-case verification includes both recovery displays.
+
+Repair16 connected verification completed64/64 passed, no failures, successful terminal event; original51 plus seven COUNTERD01, four DASHRAIL cases and both DASH15 recovery displays. Runtime unchanged from0340a641. Exact logs: wh/work/v26-repair-16. V28 full qualification and OPPO remain pending.
