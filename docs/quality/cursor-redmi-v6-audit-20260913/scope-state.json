@@ -483,7 +483,7 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "local_source_qualified_source_commit_and_successor_gates_pending",
+    "state": "source_committed_prebuild_checks_passed_evidence_seal_pending",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
@@ -500,7 +500,7 @@
     "device": "TG8HCYTGGQT885OF",
     "evidenceRoot": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-CURSOR-BUY-UAT-20260905/sku-metadata-redmi-20260914",
     "prior22OriginalAndSoleChildClosuresPreserved": true,
-    "sourceCommitted": false,
+    "sourceCommitted": true,
     "localChecksPassed": 20,
     "localFlutterImages": 68,
     "manuallyReviewedImages": 2,
@@ -508,14 +508,13 @@
     "redmiRedesignVerified": false,
     "newApkBuilt": true,
     "remaining": [
-      "Commit qualified corrections and verify live Git equality",
-      "Pass exact-source prebuild gates and seal",
-      "Build one uniquely identified successor and install data-preserving on Redmi TG8HCYTGGQT885OF",
+      "Seal prebuild evidence and verify clean live Git equality",
+      "Build one uniquely identified r66.26 successor and install data-preserving on Redmi TG8HCYTGGQT885OF",
       "Verify ten existing SKU acceptance records on Redmi and record final Git handoff"
     ],
     "registryEntryCount": 4589,
     "registrySha256": "A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB",
-    "qualificationAppliesTo": "Current uncommitted correction bytes in current-source-qualification-02.json are locally qualified. Existing applicationSource/newApkBuilt and prior reports retain r66.25 history; the corrective successor is not built.",
+    "qualificationAppliesTo": "Current corrections are committed as d6d9890fa7754a38a05b183bc8ca6e89eccf22cc and locally qualified by current-source-qualification-02.json with eleven source/prebuild checks passed. Historical applicationSource/newApkBuilt and prior reports retain r66.25 provenance. The r66.26 corrective successor is not yet built; all ten device acceptance records remain open.",
     "latestFullScreenRun": {
       "passed": 325,
       "failed": 15,
@@ -617,7 +616,14 @@
       "state": "implemented_locally_qualified_successor_device_pending",
       "regression": "REG-20260915-4617-SKU-DEVICE-METADATA-COMPLETENESS",
       "newRuntimeOwners": [],
-      "correctiveSuccessorBuilt": false
+      "correctiveSuccessorBuilt": false,
+      "applicationSource": "d6d9890fa7754a38a05b183bc8ca6e89eccf22cc",
+      "sourceCleanLiveRemoteVerified": true,
+      "prebuildChecks": "correction-prebuild-checks.json",
+      "prebuildChecksSha256": "A6014D3495AF80D1F3D0E5A391878A4A8D22329EF639C43F65D3EC214BDFC317",
+      "candidateId": "UAW-CURSOR-SKU-CORRECTION-20260915",
+      "versionName": "1.0.0-r66.26",
+      "versionCode": 2026091502
     },
     "founderReviewAmendment": {
       "date": "2026-09-15",
