@@ -1787,3 +1787,26 @@ Captures-r2 passed four tests; current Flutter captures are preserved under
 store-ledger02-c02-20260915-r2 in the external audit directory. Supplier-return
 normal and supplier-payment compact captures were inspected. These remain local
 evidence, not OPPO or founder acceptance. Original failed logs are preserved.
+
+### V25 admission pins — receipt recovery successor
+
+Tested correction f6a6117de520d5e38efb2c10cb8ee35b3ace22f8 is sealed and
+pushed. V24 and its receipt-recovery failure remain preserved. The four existing
+admission scripts change only 13 exact V24 destination literals to V25 and three
+tested-source literals to this correction. No owner permissions, content hashes,
+assertions or exclusions are expanded. Application and test sources remain at
+the tested correction; this successor metadata is not a new implementation.
+
+The pin-only comparison and all four PowerShell parsers passed. The backend
+boundary self-test and exact-source review passed. Negative controls exercised
+the actual mobile-boundary function: exact source/content accepted, changed
+content rejected, predecessor source rejected. The external receipt is
+outputs/store-ledger-mvp/v25-pin-negative-controls.json; checker SHA-256 is
+2234A0972DB507D724B91D7381831FE8545693005398B4CAD99AF9AE01B87594.
+Original checker backups remain outside Git. Existing review exceptions remain
+disclosed and cannot establish production storage, privacy or payment acceptance.
+
+V25 creation, candidate checks, APK build, retained-data OPPO verification and
+founder visual approval are still required. In particular, recover the existing
+19-pack receipt without reposting or adding stock, verify direct supplier return,
+and complete the remaining overlapping Store Ledger journeys on the device.
