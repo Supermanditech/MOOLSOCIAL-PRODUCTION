@@ -9,6 +9,7 @@ void main() {
   Future<JourneySession> sessionFor({
     MemoryJourneyStore? store,
     EmailLinkGateway? emailLinkGateway,
+    PendingEmailLinkAddressStore? pendingEmailLinkAddressStore,
     SocialAuthGateway? socialAuthGateway,
     OtpGateway? otpGateway,
     AccountBootstrapGateway? accountBootstrapGateway,
@@ -19,6 +20,7 @@ void main() {
     final session = JourneySession(
       store: store ?? _completedStore(),
       emailLinkGateway: emailLinkGateway ?? ReviewEmailLinkGateway(),
+      pendingEmailLinkAddressStore: pendingEmailLinkAddressStore,
       emailLinkAvailable: true,
       socialAuthGateway: socialAuthGateway,
       otpGateway: otpGateway,
@@ -211,31 +213,85 @@ void main() {
     expect(session.errorMessage, isNot(contains('person@example.com')));
   });
 
-  test('process return asks for matching email before completion', () async {
-    final store = _completedStore(
-      pendingRoute: '/app/chat/inbox?return=/app/social',
-    );
+  test(
+    'exact safe Firebase email code drives matching-address recovery',
+    () async {
+      final gateway = ReviewEmailLinkGateway(
+        completionFailure: const JourneyServiceException(
+          'Enter the email address that received this link.',
+          code: 'invalid-recipient-email',
+        ),
+      );
+      final session = await sessionFor(emailLinkGateway: gateway);
+      addTearDown(session.dispose);
+
+      expect(await session.requestEmailLink('person@example.com'), isTrue);
+      expect(
+        await session.prepareEmailLinkReturn(gateway.acceptedLink),
+        isTrue,
+      );
+      expect(session.emailLinkState, EmailLinkState.awaitingEmail);
+      expect(session.emailLinkReceiptCode, 'invalid-recipient-email');
+      expect(session.isAuthenticated, isFalse);
+      expect(session.errorMessage, isNot(contains('person@example.com')));
+    },
+  );
+
+  test(
+    'same-device process return completes with the retained address',
+    () async {
+      final store = _completedStore(
+        pendingRoute: '/app/chat/inbox?return=/app/social',
+      );
+      final addressStore = MemoryPendingEmailLinkAddressStore();
+      final gateway = ReviewEmailLinkGateway();
+      final first = await sessionFor(
+        store: store,
+        emailLinkGateway: gateway,
+        pendingEmailLinkAddressStore: addressStore,
+      );
+      expect(await first.requestEmailLink('person@example.com'), isTrue);
+      expect(addressStore.value, 'person@example.com');
+      first.dispose();
+
+      final returned = JourneySession(
+        store: store,
+        emailLinkGateway: gateway,
+        pendingEmailLinkAddressStore: addressStore,
+        emailLinkAvailable: true,
+      );
+      addTearDown(returned.dispose);
+      expect(
+        await returned.prepareEmailLinkReturn(gateway.acceptedLink),
+        isTrue,
+      );
+      expect(returned.emailLinkState, EmailLinkState.idle);
+      expect(returned.isAuthenticated, isTrue);
+      expect(returned.readyRoute(), '/app/chat/inbox?return=/app/social');
+      expect(gateway.completionCount, 1);
+      expect(addressStore.value, isNull);
+    },
+  );
+
+  test('cross-device return still requires the matching address', () async {
     final gateway = ReviewEmailLinkGateway();
-    final first = await sessionFor(store: store, emailLinkGateway: gateway);
-    expect(await first.requestEmailLink('person@example.com'), isTrue);
-    first.dispose();
+    final sender = await sessionFor(emailLinkGateway: gateway);
+    expect(await sender.requestEmailLink('person@example.com'), isTrue);
+    sender.dispose();
 
     final returned = JourneySession(
-      store: store,
+      store: _completedStore(
+        pendingRoute: '/app/chat/inbox?return=/app/social',
+      ),
       emailLinkGateway: gateway,
       emailLinkAvailable: true,
     );
     addTearDown(returned.dispose);
+
     expect(await returned.prepareEmailLinkReturn(gateway.acceptedLink), isTrue);
     expect(returned.emailLinkState, EmailLinkState.awaitingEmail);
     expect(returned.isAuthenticated, isFalse);
-
-    expect(await returned.completeEmailLink('other@example.com'), isFalse);
-    expect(returned.emailLinkState, EmailLinkState.awaitingEmail);
-    expect(returned.isAuthenticated, isFalse);
-
     expect(await returned.completeEmailLink('person@example.com'), isTrue);
-    expect(returned.isAuthenticated, isTrue);
     expect(returned.readyRoute(), '/app/chat/inbox?return=/app/social');
   });
 

@@ -78,8 +78,16 @@ void main() {
         final node = tester.getSemantics(details).getSemanticsData();
         expect(node.label, 'View ${product.title} product details');
         expect(node.hasAction(SemanticsAction.tap), isTrue);
-        expect(find.byTooltip('Remove one'), findsOneWidget);
-        expect(find.byTooltip('Add one'), findsOneWidget);
+        if (destination == BuyV2Destination.wholesale) {
+          expect(
+            find.byTooltip('Remove ${product.title} from Cart'),
+            findsOneWidget,
+          );
+          expect(find.byTooltip('Add one trade pack'), findsOneWidget);
+        } else {
+          expect(find.byTooltip('Remove one'), findsOneWidget);
+          expect(find.byTooltip('Add one'), findsOneWidget);
+        }
 
         await tester.tap(details);
         await tester.pumpAndSettle();
@@ -94,7 +102,13 @@ void main() {
         expect(session.quantityFor(product.id), originalQuantity);
         expect(details, findsOneWidget);
 
-        await tester.tap(find.byTooltip('Add one'));
+        await tester.tap(
+          find.byTooltip(
+            destination == BuyV2Destination.wholesale
+                ? 'Add one trade pack'
+                : 'Add one',
+          ),
+        );
         await tester.pump();
         expect(session.view, BuyV2View.cart);
         expect(session.quantityFor(product.id), originalQuantity + 1);
@@ -181,8 +195,8 @@ void main() {
     );
     expect(details, findsOneWidget);
     expect(tester.getSize(details).height, greaterThanOrEqualTo(44));
-    expect(find.byTooltip('Remove one'), findsOneWidget);
-    expect(find.byTooltip('Add one'), findsOneWidget);
+    expect(find.byTooltip('Remove ${product.title} from Cart'), findsOneWidget);
+    expect(find.byTooltip('Add one trade pack'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(details);
