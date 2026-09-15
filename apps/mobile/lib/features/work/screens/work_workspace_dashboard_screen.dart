@@ -1237,6 +1237,26 @@ class _WorkWorkspaceDashboardScreenState
             onCustomers: () => _showOperation(_WorkspaceOperation.dues),
             onMoney: () => _showOperation(_WorkspaceOperation.statement),
             onGrow: () => _showOperation(_WorkspaceOperation.offers),
+            onPromote: () => openScopedRoute(
+              Uri(
+                path: '/app/social/promote',
+                queryParameters: {
+                  'workspaceId': workspace.id,
+                  'workspaceName': workspace.name,
+                },
+              ).toString(),
+            ),
+            onAddProducts: () async {
+              _showOperation(_WorkspaceOperation.catalogue);
+              await WidgetsBinding.instance.endOfFrame;
+              if (!mounted || _operation != _WorkspaceOperation.catalogue) {
+                return;
+              }
+              final catalogue = _catalogueKey.currentState;
+              if (catalogue != null) {
+                await catalogue._edit(catalogue._blankProduct());
+              }
+            },
             onOrders: () => _showOperation(_WorkspaceOperation.orders),
             reviewedOrder: _reviewedOrder,
             onReviewOrder: () {
@@ -3514,6 +3534,8 @@ class _StoreControlDashboard extends StatelessWidget {
     required this.onCustomers,
     required this.onMoney,
     required this.onGrow,
+    required this.onPromote,
+    required this.onAddProducts,
     required this.onOrders,
     required this.onNewSale,
     required this.onDeliverOrder,
@@ -3529,6 +3551,7 @@ class _StoreControlDashboard extends StatelessWidget {
   final WorkWorkspace workspace;
   final VoidCallback onSetup, onCustomers, onMoney, onGrow, onOrders;
   final VoidCallback onNewSale, onDeliverOrder, onStock, onBuyStock;
+  final VoidCallback onPromote, onAddProducts;
   final ValueChanged<_WorkspaceOperation> onOpenOperation;
   final WorkspaceOrderRecord? reviewedOrder;
   final VoidCallback onReviewOrder, onCloseOrder;
@@ -3594,6 +3617,13 @@ class _StoreControlDashboard extends StatelessWidget {
                     Expanded(child: desk),
                     _StoreActionEdge(
                       session: session,
+                      onCounterSale: onNewSale,
+                      onStoreLink: onDeliverOrder,
+                      onAddProducts: onAddProducts,
+                      onCreateOffer: onGrow,
+                      onPromote: onPromote,
+                      onRequirement: () =>
+                          onOpenOperation(_WorkspaceOperation.paidWork),
                       onRestock: onBuyStock,
                       onPurchases: () =>
                           onOpenOperation(_WorkspaceOperation.sourcing),
@@ -3602,12 +3632,6 @@ class _StoreControlDashboard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              _StoreReachStrip(
-                onLink: onDeliverOrder,
-                onPromote: onGrow,
-                onRequirement: () =>
-                    onOpenOperation(_WorkspaceOperation.paidWork),
               ),
             ],
           );
@@ -3634,21 +3658,29 @@ class _StoreActionEdge extends StatelessWidget {
     required this.onRestock,
     required this.onPurchases,
     required this.onGroup,
+    required this.onCounterSale,
+    required this.onStoreLink,
+    required this.onAddProducts,
+    required this.onCreateOffer,
+    required this.onPromote,
+    required this.onRequirement,
   });
   final WorkSession session;
   final VoidCallback onRestock, onPurchases, onGroup;
+  final VoidCallback onCounterSale, onStoreLink, onAddProducts;
+  final VoidCallback onCreateOffer, onPromote, onRequirement;
 
   @override
   Widget build(BuildContext context) {
     final deal = session.activeGroupBuy;
     final normalWidth = MediaQuery.sizeOf(context).width < 360 ? 80.0 : 92.0;
-    final readableWidth = MediaQuery.textScalerOf(context).scale(11) > 16
-        ? _storeRailWordWidth(
-                context,
-                'Restock Track stock Group Bulk Buying',
-              ) +
-              20
-        : normalWidth;
+    final readableWidth =
+        _storeRailWordWidth(
+          context,
+          'Counter sale Share store link Buy stock Track purchases '
+          'Buy together Add products Create offer Promote store Post requirement',
+        ) +
+        17;
     return Material(
       key: const Key('work-store-supply-material'),
       color: Colors.white,
@@ -3660,13 +3692,31 @@ class _StoreActionEdge extends StatelessWidget {
           border: Border(left: BorderSide(color: Color(0xFFE5E8F1))),
         ),
         child: SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          key: const Key('work-store-quick-actions-scroll'),
+          padding: EdgeInsets.symmetric(
+            vertical: MediaQuery.textScalerOf(context).scale(11) > 16 ? 0 : 12,
+            horizontal: 4,
+          ),
           child: Column(
             children: [
               _StoreEdgeAction(
+                keyName: 'work-quick-counter-sale',
+                icon: Icons.point_of_sale_outlined,
+                label: 'Counter sale',
+                onTap: onCounterSale,
+              ),
+              const Divider(height: 16, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
+                keyName: 'work-quick-store-link',
+                icon: Icons.link_rounded,
+                label: 'Share store link',
+                onTap: onStoreLink,
+              ),
+              const Divider(height: 16, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
                 keyName: 'work-quick-buy',
                 icon: Icons.inventory_2_outlined,
-                label: 'Restock',
+                label: 'Buy stock',
                 onTap: onRestock,
                 detail: session.workspaceLowStockCount > 0
                     ? '${session.workspaceLowStockCount} low stock'
@@ -3676,7 +3726,7 @@ class _StoreActionEdge extends StatelessWidget {
               _StoreEdgeAction(
                 keyName: 'work-incoming-purchases',
                 icon: Icons.local_shipping_outlined,
-                label: 'Track stock',
+                label: 'Track purchases',
                 onTap: onPurchases,
                 detail: session.workspaceIncomingPurchaseCount > 0
                     ? session.workspacePurchasesComplete
@@ -3688,7 +3738,7 @@ class _StoreActionEdge extends StatelessWidget {
               _StoreEdgeAction(
                 keyName: 'work-quick-group-buy',
                 icon: Icons.groups_2_outlined,
-                label: 'Group Bulk Buying',
+                label: 'Buy together',
                 onTap: onGroup,
                 detail: deal == null
                     ? session.workspaceGroupOffersConnected
@@ -3700,6 +3750,34 @@ class _StoreActionEdge extends StatelessWidget {
                 progress: deal == null || deal.targetQuantity <= 0
                     ? null
                     : (deal.securedQuantity / deal.targetQuantity).clamp(0, 1),
+              ),
+              const Divider(height: 16, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
+                keyName: 'work-quick-add-products',
+                icon: Icons.add_box_outlined,
+                label: 'Add products',
+                onTap: onAddProducts,
+              ),
+              const Divider(height: 16, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
+                keyName: 'work-quick-create-offer',
+                icon: Icons.local_offer_outlined,
+                label: 'Create offer',
+                onTap: onCreateOffer,
+              ),
+              const Divider(height: 16, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
+                keyName: 'work-quick-promote-store',
+                icon: Icons.campaign_outlined,
+                label: 'Promote store',
+                onTap: onPromote,
+              ),
+              const Divider(height: 16, indent: 16, endIndent: 16),
+              _StoreEdgeAction(
+                keyName: 'work-quick-requirement',
+                icon: Icons.post_add_rounded,
+                label: 'Post requirement',
+                onTap: onRequirement,
               ),
             ],
           ),
@@ -3737,7 +3815,10 @@ class _StoreEdgeAction extends StatelessWidget {
       child: ConstrainedBox(
         constraints: const BoxConstraints(minHeight: 64, minWidth: 48),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+          padding: EdgeInsets.symmetric(
+            horizontal: 4,
+            vertical: MediaQuery.textScalerOf(context).scale(11) > 16 ? 2 : 8,
+          ),
           child: Column(
             children: [
               DecoratedBox(
@@ -3745,15 +3826,25 @@ class _StoreEdgeAction extends StatelessWidget {
                   color: MoolColors.navy.withValues(alpha: .06),
                   borderRadius: BorderRadius.circular(7),
                 ),
-                child: Icon(icon, size: 25, color: MoolColors.navy),
+                child: Icon(
+                  icon,
+                  size: MediaQuery.textScalerOf(context).scale(11) > 16
+                      ? 18
+                      : 25,
+                  color: MoolColors.navy,
+                ),
               ),
-              const SizedBox(height: 7),
+              SizedBox(
+                height: MediaQuery.textScalerOf(context).scale(11) > 16 ? 2 : 7,
+              ),
               Text(
                 label,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
-                  height: 1.3,
+                  height: MediaQuery.textScalerOf(context).scale(11) > 16
+                      ? 1.1
+                      : 1.3,
                   fontWeight: FontWeight.w700,
                   color: MoolColors.navy,
                 ),
@@ -3877,96 +3968,6 @@ class _StoreAdaptiveRail extends StatelessWidget {
       },
     );
   }
-}
-
-class _StoreReachStrip extends StatelessWidget {
-  const _StoreReachStrip({
-    required this.onLink,
-    required this.onPromote,
-    required this.onRequirement,
-  });
-  final VoidCallback onLink, onPromote, onRequirement;
-
-  @override
-  Widget build(BuildContext context) => Material(
-    key: const Key('work-store-reach-strip'),
-    color: const Color(0xFFF2F4FF),
-    child: DecoratedBox(
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFE5E8F1))),
-      ),
-      child: _StoreAdaptiveRail(
-        labels: const ['Send store link', 'Promote store', 'Post requirement'],
-        normalFlex: const [10, 10, 13],
-        builder: (flex) => IntrinsicHeight(
-          child: Row(
-            children: [
-              _action(
-                'work-quick-store-link',
-                Icons.link_rounded,
-                'Send store link',
-                onLink,
-                flex[0],
-              ),
-              const VerticalDivider(width: 1, indent: 12, endIndent: 12),
-              _action(
-                'work-quick-promote',
-                Icons.campaign_outlined,
-                'Promote store',
-                onPromote,
-                flex[1],
-              ),
-              const VerticalDivider(width: 1, indent: 12, endIndent: 12),
-              _action(
-                'work-quick-requirement',
-                Icons.post_add_rounded,
-                'Post requirement',
-                onRequirement,
-                flex[2],
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
-
-  Widget _action(
-    String key,
-    IconData icon,
-    String label,
-    VoidCallback onTap,
-    int flex,
-  ) => Expanded(
-    flex: flex,
-    child: InkWell(
-      key: Key(key),
-      onTap: onTap,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(minHeight: 52),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 19, color: MoolColors.navy),
-              const SizedBox(height: 4),
-              Text(
-                label,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 11,
-                  height: 1.25,
-                  fontWeight: FontWeight.w700,
-                  color: MoolColors.navy,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 class _StoreLiveBusinessPulse extends StatelessWidget {
@@ -4801,10 +4802,16 @@ class _IncomingOrderActivityCard extends StatelessWidget {
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              padding: EdgeInsets.symmetric(
+                horizontal: MediaQuery.textScalerOf(context).scale(11) > 16
+                    ? 2
+                    : 12,
+                vertical: 2,
+              ),
               color: const Color(0xFFF3F5FD),
               child: _StoreScaledPair(
                 gap: 5,
+                forceStack: MediaQuery.sizeOf(context).width < 360,
                 first: Row(
                   children: [
                     const Icon(Icons.circle, size: 5, color: MoolColors.navy),
@@ -7611,7 +7618,9 @@ class _StoreReadyActivity extends StatelessWidget {
         !session.workspaceVisibleToCustomers;
     return SingleChildScrollView(
       key: const Key('work-activity-ready'),
-      padding: const EdgeInsets.all(18),
+      padding: EdgeInsets.all(
+        MediaQuery.textScalerOf(context).scale(11) > 16 ? 4 : 18,
+      ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
