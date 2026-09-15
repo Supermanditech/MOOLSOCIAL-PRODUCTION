@@ -3116,6 +3116,15 @@ class SecureWorkLedgerCheckpointStore implements WorkLedgerCheckpointStore {
       }
       if (current != null) {
         final previous = current.finance;
+        if (current.purchaseReceipts.entries.any(
+          (entry) =>
+              checkpoint.purchaseReceipts[entry.key]?.canFollow(entry.value) !=
+              true,
+        )) {
+          throw const WorkGatewayException(
+            'Confirmed receipt history cannot be replaced or discarded.',
+          );
+        }
         if (current.moneyRegisters.entries.any(
           (entry) =>
               checkpoint.moneyRegisters[entry.key]?.canFollow(entry.value) !=

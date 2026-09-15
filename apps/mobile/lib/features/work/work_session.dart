@@ -333,6 +333,8 @@ class _StoreOperationalData {
   WorkspaceInventoryLedger? ledgerInventory;
   Map<String, WorkspaceOrderRecord> ledgerBilledOrders = const {};
   Map<String, WorkspaceCustomerInvoice> ledgerBilledInvoices = const {};
+  Map<String, WorkspaceConfirmedPurchaseReceipt> ledgerPurchaseReceipts =
+      const {};
   bool ledgerRecovered = false;
   Future<bool>? ledgerRecovery;
   bool collectionMayHaveSubmitted = false;
@@ -2418,6 +2420,7 @@ class WorkSession extends ChangeNotifier {
         inventory: _captureLedgerInventory(data),
         billedOrders: Map.unmodifiable(bills),
         billedInvoices: Map.unmodifiable(invoices),
+        purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
@@ -2589,6 +2592,39 @@ class WorkSession extends ChangeNotifier {
         }
         data.ledgerBilledOrders = saved.billedOrders;
         data.ledgerBilledInvoices = saved.billedInvoices;
+        final receipts = {...saved.purchaseReceipts};
+        if (canLoadStoreReviewSeed && saved.inventory != null) {
+          for (final purchase in data.purchases.values) {
+            if (receipts.containsKey(purchase.shipmentId)) continue;
+            final legacy = _legacyReviewReceipt(purchase, saved.inventory!);
+            if (legacy != null) receipts[purchase.shipmentId] = legacy;
+          }
+        }
+        final restoredReceipts = <String, WorkspacePurchaseRecord>{};
+        for (final receipt in receipts.values) {
+          final currentPurchase = data.purchases[receipt.shipmentId];
+          if (currentPurchase == null) continue;
+          if (!receipt.belongsTo(currentPurchase)) {
+            throw StateError('Saved receipt conflicts with purchase identity.');
+          }
+          final currentReceipt = WorkspaceConfirmedPurchaseReceipt.fromPurchase(
+            currentPurchase,
+          );
+          if (currentReceipt.valid && currentReceipt.canFollow(receipt)) {
+            continue;
+          }
+          if (currentReceipt.valid && !receipt.canFollow(currentReceipt)) {
+            throw StateError(
+              'Saved receipt conflicts with current confirmation.',
+            );
+          }
+          restoredReceipts[receipt.shipmentId] = receipt.applyTo(
+            currentPurchase,
+          );
+        }
+        data.ledgerPurchaseReceipts = Map.unmodifiable(receipts);
+        data.purchases.addAll(restoredReceipts);
+        data.purchaseLastRecords.addAll(restoredReceipts);
         for (final register in saved.moneyRegisters.values) {
           final key = (register.accountScope, register.registerId);
           final current = data.moneyRegisters[key];
@@ -2665,6 +2701,108 @@ class WorkSession extends ChangeNotifier {
       return false;
     } finally {
       data.ledgerRecovery = null;
+    }
+  }
+
+  // Older review APKs saved the confirmed receipt in the stock journal's
+  // exact operation identity/reason, but omitted a separate receipt snapshot.
+  // Recover only that known single-line, one-unit-per-pack review format.
+  // Neither editable counts nor an unexplained stock balance is evidence.
+  WorkspaceConfirmedPurchaseReceipt? _legacyReviewReceipt(
+    WorkspacePurchaseRecord purchase,
+    WorkspaceInventoryLedger inventory,
+  ) {
+    if (!canLoadStoreReviewSeed ||
+        purchase.lines.length != 1 ||
+        inventory.accountScope != purchase.accountScope ||
+        inventory.workspaceId != purchase.workspaceId) {
+      return null;
+    }
+    final line = purchase.lines.single;
+    final reference = jsonEncode([
+      'purchase-receipt',
+      purchase.accountScope,
+      purchase.workspaceId,
+      purchase.supplierId,
+      purchase.orderId,
+      purchase.shipmentId,
+      line.id,
+    ]);
+    final movements = inventory.movements
+        .where(
+          (movement) =>
+              movement.referenceKind ==
+                  WorkspaceStockReferenceKind.supplierReceipt &&
+              movement.referenceId == reference &&
+              movement.kind == WorkspaceStockMovementKind.goodsReceived,
+        )
+        .toList();
+    if (movements.isEmpty) return null;
+    try {
+      int revision(WorkspaceStockMovement movement) {
+        final id = jsonDecode(movement.id);
+        if (id is! List ||
+            id.length != 2 ||
+            id[0] != reference ||
+            id[1] is! int ||
+            (id[1] as int) <= 0) {
+          throw const FormatException(
+            'Unrecognized historical receipt identity',
+          );
+        }
+        return id[1] as int;
+      }
+
+      movements.sort((a, b) => revision(a).compareTo(revision(b)));
+      var received = 0;
+      var lastRevision = 0;
+      String? receiptReference;
+      DateTime? confirmedAt;
+      final pattern = RegExp(
+        '^Supplier receipt (TEST-${RegExp.escape(purchase.shipmentId)}-[0-9]+): ([0-9]+) packs × 1 units\$',
+      );
+      for (final movement in movements) {
+        final match = pattern.firstMatch(movement.reason);
+        if (match == null ||
+            movement.productId != line.productId ||
+            movement.quantityDelta <= 0 ||
+            revision(movement) <= lastRevision ||
+            (confirmedAt != null &&
+                movement.occurredAt.isBefore(confirmedAt))) {
+          return null;
+        }
+        received += movement.quantityDelta;
+        if (int.parse(match[2]!) != received || received > line.orderedPacks) {
+          return null;
+        }
+        lastRevision = revision(movement);
+        receiptReference = match[1];
+        confirmedAt = movement.occurredAt;
+      }
+      return WorkspaceConfirmedPurchaseReceipt(
+        accountScope: purchase.accountScope,
+        workspaceId: purchase.workspaceId,
+        supplierId: purchase.supplierId,
+        orderId: purchase.orderId,
+        shipmentId: purchase.shipmentId,
+        purchaseId: purchase.purchaseId,
+        revision: lastRevision,
+        reference: receiptReference!,
+        confirmedAt: confirmedAt!,
+        lines: [
+          WorkspacePurchaseLine(
+            id: line.id,
+            productId: line.productId,
+            name: line.name,
+            pack: line.pack,
+            orderedPacks: line.orderedPacks,
+            unitPriceMinor: line.unitPriceMinor,
+            receivedPacks: received,
+          ),
+        ],
+      );
+    } catch (_) {
+      return null;
     }
   }
 
@@ -2825,6 +2963,7 @@ class WorkSession extends ChangeNotifier {
           inventory: inventory,
           billedOrders: data.ledgerBilledOrders,
           billedInvoices: data.ledgerBilledInvoices,
+          purchaseReceipts: data.ledgerPurchaseReceipts,
           supplierLedgers: _supplierLedgerCheckpointEntries(data),
           moneyRegisters: _moneyRegisterCheckpointEntries(data),
           expenses: _expenseCheckpointEntries(data),
@@ -2895,6 +3034,7 @@ class WorkSession extends ChangeNotifier {
         inventory: nextInventory,
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
@@ -3021,6 +3161,7 @@ class WorkSession extends ChangeNotifier {
           inventory: data.ledgerInventory,
           billedOrders: data.ledgerBilledOrders,
           billedInvoices: data.ledgerBilledInvoices,
+          purchaseReceipts: data.ledgerPurchaseReceipts,
           supplierLedgers: _supplierLedgerCheckpointEntries(data),
           moneyRegisters: _moneyRegisterCheckpointEntries(data),
           expenses: _expenseCheckpointEntries(data),
@@ -3097,6 +3238,7 @@ class WorkSession extends ChangeNotifier {
         inventory: data.ledgerInventory,
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
@@ -3222,6 +3364,7 @@ class WorkSession extends ChangeNotifier {
           inventory: data.ledgerInventory,
           billedOrders: data.ledgerBilledOrders,
           billedInvoices: data.ledgerBilledInvoices,
+          purchaseReceipts: data.ledgerPurchaseReceipts,
           supplierLedgers: _supplierLedgerCheckpointEntries(data),
           moneyRegisters: _moneyRegisterCheckpointEntries(data),
           expenses: _expenseCheckpointEntries(data),
@@ -3299,6 +3442,7 @@ class WorkSession extends ChangeNotifier {
         inventory: data.ledgerInventory,
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
@@ -3377,6 +3521,27 @@ class WorkSession extends ChangeNotifier {
     }
     final sameAccount = data.purchaseAccountScope == accountScope;
     if (sameAccount && feedRevision <= data.purchaseFeedRevision) return false;
+    final reconciled = <WorkspacePurchaseRecord>[];
+    for (final record in records) {
+      final saved = data.ledgerPurchaseReceipts[record.shipmentId];
+      if (saved == null || !sameAccount) {
+        reconciled.add(record);
+        continue;
+      }
+      if (!saved.belongsTo(record)) return false;
+      final incoming = WorkspaceConfirmedPurchaseReceipt.fromPurchase(record);
+      if (incoming.valid &&
+          !incoming.canFollow(saved) &&
+          !saved.canFollow(incoming)) {
+        return false;
+      }
+      reconciled.add(
+        incoming.valid && incoming.canFollow(saved)
+            ? record
+            : saved.applyTo(record),
+      );
+    }
+    records = reconciled;
     final previous = sameAccount
         ? data.purchaseLastRecords
         : <String, WorkspacePurchaseRecord>{};
@@ -3573,6 +3738,7 @@ class WorkSession extends ChangeNotifier {
         inventory: _captureLedgerInventory(data),
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: Map.unmodifiable({
@@ -3660,6 +3826,7 @@ class WorkSession extends ChangeNotifier {
         inventory: _captureLedgerInventory(data),
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
         moneyRegisters: Map.unmodifiable({
@@ -3784,6 +3951,7 @@ class WorkSession extends ChangeNotifier {
         inventory: _captureLedgerInventory(data),
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: data.ledgerPurchaseReceipts,
         supplierLedgers: Map.unmodifiable({
           ..._supplierLedgerCheckpointEntries(data),
           ledger.supplierId: ledger,
@@ -3975,12 +4143,18 @@ class WorkSession extends ChangeNotifier {
     WorkspaceSupplierReturnConfirmation? returned,
   }) async {
     final data = _storeData;
+    final expectedPurchase = data.purchases[purchase.shipmentId];
     bool current() =>
         !_disposed &&
         identical(data, _storeData) &&
         _receiptCurrent(purchase) &&
-        identical(data.purchases[purchase.shipmentId], purchase);
+        identical(data.purchases[purchase.shipmentId], expectedPurchase);
     if (!current() ||
+        expectedPurchase == null ||
+        !WorkspaceConfirmedPurchaseReceipt.fromPurchase(
+          purchase,
+        ).belongsTo(expectedPurchase) ||
+        purchase.revision < expectedPurchase.revision ||
         (returned != null && !returned.belongsTo(purchase)) ||
         !{
           WorkspaceReceiptState.partial,
@@ -4127,10 +4301,24 @@ class WorkSession extends ChangeNotifier {
           ),
         );
       }
-      if (movements.isEmpty) {
-        return true;
+      final priorReceipt = data.ledgerPurchaseReceipts[purchase.shipmentId];
+      // Returning goods does not reconfirm their receipt or adopt a newer
+      // purchase-feed timestamp as the original receipt confirmation time.
+      final receipt = returned != null && priorReceipt != null
+          ? priorReceipt
+          : WorkspaceConfirmedPurchaseReceipt.fromPurchase(purchase);
+      if (!receipt.valid ||
+          !receipt.belongsTo(purchase) ||
+          (priorReceipt != null && !receipt.canFollow(priorReceipt))) {
+        return false;
       }
-      final next = inventory.post(movements, at: now);
+      final receiptChanged =
+          priorReceipt == null ||
+          jsonEncode(receipt.toJson()) != jsonEncode(priorReceipt.toJson());
+      if (movements.isEmpty && !receiptChanged) return true;
+      final next = movements.isEmpty
+          ? inventory
+          : inventory.post(movements, at: now);
       if (next == null) {
         return false;
       }
@@ -4140,6 +4328,10 @@ class WorkSession extends ChangeNotifier {
         inventory: next,
         billedOrders: data.ledgerBilledOrders,
         billedInvoices: data.ledgerBilledInvoices,
+        purchaseReceipts: Map.unmodifiable({
+          ...data.ledgerPurchaseReceipts,
+          purchase.shipmentId: receipt,
+        }),
         supplierLedgers: _supplierLedgerCheckpointEntries(data),
         moneyRegisters: _moneyRegisterCheckpointEntries(data),
         expenses: _expenseCheckpointEntries(data),
@@ -4153,6 +4345,10 @@ class WorkSession extends ChangeNotifier {
         return false;
       }
       _restoreLedgerInventory(data, next);
+      data.ledgerPurchaseReceipts = checkpoint.purchaseReceipts;
+      final confirmedPurchase = receipt.applyTo(purchase);
+      data.purchases[purchase.shipmentId] = confirmedPurchase;
+      data.purchaseLastRecords[purchase.shipmentId] = confirmedPurchase;
       return true;
     } catch (_) {
       data.ledgerRecovered = false;
@@ -4181,7 +4377,9 @@ class WorkSession extends ChangeNotifier {
   Future<bool> confirmStoreReviewReceipt(
     WorkspacePurchaseRecord purchase,
   ) async {
-    if (!canConfirmStoreReviewReceipt(purchase)) {
+    if (!canConfirmStoreReviewReceipt(purchase) ||
+        !await recoverCustomerLedger() ||
+        !canConfirmStoreReviewReceipt(purchase)) {
       return false;
     }
     final key = _receiptKey(purchase);
@@ -4207,18 +4405,10 @@ class WorkSession extends ChangeNotifier {
           _scopedOrderOperations!.gateway as StoreReviewOrderGateway;
       final confirmed = StoreReviewReceiptGateway(
         adapter.seed,
-      ).confirm(purchase, draft);
+      ).confirm(_storeData.purchases[purchase.shipmentId]!, draft);
       if (confirmed == null) {
         _receiptMessages[key] =
             'Check the pack counts. Delivery issues need review before stock confirmation.';
-        return false;
-      }
-      if (!applyWorkspacePurchases(
-        accountScope: confirmed.accountScope,
-        storeId: confirmed.workspaceId,
-        feedRevision: _storeData.purchaseFeedRevision + 1,
-        records: [confirmed],
-      )) {
         return false;
       }
       final saved = await recordWorkspacePurchaseReceipt(

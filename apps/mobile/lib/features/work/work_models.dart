@@ -1670,6 +1670,7 @@ class WorkspaceLedgerCheckpoint {
     this.supplierLedgers = const {},
     this.expenses = const {},
     this.moneyRegisters = const {},
+    this.purchaseReceipts = const {},
   });
   final int revision;
   final WorkspaceFinanceSnapshot finance;
@@ -1679,12 +1680,20 @@ class WorkspaceLedgerCheckpoint {
   final Map<String, WorkspaceSupplierLedger> supplierLedgers;
   final Map<String, WorkspaceExpenseRecord> expenses;
   final Map<String, WorkspaceMoneyRegisterSnapshot> moneyRegisters;
+  final Map<String, WorkspaceConfirmedPurchaseReceipt> purchaseReceipts;
   final WorkspaceCustomerCollection? pending;
   final WorkspacePendingCustomerReturn? pendingReturn;
   final WorkspaceCustomerRefund? pendingRefund;
   bool get valid =>
       revision > 0 &&
       finance.valid &&
+      purchaseReceipts.entries.every(
+        (entry) =>
+            entry.key == entry.value.shipmentId &&
+            entry.value.valid &&
+            entry.value.accountScope == finance.accountScope &&
+            entry.value.workspaceId == finance.workspaceId,
+      ) &&
       moneyRegisters.entries.every(
         (entry) =>
             entry.key == entry.value.registerId &&
@@ -1819,6 +1828,10 @@ class WorkspaceLedgerCheckpoint {
   Map<String, Object?> toJson() => {
     'version': 1,
     if (inventory != null) 'inventory': inventory!.toJson(),
+    if (purchaseReceipts.isNotEmpty)
+      'purchaseReceipts': purchaseReceipts.map(
+        (id, receipt) => MapEntry(id, receipt.toJson()),
+      ),
     if (expenses.isNotEmpty)
       'expenses': expenses.map((id, expense) => MapEntry(id, expense.toJson())),
     if (moneyRegisters.isNotEmpty)
@@ -1948,6 +1961,13 @@ class WorkspaceLedgerCheckpoint {
       final pending = root['pending'] as Map?;
       final result = WorkspaceLedgerCheckpoint(
         revision: root['revision'] as int,
+        purchaseReceipts: Map.unmodifiable({
+          for (final entry
+              in ((root['purchaseReceipts'] as Map?) ?? const {}).entries)
+            entry.key as String: WorkspaceConfirmedPurchaseReceipt.fromJson(
+              entry.value,
+            )!,
+        }),
         moneyRegisters: Map.unmodifiable({
           for (final entry
               in ((root['moneyRegisters'] as Map?) ?? const {}).entries)
@@ -2665,6 +2685,223 @@ class WorkspacePurchaseLine {
 /// Versioned, read-only shipment facts. Link identities must come from an
 /// authenticated purchase adapter, never a display name or a URL parameter.
 /// Rendering a receipt does not post stock or authorize payment.
+/// Confirmed cumulative receipt facts saved atomically with their stock effect.
+/// This is separate from editable counts and from payment/delivery authority.
+class WorkspaceConfirmedPurchaseReceipt {
+  WorkspaceConfirmedPurchaseReceipt({
+    required this.accountScope,
+    required this.workspaceId,
+    required this.supplierId,
+    required this.orderId,
+    required this.shipmentId,
+    required this.purchaseId,
+    required this.revision,
+    required this.reference,
+    required this.confirmedAt,
+    required List<WorkspacePurchaseLine> lines,
+  }) : lines = List.unmodifiable(lines);
+
+  factory WorkspaceConfirmedPurchaseReceipt.fromPurchase(
+    WorkspacePurchaseRecord p,
+  ) => WorkspaceConfirmedPurchaseReceipt(
+    accountScope: p.accountScope,
+    workspaceId: p.workspaceId,
+    supplierId: p.supplierId,
+    orderId: p.orderId,
+    shipmentId: p.shipmentId,
+    purchaseId: p.purchaseId,
+    revision: p.revision,
+    reference: p.receiptReference ?? '',
+    confirmedAt: p.updatedAt,
+    lines: p.lines,
+  );
+
+  final String accountScope,
+      workspaceId,
+      supplierId,
+      orderId,
+      shipmentId,
+      reference;
+  final String? purchaseId;
+  final int revision;
+  final DateTime confirmedAt;
+  final List<WorkspacePurchaseLine> lines;
+
+  bool get valid =>
+      [
+        accountScope,
+        workspaceId,
+        supplierId,
+        orderId,
+        shipmentId,
+        reference,
+      ].every((value) => value.trim().isNotEmpty) &&
+      revision > 0 &&
+      lines.isNotEmpty &&
+      lines.map((line) => line.id).toSet().length == lines.length &&
+      lines.every(
+        (line) =>
+            line.valid &&
+            line.receivedPacks != null &&
+            line.receivedPacks! <= line.orderedPacks,
+      );
+
+  bool belongsTo(WorkspacePurchaseRecord p) =>
+      valid &&
+      p.valid &&
+      accountScope == p.accountScope &&
+      workspaceId == p.workspaceId &&
+      supplierId == p.supplierId &&
+      orderId == p.orderId &&
+      shipmentId == p.shipmentId &&
+      purchaseId == p.purchaseId &&
+      lines.length == p.lines.length &&
+      lines.every(
+        (line) => p.lines.any(
+          (other) =>
+              line.id == other.id &&
+              line.productId == other.productId &&
+              line.pack == other.pack &&
+              line.orderedPacks == other.orderedPacks &&
+              line.unitPriceMinor == other.unitPriceMinor,
+        ),
+      );
+
+  bool canFollow(WorkspaceConfirmedPurchaseReceipt old) =>
+      valid &&
+      old.valid &&
+      accountScope == old.accountScope &&
+      workspaceId == old.workspaceId &&
+      supplierId == old.supplierId &&
+      orderId == old.orderId &&
+      shipmentId == old.shipmentId &&
+      purchaseId == old.purchaseId &&
+      revision >= old.revision &&
+      !confirmedAt.isBefore(old.confirmedAt) &&
+      lines.length == old.lines.length &&
+      lines.every(
+        (line) => old.lines.any(
+          (prior) =>
+              line.id == prior.id &&
+              line.productId == prior.productId &&
+              line.pack == prior.pack &&
+              line.orderedPacks == prior.orderedPacks &&
+              line.unitPriceMinor == prior.unitPriceMinor &&
+              line.receivedPacks! >= prior.receivedPacks!,
+        ),
+      ) &&
+      (revision != old.revision ||
+          jsonEncode(toJson()) == jsonEncode(old.toJson()));
+
+  WorkspacePurchaseRecord applyTo(WorkspacePurchaseRecord p) {
+    if (!belongsTo(p)) {
+      throw StateError('Receipt identity conflicts with purchase');
+    }
+    return WorkspacePurchaseRecord(
+      accountScope: p.accountScope,
+      workspaceId: p.workspaceId,
+      supplierId: p.supplierId,
+      supplierName: p.supplierName,
+      orderId: p.orderId,
+      shipmentId: p.shipmentId,
+      purchaseId: p.purchaseId,
+      procurementContext: p.procurementContext,
+      revision: p.revision > revision ? p.revision : revision,
+      createdAt: p.createdAt,
+      updatedAt: p.updatedAt.isAfter(confirmedAt) ? p.updatedAt : confirmedAt,
+      stage: p.stage,
+      amountMinor: p.amountMinor,
+      itemSummary: p.itemSummary,
+      paymentLabel: p.paymentLabel,
+      paymentTermLabel: p.paymentTermLabel,
+      balanceDueLabel: p.balanceDueLabel,
+      paymentMethod: p.paymentMethod,
+      purchaseOrderReference: p.purchaseOrderReference,
+      expectedArrival: p.expectedArrival,
+      address: p.address,
+      deliveryPartner: p.deliveryPartner,
+      trackingReference: p.trackingReference,
+      invoiceReference: p.invoiceReference,
+      receiptState:
+          lines.every((line) => line.receivedPacks == line.orderedPacks)
+          ? WorkspaceReceiptState.confirmed
+          : WorkspaceReceiptState.partial,
+      receiptReference: reference,
+      updateNote: p.updateNote,
+      lines: [
+        for (final line in p.lines)
+          WorkspacePurchaseLine(
+            id: line.id,
+            productId: line.productId,
+            name: line.name,
+            pack: line.pack,
+            orderedPacks: line.orderedPacks,
+            unitPriceMinor: line.unitPriceMinor,
+            receivedPacks: lines
+                .singleWhere((saved) => saved.id == line.id)
+                .receivedPacks,
+          ),
+      ],
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+    'accountScope': accountScope,
+    'workspaceId': workspaceId,
+    'supplierId': supplierId,
+    'orderId': orderId,
+    'shipmentId': shipmentId,
+    'purchaseId': purchaseId,
+    'revision': revision,
+    'reference': reference,
+    'confirmedAt': confirmedAt.toUtc().toIso8601String(),
+    'lines': [
+      for (final line in lines)
+        {
+          'id': line.id,
+          'productId': line.productId,
+          'name': line.name,
+          'pack': line.pack,
+          'orderedPacks': line.orderedPacks,
+          'unitPriceMinor': line.unitPriceMinor,
+          'receivedPacks': line.receivedPacks,
+        },
+    ],
+  };
+
+  static WorkspaceConfirmedPurchaseReceipt? fromJson(Object? value) {
+    try {
+      final raw = value as Map;
+      final result = WorkspaceConfirmedPurchaseReceipt(
+        accountScope: raw['accountScope'] as String,
+        workspaceId: raw['workspaceId'] as String,
+        supplierId: raw['supplierId'] as String,
+        orderId: raw['orderId'] as String,
+        shipmentId: raw['shipmentId'] as String,
+        purchaseId: raw['purchaseId'] as String?,
+        revision: raw['revision'] as int,
+        reference: raw['reference'] as String,
+        confirmedAt: DateTime.parse(raw['confirmedAt'] as String),
+        lines: [
+          for (final line in raw['lines'] as List)
+            WorkspacePurchaseLine(
+              id: line['id'] as String,
+              productId: line['productId'] as String,
+              name: line['name'] as String,
+              pack: line['pack'] as String,
+              orderedPacks: line['orderedPacks'] as int,
+              unitPriceMinor: line['unitPriceMinor'] as int,
+              receivedPacks: line['receivedPacks'] as int,
+            ),
+        ],
+      );
+      return result.valid ? result : null;
+    } catch (_) {
+      return null;
+    }
+  }
+}
+
 class WorkspacePurchaseRecord {
   WorkspacePurchaseRecord({
     required this.accountScope,

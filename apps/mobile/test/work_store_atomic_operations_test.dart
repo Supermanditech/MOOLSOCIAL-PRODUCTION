@@ -955,7 +955,14 @@ void main() {
         now: DateTime.utc(2026, 9, 14),
       );
       final native = _OrderJournalStorage();
-      WorkSession openStore() {
+      WorkSession openStore({bool refreshedClock = false}) {
+        final purchaseSeed = refreshedClock
+            ? StoreReviewSeed(
+                accountScope: seed.accountScope,
+                orderCount: 12,
+                now: DateTime.now().toUtc().add(const Duration(minutes: 1)),
+              )
+            : seed;
         final session = WorkSession(
           gateway: ReviewWorkGateway(),
           pendingProofStore: _CommandAccountStore(),
@@ -973,7 +980,7 @@ void main() {
             accountScope: seed.accountScope,
             storeId: seed.storeId,
             feedRevision: 1,
-            records: seed.purchases,
+            records: purchaseSeed.purchases,
             complete: true,
           ),
           isTrue,
@@ -1021,6 +1028,33 @@ void main() {
         problems: const {},
         note: 'Four test packs counted',
       );
+      native.failWrite = true;
+      expect(await session.confirmStoreReviewReceipt(purchase), isFalse);
+      expect(
+        session.workspacePurchases.first.receiptState,
+        purchase.receiptState,
+      );
+      expect(
+        session.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock,
+      );
+      native.failWrite = false;
+      native.loseWriteResponseOnce = true;
+      expect(await session.confirmStoreReviewReceipt(purchase), isFalse);
+      expect(
+        session.workspacePurchases.first.receiptState,
+        purchase.receiptState,
+      );
+      expect(await session.recoverCustomerLedger(), isTrue);
+      expect(
+        session.workspacePurchases.first.receiptState,
+        WorkspaceReceiptState.partial,
+      );
+      expect(
+        session.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 4,
+      );
+      expect(session.workspaceStockMovements.length, 1);
       expect(await session.confirmStoreReviewReceipt(purchase), isTrue);
       final updated = session.workspacePurchases.singleWhere(
         (item) => item.shipmentId == purchase.shipmentId,
@@ -1033,9 +1067,45 @@ void main() {
       expect(await session.confirmStoreReviewReceipt(updated), isTrue);
       expect(session.workspaceStockMovements.length, 1);
       final reopened = openStore();
+      expect(await reopened.recoverCustomerLedger(), isTrue);
       final restoredPurchase = reopened.workspacePurchases.singleWhere(
         (item) => item.shipmentId == purchase.shipmentId,
       );
+      expect(restoredPurchase.receiptState, WorkspaceReceiptState.partial);
+      expect(restoredPurchase.receiptReference, updated.receiptReference);
+      expect(restoredPurchase.lines.single.receivedPacks, 4);
+      final refreshed = WorkspacePurchaseRecord(
+        accountScope: purchase.accountScope,
+        workspaceId: purchase.workspaceId,
+        supplierId: purchase.supplierId,
+        supplierName: purchase.supplierName,
+        orderId: purchase.orderId,
+        shipmentId: purchase.shipmentId,
+        purchaseId: purchase.purchaseId,
+        revision: updated.revision + 10,
+        createdAt: purchase.createdAt,
+        updatedAt: DateTime.now().toUtc(),
+        stage: WorkspaceSupplyStage.arriving,
+        amountMinor: purchase.amountMinor,
+        itemSummary: purchase.itemSummary,
+        paymentLabel: purchase.paymentLabel,
+        lines: purchase.lines,
+      );
+      expect(
+        reopened.applyWorkspacePurchases(
+          accountScope: seed.accountScope,
+          storeId: seed.storeId,
+          feedRevision: 2,
+          records: [refreshed],
+        ),
+        isTrue,
+      );
+      final refreshedPurchase = reopened.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      expect(refreshedPurchase.receiptState, WorkspaceReceiptState.partial);
+      expect(refreshedPurchase.lines.single.receivedPacks, 4);
+      expect(refreshedPurchase.stage, WorkspaceSupplyStage.arriving);
       await reopened.loadWorkspaceReceiptDraft(restoredPurchase);
       expect(
         reopened
@@ -1077,9 +1147,12 @@ void main() {
       );
       expect(reopened.workspaceStockMovements.length, 2);
       final afterReturn = openStore();
+      expect(await afterReturn.recoverCustomerLedger(), isTrue);
       final returnPurchase = afterReturn.workspacePurchases.singleWhere(
         (item) => item.shipmentId == purchase.shipmentId,
       );
+      expect(returnPurchase.receiptState, WorkspaceReceiptState.partial);
+      expect(returnPurchase.lines.single.receivedPacks, 4);
       await afterReturn.loadWorkspaceReceiptDraft(returnPurchase);
       final retained = afterReturn.workspaceReceiptDraft(returnPurchase)!;
       expect(retained.counted(purchase.lines.single.id), 4);
@@ -1131,6 +1204,93 @@ void main() {
           finance: reopened.workspaceFinance!,
         ).toJson(),
         WorkspaceLedgerCheckpoint(revision: 1, finance: seed.finance).toJson(),
+      );
+      // Reproduce a pre-fix checkpoint, keeping the original stock journal and
+      // changing the editable counts so they cannot stand in for confirmation.
+      final checkpointStore = SecureWorkLedgerCheckpointStore(
+        accountScope: () => seed.accountScope,
+        storage: native,
+      );
+      final savedReceiptCheckpoint = (await checkpointStore.read(
+        seed.accountScope,
+        seed.storeId,
+      ))!;
+      final droppedReceipt = savedReceiptCheckpoint.toJson()
+        ..remove('purchaseReceipts')
+        ..['revision'] = savedReceiptCheckpoint.revision + 1;
+      await expectLater(
+        checkpointStore.save(
+          WorkspaceLedgerCheckpoint.fromJson(droppedReceipt)!,
+          expectedRevision: savedReceiptCheckpoint.revision,
+        ),
+        throwsA(isA<WorkGatewayException>()),
+      );
+      expect(
+        (await checkpointStore.read(seed.accountScope, seed.storeId))!.revision,
+        savedReceiptCheckpoint.revision,
+      );
+      final invalidReceipt = savedReceiptCheckpoint.toJson();
+      final receiptMap = invalidReceipt['purchaseReceipts'] as Map;
+      (receiptMap.values.first as Map)['accountScope'] = 'another-account';
+      expect(WorkspaceLedgerCheckpoint.fromJson(invalidReceipt), isNull);
+      var legacyCheckpoints = 0;
+      for (final entry in native.values.entries.toList()) {
+        final value = jsonDecode(entry.value);
+        if (value is Map<String, dynamic> &&
+            value.containsKey('purchaseReceipts')) {
+          value.remove('purchaseReceipts');
+          native.values[entry.key] = jsonEncode(value);
+          legacyCheckpoints++;
+        }
+      }
+      expect(legacyCheckpoints, 1);
+      await afterReturn.saveWorkspaceReceiptDraft(
+        latest,
+        countedPacks: {purchase.lines.single.id: '2'},
+        returnedPacks: {purchase.lines.single.id: '1'},
+        problems: const {},
+        note: 'Unconfirmed edit',
+      );
+      final legacy = openStore();
+      expect(await legacy.recoverCustomerLedger(), isTrue);
+      final legacyPurchase = legacy.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      expect(legacyPurchase.receiptState, WorkspaceReceiptState.partial);
+      expect(legacyPurchase.lines.single.receivedPacks, 4);
+      expect(
+        legacy.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 3,
+      );
+      expect(legacy.workspaceStockMovements.length, 2);
+      await legacy.loadWorkspaceReceiptDraft(legacyPurchase);
+      expect(
+        legacy
+            .workspaceReceiptDraft(legacyPurchase)!
+            .counted(purchase.lines.single.id),
+        2,
+      );
+      final freshClock = openStore(refreshedClock: true);
+      expect(await freshClock.recoverCustomerLedger(), isTrue);
+      final directReturnPurchase = freshClock.workspacePurchases.singleWhere(
+        (item) => item.shipmentId == purchase.shipmentId,
+      );
+      await freshClock.loadWorkspaceReceiptDraft(directReturnPurchase);
+      await freshClock.saveWorkspaceReceiptDraft(
+        directReturnPurchase,
+        countedPacks: {purchase.lines.single.id: '4'},
+        returnedPacks: {purchase.lines.single.id: '2'},
+        problems: const {},
+        note: 'Return directly after reopening',
+      );
+      expect(
+        await freshClock.confirmStoreReviewSupplierReturn(directReturnPurchase),
+        isTrue,
+        reason: freshClock.workspaceReceiptDraftMessage(directReturnPurchase),
+      );
+      expect(
+        freshClock.workspaceCatalogueItems.first.stock,
+        seed.products.first.stock + 2,
       );
     },
   );

@@ -1726,3 +1726,64 @@ acceptance, changed-content rejection and predecessor-source rejection. These
 remain disclosed review exceptions, not production security acceptance.
 V24 creation, exact-candidate validation, build and OPPO qualification remain
 pending; this metadata seal does not satisfy them.
+
+### STORE-LEDGER-02-C02 — Confirmed receipt recovery
+
+V24 049c0f1346d1ed565145cf223c3e236982b2d03e completed both candidate
+regression cycles (2607 passed, 83 skipped, zero failures each), 14 Ledger
+capture tests and its guarded APK build. OPPO installed artifact SHA-256
+66CBD64EDB607562CFF83B826A6038D78F027E24CE32BC1C3BEAC77BC51D9AD4,
+version 1.0.0-r66.28-runtime / 2026091502, matches the verified artifact.
+Its initial purchase-scroll/Sell/Orders replay did not reproduce C01.
+
+V24 is not qualified: after retained Store reopening, QA-PURCHASE-2 displayed
+Received not confirmed while its draft retained 19 and stock retained 10019.
+No receipt was reposted on OPPO. Its pre-update backup and exact XML/screenshot
+evidence remain in outputs/store-ledger-mvp and work outside Git.
+
+Receipt confirmation applies a purchase projection in memory, while the Ledger
+checkpoint persists inventory without confirmed receipt facts. The existing
+connected-receipt reopen test re-confirmed its draft before checking stock.
+It therefore did not cover status restoration before replay. Added assertions
+require recovered partial status, receipt reference and four received packs
+before confirmation; all existing stock/return/expense assertions remain.
+ledger02-c02-red.jsonl reproduces expected partial versus actual unavailable.
+
+Correction and successor qualification remain pending. Required coverage is
+atomic confirmed-receipt/stock persistence, scoped recovery, preserved historical
+data, no duplicated receipt/return effects and truthful incomplete legacy state.
+Do not infer a confirmed receipt from an editable draft or reset the test Store.
+
+The initial correction adds scoped confirmed-receipt facts to the existing
+Ledger checkpoint, preserves them in each Ledger write, rejects removal or
+regression of saved receipts, and restores them against matching purchase lines.
+Receipt status is published only after the checkpoint stock/receipt save succeeds.
+ledger02-c02-green-atomic.jsonl passes the strengthened reopen/replay/return test.
+This focused pass is not full qualification. Legacy checkpoints without receipt
+facts, failure/recovery controls, refreshed purchase feeds and broader regression
+coverage remain to be checked before sealing any successor.
+
+The compatibility and failure checks now cover the known legacy single-line
+review receipt journal, edited drafts, failed writes, lost write replies,
+forbidden history removal/account changes and refreshed purchase feeds. The
+normal Ledger selection passed 68 tests. Running the broader selection with
+review flags produced 11 setup failures, identical by test name/error on unchanged
+V24; both original-versus-corrected logs remain preserved, not counted as passes.
+Analysis-r2 had zero issues; the first full correction regression passed
+2607/83/0 and its four Ledger02/03 capture tests passed.
+
+Review then added a newer-seed-clock/direct-return case without re-confirming
+receipt. ledger02-c02-direct-return-red.jsonl reproduced rejection because the
+return path recaptured purchase updatedAt as receipt confirmedAt. The correction
+now retains the saved receipt facts during return; direct-return-green.jsonl
+passes. Revalidate this exact final source before sealing. OPPO remains on V24;
+no corrected successor installation or founder acceptance is claimed.
+
+Final-source analysis-r3 passed with zero issues. Full-regression-r2 passed
+2607 tests with 83 unchanged skips and zero failures; all 56 replacement checks
+passed. Its SHA-256 is
+8C02D0FECBEB530B66B34A7F0ABEF5A50D2DBD1FA44EBAF406700A7428E9D340.
+Captures-r2 passed four tests; current Flutter captures are preserved under
+store-ledger02-c02-20260915-r2 in the external audit directory. Supplier-return
+normal and supplier-payment compact captures were inspected. These remain local
+evidence, not OPPO or founder acceptance. Original failed logs are preserved.
