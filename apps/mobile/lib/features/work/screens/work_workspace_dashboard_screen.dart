@@ -1114,7 +1114,10 @@ class _WorkWorkspaceDashboardScreenState
                 ),
               ],
             ),
-            body: SafeArea(child: counterSurface(true)),
+            body: SafeArea(
+              maintainBottomViewPadding: true,
+              child: counterSurface(true),
+            ),
           ),
         ),
       );
@@ -3725,17 +3728,91 @@ class _StoreControlDashboard extends StatelessWidget {
               !collection) {
             return desk;
           }
-          final content = Column(
-            children: [
-              _StoreLiveBusinessPulse(
-                session: session,
-                onOrders: () => _navigate(onCustomers),
-                onSales: () => _navigate(onMoney),
-                onStock: () => _navigate(onStock),
-                onSettlement: () => _navigate(
-                  () => onOpenOperation(_WorkspaceOperation.payments),
+          final pulse = _StoreLiveBusinessPulse(
+            session: session,
+            onOrders: () => _navigate(onCustomers),
+            onSales: () => _navigate(onMoney),
+            onStock: () => _navigate(onStock),
+            onSettlement: () =>
+                _navigate(() => onOpenOperation(_WorkspaceOperation.payments)),
+          );
+          final actions = _StoreActionEdge(
+            session: session,
+            onCounterSale: onNewSale,
+            onStoreLink: () => _navigate(onDeliverOrder),
+            onAddProducts: () => _navigate(onAddProducts),
+            onCreateOffer: () => _navigate(onGrow),
+            onPromote: () => _navigate(onPromote),
+            onRequirement: () =>
+                _navigate(() => onOpenOperation(_WorkspaceOperation.paidWork)),
+            onRestock: () => _navigate(onBuyStock),
+            onPurchases: () =>
+                _navigate(() => onOpenOperation(_WorkspaceOperation.sourcing)),
+            onGroup: () => _navigate(
+              () => onOpenOperation(_WorkspaceOperation.groupBuying),
+            ),
+          );
+          if (workingCentre != null) {
+            final keyboard = View.of(context).viewInsets.bottom > 0;
+            final height = enlarged && !keyboard
+                ? constraints.maxHeight.clamp(1260.0, double.infinity)
+                : constraints.maxHeight;
+            // Keep the editor under the same parents when keyboard space changes.
+            // Reparenting the focused field can detach its active input connection.
+            return SingleChildScrollView(
+              key: const Key('work-active-counter-layout'),
+              child: SizedBox(
+                height: height,
+                child: Column(
+                  children: [
+                    Offstage(offstage: keyboard, child: pulse),
+                    Expanded(
+                      child: Flex(
+                        direction: enlarged ? Axis.vertical : Axis.horizontal,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Expanded(child: desk),
+                          Offstage(
+                            offstage: keyboard,
+                            child: SizedBox(
+                              height: enlarged ? 440 : null,
+                              child: actions,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
               ),
+            );
+          }
+          // Enlarged text needs a full-width order area. All actions remain
+          // available below it, without squeezing collection QR or word shapes.
+          if (enlarged) {
+            return SingleChildScrollView(
+              key: const Key('work-dashboard-enlarged-scroll'),
+              child: Column(
+                children: [
+                  pulse,
+                  if (session.workspaceDashboardState !=
+                      WorkspaceDashboardState.ready)
+                    _DashboardSyncBanner(session: session),
+                  SizedBox(height: collection ? 1260 : 760, child: desk),
+                  SizedBox(
+                    height: 440,
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: actions,
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+          final content = Column(
+            children: [
+              pulse,
               if (session.workspaceDashboardState !=
                   WorkspaceDashboardState.ready)
                 _DashboardSyncBanner(session: session),
@@ -3744,24 +3821,7 @@ class _StoreControlDashboard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Expanded(child: desk),
-                    _StoreActionEdge(
-                      session: session,
-                      onCounterSale: onNewSale,
-                      onStoreLink: () => _navigate(onDeliverOrder),
-                      onAddProducts: () => _navigate(onAddProducts),
-                      onCreateOffer: () => _navigate(onGrow),
-                      onPromote: () => _navigate(onPromote),
-                      onRequirement: () => _navigate(
-                        () => onOpenOperation(_WorkspaceOperation.paidWork),
-                      ),
-                      onRestock: () => _navigate(onBuyStock),
-                      onPurchases: () => _navigate(
-                        () => onOpenOperation(_WorkspaceOperation.sourcing),
-                      ),
-                      onGroup: () => _navigate(
-                        () => onOpenOperation(_WorkspaceOperation.groupBuying),
-                      ),
-                    ),
+                    actions,
                   ],
                 ),
               ),
@@ -24984,7 +25044,7 @@ class _CounterOrderSurfaceState extends State<_CounterOrderSurface> {
           final minimumWorkingHeight = products.isEmpty
               ? scaledLine * 4 + 190
               : scaledLine * 8 + 160;
-          if (constraints.maxHeight < minimumWorkingHeight) {
+          if (error != null || constraints.maxHeight < minimumWorkingHeight) {
             return CustomScrollView(
               key: const Key('work-sale-short-scroll'),
               keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,

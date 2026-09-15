@@ -103552,6 +103552,27 @@
   "prevention": "Require all seven STOREBACK01-06 results and negative omission/skip/failure tests before every Store review APK. Preserve historical descriptions and read the appended V19 closure. Device qualification requires exact installed hash/version, retained cart, signed-in status, Security return, IME/search/Bulk/native Back, warm and cold relaunch, complete error observation and Dashboard. Host, fixture and review passes never establish production storage, payment or authenticated backend acceptance.",
   "gates": ["scripts/build-buy-device-review.ps1", "scripts/test-public-auth-sideload-build-controls.ps1", "scripts/check-apk-regression-gate-state.ps1"],
   "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+},
+{
+  "id": "REG-20260915-4620-STORE-APPROVED-JOURNEY-FULL-RECONCILIATION",
+  "status": "registered_prevention_active",
+  "appliesTo": [
+    "primary",
+    "implementation",
+    "build",
+    "device",
+    "evidence"
+  ],
+  "mistake": "V26 full candidate regression rejected 51 cases after narrow approved counter-sale/PDF checks passed. Historical tests still expected popup and fixed quick-action layouts; enlarged-text collection QR also fell below its minimum size, and order content overflowed. Earlier candidate preflight ran before the remote branch existed; an initial shell-stream OPPO backup was incomplete.",
+  "rootCause": "Approved central customer-first sale and scrollable Dashboard actions were not reconciled with every existing connected regression. Wider action labels constrained the central area. Exact full failure taxonomy and original logs remain preserved; further cases require reproduction before classification. Git publication and binary-safe backup completeness needed explicit checks. During repair, a helper used the Windows default codec and re-encoded test Unicode, producing false rupee expectations; its exact preimage is preserved and lossless cp1252-to-UTF8 reversal was independently checked. Local helper declaration order and the evidence-archive parameter also caused preserved runner rejections before tests. All task file reads and writes must specify UTF-8 and helper dependencies must precede use. Confirmed child defects: enlarged action labels squeezed QR/order/customer content; item errors exceeded fixed vertical space; full-screen completion did not reserve bottom navigation padding. An intermediate keyboard early-return reparented the active customer editor and lost focus. Scaffold consumed the child MediaQuery keyboard inset. Nested test scrolling aligned an item outside the viewport; centered ensureVisible plus a hit-test assertion exercises the reachable control. Customer correction tests now dismiss editing with the real drag interaction before confirmation.",
+  "prevention": "Preserve rejected V26 and all failure evidence. Adapt test navigation only to actual approved interactions, retain financial, validation, geometry and lifecycle assertions, and fix reproduced layout defects. Require two complete unchanged-source cycles with the same 83 skips and all 56 replacement checks plus focused review-mode Ledger/PDF and mandatory Store Back replay. Verify remote before preflight and require all four data directories in exec-out backup. No host pass substitutes for exact installed APK or user approval. Keep active editor ancestors stable across keyboard opening using View insets and Offstage controls; retain focus/cursor/composition checks. Reserve SafeArea bottom padding, use accessible full-width enlarged panels and one short/error scroll surface. Preserve all original 51 failed cases and run the seven COUNTERD01 journeys as connected coverage; do not replace financial assertions with screenshots or programmatic model mutations. Retain all intermediate failed logs.",
+  "gates": [
+    "scripts/build-buy-device-review.ps1",
+    "scripts/check-codex-subagent-coordination-policy.ps1"
+  ],
+  "evidence": [
+    "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
+  ]
 }
 ]
 }

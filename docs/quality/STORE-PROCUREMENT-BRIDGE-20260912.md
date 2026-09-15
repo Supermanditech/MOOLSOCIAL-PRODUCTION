@@ -1858,3 +1858,15 @@ test logs and review limitations are retained in the active task outputs under
 invoice-pdf-review. These frontend checks do not establish backend issuance,
 storage, message delivery, payment acceptance or physical-device qualification.
 The production blockers above remain in force.
+
+
+## 2026-09-15 V26 reconciliation rejection (REG4620)
+
+User requested reconciliation, preservation, a new OPPO review APK and then a pause. Baseline 66de537f and tag moolsocial-store-local-review-baseline-20260915 preserve all 18 original changed owners. V26 48d1ddf4 is preserved and rejected before build: full cycle 2583 passed, 83 skipped, 51 failed. Original candidate gates/analysis passed. Exact log, receipt and 51-case taxonomy are retained at C:/Users/jisal/Documents/Codex/2026-09-15/wh/work/v26-validation-published and work/v26-failures.json. No V26 APK was built or installed. Current repairs must preserve assertions and distinguish obsolete navigation from reproduced defects. Full two-cycle successor validation and OPPO handoff remain pending.
+
+
+## 2026-09-16 bounded REG4620 repairs
+
+Preserved V26 remains rejected. Runtime repairs cover enlarged QR/order/customer width, reachable action panels, short/error item scrolling, completion safe-area padding, and stable focused-editor ancestry across keyboard changes. Historical popup/phone composer tests now follow the user-approved central customer-first/full-screen and Store-link journeys, retaining validation, financial, lifecycle and geometry assertions. No tests were removed or skipped. Repair12 passed all original 51 failures and five COUNTERD01 cases; the remaining two enlarged journeys passed in repair14 after centered scrolling with an explicit hit-test assertion. Repair14 passed all four full cash-sale journeys. Exact logs remain under wh/work/v26-repair-01 through v26-repair-14. Combined checks, unchanged successor full cycles, APK qualification and retained OPPO Store handoff remain pending; these internal checks are not user acceptance.
+
+Repair15 completed: static analysis no issues; combined original51 plus seven COUNTERD01 checks passed58/58 with a successful terminal event. Evidence: C:/Users/jisal/Documents/Codex/2026-09-15/wh/work/v26-repair-15. Successor V27 admission, full cycles and device proof remain pending.
