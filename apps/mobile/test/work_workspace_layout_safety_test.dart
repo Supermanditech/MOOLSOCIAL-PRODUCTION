@@ -7758,6 +7758,53 @@ void main() {
     await captureStoreView(tester, 'pos-10000-sku-search');
   });
 
+  testWidgets('COUNTERD01 saved UTC invoice uses local calendar date', (
+    tester,
+  ) async {
+    final work = storeViewFixture(null, _ContactDraftFixtureStore());
+    final now = DateTime.now();
+    final local = DateTime(
+      now.year,
+      now.month,
+      now.day,
+      now.timeZoneOffset.isNegative ? 23 : 1,
+    );
+    final stored = local.toUtc();
+    final date = '${local.day}/${local.month}/${local.year}';
+    work.workspaceInvoices
+      ..clear()
+      ..add(
+        WorkspaceCustomerInvoice(
+          id: 'LOCAL-DATE',
+          orderId: 'LOCAL-DATE-ORDER',
+          customer: 'Timezone customer',
+          items: 'Saved item',
+          amount: 56,
+          payment: 'Cash',
+          issuedAt: stored,
+        ),
+      );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+    );
+    await tester.tap(find.byKey(const Key('work-store-sell')));
+    await tester.pumpAndSettle();
+    final row = find.byKey(const ValueKey('work-sales-invoice-LOCAL-DATE'));
+    expect(
+      find.descendant(of: row, matching: find.text('$date · ₹56')),
+      findsOneWidget,
+    );
+    await tester.tap(row);
+    await tester.pumpAndSettle();
+    expect(find.text('Invoice date: $date'), findsOneWidget);
+    expect(work.workspaceInvoices.single.issuedAt, stored);
+    expect(work.workspaceInvoices.single.issuedAt.isUtc, isTrue);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('COUNTERD01 Sales periods filter saved invoice issue dates', (
     tester,
   ) async {

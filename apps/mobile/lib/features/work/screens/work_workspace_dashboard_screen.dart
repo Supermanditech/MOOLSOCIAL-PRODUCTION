@@ -7053,6 +7053,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
               )
               .firstOrNull
         : null;
+    final issued = invoice.issuedAt.toLocal();
     final paid =
         payment != null &&
         payment.dueMinor == 0 &&
@@ -7106,7 +7107,7 @@ class _StoreInvoiceSurfaceState extends State<_StoreInvoiceSurface> {
                     style: const TextStyle(fontWeight: FontWeight.w700),
                   ),
                   Text(
-                    'Invoice date: ${invoice.issuedAt.day}/${invoice.issuedAt.month}/${invoice.issuedAt.year}',
+                    'Invoice date: ${issued.day}/${issued.month}/${issued.year}',
                   ),
                   if (!invoice.billingDetails.isEmpty)
                     Text(
@@ -11024,6 +11025,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                   separatorBuilder: (_, _) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final invoice = invoices[index];
+                    final issued = invoice.issuedAt.toLocal();
                     return ListTile(
                       key: ValueKey('work-sales-invoice-${invoice.id}'),
                       title: Text(
@@ -11043,7 +11045,7 @@ class _StoreStatementSurfaceState extends State<_StoreStatementSurface> {
                             style: const TextStyle(fontSize: 12),
                           ),
                           Text(
-                            '${invoice.issuedAt.day}/${invoice.issuedAt.month}/${invoice.issuedAt.year} · ₹${_formatStoreAmount(invoice.amount)}',
+                            '${issued.day}/${issued.month}/${issued.year} · ₹${_formatStoreAmount(invoice.amount)}',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 12),
