@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "build_passed",
+  "buildAuthorization": "consumed_passed",
+  "preBuildValidation": {"state": "passed", "evidence": "artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/prebuild-validation.md"},
+  "candidate": {"id": "UAW-BUY-V2-R65.8-CURSOR-VALID-PAYMENT-CHOICE-20260904", "versionName": "1.0.0-r65.8", "versionCode": "2026090324", "buildMode": "debug", "gateProfile": "uaw_cursor_ui_review_debug", "branch": "work/cursor-ui/buy-mvp-ticket14-v1-20260902", "head": "d915c79a4ac5848addaa85ccd5c6103316c8ba3d"},
+  "source": {"manifestPath": "artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/source-manifest.txt", "manifestSha256": "EBD453DE6AAE934405C565E55879FF8286A609201937FD0650C5DE3B69393D88", "fileCount": 34},
+  "requiredRuntimeDefines": {"MOOLSOCIAL_UI_REVIEW_ONLY": "true", "MOOLSOCIAL_DEVICE_REVIEW": "true", "MOOLSOCIAL_USE_EMULATORS": "true", "MOOLSOCIAL_CANDIDATE_ID": "UAW-BUY-V2-R65.8-CURSOR-VALID-PAYMENT-CHOICE-20260904"},
+  "promotion": {"state": "forbidden_non_promotable"},
+  "preBuildGates": [
+    {"id": "branch-head", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/prebuild-validation.md"]},
+    {"id": "source-manifest", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/source-manifest.txt"]},
+    {"id": "format-analysis", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/local-validation.md"]},
+    {"id": "focused-tests", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/local-validation.md"]},
+    {"id": "positive-release-gates", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/prebuild-validation.md"]},
+    {"id": "protected-boundary-disposition", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/candidate-contract.md"]},
+    {"id": "rejected-candidate-preserved", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-7-cursor-payment-prerequisite-review-20260904/redmi-review-02.xml"]},
+    {"id": "startup-config-regression-registered", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/prebuild-validation.md"]},
+    {"id": "buy-regression-1", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/local-validation.md"]},
+    {"id": "buy-regression-2", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/local-validation.md"]},
+    {"id": "clean-state-regression", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/local-validation.md"]},
+    {"id": "wrapper-self-test", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/prebuild-validation.md"]},
+    {"id": "package-isolation", "state": "passed", "evidence": ["artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/candidate-contract.md"]}
+  ],
+  "premiumMotionPolicy": {"state": "audited_for_r65_8", "policy": "config/buy-premium-motion-policy.json", "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md", "candidateContract": "artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/candidate-contract.md", "disposition": "artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/motion-disposition.md", "applied": ["payment_valid_choice_state_transition"], "reused": ["approved_buy_finite_event_driven_motion", "static_reduced_motion"], "dependencyHeld": ["shared_chat_motion", "shared_shell_motion"], "inapplicable": ["perpetual_decorative_loops"]},
+  "buildResult": {"state": "passed", "wrapper": "scripts/build-buy-device-review.ps1", "apkPath": "artifacts/quality/buy-v2-r65-8-cursor-valid-payment-choice-review-20260904/uaw-buy-v2-r65.8-cursor-valid-payment-choice-20260904-device-review-debug.apk", "apkBytes": 208713217, "apkSha256": "DBE21D190A2B0D58B3643D555DC42DE5677721E6FB74430D2AA855450CC3B3F7", "head": "d915c79a4ac5848addaa85ccd5c6103316c8ba3d", "sourceFingerprint": "EBD453DE6AAE934405C565E55879FF8286A609201937FD0650C5DE3B69393D88"}
+}

@@ -75,11 +75,8 @@ void main() {
       final createPost = find.byKey(const Key('screen04-feed-create-post'));
       expect(post, findsOneWidget);
       expect(find.byKey(const Key('screen04-quick-post-feed')), findsNothing);
-      expect(createPost, findsOneWidget);
-      expect(
-        tester.getTopLeft(post).dy,
-        lessThan(tester.getTopLeft(createPost).dy),
-      );
+      expect(createPost, findsNothing);
+      expect(find.byKey(const Key('screen04-rail-create')), findsOneWidget);
       expect(find.text('Meera Rathore'), findsNothing);
       expect(find.text('Explore featured products'), findsNothing);
       expect(tester.takeException(), isNull);

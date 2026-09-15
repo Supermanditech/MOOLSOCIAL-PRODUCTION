@@ -124,10 +124,7 @@ void main() {
               '${benefit.title} ${benefit.detail}',
               isNot(
                 matches(
-                  RegExp(
-                    r'(₹|%|\bcode\b|\bunlock|\bredeem)',
-                    caseSensitive: false,
-                  ),
+                  RegExp(r'(\bcode\b|\bunlock|\bredeem)', caseSensitive: false),
                 ),
               ),
             );
@@ -156,7 +153,11 @@ void main() {
         hasLength(6),
       );
       expect(session.cartTotal, originalTotal);
-      expect(session.scopedPayableTotal, originalTotal);
+      expect(session.scopedCouponSaving, greaterThan(0));
+      expect(
+        session.scopedPayableTotal,
+        originalTotal - session.scopedCouponSaving,
+      );
       expect(
         adapter.benefitsFor(
           kind: BuyV2CartBenefitKind.coupon,
@@ -447,7 +448,208 @@ void main() {
       expect(session.isSaved(rx.id), isTrue);
       expect(session.pendingPrescriptionProductId, rx.id);
     });
+
+    test(
+      'live coupon eligibility applies only authoritative current savings',
+      () async {
+        final evaluatedAt = DateTime.utc(2026, 8, 29, 12);
+        final adapter = _LiveBenefitsAdapter(
+          BuyV2CartBenefitsSnapshot(
+            state: BuyV2CartBenefitsLoadState.ready,
+            evaluatedAt: evaluatedAt,
+            benefits: [
+              BuyV2CartBenefit(
+                id: 'live-shop-sale',
+                kind: BuyV2CartBenefitKind.coupon,
+                destination: BuyV2Destination.shop,
+                title: 'Weekend basket saving',
+                detail: 'Eligible for this Shop basket.',
+                sourceId: 'retailer-campaign-1',
+                strategy: BuyV2CartBenefitStrategy.timedSale,
+                sponsor: BuyV2CartBenefitSponsor.retailer,
+                sponsorName: 'Shree Balaji Fresh',
+                savingAmount: 10,
+                validFrom: evaluatedAt.subtract(const Duration(hours: 1)),
+                validUntil: evaluatedAt.add(const Duration(hours: 3)),
+              ),
+              BuyV2CartBenefit(
+                id: 'expired',
+                kind: BuyV2CartBenefitKind.coupon,
+                destination: BuyV2Destination.shop,
+                title: 'Expired campaign',
+                detail: 'Must fail closed.',
+                sourceId: 'expired-source',
+                savingAmount: 5,
+                validUntil: evaluatedAt,
+              ),
+              const BuyV2CartBenefit(
+                id: 'invalid-payment-deduction',
+                kind: BuyV2CartBenefitKind.paymentOffer,
+                destination: BuyV2Destination.shop,
+                title: 'Unconfirmed cashback',
+                detail: 'Must not reduce the payable total.',
+                sourceId: 'bank-source',
+                sponsor: BuyV2CartBenefitSponsor.bank,
+                sponsorName: 'Partner Bank',
+                savingAmount: 10,
+              ),
+              const BuyV2CartBenefit(
+                id: 'free-delivery',
+                kind: BuyV2CartBenefitKind.coupon,
+                destination: BuyV2Destination.shop,
+                title: 'Free delivery',
+                detail: 'Delivery is included for this basket.',
+                sourceId: 'mool-campaign',
+                strategy: BuyV2CartBenefitStrategy.freeDelivery,
+                freeDelivery: true,
+              ),
+            ],
+          ),
+        );
+        final session = BuyV2Session(
+          core: BuySession(),
+          cartBenefitsAdapter: adapter,
+        );
+        addTearDown(session.dispose);
+        final product = BuyV2Catalogue.products.firstWhere(
+          (candidate) => candidate.destination == BuyV2Destination.shop,
+        );
+        expect(session.addProduct(product.id), isTrue);
+        expect(await session.refreshCartBenefits(), isTrue);
+
+        final coupons = session.cartBenefits(
+          kind: BuyV2CartBenefitKind.coupon,
+          destination: BuyV2Destination.shop,
+        );
+        expect(coupons.map((benefit) => benefit.id), [
+          'live-shop-sale',
+          'free-delivery',
+        ]);
+        expect(session.chooseCartBenefit(coupons.first), isTrue);
+        expect(session.scopedCouponSaving, 10);
+        expect(session.scopedPayableTotal, session.scopedCartTotal - 10);
+
+        adapter.snapshot = BuyV2CartBenefitsSnapshot(
+          state: BuyV2CartBenefitsLoadState.offline,
+          evaluatedAt: evaluatedAt,
+          customerMessage: 'Reconnect to check current eligibility.',
+        );
+        expect(await session.refreshCartBenefits(), isFalse);
+        expect(session.scopedCouponSaving, 0);
+        expect(
+          session.cartBenefitsLoadState,
+          BuyV2CartBenefitsLoadState.offline,
+        );
+
+        adapter.snapshot = BuyV2CartBenefitsSnapshot(
+          state: BuyV2CartBenefitsLoadState.ready,
+          evaluatedAt: evaluatedAt,
+          benefits: [coupons.first],
+        );
+        expect(await session.refreshCartBenefits(), isTrue);
+        expect(session.scopedCouponSaving, 10);
+
+        adapter.snapshot = BuyV2CartBenefitsSnapshot(
+          state: BuyV2CartBenefitsLoadState.ready,
+          evaluatedAt: evaluatedAt,
+          benefits: [coupons.last],
+        );
+        expect(await session.refreshCartBenefits(), isFalse);
+        expect(
+          session.selectedCartBenefitsFor({BuyV2Destination.shop}),
+          isEmpty,
+        );
+        expect(session.scopedCouponSaving, 0);
+      },
+    );
+
+    test(
+      'live coupon is rechecked and retained in placed order totals',
+      () async {
+        final adapter = _LiveBenefitsAdapter(
+          BuyV2CartBenefitsSnapshot(
+            state: BuyV2CartBenefitsLoadState.ready,
+            evaluatedAt: DateTime.utc(2026, 8, 29, 12),
+            benefits: const [
+              BuyV2CartBenefit(
+                id: 'manufacturer-load-saving',
+                kind: BuyV2CartBenefitKind.coupon,
+                destination: BuyV2Destination.shop,
+                title: 'Load saving',
+                detail: 'Eligible quantity reached.',
+                sourceId: 'manufacturer-campaign',
+                strategy: BuyV2CartBenefitStrategy.loadBased,
+                sponsor: BuyV2CartBenefitSponsor.manufacturer,
+                sponsorName: 'Approved Manufacturer',
+                savingAmount: 10,
+                minimumQuantity: 1,
+              ),
+            ],
+          ),
+        );
+        final session = BuyV2Session(
+          core: BuySession(),
+          cartBenefitsAdapter: adapter,
+        );
+        addTearDown(session.dispose);
+        final product = BuyV2Catalogue.products.firstWhere(
+          (candidate) => candidate.destination == BuyV2Destination.shop,
+        );
+        expect(session.addProduct(product.id), isTrue);
+        await session.refreshCartBenefits();
+        final coupon = session
+            .cartBenefits(
+              kind: BuyV2CartBenefitKind.coupon,
+              destination: BuyV2Destination.shop,
+            )
+            .single;
+        expect(session.chooseCartBenefit(coupon), isTrue);
+        session.openCart(scope: BuyV2CartScope.shop);
+        expect(session.openCheckout(), isTrue);
+        expect(session.continueCheckoutFromAddress(), isTrue);
+        expect(session.choosePayment('Cash on Delivery'), isTrue);
+        expect(session.continueCheckoutFromPayment(), isTrue);
+        final expectedTotal = session.checkoutTotal - coupon.savingAmount;
+
+        final submitted = await session.submitOrder();
+        expect(
+          submitted,
+          isTrue,
+          reason:
+              'notice=${session.notice}; '
+              'submission=${session.checkoutSubmissionState}; '
+              'promiseReview=${session.checkoutPromiseReviewRequired}; '
+              'benefits=${session.cartBenefitsLoadState}',
+        );
+        expect(session.confirmedTotal, expectedTotal);
+        expect(session.confirmedOrders.single.discount, coupon.savingAmount);
+        expect(session.confirmedOrders.single.total, expectedTotal);
+        expect(adapter.requests, isNotEmpty);
+      },
+    );
   });
+}
+
+class _LiveBenefitsAdapter implements BuyV2LiveCartBenefitsAdapter {
+  _LiveBenefitsAdapter(this.snapshot);
+
+  BuyV2CartBenefitsSnapshot snapshot;
+  final List<BuyV2CartBenefitsRequest> requests = [];
+
+  @override
+  List<BuyV2CartBenefit> benefitsFor({
+    required BuyV2CartBenefitKind kind,
+    required Set<BuyV2Destination> destinations,
+    required int itemTotal,
+  }) => const [];
+
+  @override
+  Future<BuyV2CartBenefitsSnapshot> loadEligibility(
+    BuyV2CartBenefitsRequest request,
+  ) async {
+    requests.add(request);
+    return snapshot;
+  }
 }
 
 class _AdversarialBenefitsAdapter implements BuyV2CartBenefitsAdapter {
