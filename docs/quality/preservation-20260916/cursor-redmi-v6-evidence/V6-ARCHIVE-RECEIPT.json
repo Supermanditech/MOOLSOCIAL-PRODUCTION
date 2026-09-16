@@ -1,0 +1,9 @@
+{
+  "branch": "archive/preservation-20260916-cursor-redmi-evidence",
+  "parent": "a56c1ed94d105a68ae68770231e67c5a8e74f776",
+  "commit": "d2c8a26fadbdd488eef5f35c27bb98873b4cbdc3",
+  "archivedFiles": 2878,
+  "indexedRowsVerified": 1537,
+  "localApkCount": 6,
+  "manifestSha256": "335d28f8125a655fb2dc185b62f36ac1523d9452f38bec6523f769e5f241eafc"
+}

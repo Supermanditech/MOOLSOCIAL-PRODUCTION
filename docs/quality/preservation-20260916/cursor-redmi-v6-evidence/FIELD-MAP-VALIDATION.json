@@ -26,6 +26,7 @@
   },
   "sourcePublic": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
   "sourceOwner": "21977bff27cf22bfadb50f592a635355bb80574e",
-  "fieldMapSha256": "F8256A840CDD177E4E424A1D1819E2C6E25C7D3CFF6BA9F68100C7DC83E70D3C",
-  "assertions": "Every declared final field in the enumerated public contracts mapped once; 15 explicit Store/private gaps; original 71 rows retain every original value; not a live publication test"
+  "fieldMapSha256": "25706DAF75736C1E9ECEC54D36FB0B09A4F1340496B185A14D25D47EA5700B0B",
+  "assertions": "Every declared final field in the enumerated public contracts mapped once; 15 explicit Store/private gaps; original 71 rows retain every original value; not a live publication test",
+  "consumerBindingsRefined": true
 }
