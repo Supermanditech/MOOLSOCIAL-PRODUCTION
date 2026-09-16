@@ -1,0 +1,1668 @@
+{
+  "candidate": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
+  "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+  "applicationSource": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+  "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+  "device": "TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "version": "1.0.0-r66.24-cursorreview",
+  "completedAt": "2026-09-14T22:07:36.676458+05:30",
+  "status": "ten_D014_device_cases_passed",
+  "cases": [
+    {
+      "case": "original-normal",
+      "before": "008",
+      "result": "009",
+      "returnEvidence": "010",
+      "status": "passed"
+    },
+    {
+      "case": "original-text200",
+      "before": "052",
+      "result": "053",
+      "returnEvidence": "054/055",
+      "status": "passed"
+    },
+    {
+      "case": "shop-repeat-store",
+      "before": "013",
+      "result": "014",
+      "returnEvidence": "015",
+      "status": "passed"
+    },
+    {
+      "case": "shop-other-store",
+      "before": "017",
+      "result": "018",
+      "returnEvidence": "019",
+      "status": "passed"
+    },
+    {
+      "case": "shop-full",
+      "before": "020",
+      "result": "021",
+      "returnEvidence": "022",
+      "status": "passed"
+    },
+    {
+      "case": "shop-missing-order",
+      "before": "023/025/028",
+      "result": "024/026/027/029",
+      "returnEvidence": "030",
+      "status": "passed"
+    },
+    {
+      "case": "wholesale-repeat-store",
+      "before": "033",
+      "result": "034",
+      "returnEvidence": "035",
+      "status": "passed"
+    },
+    {
+      "case": "wholesale-other",
+      "before": "036",
+      "result": "037",
+      "returnEvidence": "038",
+      "status": "passed"
+    },
+    {
+      "case": "wholesale-other-return",
+      "before": "039",
+      "result": "040",
+      "returnEvidence": "041",
+      "status": "passed"
+    },
+    {
+      "case": "wholesale-full",
+      "before": "041",
+      "result": "042",
+      "returnEvidence": "043",
+      "status": "passed"
+    }
+  ],
+  "nativeActions": [
+    {
+      "toolChunk": "80967f",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 18,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "e8bc47",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 17,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "68c1d3",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 8,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "aaf00f",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 14,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "0d9e31",
+      "destination": "missing-order",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 8,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "a4d820",
+      "destination": "missing-order",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 8,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "e5bc45",
+      "destination": "missing-order",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 8,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "5ba3f6",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 9,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "57c6f4",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 8,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "22fdd3",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 8,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "046af8",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 15,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "8f8fd9",
+      "destination": "MS-240782",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 12,
+      "approval": "separately approved require_escalated"
+    },
+    {
+      "toolChunk": "7d69fb",
+      "destination": "basket",
+      "nativeExit": 0,
+      "status": "ok",
+      "delivery": "top-most running instance",
+      "waitTimeMs": 12,
+      "approval": "separately approved require_escalated"
+    }
+  ],
+  "missingOrderTiming": "Capture024/027 settled Orders. Capture026 at450ms still shows dismissal animation, not a failed settled result. Capture029 at1500ms visually proves This order could not be found. Existing notice clears after2600ms. All earlier captures preserved.",
+  "preservation": {
+    "saved": "same one Stone-ground wheat atta2, capture056",
+    "addresses": "Home and Work preserved; Work selected; capture062",
+    "language": "English, capture058",
+    "fontScale": "1.0 restored, capture055/064",
+    "cart": "No Add/quantity/remove/order action. Approved declared basket route064 returns catalogue, matching existing openCart empty-cart branch; Cart dock absent throughout.",
+    "finalState": "Quick Shop; Saved filter off; Saved1; no additional filters",
+    "dataClearPerformed": false,
+    "transactionsOrMessages": false
+  },
+  "children": [
+    {
+      "id": "RV6-D005-C01",
+      "status": "prior_r66.22_device_closure_preserved"
+    }
+  ],
+  "newChildren": [],
+  "originalDeviceClosures": 22,
+  "captureRecords": [
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "001-initial-shop",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:39:37.483553+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "ad2ce3aeab4314c5245ccda53f9520e8a520808230893f8ec94a1e458dc57804",
+        ".xml": "ae3c171b86ccb18112ee4abafae5c588877c3e94ffadf140e9624b1fcedf68b2",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "002-shop-tools",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:40:00.593266+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "12be402098f3ec3b09e9c1d56b9664703c56d0fa9a4c0d1f02a1036a4c9f0fa0",
+        ".xml": "b42d0ce2a54849ba15faebfc78c3151741fa6fbb88e4eae64943457a3ae59cb1",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "003-tools-expanded",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:40:19.280205+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "5b96771ae5cf395884d02a13900da15f70a214a747b66297c1e7b2c6e83f4c43",
+        ".xml": "ff216580402640d337b48595ff5df1539d44fc43fc95e60fec7f213c71a07fe3",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "004-recent-products",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:40:36.106325+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "0cbcb2be0c14e8307da8ce9ce189756f664810d0a3090d3ed68257c2bec7fb61",
+        ".xml": "c3927715bb4310dd9a09968878172c4070b2b2c37033a343f462d12e777219cd",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "005-dog-product",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:40:53.672920+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "a860186bdac3cd1e20c1e396359b9d35f9b82e6ad462637181cb92c8b399157d",
+        ".xml": "364ae41a08b89699c0360703e04a6266fbf846fd7ac1815298f315569d2b52de",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "006-pet-store",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:41:14.170435+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "abe4df4334e98859318c48613d74e1381c639b3472137923ab22f66e8a732ea3",
+        ".xml": "ac9b086b3fd35f2dc60c6f908f67bb60232ffebdb4bb3b3ae73961232342cd16",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "007-other-store",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:41:30.279850+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "7cfefc1101ab864b6c184bd20dd06f00dbfd634952abe5f197e97faceb15f44e",
+        ".xml": "78d3673972827dafd03a2722670f55971c261c9b390e5b1a907c25b08617edf8",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "008-returned-store-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:41:46.857892+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "abe4df4334e98859318c48613d74e1381c639b3472137923ab22f66e8a732ea3",
+        ".xml": "ac9b086b3fd35f2dc60c6f908f67bb60232ffebdb4bb3b3ae73961232342cd16",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "009-original-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:42:13.810481+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "7dcf900b58cb44aa896779156fe4eb89ccb21bb4695669278b3848f8daa2cf0e",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "010-shop-return",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:42:37.684843+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "126b62e8a65b367c068cc257fa1fa98f527eb5c3e65b18c7bbaa353f6bab485c",
+        ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "011-saved-before-repeat",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:42:55.838566+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "8e0c62be14424aa78bef483d66e4a63b1502b4b76a93dd3d49b262ab5e565006",
+        ".xml": "6cff7d342a6f9b8644fc5fe6a7ac45b97d6f0a046426d2a2ae8fed1b5690b3f6",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "012-wheat-product",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:43:12.083810+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "8f09cfc6f030701295267508d401c344b3a0211519e8e83517d4d26ac1e4e4b4",
+        ".xml": "7444b517af73069cacc1faa62d16b700c96393e063ab0369ecefd0566485fcb3",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "013-repeat-store-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:43:27.266746+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "8d1943221effd26f8113b0e43889c86c4b7108467c21002e36539e0987576474",
+        ".xml": "884e2199caf66442ae6b2588642beeab789e56b5129e8815347830a2353d39ae",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "014-repeat-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:43:48.171282+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "6c859f1ef9eaf8e369e2e42398b8af01a2bd7939a20970b6b8ca6cba087540fa",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "015-repeat-shop-return",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:44:14.600348+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "5d9f9238b07e206f489b74122068a828f9cd27d5fcbf186b1cd9370fb943fb57",
+        ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "016-recent-for-other-store",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:44:36.993169+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "e84f7b93e44ae1f655ee726be9574e381e1e5b07441186190bbb96cc3b049313",
+        ".xml": "c3927715bb4310dd9a09968878172c4070b2b2c37033a343f462d12e777219cd",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "017-other-store-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:44:56.522468+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "decd40a388a01588624e854e7575d50e20f802f4f80c1ab4c81afaf630b540de",
+        ".xml": "78d3673972827dafd03a2722670f55971c261c9b390e5b1a907c25b08617edf8",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "018-other-store-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:45:22.848842+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "76c3e4ce993fbcbaa7753e753931b9dbb41c547698b72f77b2a326d968219ed7",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "019-recent-for-full-store",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:45:48.585947+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "d884d63534ff3c6856eea7eedfd667be10a78b08c8779fc13758258de2127eca",
+        ".xml": "0827d5592bf808fe2df56d7627ede1e75190b0fba555ff30d52e46834bff3e3e",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "020-full-store-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:46:08.158663+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "cd1042c9ef8ec5d1ada1fadb7c5b54d1849a05ad3dd196cf6655dd68bd3c0462",
+        ".xml": "272a6c9166c852c80859ecf34ace60e8d59daf15e7ec78f368e88b8f0227c133",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "021-full-store-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:46:27.509991+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "38c7395a4db9f3b3ca4cc23d4419da93eea15df981322c6d0d7cebc7634ef411",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "022-recent-for-missing-order",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:46:50.382259+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "fb6abaa3d795a60be686596b27d1f1b11362afa14d3f959e6fe7761f26b85fc6",
+        ".xml": "0827d5592bf808fe2df56d7627ede1e75190b0fba555ff30d52e46834bff3e3e",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "023-full-store-before-missing",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:47:12.421738+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "3d49e82e38ea7e7e54fdecaf5986df08d602caca217c90d575b8c99c9b4bb06a",
+        ".xml": "272a6c9166c852c80859ecf34ace60e8d59daf15e7ec78f368e88b8f0227c133",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "024-missing-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:47:33.403448+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "e616442973544c25f0306a35d12b00b5bf60258dd4f9759e1bbcb80e12934f91",
+        ".xml": "ce34e960b1e8e94140f78bf4e730fc6a07d7c9c1e68c8df1cbd3f36be64ec929",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "025-full-store-before-timed-missing",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:49:34.745490+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "ed5033996465e9bb839e0b763335ca7372fca5407259613391e9c5e7bcdab5fc",
+        ".xml": "272a6c9166c852c80859ecf34ace60e8d59daf15e7ec78f368e88b8f0227c133",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "027-timed-missing-settled",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:50:24.169468+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "775e23c860ca167ab794a5967303f4807be80c34e4cb65b7c8ce940906d216dc",
+        ".xml": "ce34e960b1e8e94140f78bf4e730fc6a07d7c9c1e68c8df1cbd3f36be64ec929",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "028-full-store-before-notice-window",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:50:55.982149+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "7c324292b6dd919e02457f32117553b4e047489b6ce1551081309f2771ab47d6",
+        ".xml": "272a6c9166c852c80859ecf34ace60e8d59daf15e7ec78f368e88b8f0227c133",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "030-wholesale-return",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:51:41.800826+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "f5ac153e3dc8f764eb95736a219be6aac85655608fbc241717f8e6dbb9b15b38",
+        ".xml": "49f96af826c06f97489c32f5c29f952298750da93380ec60d4ab2dafbbb6208f",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "031-wholesale-recent-inventory",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:52:05.977181+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "45da65fa93a769159747da8542b88f10b89a3b18cb05ed5e6117da24d30b1a14",
+        ".xml": "fac93278c41e38427209785babba0bf8548af9810376611ec8ebd79c7573c4ec",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "032-notebook-product",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:52:26.074612+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "34d58367595f65ed504741ac96767a42366a3fb0171713b5e941d14737603bab",
+        ".xml": "adee8742093451b35e563bad3870e023b9b3d327a17284b552d5bd0a862f0969",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "033-wholesale-store-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:52:42.656836+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "025e24f3b48030491e82e695578bf86d83838db16ba0a1aea90a156f0e2093e2",
+        ".xml": "474430cee43a114bc1998f7fa68df6450196b5a7dae0326fb0e16236026982a2",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "034-wholesale-store-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:53:03.705142+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "fc8200169f827315ebd747366eab796a3e76e12836f10ddb26049cc52bc9c0c6",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "035-wholesale-recent-return",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:53:28.054775+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "20920605d88617e1f2581b58fd7944c7340ea5332b910835cec7ce88fb845694",
+        ".xml": "fac93278c41e38427209785babba0bf8548af9810376611ec8ebd79c7573c4ec",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "036-wholesale-other-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:53:50.920622+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "921bdc036717a546378e0539ffe2142eaebdde370f410dba55e0d9f977b05dbb",
+        ".xml": "52b81f6abd789f2732e4789321535056cf4be2fb0820fd8805f0830ffcc1955e",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "037-wholesale-other-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:54:12.005831+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "1f4e2e6fffa0d63209237d39cff4abb709c77e62659eb9ac6246eb47cb111a3a",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "038-wholesale-other-for-return",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:54:50.616468+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "cbd7a66a3bdc4aa0015970976d78474274417cd262fcf6f7213a131ccbf5ce14",
+        ".xml": "52b81f6abd789f2732e4789321535056cf4be2fb0820fd8805f0830ffcc1955e",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "039-wholesale-returned-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:55:08.615276+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "74cc81219ee7c266466e185a45dbe23c8e9421104dbc4dc0d038ac74dfac5e0a",
+        ".xml": "474430cee43a114bc1998f7fa68df6450196b5a7dae0326fb0e16236026982a2",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "040-wholesale-returned-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:55:27.323541+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "03773d88301fe1efd9395a675c85c7cf1f03e4280e514bb7dbba6553e07635ab",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "041-wholesale-full-before-link",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:56:02.856971+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "635bd0bd5c1e4a6968532bc3855f4b3e97fb0befd09aa25070a54a98ef2d6567",
+        ".xml": "ecf65d49b6183c50f7ae99505ee171a2d9543200ae0d81b6fcb06402b344d6ce",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "042-wholesale-full-order-result",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:56:21.755669+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "ff44526fa4c92dd0002452e27129802df1b87029318f2380fa142b4f85a078c7",
+        ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "043-shop-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:56:40.537799+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "eb50ac22b1cec2e78951acc669962caf7204081516ea0389c2cae2834e9b5ace",
+        ".xml": "c73faf51412b374e49274f156caa36c1ea9853bd16a5f38156259f098518ccfb",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "044-tools-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:56:57.224943+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "9454545986f6b1c11df47e63f3842fd40725fe0fe294d250483fb7375ff8efc5",
+        ".xml": "bcc39dfbe7996fa073edc59488ca82048913a6e1a7712dc22149397ae1d992fe",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "045-tools-scroll-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:57:15.330153+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "b93d4df4590981d2ecb9d1d0e5e5176d633597241e0fa63a8deb6f1cda779805",
+        ".xml": "adfaa8197094a919730537a774af63adb20e0396032282f1063a0b9a217670fd",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "046-tools-expanded-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:57:32.404989+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "6a23c41b22c77a70674ae3f99d7913373188ca406826650af6720f423eb4dd0f",
+        ".xml": "1398de25f808ae40e397b83dc9011afb81ec5c9f3e1a2bb4f5119ec0e2c97db9",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "047-recent-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:57:47.793371+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "49cb5025e4a8c6667a49b7f12c659bd46166b0d537a9f389d64e25258a92b6c2",
+        ".xml": "79a62c02565fbdb44894b95b73658f3274eebfcda70361eb9a36081eb8757fcc",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "048-dog-product-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:58:06.158086+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "77f3d9a164c12ff9af9d6b5a4c52451771a3f36e90cc66e9b1266846ed52d456",
+        ".xml": "4d39bc6a8ef963befc39a4d5374c96a6e0fed1fba533a414672c60cdc1b98142",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "049-pet-store-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:58:22.631652+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "5210f2ac9a76bbeadcd48d3a8f955ec3d804e014b108b4d7a54b090a07335076",
+        ".xml": "3df5eb4c22cb0b54b5612168f8a67453a5ba1900b3ffb22b1006bed12aa4445b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "050-pet-store-scrolled-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:58:38.609044+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "4702b57abce791a15720347e416535daf2a4da95f518b3c7fb216116b5381de4",
+        ".xml": "9fcee99586e525b0d9542f662081ee44df7ffda689ce7bf8a6a555360ac0b230",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "051-other-store-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:58:54.186626+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "aba739e59c2fc32210fed46ada48e337141acec347ef276608c8cadc18898c1e",
+        ".xml": "949faf1510210b556684838d3453abbb0d44cc20bf56b75c229b83d5bac83328",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "052-returned-store-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:59:11.124189+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "bd5994a165bef5185d00a98cab02a21afba9d3c065a5afb9546ecd6a46b735a4",
+        ".xml": "9fcee99586e525b0d9542f662081ee44df7ffda689ce7bf8a6a555360ac0b230",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "053-original-order-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:59:34.558550+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "0ab0d65241c00de7868e307f36b361fee5683e580ac1ac60f802d7931e7ed98b",
+        ".xml": "ee031c3a3c76efe65266d40b6c086d04a7e1d648ecc6301f8a6742abda60f36a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "2.0",
+      "label": "054-orders-return-text200",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T21:59:57.565378+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "a955c6876b243f66451ac59d1d6cc3223da7ae5e56ade3e23653b45569edb85f",
+        ".xml": "8162b31be56167ac39170363881a70d6f9cdd16b1bb8f8e057a53076f38fe017",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "055-shop-scale-restored",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:00:20.876101+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "b5aceab8059b44066f9d668b42e6ac176ec925fcec4fe9b97a05a65016835923",
+        ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "056-saved-preservation",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:00:40.920789+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "20011d054809fdf1cfc6fdbd92be7e6d28df4e3b38f73c2fab686e65f6dcba65",
+        ".xml": "6cff7d342a6f9b8644fc5fe6a7ac45b97d6f0a046426d2a2ae8fed1b5690b3f6",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "057-profile-preservation",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:00:59.551187+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "d6755e2071ff25e82a1c91f6306378d4a451f1eb5961b5893be8fc31c91928f6",
+        ".xml": "ceafe5beab3cef6214a46ae26be692fc1019378168deb96111a1e68cc8cca068",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "058-preferences-preserved",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:01:24.291966+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "ad709137ecc0f349f176713b096f056ed379be790a810e2dc9fa41592170784e",
+        ".xml": "490088ad361993a65f3b596f296b7e74d29626446235097d54f1d99a42cc2b44",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "059-orders-for-address",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:02:02.997875+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "936d35154c3ad10854ef3f8cddb001033c16763294b68187d919ce0418de91fe",
+        ".xml": "6fd870e1f6879cbab0709b6a0c785bd440d4e74a0293928ab7382cda2da1679e",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "060-shop-reentry",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:02:49.197038+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "0b6834f537d614592525b0c9e4c06fcf2bfb861faa9ec61f290dc40f9c56d0cf",
+        ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "061-orders-address-entry",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:03:19.987898+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "fa4ed1b6cb4ca49eb0dfef1efd8e17c11c0cf614d7b8443f9180fe8fe0bb5d9b",
+        ".xml": "ce34e960b1e8e94140f78bf4e730fc6a07d7c9c1e68c8df1cbd3f36be64ec929",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "062-address-preservation",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:03:46.723520+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "5160866d5ff38035dda52b0d7e229f3a7e60ba05d223789f167092eb789db010",
+        ".xml": "04e74573cea8fd9dea97a895c37eaec39dc50a5fe9eee6903d9e6ae4adda539d",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "063-final-shop",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:04:16.260751+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "a366c9edd48d57e6912091aec6afe7c95fd14e13ba69b94072d8b1dcd4e9f9a0",
+        ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    },
+    {
+      "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+      "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+      "fontScale": "1.0",
+      "label": "064-cart-preservation",
+      "serial": "TG8HCYTGGQT885OF",
+      "version": "1.0.0-r66.24-cursorreview",
+      "capturedAt": "2026-09-14T22:05:56.920512+05:30",
+      "uiautomatorExit": 0,
+      "stderrBytes": 1988,
+      "files": {
+        ".png": "7b23e27bcf53f895cb0cae3de27a547862f11acdb49afdbda4477e02ac278a1e",
+        ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      }
+    }
+  ],
+  "images": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\001-initial-shop.png",
+      "sha256": "AD2CE3AEAB4314C5245CCDA53F9520E8A520808230893F8EC94A1E458DC57804",
+      "bytes": 321799,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\002-shop-tools.png",
+      "sha256": "12BE402098F3EC3B09E9C1D56B9664703C56D0FA9A4C0D1F02A1036A4C9F0FA0",
+      "bytes": 90787,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\003-tools-expanded.png",
+      "sha256": "5B96771AE5CF395884D02A13900DA15F70A214A747B66297C1E7B2C6E83F4C43",
+      "bytes": 125247,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\004-recent-products.png",
+      "sha256": "0CBCB2BE0C14E8307DA8CE9CE189756F664810D0A3090D3ED68257C2BEC7FB61",
+      "bytes": 229555,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\005-dog-product.png",
+      "sha256": "A860186BDAC3CD1E20C1E396359B9D35F9B82E6AD462637181CB92C8B399157D",
+      "bytes": 380538,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\006-pet-store.png",
+      "sha256": "ABE4DF4334E98859318C48613D74E1381C639B3472137923AB22F66E8A732EA3",
+      "bytes": 238620,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\007-other-store.png",
+      "sha256": "7CFEFC1101AB864B6C184BD20DD06F00DBFD634952ABE5F197E97FACEB15F44E",
+      "bytes": 171620,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\008-returned-store-before-link.png",
+      "sha256": "ABE4DF4334E98859318C48613D74E1381C639B3472137923AB22F66E8A732EA3",
+      "bytes": 238620,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\009-original-order-result.png",
+      "sha256": "7DCF900B58CB44AA896779156FE4EB89CCB21BB4695669278B3848F8DAA2CF0E",
+      "bytes": 273657,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\010-shop-return.png",
+      "sha256": "126B62E8A65B367C068CC257FA1FA98F527EB5C3E65B18C7BBAA353F6BAB485C",
+      "bytes": 322591,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\011-saved-before-repeat.png",
+      "sha256": "8E0C62BE14424AA78BEF483D66E4A63B1502B4B76A93DD3D49B262AB5E565006",
+      "bytes": 218903,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\012-wheat-product.png",
+      "sha256": "8F09CFC6F030701295267508D401C344B3A0211519E8E83517D4D26AC1E4E4B4",
+      "bytes": 440332,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\013-repeat-store-before-link.png",
+      "sha256": "8D1943221EFFD26F8113B0E43889C86C4B7108467C21002E36539E0987576474",
+      "bytes": 194011,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\014-repeat-order-result.png",
+      "sha256": "6C859F1EF9EAF8E369E2E42398B8AF01A2BD7939A20970B6B8CA6CBA087540FA",
+      "bytes": 273803,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\015-repeat-shop-return.png",
+      "sha256": "5D9F9238B07E206F489B74122068A828F9CD27D5FCBF186B1CD9370FB943FB57",
+      "bytes": 322228,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\016-recent-for-other-store.png",
+      "sha256": "E84F7B93E44AE1F655EE726BE9574E381E1E5B07441186190BBB96CC3B049313",
+      "bytes": 229093,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\017-other-store-before-link.png",
+      "sha256": "DECD40A388A01588624E854E7575D50E20F802F4F80C1AB4C81AFAF630B540DE",
+      "bytes": 171534,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\018-other-store-order-result.png",
+      "sha256": "76C3E4CE993FBCBAA7753E753931B9DBB41C547698B72F77B2A326D968219ED7",
+      "bytes": 273723,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\019-recent-for-full-store.png",
+      "sha256": "D884D63534FF3C6856EEA7EEDFD667BE10A78B08C8779FC13758258DE2127ECA",
+      "bytes": 229570,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\020-full-store-before-link.png",
+      "sha256": "CD1042C9EF8EC5D1ADA1FADB7C5B54D1849A05AD3DD196CF6655DD68BD3C0462",
+      "bytes": 185728,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\021-full-store-order-result.png",
+      "sha256": "38C7395A4DB9F3B3CA4CC23D4419DA93EEA15DF981322C6D0D7CEBC7634EF411",
+      "bytes": 273812,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\022-recent-for-missing-order.png",
+      "sha256": "FB6ABAA3D795A60BE686596B27D1F1B11362AFA14D3F959E6FE7761F26B85FC6",
+      "bytes": 229644,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\023-full-store-before-missing.png",
+      "sha256": "3D49E82E38EA7E7E54FDECAF5986DF08D602CACA217C90D575B8C99C9B4BB06A",
+      "bytes": 185447,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\024-missing-order-result.png",
+      "sha256": "E616442973544C25F0306A35D12B00B5BF60258DD4F9759E1BBCB80E12934F91",
+      "bytes": 184565,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\025-full-store-before-timed-missing.png",
+      "sha256": "ED5033996465E9BB839E0B763335CA7372FCA5407259613391E9C5E7BCDAB5FC",
+      "bytes": 185192,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\026-missing-notice-immediate.png",
+      "sha256": "7C324292B6DD919E02457F32117553B4E047489B6CE1551081309F2771AB47D6",
+      "bytes": 185722,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\027-timed-missing-settled.png",
+      "sha256": "775E23C860CA167AB794A5967303F4807BE80C34E4CB65B7C8CE940906D216DC",
+      "bytes": 184817,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\028-full-store-before-notice-window.png",
+      "sha256": "7C324292B6DD919E02457F32117553B4E047489B6CE1551081309F2771AB47D6",
+      "bytes": 185722,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\029-missing-notice-window.png",
+      "sha256": "B483946B40135A37B27D46809C95B7944901CF219C0E60AEFF75C454771B6410",
+      "bytes": 195252,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\030-wholesale-return.png",
+      "sha256": "F5AC153E3DC8F764EB95736A219BE6AAC85655608FBC241717F8E6DBB9B15B38",
+      "bytes": 366656,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\031-wholesale-recent-inventory.png",
+      "sha256": "45DA65FA93A769159747DA8542B88F10B89A3B18CB05ED5E6117DA24D30B1A14",
+      "bytes": 211848,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\032-notebook-product.png",
+      "sha256": "34D58367595F65ED504741AC96767A42366A3FB0171713B5E941D14737603BAB",
+      "bytes": 297875,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\033-wholesale-store-before-link.png",
+      "sha256": "025E24F3B48030491E82E695578BF86D83838DB16BA0A1AEA90A156F0E2093E2",
+      "bytes": 231570,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\034-wholesale-store-order-result.png",
+      "sha256": "FC8200169F827315EBD747366EAB796A3E76E12836F10DDB26049CC52BC9C0C6",
+      "bytes": 273813,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\035-wholesale-recent-return.png",
+      "sha256": "20920605D88617E1F2581B58FD7944C7340EA5332B910835CEC7CE88FB845694",
+      "bytes": 212038,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\036-wholesale-other-before-link.png",
+      "sha256": "921BDC036717A546378E0539FFE2142EAEBDDE370F410DBA55E0D9F977B05DBB",
+      "bytes": 186913,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\037-wholesale-other-order-result.png",
+      "sha256": "1F4E2E6FFFA0D63209237D39CFF4ABB709C77E62659EB9AC6246EB47CB111A3A",
+      "bytes": 273738,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\038-wholesale-other-for-return.png",
+      "sha256": "CBD7A66A3BDC4AA0015970976D78474274417CD262FCF6F7213A131CCBF5CE14",
+      "bytes": 186693,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\039-wholesale-returned-before-link.png",
+      "sha256": "74CC81219EE7C266466E185A45DBE23C8E9421104DBC4DC0D038AC74DFAC5E0A",
+      "bytes": 231217,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\040-wholesale-returned-order-result.png",
+      "sha256": "03773D88301FE1EFD9395A675C85C7CF1F03E4280E514BB7DBBA6553E07635AB",
+      "bytes": 273392,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\041-wholesale-full-before-link.png",
+      "sha256": "635BD0BD5C1E4A6968532BC3855F4B3E97FB0BEFD09AA25070A54A98EF2D6567",
+      "bytes": 185732,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\042-wholesale-full-order-result.png",
+      "sha256": "FF44526FA4C92DD0002452E27129802DF1B87029318F2380FA142B4F85A078C7",
+      "bytes": 274010,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\043-shop-text200.png",
+      "sha256": "EB50AC22B1CEC2E78951ACC669962CAF7204081516EA0389C2CAE2834E9B5ACE",
+      "bytes": 250182,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\044-tools-text200.png",
+      "sha256": "9454545986F6B1C11DF47E63F3842FD40725FE0FE294D250483FB7375FF8EFC5",
+      "bytes": 121997,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\045-tools-scroll-text200.png",
+      "sha256": "B93D4DF4590981D2ECB9D1D0E5E5176D633597241E0FA63A8DEB6F1CDA779805",
+      "bytes": 129624,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\046-tools-expanded-text200.png",
+      "sha256": "6A23C41B22C77A70674AE3F99D7913373188CA406826650AF6720F423EB4DD0F",
+      "bytes": 175415,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\047-recent-text200.png",
+      "sha256": "49CB5025E4A8C6667A49B7F12C659BD46166B0D537A9F389D64E25258A92B6C2",
+      "bytes": 192644,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\048-dog-product-text200.png",
+      "sha256": "77F3D9A164C12FF9AF9D6B5A4C52451771A3F36E90CC66E9B1266846ED52D456",
+      "bytes": 277962,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\049-pet-store-text200.png",
+      "sha256": "5210F2AC9A76BBEADCD48D3A8F955EC3D804E014B108B4D7A54B090A07335076",
+      "bytes": 196912,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\050-pet-store-scrolled-text200.png",
+      "sha256": "4702B57ABCE791A15720347E416535DAF2A4DA95F518B3C7FB216116B5381DE4",
+      "bytes": 208255,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\051-other-store-text200.png",
+      "sha256": "ABA739E59C2FC32210FED46ADA48E337141ACEC347EF276608C8CADC18898C1E",
+      "bytes": 160970,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\052-returned-store-text200.png",
+      "sha256": "BD5994A165BEF5185D00A98CAB02A21AFBA9D3C065A5AFB9546ECD6A46B735A4",
+      "bytes": 207717,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\053-original-order-text200.png",
+      "sha256": "0AB0D65241C00DE7868E307F36B361FEE5683E580AC1AC60F802D7931E7ED98B",
+      "bytes": 327414,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\054-orders-return-text200.png",
+      "sha256": "A955C6876B243F66451AC59D1D6CC3223DA7AE5E56ADE3E23653B45569EDB85F",
+      "bytes": 198620,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\055-shop-scale-restored.png",
+      "sha256": "B5ACEAB8059B44066F9D668B42E6AC176EC925FCEC4FE9B97A05A65016835923",
+      "bytes": 322230,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\056-saved-preservation.png",
+      "sha256": "20011D054809FDF1CFC6FDBD92BE7E6D28DF4E3B38F73C2FAB686E65F6DCBA65",
+      "bytes": 218650,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\057-profile-preservation.png",
+      "sha256": "D6755E2071FF25E82A1C91F6306378D4A451F1EB5961B5893BE8FC31C91928F6",
+      "bytes": 215782,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\058-preferences-preserved.png",
+      "sha256": "AD709137ECC0F349F176713B096F056ED379BE790A810E2DC9FA41592170784E",
+      "bytes": 177667,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\059-orders-for-address.png",
+      "sha256": "936D35154C3AD10854EF3F8CDDB001033C16763294B68187D919CE0418DE91FE",
+      "bytes": 48086,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\060-shop-reentry.png",
+      "sha256": "0B6834F537D614592525B0C9E4C06FCF2BFB861FAA9EC61F290DC40F9C56D0CF",
+      "bytes": 322556,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\061-orders-address-entry.png",
+      "sha256": "FA4ED1B6CB4CA49EB0DFEF1EFD8E17C11C0CF614D7B8443F9180FE8FE0BB5D9B",
+      "bytes": 184795,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\062-address-preservation.png",
+      "sha256": "5160866D5FF38035DDA52B0D7E229F3A7E60BA05D223789F167092EB789DB010",
+      "bytes": 153379,
+      "visualReviewed": true
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\063-final-shop.png",
+      "sha256": "A366C9EDD48D57E6912091AEC6AFE7C95FD14E13BA69B94072D8B1DCD4E9F9A0",
+      "bytes": 322478,
+      "visualReviewed": false
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\captures\\064-cart-preservation.png",
+      "sha256": "7B23E27BCF53F895CB0CAE3DE27A547862F11ACDB49AFDBDA4477E02AC278A1E",
+      "bytes": 322591,
+      "visualReviewed": true
+    }
+  ],
+  "limits": [
+    "Only declared Redmi review fixtures; no backend/provider/production acceptance.",
+    "Historical448d4a2c commit-label handoff failure remains separate; no exception applied.",
+    "Nine image files visually reviewed; remaining captures inspected through recorded XML where applicable, not claimed individually visually reviewed."
+  ]
+}

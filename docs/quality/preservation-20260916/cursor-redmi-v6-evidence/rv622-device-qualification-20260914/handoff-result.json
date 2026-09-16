@@ -1,0 +1,18 @@
+{
+  "checkpoint": "448d4a2c7c10ee195e711e49aa4cc69a593ff37b",
+  "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+  "liveRemoteEqual": true,
+  "gitStatusBytes": 0,
+  "gitStatusSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "gitStatusStderrBytes": 0,
+  "originalsDeviceClosed": 19,
+  "childDeviceClosed": "RV6-D005-C01",
+  "originalsExternalLinkUnverified": ["RV6-D009", "RV6-D010", "RV6-D014"],
+  "manifestSha256": "25DBBD3E3C71B6081BFCFE8D25311140D4D98A5716AE1BD3657890AFC1AA301A",
+  "preCommitCoordinationGate": "passed",
+  "incrementalHandoffGate": "passed",
+  "coordinationHandoffGate": "failed",
+  "coordinationFailure": "production feature commit subject is not atomic: 448d4a2c7c10ee195e711e49aa4cc69a593ff37b",
+  "agentMistake": "Evidence commit used docs(redmi) instead of required ui(redmi-v6-audit-20260913). Pre-commit validation did not validate the future commit message. This is an agent-authored commit-label defect, not a Redmi product failure.",
+  "limits": "No history rewriting or gate modification performed. A subsequent conforming commit cannot remove an earlier invalid subject from the history checked by this gate. Clean working tree and live remote equality do not imply successful handoff qualification. This receipt does not mark the all-22 goal complete."
+}

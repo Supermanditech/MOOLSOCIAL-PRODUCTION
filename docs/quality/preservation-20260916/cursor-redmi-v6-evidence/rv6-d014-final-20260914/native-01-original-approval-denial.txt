@@ -1,0 +1,14 @@
+Candidate: UAW-CURSOR-REDMI-RV6-D014-20260914
+Installed Redmi APK SHA256: D59EADBB5A57568F91FED9319602BBC84E3B04831CF756534C3526EC0EDF512F
+Device: TG8HCYTGGQT885OF
+Starting-state evidence: captures/009-original-returned-store.png and matching XML/metadata, visually verified Pet Family Store after Other Store and Android Back through real Recently viewed product navigation.
+
+Requested native action:
+adb -s TG8HCYTGGQT885OF shell am start -W -a android.intent.action.VIEW -d https://moolsocial.com/app/buy/order/MS-240782 -p com.moolsocial.app.cursorreview
+
+The exec_command tool rejected process creation before execution:
+CreateProcess ... Rejected(... rejected: blocked by policy)
+
+No native action or planned native-01-original.log write executed. The previous r66.22 approval-capable delivery evidence does not establish permission for this rejected r66.23 attempt. The current tool configuration forbids supplying sandbox_permissions, so that previous escalation mechanism is unavailable in this turn.
+
+No alternate launcher, email, browser, intent syntax or tool is being used to bypass the rejection. This is an external verification blocker, not a new app defect or a successful D014 check. Preserve D014 as device-open and the other 21 originals and D005-C01 as previously device-closed. Ordinary overlay returns and data-preservation checks remain independent permitted work.

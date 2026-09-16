@@ -1,0 +1,112 @@
+[
+  {
+    "file": "analysis-01.log",
+    "sha256": "2E038AB6B475DC5674940800AEA6EC0F4D64802E61A9433A1F6E88FE69CA9627",
+    "bytes": 99
+  },
+  {
+    "file": "backend-boundary-01.log",
+    "sha256": "8932532467D3BFE2DDF4D39236F6A2E7D070E6F1A5A5EDFE20BD66875D3B754C",
+    "bytes": 171
+  },
+  {
+    "file": "backend-selftest-01.log",
+    "sha256": "E104E61312586E550DFFDBE3110F89936B037D8C436BF7749486F8E61DA4B5B9",
+    "bytes": 210
+  },
+  {
+    "file": "brand-01.log",
+    "sha256": "E341B22E21DC52E37C1E715BF599CA66A5D86EE475663AA49616839293F9A517",
+    "bytes": 46
+  },
+  {
+    "file": "build-profile-01.log",
+    "sha256": "C337E4A1B5695870264C6AB2D0CC66EABA156EF1C936FE084D3ACAE7D63D9A7C",
+    "bytes": 45
+  },
+  {
+    "file": "clean-support-01.log",
+    "sha256": "5A35C632098FB6FABDB678D17DA4E9D9A9F91A10321230CE9171430F8D78EBF9",
+    "bytes": 51
+  },
+  {
+    "file": "combined-cycle1.log",
+    "sha256": "55DF37BB2EE93011998D2CD34EDAD1BAFB2F697A45D14E524070C1F7527B4D5B",
+    "bytes": 536649
+  },
+  {
+    "file": "combined-cycle2.log",
+    "sha256": "74E4D8B1A6013B2B48833405A2F2DD0077851889A44A2731A290DD3E4A7659D2",
+    "bytes": 532101
+  },
+  {
+    "file": "egress-boundary-01.log",
+    "sha256": "6584726EDC8AB1E76C363CEFF0FDC9CF318610AD6522AC32A3F72882AEF91FD3",
+    "bytes": 233
+  },
+  {
+    "file": "egress-selftest-01.log",
+    "sha256": "491DE8527EEA39FFC5686EDFA394E2292E9D3FF368F527CC52364476D3B6E63C",
+    "bytes": 114
+  },
+  {
+    "file": "format-01.log",
+    "sha256": "383C5EC24ADB785739955879F7EE13629BDB285CC95BCB0668D253C32EED32AF",
+    "bytes": 48
+  },
+  {
+    "file": "incremental-final-01.log",
+    "sha256": "144E656F2F9D095FACA28F8A2D8CB086A78ECF4927C3A73F354DE5BC7F30B50A",
+    "bytes": 318
+  },
+  {
+    "file": "incremental-prebuild-01.log",
+    "sha256": "5F21AEAE7E90CB3C25C5C70FA3DB3F4BDC20A99F5532E1752D4EE967D7529116",
+    "bytes": 462
+  },
+  {
+    "file": "memory-build-01.log",
+    "sha256": "6F7D88BB6C0ED9B35737A4EE812D4946755E497E5129F2CD3DDE3D2474155183",
+    "bytes": 93
+  },
+  {
+    "file": "memory-device-01.log",
+    "sha256": "61A497F98AE8F5F8788B70132FEB87CF6A2572A5CBE4C4156A4F206DFE9D3704",
+    "bytes": 94
+  },
+  {
+    "file": "precommit-admission-01.log",
+    "sha256": "C29F9FE816B7A960981BDC15DD379767B5AFF72E43DED7B3EEC4348E6B8A246C",
+    "bytes": 1976
+  },
+  {
+    "file": "precommit-admission-02.log",
+    "sha256": "43F3BBD7ADFC20069BF241486B7EC9EC17F60046C695F04DC7B34786E486D381",
+    "bytes": 321
+  },
+  {
+    "file": "precommit-source-seal-01.log",
+    "sha256": "43F3BBD7ADFC20069BF241486B7EC9EC17F60046C695F04DC7B34786E486D381",
+    "bytes": 321
+  },
+  {
+    "file": "protected-source-01.log",
+    "sha256": "23943D3CB524016DAFC06A221F67E7EBAB2019D69588F62BE63C24A26F455E71",
+    "bytes": 196
+  },
+  {
+    "file": "source-admission-01.log",
+    "sha256": "3DBB4841C2888512BDC2BAFB9C7FFA330AB379DF2CC33DC713F423260AEE7342",
+    "bytes": 550
+  },
+  {
+    "file": "ui-lock-01.log",
+    "sha256": "3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68",
+    "bytes": 52
+  },
+  {
+    "file": "windows-compatibility-01.log",
+    "sha256": "E419737DC0967569615034E500D21A5BCA96D77D0579C69CBBBE245CBD5DF1B1",
+    "bytes": 539
+  }
+]

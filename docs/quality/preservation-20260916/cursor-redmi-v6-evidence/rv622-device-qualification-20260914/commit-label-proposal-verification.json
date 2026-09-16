@@ -1,0 +1,32 @@
+{
+  "liveGitBindings": {
+    "commit": "448d4a2c7c10ee195e711e49aa4cc69a593ff37b",
+    "parent": "d0dfea24e52c3c60c41d0cd01fcdcd2badfbcd6c",
+    "subject": "docs(redmi): close D005 persistence with r66.22 device evidence",
+    "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+    "apps": "e37147034016157ab241e26f0c8be091d4561a9c",
+    "parentApps": "e37147034016157ab241e26f0c8be091d4561a9c",
+    "owners": {
+      "docs/quality/cursor-redmi-v6-audit-20260913/DEFECTS.md": "dd866dd5ee2f4e7637236095563bb15f568680ce",
+      "docs/quality/cursor-redmi-v6-audit-20260913/EVIDENCE.csv": "18c272611cb3ffd9e815cbfd476eef073778b8cd",
+      "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md": "d687685148c71995378459ec909e825c72b97050",
+      "docs/quality/cursor-redmi-v6-audit-20260913/scope-state.json": "17ae58a35b227394f23d8afb65ab8153f00d6137"
+    }
+  },
+  "negativeSpecificationCases": [
+    "changed-commit",
+    "changed-parent",
+    "changed-subject",
+    "changed-branch",
+    "changed-apps",
+    "changed-parentApps",
+    "changed-blob-DEFECTS.md",
+    "changed-blob-EVIDENCE.csv",
+    "changed-blob-UAT.md",
+    "changed-blob-scope-state.json",
+    "extra-source-owner",
+    "missing-owner"
+  ],
+  "repositoryGateModified": false,
+  "limitation": "Specification check only; proposed exception has not been applied and actual handoff remains failed."
+}

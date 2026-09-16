@@ -1,0 +1,253 @@
+{
+  "sourceCommit": "ed39d76a7d98583ef6894c6dd4a5927ce954d85f",
+  "device": "TG8HCYTGGQT885OF",
+  "candidate": "UAW-CURSOR-REDMI-RV6-FIXES-20260914",
+  "apkSha256": null,
+  "scope": "22 originals only; register distinct children and stop after the round; no child implementation",
+  "frozenPassedRecords": 514,
+  "preservedEvidenceArtifacts": 1177,
+  "records": [
+    {
+      "ticket": "RV6-D001",
+      "sourceHeading": "## RV6-D001 — Store empty-search recovery recommends an unavailable area control",
+      "sourceSectionSha256": "df3ddb981a08849b50eb0dbec6f80f94be7700481297a1fe29492d6de197e0ab",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Journey: product → Visit store → Browse all products → Search this store → enter `zzzzzz`.",
+        "- Expected: recovery guidance should name actions available within this Store scope, such as changing/clearing the search or category. A shopper should not be directed to hunt for a nonexistent area control or leave the selected Store without explanation."
+      ]
+    },
+    {
+      "ticket": "RV6-D002",
+      "sourceHeading": "## RV6-D002 — Removing the last item while browsing a Store exits the Store",
+      "sourceSectionSha256": "f0b8c39c62fcfd4c0ac6d846ed727c34158af610dc5d1aad5f0878578ffdee7b",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Journey: Turmeric product → Visit store → Browse all products → Fruits & vegetables → add Fresh tomatoes 1 → open cart → Continue browsing Mool Market 000001 → Browse all products → decrement Fresh tomatoes from 1 to 0.",
+        "- Precondition: only this test-added item in Shop cart; selected Store category still retained on return (capture 044).",
+        "- Expected: removing an item changes the basket and removes the empty basket rail while leaving the customer in the Store catalogue and selected category. General Shop is a different browsing context."
+      ]
+    },
+    {
+      "ticket": "RV6-D003",
+      "sourceHeading": "## RV6-D003 — Order Chat presents a stale delivery promise without its unavailable qualifier",
+      "sourceSectionSha256": "89927b41217da598fe79737f6b843c18d00ccae2a8587d40c166985b250662ac",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Journey: open MS-NEW-09 tracking; Refresh produces Order updates unavailable and last recorded estimate/update unavailable (112); open Help; expand Order conversation context (146–147).",
+        "- Expected: all current order-support surfaces preserve the estimate freshness/unavailability state; an unconfirmed stored relative promise must not appear as an unqualified current countdown."
+      ],
+      "additionalRequiredOccurrences": [
+        "Order Chat after unavailable tracking refresh112/147",
+        "Historical on-screen invoice and freshly downloaded PDF occurrence480; preserve old PDF",
+        "Shopping alert freshness510-511 and exact order destination"
+      ]
+    },
+    {
+      "ticket": "RV6-D004",
+      "sourceHeading": "## RV6-D004 - Display-name validation sentence is clipped at normal text size",
+      "sourceSectionSha256": "1725edb8a0068870c2752bb9d1c22a3b5f8cca56431ebb864979abe3d7596116",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Journey: Buy account drawer > Personal profile > Display name > submit whitespace-only draft. Validation rejects it; Android Back hides keyboard.",
+        "- Expected: complete validation guidance fits or wraps, including characters, without requiring inference from clipped content."
+      ]
+    },
+    {
+      "ticket": "RV6-D005",
+      "sourceHeading": "## RV6-D005 - Hindi preference changes its value but observed Buy and preference UI remain English",
+      "sourceSectionSha256": "b5cba228b1ee59a87800d3411f4c8bc8d3b2afa58f420d2169f2fe421e801198",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Journey: Buy account > Personal profile > Language > Privacy and preferences > Language > Hindi; return to Buy catalogue.",
+        "- Expected: choosing an offered app language applies to supported customer navigation and guidance; unavailable coverage must be explicit rather than implying the language changed throughout the experience. Supplier-authored product names are not required to be translated by this finding."
+      ]
+    },
+    {
+      "ticket": "RV6-D006",
+      "sourceHeading": "## RV6-D006 - Cancelling sign-in loses the originating Buy Back route",
+      "sourceSectionSha256": "18cb67dadeecbe9288c9e1d0f961d5e7c217d974d2825f4b700b3c1b9c2c789c",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Expected: cancellation preserves the originating Buy stack/context so subsequent Back restores shopping, just as the control path does."
+      ]
+    },
+    {
+      "ticket": "RV6-D007",
+      "sourceHeading": "## RV6-D007 - Related-product Back skips the preceding product detail",
+      "sourceSectionSha256": "d12cbfed718f078d7ea5daa7c196dc0e110c48cfec7a611b4f04178d18b57adc",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Reproduction: Saved Shop wheat atta2 > product details > scroll to You may also like > related wheat from Sardarpura Supermart > Android Back.",
+        "- Expected: exploring a related offer preserves the preceding product-detail context for Back; leaving the original product then returns to its Saved/catalogue origin."
+      ]
+    },
+    {
+      "ticket": "RV6-D008",
+      "sourceHeading": "## RV6-D008 - Wholesale buyer label runs into the business name",
+      "sourceSectionSha256": "5545018860d1bf2ec9fd2eb8702a512a137de3cbe304cd72d70656861cc8764b",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "- Journey: Orders > search Wholesale > Delivered > PO-240728 View order.",
+        "- Expected: buyer-type label and business-name value have a visible separation or wrap/stack so they read as distinct fields at supported text sizes."
+      ]
+    },
+    {
+      "ticket": "RV6-D009",
+      "sourceHeading": "## RV6-D009 - Confirmation deep link displays success without a confirmed purchase",
+      "sourceSectionSha256": "3a8301df7951de49bc1a393f10b375abef203e8645e9222a5d97304446e2b92c",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: with empty cart and no order submitted,deliver declared HTTPS intent https://moolsocial.com/app/buy?view=confirmation to installed Cursor Review. Capture358 shows green check,Order placed,0 products/0 total,0 deliveries,and current saved recipient/address. This is a device-reproduced false-success state,not a completed order/payment.",
+        "Expected: require authoritative confirmed purchase identity and nonempty accepted orders before any success claim;otherwise show unavailable/recovery or return safely without inventing success or using an unrelated saved address."
+      ]
+    },
+    {
+      "ticket": "RV6-D010",
+      "sourceHeading": "## RV6-D010 - Recovery return changes selected destination while retaining order detail",
+      "sourceSectionSha256": "dd001aa5fa6d63860f8d388ac830685e55c176dca62390b874bc6119bcfcbec8",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: open existing MS-240782 via declared HTTPS /app/buy/order/MS-240782 (371;Orders selected). Open declared /app/buy?view=recovery&recovery=delay,then Return to order372-373. Same order/detail retained,but Shop is selected in bottom rail instead of original Orders.",
+        "Expected: exact return context includes originating destination as well as order ID;tracking should restore original Orders selection."
+      ]
+    },
+    {
+      "ticket": "RV6-D011",
+      "sourceHeading": "## RV6-D011 - Wholesale product repeats summary data across several content sections",
+      "sourceSectionSha256": "559c5c1de68a9befb535a5c0083f3e55b018f86f5ac7402ad486b97b8d137bcc",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: Wholesale Fresh tomatoes1/10kg580 product407;scroll408-410. Product details repeats Brand not provided/variant/pack/policy;Product and pack information repeats product/pack/unit price;Highlights repeats variant/unit price/policy;Specifications repeats brand/pack/variant;Description repeats title/variant/pack/unit price. Customer must scroll through repeated information before ratings/reviews. This is actual default content,not distinct technical specifications.",
+        "Expected: preserve useful supplier-specific information while suppressing identical summary-only highlights/specifications/generated description in Wholesale as in Shop. Keep the price/MOQ/pack decision accessible;do not remove genuinely distinct supplier facts."
+      ]
+    },
+    {
+      "ticket": "RV6-D012",
+      "sourceHeading": "## RV6-D012 - Store listing count is labelled available despite non-orderable products",
+      "sourceSectionSha256": "dd26ed5a57ef3289ebdf9834a9ba0dbbac37a14c7b61988329ecbfd0ebb27fbd",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: closed Pet Family Store423;View all428. Header says Retailer - 4 available products in green while all four cards say Store closed and expose information instead of Add. Count describes listed products,not current orderability. Closed state and purchase restriction remain correctly enforced.",
+        "Expected: use neutral listing count or distinguish listed from currently orderable products;do not label total listings available when current facts reject ordering."
+      ]
+    },
+    {
+      "ticket": "RV6-D013",
+      "sourceHeading": "## RV6-D013 - Store conversation expands without any additional content",
+      "sourceSectionSha256": "64f764aecf49cd75d85e66bc6987e188688601b036e036fa18eea69ea4a969c6",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: Pet Family Store431 Ask opens correct conversation432. Expand Store conversation433 reveals only a divider and blank spacing, with no extra facts or destination. AndroidBack434 restores exact Store. No message sent;automatic draft retained unsent.",
+        "Expected: expose expansion only when additional facts or an applicable product action exist;otherwise retain a compact static context summary. Do not invent missing facts."
+      ],
+      "requiredReturnDependency": "Store-only compact context and exact Store/product return after Chat, retained unsent draft; do not send."
+    },
+    {
+      "ticket": "RV6-D014",
+      "sourceHeading": "## RV6-D014 - Warm order link with Store overlay produces navigation error",
+      "sourceSectionSha256": "fb54b828fd8194fbfd8f402e38fcf9cd101a6d8bf89a41f274cfa1a060f2cb99",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: Pet Family Store sheet remains open after Other Store navigation and Back440. Deliver declared HTTPS https://moolsocial.com/app/buy/order/MS-240782 to installed package. Capture441 shows Flutter navigator.dart assertion line5909 !_debugLocked rather than order. App-scoped logcat at07:33:45 additionally records navigator.dart3249 !navigator._debugLocked in _RouteEntry.handlePush. Exact root cause not established;do not equate assertions with release behavior.",
+        "Expected: serialize declared-link navigation with modal dismissal safely;reach requested order or show recoverable unavailable state without error or unrelated task exit. Shared route/modal integration owner must investigate;no product implementation during audit. This is distinct from recovery rail-selection D010 and sign-in cancellation D006."
+      ],
+      "requiredReturnDependency": "Warm declared order link over original/nested Store overlays; no navigator error; exact requested order or honest unavailable recovery; retained cart/Saved/address and affected origin scroll."
+    },
+    {
+      "ticket": "RV6-D015",
+      "sourceHeading": "## RV6-D015 - Recently viewed offers Add for non-orderable products",
+      "sourceSectionSha256": "fee763c65834c98a12cb512441ed55116addaf075125bcc0bb29607f7f0dd9d6",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction:SavedShop -> Sort/filter483 -> Shoppingtools484-485 -> Recentlyviewed486. Adultdogfood from closed PetFamilyStore shows Delivery time confirmed at checkout and enabledAdd;Dailycare shampoo says Currently unavailable but also enabledAdd. Taps487/488 leave Add unchanged and no visible recovery explanation in retained sheet captures. Product489 explicitly confirms Storeclosed/tomorrow8am;AndroidBack490 returns exacthistory. No item added or restriction bypass observed."
+      ]
+    },
+    {
+      "ticket": "RV6-D016",
+      "sourceHeading": "## RV6-D016 - New Shop offers alert opens ordinary catalogue",
+      "sourceSectionSha256": "756de3fee72d521832904357ea7c8d8ef3eb902c38a704256372e0b59166d883",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction:Shopping settings -> Shopping alerts510;tap New Shop offers from516. Destination517 is ordinary Scheduled Shop product grid with Shop selected,not Offers or its product/payment offer content. AndroidBack518 correctly restores alert sheet. Customer cannot reach advertised offer results through this alert. No cart/order/message change."
+      ]
+    },
+    {
+      "ticket": "RV6-D017",
+      "sourceHeading": "## RV6-D017 - Saved GST profile selected chip has unreadable identity",
+      "sourceSectionSha256": "a2be1780d6b27e55d3f3a2e3a96a2f9988d0f41400474947378b0a1930163cd5",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction:one isolated wheat pack279;Confirm order -> enable GST -> Add;enter local test name AuditRedmiTest, host-fixture GSTIN and test billing text;leave temporary reuse enabled;Use GST details. Captures691 and settled692 show dark selected Saved GST details chip with no readable name and low-contrast check/remove icons. The separate green current-details card is readable. Customers cannot identify the saved profile through its chip, especially when choosing among profiles. Expected:readable profile identity and selected/remove affordances. Source cause not established;no product correction. No order or payment submitted."
+      ],
+      "dataPreservation": "Only necessary temporary local basket/GST state; restore original data; no order/payment submission."
+    },
+    {
+      "ticket": "RV6-D018",
+      "sourceHeading": "## RV6-D018 - Product Back loses paginated search destination and position",
+      "sourceSectionSha256": "7ef7226cdef6611deaa2d06449b54b58432eb6e886c13147a5b4d83de330fb58",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: Scheduled Shop -> search milk -> keyboard Search after settled query (898) -> Next (899, range41-80) -> open Toned fresh milk1184 (900) -> Android Back. Settled902 returns main Shop catalogue starting milk8/cereal74/chocolate144, not originating search page41-80. Query milk is retained but page and dedicated search surface are lost. Capture901 is a transition frame, not a separate blank-screen defect. Expected: return to the same search result page and retained query so the customer can continue browsing without repaging. No cart mutation or real transaction. Distinct from related-product Back D007: origin here is paginated search results. Ordinary catalogue page return passed round124; it does not cover this branch. Root cause and implementation remain pending; preserve exact route/search context in correction."
+      ]
+    },
+    {
+      "ticket": "RV6-D019",
+      "sourceHeading": "## RV6-D019 - Minimized delivery rail retains collapse chevron instead of delivery identity",
+      "sourceSectionSha256": "3028afb0df7b261946e7db253595c01a3fa7fbbbfbea2d2acb7385ee5f3fad80",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [],
+      "dispositionNote": "Evidence-reconciled, not a code correction. Confirm minimized rail identity/count and reopen on successor; do not report a fix that was not made."
+    },
+    {
+      "ticket": "RV6-D020",
+      "sourceHeading": "## RV6-D020 - Message audience sheet clips final privacy explanation",
+      "sourceSectionSha256": "995869c4ec2551dc8702f25968b0bbdb5203016a0c685af0318b7268fef0bfba",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: public Buy -> Chat -> More -> Chat settings -> Privacy and spam -> Who can message you. Captures931 and settled932 show No new conversations explanation only as Existing conversations stay at the Android navigation boundary. Upward swipe933 does not reveal the rest. Source chat_settings_screen.dart529 supplies Existing conversations stay available; no one new can start. Customer cannot read the complete consequence before choosing a privacy setting. Expected: complete readable option descriptions above system navigation, with scrolling when needed. Source85-125 uses a Column in sheet padding; exact layout correction remains unimplemented. No permission choice selected and no service update issued. Separate from existing Buy address validation clippingD004; distinct shared Chat surface and reproduction."
+      ]
+    },
+    {
+      "ticket": "RV6-D021",
+      "sourceHeading": "## RV6-D021 - Empty-cart catalogue retains expanded quantity space until Shop reentry",
+      "sourceSectionSha256": "9b5f5fb71e35c086bbdeb23ab30befb745acc87db7f960f6981d1a92e3d0ba60",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: Scheduled Shop empty cart1037 -> Add wheat2 -> quantity edit/update/cancel round150 -> remove both units using minus. Capture1043 shows Add restored, but first-row bottom remains about880 rather than initial792. Settled1044 retains the same extra88 physical pixels per row. Switch to Wholesale and back to Shop:1045 restores row bottom792 and the compact image area without changing cart or saved state. Expected: restore compact empty-cart layout when quantity controls disappear, without requiring module reentry. Customer impact: fewer products/actions visible while browsing after cart removal. No clipped content, lost item or broken Add claim. Source catalogue8801-8864 conditionally adds quantity-label height; exact stale width/state cause remains unproven. This promotes round150 QTY-ROUND150-03 observation to confirmed minor defect; it is not a second independent finding. Original Saved1, empty cart and Scheduled mode preserved. No implementation."
+      ],
+      "dataPreservation": "Only necessary temporary local basket/GST state; restore original data; no order/payment submission."
+    },
+    {
+      "ticket": "RV6-D022",
+      "sourceHeading": "## RV6-D022 - Shopping area chooser does not identify the selected area",
+      "sourceSectionSha256": "37fbd84020dd4c6c7b740a65a4704b86da19d545ab1e789a106853771496f073",
+      "redmiDisposition": "not_started",
+      "requirements": "Complete recorded reproduction, expected correction, all applicable local-fix dependencies, necessary Back/restoration; preserve state; bind evidence to installed successor APK SHA256",
+      "reproductionAndExpected": [
+        "Reproduction: original Any-area catalogue -> Shopping area1087 -> choose Jaipur ->1088 suppliers change to Mool Market000002;search milk1089 explicitly reports Jaipur. Clear active query and reopen Shopping area1090: Jaipur is an ordinary unmarked row, no active-city summary is shown, and the chooser looks the same as1087 before selection. The In this area chip marks a scope, not the selected city. Expected: identify active city/area (or Any area) in the chooser so a customer can verify the scope before choosing another supplier. Actual selection works; no claim of wrong filtering or lost address. Source catalogue1719-1743 renders ordinary Any area/area ListTiles with no selected indication. Different from provider lookup B001 and earlier address validation clipping. Tap Any area1091 restores original catalogue supplier000001 and saved wheat marker;Saved1 and emptycart preserved. No delivery-address edit, permission change or product implementation."
+      ]
+    }
+  ]
+}

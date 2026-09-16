@@ -1,0 +1,13 @@
+{
+  "label": "041-wholesale-fixture-inventory",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:05:16.196393+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "82a245c78c350661448f5ecf3d48aa5d127d811d4c8985dfb3494842354e6aa6",
+    ".xml": "49f96af826c06f97489c32f5c29f952298750da93380ec60d4ab2dafbbb6208f",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

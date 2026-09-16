@@ -1,0 +1,28 @@
+Premium-motion policy state passed: policy=BUY-PREMIUM-MOTION-POLICY-20260802; dispositions=4; candidate=UAW-CURSOR-REDMI-V6-REVIEW-20260913.
+APK regression pre-build gate passed: candidate=UAW-CURSOR-REDMI-V6-REVIEW-20260913; mode=debug; source=3C71822A4E8051AA469D0F07D3C406BB314A46F883E99D322973A6066F87F797; gates=13.
+WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): firebase_app_check, firebase_auth, firebase_core, firebase_crashlytics, mobile_scanner, speech_to_text
+Future versions of Flutter will fail to build if your app uses plugins that apply KGP.
+
+Please check the changelogs of these plugins and upgrade to a version that supports Built-in Kotlin.
+If no such version exists, report the issue to the plugin. If necessary, here is a guide on filing 
+an issue against a plugin: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-app-developers#report-incompatible-kotlin-gradle-plugin-usage-to-plugin-authors
+
+If you are a plugin author, please migrate your plugin to Built-in Kotlin using this guide: https://docs.flutter.dev/release/breaking-changes/migrate-to-built-in-kotlin/for-plugin-authors
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+APK production plugin integrity passed: candidate=UAW-CURSOR-REDMI-V6-REVIEW-20260913; package=com.moolsocial.app.cursorreview; mappingAware=false; registrant=true; firebaseCore=true; sharePlus=true; integrationTest=allowed_debug_only.
+CandidateId=UAW-CURSOR-REDMI-V6-REVIEW-20260913
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-CURSOR-REDMI-V6-REVIEW-20260913;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r66.19
+VersionCode=2026091301
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\docs\quality\cursor-redmi-v6-audit-20260913\apk-regression-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\docs\quality\cursor-redmi-v6-audit-20260913\apk-regression-state.json
+Branch=work/cursor-ui/redmi-v6-audit-20260913
+HEAD=ae084c5ea03b569c4746c651b7f6f6d7b545beca
+SourceFingerprint=3C71822A4E8051AA469D0F07D3C406BB314A46F883E99D322973A6066F87F797
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\docs\quality\cursor-redmi-v6-audit-20260913\uaw-cursor-redmi-v6-review-20260913-device-review-debug.apk
+Bytes=210792649
+SHA256=97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7
+BuiltAt=2026-09-13T02:06:54.4358013+05:30

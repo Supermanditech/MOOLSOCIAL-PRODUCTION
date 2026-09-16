@@ -1,0 +1,22 @@
+{
+  "candidate": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
+  "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+  "applicationSource": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+  "device": "TG8HCYTGGQT885OF",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r66.24-cursorreview",
+  "versionCode": 2026091405,
+  "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+  "installedApkPath": "/data/app/~~KCM7ULv8RLxFmV3pA54ahw==/com.moolsocial.app.cursorreview-ErxYYBvbHVj5HM40-vqFWg==/base.apk",
+  "installedChecksumEqual": true,
+  "firstInstallTimes": [
+    "firstInstallTime=1970-01-01 05:30:00",
+    "firstInstallTime=2026-08-27 15:09:48"
+  ],
+  "firstInstallTimesPreserved": true,
+  "dataClearPerformed": false,
+  "installedAt": "2026-09-14T21:31:05.391784+05:30",
+  "installLogSha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+  "userDataUiVerification": "pending",
+  "deviceQualification": "D014 pending"
+}

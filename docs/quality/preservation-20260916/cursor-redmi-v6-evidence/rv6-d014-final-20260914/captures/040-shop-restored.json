@@ -1,0 +1,13 @@
+{
+  "label": "040-shop-restored",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T20:23:02.816162+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "3abe7581407d7a6d5f449efac5741dce50f9c959b1d19b26b3a54b7db1ebfd9a",
+    ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

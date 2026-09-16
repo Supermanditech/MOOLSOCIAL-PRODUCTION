@@ -1,0 +1,31 @@
+{
+  "baseline": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+  "applied": false,
+  "files": [
+    {
+      "path": "config/codex-subagent-coordination-policy.json",
+      "baseSha256": "dc63592a6fb3c797373de481816f43ebb2385cf9d2a97de8d3086213051afcb0",
+      "proposedSha256": "937349827187c911f222cec698ab65a7a62b934fa5d7985b25c5b1573e63f65f"
+    },
+    {
+      "path": "scripts/check-codex-subagent-coordination-policy.ps1",
+      "baseSha256": "6cc4f32461e564e114089d5f37a0c08800104e2b45a27f840f8617fdbfb57a2a",
+      "proposedSha256": "32dce04412fca0ac778ed2a0505f3bff939d96c22403e1db2c56ea2534608aaa"
+    },
+    {
+      "path": "scripts/check-buy-protected-baseline.ps1",
+      "baseSha256": "a2623daef3736ef07fb9cded6175a0c9a503f54a34110e637b18f5c296ba5b30",
+      "proposedSha256": "138b4edace062412470f1f83c30c8495d381cccdd31c6193442c0b4152e7ce7d"
+    },
+    {
+      "path": "scripts/check-approved-ui-locks.ps1",
+      "baseSha256": "4b84764ade01480b469333f191d722fc72c07f9211133c68d128c3665436fe13",
+      "proposedSha256": "3670595e6e07e564fba778a607b1501fe6bff3115a52d8a2f28cc011f09368dc"
+    },
+    {
+      "path": "docs/quality/UAW-CURSOR-REDMI-V6-AUDIT-20260913.md",
+      "baseSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "proposedSha256": "385655840120343aab63e76edcd3129586bab49b894ef97ac863294514f9d19e"
+    }
+  ]
+}

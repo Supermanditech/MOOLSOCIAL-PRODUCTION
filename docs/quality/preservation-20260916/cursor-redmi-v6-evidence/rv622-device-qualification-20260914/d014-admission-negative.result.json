@@ -1,0 +1,40 @@
+{
+  "source": "4221158fead95a89047e3408aaeb11c9a12dd135",
+  "backendCheckerSha256": "F3DF47A393CBB5F8DD92645516265140E6E4FC9D70C58B48934AF6BC6FC4E98D",
+  "cases": [
+    {
+      "name": "exact source and screen",
+      "rejected": false,
+      "findingCount": 0
+    },
+    {
+      "name": "wrong source",
+      "rejected": true,
+      "findingCount": 1
+    },
+    {
+      "name": "changed content hash",
+      "rejected": true,
+      "findingCount": 1
+    },
+    {
+      "name": "wrong owner",
+      "rejected": true,
+      "findingCount": 1
+    },
+    {
+      "name": "review admission absent",
+      "rejected": true,
+      "findingCount": 1
+    },
+    {
+      "name": "direct network client added",
+      "rejected": true,
+      "findingCount": 2
+    }
+  ],
+  "existingBackendSelfTest": "passed",
+  "existingEgressSelfTest": "passed",
+  "appFilesMutated": false,
+  "deviceClosureEstablished": false
+}

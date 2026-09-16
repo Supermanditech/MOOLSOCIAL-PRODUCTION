@@ -1,0 +1,51 @@
+{
+  "artifacts": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-focused-01.log",
+      "bytes": 855,
+      "sha256": "ff304f1635e3dcbd61c2b8fe8ed321f89dd044acbcd7f88705f3ef587cd79fe4"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-connected-01.log",
+      "bytes": 11042,
+      "sha256": "e6d20534c711501808628d2a4ab3f9f3c0aa66cfbfc5184afa1020901607cbd3"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-analysis-01.log",
+      "bytes": 99,
+      "sha256": "78bac36aaeadbfb56c1ce88b6586681ce756c59ed445ed44a4b19ccce9ca2018"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-visual-01.log",
+      "bytes": 568,
+      "sha256": "334361e374514ed508f0516b742a95f1c4ccee14c428a455ff01ef0f1b9ca26c"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\guard-cases-01d6792be7c648c8ac862582f52fe7d2\\results.json",
+      "bytes": 1722,
+      "sha256": "5242927f5ac8ac15ce8fc58c43337c537bb5c3933fefd724db4980057d0302fe"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-visual-01\\rv6-d005-disclosure-text-1.0.png",
+      "bytes": 100316,
+      "sha256": "89eb98540900a791fe9ce2825d8f89484b0c53245d362962e082564d65f50feb"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-visual-01\\rv6-d005-disclosure-text-2.0.png",
+      "bytes": 75164,
+      "sha256": "36c968919d6384ce6c0ef5cf05d753a8d4447bd2a5eaf2434f9d597fe449a2e2"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-visual-01\\rv6-d005-selected-text-1.0.png",
+      "bytes": 143571,
+      "sha256": "44ea3664c166c5b0404f53d98e568eec867554815ec238dc43ede8b229bebbd6"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-fixture-prerequisite-20260914\\d005-c01-visual-01\\rv6-d005-selected-text-2.0.png",
+      "bytes": 76778,
+      "sha256": "ee42b1fa4b4ee90438f3c8a4d8a953e786c71842d064e033b60c529fe73bf7be"
+    }
+  ],
+  "policyOnlyThreeOwners": true,
+  "visualLimit": "Host Hindi glyph absent; no device typography or cold-relaunch qualification inferred."
+}

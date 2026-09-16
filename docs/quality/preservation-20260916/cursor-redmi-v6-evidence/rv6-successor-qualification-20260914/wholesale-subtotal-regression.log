@@ -1,0 +1,7 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart
+00:00 +0: Wholesale Cart distinguishes products, packs and landed total
+00:01 +1: scoped Wholesale header never leaks mixed-cart totals
+00:02 +2: Wholesale quantity controls explain MOQ removal exactly
+00:03 +3: product review and checkout return preserve Wholesale Cart
+00:04 +4: compact Android and iOS insets retain the Cart action
+00:05 +5: All tests passed!

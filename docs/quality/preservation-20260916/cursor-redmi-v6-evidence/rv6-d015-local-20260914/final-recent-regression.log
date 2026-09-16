@@ -1,0 +1,31 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart
+00:00 +0: R669 Recent last Add clears Android navigation shop 1.0
+00:02 +1: R669 Recent last Add clears Android navigation shop 2.0
+00:03 +2: R669 Recent last Add clears Android navigation wholesale 1.0
+00:04 +3: R669 Recent last Add clears Android navigation wholesale 2.0
+00:05 +4: R664 Recent keeps the complete arrival deadline for pasta
+00:06 +5: R664 Recent keeps the complete arrival deadline for w-rice-50kg
+00:07 +6: R66 catalogue 029 030 complete shop 320.0 text1.0
+00:08 +7: R66 catalogue 029 030 complete shop 320.0 text2.0
+00:09 +8: R66 catalogue 029 030 complete shop 360.0 text1.0
+00:10 +9: R66 catalogue 029 030 complete shop 360.0 text2.0
+00:11 +10: R66 catalogue 029 030 complete shop 430.0 text1.0
+00:12 +11: R66 catalogue 029 030 complete shop 430.0 text2.0
+00:13 +12: R66 catalogue 029 030 complete wholesale 320.0 text1.0
+00:15 +13: R66 catalogue 029 030 complete wholesale 320.0 text2.0
+00:15 +14: R66 catalogue 029 030 complete wholesale 360.0 text1.0
+00:16 +15: R66 catalogue 029 030 complete wholesale 360.0 text2.0
+00:17 +16: R66 catalogue 029 030 complete wholesale 430.0 text1.0
+00:18 +17: R66 catalogue 029 030 complete wholesale 430.0 text2.0
+00:19 +18: R66 Recently Viewed fits s-tomato at 320.0 and 200 percent
+00:20 +19: R66 Recently Viewed fits s-tomato at 360.0 and 200 percent
+00:20 +20: R66 Recently Viewed fits s-tomato at 430.0 and 200 percent
+00:20 +21: R66 Recently Viewed fits s-noodles at 320.0 and 200 percent
+00:21 +22: R66 Recently Viewed fits s-noodles at 360.0 and 200 percent
+00:21 +23: R66 Recently Viewed fits s-noodles at 430.0 and 200 percent
+00:21 +24: R66 Recently Viewed fits w-notebook at 320.0 and 200 percent
+00:22 +25: R66 Recently Viewed fits w-notebook at 360.0 and 200 percent
+00:22 +26: R66 Recently Viewed fits w-notebook at 430.0 and 200 percent
+00:22 +27: recently viewed keeps exact products, restores and stays bounded
+00:22 +28: recently viewed reopens exact variant and clears at large text
+00:23 +29: All tests passed!

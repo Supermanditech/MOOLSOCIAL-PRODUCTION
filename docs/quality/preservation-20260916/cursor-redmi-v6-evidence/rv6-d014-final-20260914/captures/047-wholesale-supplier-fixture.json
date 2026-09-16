@@ -1,0 +1,13 @@
+{
+  "label": "047-wholesale-supplier-fixture",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:09:05.183670+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "ceae1a9f3084d0788fcd490e25462bae420684140a45f7bd5825698537aebe7e",
+    ".xml": "474430cee43a114bc1998f7fa68df6450196b5a7dae0326fb0e16236026982a2",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

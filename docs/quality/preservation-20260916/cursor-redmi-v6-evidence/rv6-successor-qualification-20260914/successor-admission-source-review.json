@@ -1,0 +1,164 @@
+{
+  "candidate": "9b7e5aa7fddc08517432f9b3932da5a36ef7a92d",
+  "baseline": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+  "qualification": "admission preparation only; combined regression pending; not build authorization or security qualification",
+  "changedOwners": [
+    {
+      "path": "apps/mobile/lib/features/buy/buy_v2_shopping_alerts.dart",
+      "sha256": "6811690e8de8466f5b5da0c688c583af3ad766f269f41ee510d27c3b8d921d9c"
+    },
+    {
+      "path": "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
+      "sha256": "bb3d2ce9822798fc82ae9fd9dad4b32de8ee6d11ac837e0c781138b815c98b30"
+    },
+    {
+      "path": "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
+      "sha256": "87db27e00f2c6d63b00b04b0cb0b54d1287dd73abe7f87585771681b79ffc132"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+      "sha256": "b2a80f47e271468f2e63b5c110f40ed733b00705b6671b6106f4a16cf297b47f"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_chat_route_adapter.dart",
+      "sha256": "d5bf778897e29efe1b1651fcd19ed51e9b709284a55a06989835fa549a2ec0a4"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
+      "sha256": "71bfa30509feeaaa2203d1b4452d3192da26d91a0c383c96775f1ddad9616568"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart",
+      "sha256": "15ae529b47e0a94ed0382c82d322e78d1a5cc56be065bbd7b0b1e0d62d411183"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart",
+      "sha256": "e54dcbd73e77cbb3dbd77439cb06b293acf32fa011d8ce9787084920362f41c7"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
+      "sha256": "94b7a6ae4f5b24cae5b14795310e1a5dae5d13147c6fcfc02cb1f034640bcdf6"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
+      "sha256": "e45d043fc31b832a3a3529202df8e3915103ff17b9378e23201bda7a9e501899"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+      "sha256": "9a9ad9e36d4b4f14ae402b06907d4bb75941005235d68d159e616ea8be393bde"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/profile/global_personal_profile_v2.dart",
+      "sha256": "35abc00f96726202adb3f1e18e2e0cb50d0b549cf3fff77af9d92af7da012bec"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/profile/global_privacy_preferences_v2.dart",
+      "sha256": "84439408b613596722f44e677526efe7ff5953f19e2a7b662d30d392ccc0da76"
+    },
+    {
+      "path": "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
+      "sha256": "ff096dac8e64a3bdd32d8ae8851a095aea9fff08dede8893d62180a8d4481fd5"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",
+      "sha256": "e91c1b2e16a13f2a8da654c1486b8b05ddb25d90476539abd346eed083fd0a75"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart",
+      "sha256": "a8c6788ef3220c3c8235e3efd194d59a5db45b6adb72cd39db10515364bcc07a"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_invoice_downloader_test.dart",
+      "sha256": "fb97cd8e80691e55e115dad753f1859d308ea93d33549421dafeebb302d8f216"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart",
+      "sha256": "9af9c16a385e2a6408b0a987dc21858bd806dcaa8b79aea0a52afe23dfca205b"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
+      "sha256": "79f21ac6ddf77c3e5733690f4d16e7a2357d393882f68c6a7271ee8fefa26f65"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
+      "sha256": "720f895aedd3872fe2c225ae1b1fc112cefd3a799cef49ebef1c67ecb332b184"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
+      "sha256": "4eabd1854c8bf1241466c742255f884ebd50a7e5bad5a8b4fa1fac29710ba3dc"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart",
+      "sha256": "5ffb226fb676445c333bc7585110eb1b1a2cf5b535dac656e0f2b6b91bd130e2"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+      "sha256": "8f9ca899905bf918a9ea6175b9bfb9aa2e1c68a1149360c70d7c34e12ba1327e"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart",
+      "sha256": "ce8de65fef23d6556aef43d3317bc4803f2e80a610f7b4d49f98d1e79f199962"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart",
+      "sha256": "f1a0186fc294d5395797ff9efc6ff130eb7db64da202021295637f6cd6adec69"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart",
+      "sha256": "aa079dab40d9988e3656ac84e7f031b6a4cb244e75597a8dc24f38218537a1ef"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart",
+      "sha256": "56cf192b60b9898f562673c6f962329dbf6287125af82693c79b206f8d4e8c27"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart",
+      "sha256": "1c5f1f066e2cdedcf48aa17b8b0093405d28743713ed521595d7aa0887c1f602"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart",
+      "sha256": "01d20cb7e904cffcdab29da7d03e03c58911d3996a2f2ba291aa45c527edc818"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart",
+      "sha256": "664792cdb10bd6d732a03f14cf738c3d8a38eff133a70dc25845529a326a3241"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart",
+      "sha256": "341e59c3158be9a60f206c5eef85f9c743a56d5b518d6a943884807469d4134d"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart",
+      "sha256": "a3c9959e15c7dd600d9e8a5959e1ffd747ae7f4707102c417287d1ca48e9c38f"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart",
+      "sha256": "418581304dafc194fde60c749bbc12d02d0a51b666c534a3d7386dc476de5b51"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart",
+      "sha256": "15b7ca088d1345fb8cb18fc2f8bb7ea4fee1d5d5227a71326ac73772349da1f5"
+    }
+  ],
+  "protectedUnchanged": [
+    "apps/mobile/android",
+    "apps/mobile/ios",
+    "apps/mobile/assets",
+    "apps/mobile/pubspec.yaml",
+    "apps/mobile/pubspec.lock",
+    "backend",
+    "contracts",
+    "packages",
+    "package.json",
+    "package-lock.json",
+    "pubspec.yaml",
+    "pubspec.lock",
+    "apps/mobile/lib/features/buy/buy_v2_saved_products_store.dart",
+    "apps/mobile/lib/features/buy/buy_v2_session.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_scanner.dart"
+  ],
+  "arrivalSoundAndImportsPrefixUnchanged": true,
+  "arrivalSoundAndImportsPrefixSha256": "744a44efab076507ffac8ddf9103b1ac2a6699fd644b84cdffbc681128983912",
+  "candidateScreenSha256": "94b7a6ae4f5b24cae5b14795310e1a5dae5d13147c6fcfc02cb1f034640bcdf6",
+  "policyOwners": 46
+}

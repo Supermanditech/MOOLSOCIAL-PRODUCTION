@@ -1,0 +1,29 @@
+{
+  "parent": "9018535597239296871f9cf026e1e2a7328aca50",
+  "testedSource": "9b7e5aa7fddc08517432f9b3932da5a36ef7a92d",
+  "owners": [
+    {
+      "owner": "scripts/check-approved-ui-locks.ps1",
+      "normalizedSha256": "fe027b3b8d389a0166b109d4817c9cd7c74ac0872167ad6334c6edbf9f50e583"
+    },
+    {
+      "owner": "scripts/check-buy-backend-contract-boundary.ps1",
+      "normalizedSha256": "2192b9e15bbd43f32c1ef1d006557f7293e0651ebd770749919686bf8ed0f63f"
+    },
+    {
+      "owner": "scripts/check-buy-data-egress-boundary.ps1",
+      "normalizedSha256": "dc677d76a758b10839d4a75889b8ce5ef100aec674c2dbe29db43f01c1730385"
+    },
+    {
+      "owner": "scripts/check-buy-protected-baseline.ps1",
+      "normalizedSha256": "e2d1686f0cef2def13ea0a6634ecef0e053c13397cd1a29dda7e2bf7e26b9de4"
+    },
+    {
+      "owner": "scripts/check-codex-subagent-coordination-policy.ps1",
+      "normalizedSha256": "b03d1da615e126ad7b1aaef8d851a5ca8f97804bd77d1b366d7543a505090396"
+    }
+  ],
+  "sourcePolicyClaimsUnchanged": true,
+  "clipboardSuffixUnchangedSha256": "163f7e52a777c2731a39ec5e2f2981bd5330e82f07335a45e4b215f4456a5a1e",
+  "qualification": "review admission only; not production/backend/provider/device qualification"
+}

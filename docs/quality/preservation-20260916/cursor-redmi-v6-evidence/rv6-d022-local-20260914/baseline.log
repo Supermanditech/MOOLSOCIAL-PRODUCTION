@@ -1,0 +1,52 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: RV6 D022 area chooser retains visible selection 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'TextButton' is not a subtype of type 'Text' in type cast
+
+When the exception was thrown, this was the stack:
+#0      WidgetController.widget (package:flutter_test/src/controller.dart:828:44)
+#1      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:10058:23)
+<asynchronous suspension>
+#2      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  RV6 D022 area chooser retains visible selection 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:03 +0 -1: RV6 D022 area chooser retains visible selection 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: RV6 D022 area chooser retains visible selection 1.0
+  
+00:03 +0 -1: RV6 D022 area chooser retains visible selection 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'TextButton' is not a subtype of type 'Text' in type cast
+
+When the exception was thrown, this was the stack:
+#0      WidgetController.widget (package:flutter_test/src/controller.dart:828:44)
+#1      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:10058:23)
+<asynchronous suspension>
+#2      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#3      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  RV6 D022 area chooser retains visible selection 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +0 -2: RV6 D022 area chooser retains visible selection 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: RV6 D022 area chooser retains visible selection 2.0
+  
+00:04 +0 -2: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: RV6 D022 area chooser retains visible selection 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: RV6 D022 area chooser retains visible selection 2.0

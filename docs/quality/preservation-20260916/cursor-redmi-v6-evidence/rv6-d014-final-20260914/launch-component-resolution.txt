@@ -1,0 +1,4 @@
+Initial ordinary launch command used com.moolsocial.app.cursorreview/.MainActivity.
+Tool a2129f returned Android Error type 3: activity class does not exist, despite process exit 0. No successful launch or product defect is claimed.
+Read-only cmd package resolve-activity --brief returned com.moolsocial.app.cursorreview/com.moolsocial.app.MainActivity (tool f46d4f).
+Use that exact installed component for the ordinary launch. This was not an automatic approval rejection and does not replace native-link acceptance.

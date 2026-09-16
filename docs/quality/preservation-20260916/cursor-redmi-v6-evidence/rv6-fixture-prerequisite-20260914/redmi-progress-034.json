@@ -1,0 +1,190 @@
+{
+  "device": "TG8HCYTGGQT885OF",
+  "apkSha256": "CF6AF4E5ECCDD144963318802C1A0CB083AB51D32EA1398E6CA0D19789200234",
+  "captures": [
+    {
+      "file": "rv621-001-post-upgrade.png",
+      "bytes": 321635,
+      "sha256": "8c72982681c6f709de88c87cb3e539aee426d63be13ea582b9ae1fbf6f83a104"
+    },
+    {
+      "file": "rv621-002-filters.png",
+      "bytes": 321963,
+      "sha256": "cb80f577682890ad2e4f811524bc55a14b12a8328644e2154dee6dafbb252e1c"
+    },
+    {
+      "file": "rv621-003-filters-settled.png",
+      "bytes": 90728,
+      "sha256": "df250560f35337596d5a9a422ba418c9d1e9f18d569710fda45765d4f82ad6fe"
+    },
+    {
+      "file": "rv621-004-tools.png",
+      "bytes": 106698,
+      "sha256": "d06522acc1d0c7d920c5448117d23934bd110d02de5e35372ade9e83bdd5743e"
+    },
+    {
+      "file": "rv621-005-original-dog-food.png",
+      "bytes": 380666,
+      "sha256": "18f2178960e9bdcc099869643815e36a665023c203d12efbf98bd663b725ce3f"
+    },
+    {
+      "file": "rv621-006-pet-family-store.png",
+      "bytes": 238901,
+      "sha256": "eeb738f8f133cf6451e76b351e314ad2345550b3ca3ed0ea7eadb240a5177a72"
+    },
+    {
+      "file": "rv621-007-d012-listed-products.png",
+      "bytes": 185668,
+      "sha256": "98659459c42843b99b4e8f9bde055347bd0b8a532db1de0945be8be2a1853852"
+    },
+    {
+      "file": "rv621-008-d012-order-restriction.png",
+      "bytes": 380414,
+      "sha256": "2853a333479a7a0bff64f356d0cf5ac02fbb6ac88789568fea5a5c9e7179c57f"
+    },
+    {
+      "file": "rv621-009-d012-full-store-return.png",
+      "bytes": 185618,
+      "sha256": "bc8d905946d655bbb3495fe606dbc7873a4202fdf84b51bb23dba713aef0782d"
+    },
+    {
+      "file": "rv621-010-d012-large-text-full.png",
+      "bytes": 183709,
+      "sha256": "d46673791e6406a7134969f36094eca884a2bd3e9989422df6edb686d2fe96a7"
+    },
+    {
+      "file": "rv621-011-d012-large-text-status.png",
+      "bytes": 196241,
+      "sha256": "3dd1f0b42e9e332431db9d6ddef64a9d59032d7fb29aee12c55afd57bea43fcd"
+    },
+    {
+      "file": "rv621-012-d013-large-text-context.png",
+      "bytes": 124986,
+      "sha256": "54e05afad31356bda079dec13e40be7dfb0ed899b71665ea2138d8c88d47f4f5"
+    },
+    {
+      "file": "rv621-013-d013-context-static.png",
+      "bytes": 124986,
+      "sha256": "54e05afad31356bda079dec13e40be7dfb0ed899b71665ea2138d8c88d47f4f5"
+    },
+    {
+      "file": "rv621-014-d013-return-large.png",
+      "bytes": 196640,
+      "sha256": "3c3131494a9093a1c1f1ae1f5eaba6833141e374549dbcfdbe3803cc9d36b4d3"
+    },
+    {
+      "file": "rv621-015-restored-font-store.png",
+      "bytes": 238641,
+      "sha256": "701516a2094c9434c09d9d8a1b0dc1752efdd63d2879bbf45154ddd8dc77f52b"
+    },
+    {
+      "file": "rv621-016-d013-normal-context.png",
+      "bytes": 90994,
+      "sha256": "7b71554511cf5edfe145f0c592bfcdcb130f7b5856f32698e8554ce107383de1"
+    },
+    {
+      "file": "rv621-017-d013-normal-static.png",
+      "bytes": 91442,
+      "sha256": "4f8f52830535f9d2c4b48e507a063a08dbb100464a852e1b1fe84dfc74d89c28"
+    },
+    {
+      "file": "rv621-018-d013-normal-return.png",
+      "bytes": 238893,
+      "sha256": "b27906ac169d12eb49eae44a1799367949a184a571d2cb9eb4d2acd71c66d706"
+    },
+    {
+      "file": "rv621-019-resume-state.png",
+      "bytes": 238787,
+      "sha256": "c875046753ac1cc5c07e8c4c211ca1d44f460afa395f3d81cd5d73da6d14a01e"
+    },
+    {
+      "file": "rv621-020-store-close-product.png",
+      "bytes": 380662,
+      "sha256": "3f8f11230494e80a1340f49ccd1c46ec43715dc04c33248edb031a4fa6f104f4"
+    },
+    {
+      "file": "rv621-021-fixture-return.png",
+      "bytes": 321841,
+      "sha256": "0cc4e71dc1c4210f3e1d1235f6911f9cf672317f8f4a24b3f43c405a4fc710b1"
+    },
+    {
+      "file": "rv621-022-d015-tools-setup.png",
+      "bytes": 90746,
+      "sha256": "9d048b846fac86492daab73989a673ff0d75e7f16cd752d65ea375c15ac2a648"
+    },
+    {
+      "file": "rv621-023-d015-fixture-menu.png",
+      "bytes": 145361,
+      "sha256": "96a46db498ff0d99584b4d2202ce13e201794779d7a96be657e39c892810329b"
+    },
+    {
+      "file": "rv621-024-d015-shampoo-details.png",
+      "bytes": 368536,
+      "sha256": "46d0b0666759989b498bc0cfc115a00dca9df0b52c93a747fea2d42a569da9e5"
+    },
+    {
+      "file": "rv621-025-d015-menu-return.png",
+      "bytes": 90989,
+      "sha256": "5405fbf6a8531927b2953f055de2f2175876a062782d89f6f12e0609bbec3b3c"
+    },
+    {
+      "file": "rv621-026-d015-recent-entry.png",
+      "bytes": 145785,
+      "sha256": "20db09f76312515f00a30211b00ee8fabbeb585d05be90ef15750812ab6919c6"
+    },
+    {
+      "file": "rv621-027-d015-history.png",
+      "bytes": 233161,
+      "sha256": "a7a2495b6fbe97f7155c3c5c507d7c9dda0133e3d6afc0720004c0c9a6ecb7e5"
+    },
+    {
+      "file": "rv621-028-d015-shampoo-destination.png",
+      "bytes": 368315,
+      "sha256": "8da00e806c8388d5feea17c6a3cfabd45d7b5ad3a256ff6c113f70d9ce586ca9"
+    },
+    {
+      "file": "rv621-029-d015-shampoo-back.png",
+      "bytes": 233233,
+      "sha256": "1d240e0c7af659e9f07e429d9d50f9110386c98b53a8e88cd277f513b654fce9"
+    },
+    {
+      "file": "rv621-030-d015-dog-destination.png",
+      "bytes": 380773,
+      "sha256": "3ab4de0d1999c2b437c22ffd61c5e7df1315d5f55a14b8bf115fe002d98bab3e"
+    },
+    {
+      "file": "rv621-031-d015-dog-back.png",
+      "bytes": 233124,
+      "sha256": "1761a77358a1f8f5a2a938687002886904b8632193be1e4095eca03a5b91f21c"
+    },
+    {
+      "file": "rv621-032-d015-large-history.png",
+      "bytes": 192790,
+      "sha256": "d1c1ba491f3a8c5efe0ee2b9d42dce5962d37aa577aecddf8fa9f60cbfcf7508"
+    },
+    {
+      "file": "rv621-033-d015-large-shampoo.png",
+      "bytes": 197912,
+      "sha256": "79b1eb745a661b5761415a26b0c3511d92598e47a68caa7312ac5284606a758e"
+    },
+    {
+      "file": "rv621-034-d015-large-shampoo-control.png",
+      "bytes": 196898,
+      "sha256": "4ce3dcd4f02f0d43e591f6aabda231953a3cf7b770ce702fc06fce9436982dfb"
+    }
+  ],
+  "progress": {
+    "D013": "018 inspected: header Back returns exact Pet Family Store. 019 live resume matches. Original static context and normal/200% Back checks observed; ledger closure not yet recorded.",
+    "D015": "027 both nonorderable rows Details with restrictions;028 shampoo destination;029 Android Back history;030 dog destination;031 header Back history, recent order updated;032-034 200% text scroll exposes explanations and Details. No Add tapped or item added. Further acceptance reconciliation pending.",
+    "blocked": [
+      "D009",
+      "D010",
+      "D014"
+    ],
+    "fontScaleRestored": "1.0"
+  },
+  "limitations": [
+    "Fixture internal navigation does not qualify external Android link delivery.",
+    "No original closure count changed by this progress index."
+  ]
+}

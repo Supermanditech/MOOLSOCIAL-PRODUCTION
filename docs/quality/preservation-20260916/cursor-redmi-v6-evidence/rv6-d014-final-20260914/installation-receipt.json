@@ -1,0 +1,21 @@
+{
+  "device": "TG8HCYTGGQT885OF",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r66.23-cursorreview",
+  "versionCode": 2026091404,
+  "apkSha256": "D59EADBB5A57568F91FED9319602BBC84E3B04831CF756534C3526EC0EDF512F",
+  "sourceHead": "1d5c4be97dc13874af1f4348156782339ecacf60",
+  "applicationSource": "4221158fead95a89047e3408aaeb11c9a12dd135",
+  "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+  "installedBaseApk": "/data/app/~~ipPXXYl1K1VBvC5cvXFU9Q==/com.moolsocial.app.cursorreview-BFqq4FMw_u84d5UbgI9cHw==/base.apk",
+  "firstInstallTimes": [
+    "2026-08-27 15:09:48",
+    "1970-01-01 05:30:00"
+  ],
+  "installationMethod": "adb install -r",
+  "dataClearPerformed": false,
+  "firstInstallTimesUnchanged": true,
+  "userDataVisualVerification": "pending",
+  "D014DeviceClosure": "pending",
+  "verifiedAt": "2026-09-14T19:43:40.9272655+05:30"
+}

@@ -1,0 +1,72 @@
+[
+  {
+    "case": "intended",
+    "accepted": true,
+    "expectedAccepted": true,
+    "passed": true,
+    "reason": ""
+  },
+  {
+    "case": "wrong-root",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Approved UI Accessibility projection requires its exact isolated native owner."
+  },
+  {
+    "case": "wrong-branch",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Approved UI Accessibility projection requires its exact Cursor branch."
+  },
+  {
+    "case": "missing-v6",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Redmi audit requires the preserved V6 ancestor."
+  },
+  {
+    "case": "missing-original",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Approved UI combined native projection requires both pinned source ancestors."
+  },
+  {
+    "case": "committed-drift",
+    "accepted": true,
+    "expectedAccepted": false,
+    "passed": false,
+    "reason": ""
+  },
+  {
+    "case": "working-drift",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Redmi audit committed source differs from V6."
+  },
+  {
+    "case": "untracked-source",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Redmi audit has untracked source."
+  },
+  {
+    "case": "native-drift",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Approved UI Accessibility projection rejects an altered or missing native implementation."
+  },
+  {
+    "case": "wrong-native-owner",
+    "accepted": false,
+    "expectedAccepted": false,
+    "passed": true,
+    "reason": "Approved UI Accessibility projection requires its exact isolated native owner."
+  }
+]

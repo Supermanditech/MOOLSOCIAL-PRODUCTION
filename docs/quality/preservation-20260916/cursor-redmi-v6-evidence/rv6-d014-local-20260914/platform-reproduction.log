@@ -1,0 +1,278 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: RV6 D014 warm order link over Store false
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+══╡ EXCEPTION CAUGHT BY ANIMATION LIBRARY ╞═════════════════════════════════════════════════════════
+The following assertion was thrown while notifying status listeners for AnimationController:
+'package:flutter/src/widgets/navigator.dart': Failed assertion: line 5781 pos 14:
+'entry.currentState == _RouteLifecycle.popping': is not true.
+
+Either the assertion indicates an error in the framework itself, or we should provide substantially
+more information in this error message to help you determine and fix the underlying cause.
+In either case, please report this assertion by filing a bug on GitHub:
+  https://github.com/flutter/flutter/issues/new?template=02_bug.yml
+
+When the exception was thrown, this was the stack:
+#2      NavigatorState.finalizeRoute (package:flutter/src/widgets/navigator.dart:5781:14)
+#3      TransitionRoute._handleStatusChanged (package:flutter/src/widgets/routes.dart:315:22)
+#4      AnimationLocalStatusListenersMixin.notifyStatusListeners (package:flutter/src/animation/listener_helpers.dart:242:19)
+#5      AnimationController._checkStatusChanged (package:flutter/src/animation/animation_controller.dart:937:7)
+#6      AnimationController._tick (package:flutter/src/animation/animation_controller.dart:954:5)
+#7      Ticker._tick (package:flutter/src/scheduler/ticker.dart:277:12)
+#8      SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#9      SchedulerBinding.handleBeginFrame.<anonymous closure> (package:flutter/src/scheduler/binding.dart:1263:11)
+#10     _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#11     SchedulerBinding.handleBeginFrame (package:flutter/src/scheduler/binding.dart:1261:17)
+#12     AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2258:9)
+#15     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#16     AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#17     WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:719:23)
+<asynchronous suspension>
+#18     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#19     main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9465:7)
+<asynchronous suspension>
+#20     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#21     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from class _AssertionError, dart:async, and package:stack_trace)
+
+The AnimationController notifying status listeners was:
+  AnimationController#88cb5(⏮ 0.000; paused; DISPOSED)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY WIDGETS LIBRARY ╞═══════════════════════════════════════════════════════════
+The following assertion was thrown building Navigator-[LabeledGlobalKey<NavigatorState>#88e66
+root](dependencies: [HeroControllerScope, InheritedCupertinoTheme, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#df969]], state: NavigatorState#943a7(tickers:
+tracking 2 tickers)):
+'package:flutter/src/widgets/navigator.dart': Failed assertion: line 5909 pos 12: '!_debugLocked':
+is not true.
+
+Either the assertion indicates an error in the framework itself, or we should provide substantially
+more information in this error message to help you determine and fix the underlying cause.
+In either case, please report this assertion by filing a bug on GitHub:
+  https://github.com/flutter/flutter/issues/new?template=02_bug.yml
+
+The relevant error-causing widget was:
+  Navigator-[LabeledGlobalKey<NavigatorState>#88e66 root]
+  Navigator:file:///C:/Users/jisal/AppData/Local/Pub/Cache/hosted/pub.dev/go_router-17.3.0/lib/src/builder.dart:459:16
+
+When the exception was thrown, this was the stack:
+#2      NavigatorState.build (package:flutter/src/widgets/navigator.dart:5909:12)
+#3      StatefulElement.build (package:flutter/src/widgets/framework.dart:5931:27)
+#4      ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5817:15)
+#5      StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#6      Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#7      StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#8      Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#9      ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#10     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#11     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#12     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#13     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#14     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#15     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#16     _InheritedNotifierElement.update (package:flutter/src/widgets/inherited_notifier.dart:108:11)
+#17     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#18     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#19     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#20     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#21     StatefulElement.update (package:flutter/src/widgets/framework.dart:6007:5)
+#22     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#23     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#24     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#25     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#26     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#27     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#28     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#29     StatelessElement.update (package:flutter/src/widgets/framework.dart:5895:5)
+#30     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#31     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#32     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#33     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#34     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#35     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#36     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#37     ProxyElement.update (package:flutter/src/widgets/framework.dart:6149:5)
+#38     Element.updateChild (package:flutter/src/widgets/framework.dart:4037:15)
+#39     ComponentElement.performRebuild (package:flutter/src/widgets/framework.dart:5841:16)
+#40     StatefulElement.performRebuild (package:flutter/src/widgets/framework.dart:5982:11)
+#41     Element.rebuild (package:flutter/src/widgets/framework.dart:5529:7)
+#42     BuildScope._tryRebuild (package:flutter/src/widgets/framework.dart:2750:15)
+#43     BuildScope._flushDirtyElements (package:flutter/src/widgets/framework.dart:2807:11)
+#44     BuildOwner.buildScope (package:flutter/src/widgets/framework.dart:3111:18)
+#45     AutomatedTestWidgetsFlutterBinding.drawFrame (package:flutter_test/src/binding.dart:2431:19)
+#46     RendererBinding._handlePersistentFrameCallback (package:flutter/src/rendering/binding.dart:509:5)
+#47     SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#48     SchedulerBinding.handleDrawFrame (package:flutter/src/scheduler/binding.dart:1345:9)
+#49     AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2260:9)
+#52     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#53     AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#54     WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:719:23)
+<asynchronous suspension>
+#55     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#56     main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9465:7)
+<asynchronous suspension>
+#57     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#58     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 5 frames from class _AssertionError, dart:async, and package:stack_trace)
+
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY ANIMATION LIBRARY ╞═════════════════════════════════════════════════════════
+The following assertion was thrown while notifying status listeners for AnimationController:
+setState() called after dispose(): OverlayState#8f55e(lifecycle state: defunct, not mounted,
+entries: [OverlayEntry#3448e(opaque: true; maintainState: false), OverlayEntry#60287(opaque: false;
+maintainState: true), OverlayEntry#a2069(opaque: false; maintainState: false),
+OverlayEntry#c99e2(opaque: false; maintainState: true), OverlayEntry#cf9d2(opaque: true;
+maintainState: false), OverlayEntry#aaa19(opaque: false; maintainState: true)])
+This error happens if you call setState() on a State object for a widget that no longer appears in
+the widget tree (e.g., whose parent widget no longer includes the widget in its build). This error
+can occur when code calls setState() from a timer or an animation callback.
+The preferred solution is to cancel the timer or stop listening to the animation in the dispose()
+callback. Another solution is to check the "mounted" property of this object before calling
+setState() to ensure the object is still in the tree.
+This error might indicate a memory leak if setState() is being called because another object is
+retaining a reference to this State object after it has been removed from the tree. To avoid memory
+leaks, consider breaking the reference to this object during dispose().
+
+When the exception was thrown, this was the stack:
+#0      State.setState.<anonymous closure> (package:flutter/src/widgets/framework.dart:1163:9)
+#1      State.setState (package:flutter/src/widgets/framework.dart:1198:6)
+#2      OverlayState._didChangeEntryOpacity (package:flutter/src/widgets/overlay.dart:880:5)
+#3      OverlayEntry.opaque= (package:flutter/src/widgets/overlay.dart:145:15)
+#4      TransitionRoute._handleStatusChanged (package:flutter/src/widgets/routes.dart:297:32)
+#5      AnimationLocalStatusListenersMixin.notifyStatusListeners (package:flutter/src/animation/listener_helpers.dart:242:19)
+#6      AnimationController._checkStatusChanged (package:flutter/src/animation/animation_controller.dart:937:7)
+#7      AnimationController._tick (package:flutter/src/animation/animation_controller.dart:954:5)
+#8      Ticker._tick (package:flutter/src/scheduler/ticker.dart:277:12)
+#9      SchedulerBinding._invokeFrameCallback (package:flutter/src/scheduler/binding.dart:1430:15)
+#10     SchedulerBinding.handleBeginFrame.<anonymous closure> (package:flutter/src/scheduler/binding.dart:1263:11)
+#11     _LinkedHashMapMixin.forEach (dart:_compact_hash:772:13)
+#12     SchedulerBinding.handleBeginFrame (package:flutter/src/scheduler/binding.dart:1261:17)
+#13     AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2258:9)
+#16     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#17     AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#18     WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:719:23)
+<asynchronous suspension>
+#19     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#20     main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9465:7)
+<asynchronous suspension>
+#21     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#22     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 3 frames from dart:async and package:stack_trace)
+
+The AnimationController notifying status listeners was:
+  AnimationController#f1b3a(⏭ 1.000; paused; for
+  _PageBasedMaterialPageRoute<void>(/app/buy/order/:orderId))
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+'package:flutter/src/widgets/navigator.dart': Failed assertion: line 3249 pos 18:
+'!navigator._debugLocked': is not true.
+
+Either the assertion indicates an error in the framework itself, or we should provide substantially
+more information in this error message to help you determine and fix the underlying cause.
+In either case, please report this assertion by filing a bug on GitHub:
+  https://github.com/flutter/flutter/issues/new?template=02_bug.yml
+
+When the exception was thrown, this was the stack:
+#2      _RouteEntry.handlePush.<anonymous closure> (package:flutter/src/widgets/navigator.dart:3249:18)
+#3      TickerFuture.whenCompleteOrCancel.thunk (package:flutter/src/scheduler/ticker.dart:464:15)
+#16     FakeAsync.run.<anonymous closure>.<anonymous closure> (package:fake_async/fake_async.dart:189:18)
+#17     FakeAsync.flushMicrotasks (package:fake_async/fake_async.dart:200:32)
+#18     AutomatedTestWidgetsFlutterBinding.pump.<anonymous closure> (package:flutter_test/src/binding.dart:2259:28)
+#21     TestAsyncUtils.guard (package:flutter_test/src/test_async_utils.dart:74:41)
+#22     AutomatedTestWidgetsFlutterBinding.pump (package:flutter_test/src/binding.dart:2249:27)
+#23     WidgetTester.pumpAndSettle.<anonymous closure> (package:flutter_test/src/widget_tester.dart:719:23)
+<asynchronous suspension>
+#24     TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#25     main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9465:7)
+<asynchronous suspension>
+#26     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#27     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 17 frames from class _AssertionError, dart:async, and package:stack_trace)
+
+The test description was:
+  RV6 D014 warm order link over Store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following message was thrown:
+Multiple exceptions (4) were detected during the running of the current test, and at least one was
+unexpected.
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:03 +0 -1: RV6 D014 warm order link over Store false [E]
+  Test failed. See exception logs above.
+  The test description was: RV6 D014 warm order link over Store false
+  
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test (but after the test had completed):
+Expected: no matching candidates
+  Actual: _TypeWidgetFinder:<Found 1 widget with type "ErrorWidget": [
+            ErrorWidget-[#dc714](message: 'package:flutter/src/widgets/navigator.dart': Failed
+assertion: line 5909 pos 12: '!_debugLocked': is not true.\nSee also:
+https://docs.flutter.dev/testing/errors, renderObject: RenderErrorBox#8897d),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#0      fail (package:matcher/src/expect/expect.dart:187:31)
+#1      _expect (package:matcher/src/expect/expect.dart:182:3)
+#2      expect (package:matcher/src/expect/expect.dart:65:3)
+#3      expect (package:flutter_test/src/widget_tester.dart:473:18)
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9469:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+════════════════════════════════════════════════════════════════════════════════════════════════════
+  Test failed. See exception logs above.
+  The test description was: RV6 D014 warm order link over Store false
+  
+00:03 +0 -1: RV6 D014 warm order link over Store true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: null
+  Actual: _AssertionError:<'package:flutter/src/widgets/navigator.dart': Failed assertion: line 4100
+pos 12: '!_debugLocked': is not true.>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9468:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart line 9468
+The test description was:
+  RV6 D014 warm order link over Store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:06 +0 -2: RV6 D014 warm order link over Store true [E]
+  Test failed. See exception logs above.
+  The test description was: RV6 D014 warm order link over Store true
+  
+00:06 +0 -2: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: RV6 D014 warm order link over Store false
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: RV6 D014 warm order link over Store true

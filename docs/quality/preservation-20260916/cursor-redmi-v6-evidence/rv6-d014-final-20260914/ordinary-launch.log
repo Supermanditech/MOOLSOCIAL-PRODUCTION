@@ -1,0 +1,7 @@
+Starting: Intent { cmp=com.moolsocial.app.cursorreview/com.moolsocial.app.MainActivity }
+Status: ok
+LaunchState: COLD
+Activity: com.moolsocial.app.cursorreview/com.moolsocial.app.MainActivity
+TotalTime: 6678
+WaitTime: 6705
+Complete

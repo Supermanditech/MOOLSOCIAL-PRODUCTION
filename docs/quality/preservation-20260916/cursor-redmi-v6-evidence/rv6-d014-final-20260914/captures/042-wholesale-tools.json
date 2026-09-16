@@ -1,0 +1,13 @@
+{
+  "label": "042-wholesale-tools",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:05:41.039903+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "7590ed1d26613ba377783da34cc3dd6b5e5d803108cde1ea152d5f09cb93dbfa",
+    ".xml": "55a2052915bf47c418a0e1ca02c4b2661f6f22b79c0a6d085b0839f7e2639072",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

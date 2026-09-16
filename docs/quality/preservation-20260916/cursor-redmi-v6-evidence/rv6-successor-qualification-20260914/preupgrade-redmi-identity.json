@@ -1,0 +1,19 @@
+{
+  "device": "TG8HCYTGGQT885OF",
+  "adbState": "device",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionCode": 2026091301,
+  "versionName": "1.0.0-r66.19-cursorreview",
+  "installedApkSha256": "97750AD544EB9E77D5732A3C49ECDB530E59DF6F64AE764A8CFD02382657A4A7",
+  "matchesPreservedOriginalApk": true,
+  "fontScale": "1.0",
+  "actions": "read-only get-state, dumpsys package version, pm path, sha256sum installed base.apk and font_scale read",
+  "receiptChunks": [
+    "5ba3c7",
+    "16c668",
+    "06f409",
+    "1365b5",
+    "e88eb5"
+  ],
+  "limitations": "No proof of complete user-data integrity or ticket acceptance; no install, uninstall, data clearing, force-stop or settings mutation."
+}

@@ -1,0 +1,6 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart
+00:00 +0: R37 Cart relevance contracts coupon and payment adapters fail malformed benefits closed
+00:00 +1: R37 Cart relevance contracts normal test build defaults to fail-closed cart benefits
+00:00 +2: R37 Cart relevance contracts benefit eligibility receives only the selected vertical total
+00:00 +3: R37 Cart relevance contracts benefit selection is kind-owned, total-neutral and fails stale values closed
+00:00 +4: All tests passed!

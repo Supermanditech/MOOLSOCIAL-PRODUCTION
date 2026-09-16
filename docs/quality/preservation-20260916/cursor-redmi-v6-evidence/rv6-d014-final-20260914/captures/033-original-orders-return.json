@@ -1,0 +1,13 @@
+{
+  "label": "033-original-orders-return",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T20:16:57.778646+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "8f9453972a2b418d4d8227b43f592ac088613fc0db131e8cf55783e72315bb71",
+    ".xml": "ce34e960b1e8e94140f78bf4e730fc6a07d7c9c1e68c8df1cbd3f36be64ec929",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

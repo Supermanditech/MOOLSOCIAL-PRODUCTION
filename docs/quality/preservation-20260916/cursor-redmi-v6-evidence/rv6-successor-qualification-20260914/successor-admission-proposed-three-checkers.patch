@@ -1,0 +1,69 @@
+--- a/scripts/check-approved-ui-locks.ps1
++++ b/scripts/check-approved-ui-locks.ps1
+@@ -175,13 +175,17 @@
+       'apps', 'backend', 'contracts', 'packages',
+       'package.json', 'package-lock.json', 'pubspec.yaml', 'pubspec.lock'
+     )
+-    & git -C $root diff --quiet $redmiBaseline HEAD -- @redmiBoundaries
++    # Founder-authorized RV6-D001..D022 successor; all other sources remain rejected.
++    $redmiSource = $redmiBaseline
++    & git -C $root merge-base --is-ancestor '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' HEAD
++    if ($LASTEXITCODE -eq 0) { $redmiSource = '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' }
++    & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
+     if ($LASTEXITCODE -ne 0) {
+-      throw 'Redmi audit committed source differs from V6.'
+-    }
+-    & git -C $root diff --quiet $redmiBaseline -- @redmiBoundaries
++      throw 'Redmi audit committed source differs from its exact admitted source.'
++    }
++    & git -C $root diff --quiet $redmiSource -- @redmiBoundaries
+     if ($LASTEXITCODE -ne 0) {
+-      throw 'Redmi audit working source differs from V6.'
++      throw 'Redmi audit working source differs from its exact admitted source.'
+     }
+     $redmiUntracked = @(& git -C $root ls-files --others --exclude-standard -- @redmiBoundaries)
+     if ($LASTEXITCODE -ne 0 -or $redmiUntracked.Count -ne 0) {
+--- a/scripts/check-buy-protected-baseline.ps1
++++ b/scripts/check-buy-protected-baseline.ps1
+@@ -344,7 +344,8 @@
+ 
+ function Test-IntegratedStoreBuyReviewSource {
+   param([string]$SourceCommit)
+-  if ($SourceCommit -cne '10fb79b4469203371edf888e7d4b8aacb3546581') { return $false }
++  $redmiSuccessor = $SourceCommit -ceq '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d'
++  if ($SourceCommit -cne '10fb79b4469203371edf888e7d4b8aacb3546581' -and -not $redmiSuccessor) { return $false }
+   $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
+   $expectedBranch = switch ($canonicalRoot) {
+     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912' {
+@@ -362,13 +363,16 @@
+   $currentBranch = @(& git -C $root branch --show-current)
+   if ($LASTEXITCODE -ne 0 -or $currentBranch.Count -ne 1 -or
+       [string]$currentBranch[0] -cne $expectedBranch) { return $false }
++  if ($redmiSuccessor -and $expectedBranch -cne 'work/cursor-ui/redmi-v6-audit-20260913') { return $false }
+   if ($expectedBranch -ceq 'work/cursor-ui/redmi-v6-audit-20260913') {
+     $redmiV6 = 'da4d266f97b4081f55bd98f1e9522f25bc8ee05f'
+     & git -C $root merge-base --is-ancestor $redmiV6 HEAD
+     if ($LASTEXITCODE -ne 0) { return $false }
+-    & git -C $root diff --quiet $redmiV6 HEAD -- apps backend contracts
++    $redmiAdmittedSource = if ($redmiSuccessor) { $SourceCommit } else { $redmiV6 }
++    $redmiBoundaries = @('apps','backend','contracts','packages','package.json','package-lock.json','pubspec.yaml','pubspec.lock')
++    & git -C $root diff --quiet $redmiAdmittedSource HEAD -- @redmiBoundaries
+     if ($LASTEXITCODE -ne 0) { return $false }
+-    & git -C $root diff --quiet $redmiV6 -- apps backend contracts
++    & git -C $root diff --quiet $redmiAdmittedSource -- @redmiBoundaries
+     if ($LASTEXITCODE -ne 0) { return $false }
+   }
+ 
+--- a/scripts/check-buy-backend-contract-boundary.ps1
++++ b/scripts/check-buy-backend-contract-boundary.ps1
+@@ -164,6 +164,10 @@
+         ) -or (
+           $IntegratedReviewSourceCommit -ceq '10fb79b4469203371edf888e7d4b8aacb3546581' -and
+           $soundSourceHash -ceq '7BE1D12EE7CA2ACB96B67B14EC02CAD0DCB25D613A07AF4B0473AE323EB9C0B7'
++        ) -or (
++          # Same V6 arrival-sound/import prefix; exact successor source only.
++          $IntegratedReviewSourceCommit -ceq '9b7e5aa7fddc08517432f9b3932da5a36ef7a92d' -and
++          $soundSourceHash -ceq '94B7A6AE4F5B24CAE5B14795310E1A5DAE5D13147C6FCFC02CB1F034640BCDF6'
+         )) {
+         $Content = $Content.Replace("import 'dart:io';", '')
+       }

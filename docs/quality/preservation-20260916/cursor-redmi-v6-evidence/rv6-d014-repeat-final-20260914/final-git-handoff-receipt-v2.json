@@ -1,0 +1,36 @@
+{
+  "recordedAt": "2026-09-14T22:32:15.269156+05:30",
+  "status": "scoped_goal_complete",
+  "head": "17730e9c5a92ca51cad0c590deca368927f2bae6",
+  "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+  "liveRemoteHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
+  "remoteReadbackTool": "14b9cd",
+  "gitClean": true,
+  "preservationAuditTool": "f930e4",
+  "coordinationHandoff": {
+    "status": "passed",
+    "session": 2298,
+    "terminalTool": "3094b1",
+    "exitCode": 0
+  },
+  "historicalLabelException": {
+    "commit": "448d4a2c7c10ee195e711e49aa4cc69a593ff37b",
+    "repairCommit": "3f4d1cf92100a3008223c43a89d65e3d820a0867",
+    "historyRewritten": false,
+    "actualTests": "3 positives and26 negatives",
+    "receiptSha256": "13FF0A2B468F7AC2F89AE439E4AEB20F55E6D7FAA26192B739F3211B8969458A",
+    "exactCodeSha256": "A983D81EDDB98AC06164FCE7F00405BCA5453873365BE8B9DF99CF5BD51F40C4"
+  },
+  "originalsClosed": 22,
+  "childrenClosed": [
+    "RV6-D005-C01"
+  ],
+  "remainingScopedDependencies": [],
+  "installedApk": "1.0.0-r66.24-cursorreview",
+  "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+  "device": "TG8HCYTGGQT885OF",
+  "applicationTreeUnchangedSinceDeviceClosure": true,
+  "qualificationReportSha256": "3C4484F4A2367CF2F1A8D1341ECE228A73F2BD92F4D611C35756017BE636700E",
+  "supersedes": "final-git-handoff-receipt-v1.json historical label blocker only; prior evidence retained",
+  "limits": "Scoped Redmi review qualification; no production/backend/provider/integration/deployment acceptance."
+}

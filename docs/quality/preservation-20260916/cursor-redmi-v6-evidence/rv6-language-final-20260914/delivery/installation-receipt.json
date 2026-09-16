@@ -1,0 +1,77 @@
+{
+  "device": "TG8HCYTGGQT885OF",
+  "sourceHead": "f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r66.22-cursorreview",
+  "versionCode": 2026091403,
+  "apkSha256": "4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16",
+  "installedApkSha256": "4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16",
+  "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+  "command": "adb -s TG8HCYTGGQT885OF install -r <verified successor APK>",
+  "result": "Success",
+  "dataClearPerformed": false,
+  "uninstallPerformed": false,
+  "originalFirstInstallTimestampRetained": true,
+  "userDataLimit": "Data-preserving package upgrade and retained original installation identity; no full persisted-field audit claimed.",
+  "packageReadback": [
+    "    versionCode=2026091403 minSdk=24 targetSdk=36",
+    "    versionName=1.0.0-r66.22-cursorreview",
+    "    lastUpdateTime=2026-09-14 17:08:03",
+    "      firstInstallTime=2026-08-27 15:09:48",
+    "      firstInstallTime=1970-01-01 05:30:00"
+  ],
+  "childDeviceVerification": "not_performed_requires_subsequent_instruction",
+  "originalsClosed": 18,
+  "originalsOpen": [
+    "RV6-D005",
+    "RV6-D009",
+    "RV6-D010",
+    "RV6-D014"
+  ],
+  "childOpen": "RV6-D005-C01",
+  "linkDeliveryBlocker": "Prior automatic approval rejection retained; no bypass attempted",
+  "productionReady": false,
+  "createdAt": "2026-09-14T17:08:35.3098190+05:30",
+  "archivedFiles": [
+    {
+      "file": "uaw-cursor-redmi-rv6-language-20260914-device-review-debug.apk",
+      "sha256": "4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16",
+      "bytes": 210808137
+    },
+    {
+      "file": "uaw-cursor-redmi-rv6-language-20260914-build-provenance.txt",
+      "sha256": "9C5F7BAD865D2678D722ACF649707A45CC8F452E53A61B8AE04FD5DFC5921F4D",
+      "bytes": 1172
+    },
+    {
+      "file": "source-manifest.txt",
+      "sha256": "6364AD7D65BD1A6DC85C2E073B143274700125DB8C89067ED5B1B43A068B83D0",
+      "bytes": 41509
+    },
+    {
+      "file": "evidence-copy-receipt.json",
+      "sha256": "D6C27869998D4AC5168658951C4C1B41CF1AB9D0CF0692B1E3284B059058D9DB",
+      "bytes": 3306
+    },
+    {
+      "file": "built-machine-state.json",
+      "sha256": "74AA1ED385D9ADA09C730317E0B73FEA04DA6A933284810412D0A8BC1D7F8219",
+      "bytes": 6569
+    },
+    {
+      "file": "apk-identity.json",
+      "sha256": "37FCA791F81950B4431371EABDC3D88ABCA238607B8CC66B106C6AEC032C904A",
+      "bytes": 1048
+    },
+    {
+      "file": "apk-signer.log",
+      "sha256": "DF32B0258C96DAD5939EEE4D72314434AEABE920199912E9976876C51166EE7D",
+      "bytes": 311
+    },
+    {
+      "file": "redmi-install-01.log",
+      "sha256": "C4AA470ACAFCF8576C15B0F0B5AE7E852D1EC5413372D0E6A9272E788E1306D3",
+      "bytes": 38
+    }
+  ]
+}

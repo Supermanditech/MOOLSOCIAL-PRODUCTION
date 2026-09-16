@@ -1,0 +1,15 @@
+CandidateId=UAW-CURSOR-REDMI-RV6-FIXTURE-20260914
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-CURSOR-REDMI-RV6-FIXTURE-20260914;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r66.21
+VersionCode=2026091402
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.21\machine-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.21\machine-state.json
+Branch=work/cursor-ui/redmi-v6-audit-20260913
+HEAD=e8cbc3ef46a1d1360e2445163ebf515f3cbcf029
+SourceFingerprint=81362C35B96CB5F575708A230E1504862C8CB19012D4F256E07AFF25CFC5A9EB
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.21\artifacts\uaw-cursor-redmi-rv6-fixture-20260914-device-review-debug.apk
+Bytes=210801013
+SHA256=CF6AF4E5ECCDD144963318802C1A0CB083AB51D32EA1398E6CA0D19789200234
+BuiltAt=2026-09-14T14:53:27.1198224+05:30

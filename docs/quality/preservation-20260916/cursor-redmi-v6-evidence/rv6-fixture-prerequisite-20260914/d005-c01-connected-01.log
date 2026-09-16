@@ -1,0 +1,55 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: fresh review keeps seed and does not create authentication state
+00:00 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: new store restores Hindi then subsequent English without other keys
+00:00 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: unrelated production preference and route keys remain untouched
+00:00 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: invalid stored value unknown safely retains seed
+00:00 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: invalid stored value 42 safely retains seed
+00:00 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: invalid stored value true safely retains seed
+00:00 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: failed save rolls session preference back with an honest error
+00:00 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/app/ui_review_language_store_test.dart: new session restores saved language using the review store
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=false
+00:00 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 existing global preferences includes Accessibility
+00:02 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 1.0
+00:03 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 1.0
+00:03 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 1.0
+00:03 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 1.0
+00:03 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 1.0
+00:03 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 1.0
+00:03 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 timeout and late return do not strand the action
+00:03 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 320.0 text 1.0
+00:03 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 320.0 text 1.0
+00:04 +18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 320.0 text 1.0
+00:04 +19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 320x844-1.0-light
+00:04 +20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 2.0
+00:04 +21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 390.0 text 2.0
+00:04 +22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 320x844-2.0-light
+00:05 +23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: D004 complete name validation 320.0 text 2.0
+00:05 +24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 320x844-2.0-socialDark
+00:05 +25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: one personal profile shows only global account information
+00:05 +26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 640x360-1.0-light
+00:05 +27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: incomplete profile explains progress and every row acts
+00:06 +28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: incomplete profile explains progress and every row acts
+00:06 +29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 640x360-2.0-light
+00:06 +30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: compact personal profile remains readable without overflow
+00:06 +31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 640x360-2.0-socialDark
+00:06 +32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 640x360-2.0-socialDark
+00:06 +33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 640x360-2.0-socialDark
+00:06 +34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: A11Y-001 actual settings and Security fit 640x360-2.0-socialDark
+00:06 +35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_personal_profile_v2_test.dart: unsafe Personal profile return uses the neutral Mool destination
+00:06 +36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: Work opens one global preferences screen and saves choices
+00:07 +37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: invalid area remains editable and exact retry succeeds
+00:08 +38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: notification and privacy actions use their real boundaries
+00:08 +39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: debug hot reload reconstructs the router at its current location
+00:08 +40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: global profile destinations share one sleek native Back control
+00:08 +41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: compact preferences stay proportional without overflow
+00:08 +42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: D005 language availability persists text 1.0
+MOOLSOCIAL_STARTUP stage=setup snapshot=true setupComplete=true completedSetupVersion=0 requiredSetupVersion=5 authenticated=false
+00:09 +43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: D005 language availability persists text 2.0
+MOOLSOCIAL_STARTUP stage=setup snapshot=true setupComplete=true completedSetupVersion=0 requiredSetupVersion=5 authenticated=false
+00:09 +44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: Language choices remain fully visible above compact phone insets
+00:10 +45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: Service area actions fit the phone and remain reachable with a keyboard
+00:11 +46: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: Language sheet uses OPPO top-only exported clearance
+00:11 +47: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: direct Preferences restore returns to its exact safe origin
+00:12 +48: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: profile panel binds Preferences to the exact originating location
+00:12 +49: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/profile/global_privacy_preferences_v2_test.dart: unsafe Preferences return uses the neutral Mool destination
+00:12 +50: All tests passed!

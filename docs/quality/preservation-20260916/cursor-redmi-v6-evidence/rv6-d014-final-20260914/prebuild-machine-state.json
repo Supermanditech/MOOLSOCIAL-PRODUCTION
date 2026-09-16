@@ -1,0 +1,213 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "prebuild_passed",
+  "buildAuthorization": "approved_for_one_build",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+  },
+  "candidate": {
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "versionCode": 2026091404,
+    "id": "UAW-CURSOR-REDMI-RV6-D014-20260914",
+    "versionName": "1.0.0-r66.23",
+    "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+    "buildMode": "debug",
+    "head": "1d5c4be97dc13874af1f4348156782339ecacf60"
+  },
+  "source": {
+    "fileCount": 326,
+    "manifestPath": "apps/mobile/build/cursor-review-r66.23/source-manifest.txt",
+    "manifestSha256": "8A80AF113CDD55C234AC8DE70E59B808767B742136E2EED00C1F89E3E43A97FA"
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CURSOR-REDMI-RV6-D014-20260914"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.23/evidence/d014-qualified-analysis.log"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.23/evidence/d014-qualified-screen.log"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.23/evidence/d014-combined-cycle1.log"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.23/evidence/d014-combined-cycle2.log"
+      ]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.23/evidence/d014-prebuild-clean-support.log"
+      ]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.23/evidence/d014-prebuild-build-profile.log"
+      ]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.23/evidence/d014-prebuild-build-profile.log"
+      ]
+    }
+  ],
+  "premiumMotionPolicy": {
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "reused": [
+      "existing_finite_transitions_and_reduced_motion"
+    ],
+    "applied": [
+      "existing_nested_product_transition_with_stale_return_cancellation"
+    ],
+    "state": "local_source_checks_passed_device_acceptance_preserved_separately",
+    "candidateContract": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+    "disposition": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+    "dependencyHeld": [
+      "scoped_Redmi_physical_motion_and_accessibility",
+      "provider_backend_authority"
+    ],
+    "inapplicable": [
+      "new_decorative_motion_design"
+    ]
+  },
+  "postBuildGates": [
+    {
+      "id": "artifact-package-version-signer-checksum",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "installed-apk-checksum-equality",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "redmi-data-preserving-upgrade",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "redmi-RV6-D001-through-D022-recorded-reproductions",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "redmi-directly-affected-return-restoration",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "child-defects-and-original-disposition",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "final-evidence-git-handoff",
+      "state": "failed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ],
+      "reason": "Historical commit 448d4a2c uses an incorrect subject prefix; exception not approved or applied."
+    }
+  ],
+  "qualificationLimits": [
+    "21_original_device_closures_and_D005_C01_preserved_on_prior_evidenced_APKs",
+    "D014_corrected_source_locally_qualified_successor_device_replay_pending",
+    "27_inherited_capture_skips_are_not_passes",
+    "historical_commit_label_handoff_failure_remains_open",
+    "review_only_no_production_backend_provider_or_integration_qualification",
+    "one_corrective_APK_only_Redmi_TG8HCYTGGQT885OF_data_preserving_install"
+  ]
+}

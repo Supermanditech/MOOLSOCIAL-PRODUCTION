@@ -1,0 +1,268 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: R669 forwarded catalogue empty and populated 320x568 2x shop
+00:05 +1: R669 forwarded catalogue empty and populated 320x568 2x wholesale
+00:07 +2: R5 readability tracking false 320x844-1.0
+00:10 +3: R5 readability tracking true 320x844-1.0
+00:12 +4: R5 readability cart s-milk 320x844-1.0
+00:14 +5: R5 readability cart w-oil-10l 320x844-1.0
+00:16 +6: R5 readability cart m-paracetamol-500 320x844-1.0
+00:17 +7: R5 readability prescription 320x844-1.0
+00:17 +8: R5 readability tracking false 320x844-2.0
+00:18 +9: R5 readability tracking true 320x844-2.0
+00:18 +10: R5 readability cart s-milk 320x844-2.0
+00:19 +11: R5 readability cart w-oil-10l 320x844-2.0
+00:20 +12: R5 readability cart m-paracetamol-500 320x844-2.0
+00:20 +13: R5 readability prescription 320x844-2.0
+00:20 +14: R5 readability tracking false 640x360-1.0
+00:21 +15: R5 readability tracking true 640x360-1.0
+00:22 +16: R5 readability cart s-milk 640x360-1.0
+00:22 +17: R5 readability cart w-oil-10l 640x360-1.0
+00:23 +18: R5 readability cart m-paracetamol-500 640x360-1.0
+00:23 +19: R5 readability prescription 640x360-1.0
+00:24 +20: R5 readability tracking false 640x360-2.0
+00:24 +21: R5 readability tracking true 640x360-2.0
+00:25 +22: R5 readability cart s-milk 640x360-2.0
+00:25 +23: R5 readability cart w-oil-10l 640x360-2.0
+00:26 +24: R5 readability cart m-paracetamol-500 640x360-2.0
+00:26 +25: R5 readability prescription 640x360-2.0
+00:27 +26: R5 search 029A enlarged hint is fully painted
+00:27 +27: R5 search 029A enlarged history is fully painted
+00:27 +28: R5 search 029A keyboard and history actions 320x780-1
+00:32 +29: R5 search 029A keyboard and history actions 320x780-2
+00:34 +30: R5 search 029A keyboard and history actions 360x800-1
+00:37 +31: R5 search 029A keyboard and history actions 360x800-2
+00:40 +32: R5 search 029A keyboard and history actions 430x932-1
+00:42 +33: R5 search 029A keyboard and history actions 430x932-2
+00:45 +34: R5 search 029A keyboard and history actions 640x360-1
+00:47 +35: R5 search 029A keyboard and history actions 640x360-2
+00:49 +36: R5 search submit and Back preserve both carts 1.0
+00:50 +37: R5 search submit and Back preserve both carts 2.0
+00:50 +38: R5 purchase decisions payment recovery 320x844-1.0
+00:51 +39: R5 purchase decisions full benefit terms and totals 320x844-1.0
+00:52 +40: R5 purchase decisions complete Saved notice shop 320x844-1.0
+00:53 +41: R5 purchase decisions complete Saved notice wholesale 320x844-1.0
+00:54 +42: R5 purchase decisions payment recovery 320x844-2.0
+00:54 +43: R5 purchase decisions full benefit terms and totals 320x844-2.0
+00:55 +44: R5 purchase decisions complete Saved notice shop 320x844-2.0
+00:56 +45: R5 purchase decisions complete Saved notice wholesale 320x844-2.0
+00:56 +46: R5 purchase decisions payment recovery 640x360-1.0
+00:57 +47: R5 purchase decisions full benefit terms and totals 640x360-1.0
+00:58 +48: R5 purchase decisions complete Saved notice shop 640x360-1.0
+00:58 +49: R5 purchase decisions complete Saved notice wholesale 640x360-1.0
+00:59 +50: R5 purchase decisions payment recovery 640x360-2.0
+00:59 +51: R5 purchase decisions full benefit terms and totals 640x360-2.0
+01:01 +52: R5 purchase decisions complete Saved notice shop 640x360-2.0
+01:01 +53: R5 purchase decisions complete Saved notice wholesale 640x360-2.0
+01:02 +54: R5 system bars restore after global routes 320x844-1.0
+01:06 +55: R5 system bars restore after global routes 320x844-2.0
+01:09 +56: R5 system bars restore after global routes 640x360-1.0
+01:12 +57: R5 system bars restore after global routes 640x360-2.0
+01:15 +58: payment handoff provider labels preserve customer brand casing
+01:15 +59: Cart total supports the full approved Indian amount range
+01:15 +60: persistent Buy navigation preserves one destination surface
+01:15 +61: vertical changes transition the real surface without a wait
+01:16 +62: MoolSocial opens connected actions without replacing Buy
+01:16 +63: approved Buy shell fits representative small and large devices
+01:19 +64: discovery hierarchy leads with one horizontal product-image collection
+01:19 +65: search expands into a dedicated responsive results owner
+01:23 +66: expanded search offers flat separate Shop Wholesale and Medicine lists
+01:24 +67: responsive search surface is shared across every Buy destination
+01:26 +68: Account and product depth close the active search owner
+01:27 +69: category action is compact and Shop sale types reuse its toolbar space
+01:27 +70: commerce toolbar stays spacious at compact width and larger text
+01:28 +71: commerce toolbar motion respects reduced-motion preference
+01:28 +72: every Buy destination keeps one global profile and exact Back return
+01:29 +73: Shop uses the shared global profile and exact Back recovery
+01:30 +74: Shop profile context opens the current order destination
+01:30 +75: inactive sponsored placement consumes no catalogue height
+01:30 +76: category glass ends above the dock with compact heading and close
+01:30 +77: every approved Buy category has a specific visual icon
+01:30 +78: category selector fits 320 at 140 percent and finds a late category
+01:31 +79: catalogue keeps vertical discovery and lazy horizontal products
+01:31 +80: single-product results reserve only one horizontal lane
+01:31 +81: 140 percent text keeps navigation reachable
+01:32 +82: accessible featured cards keep purchase actions in bounds
+01:32 +83: destination tool menus remain usable at 140 percent text
+01:33 +84: purchase and navigation actions meet the 44 pixel target
+01:33 +85: critical Buy journeys fit compact and large phone widths
+01:36 +86: product detail exposes purchase decision information
+01:36 +87: R669 address layout keeps focus and actions visible Size(320.0, 711.0) 1.0 edit false
+01:38 +88: R669 address layout keeps focus and actions visible Size(320.0, 711.0) 1.0 edit true
+01:41 +89: R669 address layout keeps focus and actions visible Size(320.0, 711.0) 2.0 edit false
+01:43 +90: R669 address layout keeps focus and actions visible Size(320.0, 711.0) 2.0 edit true
+01:45 +91: R669 address layout keeps focus and actions visible Size(711.0, 320.0) 1.0 edit false
+01:47 +92: R669 address layout keeps focus and actions visible Size(711.0, 320.0) 1.0 edit true
+01:49 +93: R669 address layout keeps focus and actions visible Size(711.0, 320.0) 2.0 edit false
+01:50 +94: R669 address layout keeps focus and actions visible Size(711.0, 320.0) 2.0 edit true
+01:51 +95: R669 address request preserves manual recipient 1.0 blank
+01:52 +96: R669 address request preserves manual recipient 1.0 named
+01:52 +97: R669 address request preserves manual recipient 2.0 blank
+01:52 +98: R669 address request preserves manual recipient 2.0 named
+01:53 +99: R665 D04 enlarged report actions fit safe viewport Size(320.0, 711.0)
+01:53 +100: R665 D04 enlarged report actions fit safe viewport Size(711.0, 320.0)
+01:54 +101: product detail uses automatic fulfilment reviews and reporting
+01:54 +102: R66 019 Quick category retains 12 minute product and Cart promise
+01:55 +103: R66 019 Quick category retains 18 minute product and Cart promise
+01:56 +104: B01 T02 keeps one product while server promises 3 5 and 10 minutes
+01:57 +105: B01 T02 promise copy fails closed for checking stale and unavailable
+01:57 +106: packshot atlas isolates one exact cell per product
+01:57 +107: every seeded product resolves to exact or truthful category media
+01:57 +108: featured products lead with a dominant photo and readable filtered cards
+01:57 +109: featured press and quantity motion respect reduced motion
+01:58 +110: product detail keeps a large upload-ready media tile
+01:58 +111: tracking Items opens an order item and returns to that order
+01:59 +112: Shop Wholesale and Medicine details fit compact Android and iOS sizes
+02:01 +113: Account and shared Chat preserve the exact purchase depth
+02:01 +114: Account Orders Prescription and Wholesale actions complete and return
+02:02 +115: each Buy vertical category uses lazy horizontal products
+02:03 +116: catalogue plus becomes an inline quantity stepper and returns
+02:03 +117: product and Cart keep plus and minus quantity controls
+02:03 +118: add confirmation is owned by the Cart bar, not the top toast
+02:04 +119: non-empty Cart becomes a compact conversion control
+02:04 +120: R66 cart drag accumulates every pointer update between frames
+02:05 +121: R66 store cart only intercepts its visible compact control
+02:05 +122: R66 cart display fixture INR1 fits complete text at 1.0
+02:05 +123: R66 cart display fixture INR1 fits complete text at 2.0
+02:05 +124: R66 cart display fixture INR10000 fits complete text at 1.0
+02:06 +125: R66 cart display fixture INR10000 fits complete text at 2.0
+02:06 +126: R66 cart display fixture INR10000000 fits complete text at 1.0
+02:07 +127: R66 cart display fixture INR10000000 fits complete text at 2.0
+02:07 +128: Cart stays destination-scoped in Shop and Wholesale and aggregate in Orders
+02:08 +129: T01A Cart hides Medicine in Shop and preserves Care Medicine
+02:09 +130: Care Medicine never exposes an unrelated Shop basket
+02:09 +131: compact Buy surface and Cart total remain whole at 320 and 140 percent
+02:09 +132: saved destination and payment remain separate decisions
+02:10 +133: tracking shows current progress, next step and working alerts
+02:10 +134: compact cart never covers tracking or support actions
+02:10 +135: retired Assist state uses tracking and shared Chat only
+02:11 +136: cart item count uses correct singular and plural copy
+02:11 +137: Buy prices use locked Indian currency grouping
+02:11 +138: order card body performs its advertised primary action
+02:12 +139: Orders opens at the top after Checkout was scrolled
+02:12 +140: saved and typed product-code search complete visibly
+02:13 +141: R5 search 022A every catalogue retires the generic scanner
+02:14 +142: products save at the grid and appear in the Saved owner
+02:15 +143: category and search actions cannot strand the Saved grid
+02:15 +144: manual scanner recovery is compact and returns a code
+02:15 +145: featured card exposes automatic delivery and a stable purchase action
+02:16 +146: PAY-07 success settles once with customer actions only
+02:16 +147: PAY-08 Quick status is compact with restorable preferences
+02:17 +148: PAY-08 scheduled and courier delivery uses quiet status
+02:17 +149: R668 cart payable INR1000000 is complete at normal
+02:17 +150: R668 cart payable INR1000000 is complete at enlarged-portrait
+02:18 +151: R668 cart payable INR1000000 is complete at enlarged-landscape
+02:18 +152: R668 cart payable INR10000000 is complete at normal
+02:19 +153: R668 cart payable INR10000000 is complete at enlarged-portrait
+02:19 +154: R668 cart payable INR10000000 is complete at enlarged-landscape
+02:19 +155: R668 cart payable INR100001280 is complete at normal
+02:20 +156: R668 cart payable INR100001280 is complete at enlarged-portrait
+02:20 +157: R668 cart payable INR100001280 is complete at enlarged-landscape
+02:20 +158: PAY-09 Cart summary clears the fixed action bar
+02:21 +159: PAY-01 through PAY-09 fit Android and iOS viewport matrix
+02:23 +160: Payment primary action requires a currently available method
+02:24 +161: checkout payment recovery states stay actionable at compact size
+02:24 +162: checkout renders only the fulfilment families being purchased
+02:24 +163: T01C carries exact mixed delivery promises through one purchase
+02:25 +164: T01C blocks and explains a changed pre-commit promise
+02:25 +165: RV6 D009 rejects inconsistent confirmation missing reference
+02:25 +166: RV6 D009 rejects inconsistent confirmation blank reference
+02:25 +167: RV6 D009 rejects inconsistent confirmation mismatched purchase
+02:25 +168: RV6 D009 rejects inconsistent confirmation empty orders
+02:25 +169: RV6 D009 rejects inconsistent confirmation unconfirmed
+02:25 +170: RV6 D009 rejects inconsistent confirmation no products
+02:25 +171: RV6 D009 accepted confirmation uses recorded delivery address
+02:25 +172: RV6 D009 unsubmitted confirmation text 1.0 cart false orders false
+02:26 +173: RV6 D009 unsubmitted confirmation text 1.0 cart false orders true
+02:26 +174: RV6 D009 unsubmitted confirmation text 1.0 cart true orders false
+02:26 +175: RV6 D009 unsubmitted confirmation text 1.0 cart true orders true
+02:27 +176: RV6 D009 unsubmitted confirmation text 2.0 cart false orders false
+02:27 +177: RV6 D009 unsubmitted confirmation text 2.0 cart false orders true
+02:27 +178: RV6 D009 unsubmitted confirmation text 2.0 cart true orders false
+02:28 +179: RV6 D009 unsubmitted confirmation text 2.0 cart true orders true
+02:28 +180: order confirmation preserves family identifiers then opens Orders
+02:29 +181: Orders row keys stay unique when retained delivery IDs repeat
+02:29 +182: invoice download uses the placed-order document contract
+02:29 +183: R669 invoice missing history explains recovery and preserves Orders
+02:29 +184: R669 invoice missing MS-240741 fits and refreshes at 1.0
+02:30 +185: R669 invoice missing PO-240728 fits and refreshes at 1.0
+02:31 +186: R669 invoice missing MS-240741 fits and refreshes at 2.0
+02:31 +187: R669 invoice missing PO-240728 fits and refreshes at 2.0
+02:32 +188: R669 invoice missing tracking returns to exact order
+02:32 +189: R669 invoice missing confirmation uses the same recovery
+02:32 +190: R669 invoice refresh rejects an unmounted originating session
+02:32 +191: RV6 D008 buyer identity separation 320.0 text 1.0
+02:32 +192: RV6 D008 buyer identity separation 320.0 text 2.0
+02:33 +193: RV6 D008 buyer identity separation 360.0 text 1.0
+02:33 +194: RV6 D008 buyer identity separation 360.0 text 2.0
+02:33 +195: delivered Orders expose non-mutating order inspection
+02:34 +196: shared search filters Orders by an existing order ID
+02:34 +197: R66 032 basket preview price and actions fit 1.0
+02:35 +198: R66 032 basket preview price and actions fit 2.0
+02:35 +199: R669 Monthly vertical discovery quick text 1.0
+02:37 +200: R669 Monthly vertical discovery courier text 1.0
+02:39 +201: R669 Monthly vertical discovery quick text 2.0
+02:40 +202: R669 Monthly vertical discovery courier text 2.0
+02:42 +203: R66 032 monthly basket keeps price groups and Shop Cart scope
+02:44 +204: R66 R2 Cart clears retained actions saved=false scale=1.0
+02:44 +205: R66 R2 Cart clears retained actions saved=false scale=2.0
+02:45 +206: R66 R2 Cart clears retained actions saved=true scale=1.0
+02:45 +207: R66 R2 Cart clears retained actions saved=true scale=2.0
+02:45 +208: R66 R3 Cart permits Save and Remove shop 1.0
+02:46 +209: R66 R3 Cart permits Save and Remove shop 2.0
+02:46 +210: R66 R3 Cart permits Save and Remove wholesale 1.0
+02:47 +211: R66 R3 Cart permits Save and Remove wholesale 2.0
+02:48 +212: R66 R3 Cart permits Save and Remove medicine 1.0
+02:49 +213: R66 R3 Cart permits Save and Remove medicine 2.0
+02:49 +214: R66 R2 catalogue promises describe future delivery
+02:49 +215: R66 032 basket rejects unavailable products true
+02:50 +216: R66 032 basket rejects unavailable products false
+02:50 +217: R66 landscape shop 1.0 retains usable product actions
+02:55 +218: R66 landscape shop 2.0 retains usable product actions
+02:58 +219: R66 landscape wholesale 1.0 retains usable product actions
+03:02 +220: R66 landscape wholesale 2.0 retains usable product actions
+03:05 +221: R66 landscape medicine 1.0 retains usable product actions
+03:08 +222: R66 landscape medicine 2.0 retains usable product actions
+03:10 +223: first-party promotions use established Buy actions
+03:11 +224: promotion and featured product remain usable at 320 and 140 percent
+03:12 +225: RV6 D010 recovery preserves Orders context text 1.0 via button
+03:12 +226: RV6 D010 recovery preserves Orders context text 1.0 via back
+03:12 +227: RV6 D010 recovery preserves Orders context text 1.0 via help
+03:13 +228: RV6 D010 recovery preserves Orders context text 2.0 via button
+03:13 +229: RV6 D010 recovery preserves Orders context text 2.0 via back
+03:13 +230: RV6 D010 recovery preserves Orders context text 2.0 via help
+03:14 +231: RV6 D010 routed Help Back retains recovery order text 1.0
+03:14 +232: RV6 D010 routed Help Back retains recovery order text 2.0
+03:14 +233: RV6 D010 cold recovery retains existing Wholesale origin
+03:15 +234: all six recovery states fit and return without an extra page
+03:16 +235: 140 percent text fits every primary Buy state at 320 width
+03:17 +236: every primary Buy state contains only customer-facing copy
+03:18 +237: Buy footer subactions keep one equal interaction geometry
+03:19 +238: live Offers recover from offline without static production data
+03:19 +239: Offers accepts an ordered published catalogue seam
+03:19 +240: Offers completes product Cart and Checkout navigation
+03:20 +241: R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced false
+03:21 +242: R669 Offers promotion category CTA Back Size(640.0, 360.0) reduced false
+03:22 +243: R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced true
+03:22 +244: R669 Offers promotion category CTA Back Size(640.0, 360.0) reduced true
+03:23 +245: Shop Orders excludes Care-owned Medicine and stale promises
+03:23 +246: Cart can return to Offers and add another product
+03:24 +247: Shop Wholesale Orders and Offers page product grids
+03:25 +248: Offers search stays inside the published mixed catalogue
+03:25 +249: store Add feedback Cart access and product return keep one browse path
+03:27 +250: store Chat keeps supplier context, Admin visibility and Buy return
+03:27 +251: Chat return restores the exact store instead of product depth
+03:28 +252: Android Back from store Chat restores the Cart-origin store
+03:29 +253: single-SKU Shop products expose owner and Visit store wiring
+03:29 +254: master Shop and Wholesale cards show real provider owners
+03:30 +255: View all keeps browsing depth and surfaces live Cart feedback
+03:31 +256: Other stores cards carry decisions, motion and Back continuity
+03:31 +257: Other store Cart closes both storefronts and opens Cart
+03:32 +258: Other stores decisions fit 320px at 140 percent text
+03:32 +259: Other stores cinematic reveal respects reduced motion
+03:32 +260: closed store preserves truth and blocks unavailable Add
+03:32 +261: no-products store preserves identity, status and Ask store
+03:32 +262: public store truth fits 320px at 140 percent text
+03:32 +263: Masala Ghar storefront is compact and product-led
+03:33 +264: Wholesale and Bulk provider storefront keeps Cart on SKU depth
+03:33 +265: Shop Quick Scheduled and Wholesale Bulk swipe selectors wire catalogues
+03:34 +266: All tests passed!

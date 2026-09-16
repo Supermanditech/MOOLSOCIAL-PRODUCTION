@@ -1,0 +1,20 @@
+[
+  {
+    "owner": "scripts/check-buy-data-egress-boundary.ps1",
+    "onlyExactCommitIdentityAdded": true,
+    "sha256": "F19A9110368B853D30A0AF013B3E0A300DAE69284AD285EF534FC26599D80724"
+  },
+  {
+    "owner": "scripts/check-buy-backend-contract-boundary.ps1",
+    "onlyExactCommitIdentityAdded": true,
+    "sha256": "C34B3769EF9CD188EABE94A7A8AAD771567B24FB03082F513F2F1AABC2F800A1"
+  },
+  {
+    "owner": "scripts/check-approved-ui-locks.ps1",
+    "onlyExactSourceAncestorPinAdded": true
+  },
+  {
+    "owner": "scripts/check-codex-subagent-coordination-policy.ps1",
+    "outsideAdmissionBlockUnchanged": true
+  }
+]

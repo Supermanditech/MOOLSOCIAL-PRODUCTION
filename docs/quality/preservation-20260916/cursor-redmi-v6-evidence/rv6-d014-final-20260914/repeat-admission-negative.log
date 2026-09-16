@@ -1,0 +1,3 @@
+Buy backend contract boundary self-test passed: seven mobile cases and one backend owner behaved as required; the exact SUP-001/SUP-003/B2B-002 pure-contract allowlist does not authorize a service or gateway.
+Buy data-egress boundary self-test passed: seven forbidden cases were rejected and two safe cases were accepted.
+D014 admission: exact source accepted; five negative cases rejected; existing backend/egress self-tests passed.

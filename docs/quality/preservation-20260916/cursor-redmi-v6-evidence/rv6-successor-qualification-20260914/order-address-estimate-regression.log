@@ -1,0 +1,13 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart
+00:00 +0: R66 order address remains complete at 320.0 / 1.0
+00:02 +1: R66 order address remains complete at 320.0 / 2.0
+00:02 +2: R66 order address remains complete at 390.0 / 1.0
+00:03 +3: R66 order address remains complete at 390.0 / 2.0
+00:03 +4: R66 order address remains complete at 430.0 / 1.0
+00:04 +5: R66 order address remains complete at 430.0 / 2.0
+00:04 +6: three order families expose exact immutable delivery facts
+00:05 +7: future address continuation waits for reverse and is explicit
+00:05 +8: order Help continues after reverse with exact Chat context
+00:05 +9: Back and reduced motion retain Tracking at 320px and 140%
+00:06 +10: R58.8.3 delivery context responsive founder captures
+00:06 +10 ~1: All tests passed!

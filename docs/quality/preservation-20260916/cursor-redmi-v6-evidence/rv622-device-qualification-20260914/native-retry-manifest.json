@@ -1,0 +1,125 @@
+{
+  "scope": "Explicit user-approved native retries; D009/D010 passed, D014 destination lost",
+  "files": [
+    {
+      "file": "032-approved-retry-start.png",
+      "sha256": "5BEE082AD6D61D1B6245BA1FBFDF3AF8DA9FCA7936AB88A913458E12FE02D438",
+      "bytes": 238957
+    },
+    {
+      "file": "032-approved-retry-start.xml",
+      "sha256": "AC9B086B3FD35F2DC60C6F908F67BB60232FFEBDB4BB3B3AE73961232342CD16",
+      "bytes": 16771
+    },
+    {
+      "file": "032-approved-retry-start.json",
+      "sha256": "05F2B4C6AED9B0E919C47E9A71849ACAF36FA4DC02E8252A7B366DF0C5FF8725",
+      "bytes": 565
+    },
+    {
+      "file": "033-d014-native-order-result.png",
+      "sha256": "2F61A738BE810FC02ED35E808F1804029B1746D1D7EC7F5B1CF49353135810D4",
+      "bytes": 322456
+    },
+    {
+      "file": "033-d014-native-order-result.xml",
+      "sha256": "800DFA37755454D6E83038C88BD2203619439CB73042AF6D8617DD6F5D5B587A",
+      "bytes": 24075
+    },
+    {
+      "file": "033-d014-native-order-result.json",
+      "sha256": "6E534531C32AEF353CC99B24F1B3C789F49EAE51CBE1F9EA563E0F1E0B18F128",
+      "bytes": 569
+    },
+    {
+      "file": "034-d009-native-confirmation-result.png",
+      "sha256": "AF3BB76A5B9C6DCA8E2EB544BF16019365EF14E1C3D6AE445F7A576B29D0EF5A",
+      "bytes": 167156
+    },
+    {
+      "file": "034-d009-native-confirmation-result.xml",
+      "sha256": "104C5EE106EBD561F01D9961DECD55FA9E89674CDA8AD44A9D55C784D0AD736E",
+      "bytes": 10869
+    },
+    {
+      "file": "034-d009-native-confirmation-result.json",
+      "sha256": "4CD1FF2E4B718CEA34E808D994B050219347C357335C8B5500A867B9E04D1616",
+      "bytes": 576
+    },
+    {
+      "file": "035-d009-view-orders.png",
+      "sha256": "B05FB538673C72E542722DF94C5E512F3191461E89711B259549B9211C1840EC",
+      "bytes": 184777
+    },
+    {
+      "file": "035-d009-view-orders.xml",
+      "sha256": "CE34E960B1E8E94140F78BF4E730FC6A07D7C9C1E68C8DF1CBD3F36BE64EC929",
+      "bytes": 13723
+    },
+    {
+      "file": "035-d009-view-orders.json",
+      "sha256": "53F5737C2681590E320E4E8F985C9BD81C1649ADAAACD03FFA6A8DF4D33885BF",
+      "bytes": 561
+    },
+    {
+      "file": "036-d009-continue-shopping.png",
+      "sha256": "AF50DBADA7F4A13E24C90F44D439AF937F555006C136B60ED75210F71912102D",
+      "bytes": 322642
+    },
+    {
+      "file": "036-d009-continue-shopping.xml",
+      "sha256": "800DFA37755454D6E83038C88BD2203619439CB73042AF6D8617DD6F5D5B587A",
+      "bytes": 24075
+    },
+    {
+      "file": "036-d009-continue-shopping.json",
+      "sha256": "496D314652C0E8CDCC655992CBDE2451D8E5DA49426663CA63FDCFA27A482E07",
+      "bytes": 567
+    },
+    {
+      "file": "037-d010-native-order-start.png",
+      "sha256": "339CD78159C54D88D0E0F13B47038D2F82E20279A9E87B4867947B2FFD5856DD",
+      "bytes": 273108
+    },
+    {
+      "file": "037-d010-native-order-start.xml",
+      "sha256": "4CECDD259126B6484A607E30A192EB05BE57B4DE19AE8022DC3B2BF0C4F4C28A",
+      "bytes": 11228
+    },
+    {
+      "file": "037-d010-native-order-start.json",
+      "sha256": "DA9AC261BE1DC1E973F4C966F202F11DC82D81D23A7D8FEF1DAC670E9BEF84B7",
+      "bytes": 568
+    },
+    {
+      "file": "038-d010-delay-recovery.png",
+      "sha256": "3E4C468EFCC7A171C693506857DA5B2C57CBC4BD64A0CA6DC9C243D00216F6CC",
+      "bytes": 145020
+    },
+    {
+      "file": "038-d010-delay-recovery.xml",
+      "sha256": "8817B12FAD52E878DF6F35C0AE998A5850F30A5C549F34B971B9174D3154BF9B",
+      "bytes": 8227
+    },
+    {
+      "file": "038-d010-delay-recovery.json",
+      "sha256": "C7F55AB1A5E5D8ABAB8A702B3AEB36EEB7F5A886412285FAF627C323BD759966",
+      "bytes": 564
+    },
+    {
+      "file": "039-d010-return-order.png",
+      "sha256": "BEE8DEA44CE6F633D0352448855D081901E9EC483AAC2554795FF9E851E53A2C",
+      "bytes": 273323
+    },
+    {
+      "file": "039-d010-return-order.xml",
+      "sha256": "4CECDD259126B6484A607E30A192EB05BE57B4DE19AE8022DC3B2BF0C4F4C28A",
+      "bytes": 11228
+    },
+    {
+      "file": "039-d010-return-order.json",
+      "sha256": "8271EF69C4F03A0409CD792CE8D47A56EC32F5C5BCA488A95B7025710B280267",
+      "bytes": 562
+    }
+  ]
+}

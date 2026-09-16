@@ -1,0 +1,143 @@
+{
+  "baseline": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+  "count": 27,
+  "allEntireSkippedTestBlocksUnchanged": true,
+  "meaning": "Inherited capture-only skips; not executed or counted as passes; current defect visuals qualified separately in UAT.md",
+  "records": [
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart",
+      "skipBlockSha256": "e8215044586f98a6e9f73f59bc0acd180eea39a676dcfcc055cadf31a42befc7",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart",
+      "skipBlockSha256": "4ba8d4b6d482779dd4a6da3e26fac59da9298551341228050de76802bca06a4c",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "d87cbd574c2d9c9b338924c71d5b53b356ec2023d698cfb222c372a93bd99efe",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "34719059ccd8711561adb4f4805e1fb8551868289a16536559eaced3fde2fef4",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "b94f6a5b40b70b7688929cbe8210adedd35c31145c0ba12a6818079ffb12a874",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "28e9ca76d09e82f99198f98f45490ec0acb38836e22bf7dfb945107b79786f35",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "842a3d00dc8209991106c2cc69e2f5e3b87c18a79433efa4ff1a466e12db670d",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "56d12756eae5b61c47154de522afef598197cc02a192e96c73dcbb0aa479df32",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "174a98bac415d8fa6d451dbc9eafc1383d84553d196a921c18b0962e4399f4d8",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "42b912ec886b4ab4aa7e8197e4eed089720f65a5790b83f1808f1464c6c80f35",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "b7db0293ea35476e8680fc1344a414e7698c959655fbbe7fa01c999d37decdc3",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "31e4f903079a73ef2e24fdc463503d8bddda58567a90288c13804b6b67b73388",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "skipBlockSha256": "4c43e614c0579c2028455b4d385b4756aa2b1d8d20d00ce155baf76eb9d4a883",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart",
+      "skipBlockSha256": "8249e4267bba3689f884112afada9ed58e0cb3444145391594a933c6202fa460",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart",
+      "skipBlockSha256": "97a9d0c75dafed18b0e786942a357d623dd1557cbfb665f49205670c2e94cfe3",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart",
+      "skipBlockSha256": "1c6cd3078b1c8ed0da7734401846dfab583d91e4f9b6f12a39d9ff6d3ee70757",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_info_sheets_motion_test.dart",
+      "skipBlockSha256": "3ed543ecaadd84d736456519411c3720d9eeba6f11e20100d56ec8b3d9aff3ca",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart",
+      "skipBlockSha256": "9ed4b979f6bde3426eae454a5e3df6533bc4479980072c9925461e73eade4bcc",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+      "skipBlockSha256": "82a8bc3334663dd04c77e14e2c2cdfc3aa6d153db20ecb1c9fc5e340fb6635c2",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
+      "skipBlockSha256": "e0ff9f8a241150c3d57313cdda354b30151884ec43449edef13d15e835a6ef37",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart",
+      "skipBlockSha256": "64d9c461d72122fa23911364fe8d8b6ef02c06da8c9246de431a05ce98845f94",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart",
+      "skipBlockSha256": "11f8ebb33c31f07dc2617d270e92f6eb3b9ed711fdd46ac64918f316369d7fd9",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+      "skipBlockSha256": "9492d06a1640c4496467b5ea227d2b769146f114053acce4a2c16191ed54e307",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_prescription_sheet_motion_test.dart",
+      "skipBlockSha256": "a43447653cc7ecc50a6e37bcc91236debcbcb5bac755bded7c16c63f6118676d",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart",
+      "skipBlockSha256": "89aad3405f2f1b7408739f349346b2b39b45a6b32772e8af545f5091a4650550",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart",
+      "skipBlockSha256": "96c93e662aa0fbc5a9685beb7976966bd17e80796b3f567b8c7c0e945f389ec7",
+      "entireSkippedBlockUnchangedFromV6": true
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+      "skipBlockSha256": "4102f9d329a30a170e3373cfe09619091b5d5bc151d9bac330975546f2ce2dbd",
+      "entireSkippedBlockUnchangedFromV6": true
+    }
+  ]
+}

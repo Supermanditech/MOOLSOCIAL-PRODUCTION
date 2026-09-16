@@ -1,0 +1,13 @@
+{
+  "label": "044-wholesale-recent",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:06:39.093537+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "01faa549ca83424ea25bf4d207199997da6790e2818f8fe925d2202a879788ed",
+    ".xml": "7eeb3645f6100a62c0272b8e4d085070d3918640205743da983f2f3be6c124e2",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

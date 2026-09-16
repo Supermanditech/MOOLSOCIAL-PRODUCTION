@@ -1,0 +1,77 @@
+{
+  "sourceCommit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+  "matrix": {
+    "passed": 25,
+    "failed": 0
+  },
+  "screen": {
+    "passed": 340,
+    "failed": 0
+  },
+  "countsOverlap": true,
+  "analysis": "no issues",
+  "deviceClosedOriginals": 21,
+  "deviceOpenOriginals": [
+    "RV6-D014"
+  ],
+  "soleChild": "RV6-D005-C01 previously device closed",
+  "newCorrectionInstalled": false,
+  "visuallyReviewed": [
+    "repeat-flutter-visuals/rv6-d014-s-dog-food-repeat-store-MS-240782-text-1.0.png",
+    "repeat-flutter-visuals/rv6-d014-s-dog-food-repeat-store-MS-240782-text-2.0.png",
+    "repeat-flutter-visuals/rv6-d014-w-notebook-repeat-store-MS-240782-text-1.0.png",
+    "repeat-flutter-visuals/rv6-d014-w-notebook-repeat-store-MS-240782-text-2.0.png"
+  ],
+  "files": [
+    {
+      "path": "native-approved-resume-receipts.json",
+      "sha256": "15DF9FBE9FB3B558BEB4F2C5DAC719209770DA845189289665E960938A38DFF9",
+      "bytes": 2690
+    },
+    {
+      "path": "repeat-reproduction-approved.log",
+      "sha256": "09D9FC5E093B6251A385FFEB45FE551D6AF0C2A5B3973035ACE4697E8AFAE190",
+      "bytes": 9352
+    },
+    {
+      "path": "repeat-correction.log",
+      "sha256": "9659D4D2D0A3E91D9CFAE47FB6D5EFCDCB9CD3DE00CD213B899ACE0C4986214E",
+      "bytes": 1186
+    },
+    {
+      "path": "repeat-qualified-matrix.log",
+      "sha256": "558A0DF94DA6B9A3ADBFAA1339478699F87C3B53583291B773DB959C4FE6DC51",
+      "bytes": 10744
+    },
+    {
+      "path": "repeat-qualified-screen.log",
+      "sha256": "C459E451281505B8EF1324027262DDC693662FFE35B54E2871FF88D8CDE8F71D",
+      "bytes": 57444
+    },
+    {
+      "path": "repeat-qualified-analysis.log",
+      "sha256": "F3878A80F2E2A73800E39B64B88978F2E39FF2C193A852E400374CFCE16E839E",
+      "bytes": 200
+    },
+    {
+      "path": "repeat-flutter-visuals/rv6-d014-s-dog-food-repeat-store-MS-240782-text-1.0.png",
+      "sha256": "127F05F7711394A931E2E82ABFE87F0497F97AF93325A69AEE7F8BEC5A7188E6",
+      "bytes": 254165
+    },
+    {
+      "path": "repeat-flutter-visuals/rv6-d014-s-dog-food-repeat-store-MS-240782-text-2.0.png",
+      "sha256": "CB60B177147AAAC4B4512072E5A74427E840046C4E954DBC84A8793FD90F4E2F",
+      "bytes": 301722
+    },
+    {
+      "path": "repeat-flutter-visuals/rv6-d014-w-notebook-repeat-store-MS-240782-text-1.0.png",
+      "sha256": "127F05F7711394A931E2E82ABFE87F0497F97AF93325A69AEE7F8BEC5A7188E6",
+      "bytes": 254165
+    },
+    {
+      "path": "repeat-flutter-visuals/rv6-d014-w-notebook-repeat-store-MS-240782-text-2.0.png",
+      "sha256": "CB60B177147AAAC4B4512072E5A74427E840046C4E954DBC84A8793FD90F4E2F",
+      "bytes": 301722
+    }
+  ]
+}

@@ -1,0 +1,140 @@
+{
+  "scope": "D014 fixture setup only; no native-link acceptance",
+  "files": [
+    {
+      "file": "023-fixture-start.png",
+      "sha256": "DC17C8E9BB81AB1C8B26CBB562A5814FACCA6EEC031FED2F10FFCB2450934E56",
+      "bytes": 322087
+    },
+    {
+      "file": "023-fixture-start.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "file": "023-fixture-start.json",
+      "sha256": "6F3E360A2F2CCE707C2842FB5FF0C486CF47F7BBD4172CB729C29E9E6800765E",
+      "bytes": 558
+    },
+    {
+      "file": "024-fixture-tools.png",
+      "sha256": "01D2889F8F3ECAE8359102DF7B69440E4C2D63D3EC3F978135235249C50DC0F5",
+      "bytes": 91071
+    },
+    {
+      "file": "024-fixture-tools.xml",
+      "sha256": "B42D0CE2A54849BA15FAEBFC78C3151741FA6FBB88E4EAE64943457A3AE59CB1",
+      "bytes": 12127
+    },
+    {
+      "file": "024-fixture-tools.json",
+      "sha256": "AD32888683F4B2B0FAA48F2EAFEC9CF73F22AA076E5EF81773F6153D9150BAC7",
+      "bytes": 558
+    },
+    {
+      "file": "025-fixture-history-entry.png",
+      "sha256": "E8EE8112D5A2DA6BF8D701D98D72C148938307B197060D5708D7CA1E647E0F20",
+      "bytes": 101432
+    },
+    {
+      "file": "025-fixture-history-entry.xml",
+      "sha256": "4CA5AB4357AAF6DE09071424BEB5010450B769A31011F4F3C0C4B0FB349D4911",
+      "bytes": 12499
+    },
+    {
+      "file": "025-fixture-history-entry.json",
+      "sha256": "CB33B6238151A75B5397137A143282241CE38EDD7E6B7ED2B7E37310CB08B5DA",
+      "bytes": 566
+    },
+    {
+      "file": "026-fixture-history-visible.png",
+      "sha256": "BDAC048EBD169793A31CA3BE85E002365503D1C0FCF9591D46B1FE80C13E243B",
+      "bytes": 125153
+    },
+    {
+      "file": "026-fixture-history-visible.xml",
+      "sha256": "19B1B3C8FD6DE186B349607C8B121959C104C303011DAC3AFF4795DE1741200C",
+      "bytes": 11571
+    },
+    {
+      "file": "026-fixture-history-visible.json",
+      "sha256": "66473597F7D292B709925ADCD59B9DA0462D9584A7EFAAA2FBF646044F8399F4",
+      "bytes": 568
+    },
+    {
+      "file": "027-fixture-retained-history.png",
+      "sha256": "8F26D237F518D6BB48D730134A945D151D6A379FD777E90D5ECBFC23123405F1",
+      "bytes": 232451
+    },
+    {
+      "file": "027-fixture-retained-history.xml",
+      "sha256": "D3FFE0D4C820D18193022AB826E51493ED749844AC2EEA18B64D3ED6632026B9",
+      "bytes": 10752
+    },
+    {
+      "file": "027-fixture-retained-history.json",
+      "sha256": "D6E7E63B5FA67EAEEE8AC490D32F5778419BDF9E627D4AA2202EBAF293B2FDFF",
+      "bytes": 569
+    },
+    {
+      "file": "028-fixture-original-product.png",
+      "sha256": "2454FC5EB0F60BE8187A1FB57A407F2EA83ECE445F3856D516D2668C7569AE5B",
+      "bytes": 380668
+    },
+    {
+      "file": "028-fixture-original-product.xml",
+      "sha256": "364AE41A08B89699C0360703E04A6266FBF846FD7AC1815298F315569D2B52DE",
+      "bytes": 10870
+    },
+    {
+      "file": "028-fixture-original-product.json",
+      "sha256": "AAA93F394D19DD289AC64CEFE44087EFC3BD089BC04F591540188E58986ADBC9",
+      "bytes": 569
+    },
+    {
+      "file": "029-fixture-store-overlay.png",
+      "sha256": "B5B743C88FDF9483802A0047DB1E4344ECB5F93E663D6FDEBA46CE1795C045B7",
+      "bytes": 239015
+    },
+    {
+      "file": "029-fixture-store-overlay.xml",
+      "sha256": "AC9B086B3FD35F2DC60C6F908F67BB60232FFEBDB4BB3B3AE73961232342CD16",
+      "bytes": 16771
+    },
+    {
+      "file": "029-fixture-store-overlay.json",
+      "sha256": "5C0AC3F891E5C4916F8DD1ACD6425CEB6C445E0BBBD491C95DD11111BE5924F0",
+      "bytes": 566
+    },
+    {
+      "file": "030-fixture-other-store.png",
+      "sha256": "E4EF0596ABF46366707EA192271990A77A7854A6723E039A15D591F23C342A47",
+      "bytes": 172020
+    },
+    {
+      "file": "030-fixture-other-store.xml",
+      "sha256": "78D3673972827DAFD03A2722670F55971C261C9B390E5B1A907C25B08617EDF8",
+      "bytes": 13902
+    },
+    {
+      "file": "030-fixture-other-store.json",
+      "sha256": "10DBEFB77B66D02976652B78EB2924129139FB32B28C7C9CD8AAA60F9A080698",
+      "bytes": 564
+    },
+    {
+      "file": "031-fixture-returned-overlay-ready.png",
+      "sha256": "B5B743C88FDF9483802A0047DB1E4344ECB5F93E663D6FDEBA46CE1795C045B7",
+      "bytes": 239015
+    },
+    {
+      "file": "031-fixture-returned-overlay-ready.xml",
+      "sha256": "AC9B086B3FD35F2DC60C6F908F67BB60232FFEBDB4BB3B3AE73961232342CD16",
+      "bytes": 16771
+    },
+    {
+      "file": "031-fixture-returned-overlay-ready.json",
+      "sha256": "1552A82E018CB4790AAAE00C7B05EE88858EC18FEFA0C57885F54CE2E3CC2B87",
+      "bytes": 575
+    }
+  ]
+}

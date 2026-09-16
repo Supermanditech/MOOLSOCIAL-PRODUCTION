@@ -1,0 +1,9 @@
+Incremental ticket gate rejected: machine state is invalid JSON.
+At C:\GUARANTEED 
+OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\scripts\check-cross-agent-incremental-ticket-gate.ps1:71 
+char:3
++   throw 'Incremental ticket gate rejected: machine state is invalid J ...
++   ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Incremental tic...s invalid JSON.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Incremental ticket gate rejected: machine state is invalid JSON.
+ 

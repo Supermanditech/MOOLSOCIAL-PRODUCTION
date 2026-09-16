@@ -1,0 +1,11 @@
+PASS actual source with real Git, branch, ancestry and boundaries
+PASS real changed source rejects predecessor pin
+PASS rejected wrong-branch at intended boundary
+PASS rejected missing-ancestor at intended boundary
+PASS rejected committed-drift at intended boundary
+PASS rejected working-drift at intended boundary
+PASS rejected untracked-source at intended boundary
+PASS rejected git-failure at intended boundary
+PASS rejected unknown source pin
+PASS rejected wrong root
+10 source admission checks passed; no real source or Git mutation.

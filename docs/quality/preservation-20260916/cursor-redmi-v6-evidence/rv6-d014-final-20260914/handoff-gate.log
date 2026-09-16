@@ -1,0 +1,6 @@
+Exception: C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\scripts\check-codex-subagent-coordination-policy.ps1:54
+Line |
+  54 |      throw "Codex subagent coordination gate rejected: $Message"
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Codex subagent coordination gate rejected: production feature commit subject is not atomic:
+     | 448d4a2c7c10ee195e711e49aa4cc69a593ff37b

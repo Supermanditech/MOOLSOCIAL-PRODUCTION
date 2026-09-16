@@ -1,0 +1,22 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart
+00:00 +0: RV6 D013 Store context stays static s-dog-food text 1.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+D013 before Back matches=[RouteMatch, ImperativeRouteMatch]
+D013 after Back matches=[RouteMatch]
+D013 return view=BuyV2View.product product=s-dog-food sheets=[[<'buy-shop-seller-sheet-s-dog-food'>], [<'buy-shop-seller-sheet-list'>], [<'buy-shop-seller-sheet-header'>], [<'buy-shop-seller-sheet-close'>]]
+00:03 +1: RV6 D013 Store context stays static s-dog-food text 2.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+D013 before Back matches=[RouteMatch, ImperativeRouteMatch]
+D013 after Back matches=[RouteMatch]
+D013 return view=BuyV2View.product product=s-dog-food sheets=[[<'buy-shop-seller-sheet-s-dog-food'>], [<'buy-shop-seller-sheet-list'>], [<'buy-shop-seller-sheet-header'>], [<'buy-shop-seller-sheet-close'>]]
+00:05 +2: RV6 D013 Store context stays static w-notebook text 1.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+D013 before Back matches=[RouteMatch, ImperativeRouteMatch]
+D013 after Back matches=[RouteMatch]
+D013 return view=BuyV2View.product product=w-notebook sheets=[]
+00:06 +3: RV6 D013 Store context stays static w-notebook text 2.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+D013 before Back matches=[RouteMatch, ImperativeRouteMatch]
+D013 after Back matches=[RouteMatch]
+D013 return view=BuyV2View.product product=w-notebook sheets=[]
+00:08 +4: All tests passed!

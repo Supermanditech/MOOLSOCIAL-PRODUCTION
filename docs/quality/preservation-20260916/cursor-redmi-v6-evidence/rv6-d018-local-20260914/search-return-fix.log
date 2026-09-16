@@ -1,0 +1,6 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: RV6 D018 paginated search Back retains visible page system true text 1.0
+00:03 +1: RV6 D018 paginated search Back retains visible page system false text 1.0
+00:04 +2: RV6 D018 paginated search Back retains visible page system true text 2.0
+00:05 +3: RV6 D018 paginated search Back retains visible page system false text 2.0
+00:06 +4: All tests passed!

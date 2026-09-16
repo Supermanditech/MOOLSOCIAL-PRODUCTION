@@ -1,0 +1,118 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D003 Chat preserves estimate freshness null
+00:00 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D003 Chat preserves estimate freshness BuyV2CommerceLoadState.loading
+00:00 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D003 Chat preserves estimate freshness BuyV2CommerceLoadState.ready
+00:00 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D003 Chat preserves estimate freshness BuyV2CommerceLoadState.offline
+00:00 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D003 Chat preserves estimate freshness BuyV2CommerceLoadState.unavailable
+00:00 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D003 missing refresh evidence stays recorded and refresh stays pending
+00:00 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D003 historical estimate preserves known window and discloses missing estimate
+00:00 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Order Help omits shopping prompts while product enquiries retain them
+00:00 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Buy Chat adapter preserves context without a second Chat shell
+00:00 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: every Buy depth has one exact shared Chat return
+00:00 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: order Help opens MoolSocial Assist inside shared Chat
+00:00 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: order Help carries the exact supplier and purchased SKU snapshot
+00:00 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: supplier Chat route carries exact published product context
+00:00 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: supplier Chat shares exact public SKU link for shop
+00:00 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: supplier Chat shares exact public SKU link for wholesale
+00:00 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: supplier Chat shares exact public SKU link for medicine
+00:00 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: retailer wholesaler and manufacturer all receive supplier Chat
+00:00 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: supplier Chat fails closed when provider identity is missing
+00:00 +18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Medicine product and order Chat remain Care-owned
+00:00 +19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: supplier Chat carries structured purchase-protection fields
+00:00 +20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: supplier Chat snapshot carries product compliance facts
+00:00 +21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: blank optional supplier facts stay absent from Chat context
+00:00 +22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Buy Chat action opens only the shared Chat module
+00:01 +23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Buy Chat action opens only the shared Chat module
+00:01 +24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Buy Chat action opens only the shared Chat module
+00:01 +25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Buy Chat action opens only the shared Chat module
+00:01 +26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Buy Chat action opens only the shared Chat module
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:03 +27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: /app/buy?sub=wholesale opens its exact shared Chat and returns
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:06 +28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_invoice_regulatory_context_test.dart: RV6 D003 invoice estimate is historical shop text 1.0
+00:06 +29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:06 +30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:06 +31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:06 +32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:07 +33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:07 +34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:08 +34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: /app/buy?sub=orders opens its exact shared Chat and returns
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:08 +35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:09 +35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: /app/buy?sub=offers opens its exact shared Chat and returns
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:09 +36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:10 +36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: /app/buy?sub=medicine opens its exact shared Chat and returns
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:10 +37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:11 +38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 1.0
+00:12 +39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Offers keeps global Profile and Chat returns usable at compact large text
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:12 +40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_live_delivery_tracking_test.dart: Tracking shows live map, courier, ETA and freshness
+00:13 +41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(320.0, 700.0) 2.0
+00:13 +42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Offers global Profile destination returns to exact Offers
+00:13 +43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Offers global Profile destination returns to exact Offers
+00:13 +44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Offers global Profile destination returns to exact Offers
+00:13 +45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Offers global Profile destination returns to exact Offers
+00:14 +46: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Offers global Profile destination returns to exact Offers
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:14 +47: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(640.0, 360.0) 1.0
+00:14 +48: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: retired Buy Account route resolves to global Profile entry
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:15 +49: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 029G full alert descriptions Size(640.0, 360.0) 2.0
+00:15 +50: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: product and order-items Chat return to their exact subtap
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:16 +51: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 033 all alert returns then collections and Help keyboard
+00:18 +51: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: product supplier Chat keeps exact context above the compact keyboard
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:18 +52: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 033 all alert returns then collections and Help keyboard
+00:19 +52: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: order Help stays in one supplier conversation with one composer text 1.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:19 +53: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 033 all alert returns then collections and Help keyboard
+00:21 +53: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: order Help stays in one supplier conversation with one composer text 2.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _KeyWidgetFinder:<Found 1 widget with key [<'chat-thread-screen'>]: [
+            ChatPageScaffold-[<'chat-thread-screen'>](dependencies: [InheritedCupertinoTheme,
+MediaQuery, _InheritedTheme, _LocalizationsScope-[GlobalKey#d0dc2]]),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart:1140:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart line 1140
+The test description was:
+  order Help stays in one supplier conversation with one composer text 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:21 +53 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 033 all alert returns then collections and Help keyboard
+00:21 +53 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: order Help stays in one supplier conversation with one composer text 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: order Help stays in one supplier conversation with one composer text 2.0
+  
+00:22 +53 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: Medicine order Help stays on Care and returns to Care
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+00:22 +54 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R5 033 all alert returns then collections and Help keyboard
+00:24 +55 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R66 033 alert return retains sheets and scroll system=true scale=1.4
+00:26 +56 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R66 033 alert return retains sheets and scroll system=false scale=1.4
+00:27 +57 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R66 033 alert return retains sheets and scroll system=true scale=2.0
+00:28 +58 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R66 033 product and offer alerts return product=true
+00:30 +59 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R66 033 product and offer alerts return product=false
+00:31 +60 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: R66 033 direct order Back and abandoned alert cannot restore stale state
+00:31 +61 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: shopping alerts retain exact identities and routes
+00:31 +62 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shopping_alerts_test.dart: shopping alert previews fit at 320 large text
+00:31 +63 -1: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: order Help stays in one supplier conversation with one composer text 2.0

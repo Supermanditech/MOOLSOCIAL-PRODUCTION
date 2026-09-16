@@ -1,0 +1,28 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart
+00:00 +0: R66 Compare returns through source offers false at 1.0
+00:05 +1: R66 Compare returns through source offers false at 2.0
+00:08 +2: R66 Compare returns through source offers true at 1.0
+00:10 +3: R66 Compare returns through source offers true at 2.0
+00:13 +4: R66 compared product isolates nested Store false
+00:14 +5: R66 compared product isolates nested Store true
+00:16 +6: R66 comparison return survives a nested Cart product
+00:16 +7: R66 comparison validates IDs and keeps ordinary variant navigation
+00:16 +8: R66 order product Back is contextual for s-tomato at 1.0
+00:16 +9: R66 order product Back is contextual for s-tomato at 2.0
+00:17 +10: R66 order product Back is contextual for w-notebook at 1.0
+00:17 +11: R66 order product Back is contextual for w-notebook at 2.0
+00:18 +12: R66 Saved return preserves s-tomato at text 1.0
+00:19 +13: R66 Saved return preserves s-tomato at text 2.0
+00:21 +14: R66 Saved return preserves w-notebook at text 1.0
+00:22 +15: R66 Saved return preserves w-notebook at text 2.0
+00:24 +16: R66 Saved return retains the horizontal browsing position
+00:24 +17: detail media zoom is explicit, bounded and resettable
+00:25 +18: one-finger drag at 1x remains owned by product page scroll
+00:25 +19: reduced motion resets zoom immediately without route change
+00:25 +20: decoded-frame fade is scoped to the truthful detail packshot
+00:25 +21: D007 related products restore each visit from Saved false
+00:26 +22: D007 related products restore each visit from Saved true
+00:27 +23: Medicine continuation is isolated and not medical advice
+00:27 +24: Wholesale continuation uses only current trade-pack products
+00:27 +25: continuation is static with reduced motion at 320px and 140%
+00:28 +26: All tests passed!

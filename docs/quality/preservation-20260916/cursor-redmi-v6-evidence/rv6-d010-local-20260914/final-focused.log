@@ -1,0 +1,11 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: RV6 D010 recovery preserves Orders context text 1.0 via button
+00:02 +1: RV6 D010 recovery preserves Orders context text 1.0 via back
+00:03 +2: RV6 D010 recovery preserves Orders context text 1.0 via help
+00:03 +3: RV6 D010 recovery preserves Orders context text 2.0 via button
+00:04 +4: RV6 D010 recovery preserves Orders context text 2.0 via back
+00:04 +5: RV6 D010 recovery preserves Orders context text 2.0 via help
+00:05 +6: RV6 D010 routed Help Back retains recovery order text 1.0
+00:05 +7: RV6 D010 routed Help Back retains recovery order text 2.0
+00:06 +8: RV6 D010 cold recovery retains existing Wholesale origin
+00:06 +9: All tests passed!

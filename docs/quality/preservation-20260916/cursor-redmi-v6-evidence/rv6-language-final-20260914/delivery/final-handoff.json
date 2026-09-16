@@ -1,0 +1,27 @@
+{
+  "authorizedDeliveryScope": "complete",
+  "deviceAcceptance": "incomplete_as_explicitly_reported",
+  "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+  "finalEvidenceHead": "d0dfea24e52c3c60c41d0cd01fcdcd2badfbcd6c",
+  "liveRemoteHead": "d0dfea24e52c3c60c41d0cd01fcdcd2badfbcd6c",
+  "gitStatusRecords": 0,
+  "sourceBaseline": "f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b",
+  "applicationSource": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34",
+  "runtimeOwnersVerifiedAfterBuild": 326,
+  "candidate": "1.0.0-r66.22-cursorreview",
+  "apkSha256": "4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16",
+  "installedApkSha256": "4EC88FAF583797B60220CC2795CB5690D1F8779130B037CCCF75E98AA1699A16",
+  "originalDeviceClosures": 18,
+  "deviceOpen": [
+    "RV6-D005",
+    "RV6-D005-C01",
+    "RV6-D009",
+    "RV6-D010",
+    "RV6-D014"
+  ],
+  "noNewApkChildTesting": true,
+  "noIntegration": true,
+  "productionReady": false,
+  "report": "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md",
+  "timestamp": "2026-09-14T17:14:58.5566962+05:30"
+}

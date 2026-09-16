@@ -1,0 +1,420 @@
+{
+  "candidate": "UAW-CURSOR-REDMI-RV6-D014-20260914",
+  "captures": 20,
+  "files": [
+    {
+      "path": "captures/001-r6623-initial.json",
+      "sha256": "0310397926455AA02338632DA56C35AE2F059AE2AFE8EA893243312DDB514AD0",
+      "bytes": 558
+    },
+    {
+      "path": "captures/001-r6623-initial.png",
+      "sha256": "C57AC8D696AC99A2F5F339BC82E003311C907B2699F6FFEFEEE445040C343FD1",
+      "bytes": 321637
+    },
+    {
+      "path": "captures/001-r6623-initial.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "captures/001-r6623-initial-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/002-shop-tools.json",
+      "sha256": "E72530FE6DE6265AF56C089DBB0FCE939755E9B9C6B55250A6A848DFB4036BD1",
+      "bytes": 555
+    },
+    {
+      "path": "captures/002-shop-tools.png",
+      "sha256": "25D77B32E958FEA8D7749258A95BAAE8F29F4AB17FE20C392CA4E73139BEA124",
+      "bytes": 90524
+    },
+    {
+      "path": "captures/002-shop-tools.xml",
+      "sha256": "B42D0CE2A54849BA15FAEBFC78C3151741FA6FBB88E4EAE64943457A3AE59CB1",
+      "bytes": 12127
+    },
+    {
+      "path": "captures/002-shop-tools-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/003-shopping-tools.json",
+      "sha256": "201760EEC0FF3844E0CE68A1ECC1E839178820001D11D10E93CBE1726923167A",
+      "bytes": 559
+    },
+    {
+      "path": "captures/003-shopping-tools.png",
+      "sha256": "BA73847EA8ACEEE7110A1D6551F9DC308E8626F3FFB8A7825262E065469F7021",
+      "bytes": 101211
+    },
+    {
+      "path": "captures/003-shopping-tools.xml",
+      "sha256": "4CA5AB4357AAF6DE09071424BEB5010450B769A31011F4F3C0C4B0FB349D4911",
+      "bytes": 12499
+    },
+    {
+      "path": "captures/003-shopping-tools-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/004-tools-recent-visible.json",
+      "sha256": "0053028AA8C430F307694C309C64C64DE675EC947CC1086E6280FF574049CEC9",
+      "bytes": 565
+    },
+    {
+      "path": "captures/004-tools-recent-visible.png",
+      "sha256": "56C277CA578DBD470407FAD4CBD358084BE8AAE5ACB1CDC1CF052EA14ED1F306",
+      "bytes": 124333
+    },
+    {
+      "path": "captures/004-tools-recent-visible.xml",
+      "sha256": "19B1B3C8FD6DE186B349607C8B121959C104C303011DAC3AFF4795DE1741200C",
+      "bytes": 11571
+    },
+    {
+      "path": "captures/004-tools-recent-visible-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/005-recent-products.json",
+      "sha256": "32D7E97C5844C72C30711603BBE01E15A24E4426E46FB98A27A089997C36CCBD",
+      "bytes": 560
+    },
+    {
+      "path": "captures/005-recent-products.png",
+      "sha256": "DAB5197B99107C990A174EDCC6F455C2295C6F80D10161081040896053BDAF2C",
+      "bytes": 231787
+    },
+    {
+      "path": "captures/005-recent-products.xml",
+      "sha256": "D3FFE0D4C820D18193022AB826E51493ED749844AC2EEA18B64D3ED6632026B9",
+      "bytes": 10752
+    },
+    {
+      "path": "captures/005-recent-products-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/006-dog-product.json",
+      "sha256": "EBBCDC4FD7845E16D5858FC8D5BAA7E07DA0A1DDAF7CB46482B16541D88574D5",
+      "bytes": 556
+    },
+    {
+      "path": "captures/006-dog-product.png",
+      "sha256": "12717AF0D186CD8AF9503F75E75C66486ACBFEE22EEB13BE385B607FA2AF8075",
+      "bytes": 379773
+    },
+    {
+      "path": "captures/006-dog-product.xml",
+      "sha256": "364AE41A08B89699C0360703E04A6266FBF846FD7AC1815298F315569D2B52DE",
+      "bytes": 10870
+    },
+    {
+      "path": "captures/006-dog-product-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/007-pet-store.json",
+      "sha256": "F441317241E6B9D0EC1A673401D1E8ED886E5AC3B760D34B17FB7BE67FFE4F1F",
+      "bytes": 554
+    },
+    {
+      "path": "captures/007-pet-store.png",
+      "sha256": "D74FE9147EC5BEC79A596D42ACC9500B9847587EE172D8045F17C002FEBB2F85",
+      "bytes": 238543
+    },
+    {
+      "path": "captures/007-pet-store.xml",
+      "sha256": "AC9B086B3FD35F2DC60C6F908F67BB60232FFEBDB4BB3B3AE73961232342CD16",
+      "bytes": 16771
+    },
+    {
+      "path": "captures/007-pet-store-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/008-other-store.json",
+      "sha256": "8FE78016D170FA6A6043BA8B83A1788482119A670F5CD91EB4A7A8EAEAD2E77E",
+      "bytes": 556
+    },
+    {
+      "path": "captures/008-other-store.png",
+      "sha256": "85CF03357B2A2691DFD06AD5E3573430FD1063DE041E9E8D98514C49ED170059",
+      "bytes": 171515
+    },
+    {
+      "path": "captures/008-other-store.xml",
+      "sha256": "78D3673972827DAFD03A2722670F55971C261C9B390E5B1A907C25B08617EDF8",
+      "bytes": 13902
+    },
+    {
+      "path": "captures/008-other-store-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/009-original-returned-store.json",
+      "sha256": "10875D727C3A13EF450888229694E5EFA61CCBF4B27CDB265F6A3D4AC8A4CBBB",
+      "bytes": 568
+    },
+    {
+      "path": "captures/009-original-returned-store.png",
+      "sha256": "D74FE9147EC5BEC79A596D42ACC9500B9847587EE172D8045F17C002FEBB2F85",
+      "bytes": 238543
+    },
+    {
+      "path": "captures/009-original-returned-store.xml",
+      "sha256": "AC9B086B3FD35F2DC60C6F908F67BB60232FFEBDB4BB3B3AE73961232342CD16",
+      "bytes": 16771
+    },
+    {
+      "path": "captures/009-original-returned-store-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/010-after-rejected-link.json",
+      "sha256": "B733FADDBAEA3C85E759538CFDACF25422ECC15565ABD326AF07167A679F0674",
+      "bytes": 564
+    },
+    {
+      "path": "captures/010-after-rejected-link.png",
+      "sha256": "5E221518359794A56723AA963A2D1E5D6E89A425DAF7FA4F44FF711ED90005DD",
+      "bytes": 238606
+    },
+    {
+      "path": "captures/010-after-rejected-link.xml",
+      "sha256": "AC9B086B3FD35F2DC60C6F908F67BB60232FFEBDB4BB3B3AE73961232342CD16",
+      "bytes": 16771
+    },
+    {
+      "path": "captures/010-after-rejected-link-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/011-store-back-product.json",
+      "sha256": "104DF622D35245CEDFF97CDBFE8D162B353519B37A7E17AAAD1527EFCDD56392",
+      "bytes": 563
+    },
+    {
+      "path": "captures/011-store-back-product.png",
+      "sha256": "FFDF7627163BE546A40A53DF3C89477044EBA44EC484BAFF6B0A486E801C52C9",
+      "bytes": 380313
+    },
+    {
+      "path": "captures/011-store-back-product.xml",
+      "sha256": "364AE41A08B89699C0360703E04A6266FBF846FD7AC1815298F315569D2B52DE",
+      "bytes": 10870
+    },
+    {
+      "path": "captures/011-store-back-product-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/012-product-back-shop.json",
+      "sha256": "612127DB861723ECCFA4D2A63F4D0E67A16EB69524689ABE0DBD939953AF481E",
+      "bytes": 562
+    },
+    {
+      "path": "captures/012-product-back-shop.png",
+      "sha256": "8235B76CA534919753ACC62798EF1BF768F1261079F927D73A37EB76EEFF4C0D",
+      "bytes": 232027
+    },
+    {
+      "path": "captures/012-product-back-shop.xml",
+      "sha256": "D3FFE0D4C820D18193022AB826E51493ED749844AC2EEA18B64D3ED6632026B9",
+      "bytes": 10752
+    },
+    {
+      "path": "captures/012-product-back-shop-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/013-shop-restored.json",
+      "sha256": "90323F8A2AB9C12350E23763FAD8CF89308BDE6FE64593E027C870641DC38F71",
+      "bytes": 558
+    },
+    {
+      "path": "captures/013-shop-restored.png",
+      "sha256": "D314BD4C6912A65D071DA7EE8EB4F3868BF7B9E9C8B09D6496C373E274737A9C",
+      "bytes": 321509
+    },
+    {
+      "path": "captures/013-shop-restored.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "captures/013-shop-restored-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/014-saved-preserved.json",
+      "sha256": "BC6EEFB7AA9EDA30853D32000A4685F52CA8975D9F4FEF18ED4778C372A39B2C",
+      "bytes": 560
+    },
+    {
+      "path": "captures/014-saved-preserved.png",
+      "sha256": "4D15D8DB0E8D96B1E3DC73A59AB42179C61E0BCC7D3C8CB8E92E8DD5B760FABD",
+      "bytes": 217544
+    },
+    {
+      "path": "captures/014-saved-preserved.xml",
+      "sha256": "911A72C3871308C0ED99FD2C37402CEFD1747EEE050F6A155B32035C5196CEDD",
+      "bytes": 14726
+    },
+    {
+      "path": "captures/014-saved-preserved-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/015-address-preservation.json",
+      "sha256": "665B999948B637D50CC1A025B5CBC4FEA13BDE69A252D416B02EF8B79BE2379D",
+      "bytes": 565
+    },
+    {
+      "path": "captures/015-address-preservation.png",
+      "sha256": "5B24FD3F9B16911CC39C3D90641194C86E331853CD76617D974C79B732AED1A9",
+      "bytes": 112552
+    },
+    {
+      "path": "captures/015-address-preservation.xml",
+      "sha256": "1D4BA4F74DF7A70F5DC1E3B58A5637A274DB1DDD87F3EA24B741A197FE470002",
+      "bytes": 10706
+    },
+    {
+      "path": "captures/015-address-preservation-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/016-tools-for-addresses.json",
+      "sha256": "8D19046076E22EAA168EED95F4B5A3C0AE71CB41BD2209020FC12DF1EA33E7B2",
+      "bytes": 564
+    },
+    {
+      "path": "captures/016-tools-for-addresses.png",
+      "sha256": "0DFA470D7D00CC5D7B776AA81B87D65EA57695817B737A62C5EA116C1CC2928F",
+      "bytes": 90458
+    },
+    {
+      "path": "captures/016-tools-for-addresses.xml",
+      "sha256": "B42D0CE2A54849BA15FAEBFC78C3151741FA6FBB88E4EAE64943457A3AE59CB1",
+      "bytes": 12127
+    },
+    {
+      "path": "captures/016-tools-for-addresses-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/017-shopping-settings-visible.json",
+      "sha256": "0C6DDD52B7C47801022341C668FBC685BA91137439ED46F4903130DEF43760CF",
+      "bytes": 570
+    },
+    {
+      "path": "captures/017-shopping-settings-visible.png",
+      "sha256": "A9E97CD93489BEBC303F1E589585ED2B721E58BF57B3578DE6661FBFEC612766",
+      "bytes": 124863
+    },
+    {
+      "path": "captures/017-shopping-settings-visible.xml",
+      "sha256": "19B1B3C8FD6DE186B349607C8B121959C104C303011DAC3AFF4795DE1741200C",
+      "bytes": 11571
+    },
+    {
+      "path": "captures/017-shopping-settings-visible-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/018-shopping-settings.json",
+      "sha256": "00CE8F9CB5833D31F9CE9090D7E103A62A4E439CE38204469E1973B128D6DF7A",
+      "bytes": 562
+    },
+    {
+      "path": "captures/018-shopping-settings.png",
+      "sha256": "A9ABE08AD0F2A7BD917412332B8C9686427BDEE4D17E1FB8425C9FF9D05B40F2",
+      "bytes": 141914
+    },
+    {
+      "path": "captures/018-shopping-settings.xml",
+      "sha256": "EE875B5953FD63D05A8EECE214C4F38D88357A7AB7319BD71FD51BA87196AB10",
+      "bytes": 10155
+    },
+    {
+      "path": "captures/018-shopping-settings-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/019-addresses-preserved.json",
+      "sha256": "664C41C3782A1E79E6912C4E89D58E358237EFD1250AB3282E6D8F4BB091612D",
+      "bytes": 564
+    },
+    {
+      "path": "captures/019-addresses-preserved.png",
+      "sha256": "E9C7B5CC1003847F1BCBF91F8EB6238FC4F2BD17EAE94F0F8FDD6321048C1D3C",
+      "bytes": 138928
+    },
+    {
+      "path": "captures/019-addresses-preserved.xml",
+      "sha256": "04E74573CEA8FD9DEA97A895C37EAEC39DC50A5FE9EEE6903D9E6AE4ADDA539D",
+      "bytes": 10257
+    },
+    {
+      "path": "captures/019-addresses-preserved-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "captures/020-final-shop-restored.json",
+      "sha256": "E64A0C2D6B1550CFA149DB29397C1DB856309EEFE94F0EC4EB615656FD9C00E2",
+      "bytes": 564
+    },
+    {
+      "path": "captures/020-final-shop-restored.png",
+      "sha256": "C9BACA54274161A8F56A04A1D533125D893337473B922140FFA02FABF06EFD54",
+      "bytes": 321792
+    },
+    {
+      "path": "captures/020-final-shop-restored.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "captures/020-final-shop-restored-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    }
+  ],
+  "visuallyReviewedCaptureNumbers": [
+    1,
+    2,
+    8,
+    9,
+    10,
+    11,
+    14,
+    15,
+    19,
+    20
+  ],
+  "nativeLinkExecution": "rejected_before_process_creation",
+  "D014DeviceClosed": false
+}

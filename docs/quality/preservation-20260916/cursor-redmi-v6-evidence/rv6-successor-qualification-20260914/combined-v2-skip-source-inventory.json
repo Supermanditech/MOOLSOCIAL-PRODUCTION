@@ -1,0 +1,169 @@
+{
+  "source": "9b7e5aa7fddc08517432f9b3932da5a36ef7a92d",
+  "count": 27,
+  "status": "source inventory; skipped cases are not passes",
+  "records": [
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_address_form_sheet_motion_test.dart",
+      "line": 800,
+      "testDeclarationExcerpt": "'R56.10 request/add responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n      (Size(360, 800), 1.0, false, 'android-360x",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_address_sheet_motion_test.dart",
+      "line": 429,
+      "testDeclarationExcerpt": "'R56.9 address-sheet responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n      (Size(360, 800), 1.0, false, 'android-360",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 205,
+      "testDeclarationExcerpt": "\n    'Buy V2 R33 search-media-chat local candidate captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(360, 800);\n      addTearDown(tester.view.",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 341,
+      "testDeclarationExcerpt": "\n    'Buy V2 R33 search-media-chat responsive journey captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      addTearDown(tester.view.reset);\n\n      for (final viewport in const [\n      ",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 423,
+      "testDeclarationExcerpt": "\n    'Buy V2 R33 horizontal and Account supplement captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(360, 800);\n      addTearDown(tester.view.",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 507,
+      "testDeclarationExcerpt": "\n    'Buy V2 R35.1 dense flat vertical search suggestion captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      addTearDown(tester.view.reset);\n\n      for (final viewport in const [\n   ",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 589,
+      "testDeclarationExcerpt": "\n    'OPPO installed baseline header removal review captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(360, 800);\n      addTearDown(tester.view",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 662,
+      "testDeclarationExcerpt": "\n    'post-order confirmation and invoice review captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(360, 800);\n      addTearDown(tester.view.re",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 734,
+      "testDeclarationExcerpt": "\n    'Offers progressive browsing laptop review captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(390, 844);\n      addTearDown(tester.view.res",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 801,
+      "testDeclarationExcerpt": "\n    'B01 T02 automatic fulfilment founder capture',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(390, 844);\n      addTearDown(tester.view.reset);\n\n",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 871,
+      "testDeclarationExcerpt": "\n    'B01 T01C delivery plan and split founder captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(390, 844);\n      addTearDown(tester.view.rese",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 933,
+      "testDeclarationExcerpt": "\n    'B01 T01A remove Medicine tab founder capture',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(360, 800);\n      addTearDown(tester.view.reset);\n\n",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_candidate_capture_test.dart",
+      "line": 1003,
+      "testDeclarationExcerpt": "\n    'B01 T01B optional GST invoice founder capture',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      tester.view.physicalSize = const Size(390, 844);\n      addTearDown(tester.view.reset);\n",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_category_sheet_style_motion_test.dart",
+      "line": 535,
+      "testDeclarationExcerpt": "'R56.3 category-sheet responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (\n        Size(320, 700),\n        1.4,\n        false,\n        EdgeInsets.zero,\n        'compact-320x700",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart",
+      "line": 386,
+      "testDeclarationExcerpt": "'R56.6 filter-sheet responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n      (Size(360, 800), 1.0, false, 'android-360x",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_filter_sheet_motion_test.dart",
+      "line": 434,
+      "testDeclarationExcerpt": "'R56.6 FIX3 unified-sheet responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n      (Size(360, 800), 1.0, false, 'androi",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_info_sheets_motion_test.dart",
+      "line": 398,
+      "testDeclarationExcerpt": "\n    'R56.4 household and Saved responsive evidence captures',\n    (tester) async {\n      const cases = [\n        (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n        (Size(360, 800), 1.0, false, ",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_manual_code_sheet_motion_test.dart",
+      "line": 765,
+      "testDeclarationExcerpt": "'R56.2 scanner manual-code responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (Size(320, 700), 1.4, false, EdgeInsets.zero, 'compact-320x700-text140'),\n      (Size(360, 800), 1",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_assist_context_continuity_test.dart",
+      "line": 243,
+      "testDeclarationExcerpt": "'R58.8.2 Assist responsive founder captures', (tester) async {\n    tester.view.devicePixelRatio = 1;\n    addTearDown(tester.view.reset);\n\n    for (final viewport in const [\n      (\n        size: Size(320, 568",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_delivery_address_context_test.dart",
+      "line": 467,
+      "testDeclarationExcerpt": "'R58.8.3 delivery context responsive founder captures', (\n    tester,\n  ) async {\n    tester.view.devicePixelRatio = 1;\n    addTearDown(tester.view.reset);\n\n    for (final viewport in const [\n      (\n        ",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_order_issue_recovery_continuity_test.dart",
+      "line": 303,
+      "testDeclarationExcerpt": "'R58.8.4 responsive founder captures', (tester) async {\n    tester.view.devicePixelRatio = 1;\n    addTearDown(tester.view.reset);\n\n    for (final viewport in const [\n      (\n        size: Size(320, 568),\n    ",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart",
+      "line": 254,
+      "testDeclarationExcerpt": "\n    'R58.7 Orders responsive founder captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      addTearDown(tester.view.reset);\n\n      for (final viewport in const [\n        (\n          si",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_payment_sheet_motion_test.dart",
+      "line": 509,
+      "testDeclarationExcerpt": "'R56.7 payment-sheet responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n      (Size(360, 800), 1.0, false, 'android-360",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_prescription_sheet_motion_test.dart",
+      "line": 396,
+      "testDeclarationExcerpt": "'R56.8 prescription-sheet responsive evidence captures', (\n    tester,\n  ) async {\n    const cases = [\n      (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n      (Size(360, 800), 1.0, false, 'androi",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_product_feedback_sheet_motion_test.dart",
+      "line": 649,
+      "testDeclarationExcerpt": "'R56.5 responsive evidence captures', (tester) async {\n    const cases = [\n      (\n        Size(320, 700),\n        1.4,\n        false,\n        EdgeInsets.zero,\n        'review-compact-320x700-text140',\n      ",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_saved_clear_sheet_motion_test.dart",
+      "line": 377,
+      "testDeclarationExcerpt": "\n    'R56.1 Saved-clear responsive evidence captures',\n    (tester) async {\n      const cases = [\n        (Size(320, 700), 1.4, false, 'compact-320x700-text140'),\n        (Size(360, 800), 1.0, false, 'android",
+      "skipExpression": "true"
+    },
+    {
+      "path": "apps/mobile/test/ui_v2/buy/buy_v2_shop_pharmacy_seller_continuity_test.dart",
+      "line": 310,
+      "testDeclarationExcerpt": "\n    'B01 T02 automatic fulfilment responsive founder captures',\n    (tester) async {\n      tester.view.devicePixelRatio = 1;\n      addTearDown(tester.view.reset);\n\n      for (final viewport in const [\n      ",
+      "skipExpression": "true"
+    }
+  ]
+}

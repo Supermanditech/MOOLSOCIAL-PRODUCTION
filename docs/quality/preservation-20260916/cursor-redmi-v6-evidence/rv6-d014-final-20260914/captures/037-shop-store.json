@@ -1,0 +1,13 @@
+{
+  "label": "037-shop-store",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T20:18:13.955983+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "31fbf8f2fc140af75749d3dc74d9b99b43ee7b31ecb3008fb93b3568d9098fd3",
+    ".xml": "884e2199caf66442ae6b2588642beeab789e56b5129e8815347830a2353d39ae",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

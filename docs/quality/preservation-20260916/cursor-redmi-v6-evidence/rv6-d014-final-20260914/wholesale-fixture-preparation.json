@@ -1,0 +1,17 @@
+{
+  "purpose": "Establish the existing D014 Wholesale notebook supplier fixture before the corrective successor build",
+  "device": "TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "installedVersion": "1.0.0-r66.23-cursorreview",
+  "before": "Wholesale Recently viewed contains one generated tomato product; original notebook fixture is absent from that UI list (captures041-044).",
+  "routeEvidence": "journey_router.dart existing /app/buy/product/:productId route; existing w-notebook ID in buy_v2_session.dart",
+  "approvedCommand": "adb -s TG8HCYTGGQT885OF shell am start -W -a android.intent.action.VIEW -d https://moolsocial.com/app/buy/product/w-notebook -p com.moolsocial.app.cursorreview",
+  "toolChunk": "e6f4bd",
+  "exitCode": 0,
+  "androidStatus": "ok",
+  "delivery": "intent delivered to currently running top-most instance",
+  "waitTimeMs": 12,
+  "after": "Existing A4 ruled notebooks, carton120, Rajasthan Paper Products opens in Wholesale. Visit supplier opens four-pack supplier catalogue with Other stores and View all (captures045-047).",
+  "limitations": "Fixture preparation only; no D014 order-link acceptance claim. Product browsing may record a new Recently viewed entry; no existing history was cleared or replaced. Persistence across the successor install is not yet verified.",
+  "preservation": "No Cart, Saved, address, language, text-scale, order, payment, message, backend or source mutation. Quick Shop restored in048 with Saved count1 and no Cart dock."
+}

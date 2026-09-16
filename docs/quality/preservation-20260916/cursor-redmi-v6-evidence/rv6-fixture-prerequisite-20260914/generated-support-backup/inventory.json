@@ -1,0 +1,22 @@
+[
+  {
+    "owner": "apps/mobile/.dart_tool/package_config.json",
+    "generatedSha256": "b99e9efa046b4d25f888468ca0d81d1de33292bf0807ef9ac53202adbf735bae",
+    "restoredHeadSha256": "b99e9efa046b4d25f888468ca0d81d1de33292bf0807ef9ac53202adbf735bae"
+  },
+  {
+    "owner": "apps/mobile/.dart_tool/package_graph.json",
+    "generatedSha256": "05a1b1abd8d59a0f667ac63571c212cc700b808b01c8934414edc8f701db23f4",
+    "restoredHeadSha256": "05a1b1abd8d59a0f667ac63571c212cc700b808b01c8934414edc8f701db23f4"
+  },
+  {
+    "owner": "apps/mobile/.flutter-plugins-dependencies",
+    "generatedSha256": "691d1881aceeae571afe9d15bc78bdbf842f5a9aab56a78d7d19dbf242fdc540",
+    "restoredHeadSha256": "0acc4c6c517389f6a108bda1a3ba1426b2e564111b9a334c5536787245bde3e7"
+  },
+  {
+    "owner": "apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java",
+    "generatedSha256": "3f07c2526abe5bc785154331fb37d0ce71637cd0bb6b46fced6551f496f792dc",
+    "restoredHeadSha256": "3f07c2526abe5bc785154331fb37d0ce71637cd0bb6b46fced6551f496f792dc"
+  }
+]

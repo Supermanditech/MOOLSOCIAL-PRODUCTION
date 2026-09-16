@@ -1,0 +1,78 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: RV6 D002 last Store item removal retains catalogue s-eggs text 1.0
+00:05 +1: RV6 D002 last Store item removal retains catalogue s-eggs text 2.0
+00:07 +2: RV6 D002 last Store item removal retains catalogue w-notebook text 1.0
+00:10 +3: RV6 D002 last Store item removal retains catalogue w-notebook text 2.0
+00:12 +4: RV6 D002 paged Store last item retains category shop text 1.0
+00:16 +5: RV6 D002 paged Store last item retains category shop text 2.0
+00:19 +6: RV6 D002 paged Store last item retains category wholesale text 1.0
+00:21 +7: RV6 D002 paged Store last item retains category wholesale text 2.0
+00:23 +8: R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+00:24 +9: R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+00:25 +10: R669 small full catalogue exposes every SKU s-curd-711x320-1.0
+00:26 +11: R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+00:27 +12: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+00:28 +13: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+00:29 +14: R669 small full catalogue exposes every SKU w-notebook-711x320-1.0
+00:30 +15: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+00:32 +16: R669 area final row clears Android navigation Size(320.0, 711.0) 1.0
+00:32 +17: R669 area final row clears Android navigation Size(320.0, 711.0) 2.0
+00:33 +18: R669 area final row clears Android navigation Size(711.0, 320.0) 1.0
+00:34 +19: R669 area final row clears Android navigation Size(711.0, 320.0) 2.0
+00:35 +20: R5 paged published Offers journey 320x844-1.0
+00:40 +21: R5 paged published Offers journey 320x844-2.0
+00:43 +22: R5 paged published Offers journey 640x360-1.0
+00:48 +23: R5 paged published Offers journey 640x360-2.0
+00:52 +24: R5 store-first catalogue journey shop-320x844-1.0
+00:56 +25: R5 paged catalogue user actions shop-320x844-1.0
+00:58 +26: R5 store-first catalogue journey shop-320x844-2.0
+01:02 +27: R5 paged catalogue user actions shop-320x844-2.0
+01:03 +28: R5 store-first catalogue journey shop-640x360-1.0
+01:07 +29: R5 paged catalogue user actions shop-640x360-1.0
+01:09 +30: R5 store-first catalogue journey shop-640x360-2.0
+01:13 +31: R5 paged catalogue user actions shop-640x360-2.0
+01:15 +32: R5 store-first catalogue journey wholesale-320x844-1.0
+01:19 +33: R5 paged catalogue user actions wholesale-320x844-1.0
+01:21 +34: R5 store-first catalogue journey wholesale-320x844-2.0
+01:24 +35: R5 paged catalogue user actions wholesale-320x844-2.0
+01:26 +36: R5 store-first catalogue journey wholesale-640x360-1.0
+01:29 +37: R5 paged catalogue user actions wholesale-640x360-1.0
+01:31 +38: R5 store-first catalogue journey wholesale-640x360-2.0
+01:34 +39: R5 paged catalogue user actions wholesale-640x360-2.0
+01:36 +40: R669 collection discovery keeps the exact branch 320x844-1.0
+01:37 +41: R669 collection discovery keeps the exact branch 320x844-2.0
+01:37 +42: R669 collection discovery keeps the exact branch 640x360-1.0
+01:37 +43: R669 collection discovery keeps the exact branch 640x360-2.0
+01:38 +44: R5 collection visibility hides unsupported capability
+01:38 +45: R5 collection visibility hides absent capability
+01:38 +46: R5 collection visibility hides wrong-branch capability
+01:38 +47: R5 collection visibility hides expired capability
+01:38 +48: R5 collection visibility hides future-observation capability
+01:38 +49: R5 collection visibility hides blank-source capability
+01:39 +50: R5 collection visibility hides stale-facts capability
+01:39 +51: R5 collection visibility hides wrong-product capability
+01:39 +52: R5 collection visibility updates and expires on the same Store
+01:39 +53: R5 collection visibility withdraws after an invalid refresh
+01:39 +54: R5 collection visibility rechecks capability on app resume
+01:39 +55: R66 supplier catalogue retains exact entry variant s-milk-500ml
+01:39 +56: R66 supplier variant journey s-milk-500ml text 1.0
+01:42 +57: R66 supplier variant journey s-milk-500ml text 2.0
+01:44 +58: R66 supplier catalogue retains exact entry variant s-milk-2l
+01:44 +59: R66 supplier variant journey s-milk-2l text 1.0
+01:47 +60: R66 supplier variant journey s-milk-2l text 2.0
+01:49 +61: R66 supplier catalogue retains exact entry variant w-rice-50kg
+01:49 +62: R66 supplier variant journey w-rice-50kg text 1.0
+01:52 +63: R66 supplier variant journey w-rice-50kg text 2.0
+01:54 +64: R66 supplier catalogue retains exact entry variant w-oil-10l
+01:54 +65: R66 supplier variant journey w-oil-10l text 1.0
+01:56 +66: R66 supplier variant journey w-oil-10l text 2.0
+01:58 +67: R66 Cart store continuation stays scoped after s-eggs
+02:00 +68: R66 Cart store continuation stays scoped after w-notebook
+02:03 +69: store and brand catalogues remain exact and destination-scoped
+02:03 +70: Shop store catalogue reuses product cards and opens one item
+02:03 +71: product details keeps Visit store as the single store route
+02:03 +72: store grid keeps one full-size Add action
+02:03 +73: store grid Add keeps the shopper in the store and updates Cart
+02:04 +74: store catalogue exposes full products and exact related-store continuation
+02:04 +75: four-product store fills one three-SKU row without dead width
+02:04 +76: All tests passed!

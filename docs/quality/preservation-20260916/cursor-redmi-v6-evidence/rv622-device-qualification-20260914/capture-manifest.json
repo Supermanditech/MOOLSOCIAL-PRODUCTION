@@ -1,0 +1,462 @@
+{
+  "device": "TG8HCYTGGQT885OF",
+  "originalsClosed": 19,
+  "childClosed": "RV6-D005-C01",
+  "externalLinkUnverified": [
+    "RV6-D009",
+    "RV6-D010",
+    "RV6-D014"
+  ],
+  "files": [
+    {
+      "path": "001-initial-shop.png",
+      "sha256": "97CFA410E2417275FBD11A34F8C770D4AFF274E10F9DF381D143AF8B910790CD",
+      "bytes": 267578
+    },
+    {
+      "path": "001-initial-shop.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "001-initial-shop.json",
+      "sha256": "23B858883681E6A67D73ED4285226BE5902DD6C374BC77C365BEA0E9EF55171B",
+      "bytes": 557
+    },
+    {
+      "path": "002-profile.png",
+      "sha256": "A2FF732AB12163E9A879E66C6DA9F00E4525F65546A6F287A7F9C78CC411BDA9",
+      "bytes": 321978
+    },
+    {
+      "path": "002-profile.xml",
+      "sha256": "CEAFE5BEAB3CEF6214A46AE26BE692FC1019378168DEB96111A1E68CC8CCA068",
+      "bytes": 7419
+    },
+    {
+      "path": "002-profile.json",
+      "sha256": "789649E19E660D14AD68B583A10CAAE32A1142F7712C678D9C5DCB12266658FB",
+      "bytes": 552
+    },
+    {
+      "path": "003-preferences-initial.png",
+      "sha256": "EE74B9840C129FB196BA61590CB64897346B65B87FABC01F31D1848FD04D414B",
+      "bytes": 216107
+    },
+    {
+      "path": "003-preferences-initial.xml",
+      "sha256": "490088AD361993A65F3B596F296B7E74D29626446235097D54F1D99A42CC2B44",
+      "bytes": 8234
+    },
+    {
+      "path": "003-preferences-initial.json",
+      "sha256": "EBD1881A186697AA8DAB32CCFD4101801529F6A46B0FC78BF30D163BFEE85AD3",
+      "bytes": 564
+    },
+    {
+      "path": "004-preferences-settled.png",
+      "sha256": "00BB9BBED27A12F544A411CA3F3F3FF1A2DDE13A0FCAECFF0C00D8CDC4737FB4",
+      "bytes": 178027
+    },
+    {
+      "path": "004-preferences-settled.xml",
+      "sha256": "490088AD361993A65F3B596F296B7E74D29626446235097D54F1D99A42CC2B44",
+      "bytes": 8234
+    },
+    {
+      "path": "004-preferences-settled.json",
+      "sha256": "CA9E47A44849956BCC3D6516A8E50560687A38D4D69EF8FEA67BF2E93EC89262",
+      "bytes": 564
+    },
+    {
+      "path": "005-language-initial.png",
+      "sha256": "8C4A407B5834C090B4E154C0C0E0BAF9C464E8B4E98829CE1D2800DEAC417616",
+      "bytes": 164713
+    },
+    {
+      "path": "005-language-initial.xml",
+      "sha256": "9A42403E191619BAA18C5F5A277D1DB04A97FFC6D00C1FCB5F0122BB82ED526F",
+      "bytes": 5998
+    },
+    {
+      "path": "005-language-initial.json",
+      "sha256": "243F3ED716FDD29686C4F7A31BDDF7F6120B3988FCE3F0FCC7001A1E7612FA8A",
+      "bytes": 561
+    },
+    {
+      "path": "006-hindi-selected.png",
+      "sha256": "37F18A2AE0FF4BDE131CC7CEF71DA34D6AB79C8252B16474E5D213EB43AF4358",
+      "bytes": 181896
+    },
+    {
+      "path": "006-hindi-selected.xml",
+      "sha256": "0F8CFAE925F07821989A14310CBEEB571BC8C62754739FF761A304B41776357C",
+      "bytes": 8266
+    },
+    {
+      "path": "006-hindi-selected.json",
+      "sha256": "30E80BB8D7FEB76524F680541FD5F26343F3A2E95D1F3AA944E2D7689EF051EF",
+      "bytes": 559
+    },
+    {
+      "path": "007-return-global-profile.png",
+      "sha256": "4FC3E1F873602810FC01C01B412E6C972F8076CD4A85FD3B96647043D22E30B6",
+      "bytes": 321788
+    },
+    {
+      "path": "007-return-global-profile.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "007-return-global-profile.json",
+      "sha256": "1C18B917148042463CD49C4B566420B717E9F0E6D2C5FE42AEC29A3F8D8A05AD",
+      "bytes": 566
+    },
+    {
+      "path": "008-before-cold-relaunch.png",
+      "sha256": "2E47C9F610B1E8D85DD9FB11A0C0D199E8522D5CCEA69152882BBE0F223579B6",
+      "bytes": 322206
+    },
+    {
+      "path": "008-before-cold-relaunch.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "008-before-cold-relaunch.json",
+      "sha256": "598984D3F67DB74F933F52625C6007FE4197D6EEDEEC6E28BABBBFD6173B7CEF",
+      "bytes": 565
+    },
+    {
+      "path": "009-hindi-cold-shop.png",
+      "sha256": "7ABCB350EAFCC138B3356AF1A52BCE113982E8412D4E0C29A692DFE43139C65C",
+      "bytes": 322217
+    },
+    {
+      "path": "009-hindi-cold-shop.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "009-hindi-cold-shop.json",
+      "sha256": "3AB8FD2C4B6FEB05B07E1708867650A088A8E9D609C14A3F5204539A6F2BF880",
+      "bytes": 560
+    },
+    {
+      "path": "010-hindi-cold-profile.png",
+      "sha256": "004D274983E6EEE57DE5B0B310A2DCD1B65E6243B0E9A722CE9A87967E3F6E66",
+      "bytes": 216232
+    },
+    {
+      "path": "010-hindi-cold-profile.xml",
+      "sha256": "CEAFE5BEAB3CEF6214A46AE26BE692FC1019378168DEB96111A1E68CC8CCA068",
+      "bytes": 7419
+    },
+    {
+      "path": "010-hindi-cold-profile.json",
+      "sha256": "E2B503B504151235A490C01EBC8379AB22362EB364ED4B18C5CED31924F4A392",
+      "bytes": 563
+    },
+    {
+      "path": "011-hindi-after-cold.png",
+      "sha256": "4C0580527B39C3271ABA6D78505BECC313012D551030A45E3B283412E0040385",
+      "bytes": 182524
+    },
+    {
+      "path": "011-hindi-after-cold.xml",
+      "sha256": "0F8CFAE925F07821989A14310CBEEB571BC8C62754739FF761A304B41776357C",
+      "bytes": 8266
+    },
+    {
+      "path": "011-hindi-after-cold.json",
+      "sha256": "808D581BB84923C41CD28AC9F5ABDECE1E3008783847C9DCAD832B8140D6B878",
+      "bytes": 561
+    },
+    {
+      "path": "012-hindi-radio-after-cold.png",
+      "sha256": "D110ED5EFFE56E62E38991582FF896F1A9D833C92BFAB61401538662B4BDF4B7",
+      "bytes": 167313
+    },
+    {
+      "path": "012-hindi-radio-after-cold.xml",
+      "sha256": "124BAC5675A535FB95BB3B19F941C13CFB3A307E16010170771DEDA15E308C4A",
+      "bytes": 5998
+    },
+    {
+      "path": "012-hindi-radio-after-cold.json",
+      "sha256": "8C880536B6B9BA0D5A48FA1239E9A6116732348315B4A81605767114B0AA77B2",
+      "bytes": 567
+    },
+    {
+      "path": "013-return-shop-hindi.png",
+      "sha256": "63B77551FB86C2B325E06EC9CE72687A2641F5C3E6C88E136DE754393B2B23A2",
+      "bytes": 322205
+    },
+    {
+      "path": "013-return-shop-hindi.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "013-return-shop-hindi.json",
+      "sha256": "FDA02309DB4BB3C15781A6FAD31F1844D5C94E40AAFC2B3BCC1703E4AABAE969",
+      "bytes": 562
+    },
+    {
+      "path": "014-personal-hindi.png",
+      "sha256": "51014B8E94296305229CC0C4E09C1A349B55E58AC49442DB4A4334156156C17B",
+      "bytes": 230395
+    },
+    {
+      "path": "014-personal-hindi.xml",
+      "sha256": "7571C19BB2F40B0A2F1F3C084D8090111AED1CA412598BB867C2026A1A798E25",
+      "bytes": 9579
+    },
+    {
+      "path": "014-personal-hindi.json",
+      "sha256": "1A3D014C99C068FA7DC9826CCD1A904E06AD718872F80DBCC2DACCDE36E0736F",
+      "bytes": 559
+    },
+    {
+      "path": "015-personal-to-preferences.png",
+      "sha256": "E89FA0F9990B7EAA97974AE9370DC6DA14A99056E0E9B980455497E8B9923318",
+      "bytes": 182443
+    },
+    {
+      "path": "015-personal-to-preferences.xml",
+      "sha256": "0F8CFAE925F07821989A14310CBEEB571BC8C62754739FF761A304B41776357C",
+      "bytes": 8266
+    },
+    {
+      "path": "015-personal-to-preferences.json",
+      "sha256": "FDC7C64A96FB8378074C13EABCC09165B35604BD7ABA483167F37032A4D943B3",
+      "bytes": 568
+    },
+    {
+      "path": "016-language-before-restore.png",
+      "sha256": "1FB2D1B9D45E5BF2741D74F5F042F77A39876706B67DADB6B75F8735EED639D6",
+      "bytes": 167270
+    },
+    {
+      "path": "016-language-before-restore.xml",
+      "sha256": "124BAC5675A535FB95BB3B19F941C13CFB3A307E16010170771DEDA15E308C4A",
+      "bytes": 5998
+    },
+    {
+      "path": "016-language-before-restore.json",
+      "sha256": "8D7F314CF2EDCE61DE2B8169E486567978932AA92DD62FC1E04451EC87D40D96",
+      "bytes": 568
+    },
+    {
+      "path": "017-english-restored.png",
+      "sha256": "780E8DEFD974169147831D7BD71C66F5CE2EC7B95A78F89739DB2A611D2E05FD",
+      "bytes": 178231
+    },
+    {
+      "path": "017-english-restored.xml",
+      "sha256": "490088AD361993A65F3B596F296B7E74D29626446235097D54F1D99A42CC2B44",
+      "bytes": 8234
+    },
+    {
+      "path": "017-english-restored.json",
+      "sha256": "08E55EADAA0BA14D4FAF0CCCA9FE8A2E1A5590DB6C93F60007A148D9E9A2F7A1",
+      "bytes": 561
+    },
+    {
+      "path": "018-personal-return-english.png",
+      "sha256": "451AE7912E90867AE1B9ED723B27DE71F846B026405C30A77633C201F923C966",
+      "bytes": 225149
+    },
+    {
+      "path": "018-personal-return-english.xml",
+      "sha256": "13F07C07865FFD53CEF102B0C07761FBF0CD23AF224B46D88D756401A295509C",
+      "bytes": 9547
+    },
+    {
+      "path": "018-personal-return-english.json",
+      "sha256": "1547CE4840946F8574B2445055E58201F46CEBB2CA7A8FD0AC3A694B0B5920D6",
+      "bytes": 568
+    },
+    {
+      "path": "019-english-cold-shop.png",
+      "sha256": "B3614B61D16947582756B6E8EA02AABC6F20265461C0D397AB7B1A3B20E08BA0",
+      "bytes": 321914
+    },
+    {
+      "path": "019-english-cold-shop.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "019-english-cold-shop.json",
+      "sha256": "E8E90F301F649FC00F10627A2E856011A54D92B4804A19C137D1DAEEBAE56A54",
+      "bytes": 562
+    },
+    {
+      "path": "020-english-after-cold.png",
+      "sha256": "0654786AF2F7ABEB181E95ABA966B776CF6E544E0C2674C56C055D7CC884C634",
+      "bytes": 177965
+    },
+    {
+      "path": "020-english-after-cold.xml",
+      "sha256": "490088AD361993A65F3B596F296B7E74D29626446235097D54F1D99A42CC2B44",
+      "bytes": 8234
+    },
+    {
+      "path": "020-english-after-cold.json",
+      "sha256": "0C7D5C65F59D7F86D2F0ADF4258C1D0362005BECAA54EE17533F503DB442C6B1",
+      "bytes": 563
+    },
+    {
+      "path": "021-english-radio-after-cold.png",
+      "sha256": "3E53E7E0A6EA6AB79C97A023AA7E0CAF4CE0EF1AE07A8BFED20E6615E0670BD8",
+      "bytes": 165183
+    },
+    {
+      "path": "021-english-radio-after-cold.xml",
+      "sha256": "9A42403E191619BAA18C5F5A277D1DB04A97FFC6D00C1FCB5F0122BB82ED526F",
+      "bytes": 5998
+    },
+    {
+      "path": "021-english-radio-after-cold.json",
+      "sha256": "9063B3499174B98007AE1F271334AF683ADCE784D2B4BA0CC594031587D763FF",
+      "bytes": 569
+    },
+    {
+      "path": "022-final-shop-restored.png",
+      "sha256": "B8CBC0F43319DE013A549CCAF18C4EBE929CFFDCB5AD83A000375F916DEBBE1E",
+      "bytes": 322182
+    },
+    {
+      "path": "022-final-shop-restored.xml",
+      "sha256": "AE3C171B86CCB18112EE4ABAFAE5C588877C3E94FFADF140E9624B1FCEDF68B2",
+      "bytes": 24101
+    },
+    {
+      "path": "022-final-shop-restored.json",
+      "sha256": "FE6142CBAD1A43E1661F427A16E770EED204F732C50372FF5D47DF80F37759F6",
+      "bytes": 564
+    },
+    {
+      "path": "002-profile-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "003-preferences-initial-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "004-preferences-settled-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "005-language-initial-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "006-hindi-selected-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "007-return-global-profile-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "008-before-cold-relaunch-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "009-hindi-cold-shop-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "010-hindi-cold-profile-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "011-hindi-after-cold-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "012-hindi-radio-after-cold-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "013-return-shop-hindi-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "014-personal-hindi-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "015-personal-to-preferences-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "016-language-before-restore-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "017-english-restored-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "018-personal-return-english-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "019-english-cold-shop-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "020-english-after-cold-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "021-english-radio-after-cold-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "022-final-shop-restored-uiautomator.stderr.log",
+      "sha256": "AE9BFED8EF3C44F6C9E8659D19C231C42C9ACFFC1E67C71446EC0448E821838F",
+      "bytes": 1988
+    },
+    {
+      "path": "cold-english-01.log",
+      "sha256": "88FFDC43070B1EF395AAD9D22300CCE6F485361DA007556F8E25567460CF9940",
+      "bytes": 286
+    },
+    {
+      "path": "cold-hindi-01.log",
+      "sha256": "15E26D9463CD6309826D4A6CE5BBFBD20532DCEC31D2F0F606477E9FFBF08DEF",
+      "bytes": 55
+    },
+    {
+      "path": "cold-hindi-02.log",
+      "sha256": "2E8AEE74AD6DDBCB7391CD192D0C6FC9066268EFD8929218892E79A790D49536",
+      "bytes": 286
+    }
+  ]
+}

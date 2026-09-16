@@ -1,0 +1,7 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_supplier_continuity_test.dart
+00:00 +0: supplier selector is exact, deterministic and fail closed
+00:00 +1: Wholesale keeps automatic fulfilment and exact supplier continuity
+00:02 +2: canonical recommendations preserve Wholesale product state
+00:02 +3: unverified business sees one Workspace recovery and no Add
+00:02 +4: automatic fulfilment is stable at 320px 140 percent
+00:03 +5: All tests passed!

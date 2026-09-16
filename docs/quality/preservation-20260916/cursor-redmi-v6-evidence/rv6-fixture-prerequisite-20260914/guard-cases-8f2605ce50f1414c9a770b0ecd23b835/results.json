@@ -1,0 +1,44 @@
+[
+  {
+    "case": "exact",
+    "accepted": true,
+    "expected": true,
+    "reason": ""
+  },
+  {
+    "case": "changed-catalogue",
+    "accepted": false,
+    "expected": false,
+    "reason": "Fixture admission source hash differs: apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"
+  },
+  {
+    "case": "changed-test",
+    "accepted": false,
+    "expected": false,
+    "reason": "Fixture admission source hash differs: apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart"
+  },
+  {
+    "case": "extra-owner",
+    "accepted": false,
+    "expected": false,
+    "reason": "Fixture admission changed an unrelated source owner."
+  },
+  {
+    "case": "missing-owner",
+    "accepted": false,
+    "expected": false,
+    "reason": "Fixture admission changed an unrelated source owner."
+  },
+  {
+    "case": "duplicate-owner",
+    "accepted": false,
+    "expected": false,
+    "reason": "Fixture admission changed an unrelated source owner."
+  },
+  {
+    "case": "wrong-ancestor",
+    "accepted": false,
+    "expected": false,
+    "reason": "Fixture admission requires the preserved Redmi checkpoint."
+  }
+]

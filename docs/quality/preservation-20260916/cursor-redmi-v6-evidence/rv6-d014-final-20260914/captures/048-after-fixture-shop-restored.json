@@ -1,0 +1,13 @@
+{
+  "label": "048-after-fixture-shop-restored",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:09:58.638830+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "12ae903f0983cc780dd77bea2245134905681dccfa8286f0faaa7beb76092843",
+    ".xml": "800dfa37755454d6e83038c88bd2203619439cb73042af6d8617dd6f5d5b587a",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

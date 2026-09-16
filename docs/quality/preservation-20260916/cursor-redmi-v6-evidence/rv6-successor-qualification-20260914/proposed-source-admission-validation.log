@@ -1,0 +1,16 @@
+PASS original checker rejects successor (expected limitation)
+PASS proposed admission accepts exact real source; not complete release qualification
+PASS rejected wrong-branch
+PASS rejected missing-ancestor
+PASS rejected committed-source-drift
+fatal: packages: no such path in the working tree.
+Use 'git <command> -- <path>...' to specify paths that do not exist locally.
+PASS rejected working-source-drift
+fatal: packages: no such path in the working tree.
+Use 'git <command> -- <path>...' to specify paths that do not exist locally.
+PASS rejected untracked-source
+PASS rejected git-failure
+PASS rejected unknown source pin
+PASS rejected wrong root
+PASS rejected Redmi successor in Desktop lane
+11 admission checks passed; no tracked files or real Git state changed.

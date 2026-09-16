@@ -1,0 +1,18 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart
+Warning: A tag was used that wasn't specified in dart_test.yaml.
+  protected-reference was used in:
+    the test "R58.8.7 responsive 320x568-android-checkout candidate capture"
+    the test "R58.8.7 responsive 360x800-android-cart candidate capture"
+    the test "R58.8.7 responsive 390x844-ios-checkout candidate capture"
+    the test "R58.8.7 responsive 430x932-ios-cart candidate capture"
+    the test "R58.8.7 responsive 320x568-a11y140-reduced candidate capture"
+
+00:00 +0: R5 004 product description survives Compare and Cart return 320x700-1.0
+00:03 +1: R5 004 product description survives Compare and Cart return 320x700-2.0
+00:04 +2: R5 004 product description survives Compare and Cart return 360x800-1.0
+00:05 +3: R5 004 product description survives Compare and Cart return 360x800-2.0
+00:06 +4: R5 004 product description survives Compare and Cart return 430x900-1.0
+00:07 +5: R5 004 product description survives Compare and Cart return 430x900-2.0
+00:08 +6: R5 004 product description survives Compare and Cart return 640x360-1.0
+00:09 +7: R5 004 product description survives Compare and Cart return 640x360-2.0
+00:10 +8: All tests passed!

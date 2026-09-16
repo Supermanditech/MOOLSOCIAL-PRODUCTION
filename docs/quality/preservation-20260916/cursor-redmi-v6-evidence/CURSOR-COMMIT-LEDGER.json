@@ -1,0 +1,1084 @@
+{
+  "commonIntegrationAncestor": "11cdabb727e820fcf888089a58b6699d9addfda7",
+  "currentCursorHead": "8ecf24a9a7c14a492f603c019c0d40ef805b8aab",
+  "integrationReference": "21977bff27cf22bfadb50f592a635355bb80574e",
+  "firstParentCommits": [
+    {
+      "commit": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+      "subject": "merge(store-buy-final-v6-20260912): integrate qualified Store and Buy"
+    },
+    {
+      "commit": "7a9e0a291c969fc12aa961a0426aaaea6b9a08ce",
+      "subject": "coordination(redmi-v6-audit-20260913): admit exact V6 Redmi audit lane"
+    },
+    {
+      "commit": "ae084c5ea03b569c4746c651b7f6f6d7b545beca",
+      "subject": "ui(redmi-v6-audit-20260913): bind unchanged V6 build evidence"
+    },
+    {
+      "commit": "446ba27a4ffbc74b1905ff9030cc5834da867a2f",
+      "subject": "ui(redmi-v6-audit-20260913): record verified APK and first device audit slice"
+    },
+    {
+      "commit": "a7af3a5579f3db40ecc649c3d87d07e515d7cdd1",
+      "subject": "ui(redmi-v6-audit-20260913): record Store and product audit findings"
+    },
+    {
+      "commit": "27b276ee639b67df0896541bb10a3fe3f34625e2",
+      "subject": "ui(redmi-v6-audit-20260913): record filters offers and bulk device evidence"
+    },
+    {
+      "commit": "01edf441599dc876eb5f35295db478f3942577ec",
+      "subject": "ui(redmi-v6-audit-20260913): preserve bulk checkout and benefit audit"
+    },
+    {
+      "commit": "5a41c63c1dc7d94e5905ecb3f98f7c94f7e32b67",
+      "subject": "ui(redmi-v6-audit-20260913): record invoice validation and tracker recovery"
+    },
+    {
+      "commit": "564caefce556028e367d767e9d95f7b6613ddfe8",
+      "subject": "ui(redmi-v6-audit-20260913): record tracking and nested address audit"
+    },
+    {
+      "commit": "48e09e5bdf32a16f6cb27e06ec66c855eb34f5cf",
+      "subject": "ui(redmi-v6-audit-20260913): record invoice navigation and remaining coverage"
+    },
+    {
+      "commit": "89c88f587a4daf21d6973cc6dd3dd9ab693f8ac6",
+      "subject": "ui(redmi-v6-audit-20260913): record export evidence and stale order chat ETA"
+    },
+    {
+      "commit": "398074b4d7f95064413a973a1120b442d059c1ac",
+      "subject": "ui(redmi-v6-audit-20260913): record delivered order and resolution audit"
+    },
+    {
+      "commit": "957f61ea5af154e77b3e65b263acecb6bd4205f4",
+      "subject": "ui(redmi-v6-audit-20260913): record cart instructions and shipment review"
+    },
+    {
+      "commit": "7e659c695b4b6704ddbb58e39b02eda556db9f63",
+      "subject": "ui(redmi-v6-audit-20260913): record cart and profile device findings"
+    },
+    {
+      "commit": "9668142901347d1a5db3963c58b18c9196e89749",
+      "subject": "ui(redmi-v6-audit-20260913): record settings return paths and offline boundary"
+    },
+    {
+      "commit": "9bf929512e039427671bd0bd144cfe33dc19c1ae",
+      "subject": "ui(redmi-v6-audit-20260913): qualify security returns and assist reachability"
+    },
+    {
+      "commit": "4ece28df692053dcecf38c43391eb24bb491a031",
+      "subject": "ui(redmi-v6-audit-20260913): record lost Buy return after sign-in cancellation"
+    },
+    {
+      "commit": "0075825f2bccb4e93facc1da97f8c4a3522daf8c",
+      "subject": "ui(redmi-v6-audit-20260913): record saved lifecycle and Scheduled checkout audit"
+    },
+    {
+      "commit": "8c63ceb1a4a3244c606fe5f2284dfb30160f75c6",
+      "subject": "ui(redmi-v6-audit-20260913): verify Saved clearing and destination isolation"
+    },
+    {
+      "commit": "09120204915aa3e6d779f8d2a417ca1b734cfa5e",
+      "subject": "ui(redmi-v6-audit-20260913): audit Store collection entry and identity boundary"
+    },
+    {
+      "commit": "ca1ada74aa8eb2d3a2cf3953b23a02a23828e80c",
+      "subject": "ui(redmi-v6-audit-20260913): identify supplier media coverage gap"
+    },
+    {
+      "commit": "82119e0e766c7ffd811f1f0ed465ead8c7c87dad",
+      "subject": "ui(redmi-v6-audit-20260913): record physical enlarged-text and media mapping checks"
+    },
+    {
+      "commit": "96c2af9d83cbe8ccb16807d61e8d706eb31f3df8",
+      "subject": "ui(redmi-v6-audit-20260913): register related-product Back context defect"
+    },
+    {
+      "commit": "087bcbb7511a405608b260e33aeee3c820d599c8",
+      "subject": "ui(redmi-v6-audit-20260913): verify milk variant selection and cart identity"
+    },
+    {
+      "commit": "2d9516a60a6e1051775899c2ea02849812e89f43",
+      "subject": "ui(redmi-v6-audit-20260913): record Wholesale order device audit"
+    },
+    {
+      "commit": "51350c7c58080a558892e27d8ab583c987b615d8",
+      "subject": "ui(redmi-v6-audit-20260913): record Wholesale invoice recovery gap"
+    },
+    {
+      "commit": "cbd092412755e241035677cd09301a8e64e2ad25",
+      "subject": "ui(redmi-v6-audit-20260913): audit Wholesale Items and address return"
+    },
+    {
+      "commit": "7c2256108d915ba7d8f2d09377f2ffec7d3b0716",
+      "subject": "ui(redmi-v6-audit-20260913): verify trade receiving and reorder basket"
+    },
+    {
+      "commit": "880edc437e235ab5338ff7f8ca0295c50f926234",
+      "subject": "ui(redmi-v6-audit-20260913): verify quantity validation and keyboard Back"
+    },
+    {
+      "commit": "dc3be762a3d9d401d914b099164db5ee00427377",
+      "subject": "ui(redmi-v6-audit-20260913): record false confirmation and recovery inventory"
+    },
+    {
+      "commit": "82db8c5aab9b252433f9ad72661c827647d3775f",
+      "subject": "ui(redmi-v6-audit-20260913): qualify generic recovery route returns"
+    },
+    {
+      "commit": "dbdca6034a4151651e461afc3772846db6ec1115",
+      "subject": "ui(redmi-v6-audit-20260913): record order recovery and help qualification"
+    },
+    {
+      "commit": "ab386dc01f78dec06b43abc27d0d8c2432a4947c",
+      "subject": "ui(redmi-v6-audit-20260913): qualify checkout address recovery returns"
+    },
+    {
+      "commit": "6b303569ae443c9e2d79976e775c47e8a19b88cf",
+      "subject": "ui(redmi-v6-audit-20260913): record quantity limits and conditional prerequisites"
+    },
+    {
+      "commit": "c6dc54d77acbbb221d715336cbf16cde40f493e0",
+      "subject": "ui(redmi-v6-audit-20260913): qualify wholesale quantity and scope retention"
+    },
+    {
+      "commit": "16049ce13c02506dd2e96ddcd21523332895e9f1",
+      "subject": "ui(redmi-v6-audit-20260913): record wholesale content duplication and data claims"
+    },
+    {
+      "commit": "c3be466a96589f8e76ad160ec901126133f85ca4",
+      "subject": "ui(redmi-v6-audit-20260913): qualify closed and unavailable product entry"
+    },
+    {
+      "commit": "a6433221c0364cfa7149705b47f8055da4b250d0",
+      "subject": "ui(redmi-v6-audit-20260913): record medicine destination boundary"
+    },
+    {
+      "commit": "f81213199618c01098657c8b75e7fa9003f22e44",
+      "subject": "ui(redmi-v6-audit-20260913): record closed store listing and header qualification"
+    },
+    {
+      "commit": "86b326118e03986264128d6edd910d1fad7f216f",
+      "subject": "ui(redmi-v6-audit-20260913): record Store conversation context audit"
+    },
+    {
+      "commit": "19aa482a26e0a4d33c79557b6b9ced89101f893b",
+      "subject": "ui(redmi-v6-audit-20260913): verify other Store navigation and return"
+    },
+    {
+      "commit": "d0538ee306ea58f8731ab7cff3a0b57e93e470b7",
+      "subject": "ui(redmi-v6-audit-20260913): record modal link failure and address lifecycle"
+    },
+    {
+      "commit": "eafd94505a7f3963dc65d81973166ad1f3e843f8",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile conditional recovery coverage"
+    },
+    {
+      "commit": "8faaa8a480ddd646028fda08c1d45a493745040f",
+      "subject": "ui(redmi-v6-audit-20260913): verify saved-list cancellation paths"
+    },
+    {
+      "commit": "1257a52e8de322a6186e8f8129648936c6987ae2",
+      "subject": "ui(redmi-v6-audit-20260913): verify Wholesale saved clear isolation"
+    },
+    {
+      "commit": "5eca240ab3839699072acf3f8a9789330c7dff28",
+      "subject": "ui(redmi-v6-audit-20260913): verify saved invoice on Redmi viewer"
+    },
+    {
+      "commit": "a1a4426aef84b0c2de113112e279bd7b15288d4b",
+      "subject": "ui(redmi-v6-audit-20260913): record recently viewed availability audit"
+    },
+    {
+      "commit": "833d4c3d95159890c18f5044bed1cd88f53fb598",
+      "subject": "ui(redmi-v6-audit-20260913): map history and monthly basket device coverage"
+    },
+    {
+      "commit": "159ae522a6fec0eaa18c6f37d3d62e692be3d483",
+      "subject": "ui(redmi-v6-audit-20260913): verify basket cart and settings returns"
+    },
+    {
+      "commit": "b76325d5064f46a12f8c1588c2da92461ea7f80c",
+      "subject": "ui(redmi-v6-audit-20260913): record shopping alert navigation and freshness"
+    },
+    {
+      "commit": "a31de8a5201486179b2f1e2760f7cc1f78e986ee",
+      "subject": "ui(redmi-v6-audit-20260913): verify settings notification and nested returns"
+    },
+    {
+      "commit": "040f15b694ab047401a91568fd33dec8c9effbdd",
+      "subject": "ui(redmi-v6-audit-20260913): verify shared settings routes and help guidance"
+    },
+    {
+      "commit": "7aa72a1aaf9b8eaa3b46fef61c45e9c035f5a4e1",
+      "subject": "ui(redmi-v6-audit-20260913): verify help search and order return context"
+    },
+    {
+      "commit": "2df780bee14401a935eb95d3b551741ad731e64c",
+      "subject": "ui(redmi-v6-audit-20260913): verify help matching and dismissal coverage"
+    },
+    {
+      "commit": "b0c23c1f0a3f589f68f1fa25b015767d3c8814d1",
+      "subject": "ui(redmi-v6-audit-20260913): verify recently viewed cart addition"
+    },
+    {
+      "commit": "1e8e48943be7a014a621a583561e3e48bfd8e7dc",
+      "subject": "ui(redmi-v6-audit-20260913): verify monthly basket repeat quantities"
+    },
+    {
+      "commit": "91e81cde8970378de607837622ed05ddc4ff7a8c",
+      "subject": "ui(redmi-v6-audit-20260913): qualify price filters and cancellation"
+    },
+    {
+      "commit": "b71f9257f069261207e147b2b0ee8acc326aec47",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile pending coverage evidence"
+    },
+    {
+      "commit": "128f038b3c66c1131dbfd96db0e9676d177a419f",
+      "subject": "ui(redmi-v6-audit-20260913): verify isolated address edit and resume"
+    },
+    {
+      "commit": "41a8dbbf28cf5511aacf10b1fa93526991c2b007",
+      "subject": "ui(redmi-v6-audit-20260913): verify variant cart identity retention"
+    },
+    {
+      "commit": "de455405e749c47f5acd8754dff504bf8f9daa6b",
+      "subject": "ui(redmi-v6-audit-20260913): verify wholesale search recovery"
+    },
+    {
+      "commit": "b54ce6a7bc6a9419f12b610baab9f8fa34f53a7c",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile filter data qualification"
+    },
+    {
+      "commit": "483fab6d1ae9e2276e13e769a4d01574ef239b93",
+      "subject": "ui(redmi-v6-audit-20260913): record wholesale price band device checks"
+    },
+    {
+      "commit": "cde2768fba48da58c4f53cd353c930bf5859eff1",
+      "subject": "ui(redmi-v6-audit-20260913): qualify help Back to wholesale"
+    },
+    {
+      "commit": "eddb0be095927f4221349833dcbbbf39fddb0ada",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile early coverage residuals"
+    },
+    {
+      "commit": "26436f18f15d471f09edcba2709811dbf5c133b4",
+      "subject": "ui(redmi-v6-audit-20260913): qualify mixed cart isolation on device"
+    },
+    {
+      "commit": "a66bedea00f3a0c45a710cb2e6f17665ea4b2ece",
+      "subject": "ui(redmi-v6-audit-20260913): qualify saved search recovery"
+    },
+    {
+      "commit": "f33c067316edfad301f1a6d03f0f8d19e55867bf",
+      "subject": "ui(redmi-v6-audit-20260913): map delivery controls and reconcile coverage"
+    },
+    {
+      "commit": "d2ce7ecb695bb589a7bfc5dcf9dd1029975e698b",
+      "subject": "ui(redmi-v6-audit-20260913): inventory conditional delivery and balance actions"
+    },
+    {
+      "commit": "ad1c65e90313560f6d6980fe7cf09698257a71e0",
+      "subject": "ui(redmi-v6-audit-20260913): qualify Offers cart and return checks"
+    },
+    {
+      "commit": "328c8168811bce093a96abcc1ff8a560df6f6db5",
+      "subject": "ui(redmi-v6-audit-20260913): enumerate collection order audit boundaries"
+    },
+    {
+      "commit": "518baec0a2d83620b157e96b4ce211a074b9c444",
+      "subject": "ui(redmi-v6-audit-20260913): verify Offers category product return on Redmi"
+    },
+    {
+      "commit": "c5900b4fc8228a58cb46fe20cbe1634fabfe8b62",
+      "subject": "ui(redmi-v6-audit-20260913): record Offers reset and pagination checks"
+    },
+    {
+      "commit": "3514b0b31648a7acfdd27bb547360293ba1c04f2",
+      "subject": "ui(redmi-v6-audit-20260913): map collection status and receipt authority"
+    },
+    {
+      "commit": "d0a152d0888dcbf5ce70eafcd761418b49cf00fb",
+      "subject": "ui(redmi-v6-audit-20260913): record Redmi Offers at double text size"
+    },
+    {
+      "commit": "d1bec77cbc9f3bf6843cef3290c8ce9ac87a343e",
+      "subject": "ui(redmi-v6-audit-20260913): explain large-text illustration fallback"
+    },
+    {
+      "commit": "ece284c3eaf1a1480474f4704ac0577586b30f81",
+      "subject": "ui(redmi-v6-audit-20260913): record public scanner reachability boundary"
+    },
+    {
+      "commit": "68732355e6f267a5126d31422b12431583afbfa5",
+      "subject": "ui(redmi-v6-audit-20260913): enumerate supplier media control blockers"
+    },
+    {
+      "commit": "24466b44f805be7e489bcec86243a4b487bce8fe",
+      "subject": "ui(redmi-v6-audit-20260913): verify expiry recovery and large-text tracking"
+    },
+    {
+      "commit": "aa17997855d1b795f56819a6ceab6cdd464306fd",
+      "subject": "ui(redmi-v6-audit-20260913): clarify supplier media publication requirements"
+    },
+    {
+      "commit": "748bc2de58dcc00091f5f13f3a9cc8fe8deb2fef",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile checkout validation coverage"
+    },
+    {
+      "commit": "3f66a2c692b01a86378ddbae6921338db2be74c9",
+      "subject": "ui(redmi-v6-audit-20260913): record GST profile visibility defect and cleanup"
+    },
+    {
+      "commit": "cc9e4b07899b7e3b9ac0003dc3cb5a3276cfe382",
+      "subject": "ui(redmi-v6-audit-20260913): correlate GST chip contrast and qualification"
+    },
+    {
+      "commit": "6cf0fd4c064ffafa1de028628e1f26165ce3c53a",
+      "subject": "ui(redmi-v6-audit-20260913): record enlarged tracking and management checks"
+    },
+    {
+      "commit": "8607adb51e716c978dcbb77109d91e4654d88219",
+      "subject": "ui(redmi-v6-audit-20260913): qualify reason fit and inventory resolution gaps"
+    },
+    {
+      "commit": "088f83677c961d5a23f772ca49869e62d332746a",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile cancellation menu coverage"
+    },
+    {
+      "commit": "5a0b8976be05c54370f01ff561cb877c04820c46",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile superseded audit gaps"
+    },
+    {
+      "commit": "63da2defcdef5ece70810e5a710aa8ed78945949",
+      "subject": "ui(redmi-v6-audit-20260913): qualify Store category pagination and return"
+    },
+    {
+      "commit": "31ada4bd1f21e42f2787ded92b4a3b78c591e47c",
+      "subject": "ui(redmi-v6-audit-20260913): map catalogue paging data requirements"
+    },
+    {
+      "commit": "248066040551d4b21d2ec26770253cb0b89d7da8",
+      "subject": "ui(redmi-v6-audit-20260913): verify Store previous and refresh recovery"
+    },
+    {
+      "commit": "74607764a5454ca1960eeb29df2201f7c8e2ae04",
+      "subject": "ui(redmi-v6-audit-20260913): index source interactions for coverage reconciliation"
+    },
+    {
+      "commit": "45a5680f0adf043bf6b812cb519d86fea5a61ac9",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile public Buy shared chat routing"
+    },
+    {
+      "commit": "1c574bdf44c73823ce83a8c1cd7560d898c39bf2",
+      "subject": "ui(redmi-v6-audit-20260913): record report dismissal device checks"
+    },
+    {
+      "commit": "5af501e3515db132e50b003577ae45272b051761",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile review conditional coverage"
+    },
+    {
+      "commit": "adb2888d1574870ce43cfcf4d4eeaeda4f6c21f3",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile public filter coverage gaps"
+    },
+    {
+      "commit": "4b2779d23a89adc103b939cdeea9d6bada25e869",
+      "subject": "ui(redmi-v6-audit-20260913): verify individual filter reset controls on Redmi"
+    },
+    {
+      "commit": "2ce723c444d08dcfe329cac8dcded37ccc4240db",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile cart and GST action coverage"
+    },
+    {
+      "commit": "5349b9a71833d8712962785174c9bea6529672f1",
+      "subject": "ui(redmi-v6-audit-20260913): verify GST keyboard and reuse controls"
+    },
+    {
+      "commit": "d02b795caaed9ba4b0a4766433b1572565c0127a",
+      "subject": "ui(redmi-v6-audit-20260913): inventory supplemental action callbacks"
+    },
+    {
+      "commit": "f3fa8c80af705c5543cedbf343ef915514a1aeed",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile blocked gallery controls"
+    },
+    {
+      "commit": "c27666fa916ce19e828d315fba1755a8b16d5699",
+      "subject": "ui(redmi-v6-audit-20260913): verify cart browse return on Redmi"
+    },
+    {
+      "commit": "3a29f3ab443c07d6c35ef8940379cc92899ab982",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile and verify Offers entry controls"
+    },
+    {
+      "commit": "bb6bc1a64586e2d81946c14a03826c16cac99502",
+      "subject": "ui(redmi-v6-audit-20260913): verify area controls and reconcile paging"
+    },
+    {
+      "commit": "b2fa829264c71ceade16aa7d6ab9e84adf89de06",
+      "subject": "ui(redmi-v6-audit-20260913): distinguish sale and search audit actions"
+    },
+    {
+      "commit": "87050689b5592e286112689ee9de1539511c71af",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile category and settings coverage"
+    },
+    {
+      "commit": "71c1c56b22a0acf1d18c7937c25d3b84bb3fe765",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile Help and Store action evidence"
+    },
+    {
+      "commit": "2f2c97031c175b8b2502a546ac555e8812af5ea3",
+      "subject": "ui(redmi-v6-audit-20260913): finish catalogue callback reconciliation"
+    },
+    {
+      "commit": "eafd1ae6bd1b8ffee08964cb72828bfeb4d0c0d6",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile shell navigation and tracker controls"
+    },
+    {
+      "commit": "f4dea4ba21ce490631faaec57a6f93a51d84d0f3",
+      "subject": "ui(redmi-v6-audit-20260913): verify category and expired offer recovery"
+    },
+    {
+      "commit": "889a8df95031898591ca1aba557d9176a5b9e1ef",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile product actions and recovery gaps"
+    },
+    {
+      "commit": "b4a1266052890d41554db38ac6fd77ef6d72f89d",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile checkout and recovery controls"
+    },
+    {
+      "commit": "e7ffa91c3f4b6d6bc56d7805a879059cba56a61a",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile order and collection actions"
+    },
+    {
+      "commit": "8578ba6af82d9125b0bb0a1b85d072c9b41ee081",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile tracking and resolution evidence"
+    },
+    {
+      "commit": "8961605937322004a4ac69241ac5b4d60042b325",
+      "subject": "ui(redmi-v6-audit-20260913): record shared profile order return on Redmi"
+    },
+    {
+      "commit": "3ff18a12a62c0efdb546c111302137f553301daf",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile address payment and quantity coverage"
+    },
+    {
+      "commit": "c92d1cf736a2de57e2bff46f75b3e6722f3885df",
+      "subject": "ui(redmi-v6-audit-20260913): verify cart quantity controls and complete callback triage"
+    },
+    {
+      "commit": "0d3335828fb7a8b238c096cd78f6621f4335ec62",
+      "subject": "ui(redmi-v6-audit-20260913): group shared inbox action coverage"
+    },
+    {
+      "commit": "f467111bf39bf2dfa7948fc96c7900889cc66b19",
+      "subject": "ui(redmi-v6-audit-20260913): verify shared Chat filters and Buy return"
+    },
+    {
+      "commit": "6eb6ae83978b31ba181a088ac2b67e24c8e66ce5",
+      "subject": "ui(redmi-v6-audit-20260913): verify Chat search recovery and keyboard controls"
+    },
+    {
+      "commit": "1a1d5a1b4d48ae9b53b2541876347f658e40f471",
+      "subject": "ui(redmi-v6-audit-20260913): verify Chat archive settings navigation and data boundaries"
+    },
+    {
+      "commit": "6a3527a5d8bbb7c16d8736cc85463477e56cf7b4",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile framework and shared settings actions"
+    },
+    {
+      "commit": "5acc20a74b8829a3dae73a9ae8362cfa8f1f86ab",
+      "subject": "ui(redmi-v6-audit-20260913): record preview masking and restoration audit"
+    },
+    {
+      "commit": "18e7c66bdde6ad7e5f295ff363e0d5b9d9b2235e",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile catalogue callback coverage"
+    },
+    {
+      "commit": "dcd30f49ba84f2f0262fc7baacd5e8833aec8c51",
+      "subject": "ui(redmi-v6-audit-20260913): verify catalogue page return on Redmi"
+    },
+    {
+      "commit": "a9d1a9186fe8b50709a6a805770da44bb8d4fcbd",
+      "subject": "ui(redmi-v6-audit-20260913): record search return defect on Redmi"
+    },
+    {
+      "commit": "af0aaea151c5d866116041460452af58086a1833",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile tools and Store action coverage"
+    },
+    {
+      "commit": "423f84c1435a329800324e8383f5e1d927040bc5",
+      "subject": "ui(redmi-v6-audit-20260913): classify catalogue and scanner action aliases"
+    },
+    {
+      "commit": "c92fb605a2df29d6b978eb85a040c04a36e27b6e",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile Buy navigation and recovery actions"
+    },
+    {
+      "commit": "49e98efe6c5d2ac162b8350034c2c547ad991fd4",
+      "subject": "ui(redmi-v6-audit-20260913): complete supplemental callback triage"
+    },
+    {
+      "commit": "ac9d5ecae9c50b51d51c76263d0e5998d6336d19",
+      "subject": "ui(redmi-v6-audit-20260913): record minimized delivery indicator defect"
+    },
+    {
+      "commit": "b9b7b7f1743b3f4b8297451c4d834d810af903ad",
+      "subject": "ui(redmi-v6-audit-20260913): record notification and privacy return checks"
+    },
+    {
+      "commit": "d69bb663279d0728ad0b114cb3b7aaf7915b8663",
+      "subject": "ui(redmi-v6-audit-20260913): record clipped privacy explanation on Redmi"
+    },
+    {
+      "commit": "8014f31e0b452ca369b224a8bcb31134fd963d9a",
+      "subject": "ui(redmi-v6-audit-20260913): map shared privacy data and conditional actions"
+    },
+    {
+      "commit": "cd9780fbdb7da7bb77eb65c5e692b6e953be7d46",
+      "subject": "ui(redmi-v6-audit-20260913): verify checkout dismissal and cart preservation"
+    },
+    {
+      "commit": "ef54b45fff034b8753bc640cde18051716f5927f",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile exact settings sheet closure coverage"
+    },
+    {
+      "commit": "12f3e2e2691d1ed70dc8df4fb8362b8ec00c0263",
+      "subject": "ui(redmi-v6-audit-20260913): qualify request sharing cancellation and exact payment route"
+    },
+    {
+      "commit": "0856d088f06057a7af8cea885c49a92842140c1e",
+      "subject": "ui(redmi-v6-audit-20260913): verify recipient prefill and nested cancellation"
+    },
+    {
+      "commit": "d07f176fc59e700f82c5fb5fad5feefbb84d3d0f",
+      "subject": "ui(redmi-v6-audit-20260913): verify address types retain unsaved recipient"
+    },
+    {
+      "commit": "f52f7a3530ab2160a120db8c739e1e4a88c415b0",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile existing recovery and tracker evidence"
+    },
+    {
+      "commit": "a8d0fe8b9f3a6e5cdc826e353442a4c1a046a2d8",
+      "subject": "ui(redmi-v6-audit-20260913): verify settings address selection and restoration"
+    },
+    {
+      "commit": "aa5c9c5de7f84aae48cf862ed0a379d11b594057",
+      "subject": "ui(redmi-v6-audit-20260913): qualify short area query submission"
+    },
+    {
+      "commit": "667668f7518e8c75721f53be8bcbf7dd2bd285dd",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile catalogue follow-up coverage"
+    },
+    {
+      "commit": "9a836d9f39337ea13fb02ca5af0cfe5b04d5309b",
+      "subject": "ui(redmi-v6-audit-20260913): qualify Store close and submit controls"
+    },
+    {
+      "commit": "2e83116b87791a8838328749c173e6f492b1f946",
+      "subject": "ui(redmi-v6-audit-20260913): verify Store search page and category return"
+    },
+    {
+      "commit": "c40ae524f44b71db405e93407c2b88979363ebba",
+      "subject": "ui(redmi-v6-audit-20260913): verify Shop sale selector gestures"
+    },
+    {
+      "commit": "5136121ba91eeb01965692153e11be86ecc79aee",
+      "subject": "ui(redmi-v6-audit-20260913): qualify Wholesale Bulk gestures"
+    },
+    {
+      "commit": "ebbcf98223444b65e22bbed0e8d929e950cad960",
+      "subject": "ui(redmi-v6-audit-20260913): qualify Offers footer location return"
+    },
+    {
+      "commit": "5f2a920f8fb41bcd76f7af8adeb80abca74d05b0",
+      "subject": "ui(redmi-v6-audit-20260913): verify final Offers promotion boundary"
+    },
+    {
+      "commit": "fe26e92fa20374c45b3ff82c79a6939561366064",
+      "subject": "ui(redmi-v6-audit-20260913): qualify catalogue quantity editor"
+    },
+    {
+      "commit": "b2c44b8822a8dd7d9102fd3bb48f070bbe77794e",
+      "subject": "ui(redmi-v6-audit-20260913): record empty-cart catalogue height defect"
+    },
+    {
+      "commit": "d64ae9ab58da70316e3334286a9d68b03dc785e8",
+      "subject": "ui(redmi-v6-audit-20260913): qualify search suggestion navigation"
+    },
+    {
+      "commit": "7bf65262c813d3de09f36376b4feb0db5536f2ee",
+      "subject": "ui(redmi-v6-audit-20260913): map search data and alternate scope control"
+    },
+    {
+      "commit": "f8d1c5b8403c9445eb6b6fcf1df877f563bd6ce9",
+      "subject": "ui(redmi-v6-audit-20260913): verify saved settings removal on Redmi"
+    },
+    {
+      "commit": "18a04667380c0682196d16ee74827ff212ca7214",
+      "subject": "ui(redmi-v6-audit-20260913): verify active-order tool route"
+    },
+    {
+      "commit": "8af8a0beb75c8eb71736af9201ab5ace385acd13",
+      "subject": "ui(redmi-v6-audit-20260913): verify monthly basket recovery controls"
+    },
+    {
+      "commit": "48d011d6da3be74647b695147d21295a9c974e60",
+      "subject": "ui(redmi-v6-audit-20260913): verify Store search page returns"
+    },
+    {
+      "commit": "f349e61cde152af5f9abd937370110d59ea2fda3",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile remaining catalogue audit paths"
+    },
+    {
+      "commit": "f7cdf8cd1070cd9e7541dd05bba8620d05a97c30",
+      "subject": "ui(redmi-v6-audit-20260913): record area selection visibility defect"
+    },
+    {
+      "commit": "663536744bb2e9ec72e833b5c870140f48e52945",
+      "subject": "ui(redmi-v6-audit-20260913): record Wholesale category and mode device checks"
+    },
+    {
+      "commit": "717c81875e1df7ba7eaea22ae12f5e6091bda78b",
+      "subject": "ui(redmi-v6-audit-20260913): record Shop and Wholesale pager boundary checks"
+    },
+    {
+      "commit": "4b4fd986d152a23ec2c1a176706de77180e983dc",
+      "subject": "ui(redmi-v6-audit-20260913): qualify product save and reconcile product action gaps"
+    },
+    {
+      "commit": "44e3ad553f8af3dbddbea8db946f0be3da0bb3fa",
+      "subject": "ui(redmi-v6-audit-20260913): record supplier return and verification coverage boundary"
+    },
+    {
+      "commit": "b54b9af7936e55c903d6e95e501587438dd82e18",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile cart and checkout action coverage"
+    },
+    {
+      "commit": "d704706d9ffcc7cc9f4be8899b772ea6634658b5",
+      "subject": "ui(redmi-v6-audit-20260913): qualify cart browse and checkout visible return"
+    },
+    {
+      "commit": "c7efabf33051aa9c808e386ec5be234dabf7cb3b",
+      "subject": "ui(redmi-v6-audit-20260913): qualify coupon returns and checkout address controls"
+    },
+    {
+      "commit": "56953a7a5be8b78763bcfc54ca4c6f89a426e84f",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile order tracking and collection coverage"
+    },
+    {
+      "commit": "44a3e4a2b4d4776160ce68cb56de2e44e1af9d16",
+      "subject": "ui(redmi-v6-audit-20260913): record exact order context return checks"
+    },
+    {
+      "commit": "f771d27b78e223e23b6f88025b8c67930097b542",
+      "subject": "ui(redmi-v6-audit-20260913): qualify tracking restore and alert controls"
+    },
+    {
+      "commit": "a846c558fe4bd606a69cfc613112979ba6d6a022",
+      "subject": "ui(redmi-v6-audit-20260913): freeze passed evidence and pause for founder handoff"
+    },
+    {
+      "commit": "48366d66307e425f4cee3b9094a9cea4ce4b9084",
+      "subject": "ui(redmi-v6-audit-20260913): admit D001 source and test ownership"
+    },
+    {
+      "commit": "d532b9dea97a52473a5a95e090a9831fd9635696",
+      "subject": "ui(redmi-v6-audit-20260913): fix D001 contextual empty-search guidance"
+    },
+    {
+      "commit": "cea1699a42bf182c9648719b8780b5ec9afd05ba",
+      "subject": "ui(redmi-v6-audit-20260913): admit D002 source and test ownership"
+    },
+    {
+      "commit": "55877c20437bdc34c1a90de19904381e94014cde",
+      "subject": "ui(redmi-v6-audit-20260913): retain Store after final cart item removal"
+    },
+    {
+      "commit": "3b0fd2fcdbcc444ead93590f7992e6ccb8d9b384",
+      "subject": "ui(redmi-v6-audit-20260913): admit D003 freshness source and test ownership"
+    },
+    {
+      "commit": "e01ff726fd7b92ecb8c3fd6928cc9f248b9f6eaa",
+      "subject": "ui(redmi-v6-audit-20260913): preserve D003 order estimate freshness across Buy surfaces"
+    },
+    {
+      "commit": "41c5e36cfd2950521c918271afb56dcff2e02354",
+      "subject": "ui(redmi-v6-audit-20260913): admit D004 profile source and test ownership"
+    },
+    {
+      "commit": "2967bf188ffe6587a9f3e6409584ce3686504f60",
+      "subject": "ui(redmi-v6-audit-20260913): show complete D004 profile validation guidance"
+    },
+    {
+      "commit": "0ee85fd2d98595b0134b6190d3e9af58532990f3",
+      "subject": "ui(redmi-v6-audit-20260913): admit D005 language source and test ownership"
+    },
+    {
+      "commit": "dce65c05ab54b39751211a608c923c00226e4a26",
+      "subject": "ui(redmi-v6-audit-20260913): disclose D005 language preference availability"
+    },
+    {
+      "commit": "9af7e19f79d61cabc5a96ba3be252ec242f2dcbc",
+      "subject": "ui(redmi-v6-audit-20260913): admit D006 Security source and test ownership"
+    },
+    {
+      "commit": "ed0233761e825e22a4d6e14c7d0f0e0073f9ea25",
+      "subject": "ui(redmi-v6-audit-20260913): restore D006 Buy return after sign-in cancellation"
+    },
+    {
+      "commit": "877656e54eab174f3c4dc698da23799553d8023a",
+      "subject": "ui(redmi-v6-audit-20260913): admit D007 product continuity test ownership"
+    },
+    {
+      "commit": "e604579b1f102573766bcaee8bcbf772f9cf96bd",
+      "subject": "ui(redmi-v6-audit-20260913): preserve D007 related product return context"
+    },
+    {
+      "commit": "6104c9cc83d3407a142490e3fd4ac23c2b7cfec3",
+      "subject": "ui(redmi-v6-audit-20260913): admit D008 order details test ownership"
+    },
+    {
+      "commit": "0fe77e604fc4787a3b1584a3c0e3e92bff1e53e5",
+      "subject": "ui(redmi-v6-audit-20260913): separate D008 wholesale buyer identity labels"
+    },
+    {
+      "commit": "e29194eb14d0d90ebf37eff329705e8ee4ec2381",
+      "subject": "ui(redmi-v6-audit-20260913): reject D009 unverified order confirmation"
+    },
+    {
+      "commit": "6fcb36cbd8e9ae1b42ee7f97c31230633b50f0f1",
+      "subject": "ui(redmi-v6-audit-20260913): preserve D010 recovery destination context"
+    },
+    {
+      "commit": "b46c582bc747c15576f8349b0c2fd144d452f02b",
+      "subject": "ui(redmi-v6-audit-20260913): remove D011 duplicate wholesale product content"
+    },
+    {
+      "commit": "4194ea5985bc95ddd228f25011ccf198dda38926",
+      "subject": "ui(redmi-v6-audit-20260913): distinguish D012 Store listings from availability"
+    },
+    {
+      "commit": "da9555f36919292a19f74ee1bff162a5730dec27",
+      "subject": "ui(redmi-v6-audit-20260913): admit D013 Chat presentation ownership"
+    },
+    {
+      "commit": "4fccb654d602319e4b7352c5160e93c2bbf4e485",
+      "subject": "ui(redmi-v6-audit-20260913): remove empty Store context expansion and preserve return"
+    },
+    {
+      "commit": "da26e9ff88616262c6677b0cb7903fd952b42656",
+      "subject": "ui(redmi-v6-audit-20260913): finish Store sheet disposal before linked order entry"
+    },
+    {
+      "commit": "0c10682b9c5e6955e5cf845de8897090b95f60d4",
+      "subject": "ui(redmi-v6-audit-20260913): align Recently Viewed availability and visible recovery"
+    },
+    {
+      "commit": "ac5a95e5f8fa410ca4e5d0e8c41ca5de7bd271eb",
+      "subject": "ui(redmi-v6-audit-20260913): render Offers on initial alert entry"
+    },
+    {
+      "commit": "99f74b80e37850003f7fdd37db81e71387fbc9ca",
+      "subject": "ui(redmi-v6-audit-20260913): make selected GST profile identity readable"
+    },
+    {
+      "commit": "04afab670c14e5cc425269f6753a3410e0b82548",
+      "subject": "ui(redmi-v6-audit-20260913): restore paged search after product Back"
+    },
+    {
+      "commit": "70b117b966a58ca4a551edb31742e175c2723dde",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile delivery minimize evidence and regression"
+    },
+    {
+      "commit": "213d2e6c41fa4c123b9648fb4913e015bb973040",
+      "subject": "ui(redmi-v6-audit-20260913): admit D020 Chat settings presentation ownership"
+    },
+    {
+      "commit": "9a81541e866975c15c4044f8a5d68906e45dd638",
+      "subject": "ui(redmi-v6-audit-20260913): keep audience explanation above Android navigation"
+    },
+    {
+      "commit": "7e811a753a9896947f514a209f50138d21ea9544",
+      "subject": "ui(redmi-v6-audit-20260913): restore compact grid after final quantity removal"
+    },
+    {
+      "commit": "4eb257d146fa656b63d7e0fe003cc8898ee8cd09",
+      "subject": "ui(redmi-v6-audit-20260913): identify selected shopping area"
+    },
+    {
+      "commit": "9d73a543e0aa01dfd01c488eb04897eca1300def",
+      "subject": "ui(redmi-v6-audit-20260913): restore product position after store completion"
+    },
+    {
+      "commit": "e65f341b690d4345fda29fa3609d02e6293b6d25",
+      "subject": "ui(redmi-v6-audit-20260913): record remaining qualification conflicts"
+    },
+    {
+      "commit": "4881429fdfe3ade5cbfb35c1f7c736f22f323a95",
+      "subject": "ui(redmi-v6-audit-20260913): admit exact qualification test ownership"
+    },
+    {
+      "commit": "d67d269d25cfc3376cc95447f7849b7735e1428f",
+      "subject": "ui(redmi-v6-audit-20260913): retain distinct supplier description regression"
+    },
+    {
+      "commit": "cd92728c56cbfadfbd9fa4cb10703c888311c4d4",
+      "subject": "ui(redmi-v6-audit-20260913): assert historical order estimate context"
+    },
+    {
+      "commit": "8627359d0eb954b3f0909f787eb054362a103c1a",
+      "subject": "ui(redmi-v6-audit-20260913): qualify optional supplier brand contract"
+    },
+    {
+      "commit": "260e5d4da422da433c8b4181c9069a06ae4b72f5",
+      "subject": "ui(redmi-v6-audit-20260913): qualify seeded benefit spend thresholds"
+    },
+    {
+      "commit": "28a25ab53251eb70642821bb30b6a8384e1eb790",
+      "subject": "ui(redmi-v6-audit-20260913): qualify delivery-dependent checkout fixtures"
+    },
+    {
+      "commit": "0356a82179a805f63a33f73f62ac3fadbcd6e691",
+      "subject": "ui(redmi-v6-audit-20260913): qualify canonical Medicine route continuity"
+    },
+    {
+      "commit": "84101a16083b065bd822ec09c35a6ef22d5dc732",
+      "subject": "ui(redmi-v6-audit-20260913): qualify Wholesale display contracts"
+    },
+    {
+      "commit": "9b7e5aa7fddc08517432f9b3932da5a36ef7a92d",
+      "subject": "ui(redmi-v6-audit-20260913): qualify compact Offers scroll continuity"
+    },
+    {
+      "commit": "9018535597239296871f9cf026e1e2a7328aca50",
+      "subject": "ui(redmi-v6-audit-20260913): record final connected local qualification"
+    },
+    {
+      "commit": "242a1b87c21389d3bc65e694d4a3cc8f28a26d05",
+      "subject": "ui(redmi-v6-audit-20260913): admit exact qualified successor review source"
+    },
+    {
+      "commit": "ed39d76a7d98583ef6894c6dd4a5927ce954d85f",
+      "subject": "ui(redmi-v6-audit-20260913): preserve successor build prerequisites and source manifest"
+    },
+    {
+      "commit": "32ebd7361fedf2224dae9cd89bb02337ca53286a",
+      "subject": "ui(redmi-v6-audit-20260913): seal both successor prebuild regression cycles"
+    },
+    {
+      "commit": "92f410e4a0efb968028ce24211c400a22ec6aa19",
+      "subject": "ui(redmi-v6-audit-20260913): preserve verified r66.20 APK and consumed build record"
+    },
+    {
+      "commit": "acb50158692686326193fdd9a17cc011c93ab3b6",
+      "subject": "ui(redmi-v6-audit-20260913): record r66.20 Redmi install and D001 acceptance"
+    },
+    {
+      "commit": "8686895bbc10dedd25da73726da7eab9caba2d39",
+      "subject": "ui(redmi-v6-audit-20260913): record D002 Redmi acceptance"
+    },
+    {
+      "commit": "2d8adbeba9071b4d628de090590606b1994ad44b",
+      "subject": "ui(redmi-v6-audit-20260913): qualify D003 Redmi freshness occurrences"
+    },
+    {
+      "commit": "2ca408bd9bac0b87ad4492e4fc2fce9e3e78c17d",
+      "subject": "ui(redmi-v6-audit-20260913): record D004 Redmi validation acceptance"
+    },
+    {
+      "commit": "1666ae109d95e7165d3ddbde05f2e6ed71ffe126",
+      "subject": "ui(redmi-v6-audit-20260913): record D005 Redmi persistence child"
+    },
+    {
+      "commit": "4a13f2f53824df91183003fdf332f80f8a32d42f",
+      "subject": "ui(redmi-v6-audit-20260913): record D006 Redmi cancellation return"
+    },
+    {
+      "commit": "d4225c31a5f3ff947fae35dc449423f501ca3605",
+      "subject": "ui(redmi-v6-audit-20260913): record D007 Redmi product return"
+    },
+    {
+      "commit": "01cea97bd0431a18490d4da722c151ebbdd963a1",
+      "subject": "ui(redmi-v6-audit-20260913): record D008 Redmi buyer spacing"
+    },
+    {
+      "commit": "8ee766845c473160f101f2de209776860fb45181",
+      "subject": "ui(redmi-v6-audit-20260913): record D011 Redmi content acceptance"
+    },
+    {
+      "commit": "8bd95d77150e9c2ff69761648e1dbbd8f0879f3e",
+      "subject": "ui(redmi-v6-audit-20260913): record D016 Redmi offer navigation acceptance"
+    },
+    {
+      "commit": "fb185f98c82a5ddf0d6c392bf7bd9ce7ad4081cc",
+      "subject": "ui(redmi-v6-audit-20260913): record D017 Redmi GST profile acceptance"
+    },
+    {
+      "commit": "47912cf353e5eaa93377398a869bd104da7453b7",
+      "subject": "ui(redmi-v6-audit-20260913): preserve scoped D018 return evidence and limits"
+    },
+    {
+      "commit": "84a7ab62311c049e10339edf715db05e8ee3bd49",
+      "subject": "ui(redmi-v6-audit-20260913): confirm D019 delivery rail reconciliation on Redmi"
+    },
+    {
+      "commit": "cde06820f2e55366839e721f0609d7bb76402207",
+      "subject": "ui(redmi-v6-audit-20260913): record D020 Redmi privacy sheet acceptance"
+    },
+    {
+      "commit": "aaeb75fc9187a72f8c16f29c29b4f70732bf242b",
+      "subject": "ui(redmi-v6-audit-20260913): record D021 Redmi grid restoration acceptance"
+    },
+    {
+      "commit": "2949b9071f016c4bce6826ff8ab2720b28b3a7d3",
+      "subject": "ui(redmi-v6-audit-20260913): record D022 Redmi area selection acceptance"
+    },
+    {
+      "commit": "859056fcae9b88d7199aae4d330871ea64865f91",
+      "subject": "ui(redmi-v6-audit-20260913): qualify D018 exact Redmi search return"
+    },
+    {
+      "commit": "e4b33ab1f092aa390805ca50b190288e6b3a2685",
+      "subject": "ui(redmi-v6-audit-20260913): record six remaining device prerequisites"
+    },
+    {
+      "commit": "b437a216b3c61db9a7ef67968828b71ef7243474",
+      "subject": "ui(redmi-v6-audit-20260913): consolidate scoped ticket and preservation evidence"
+    },
+    {
+      "commit": "11b6562e7bf382afeb11e1801a0a390477fcae8f",
+      "subject": "ui(redmi-v6-audit-20260913): qualify isolated original fixture access"
+    },
+    {
+      "commit": "d7efb8f9daec35835a9c2e476f34d43e5fbc1039",
+      "subject": "ui(redmi-v6-audit-20260913): admit exact fixture prerequisite source pins"
+    },
+    {
+      "commit": "e8cbc3ef46a1d1360e2445163ebf515f3cbcf029",
+      "subject": "ui(redmi-v6-audit-20260913): seal fixture prerequisite prebuild evidence"
+    },
+    {
+      "commit": "2be0968529f43e41cf6a95f07b8b7e46f4d0035e",
+      "subject": "ui(redmi-v6-audit-20260913): record three scoped Redmi closures"
+    },
+    {
+      "commit": "fe3ee1d3bd1f01f3f6bc254bc6e06646bff40b78",
+      "subject": "ui(redmi-v6-audit-20260913): diagnose language persistence dependency"
+    },
+    {
+      "commit": "3c30ba11521db6bb1a1ec6995b181a81df1a6b34",
+      "subject": "ui(redmi-v6-audit-20260913): persist isolated review language preference"
+    },
+    {
+      "commit": "43548137e445457b84587547edbab4195e50cba9",
+      "subject": "ui(redmi-v6-audit-20260913): qualify language source admission and reconcile device status"
+    },
+    {
+      "commit": "f1500cb2b6a4e27c7c11ef5bca6f3e8ccaf54c9b",
+      "subject": "ui(redmi-v6-audit-20260913): seal qualified r66.22 language source baseline"
+    },
+    {
+      "commit": "d0dfea24e52c3c60c41d0cd01fcdcd2badfbcd6c",
+      "subject": "ui(redmi-v6-audit-20260913): record r66.22 Redmi delivery and open qualification"
+    },
+    {
+      "commit": "448d4a2c7c10ee195e711e49aa4cc69a593ff37b",
+      "subject": "docs(redmi): close D005 persistence with r66.22 device evidence"
+    },
+    {
+      "commit": "f0f73c427e27f30117e4b98b116100f7d306c76a",
+      "subject": "ui(redmi-v6-audit-20260913): prepare original D014 Store fixture on r66.22"
+    },
+    {
+      "commit": "b7012e92f583fcf48ae428bc89f208b665537337",
+      "subject": "ui(redmi-v6-audit-20260913): verify approved native links and retain D014 failure"
+    },
+    {
+      "commit": "4221158fead95a89047e3408aaeb11c9a12dd135",
+      "subject": "ui(redmi-v6-audit-20260913): preserve incoming order over temporary Store returns"
+    },
+    {
+      "commit": "3d8827ccfbb0b0d1e95d31190c9a17f4f832efd3",
+      "subject": "ui(redmi-v6-audit-20260913): admit exact D014 correction for source checks"
+    },
+    {
+      "commit": "1d5c4be97dc13874af1f4348156782339ecacf60",
+      "subject": "ui(redmi-v6-audit-20260913): seal D014 combined qualification for r66.23"
+    },
+    {
+      "commit": "7fabefa9ed78e7f694440f8eae6d083ac92dffde",
+      "subject": "ui(redmi-v6-audit-20260913): record r66.23 install and native approval blocker"
+    },
+    {
+      "commit": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+      "subject": "ui(redmi-v6-audit-20260913): restore repeated order link navigation"
+    },
+    {
+      "commit": "e52f60301c8d5bdd28895681d2888c9612ba6dd6",
+      "subject": "ui(redmi-v6-audit-20260913): admit exact repeated-link correction source"
+    },
+    {
+      "commit": "32630c34df17d52bb0ac74156fb1580177977d9d",
+      "subject": "ui(redmi-v6-audit-20260913): qualify r66.24 corrective source baseline"
+    },
+    {
+      "commit": "9d775c481b749833127039b2ac6cf0fd71d57a51",
+      "subject": "ui(redmi-v6-audit-20260913): close D014 with r66.24 Redmi evidence"
+    },
+    {
+      "commit": "3f4d1cf92100a3008223c43a89d65e3d820a0867",
+      "subject": "ui(redmi-v6-audit-20260913): bind historical evidence label exception"
+    },
+    {
+      "commit": "17730e9c5a92ca51cad0c590deca368927f2bae6",
+      "subject": "ui(redmi-v6-audit-20260913): reconcile completed Redmi handoff"
+    },
+    {
+      "commit": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
+      "subject": "ui(redmi-v6-audit-20260913): improve customer SKU metadata across Buy presentations"
+    },
+    {
+      "commit": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+      "subject": "ui(redmi-v6-audit-20260913): seal SKU source admission and r66.25 prebuild evidence"
+    },
+    {
+      "commit": "d6d9890fa7754a38a05b183bc8ca6e89eccf22cc",
+      "subject": "ui(redmi-v6-audit-20260913): qualify adaptive SKU metadata and vertical product discovery"
+    },
+    {
+      "commit": "dad26da0365006d16891203e45839db40b9ed8d6",
+      "subject": "ui(redmi-v6-audit-20260913): seal qualified r66.26 SKU review source"
+    },
+    {
+      "commit": "64ca4d757cffc1cc1fa575b84004cd827e6695ab",
+      "subject": "ui(redmi-v6-audit-20260913): qualify product page swipes and seller wording"
+    },
+    {
+      "commit": "f3403f9ad14a709e0bee9b37d2c5aa03a72c5a5a",
+      "subject": "ui(redmi-v6-audit-20260913): seal twelve-ticket navigation prebuild evidence"
+    },
+    {
+      "commit": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+      "subject": "ui(redmi-v6-audit-20260913): remove product paging rows and preserve full media"
+    },
+    {
+      "commit": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+      "subject": "ui(redmi-v6-audit-20260913): seal r66.28 source qualification and build gates"
+    },
+    {
+      "commit": "067b26d1c66ac9511d026539470103baaea194fc",
+      "subject": "ui(redmi-v6-audit-20260913): qualify twelve SKU records on r66.28 Redmi"
+    },
+    {
+      "commit": "e5d39769e260c1a6691ea7808642308472261a97",
+      "subject": "ui(redmi-v6-audit-20260913): reopen whole-grid horizontal motion with Redmi evidence"
+    },
+    {
+      "commit": "8ecf24a9a7c14a492f603c019c0d40ef805b8aab",
+      "subject": "ui(redmi-v6-audit-20260913): preserve unqualified catalogue WIP and pending review defects"
+    }
+  ],
+  "note": "Exact ancestry inventory; presence does not mean accepted implementation. Prior 269-branch archive is retained, not repeated."
+}

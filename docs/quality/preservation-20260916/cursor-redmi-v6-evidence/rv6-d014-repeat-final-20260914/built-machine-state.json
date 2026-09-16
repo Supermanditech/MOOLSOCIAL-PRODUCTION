@@ -1,0 +1,234 @@
+{
+  "schemaVersion": 1,
+  "contractId": "APK-BUILD-REGRESSION-GATES-001",
+  "machineState": "built_device_qualification_pending",
+  "buildAuthorization": "consumed_one_build",
+  "preBuildValidation": {
+    "state": "passed",
+    "evidence": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+  },
+  "candidate": {
+    "gateProfile": "uaw_cursor_ui_review_debug",
+    "versionCode": 2026091405,
+    "id": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
+    "versionName": "1.0.0-r66.24",
+    "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+    "buildMode": "debug",
+    "head": "32630c34df17d52bb0ac74156fb1580177977d9d"
+  },
+  "source": {
+    "fileCount": 326,
+    "manifestPath": "apps/mobile/build/cursor-review-r66.24/source-manifest.txt",
+    "manifestSha256": "6C9F32BF2C58C97CF4BB546056963E14BCD2653417BDCEBF3485EC55A28AFD1B"
+  },
+  "requiredRuntimeDefines": {
+    "MOOLSOCIAL_UI_REVIEW_ONLY": "true",
+    "MOOLSOCIAL_DEVICE_REVIEW": "true",
+    "MOOLSOCIAL_USE_EMULATORS": "true",
+    "MOOLSOCIAL_CANDIDATE_ID": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914"
+  },
+  "promotion": {
+    "state": "forbidden_non_promotable"
+  },
+  "preBuildGates": [
+    {
+      "id": "branch-head",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "source-manifest",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "format-analysis",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.24/evidence/repeat-qualified-analysis.log"
+      ]
+    },
+    {
+      "id": "focused-tests",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.24/evidence/repeat-qualified-screen.log"
+      ]
+    },
+    {
+      "id": "positive-release-gates",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "protected-boundary-disposition",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "rejected-candidate-preserved",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "startup-config-regression-registered",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md"
+      ]
+    },
+    {
+      "id": "buy-regression-1",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.24/evidence/repeat-combined-cycle1.log"
+      ]
+    },
+    {
+      "id": "buy-regression-2",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.24/evidence/repeat-combined-cycle2.log"
+      ]
+    },
+    {
+      "id": "clean-state-regression",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.24/evidence/repeat-prebuild-clean-support.log"
+      ]
+    },
+    {
+      "id": "wrapper-self-test",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.24/evidence/repeat-prebuild-build-profile.log"
+      ]
+    },
+    {
+      "id": "package-isolation",
+      "state": "passed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+        "apps/mobile/build/cursor-review-r66.24/evidence/repeat-prebuild-build-profile.log"
+      ]
+    }
+  ],
+  "premiumMotionPolicy": {
+    "policy": "config/buy-premium-motion-policy.json",
+    "coverage": "docs/quality/BUY-PREMIUM-MOTION-SURFACE-COVERAGE-20260802.md",
+    "reused": [
+      "existing_finite_transitions_and_reduced_motion"
+    ],
+    "applied": [
+      "existing_navigation_motion_with_order_url_synchronization"
+    ],
+    "state": "local_source_checks_passed_device_acceptance_preserved_separately",
+    "candidateContract": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+    "disposition": "docs/quality/cursor-redmi-v6-audit-20260913/PREBUILD.md",
+    "dependencyHeld": [
+      "scoped_Redmi_physical_motion_and_accessibility",
+      "provider_backend_authority"
+    ],
+    "inapplicable": [
+      "new_decorative_motion_design"
+    ]
+  },
+  "postBuildGates": [
+    {
+      "id": "artifact-package-version-signer-checksum",
+      "state": "passed",
+      "evidence": [
+        "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\apk-identity.json",
+        "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\apk-metadata-verified.log",
+        "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\rv6-d014-repeat-final-20260914\\apk-signer.log"
+      ]
+    },
+    {
+      "id": "installed-apk-checksum-equality",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "redmi-data-preserving-upgrade",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "redmi-RV6-D001-through-D022-recorded-reproductions",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "redmi-directly-affected-return-restoration",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "child-defects-and-original-disposition",
+      "state": "pending",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ]
+    },
+    {
+      "id": "final-evidence-git-handoff",
+      "state": "failed",
+      "evidence": [
+        "docs/quality/cursor-redmi-v6-audit-20260913/UAT.md"
+      ],
+      "reason": "Historical commit 448d4a2c uses an incorrect subject prefix; exception not approved or applied."
+    }
+  ],
+  "qualificationLimits": [
+    "21_original_device_closures_and_D005_C01_preserved_on_prior_evidenced_APKs",
+    "D014_corrected_source_locally_qualified_successor_device_replay_pending",
+    "27_inherited_capture_skips_are_not_passes",
+    "historical_commit_label_handoff_failure_remains_open",
+    "review_only_no_production_backend_provider_or_integration_qualification",
+    "one_corrective_APK_only_Redmi_TG8HCYTGGQT885OF_data_preserving_install"
+  ],
+  "artifact": {
+    "candidate": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
+    "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+    "applicationSource": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+    "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.24\\artifacts\\uaw-cursor-redmi-rv6-d014-repeat-20260914-device-review-debug.apk",
+    "packageId": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r66.24-cursorreview",
+    "versionCode": 2026091405,
+    "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+    "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+    "bytes": 210809605,
+    "sourceManifestSha256": "6C9F32BF2C58C97CF4BB546056963E14BCD2653417BDCEBF3485EC55A28AFD1B",
+    "runtimeProfile": "CursorUiReview",
+    "buildMode": "debug",
+    "promotable": false,
+    "permittedDevice": "TG8HCYTGGQT885OF",
+    "installation": "not_yet_performed",
+    "deviceVerification": "D014_pending_under_active_founder_goal"
+  }
+}

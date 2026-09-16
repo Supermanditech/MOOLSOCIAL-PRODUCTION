@@ -1,0 +1,21 @@
+{
+  "status": "UNAPPLIED; coordination admission and positive/negative validation still required; regression pending",
+  "source": "9b7e5aa7fddc08517432f9b3932da5a36ef7a92d",
+  "owners": [
+    {
+      "owner": "scripts/check-approved-ui-locks.ps1",
+      "beforeNormalizedSha256": "3670595e6e07e564fba778a607b1501fe6bff3115a52d8a2f28cc011f09368dc",
+      "proposedSha256": "fe027b3b8d389a0166b109d4817c9cd7c74ac0872167ad6334c6edbf9f50e583"
+    },
+    {
+      "owner": "scripts/check-buy-protected-baseline.ps1",
+      "beforeNormalizedSha256": "138b4edace062412470f1f83c30c8495d381cccdd31c6193442c0b4152e7ce7d",
+      "proposedSha256": "e2d1686f0cef2def13ea0a6634ecef0e053c13397cd1a29dda7e2bf7e26b9de4"
+    },
+    {
+      "owner": "scripts/check-buy-backend-contract-boundary.ps1",
+      "beforeNormalizedSha256": "50a50509270668431172b7adb93658fc5f56b5723a2c6d3fdc5ce9aecfae26d2",
+      "proposedSha256": "2192b9e15bbd43f32c1ef1d006557f7293e0651ebd770749919686bf8ed0f63f"
+    }
+  ]
+}

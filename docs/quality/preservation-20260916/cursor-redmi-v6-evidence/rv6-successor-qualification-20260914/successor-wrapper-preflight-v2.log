@@ -1,0 +1,3 @@
+Premium-motion policy state passed: policy=BUY-PREMIUM-MOTION-POLICY-20260802; dispositions=5; candidate=UAW-CURSOR-REDMI-RV6-FIXES-20260914.
+APK regression pre-build gate passed: candidate=UAW-CURSOR-REDMI-RV6-FIXES-20260914; mode=debug; source=97AB0C61A9B73F7E35E3C25DCA608AE38F373EAC59836B29AA60AA748B3794EB; gates=13.
+Device-review APK preflight passed without artifact build: candidate=UAW-CURSOR-REDMI-RV6-FIXES-20260914; version=1.0.0-r66.20; buildNumber=2026091401; runtimeProfile=CursorUiReview.

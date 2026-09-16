@@ -1,0 +1,124 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart
+Warning: A tag was used that wasn't specified in dart_test.yaml.
+  protected-reference was used in:
+    the test "R58.8.7 responsive 320x568-android-checkout candidate capture"
+    the test "R58.8.7 responsive 360x800-android-cart candidate capture"
+    the test "R58.8.7 responsive 390x844-ios-checkout candidate capture"
+    the test "R58.8.7 responsive 430x932-ios-cart candidate capture"
+    the test "R58.8.7 responsive 320x568-a11y140-reduced candidate capture"
+
+00:00 +0: R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <446.0>
+  Actual: <0.0>
+   Which:  differs by <446.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:2728:13)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart line 2728
+The test description was:
+  R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:05 +0 -1: R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 1.0
+  
+00:05 +0 -1: R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 2.0
+00:07 +1 -1: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <342.0>
+  Actual: <0.0>
+   Which:  differs by <342.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:2728:13)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart line 2728
+The test description was:
+  R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:09 +1 -2: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 1.0
+  
+00:09 +1 -2: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <479.0>
+  Actual: <0.0>
+   Which:  differs by <479.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:2728:13)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart line 2728
+The test description was:
+  R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +1 -3: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 2.0
+  
+00:10 +1 -3: R5 007 related Store Cart has no phantom visit wholesale Size(360.0, 800.0) at 1.0
+00:13 +2 -3: R5 007 related Store Cart has no phantom visit wholesale Size(360.0, 800.0) at 2.0
+00:14 +3 -3: R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a numeric value within <0.1> of <406.0>
+  Actual: <0.0>
+   Which:  differs by <406.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:2728:13)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart line 2728
+The test description was:
+  R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:16 +3 -4: R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 1.0
+  
+00:16 +3 -4: R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 2.0
+00:17 +4 -4: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 1.0

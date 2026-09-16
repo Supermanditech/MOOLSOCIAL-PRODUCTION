@@ -1,0 +1,12 @@
+PASS original checker rejects successor (expected limitation)
+PASS proposed admission accepts exact real source; not complete release qualification
+PASS rejected wrong-branch at intended boundary
+PASS rejected missing-ancestor at intended boundary
+PASS rejected committed-source-drift at intended boundary
+PASS rejected working-source-drift at intended boundary
+PASS rejected untracked-source at intended boundary
+PASS rejected git-failure at intended boundary
+PASS rejected unknown source pin
+PASS rejected wrong root
+PASS rejected Redmi successor in Desktop lane
+11 admission checks passed; no tracked files or real Git state changed.

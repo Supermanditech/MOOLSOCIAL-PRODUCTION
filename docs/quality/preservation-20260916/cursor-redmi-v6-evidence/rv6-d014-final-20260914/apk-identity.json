@@ -1,0 +1,19 @@
+{
+  "candidate": "UAW-CURSOR-REDMI-RV6-D014-20260914",
+  "sourceHead": "1d5c4be97dc13874af1f4348156782339ecacf60",
+  "applicationSource": "4221158fead95a89047e3408aaeb11c9a12dd135",
+  "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.23\\artifacts\\uaw-cursor-redmi-rv6-d014-20260914-device-review-debug.apk",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r66.23-cursorreview",
+  "versionCode": 2026091404,
+  "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+  "apkSha256": "D59EADBB5A57568F91FED9319602BBC84E3B04831CF756534C3526EC0EDF512F",
+  "bytes": 210809241,
+  "sourceManifestSha256": "8A80AF113CDD55C234AC8DE70E59B808767B742136E2EED00C1F89E3E43A97FA",
+  "runtimeProfile": "CursorUiReview",
+  "buildMode": "debug",
+  "promotable": false,
+  "permittedDevice": "TG8HCYTGGQT885OF",
+  "installation": "not_yet_performed",
+  "deviceVerification": "D014_pending_under_active_founder_goal"
+}

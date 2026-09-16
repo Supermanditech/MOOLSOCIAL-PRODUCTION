@@ -1,0 +1,37 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart
+00:00 +0: RV6 D013 Store context stays static s-dog-food text 1.0
+MOOLSOCIAL_STARTUP stage=ready snapshot=true setupComplete=true completedSetupVersion=5 requiredSetupVersion=5 authenticated=true
+D013 Ask entry s-dog-food
+D013 pushing Store Chat s-dog-food
+D013 before Back matches=[RouteMatch, ImperativeRouteMatch]
+D013 after Back matches=[RouteMatch]
+D013 return view=BuyV2View.product product=s-dog-food sheets=[]
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-shop-seller-sheet-s-dog-food'>]: []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart:987:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart line 987
+The test description was:
+  RV6 D013 Store context stays static s-dog-food text 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +0 -1: RV6 D013 Store context stays static s-dog-food text 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: RV6 D013 Store context stays static s-dog-food text 1.0
+  
+00:04 +0 -1: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_shop_chat_test.dart: RV6 D013 Store context stays static s-dog-food text 1.0

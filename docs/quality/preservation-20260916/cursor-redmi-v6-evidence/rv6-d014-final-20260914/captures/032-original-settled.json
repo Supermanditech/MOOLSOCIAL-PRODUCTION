@@ -1,0 +1,13 @@
+{
+  "label": "032-original-settled",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T20:16:37.098401+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "39fb7bc1a5e55a433defdfd494026c9ceb24b95867528fccdd1164dc660848f7",
+    ".xml": "4cecdd259126b6484a607e30a192eb05be57b4de19ae8022dc3b2bf0c4f4c28a",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

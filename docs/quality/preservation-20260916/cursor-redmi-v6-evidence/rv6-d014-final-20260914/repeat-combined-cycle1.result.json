@@ -1,0 +1,10 @@
+{
+    "source":  "41412f56a4af4d75e2976dc04843dd293ae4869d",
+    "cycle":  1,
+    "startedAt":  "2026-09-14T20:40:35.3179954+05:30",
+    "finishedAt":  "2026-09-14T20:56:24.1841945+05:30",
+    "exitCode":  0,
+    "logSha256":  "FB4EDEEB33A3122B1F5BDCEE500393F5EC4D932C8CEA4DFB28A18618784D3AFF",
+    "supportRestoration":  "completed",
+    "sourceAfter":  "equal"
+}

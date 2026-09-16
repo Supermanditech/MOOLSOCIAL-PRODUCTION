@@ -1,0 +1,13 @@
+{
+  "label": "045-notebook-fixture-product",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:08:08.382760+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "5b38419a7b42e56d83ffadd6bfe01d6cc33796ddb830f1805edf56803789f9d3",
+    ".xml": "93fd66942df31f6537e52e134ca8237f99159f42fb1c2a917467dd4c001db096",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

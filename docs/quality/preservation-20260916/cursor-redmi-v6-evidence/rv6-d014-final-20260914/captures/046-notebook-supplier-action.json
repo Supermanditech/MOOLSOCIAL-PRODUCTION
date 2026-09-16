@@ -1,0 +1,13 @@
+{
+  "label": "046-notebook-supplier-action",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:08:40.163781+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "a5b233ecaae54727188814615834a5acae65157f770bbb1e4346186545ad523b",
+    ".xml": "a1424300d323e582288dab35ace0f596f2c6250f394d2b978fcb6ecb3446b374",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

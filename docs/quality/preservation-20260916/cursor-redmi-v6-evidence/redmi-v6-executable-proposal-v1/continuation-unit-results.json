@@ -1,0 +1,58 @@
+[
+  {
+    "case": "valid",
+    "passed": true
+  },
+  {
+    "case": "missing",
+    "passed": true
+  },
+  {
+    "case": "duplicate",
+    "passed": true
+  },
+  {
+    "case": "task",
+    "passed": true
+  },
+  {
+    "case": "role",
+    "passed": true
+  },
+  {
+    "case": "lane",
+    "passed": true
+  },
+  {
+    "case": "branch",
+    "passed": true
+  },
+  {
+    "case": "worktreePath",
+    "passed": true
+  },
+  {
+    "case": "baselineHead",
+    "passed": true
+  },
+  {
+    "case": "ticketId",
+    "passed": true
+  },
+  {
+    "case": "bootstrapCommitSubject",
+    "passed": true
+  },
+  {
+    "case": "extra-owner",
+    "passed": true
+  },
+  {
+    "case": "missing-owner",
+    "passed": true
+  },
+  {
+    "case": "integrationRequiredBeforeSuccessorApk",
+    "passed": true
+  }
+]

@@ -1,0 +1,81 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart: Buy V2 deterministic state invariants all unrestricted offers preserve quantity and total floors
+00:00 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart: Buy V2 deterministic state invariants every prescription offer fails closed before a matched approval
+00:00 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart: Buy V2 deterministic state invariants invalid external inputs cannot mutate established valid state
+00:00 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart: Buy V2 deterministic state invariants checkout views are immutable and confirmation is single-use
+00:00 +3 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart: Buy V2 deterministic state invariants checkout views are immutable and confirmation is single-use [E]
+  Expected: <3>
+    Actual: <0>
+  
+  package:matcher                                        expect
+  package:flutter_test/src/widget_tester.dart 473:18     expect
+  test\ui_v2\buy\buy_v2_state_invariant_test.dart 202:7  main.<fn>.<fn>
+  
+00:00 +3 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart: Buy V2 deterministic state invariants repeated vertical traversal cannot leak transient search state
+00:00 +4 -1: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart
+00:01 +4 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart: mixed Buy actions preserve exact commerce state after every step
+00:01 +4 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart: mixed Buy actions preserve exact commerce state after every step [E]
+  Expected: true
+    Actual: <false>
+  step 9 confirmation must complete: Delivery estimate unavailable. Check delivery before placing your order.
+  
+  package:matcher                                       expect
+  package:flutter_test/src/widget_tester.dart 473:18    expect
+  test\ui_v2\buy\buy_v2_state_machine_test.dart 207:13  main.<fn>
+  
+00:01 +4 -2: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart
+00:02 +4 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts every product is complete and belongs to its vertical taxonomy
+00:02 +4 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts every product is complete and belongs to its vertical taxonomy [E]
+  Expected: non-empty
+    Actual: ''
+  s-tomato
+  
+  package:matcher                                         expect
+  package:flutter_test/src/widget_tester.dart 473:18      expect
+  test\ui_v2\buy\buy_v2_vertical_contract_test.dart 39:9  main.<fn>.<fn>
+  
+00:02 +4 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts Shop and Wholesale share identity, never offer records
+00:02 +5 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts Medicine remains licensed and regulatory facts stay attached
+00:02 +6 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts exact offer search never crosses destination boundaries
+00:02 +7 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts category state is independent and transient search state resets
+00:02 +8 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts filters and exposed cart collections cannot cross or mutate state
+00:02 +9 -3: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart
+00:03 +9 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts recommendations stay in-family and exclude Cart products
+00:03 +10 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts bill savings derive only from current MRP and quantities
+00:03 +11 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts coupon and payment adapters fail malformed benefits closed
+00:03 +12 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts device-review seeds cover every vertical and stay total-neutral
+00:03 +12 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts device-review seeds cover every vertical and stay total-neutral [E]
+  Expected: an object with length of <3>
+    Actual: []
+     Which: has length of <0>
+  
+  package:matcher                                        expect
+  package:flutter_test/src/widget_tester.dart 473:18     expect
+  test\ui_v2\buy\buy_v2_cart_relevance_test.dart 114:11  main.<fn>.<fn>
+  
+00:03 +12 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts normal test build defaults to fail-closed cart benefits
+00:03 +13 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts benefit eligibility receives only the selected vertical total
+00:03 +14 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts benefit selection is kind-owned, total-neutral and fails stale values closed
+00:03 +15 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts delivery instructions stay vertical-owned through confirmation
+00:03 +15 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts delivery instructions stay vertical-owned through confirmation [E]
+  Expected: true
+    Actual: <false>
+  
+  package:matcher                                       expect
+  package:flutter_test/src/widget_tester.dart 473:18    expect
+  test\ui_v2\buy\buy_v2_cart_relevance_test.dart 340:7  main.<fn>.<fn>
+  
+00:03 +15 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts monetary tips fail closed without a quick-delivery policy
+00:03 +16 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Saved purchase-intent contracts store boundary restores only explicit vertical choices
+00:03 +17 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Saved purchase-intent contracts clear removes only the selected Saved vertical
+00:03 +18 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Saved purchase-intent contracts productwise Saved add respects Wholesale and prescription gates
+00:03 +19 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Saved purchase-intent contracts live coupon eligibility applies only authoritative current savings
+00:03 +20 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Saved purchase-intent contracts live coupon is rechecked and retained in placed order totals
+00:03 +21 -5: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts delivery instructions stay vertical-owned through confirmation
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_test.dart: R37 Cart relevance contracts device-review seeds cover every vertical and stay total-neutral
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_invariant_test.dart: Buy V2 deterministic state invariants checkout views are immutable and confirmation is single-use
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_state_machine_test.dart: mixed Buy actions preserve exact commerce state after every step
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_vertical_contract_test.dart: Buy V2 independent vertical contracts every product is complete and belongs to its vertical taxonomy

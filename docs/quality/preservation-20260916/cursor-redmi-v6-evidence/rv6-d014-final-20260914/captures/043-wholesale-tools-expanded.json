@@ -1,0 +1,13 @@
+{
+  "label": "043-wholesale-tools-expanded",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.23-cursorreview",
+  "capturedAt": "2026-09-14T21:06:09.130950+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "e0d6ae1a0d528b732983deea6b7fcf030f3d17db972e9a0ed603d7a0d3742caa",
+    ".xml": "be5649e5a3e744595198caf87507e84b20a7a83eccc3f281f42bc28f778e7484",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

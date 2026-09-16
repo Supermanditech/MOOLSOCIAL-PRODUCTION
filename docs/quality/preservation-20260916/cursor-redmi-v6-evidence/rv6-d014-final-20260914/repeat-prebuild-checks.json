@@ -1,0 +1,51 @@
+{
+  "source": "41412f56a4af4d75e2976dc04843dd293ae4869d",
+  "candidate": "UAW-CURSOR-REDMI-RV6-D014-REPEAT-20260914",
+  "versionName": "1.0.0-r66.24",
+  "versionCode": 2026091405,
+  "checks": [
+    {
+      "path": "repeat-prebuild-build-profile.log",
+      "sha256": "C337E4A1B5695870264C6AB2D0CC66EABA156EF1C936FE084D3ACAE7D63D9A7C",
+      "bytes": 45,
+      "terminal": "CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED"
+    },
+    {
+      "path": "repeat-prebuild-brand.log",
+      "sha256": "E341B22E21DC52E37C1E715BF599CA66A5D86EE475663AA49616839293F9A517",
+      "bytes": 46,
+      "terminal": "Brand integrity gate passed for surface: App"
+    },
+    {
+      "path": "repeat-prebuild-clean-support.log",
+      "sha256": "5A35C632098FB6FABDB678D17DA4E9D9A9F91A10321230CE9171430F8D78EBF9",
+      "bytes": 51,
+      "terminal": "Flutter tracked-support cleanliness guard passed."
+    },
+    {
+      "path": "repeat-prebuild-windows-compatibility.log",
+      "sha256": "E419737DC0967569615034E500D21A5BCA96D77D0579C69CBBBE245CBD5DF1B1",
+      "bytes": 539,
+      "terminal": "Windows PowerShell 5.1 compatibility gate passed:"
+    },
+    {
+      "path": "repeat-prebuild-incremental-pwsh7.log",
+      "sha256": "9BB0A43076D8CDC1F706973475B44BCDE644753834B0D600866CFE9FBBC905DD",
+      "bytes": 313,
+      "terminal": "Incremental ticket gate passed:"
+    },
+    {
+      "path": "repeat-prebuild-regression-memory.log",
+      "sha256": "6F7D88BB6C0ED9B35737A4EE812D4946755E497E5129F2CD3DDE3D2474155183",
+      "bytes": 93,
+      "terminal": "Codex regression memory passed: entries=4584; applicable=222; phase=build; buildMode=debug."
+    }
+  ],
+  "initialIncrementalFailure": {
+    "log": "repeat-prebuild-incremental.log",
+    "cause": "PowerShell5.1 does not support ConvertFrom-Json -Depth; original gate catch reports invalid JSON",
+    "resolution": "Unchanged gate passes in verified PowerShell7.6.6; no state/checker edit"
+  },
+  "combinedCycles": "separate receipts required; cycle2 still running",
+  "built": false
+}

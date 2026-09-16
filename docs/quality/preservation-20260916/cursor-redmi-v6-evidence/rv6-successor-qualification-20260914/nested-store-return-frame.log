@@ -1,0 +1,32 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart
+Warning: A tag was used that wasn't specified in dart_test.yaml.
+  protected-reference was used in:
+    the test "R58.8.7 responsive 320x568-android-checkout candidate capture"
+    the test "R58.8.7 responsive 360x800-android-cart candidate capture"
+    the test "R58.8.7 responsive 390x844-ios-checkout candidate capture"
+    the test "R58.8.7 responsive 430x932-ios-cart candidate capture"
+    the test "R58.8.7 responsive 320x568-a11y140-reduced candidate capture"
+
+00:00 +0: R66 nested Store Cart returns shop at 1.0
+00:06 +1: R66 nested Store Cart returns shop at 2.0
+00:09 +2: R66 nested Store Cart returns wholesale at 1.0
+00:13 +3: R66 nested Store Cart returns wholesale at 2.0
+00:15 +4: R66 nested Store Cart returns bulk at 1.0
+00:17 +5: R66 nested Store Cart returns bulk at 2.0
+00:19 +6: R66 nested Store Cart returns shop-all at 1.0
+00:22 +7: R66 nested Store Cart returns shop-all at 2.0
+00:25 +8: R66 nested Store Cart returns shop-live at 1.0
+00:28 +9: R66 nested Store Cart returns shop-live at 2.0
+00:31 +10: R66 nested Store Cart returns wholesale-quiet at 1.0
+00:33 +11: R66 nested Store Cart returns wholesale-quiet at 2.0
+00:35 +12: R66 nested Store Cart returns shop-wide at 1.0
+00:38 +13: R66 nested Store Cart returns shop-wide at 2.0
+00:40 +14: R66 nested Store Cart returns shop-root-return at 1.0
+00:42 +15: R66 nested Store Cart returns shop-root-return at 2.0
+00:43 +16: R66 nested Store Cart returns shop-root-cart-first at 1.0
+00:45 +17: R66 nested Store Cart returns shop-root-cart-first at 2.0
+00:46 +18: R66 nested Store Cart returns shop-root-live-cart-first at 1.0
+00:48 +19: R66 nested Store Cart returns shop-root-live-cart-first at 2.0
+00:50 +20: R66 nested Store Cart returns wholesale-root-cart-first at 1.0
+00:51 +21: R66 nested Store Cart returns wholesale-root-cart-first at 2.0
+00:53 +22: All tests passed!

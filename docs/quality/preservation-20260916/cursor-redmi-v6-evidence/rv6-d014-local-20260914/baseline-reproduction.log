@@ -1,0 +1,18 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+test/ui_v2/buy/buy_v2_screen_test.dart:9456:35: Error: The method 'handlePushRouteInformation' isn't defined for the type 'TestWidgetsFlutterBinding'.
+ - 'TestWidgetsFlutterBinding' is from 'package:flutter_test/src/binding.dart' ('/C:/Users/jisal/develop/flutter/packages/flutter_test/lib/src/binding.dart').
+Try correcting the name to the name of an existing method, or defining a method named 'handlePushRouteInformation'.
+      expect(await tester.binding.handlePushRouteInformation(RouteInformation(
+                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^
+00:00 +0 -1: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart [E]
+  Failed to load "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart":
+  Compilation failed for testPath=C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: test/ui_v2/buy/buy_v2_screen_test.dart:9456:35: Error: The method 'handlePushRouteInformation' isn't defined for the type 'TestWidgetsFlutterBinding'.
+   - 'TestWidgetsFlutterBinding' is from 'package:flutter_test/src/binding.dart' ('/C:/Users/jisal/develop/flutter/packages/flutter_test/lib/src/binding.dart').
+  Try correcting the name to the name of an existing method, or defining a method named 'handlePushRouteInformation'.
+        expect(await tester.binding.handlePushRouteInformation(RouteInformation(
+                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  .
+00:00 +0 -1: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart

@@ -1,0 +1,40 @@
+{
+  "device": "TG8HCYTGGQT885OF",
+  "package": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r66.23-cursorreview",
+  "versionCode": 2026091404,
+  "installedSha256": "D59EADBB5A57568F91FED9319602BBC84E3B04831CF756534C3526EC0EDF512F",
+  "checksumReadbackToolChunk": "efb012",
+  "permissionChange": "Workspace-write with require_escalated reviewed by auto_review became available. Exact declared ACTION_VIEW requests were separately approved and executed; previous denial evidence remains preserved.",
+  "command": "adb -s TG8HCYTGGQT885OF shell am start -W -a android.intent.action.VIEW -d https://moolsocial.com/app/buy/order/MS-240782 -p com.moolsocial.app.cursorreview",
+  "executions": [
+    {
+      "case": "original normal-text nested Store return",
+      "toolChunk": "860c53",
+      "exitCode": 0,
+      "status": "ok",
+      "activity": "com.moolsocial.app.cursorreview/com.moolsocial.app.MainActivity",
+      "delivery": "intent delivered to currently running top-most instance",
+      "waitTimeMs": 65,
+      "beforeCapture": "030-returned.png",
+      "afterCaptures": ["031-native-original.png", "032-original-settled.png"],
+      "returnCaptures": ["033-original-orders-return.png", "034-shop-return.png"],
+      "result": "pass: existing MS-240782 tracking remains, Orders current, then Orders and Shop return"
+    },
+    {
+      "case": "Shop Store after the same order link had already been opened and customer returned to Shop",
+      "toolChunk": "5f05c2",
+      "exitCode": 0,
+      "status": "ok",
+      "activity": "com.moolsocial.app.cursorreview/com.moolsocial.app.MainActivity",
+      "delivery": "intent delivered to currently running top-most instance",
+      "waitTimeMs": 7,
+      "beforeCapture": "037-shop-store.png",
+      "afterCapture": "038-shop-store-result.png",
+      "result": "fail: Store remains visible; existing order destination not applied. Before and after PNG/XML SHA256 values are identical. No Flutter assertion is claimed."
+    }
+  ],
+  "finalDeviceState": "Quick Shop, Saved filter off, Saved count 1, font_scale 1.0; capture 040-shop-restored. Language, addresses and Cart not mutated.",
+  "captureLimitations": "021 has PNG only because PowerShell treated native stderr as a terminating error. 022 was captured before the category transition settled and is not starting-state proof. 023-028 are XML-only navigation evidence. 036 is the product screen, despite its filename. Later Python captures preserve stderr separately and require native exit 0 and parseable XML; the MIUI theme warning is not an app failure.",
+  "otherRequiredD014DeviceCases": "pending; do not infer closure from the original-case pass or local tests"
+}

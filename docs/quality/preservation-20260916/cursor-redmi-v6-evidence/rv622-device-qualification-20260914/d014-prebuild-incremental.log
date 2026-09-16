@@ -1,0 +1,1 @@
+Incremental ticket gate passed: phase=pre_build; lane=cursor_ui; ticket=UAW-CURSOR-REDMI-V6-AUDIT-20260913; scope=buy.redmi_v6_audit; baseline=moolsocial-buy-chat-profile-r61-48-accepted-20260829@9dc34de2f5f6ed2b2ad8998442c935136e2a962f; version=1.0.0-r66.23+2026091404; package=com.moolsocial.app.cursorreview.

@@ -1,0 +1,20 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: RV6 D009 rejects inconsistent confirmation missing reference
+00:00 +1: RV6 D009 rejects inconsistent confirmation blank reference
+00:00 +2: RV6 D009 rejects inconsistent confirmation mismatched purchase
+00:01 +3: RV6 D009 rejects inconsistent confirmation empty orders
+00:01 +4: RV6 D009 rejects inconsistent confirmation unconfirmed
+00:01 +5: RV6 D009 rejects inconsistent confirmation no products
+00:01 +6: RV6 D009 accepted confirmation uses recorded delivery address
+00:01 +7: RV6 D009 unsubmitted confirmation text 1.0 cart false orders false
+00:02 +8: RV6 D009 unsubmitted confirmation text 1.0 cart false orders true
+00:03 +9: RV6 D009 unsubmitted confirmation text 1.0 cart true orders false
+00:03 +10: RV6 D009 unsubmitted confirmation text 1.0 cart true orders true
+00:04 +11: RV6 D009 unsubmitted confirmation text 2.0 cart false orders false
+00:05 +12: RV6 D009 unsubmitted confirmation text 2.0 cart false orders true
+00:05 +13: RV6 D009 unsubmitted confirmation text 2.0 cart true orders false
+00:06 +14: RV6 D009 unsubmitted confirmation text 2.0 cart true orders true
+00:06 +15: order confirmation preserves family identifiers then opens Orders
+00:07 +16: R669 invoice missing confirmation uses the same recovery
+00:07 +17: R669 invoice refresh rejects an unmounted originating session
+00:08 +18: All tests passed!
