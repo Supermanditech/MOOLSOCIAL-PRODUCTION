@@ -91,8 +91,9 @@
     }
   ],
   "nextWork": [
-    "D005 and sole child D005-C01 are device-closed on installed r66.22; preserve the other 18 original closures and the original English preference restored in this round.",
-    "Corrected r66.23 is built, installed and checksum-verified on Redmi. D014 native-link process creation was rejected before execution by automatic approval review; await a permitted approval mechanism before any native retry. Ordinary returns, original Saved product, Home/Work addresses and font scale are preserved. Do not rebuild, repeat unrelated closures or bypass the denial. The historical commit-label handoff failure also remains unresolved."
+    "Codex reads committed HANDOFF.md and PUBLIC-DATA.csv before Store catalogue implementation.",
+    "Keep C04/C06/C07 pending; do not treat preserved WIP as accepted.",
+    "Preserve original22 and D005-C01 closures, remaining11 SKU closures and external publication limitations."
   ],
   "preservation": {
     "cart": "1175 original Scheduled Shop Saved1 emptycart restored;no cart changes in round169",
@@ -996,5 +997,31 @@
       "apkChanged": false,
       "newTicket": false
     }
+  },
+  "catalogueHandoff20260916": {
+    "state": "documentation_and_git_preservation_runtime_paused",
+    "authority": "HANDOFF.md current section supersedes historical workflow labels",
+    "preservedWipCommit": "8ecf24a9a7c14a492f603c019c0d40ef805b8aab",
+    "lastQualifiedApplicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+    "originalsClosed": 22,
+    "originalChildrenClosed": [
+      "RV6-D005-C01"
+    ],
+    "skuRecords": 14,
+    "skuRetainedClosures": 11,
+    "skuOpen": [
+      "SKU-M05-C04",
+      "SKU-M05-C06",
+      "SKU-M05-C07"
+    ],
+    "externalOpen": [
+      "R668-AUDIT-MEDIA-002"
+    ],
+    "fieldMap": "PUBLIC-DATA.csv",
+    "fieldMapRows": 271,
+    "fieldMapSha256": "25706DAF75736C1E9ECEC54D36FB0B09A4F1340496B185A14D25D47EA5700B0B",
+    "publication": "Owner preview/save exists; authoritative owner-to-public publication missing or unqualified",
+    "newRuntimeTests": false,
+    "newApk": false
   }
 }
