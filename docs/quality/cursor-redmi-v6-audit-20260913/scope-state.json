@@ -483,7 +483,7 @@
     "externalServiceWriteAuthorized": false
   },
   "skuMetadataWorkflow": {
-    "state": "twelve_scoped_ui_records_qualified_r66_28_installed_final_git_receipt_required",
+    "state": "founder_horizontal_whole_grid_motion_reopened_C04",
     "baselineHead": "17730e9c5a92ca51cad0c590deca368927f2bae6",
     "tickets": [
       "SKU-M01",
@@ -507,10 +507,10 @@
     "localFlutterImages": 68,
     "manuallyReviewedImages": 2,
     "qualificationReportSha256": "A5D824A5599815784675E067B57D3A7E178B2F7FEA4AE7376A0939C42609BDC0",
-    "redmiRedesignVerified": true,
+    "redmiRedesignVerified": false,
     "newApkBuilt": true,
     "remaining": [
-      "Verify evidence-only commit, push and exact clean/live remote equality; write r66.28-final-git-handoff.json, then stop."
+      "SKU-M05-C04: implement and qualify whole-grid horizontal dragging; preserve founder-approved vertical scrolling."
     ],
     "registryEntryCount": 4589,
     "registrySha256": "A76DED4C032C0D51479DA588605E56AD5BD16562348671D3354C231DF50373DB",
@@ -549,7 +549,7 @@
       "terminal": "e6eb1b",
       "currentSourceQualification": "Verified by current-source-qualification-01.json; both current runs pass; 27 inherited skips and 10 frozen-reference exclusions remain separately disclosed."
     },
-    "implementationStatus": "complete_for_twelve_scoped_ui_records",
+    "implementationStatus": "C04_reopened_whole_grid_motion_not_implemented",
     "successorAuthorization": {
       "basis": "Current founder goal explicitly requests necessary unique successor APK and data-preserving Redmi qualification after local checks.",
       "candidatePlan": "UAW-CURSOR-SKU-METADATA-CORRECTION-20260915",
@@ -598,7 +598,7 @@
       "report": "r66.28-final-qualification.json",
       "reportSha256": "D8A4A26B26F3165048C6D1AEAA9763A2601324F07C8B8DCB03F4E03EF4296873",
       "captureReceipts": 62,
-      "scopedUiRecordsClosed": 12,
+      "scopedUiRecordsClosed": 11,
       "priorDeviceEvidenceExplicitlyRetained": [
         "Orders",
         "Cart",
@@ -611,6 +611,9 @@
         "27 inherited skips and ten protected-reference exclusions are not passes; frozen reference drift remains separately disclosed.",
         "Prior 22 RV6 originals and D005-C01 closures preserved.",
         "Final Git handoff is proven separately by r66.28-final-git-handoff.json; no integration or founder production acceptance implied."
+      ],
+      "reopened": [
+        "SKU-M05-C04"
       ]
     },
     "correctiveImplementation": {
@@ -868,9 +871,10 @@
       "applicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
       "built": true,
       "installed": true,
-      "deviceQualified": true,
+      "deviceQualified": false,
       "apkSha256": "B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8",
-      "buildSeal": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc"
+      "buildSeal": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+      "qualificationAmendment": "Eleven records retain disposition; C04 whole-grid horizontal motion reopened."
     },
     "priorRedmiQualificationBeforeR6628": {
       "state": "corrections_required",
@@ -955,9 +959,9 @@
       },
       {
         "id": "SKU-M05-C04",
-        "status": "closed_for_scoped_cursor_review_ui",
-        "qualification": "Next/previous on Shop, Wholesale, Bulk, Search, Store and Supplier; query/context retained.",
-        "captures": "002/005/006;011/012/013;015/016/018;020/021/022;027/028/031;035/036/037;059/060/061"
+        "status": "reopened",
+        "qualification": "Page transitions previously passed; whole three-column grid does not move with horizontal drag on installed r66.28. Founder vertical scrolling approval preserved.",
+        "captures": "r66.28-swipe-motion/motion-proof.json; captures064-074"
       },
       {
         "id": "SKU-M05-C05",
@@ -982,6 +986,15 @@
       "required": "clean status and exact live remote equals evidence-only HEAD",
       "applicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
       "buildSeal": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc"
+    },
+    "horizontalMotionRetest": {
+      "state": "failed_whole_grid_motion",
+      "finding": "r66.28-swipe-motion/finding.json",
+      "sha256": "2DA320CB2223B6F6BC8A4040D2945C27E4F827E1802F91AB0D00A9CD5DBB05F5",
+      "verticalBothDirectionsFounderApproved": true,
+      "runtimeChanged": false,
+      "apkChanged": false,
+      "newTicket": false
     }
   }
 }
