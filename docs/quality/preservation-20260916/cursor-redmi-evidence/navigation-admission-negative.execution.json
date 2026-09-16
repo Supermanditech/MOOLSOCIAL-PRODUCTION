@@ -1,0 +1,16 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\test-sku-navigation-source-admission.ps1",
+    "-source",
+    "64ca4d757cffc1cc1fa575b84004cd827e6695ab"
+  ],
+  "exitCode": 1,
+  "sha256": "9B2C673ED4B60D3F75C1BD4E26DD2C5BBBCFEC6891A275B1C52A26B480AF3078",
+  "requiredMarker": "SKU admission: exact source accepted; five negative cases rejected;",
+  "passed": false
+}

@@ -1,0 +1,8 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart
+00:00 +0: R664 Cart protects Recent heading and Clear at Size(360.0, 800.0) / 1.0
+00:03 +1: R664 Cart protects Recent heading and Clear at Size(360.0, 800.0) / 2.0
+00:06 +2: R664 Cart protects Recent heading and Clear at Size(320.0, 800.0) / 1.0
+00:08 +3: R664 Cart protects Recent heading and Clear at Size(320.0, 800.0) / 2.0
+00:10 +4: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+00:12 +5: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+00:15 +6: All tests passed!

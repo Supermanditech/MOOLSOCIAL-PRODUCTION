@@ -1,0 +1,137 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: R5 readability cart s-milk 320x844-1.0
+00:03 +1: R5 readability cart w-oil-10l 320x844-1.0
+00:05 +2: R5 readability cart m-paracetamol-500 320x844-1.0
+00:06 +3: R5 readability cart s-milk 320x844-2.0
+00:07 +4: R5 readability cart w-oil-10l 320x844-2.0
+00:08 +5: R5 readability cart m-paracetamol-500 320x844-2.0
+00:09 +6: R5 readability cart s-milk 640x360-1.0
+00:10 +7: R5 readability cart w-oil-10l 640x360-1.0
+00:11 +8: R5 readability cart m-paracetamol-500 640x360-1.0
+00:12 +9: R5 readability cart s-milk 640x360-2.0
+00:13 +10: R5 readability cart w-oil-10l 640x360-2.0
+00:14 +11: R5 readability cart m-paracetamol-500 640x360-2.0
+00:15 +12: R5 purchase decisions complete Saved notice shop 320x844-1.0
+00:15 +13: R5 purchase decisions complete Saved notice wholesale 320x844-1.0
+00:16 +14: R5 purchase decisions complete Saved notice shop 320x844-2.0
+00:17 +15: R5 purchase decisions complete Saved notice wholesale 320x844-2.0
+00:18 +16: R5 purchase decisions complete Saved notice shop 640x360-1.0
+00:18 +17: R5 purchase decisions complete Saved notice wholesale 640x360-1.0
+00:20 +18: R5 purchase decisions complete Saved notice shop 640x360-2.0
+00:21 +19: R5 purchase decisions complete Saved notice wholesale 640x360-2.0
+00:22 +20: accessible featured cards keep purchase actions in bounds
+00:22 +21: featured products lead with a dominant photo and readable filtered cards
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: Size:<Size(78.0, 70.0)>
+  Actual: _DebugSize:<Size(96.0, 70.0)>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:4444:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart line 4444
+The test description was:
+  featured products lead with a dominant photo and readable filtered cards
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:24 +21 -1: featured products lead with a dominant photo and readable filtered cards [E]
+  Test failed. See exception logs above.
+  The test description was: featured products lead with a dominant photo and readable filtered cards
+  
+00:24 +21 -1: featured press and quantity motion respect reduced motion
+00:24 +22 -1: products save at the grid and appear in the Saved owner
+00:25 +23 -1: category and search actions cannot strand the Saved grid
+00:26 +24 -1: featured card exposes automatic delivery and a stable purchase action
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with text containing Quick local descending from
+widgets with key [<'buy-product-s-tomato'>]: []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:5885:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart line 5885
+The test description was:
+  featured card exposes automatic delivery and a stable purchase action
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:29 +24 -2: featured card exposes automatic delivery and a stable purchase action [E]
+  Test failed. See exception logs above.
+  The test description was: featured card exposes automatic delivery and a stable purchase action
+  
+00:29 +24 -2: promotion and featured product remain usable at 320 and 140 percent
+00:30 +25 -2: Cart can return to Offers and add another product
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'buy-add-w-oil'>]: [
+  Material-[<'buy-add-w-oil'>](type: canvas, color: Color(alpha: 0.0000, red: 0.0000, green: 0.0000, blue: 0.0000, colorSpace: ColorSpace.sRGB), dependencies: [InheritedCupertinoTheme, _InheritedTheme, _LocalizationsScope-[GlobalKey#f9391]], state: _MaterialState#8c51e),
+]" derived an Offset (Offset(227.7, 590.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderPhysicalModel#99fa0
+The hit test result at that offset is: HitTestResult(RenderPointerListener#6d910@Offset(113.4, 50.0), RenderSemanticsAnnotations#5dea6@Offset(113.4, 50.0), RenderMouseRegion#229b9@Offset(113.4, 50.0), RenderSemanticsAnnotations#314a3@Offset(113.4, 50.0), _RenderInkFeatures#f6636@Offset(113.4, 50.0), RenderCustomPaint#fe192@Offset(113.4, 50.0), RenderPhysicalShape#1e4b7@Offset(113.4, 50.0), RenderConstrainedBox#38efe@Offset(113.4, 50.0), RenderSemanticsAnnotations#428c1@Offset(113.4, 50.0), RenderFlex#8d844@Offset(227.7, 50.0), RenderConstrainedBox#d3531@Offset(227.7, 50.0), RenderPadding#0b4f3@Offset(227.7, 50.0), RenderPadding#4c713@Offset(227.7, 50.0), _RenderInkFeatures#47b1a@Offset(227.7, 50.0), RenderPhysicalModel#ec179@Offset(227.7, 50.0), RenderDecoratedBox#88020@Offset(227.7, 50.0), RenderRepaintBoundary#08528@Offset(227.7, 50.0), RenderCustomMultiChildLayoutBox#6765c@Offset(227.7, 590.0), _RenderInkFeatures#0a23d@Offset(227.7, 590.0), RenderPhysicalModel#22318@Offset(227.7, 590.0), RenderStack#6f508@Offset(227.7, 590.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#869de@Offset(227.7, 590.0), RenderSemanticsAnnotations#debc4@Offset(227.7, 590.0), RenderRepaintBoundary#b436c@Offset(227.7, 590.0), RenderIgnorePointer#7c129@Offset(227.7, 590.0), RenderStack#94f40@Offset(227.7, 590.0), RenderDecoratedBox#3b952@Offset(227.7, 590.0), RenderRepaintBoundary#6ae0b@Offset(227.7, 590.0), RenderSemanticsAnnotations#b9e22@Offset(227.7, 590.0), RenderOffstage#28da8@Offset(227.7, 590.0), RenderSemanticsAnnotations#1e918@Offset(227.7, 590.0), _RenderTheater#bf2d6@Offset(227.7, 590.0), RenderAbsorbPointer#abda5@Offset(227.7, 590.0), RenderPointerListener#2bfce@Offset(227.7, 590.0), RenderSemanticsAnnotations#dc2e5@Offset(227.7, 590.0), RenderRepaintBoundary#c7f8a@Offset(227.7, 590.0), RenderCustomPaint#bdd74@Offset(227.7, 590.0), RenderSemanticsAnnotations#3ec0f@Offset(227.7, 590.0), RenderSemanticsAnnotations#ea6e2@Offset(227.7, 590.0), RenderSemanticsAnnotations#f9803@Offset(227.7, 590.0), RenderTapRegionSurface#7731f@Offset(227.7, 590.0), RenderSemanticsAnnotations#3746d@Offset(227.7, 590.0), RenderSemanticsAnnotations#40fe1@Offset(227.7, 590.0), HitTestEntry<HitTestTarget>#a9c0d(_ReusableRenderView#10ecd), HitTestEntry<HitTestTarget>#3f4bb(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9090:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+The finder "Found 0 widgets with key [<'buy-compact-cart-indicator'>]: []" (used in a call to
+"tap()") could not find any matching widgets.
+
+When the exception was thrown, this was the stack:
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2095:7)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9092:18)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  Cart can return to Offers and add another product
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:32 +25 -3: Cart can return to Offers and add another product [E]
+  Test failed. See exception logs above.
+  The test description was: Cart can return to Offers and add another product
+  
+00:32 +25 -3: RV6 D015 recent availability and recovery s-dog-food text 1.0
+00:34 +26 -3: RV6 D015 recent availability and recovery s-shampoo text 1.0
+00:36 +27 -3: RV6 D015 recent availability and recovery w-notebook text 1.0
+00:38 +28 -3: RV6 D015 recent availability and recovery s-dog-food text 2.0
+00:39 +29 -3: RV6 D015 recent availability and recovery s-shampoo text 2.0
+00:40 +30 -3: RV6 D015 recent availability and recovery w-notebook text 2.0
+00:43 +31 -3: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: Cart can return to Offers and add another product
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured card exposes automatic delivery and a stable purchase action
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart: featured products lead with a dominant photo and readable filtered cards

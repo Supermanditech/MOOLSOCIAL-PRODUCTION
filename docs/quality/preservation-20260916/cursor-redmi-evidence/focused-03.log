@@ -1,0 +1,41 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: SKU order snapshot preview 1.0 lines true large false
+00:01 +1: SKU order snapshot preview 1.0 lines true large true
+00:01 +2: SKU order snapshot preview 1.0 lines false large false
+00:02 +3: SKU order snapshot preview 1.0 lines false large true
+00:02 +4: SKU order snapshot preview 2.0 lines true large false
+00:02 +5: SKU order snapshot preview 2.0 lines true large true
+00:03 +6: SKU order snapshot preview 2.0 lines false large false
+00:03 +7: SKU order snapshot preview 2.0 lines false large true
+00:03 +8: SKU metadata strips only exact development decoration
+00:03 +9: SKU metadata glance shop 320.0 1.0
+00:04 +10: SKU metadata glance shop 320.0 1.3
+00:04 +11: SKU metadata glance shop 320.0 2.0
+00:05 +12: SKU metadata glance shop 360.0 1.0
+00:05 +13: SKU metadata glance shop 360.0 1.3
+00:06 +14: SKU metadata glance shop 360.0 2.0
+00:06 +15: SKU metadata glance shop 390.0 1.0
+00:07 +16: SKU metadata glance shop 390.0 1.3
+00:08 +17: SKU metadata glance shop 390.0 2.0
+00:08 +18: SKU metadata glance wholesale 320.0 1.0
+00:09 +19: SKU metadata glance wholesale 320.0 1.3
+00:09 +20: SKU metadata glance wholesale 320.0 2.0
+00:10 +21: SKU metadata glance wholesale 360.0 1.0
+00:10 +22: SKU metadata glance wholesale 360.0 1.3
+00:11 +23: SKU metadata glance wholesale 360.0 2.0
+00:11 +24: SKU metadata glance wholesale 390.0 1.0
+00:11 +25: SKU metadata glance wholesale 390.0 1.3
+00:12 +26: SKU metadata glance wholesale 390.0 2.0
+00:12 +27: R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+00:15 +28: R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+00:17 +29: R669 small full catalogue exposes every SKU s-curd-711x320-1.0
+00:18 +30: R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+00:20 +31: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+00:22 +32: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+00:23 +33: R669 small full catalogue exposes every SKU w-notebook-711x320-1.0
+00:24 +34: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+00:26 +35: R5 paged published Offers journey 320x844-1.0
+00:33 +36: R5 paged published Offers journey 320x844-2.0
+00:39 +37: R5 paged published Offers journey 640x360-1.0
+00:47 +38: R5 paged published Offers journey 640x360-2.0
+00:53 +39: All tests passed!

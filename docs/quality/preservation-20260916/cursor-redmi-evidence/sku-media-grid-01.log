@@ -1,0 +1,610 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart
+00:00 +0: R669 supplier media contract SKU media grid shop 320.0 1.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <86>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 320.0 1.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +0 -1: R669 supplier media contract SKU media grid shop 320.0 1.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 320.0 1.0 store false
+  
+00:02 +0 -1: R669 supplier media contract SKU media grid shop 320.0 1.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <86>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 320.0 1.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:02 +0 -2: R669 supplier media contract SKU media grid shop 320.0 1.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 320.0 1.0 store true
+  
+00:02 +0 -2: R669 supplier media contract SKU media grid shop 320.0 2.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 320.0 2.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:03 +0 -3: R669 supplier media contract SKU media grid shop 320.0 2.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 320.0 2.0 store false
+  
+00:03 +0 -3: R669 supplier media contract SKU media grid shop 320.0 2.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 320.0 2.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:03 +0 -4: R669 supplier media contract SKU media grid shop 320.0 2.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 320.0 2.0 store true
+  
+00:03 +0 -4: R669 supplier media contract SKU media grid shop 360.0 1.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 360.0 1.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:04 +0 -5: R669 supplier media contract SKU media grid shop 360.0 1.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 360.0 1.0 store false
+  
+00:04 +0 -5: R669 supplier media contract SKU media grid shop 360.0 1.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 360.0 1.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:05 +0 -6: R669 supplier media contract SKU media grid shop 360.0 1.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 360.0 1.0 store true
+  
+00:05 +0 -6: R669 supplier media contract SKU media grid shop 360.0 2.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 360.0 2.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:05 +0 -7: R669 supplier media contract SKU media grid shop 360.0 2.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 360.0 2.0 store false
+  
+00:05 +0 -7: R669 supplier media contract SKU media grid shop 360.0 2.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 360.0 2.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:06 +0 -8: R669 supplier media contract SKU media grid shop 360.0 2.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 360.0 2.0 store true
+  
+00:06 +0 -8: R669 supplier media contract SKU media grid shop 390.0 1.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 390.0 1.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:06 +0 -9: R669 supplier media contract SKU media grid shop 390.0 1.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 390.0 1.0 store false
+  
+00:06 +0 -9: R669 supplier media contract SKU media grid shop 390.0 1.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 390.0 1.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:07 +0 -10: R669 supplier media contract SKU media grid shop 390.0 1.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 390.0 1.0 store true
+  
+00:07 +0 -10: R669 supplier media contract SKU media grid shop 390.0 2.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 390.0 2.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:07 +0 -11: R669 supplier media contract SKU media grid shop 390.0 2.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 390.0 2.0 store false
+  
+00:07 +0 -11: R669 supplier media contract SKU media grid shop 390.0 2.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid shop 390.0 2.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:08 +0 -12: R669 supplier media contract SKU media grid shop 390.0 2.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid shop 390.0 2.0 store true
+  
+00:08 +0 -12: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <86>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 320.0 1.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:09 +0 -13: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 320.0 1.0 store false
+  
+00:09 +0 -13: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <86>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 320.0 1.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:09 +0 -14: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 320.0 1.0 store true
+  
+00:09 +0 -14: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 320.0 2.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +0 -15: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 320.0 2.0 store false
+  
+00:10 +0 -15: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 320.0 2.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:10 +0 -16: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 320.0 2.0 store true
+  
+00:10 +0 -16: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 360.0 1.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +0 -17: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 360.0 1.0 store false
+  
+00:11 +0 -17: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 360.0 1.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:12 +0 -18: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 360.0 1.0 store true
+  
+00:12 +0 -18: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 360.0 2.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:12 +0 -19: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 360.0 2.0 store false
+  
+00:12 +0 -19: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 360.0 2.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:13 +0 -20: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 360.0 2.0 store true
+  
+00:13 +0 -20: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 390.0 1.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:13 +0 -21: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 390.0 1.0 store false
+  
+00:13 +0 -21: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <88>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 390.0 1.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:14 +0 -22: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 390.0 1.0 store true
+  
+00:14 +0 -22: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store false
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 390.0 2.0 store false
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:14 +0 -23: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store false [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 390.0 2.0 store false
+  
+00:14 +0 -23: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store true
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <800>
+  Actual: <122>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart:514:21)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart line 514
+The test description was:
+  SKU media grid wholesale 390.0 2.0 store true
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:14 +0 -24: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store true [E]
+  Test failed. See exception logs above.
+  The test description was: SKU media grid wholesale 390.0 2.0 store true
+  
+00:15 +0 -24: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R669 supplier media contract SKU media grid shop 320.0 1.0 store false
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R669 supplier media contract SKU media grid shop 320.0 1.0 store true
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R669 supplier media contract SKU media grid shop 320.0 2.0 store false
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R669 supplier media contract SKU media grid shop 320.0 2.0 store true
+  ... and 20 more
+1

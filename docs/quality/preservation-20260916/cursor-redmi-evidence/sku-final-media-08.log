@@ -1,0 +1,27 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart
+00:00 +0: R669 supplier media contract SKU media grid shop 320.0 1.0 store false
+00:01 +1: R669 supplier media contract SKU media grid shop 320.0 1.0 store true
+00:01 +2: R669 supplier media contract SKU media grid shop 320.0 2.0 store false
+00:02 +3: R669 supplier media contract SKU media grid shop 320.0 2.0 store true
+00:02 +4: R669 supplier media contract SKU media grid shop 360.0 1.0 store false
+00:02 +5: R669 supplier media contract SKU media grid shop 360.0 1.0 store true
+00:03 +6: R669 supplier media contract SKU media grid shop 360.0 2.0 store false
+00:03 +7: R669 supplier media contract SKU media grid shop 360.0 2.0 store true
+00:03 +8: R669 supplier media contract SKU media grid shop 390.0 1.0 store false
+00:04 +9: R669 supplier media contract SKU media grid shop 390.0 1.0 store true
+00:04 +10: R669 supplier media contract SKU media grid shop 390.0 2.0 store false
+00:04 +11: R669 supplier media contract SKU media grid shop 390.0 2.0 store true
+00:05 +12: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store false
+00:05 +13: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store true
+00:05 +14: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store false
+00:06 +15: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store true
+00:06 +16: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store false
+00:06 +17: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store true
+00:07 +18: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store false
+00:07 +19: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store true
+00:07 +20: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store false
+00:08 +21: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store true
+00:08 +22: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store false
+00:08 +23: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store true
+00:09 +24: All tests passed!
+0

@@ -1,0 +1,99 @@
+{
+  "recordedAtUtc": "2026-09-15T08:36:46.471578+00:00",
+  "completedRun": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-cross-surface-test-01.log",
+    "sha256": "631ED715E3ABCAECBB611DB3C1C494DD748D02BBC9E6FE5D2509781ACD51E5F1",
+    "passes": 210,
+    "failures": 77,
+    "exitCode": 1,
+    "terminalChunk": "34636c",
+    "groups": {
+      "buy_v2_responsive_product_grid_test.dart:73": {
+        "count": 8,
+        "reason": "StateError was thrown running a test:\nBad state: No element"
+      },
+      "buy_v2_responsive_product_grid_test.dart:308": {
+        "count": 12,
+        "reason": "StateError was thrown running a test:\nBad state: No element"
+      },
+      "buy_v2_recently_viewed_test.dart:190": {
+        "count": 2,
+        "reason": "StateError was thrown running a test:\nBad state: No element"
+      },
+      "buy_v2_responsive_product_grid_test.dart:509": {
+        "count": 8,
+        "reason": "StateError was thrown running a test:\nBad state: Finder returned no matching elements."
+      },
+      "buy_v2_responsive_product_grid_test.dart:504": {
+        "count": 8,
+        "reason": "TestFailure was thrown running a test:\nExpected: exactly one matching candidate\n  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-lane-1'>]: []>\n   Which: means none were found but one was expected"
+      },
+      "buy_v2_responsive_product_grid_test.dart:742": {
+        "count": 4,
+        "reason": "TestFailure was thrown running a test:\nExpected: false\n  Actual: <true>"
+      },
+      "buy_v2_recently_viewed_test.dart:124": {
+        "count": 9,
+        "reason": "TestFailure was thrown running a test:\nExpected: at least one matching candidate\n  Actual: _DescendantWidgetFinder:<Found 0 widgets with type \"Text\" descending from widgets with key\n[<'buy-recently-viewed-facts-s-tomato'>] inclusive: []>\n   Which: means none were found but some were expected"
+      },
+      "buy_v2_responsive_product_grid_test.dart:831": {
+        "count": 18,
+        "reason": "StateError was thrown running a test:\nBad state: No element"
+      },
+      "buy_v2_recently_viewed_test.dart:533": {
+        "count": 1,
+        "reason": "TestFailure was thrown running a test:\nExpected: 's-milk-2l'\n  Actual: <null>\n   Which: not an <Instance of 'String'>"
+      },
+      "buy_v2_partner_catalogue_test.dart:1329": {
+        "count": 4,
+        "reason": "TestFailure was thrown running a test:\nExpected: exactly one matching candidate\n  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-page-next-published-offers'>]: []>\n   Which: means none were found but one was expected"
+      },
+      "buy_v2_responsive_product_grid_test.dart:979": {
+        "count": 1,
+        "reason": "TestFailure was thrown running a test:\nExpected: a value greater than or equal to <134>\n  Actual: <95.33333333333333>\n   Which: is not a value greater than or equal to <134>\nSize(320.0, 700.0) width"
+      },
+      "buy_v2_responsive_product_grid_test.dart:1105": {
+        "count": 1,
+        "reason": "TestFailure was thrown running a test:\nExpected: exactly one matching candidate\n  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-lane-0'>]: []>\n   Which: means none were found but one was expected"
+      },
+      "buy_v2_partner_catalogue_test.dart:3511": {
+        "count": 1,
+        "reason": "StateError was thrown running a test:\nBad state: No element"
+      }
+    }
+  },
+  "registry": {
+    "id": "REG-20260915-4618-SKU-VERTICAL-CONTROLS-AND-TRAVERSAL",
+    "entries": 4589,
+    "sha256": "D56BBBFB432AFD480A6AE39E3419880020930914A2E462321A6FE8BE74A84994"
+  },
+  "claimAdmission": {
+    "owners": 56,
+    "onlyAddedOwner": "apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart",
+    "coordinationPass": "c596a0",
+    "memoryPass": "15be56",
+    "preservation": "Exact outside-admission restoration comparison retained; all prior claims and history retained"
+  },
+  "changes": [
+    "Featured quantity overlay uses full card width without reducing 44-pixel targets",
+    "Responsive tests use vertical rows, full counts, destination-specific offsets and reachable actions; quantity geometry/corner taps retained",
+    "Recent tests inspect shared metadata cards, open visible packshots and retain exact variant/Clear/state checks",
+    "Offers and View more helpers return to top before downward traversal",
+    "Featured quantity captures have a unique external-directory option"
+  ],
+  "sourceNormalizedSha256": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "E0E66A9446040A3CA9CC211E50FC041EC6355ED3F634F8FD9C27AD63D1348BCE",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "2CFB7FDBB3A06C4C722657538BF47967C4366230127774DD3E18D3C9F0A706D1",
+    "apps/mobile/test/ui_v2/buy/buy_v2_recently_viewed_test.dart": "E3C999E779F61FEAA6CFD41F7F037A32B8879B6CEFFD94A965309ADD340A1E8C",
+    "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart": "D3BD0E2BFD78232318BA142603AC5EC08186187AE1AE2D029FCA9E1B64C9AFD9"
+  },
+  "running": {
+    "session": 10776,
+    "analysis": "founder-analysis-07.log",
+    "conditionalTest": "featured-quantity-test-01.log",
+    "visualDirectory": "featured-quantity-visual-01",
+    "result": "not yet asserted"
+  },
+  "openAcceptanceRecords": 10,
+  "newApkBuilt": false
+}

@@ -1,0 +1,129 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: SKU order snapshot preview 1.0 lines true large false
+00:01 +1: SKU order snapshot preview 1.0 lines true large true
+00:01 +2: SKU order snapshot preview 1.0 lines false large false
+00:02 +3: SKU order snapshot preview 1.0 lines false large true
+00:02 +4: SKU order snapshot preview 2.0 lines true large false
+00:02 +5: SKU order snapshot preview 2.0 lines true large true
+00:03 +6: SKU order snapshot preview 2.0 lines false large false
+00:03 +7: SKU order snapshot preview 2.0 lines false large true
+00:03 +8: SKU metadata strips only exact development decoration
+00:03 +9: SKU metadata glance shop 320.0 1.0
+00:04 +10: SKU metadata glance shop 320.0 1.3
+00:04 +11: SKU metadata glance shop 320.0 2.0
+00:05 +12: SKU metadata glance shop 360.0 1.0
+00:05 +13: SKU metadata glance shop 360.0 1.3
+00:06 +14: SKU metadata glance shop 360.0 2.0
+00:06 +15: SKU metadata glance shop 390.0 1.0
+00:07 +16: SKU metadata glance shop 390.0 1.3
+00:07 +17: SKU metadata glance shop 390.0 2.0
+00:08 +18: SKU metadata glance wholesale 320.0 1.0
+00:08 +19: SKU metadata glance wholesale 320.0 1.3
+00:09 +20: SKU metadata glance wholesale 320.0 2.0
+00:09 +21: SKU metadata glance wholesale 360.0 1.0
+00:09 +22: SKU metadata glance wholesale 360.0 1.3
+00:10 +23: SKU metadata glance wholesale 360.0 2.0
+00:10 +24: SKU metadata glance wholesale 390.0 1.0
+00:11 +25: SKU metadata glance wholesale 390.0 1.3
+00:11 +26: SKU metadata glance wholesale 390.0 2.0
+00:12 +27: SKU long metadata shop 1.0
+00:13 +28: SKU long metadata shop 2.0
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'buy-cart-product-details-buy-catalogue-dev-v1-shop-store-000001-sku-0001'>]: [
+  InkWell-[<'buy-cart-product-details-buy-catalogue-dev-v1-shop-store-000001-sku-0001'>](dependencies: [_ScrollableScope]),
+]" derived an Offset (Offset(160.5, 651.5)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderSemanticsAnnotations#65add relayoutBoundary=up19
+The hit test result at that offset is: HitTestResult(RenderDecoratedBox#24411@Offset(160.5, 31.5), RenderFlex#3630b@Offset(160.5, 651.5), RenderOpacity#be3a5@Offset(160.5, 651.5), RenderOpacity#d49d6@Offset(160.5, 651.5), RenderClipRect#4f879@Offset(160.5, 651.5), RenderClipRect#2a389@Offset(160.5, 651.5), RenderPadding#f0cee@Offset(160.5, 651.5), RenderStack#3e5f1@Offset(160.5, 651.5), RenderFlex#005cc@Offset(160.5, 651.5), _RenderColoredBox#b8d0a@Offset(160.5, 651.5), RenderPadding#ac5a1@Offset(160.5, 651.5), RenderDecoratedBox#cb4c1@Offset(160.5, 651.5), RenderConstrainedBox#ef702@Offset(160.5, 651.5), RenderPositionedBox#77267@Offset(160.5, 651.5), RenderPadding#02354@Offset(160.5, 651.5), RenderDecoratedBox#8a8c3@Offset(160.5, 651.5), _RenderLayoutBuilder#03f35@Offset(160.5, 651.5), RenderCustomMultiChildLayoutBox#cfad1@Offset(160.5, 651.5), _RenderInkFeatures#aa723@Offset(160.5, 651.5), RenderPhysicalModel#5cae8@Offset(160.5, 651.5), RenderStack#8644f@Offset(160.5, 651.5), RenderAnnotatedRegion<SystemUiOverlayStyle>#ae0db@Offset(160.5, 651.5), RenderSemanticsAnnotations#ccb37@Offset(160.5, 651.5), RenderRepaintBoundary#f9166@Offset(160.5, 651.5), RenderIgnorePointer#d5afd@Offset(160.5, 651.5), RenderStack#4b9e5@Offset(160.5, 651.5), RenderDecoratedBox#f6233@Offset(160.5, 651.5), RenderRepaintBoundary#12ddf@Offset(160.5, 651.5), RenderSemanticsAnnotations#dd468@Offset(160.5, 651.5), RenderOffstage#76229@Offset(160.5, 651.5), RenderSemanticsAnnotations#936c2@Offset(160.5, 651.5), _RenderTheater#029af@Offset(160.5, 651.5), RenderAbsorbPointer#6b6f2@Offset(160.5, 651.5), RenderPointerListener#92270@Offset(160.5, 651.5), RenderSemanticsAnnotations#dd7b9@Offset(160.5, 651.5), RenderRepaintBoundary#8c3e4@Offset(160.5, 651.5), RenderSemanticsAnnotations#4f487@Offset(160.5, 651.5), RenderSemanticsAnnotations#3bc1d@Offset(160.5, 651.5), RenderSemanticsAnnotations#7966d@Offset(160.5, 651.5), RenderTapRegionSurface#aea0c@Offset(160.5, 651.5), RenderSemanticsAnnotations#6e183@Offset(160.5, 651.5), RenderSemanticsAnnotations#b93c5@Offset(160.5, 651.5), HitTestEntry<HitTestTarget>#70272(_ReusableRenderView#db4d8), HitTestEntry<HitTestTarget>#89f85(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:406:22)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: 'buy-catalogue-dev-v1-shop-store-000001-sku-0001'
+  Actual: <null>
+   Which: not an <Instance of 'String'>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:408:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 408
+The test description was:
+  SKU long metadata shop 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:15 +28 -1: SKU long metadata shop 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: SKU long metadata shop 2.0
+  
+00:15 +28 -1: SKU long metadata wholesale 1.0
+00:16 +29 -1: SKU long metadata wholesale 2.0
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'buy-cart-product-details-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001'>]: [
+  InkWell-[<'buy-cart-product-details-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001'>](dependencies: [_ScrollableScope]),
+]" derived an Offset (Offset(160.5, 667.5)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderSemanticsAnnotations#36643 relayoutBoundary=up19
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#25ff4(TextSpan(debugLabel: ((englishLike bodyMedium 2021).merge((((blackMountainView bodyMedium).apply).apply).merge(unknown))).merge(unknown), inherit: false, color: Color(alpha: 1.0000, red: 0.0000, green: 0.0000, blue: 0.5020, colorSpace: ColorSpace.sRGB), family: Inter, size: 20.0, weight: 900, letterSpacing: 0.3, baseline: alphabetic, height: 1.4x, leadingDistribution: even, decoration: Color(alpha: 1.0000, red: 0.1059, green: 0.1059, blue: 0.1294, colorSpace: ColorSpace.sRGB) TextDecoration.none, "₹2,00,00,000")), RenderParagraph#eaac4@Offset(146.5, 13.5), RenderOpacity#be242@Offset(146.5, 13.5), RenderPositionedBox#5c0f9@Offset(146.5, 13.5), RenderSemanticsAnnotations#4771e@Offset(146.5, 13.5), RenderConstrainedBox#11f4b@Offset(146.5, 13.5), RenderSemanticsAnnotations#cd3de@Offset(146.5, 13.5), RenderFlex#4279b@Offset(146.5, 37.5), RenderFlex#f9b70@Offset(146.5, 37.5), _RenderLayoutBuilder#21d0a@Offset(146.5, 37.5), RenderPadding#50dd7@Offset(160.5, 47.5), RenderDecoratedBox#97a11@Offset(160.5, 47.5), RenderFlex#f4474@Offset(160.5, 667.5), RenderOpacity#c1edf@Offset(160.5, 667.5), RenderOpacity#d9d5c@Offset(160.5, 667.5), RenderClipRect#56a2e@Offset(160.5, 667.5), RenderClipRect#8ee41@Offset(160.5, 667.5), RenderPadding#dde2f@Offset(160.5, 667.5), RenderStack#27189@Offset(160.5, 667.5), RenderFlex#ab620@Offset(160.5, 667.5), _RenderColoredBox#e69c8@Offset(160.5, 667.5), RenderPadding#0b9f9@Offset(160.5, 667.5), RenderDecoratedBox#2ef34@Offset(160.5, 667.5), RenderConstrainedBox#5e43e@Offset(160.5, 667.5), RenderPositionedBox#d20e8@Offset(160.5, 667.5), RenderPadding#c7dbf@Offset(160.5, 667.5), RenderDecoratedBox#bf7d9@Offset(160.5, 667.5), _RenderLayoutBuilder#b7ba5@Offset(160.5, 667.5), RenderCustomMultiChildLayoutBox#9a8d3@Offset(160.5, 667.5), _RenderInkFeatures#084b9@Offset(160.5, 667.5), RenderPhysicalModel#1748e@Offset(160.5, 667.5), RenderStack#2c0d5@Offset(160.5, 667.5), RenderAnnotatedRegion<SystemUiOverlayStyle>#78a2d@Offset(160.5, 667.5), RenderSemanticsAnnotations#01708@Offset(160.5, 667.5), RenderRepaintBoundary#aab52@Offset(160.5, 667.5), RenderIgnorePointer#f4d56@Offset(160.5, 667.5), RenderStack#6c619@Offset(160.5, 667.5), RenderDecoratedBox#00670@Offset(160.5, 667.5), RenderRepaintBoundary#8b1d8@Offset(160.5, 667.5), RenderSemanticsAnnotations#0687e@Offset(160.5, 667.5), RenderOffstage#8db82@Offset(160.5, 667.5), RenderSemanticsAnnotations#c7e27@Offset(160.5, 667.5), _RenderTheater#01710@Offset(160.5, 667.5), RenderAbsorbPointer#e7e10@Offset(160.5, 667.5), RenderPointerListener#0f501@Offset(160.5, 667.5), RenderSemanticsAnnotations#0d53b@Offset(160.5, 667.5), RenderRepaintBoundary#673e4@Offset(160.5, 667.5), RenderSemanticsAnnotations#3e0c1@Offset(160.5, 667.5), RenderSemanticsAnnotations#febf3@Offset(160.5, 667.5), RenderSemanticsAnnotations#93338@Offset(160.5, 667.5), RenderTapRegionSurface#76c67@Offset(160.5, 667.5), RenderSemanticsAnnotations#43fa7@Offset(160.5, 667.5), RenderSemanticsAnnotations#5b98c@Offset(160.5, 667.5), HitTestEntry<HitTestTarget>#3ffea(_ReusableRenderView#db4d8), HitTestEntry<HitTestTarget>#992a4(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:406:22)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: 'buy-catalogue-dev-v1-wholesale-store-000001-sku-0001'
+  Actual: <null>
+   Which: not an <Instance of 'String'>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:408:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 408
+The test description was:
+  SKU long metadata wholesale 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:17 +29 -2: SKU long metadata wholesale 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: SKU long metadata wholesale 2.0
+  
+00:17 +29 -2: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU long metadata shop 2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU long metadata wholesale 2.0

@@ -1,0 +1,15 @@
+{
+  "candidate": "UAW-CURSOR-SKU-METADATA-20260915",
+  "applicationSource": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
+  "sourceHead": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "buildTerminal": "7a2f3b",
+  "artifactVerificationTerminal": "195e59",
+  "apkSha256": "209E51297A64D52A7C20E5B8E662EAFE0CE88D78A6A1F3C4D4B618F6D14A377E",
+  "preflightTerminal": "4b838a",
+  "buildLogSha256": "8E0FB85895CF254FC5B518223CCE06ADFE2CA15A5618F4BE105A14FA7CC27EE9",
+  "preflightLogSha256": "1A5769C8A0E03567D8A4A3B2B246171E9A09C273B2B2C6279F8B300693C9C709",
+  "preservedOwnerCount": 3044,
+  "cleanAfterBuild": true,
+  "buildAuthorization": "consumed_one_build",
+  "installed": false
+}

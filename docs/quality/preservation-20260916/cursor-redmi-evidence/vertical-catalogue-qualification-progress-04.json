@@ -1,0 +1,29 @@
+{
+  "recordedAtUtc": "2026-09-15T08:11:06.151177+00:00",
+  "head": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "previousRun": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-price-test-03.log",
+    "sha256": "D861C0BDBC377E88ABB42AA15BE96B2422EE25BBA4CE35AB964A0E6231E899A2",
+    "passes": 0,
+    "failures": 4,
+    "exitCode": 1,
+    "terminalChunk": "c14fc4",
+    "reason": "Strict intact-price assertion still found two lines at both normal and enlarged text; no Offers follow-up ran"
+  },
+  "correction": "Use exact whole lakh/crore amounts only when divisible without rounding; retain full numeric card semantics and product detail price. Other prices unchanged. Price fit reserves 2 pixels for spacing.",
+  "currentSourceNormalizedSha256": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "B0EB9F8B8FFE8B112ECACE51EBF63CEE36B259E53D4439983511F82EABF73FCB",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "1E0322CF52366D26A80FCAC9753A0B54AFAE5E7B106FD18FF80B23F2E6E406A4"
+  },
+  "running": {
+    "sessionId": 74147,
+    "sequence": [
+      "founder-analysis-06.log",
+      "vertical-price-test-04.log; actual Flutter captures vertical-price-visual-04",
+      "vertical-cross-surface-test-01.log; full partner catalogue, recently viewed and responsive grid files, only if earlier stages pass"
+    ],
+    "state": "no current result asserted"
+  },
+  "newApkBuilt": false,
+  "openAcceptanceRecords": 10
+}

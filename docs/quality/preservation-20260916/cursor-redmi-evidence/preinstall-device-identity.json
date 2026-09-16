@@ -1,0 +1,16 @@
+{
+  "serial": "TG8HCYTGGQT885OF",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "recordedAt": "2026-09-15T03:22:43.737384+05:30",
+  "packageFields": {
+    "versionCode": "2026091405 minSdk=24 targetSdk=36",
+    "versionName": "1.0.0-r66.24-cursorreview",
+    "firstInstallTime": "2026-08-27 15:09:48",
+    "lastUpdateTime": "2026-09-14 21:30:22"
+  },
+  "fontScale": "1.0",
+  "foreground": [
+    "topResumedActivity=ActivityRecord{f856c5e u0 com.moolsocial.app.cursorreview/com.moolsocial.app.MainActivity} t122}"
+  ],
+  "dataCleared": false
+}

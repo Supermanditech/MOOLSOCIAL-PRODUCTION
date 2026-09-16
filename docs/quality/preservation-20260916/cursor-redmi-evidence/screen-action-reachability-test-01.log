@@ -1,0 +1,10 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart
+00:00 +0: R669 invoice missing history explains recovery and preserves Orders
+00:03 +1: R669 invoice missing MS-240741 fits and refreshes at 1.0
+00:04 +2: R669 invoice missing PO-240728 fits and refreshes at 1.0
+00:06 +3: R669 invoice missing MS-240741 fits and refreshes at 2.0
+00:07 +4: R669 invoice missing PO-240728 fits and refreshes at 2.0
+00:08 +5: R669 invoice missing tracking returns to exact order
+00:09 +6: R669 invoice missing confirmation uses the same recovery
+00:09 +7: store Add feedback Cart access and product return keep one browse path
+00:13 +8: All tests passed!

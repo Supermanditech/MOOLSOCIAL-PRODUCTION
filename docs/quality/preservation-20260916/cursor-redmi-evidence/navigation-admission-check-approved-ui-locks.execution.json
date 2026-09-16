@@ -1,0 +1,14 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-approved-ui-locks.ps1"
+  ],
+  "exitCode": 0,
+  "sha256": "3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68",
+  "requiredMarker": "Approved UI reference and production locks passed.",
+  "passed": true
+}

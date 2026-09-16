@@ -1,0 +1,17 @@
+{
+  "sourceHead": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+  "apkSha256": "B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8",
+  "installationReceiptSha256": "A566539242CA94960635B651C3B8E5BE0DD93783F399D2ED00F8B4776AF50066",
+  "fontScale": "1.0",
+  "label": "007-shop-vertical",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.28-cursorreview",
+  "capturedAt": "2026-09-16T03:14:43.974670+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "8fe199d0305a930a08236b176fb44f713823639d16d3288f9fe7b7f617862ddf",
+    ".xml": "eb8a1ab5e7d2629cf3fa9584354002356f3baf3d5ec02ae3a675124eb9ea3bc8",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

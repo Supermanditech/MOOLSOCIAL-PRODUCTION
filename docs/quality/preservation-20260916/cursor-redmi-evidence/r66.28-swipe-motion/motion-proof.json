@@ -1,0 +1,62 @@
+{
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "r66.28",
+  "records": [
+    {
+      "direction": "left",
+      "input": [
+        620,
+        620,
+        100,
+        620,
+        4000
+      ],
+      "inputActiveBeforeAndAfterMidCapture": true,
+      "exitCode": 0,
+      "stderrBytes": 0,
+      "before": {
+        "file": "left-before.png",
+        "sha256": "011120b9b062c82ee73e490712e2e613a247749dda01cb86db7e99fa119c9d86",
+        "at": "2026-09-16T11:17:03.967927+05:30"
+      },
+      "during": {
+        "file": "left-during.png",
+        "sha256": "3904f1cd465df199787e9fd86617f308f6dba0ff9dcf76646c888206f1155e8b",
+        "at": "2026-09-16T11:17:06.347842+05:30"
+      },
+      "after": {
+        "file": "left-after.png",
+        "sha256": "3904f1cd465df199787e9fd86617f308f6dba0ff9dcf76646c888206f1155e8b",
+        "at": "2026-09-16T11:17:09.814764+05:30"
+      }
+    },
+    {
+      "direction": "right",
+      "input": [
+        100,
+        620,
+        620,
+        620,
+        4000
+      ],
+      "inputActiveBeforeAndAfterMidCapture": true,
+      "exitCode": 0,
+      "stderrBytes": 0,
+      "before": {
+        "file": "right-before.png",
+        "sha256": "1835c189ab04db90bf4df6ecf9fc83d2c582ef1db57929316c0b1ea60add18db",
+        "at": "2026-09-16T11:17:11.396837+05:30"
+      },
+      "during": {
+        "file": "right-during.png",
+        "sha256": "9dfb507ad809571a59a7aac51910b50f8bebab3e0178f50b1033214c9332af86",
+        "at": "2026-09-16T11:17:13.848238+05:30"
+      },
+      "after": {
+        "file": "right-after.png",
+        "sha256": "9dfb507ad809571a59a7aac51910b50f8bebab3e0178f50b1033214c9332af86",
+        "at": "2026-09-16T11:17:17.116046+05:30"
+      }
+    }
+  ]
+}

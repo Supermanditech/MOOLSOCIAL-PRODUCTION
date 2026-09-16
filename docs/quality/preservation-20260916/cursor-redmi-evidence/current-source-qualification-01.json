@@ -1,0 +1,34 @@
+{
+  "state": "current_source_analysis_and_two_combined_runs_passed",
+  "stages": [
+    {
+      "stage": "analysis-06",
+      "exitCode": 0,
+      "logSha256": "36BD78A7F9C28989CD013755370F7DEC003D5388320E1692BC618C850ABF6961",
+      "receiptSha256": "B20CB152CFDD9D721B2D949E46F573B12247B7485DFB84B987E028C5F4FD3CAC",
+      "terminal": "No issues found! (ran in 10.3s)"
+    },
+    {
+      "stage": "combined-behavior-05",
+      "exitCode": 0,
+      "logSha256": "E0D232EEE7AB56D0A6BFBEDCE8027CCEF53B3791794D35E7FAC6D131599B3D00",
+      "receiptSha256": "37187C8EEBC0914812C2DE6E4184BA1E7481755180EE71687A7C41C42AC1D707",
+      "terminal": "12:58 +2364 ~27: All tests passed!"
+    },
+    {
+      "stage": "combined-behavior-06",
+      "exitCode": 0,
+      "logSha256": "A6B0436A2E7DD8B6517F82C848C1212F28E20D0179F444D889E545D507C12615",
+      "receiptSha256": "02223DE3C4845083C4CF87663323718EC807337C139BFE5C3198588598940437",
+      "terminal": "13:43 +2364 ~27: All tests passed!"
+    }
+  ],
+  "preservedOwnerCount": 3044,
+  "preservationReceiptSha256": "7070BA74F8BA3FAC2D2C5A9331C52DBAE9A5BD35BB99C5183E2BDEDA3F4FC5B3",
+  "protectedReferenceSelector": "exclude-tags protected-reference",
+  "limits": [
+    "27 inherited skips per combined run are not passes",
+    "10 protected-reference cases excluded; frozen reference drift retained separately",
+    "Device qualification pending; no APK built by this verifier"
+  ]
+}

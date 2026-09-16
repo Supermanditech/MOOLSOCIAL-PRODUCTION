@@ -1,0 +1,18 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-buy-backend-contract-boundary.ps1",
+    "-RepositoryRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+    "-IntegratedReviewSourceCommit",
+    "f0fc06a92bb43627ec4ca952e8996a888ec96ac2"
+  ],
+  "exitCode": 0,
+  "sha256": "8932532467D3BFE2DDF4D39236F6A2E7D070E6F1A5A5EDFE20BD66875D3B754C",
+  "requiredMarker": "Buy backend contract boundary passed:",
+  "passed": true
+}

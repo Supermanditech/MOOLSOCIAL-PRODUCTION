@@ -1,0 +1,1634 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart
+00:00 +0: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.all
+00:07 +1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:10 +2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:10 +3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:11 +4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:11 +5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:11 +6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:11 +7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:11 +8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:11 +9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(320.0, 711.0) BuyV2CartScope.shop
+00:12 +10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:12 +11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:12 +12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:13 +13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:13 +14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:13 +15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:13 +16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:13 +17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:14 +18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:14 +19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:14 +20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:14 +21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:15 +22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:15 +23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:17 +24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:17 +25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:17 +26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:18 +27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:19 +28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:19 +29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:19 +30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:20 +31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:20 +32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:20 +33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(360.0, 800.0)
+00:20 +34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(711.0, 320.0) BuyV2CartScope.wholesale
+00:20 +35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R665 D01 Cart confirmation stays reachable text2 Size(711.0, 320.0) BuyV2CartScope.wholesale
+00:20 +36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R669 complete grid quantity store false Size(711.0, 320.0) scale 2.0
+00:21 +37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:21 +38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:21 +39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:21 +40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:21 +41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:22 +42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:22 +43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:22 +44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:23 +45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:24 +46: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +47: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +48: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +49: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +50: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +51: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +52: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +53: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +54: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +55: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +56: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +57: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +58: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +59: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +60: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +61: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +62: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +63: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +64: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +65: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +66: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +67: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +68: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +69: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +70: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +71: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +72: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +73: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +74: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +75: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +76: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +77: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +78: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +79: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +80: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +81: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +82: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +83: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +84: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +85: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:25 +86: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:26 +87: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 Fresh picks disclosure clears Add and retained quantity Size(800.0, 600.0)
+00:26 +88: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(360.0, 800.0)
+00:27 +89: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:28 +90: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:29 +91: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:30 +92: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:30 +93: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:30 +94: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:31 +95: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:32 +96: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:32 +97: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:33 +98: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:34 +99: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 1.0
+00:34 +100: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured medicine item0 return at Size(800.0, 360.0)
+00:34 +101: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R66 Cart payable display INR3480 fits 320.0 at 2.0
+00:35 +102: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 review draft survives Android Back and explicit close
+00:35 +103: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 review draft survives Android Back and explicit close
+00:36 +104: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 review draft survives Android Back and explicit close
+00:37 +105: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 review draft survives Android Back and explicit close
+00:38 +106: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 2.0
+00:38 +107: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 2.0
+00:38 +108: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 2.0
+00:39 +109: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers false at 2.0
+00:39 +110: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 review entry is actionable 320-1.0-false
+00:40 +111: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:40 +112: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item0 return at Size(360.0, 800.0)
+00:41 +113: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:41 +114: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:41 +115: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:41 +116: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:42 +117: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:43 +118: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:43 +119: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:43 +120: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:44 +121: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 1.0
+00:45 +122: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: mixed Cart uses real media and context-specific benefit pages
+00:47 +123: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: mixed Cart uses real media and context-specific benefit pages
+00:47 +124: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: mixed Cart uses real media and context-specific benefit pages
+00:47 +125: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 2.0
+00:49 +126: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart: R5 singular trade pack from offers true at 2.0
+00:49 +127: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured shop item2 return at Size(800.0, 360.0)
+00:50 +128: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:51 +129: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:52 +130: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:52 +131: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:53 +132: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:53 +133: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:54 +134: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:55 +135: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:55 +136: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: device-review offer UI selects and removes all six seeded states
+00:56 +137: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+00:57 +138: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+00:58 +139: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+00:58 +140: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: REG4548 featured wholesale item0 return at Size(800.0, 360.0)
+00:59 +141: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: Saved shelf adds productwise and clears only after confirmation
+01:00 +142: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 review retains draft after eligibility changes and rejected save
+01:00 +143: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:02 +144: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:02 +145: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:02 +146: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:03 +147: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:03 +148: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:03 +149: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:03 +150: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:03 +151: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _TextWidgetFinder:<Found 0 widgets with text "Minimum order 2 · ₹775 per pack · ₹31/kg":
+[]>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart:75:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart line 75
+The test description was:
+  one Wholesale receiving line retains every Cart decision fact
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:03 +152: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact
+01:03 +152 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:03 +152 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart: one Wholesale receiving line retains every Cart decision fact [E]
+  Test failed. See exception logs above.
+  The test description was: one Wholesale receiving line retains every Cart decision fact
+  
+01:03 +153 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:03 +154 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:03 +155 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:03 +156 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:04 +157 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:04 +158 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:04 +159 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:04 +160 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:04 +161 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:04 +162 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:05 +163 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:05 +164 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:05 +165 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:05 +166 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:05 +167 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:05 +168 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: R37 Cart sections fit compact Android and iOS-size viewports
+01:06 +169 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-1.0
+01:06 +170 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-1.0
+01:06 +171 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-1.0
+01:06 +172 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-1.0
+01:06 +173 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-1.0
+01:07 +174 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-1.0
+01:07 +175 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-1.0
+01:08 +176 -1: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store quick at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:08 +176 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: validated coupon selects, removes and projects its saving into Checkout
+01:08 +176 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store quick at 320.0 / 1.0
+  
+01:09 +176 -2: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store quick at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:09 +176 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart: validated coupon selects, removes and projects its saving into Checkout
+01:09 +176 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store quick at 320.0 / 2.0
+  
+01:10 +177 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-2.0
+01:10 +178 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-2.0
+01:10 +178 -3: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store quick at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:10 +178 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-2.0
+01:10 +178 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store quick at 360.0 / 2.0
+  
+01:11 +179 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 320.0-2.0
+01:11 +180 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:12 +181 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:12 +181 -4: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store quick at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:12 +181 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:12 +181 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store quick at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store quick at 430.0 / 2.0
+  
+01:13 +181 -5: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store scheduled at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:13 +181 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:13 +181 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store scheduled at 320.0 / 1.0
+  
+01:14 +181 -6: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store scheduled at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:14 +181 -7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:14 +181 -7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store scheduled at 320.0 / 2.0
+  
+01:14 +182 -7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:15 +182 -7: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store scheduled at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:15 +182 -8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:15 +182 -8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store scheduled at 360.0 / 2.0
+  
+01:16 +183 -8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:16 +184 -8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: ready trade decision leads with MOQ, total and genuine signal
+01:16 +185 -8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:17 +185 -8: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store scheduled at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:17 +185 -9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:17 +185 -9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store scheduled at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store scheduled at 430.0 / 2.0
+  
+01:18 +186 -9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:18 +186 -9: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store wholesale at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:18 +186 -10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:18 +186 -10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store wholesale at 320.0 / 1.0
+  
+01:19 +187 -10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:20 +187 -10: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store wholesale at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:20 +187 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:20 +187 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store wholesale at 320.0 / 2.0
+  
+01:20 +188 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:20 +189 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 media detail illustrations retain SKU and Back 711.0-2.0
+01:20 +190 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 360.0 / 1.0
+01:20 +191 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 360.0 / 1.0
+01:20 +192 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: stale offer blocks Cart and exposes both recovery paths
+01:21 +193 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: stale offer blocks Cart and exposes both recovery paths
+01:21 +194 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: stale offer blocks Cart and exposes both recovery paths
+01:21 +194 -11: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store wholesale at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:21 +194 -12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: stale offer blocks Cart and exposes both recovery paths
+01:21 +194 -12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store wholesale at 360.0 / 2.0
+  
+01:22 +195 -12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: stale offer blocks Cart and exposes both recovery paths
+01:22 +196 -12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: stale offer blocks Cart and exposes both recovery paths
+01:23 +197 -12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:23 +197 -12: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets store wholesale at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:23 +197 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:23 +197 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets store wholesale at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets store wholesale at 430.0 / 2.0
+  
+01:23 +198 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:24 +199 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:24 +200 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:24 +201 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:25 +202 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:25 +203 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:25 +204 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:25 +205 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:26 +205 -13: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main quick at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:26 +205 -14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 0.0
+01:26 +205 -14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main quick at 320.0 / 1.0
+  
+01:27 +206 -14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: compact Android and iOS insets keep the trade action usable
+01:27 +206 -14: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main quick at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:27 +206 -15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: compact Android and iOS insets keep the trade action usable
+01:27 +206 -15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main quick at 320.0 / 2.0
+  
+01:28 +207 -15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: compact Android and iOS insets keep the trade action usable
+01:28 +208 -15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 1.0
+01:28 +208 -15: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main quick at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:28 +208 -16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 1.0
+01:28 +208 -16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main quick at 360.0 / 2.0
+  
+01:29 +209 -16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 1.0
+01:29 +209 -16: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main quick at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:29 +209 -17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 1.0
+01:29 +209 -17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main quick at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main quick at 430.0 / 2.0
+  
+01:29 +210 -17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 1.0 keyboard 280.0
+01:30 +211 -17: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main scheduled at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:30 +211 -18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart w-notebook scale 1.0
+01:30 +211 -18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main scheduled at 320.0 / 1.0
+  
+01:31 +211 -18: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main scheduled at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:31 +211 -19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart w-notebook scale 1.0
+01:31 +211 -19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main scheduled at 320.0 / 2.0
+  
+01:31 +212 -19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart w-notebook scale 1.0
+01:32 +212 -19: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main scheduled at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:32 +212 -20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart w-notebook scale 1.0
+01:32 +212 -20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main scheduled at 360.0 / 2.0
+  
+01:32 +213 -20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart w-notebook scale 1.0
+01:33 +214 -20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart w-notebook scale 1.0
+01:33 +215 -20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 2.0 keyboard 280.0
+01:34 +215 -20: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main scheduled at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:34 +215 -21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 320.0 2.0 keyboard 280.0
+01:34 +215 -21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main scheduled at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main scheduled at 430.0 / 2.0
+  
+01:34 +216 -21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 006 parked Cart reuses a newly clear preferred position
+01:34 +216 -21: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main wholesale at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:35 +216 -22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 006 parked Cart reuses a newly clear preferred position
+01:35 +216 -22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main wholesale at 320.0 / 1.0
+  
+01:35 +217 -22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 2.0
+01:35 +217 -22: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main wholesale at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:35 +217 -23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 2.0
+01:35 +217 -23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main wholesale at 320.0 / 2.0
+  
+01:36 +218 -23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 2.0
+01:36 +218 -23: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main wholesale at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:36 +218 -24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: R669 direct quantity product and Cart s-milk scale 2.0
+01:36 +218 -24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main wholesale at 360.0 / 2.0
+  
+01:37 +219 -24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 390.0 1.0 keyboard 0.0
+01:37 +220 -24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:37 +221 -24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:38 +221 -24: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets main wholesale at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:38 +221 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:38 +221 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets main wholesale at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets main wholesale at 430.0 / 2.0
+  
+01:39 +222 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:39 +223 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:39 +224 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:39 +225 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:39 +226 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:39 +227 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:39 +228 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:39 +229 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:40 +230 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 populated Saved avoids Cart shop
+01:40 +231 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 390.0 2.0 keyboard 0.0
+01:40 +232 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 390.0 2.0 keyboard 0.0
+01:41 +233 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: Shop Wholesale and Offers use one Cart-first product action
+01:42 +234 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart: Shop Wholesale and Offers use one Cart-first product action
+01:42 +235 -25: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured quick at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:42 +235 -26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 sparse search 390.0 2.0 keyboard 280.0
+01:42 +235 -26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured quick at 320.0 / 1.0
+  
+01:42 +236 -26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=false
+01:43 +237 -26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=false
+01:43 +238 -26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=false
+01:44 +239 -26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=false
+01:44 +239 -26: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured quick at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:44 +239 -27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=false
+01:44 +239 -27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured quick at 320.0 / 2.0
+  
+01:45 +240 -27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=false
+01:45 +241 -27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=false
+01:45 +242 -27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 1.0
+01:46 +243 -27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 1.0
+01:46 +244 -27: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured quick at 360.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:46 +244 -28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=true
+01:46 +244 -28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured quick at 360.0 / 1.0
+  
+01:47 +245 -28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=true
+01:47 +246 -28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R665 D02 search history and no-match text avoid Cart paged=true
+01:47 +247 -28: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured quick at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:48 +247 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart: R66 no-results clears refinements for wholesale at 1.0
+01:48 +247 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured quick at 360.0 / 2.0
+  
+01:48 +248 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:49 +249 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:50 +250 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:50 +251 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:50 +252 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:50 +253 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:51 +253 -29: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 430.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured quick at 430.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:51 +253 -30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:51 +253 -30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 430.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured quick at 430.0 / 1.0
+  
+01:51 +254 -30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:52 +255 -30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:52 +256 -30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:52 +257 -30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:53 +257 -30: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured quick at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:53 +257 -31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 320x700-1.0
+01:53 +257 -31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured quick at 430.0 / 2.0
+  
+01:53 +258 -31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale Cart distinguishes products, packs and landed total
+01:53 +259 -31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale Cart distinguishes products, packs and landed total
+01:54 +259 -31: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured scheduled at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:54 +259 -32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale Cart distinguishes products, packs and landed total
+01:54 +259 -32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured scheduled at 320.0 / 1.0
+  
+01:56 +260 -32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale Cart distinguishes products, packs and landed total
+01:56 +260 -32: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured scheduled at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:56 +260 -33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale Cart distinguishes products, packs and landed total
+01:56 +260 -33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured scheduled at 320.0 / 2.0
+  
+01:57 +261 -33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 360x800-1.0
+01:58 +261 -33: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 360.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured scheduled at 360.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:58 +261 -34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 360x800-1.0
+01:58 +261 -34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 360.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured scheduled at 360.0 / 1.0
+  
+01:59 +262 -34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 360x800-1.0
+02:00 +263 -34: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured scheduled at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:00 +263 -35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale quantity controls explain MOQ removal exactly
+02:00 +263 -35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured scheduled at 360.0 / 2.0
+  
+02:02 +264 -35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale quantity controls explain MOQ removal exactly
+02:02 +264 -35: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 430.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured scheduled at 430.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:02 +264 -36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: Wholesale quantity controls explain MOQ removal exactly
+02:02 +264 -36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 430.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured scheduled at 430.0 / 1.0
+  
+02:03 +265 -36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 430x900-1.0
+02:04 +265 -36: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <2>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured scheduled at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:04 +265 -37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 430x900-1.0
+02:04 +265 -37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured scheduled at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured scheduled at 430.0 / 2.0
+  
+02:06 +266 -37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart: product review and checkout return preserve Wholesale Cart
+02:06 +267 -37: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 320.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured wholesale at 320.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:06 +267 -38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 430x900-2.0
+02:06 +267 -38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 320.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured wholesale at 320.0 / 1.0
+  
+02:07 +268 -38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 430x900-2.0
+02:08 +268 -38: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 320.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured wholesale at 320.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:08 +268 -39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 430x900-2.0
+02:08 +268 -39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 320.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured wholesale at 320.0 / 2.0
+  
+02:08 +269 -39: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 360.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured wholesale at 360.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:10 +269 -40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 640x360-1.0
+02:10 +269 -40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 360.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured wholesale at 360.0 / 1.0
+  
+02:10 +270 -40: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 360.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured wholesale at 360.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:11 +270 -41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 product description survives Compare and Cart return 640x360-2.0
+02:11 +270 -41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 360.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured wholesale at 360.0 / 2.0
+  
+02:11 +271 -41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 430.0 / 1.0
+02:13 +272 -41: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 430.0 / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured wholesale at 430.0 / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:13 +272 -42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear shop saved=false text=2.0
+02:13 +272 -42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 430.0 / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured wholesale at 430.0 / 1.0
+  
+02:14 +273 -42: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 430.0 / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <3>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:749:15)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 749
+The test description was:
+  R66 quantity targets featured wholesale at 430.0 / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:14 +273 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear shop saved=true text=1.0
+02:14 +273 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured wholesale at 430.0 / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 quantity targets featured wholesale at 430.0 / 2.0
+  
+02:15 +274 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear shop saved=true text=1.0
+02:15 +275 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 320.0 / 2.0
+02:15 +276 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear shop saved=true text=2.0
+02:15 +277 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear shop saved=true text=2.0
+02:16 +278 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured bulk at 360.0 / 2.0
+02:16 +279 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear wholesale saved=false text=1.0
+02:16 +280 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear wholesale saved=false text=1.0
+02:16 +281 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear wholesale saved=false text=1.0
+02:17 +282 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 1.0 text
+02:17 +283 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear wholesale saved=false text=2.0
+02:18 +284 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 1.4 text
+02:18 +285 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear wholesale saved=true text=1.0
+02:19 +286 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(320.0, 700.0) at 2.0 text
+02:19 +287 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 empty content stays clear wholesale saved=true text=2.0
+02:20 +288 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured shop cards fit Size(430.0, 932.0) at 1.0 text
+02:20 +289 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-320x700-1.0
+02:21 +290 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-320x700-1.0
+02:22 +291 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-320x700-1.0
+02:22 +292 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(320.0, 700.0) at 1.0 text
+02:23 +293 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-320x700-1.0
+02:24 +294 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-320x700-1.0
+02:25 +295 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(320.0, 700.0) at 2.0 text
+02:25 +296 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-320x700-2.0
+02:26 +297 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-320x700-2.0
+02:26 +298 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(430.0, 932.0) at 1.4 text
+02:27 +299 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-320x700-2.0
+02:28 +300 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured wholesale cards fit Size(430.0, 932.0) at 2.0 text
+02:28 +301 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-430x900-1.0
+02:29 +302 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-430x900-1.0
+02:29 +303 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-430x900-1.0
+02:30 +304 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(320.0, 700.0) at 2.0 text
+02:30 +305 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-430x900-1.0
+02:31 +306 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-430x900-1.0
+02:32 +307 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-430x900-1.0
+02:32 +308 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: featured medicine cards fit Size(430.0, 932.0) at 2.0 text
+02:32 +309 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-430x900-2.0
+02:33 +309 -43: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: phone widths keep two readable product cards with all products reachable
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-product-s-soap'>]: []>
+   Which: means none were found but one was expected
+Size(320.0, 700.0) product 4
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:982:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 982
+The test description was:
+  phone widths keep two readable product cards with all products reachable
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:33 +309 -44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-430x900-2.0
+02:33 +309 -44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: phone widths keep two readable product cards with all products reachable [E]
+  Test failed. See exception logs above.
+  The test description was: phone widths keep two readable product cards with all products reachable
+  
+02:34 +309 -44: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: large text retains two lanes and complete minimum tap actions
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with text containing 1 day descending from
+widgets with key [<'buy-product-w-oil'>]: []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart:1112:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart line 1112
+The test description was:
+  large text retains two lanes and complete minimum tap actions
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:34 +309 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-430x900-2.0
+02:34 +309 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: large text retains two lanes and complete minimum tap actions [E]
+  Test failed. See exception logs above.
+  The test description was: large text retains two lanes and complete minimum tap actions
+  
+02:34 +310 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: wide catalogue admits three cards without compressing content
+02:34 +311 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-430x900-2.0
+02:35 +312 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-430x900-2.0
+02:36 +313 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-430x900-2.0
+02:36 +314 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-640x360-1.0
+02:39 +315 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-640x360-1.0
+02:41 +316 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable shop-640x360-2.0
+02:43 +317 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 004 Saved clear keeps Cart and recovery usable wholesale-640x360-2.0
+02:45 +318 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Mool menu stays inside safe area at Size(360.0, 800.0) / 1.0
+02:49 +319 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Mool menu stays inside safe area at Size(360.0, 800.0) / 2.0
+02:52 +320 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Mool menu stays inside safe area at Size(800.0, 360.0) / 1.0
+02:54 +321 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Mool menu stays inside safe area at Size(800.0, 360.0) / 2.0
+02:57 +322 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 standalone Mool bounds Size(320.0, 568.0) compact=false
+02:57 +323 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 standalone Mool bounds Size(800.0, 360.0) compact=false
+02:57 +324 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 standalone Mool bounds Size(320.0, 568.0) compact=true
+02:58 +325 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 standalone Mool bounds Size(800.0, 360.0) compact=true
+02:58 +326 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Orders tab at Size(360.0, 800.0) / 1.0
+03:01 +327 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(360.0, 800.0) / 1.0
+03:02 +328 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Orders tab at Size(360.0, 800.0) / 2.0
+03:04 +329 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(360.0, 800.0) / 2.0
+03:04 +330 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Orders tab at Size(320.0, 800.0) / 1.0
+03:06 +331 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(320.0, 800.0) / 1.0
+03:07 +332 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Orders tab at Size(320.0, 800.0) / 2.0
+03:08 +333 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(320.0, 800.0) / 2.0
+03:09 +334 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Orders tab at Size(800.0, 360.0) / 1.0
+03:10 +335 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+03:12 +336 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Orders tab at Size(800.0, 360.0) / 2.0
+03:13 +337 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+03:14 +338 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Wholesale footer keeps freight and invoice at 320.0
+03:15 +339 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Wholesale footer keeps freight and invoice at 360.0
+03:15 +340 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [] / false / 1.0
+03:17 +341 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [] / false / 2.0
+03:19 +342 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [] / true / 1.0
+03:21 +343 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [] / true / 2.0
+03:21 +344 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato] / false / 1.0
+03:26 +345 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato] / false / 2.0
+03:30 +346 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato] / true / 1.0
+03:35 +347 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato] / true / 2.0
+03:39 +348 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [w-notebook] / false / 1.0
+03:43 +349 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [w-notebook] / false / 2.0
+03:46 +350 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [w-notebook] / true / 1.0
+03:50 +351 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [w-notebook] / true / 2.0
+03:53 +352 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato, w-notebook] / false / 1.0
+03:59 +353 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato, w-notebook] / false / 2.0
+04:02 +354 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato, w-notebook] / true / 1.0
+04:06 +355 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 cross-destination Cart remains available [s-tomato, w-notebook] / true / 2.0
+04:09 +356 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Care Cart keeps its own basket and full viewport at 1.0
+04:10 +357 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Care Cart keeps its own basket and full viewport at 2.0
+04:10 +358 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 compact order choices Size(320.0, 800.0) / 1.0
+04:13 +359 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 compact order choices Size(320.0, 800.0) / 2.0
+04:15 +360 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 compact order choices Size(800.0, 360.0) / 1.0
+04:17 +361 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 compact order choices Size(800.0, 360.0) / 2.0
+04:19 +362 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 tracking labels fit MS-240782 at 320.0
+04:19 +363 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 tracking labels fit MS-240741 at 320.0
+04:19 +364 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 checkout arrival label fits at 320.0
+04:19 +365 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Saved badge fits at 320.0 / 1.0
+04:20 +366 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Saved badge fits at 320.0 / 2.0
+04:20 +367 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 tracking labels fit MS-240782 at 360.0
+04:20 +368 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 tracking labels fit MS-240741 at 360.0
+04:20 +369 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 checkout arrival label fits at 360.0
+04:20 +370 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Saved badge fits at 360.0 / 1.0
+04:21 +371 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Saved badge fits at 360.0 / 2.0
+04:22 +372 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 order choices remain reachable with keyboard Size(320.0, 800.0)
+04:22 +373 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 order choices remain reachable with keyboard Size(800.0, 360.0)
+04:23 +374 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-tomato at 1.0 mixed=false
+04:23 +375 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-tomato at 2.0 mixed=false
+04:24 +376 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-atta at 1.0 mixed=false
+04:25 +377 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-atta at 2.0 mixed=false
+04:26 +378 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-tomato at 1.0 mixed=false
+04:27 +379 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-tomato at 2.0 mixed=false
+04:28 +380 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-rice at 1.0 mixed=false
+04:28 +381 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-rice at 2.0 mixed=false
+04:29 +382 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-tomato at 1.0 mixed=true
+04:29 +383 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-tomato at 2.0 mixed=true
+04:30 +384 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-atta at 1.0 mixed=true
+04:31 +385 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls s-atta at 2.0 mixed=true
+04:32 +386 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-tomato at 1.0 mixed=true
+04:33 +387 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-tomato at 2.0 mixed=true
+04:33 +388 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-rice at 1.0 mixed=true
+04:34 +389 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 floating Cart avoids product controls w-rice at 2.0 mixed=true
+04:34 +390 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity s-tomato Size(320.0, 700.0) at 1.0
+04:35 +391 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity w-notebook Size(320.0, 700.0) at 1.0
+04:36 +392 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity s-tomato Size(320.0, 700.0) at 2.0
+04:37 +393 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity w-notebook Size(320.0, 700.0) at 2.0
+04:38 +394 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity s-tomato Size(430.0, 900.0) at 1.0
+04:39 +395 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity w-notebook Size(430.0, 900.0) at 1.0
+04:41 +396 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity s-tomato Size(430.0, 900.0) at 2.0
+04:42 +397 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity w-notebook Size(430.0, 900.0) at 2.0
+04:43 +398 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity s-tomato Size(640.0, 360.0) at 1.0
+04:44 +399 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity w-notebook Size(640.0, 360.0) at 1.0
+04:45 +400 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity s-tomato Size(640.0, 360.0) at 2.0
+04:46 +401 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 023 Offers last quantity w-notebook Size(640.0, 360.0) at 2.0
+04:47 +402 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop false partial false at 1.0
+04:48 +403 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop false partial true at 1.0
+04:50 +404 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop true partial false at 1.0
+04:51 +405 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop true partial true at 1.0
+04:51 +406 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop false partial false at 2.0
+04:53 +407 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop false partial true at 2.0
+04:54 +408 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop true partial false at 2.0
+04:55 +409 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns shop true partial true at 2.0
+04:55 +410 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale false partial false at 1.0
+04:57 +411 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale false partial true at 1.0
+04:59 +412 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale true partial false at 1.0
+04:59 +413 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale true partial true at 1.0
+05:00 +414 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale false partial false at 2.0
+05:02 +415 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale false partial true at 2.0
+05:04 +416 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale true partial false at 2.0
+05:05 +417 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 landscape visible search returns wholesale true partial true at 2.0
+05:06 +418 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 1.0
+05:09 +419 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit shop Size(360.0, 800.0) at 2.0
+05:12 +420 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 1.0
+05:14 +421 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit shop Size(640.0, 360.0) at 2.0
+05:16 +422 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit wholesale Size(360.0, 800.0) at 1.0
+05:18 +423 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit wholesale Size(360.0, 800.0) at 2.0
+05:19 +424 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 1.0
+05:22 +425 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R5 007 related Store Cart has no phantom visit wholesale Size(640.0, 360.0) at 2.0
+05:24 +426 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop at 1.0
+05:27 +427 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop at 2.0
+05:31 +428 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns wholesale at 1.0
+05:35 +429 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns wholesale at 2.0
+05:37 +430 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns bulk at 1.0
+05:42 +431 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns bulk at 2.0
+05:45 +432 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-all at 1.0
+05:50 +433 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-all at 2.0
+05:54 +434 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-live at 1.0
+05:58 +435 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-live at 2.0
+06:01 +436 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns wholesale-quiet at 1.0
+06:05 +437 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns wholesale-quiet at 2.0
+06:07 +438 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-wide at 1.0
+06:10 +439 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-wide at 2.0
+06:14 +440 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-root-return at 1.0
+06:16 +441 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-root-return at 2.0
+06:18 +442 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-root-cart-first at 1.0
+06:20 +443 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-root-cart-first at 2.0
+06:23 +444 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-root-live-cart-first at 1.0
+06:25 +445 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns shop-root-live-cart-first at 2.0
+06:27 +446 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns wholesale-root-cart-first at 1.0
+06:31 +447 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 nested Store Cart returns wholesale-root-cart-first at 2.0
+06:33 +448 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 scoped add feedback and Cart return shop at 1.0
+06:35 +449 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 Store Cart feedback stays scoped shop at 1.0
+06:35 +450 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 scoped add feedback and Cart return shop at 2.0
+06:36 +451 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 Store Cart feedback stays scoped shop at 2.0
+06:36 +452 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 scoped add feedback and Cart return wholesale at 1.0
+06:37 +453 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 Store Cart feedback stays scoped wholesale at 1.0
+06:37 +454 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 scoped add feedback and Cart return wholesale at 2.0
+06:38 +455 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R66 Store Cart feedback stays scoped wholesale at 2.0
+06:38 +456 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: derived dock owner follows scoped Cart and Checkout without routing
+06:38 +457 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: scoped Cart and Checkout retain every established rail action
+06:40 +458 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: combined scope retains its valid entry vertical
+06:40 +459 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: compact Mool launcher opens and Back closes the menu without losing Cart
+06:41 +460 -45: C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: 320px 140% reduced motion is immediate and semantically exact
+06:41 +461 -45: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 320.0 / 2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart: R66 quantity targets featured quick at 360.0 / 2.0
+  ... and 41 more

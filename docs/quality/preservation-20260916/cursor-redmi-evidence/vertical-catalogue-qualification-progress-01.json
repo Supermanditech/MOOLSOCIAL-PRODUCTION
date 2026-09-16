@@ -1,0 +1,51 @@
+{
+  "recordedAtUtc": "2026-09-15T07:44:29.318839+00:00",
+  "head": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "sourceCommitted": false,
+  "analysis02": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\founder-analysis-02.log",
+    "sha256": "2521596A6174CDE0C95651B0F626588164E382244E3BE94D8CA6A4A85985BFCF",
+    "result": "No issues found; before latest vertical semantics change"
+  },
+  "verticalPagination01": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-pagination-test-01.log",
+    "sha256": "F517C69FA3D696AC317007211106E234F381021FE5281A217DD4AF497E420630",
+    "passes": 8,
+    "terminalChunk": "637a9c"
+  },
+  "sharedCatalogue01": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\shared-catalogue-test-01.log",
+    "sha256": "954142F7D26DB3C463D4F3F1B2CE9014E9BD85E417C3EEB418E7C685FC779B7B",
+    "passes": 90,
+    "failures": 25,
+    "exitCode": 1,
+    "terminalChunk": "084ee6",
+    "groups": [
+      "2 offscreen Add attempts after empty Store feedback",
+      "8 small Store horizontal grid expectations",
+      "4 Offers hidden range expectations",
+      "8 Store horizontal lane expectations",
+      "1 Store horizontal summary expectation",
+      "1 former two-column minimum width",
+      "1 horizontal four-product preview expectation"
+    ]
+  },
+  "changes": [
+    "Shared vertical grid now announces full product count and vertical browsing guidance",
+    "Updated superseded layout assertions; kept quantity, Saved, retry and navigation acceptance",
+    "Recheck Add hit-test after asynchronous Store feedback settles",
+    "Three-column preview geometry asserted"
+  ],
+  "currentSourceNormalizedSha256": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "ABE086BCA276B590D3B90ECE923FB97D195EE61DFD938BA75697A4BD89AD38F0",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "A877D5C3A2C2C4727000D88C5160947BE3E7C51C274205B1064D1B8D3DE2A125"
+  },
+  "nextRun": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\shared-catalogue-test-02.log",
+    "sessionId": 46540,
+    "state": "running; no result asserted"
+  },
+  "newApkBuilt": false,
+  "deviceClosedAcceptanceRecords": 0,
+  "openAcceptanceRecords": 10
+}

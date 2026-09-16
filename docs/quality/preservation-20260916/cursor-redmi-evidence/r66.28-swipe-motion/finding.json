@@ -1,0 +1,94 @@
+{
+  "ticket": "SKU-M05-C04",
+  "status": "reopened",
+  "device": "TG8HCYTGGQT885OF",
+  "apk": "r66.28",
+  "source": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+  "finding": "Three-column product grid remains stationary during horizontal dragging; touched card shows pressed feedback. Content page changes only after release. Previous page-change acceptance did not prove whole-grid motion.",
+  "founderAcceptance": "Vertical scrolling both directions approved; preserve it.",
+  "motionProof": "motion-proof.json",
+  "motionProofSha256": "82d3ae056932275a76cb8700d9695ce41da9b829e86e580f6492818130f75f4a",
+  "captures": [
+    {
+      "capture": "064-founder-swipe-before",
+      "receiptSha256": "911e7b4f7d568f812b2bb1d5fdf209006e36982077dd4217b2b316705279d29e",
+      "range": [
+        "1\u201340 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "065-founder-long-left",
+      "receiptSha256": "eb47df5ced68e87b5b839252c5f690be1c245e890e15749b4b25373806894ab7",
+      "range": [
+        "41\u201380 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "066-founder-long-right",
+      "receiptSha256": "c599051631772baafa035e8eff79ea80c5e032da7a4467e1ffbb002f9f2eb4d1",
+      "range": [
+        "1\u201340 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "067-founder-diagonal-left",
+      "receiptSha256": "29ec5de4c0974085957a60876c291e6b0385be7c768151ea27b3a258bf5771a3",
+      "range": [
+        "41\u201380 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "068-founder-diagonal-right",
+      "receiptSha256": "978ff5cb005cf9ba636e73285eca158bfd0304d12e21283ac45e781835bc2632",
+      "range": [
+        "1\u201340 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "069-founder-short-left",
+      "receiptSha256": "796fdb0688beaddf65eb0e283480d0563f47bd9295c81517f8a5fe58acb10bb2",
+      "range": [
+        "41\u201380 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "070-founder-next-for-short-right",
+      "receiptSha256": "86eed29baff0347794a64ae7c6577922ebd5fee115a7dd71112f216a9cf03c9d",
+      "range": [
+        "81\u2013120 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "071-founder-short-right",
+      "receiptSha256": "bf9e8ab2bc3099136760377e27cdd93cb71513cb645e6bc4874723123eb0c93a",
+      "range": [
+        "81\u2013120 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "072-founder-restored-before-drag",
+      "receiptSha256": "1890ef2a63b4dcc52c386be8206c1cb2d449a59c3acc02ec4e1e99f9f3058ae0",
+      "range": [
+        "41\u201380 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "073-founder-motion-after",
+      "receiptSha256": "94e0c43572893b2edfb413a5f9ceab98df4ee4d8126284b2a2e97949f7e3984a",
+      "range": [
+        "41\u201380 of 250,000,000"
+      ]
+    },
+    {
+      "capture": "074-founder-final-restored",
+      "receiptSha256": "28aad2fdfa386a17595243f1182a12132e56fabe19e169fda1f3422e0ef383d6",
+      "range": [
+        "1\u201340 of 250,000,000"
+      ]
+    }
+  ],
+  "shortSwipeObservation": "100px/120ms left advanced; same-distance right did not. Not counted as reliable short-flick acceptance.",
+  "requiredCorrection": "Whole three-column product grid follows horizontal drag together and settles to next/previous product group, with cancellation/boundary behavior, stable vertical scrolling and no accidental card/cart action. Preserve query/category/page/return state and accessibility/reduced-motion behavior.",
+  "scope": "Existing C04 reopened; no new ticket. Eleven other scoped records retain dispositions. No source edits, build or installation in this retest.",
+  "restoration": "Final074 XML exactly equals initial064; Shop first page, Saved1, font1.0; no quantity mutations."
+}

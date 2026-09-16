@@ -1,0 +1,18 @@
+{
+  "finding": "Observed 9+ is delivery tracker, not Cart badge",
+  "founderDidNotAddProducts": true,
+  "assistantEarlierCartAttribution": "incorrect; corrected by UI and source evidence",
+  "captures": [
+    "035-delivery-indicator-investigation",
+    "036-delivery-indicator-expanded"
+  ],
+  "device": "TG8HCYTGGQT885OF",
+  "apkVersion": "1.0.0-r66.25-cursorreview",
+  "deviceObservation": "Tap observed 9+ control opens Deliveries (12), order MS-240782. Panel then collapsed.",
+  "sourceEvidence": "buy_v2_screen.dart delivery-count reads _deliveryOrders.length; separate Cart badge reads itemCount",
+  "cartContentsChanged": false,
+  "ordersCreated": false,
+  "confirmedUnexpectedCartDefect": false,
+  "limitation": "This identifies the observed badge; it does not independently enumerate every Cart scope.",
+  "mutations": "Delivery panel expanded and collapsed only."
+}

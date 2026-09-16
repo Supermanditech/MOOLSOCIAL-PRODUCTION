@@ -1,0 +1,7 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart
+00:00 +0: ready trade decision leads with MOQ, total and genuine signal
+00:03 +1: missing optional signal stays hidden and does not block trade
+00:04 +2: loading and adapter failure retain current trade facts
+00:04 +3: stale offer blocks Cart and exposes both recovery paths
+00:05 +4: compact Android and iOS insets keep the trade action usable
+00:09 +5: All tests passed!

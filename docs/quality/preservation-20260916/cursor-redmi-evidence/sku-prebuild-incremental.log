@@ -1,0 +1,5 @@
+warning: in the working copy of 'scripts/check-approved-ui-locks.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/check-buy-backend-contract-boundary.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/check-buy-data-egress-boundary.ps1', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'scripts/check-buy-protected-baseline.ps1', LF will be replaced by CRLF the next time Git touches it
+Incremental ticket gate passed: phase=pre_build; lane=cursor_ui; ticket=UAW-CURSOR-SKU-METADATA-20260914; scope=buy.sku_metadata; baseline=moolsocial-buy-chat-profile-r61-48-accepted-20260829@9dc34de2f5f6ed2b2ad8998442c935136e2a962f; version=1.0.0-r66.25+2026091501; package=com.moolsocial.app.cursorreview.

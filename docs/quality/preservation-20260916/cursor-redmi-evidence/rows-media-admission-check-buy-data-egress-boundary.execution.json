@@ -1,0 +1,18 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-buy-data-egress-boundary.ps1",
+    "-RepositoryRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+    "-IntegratedReviewSourceCommit",
+    "f0fc06a92bb43627ec4ca952e8996a888ec96ac2"
+  ],
+  "exitCode": 0,
+  "sha256": "6584726EDC8AB1E76C363CEFF0FDC9CF318610AD6522AC32A3F72882AEF91FD3",
+  "requiredMarker": "Buy data-egress integrated review boundary passed:",
+  "passed": true
+}

@@ -1,0 +1,133 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: SKU swipe pages and compact navigation shop 1.0
+00:13 +1: SKU swipe pages and compact navigation shop 2.0
+00:20 +2: SKU swipe pages and compact navigation wholesale 1.0
+00:28 +3: SKU swipe pages and compact navigation wholesale 2.0
+00:36 +4: SKU swipe final page shop
+00:36 +5: SKU swipe final page wholesale
+00:37 +6: R5 paged published Offers journey 320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'TextButton' is not a subtype of type 'Semantics' in type cast
+
+When the exception was thrown, this was the stack:
+#0      WidgetController.widget (package:flutter_test/src/controller.dart:828:44)
+#1      _performCatalogueAction (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4442:30)
+<asynchronous suspension>
+#2      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2186:9)
+<asynchronous suspension>
+#3      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#4      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 paged published Offers journey 320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:53 +6 -1: R5 paged published Offers journey 320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-1.0
+  
+00:53 +6 -1: R5 paged published Offers journey 320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'TextButton' is not a subtype of type 'Semantics' in type cast
+
+When the exception was thrown, this was the stack:
+#0      WidgetController.widget (package:flutter_test/src/controller.dart:828:44)
+#1      _performCatalogueAction (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4442:30)
+<asynchronous suspension>
+#2      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2186:9)
+<asynchronous suspension>
+#3      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#4      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 paged published Offers journey 320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:07 +6 -2: R5 paged published Offers journey 320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-2.0
+  
+01:07 +6 -2: R5 paged published Offers journey 640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'TextButton' is not a subtype of type 'Semantics' in type cast
+
+When the exception was thrown, this was the stack:
+#0      WidgetController.widget (package:flutter_test/src/controller.dart:828:44)
+#1      _performCatalogueAction (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4442:30)
+<asynchronous suspension>
+#2      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2186:9)
+<asynchronous suspension>
+#3      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#4      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 paged published Offers journey 640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:21 +6 -3: R5 paged published Offers journey 640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-1.0
+  
+01:21 +6 -3: R5 paged published Offers journey 640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following _TypeError was thrown running a test:
+type 'TextButton' is not a subtype of type 'Semantics' in type cast
+
+When the exception was thrown, this was the stack:
+#0      WidgetController.widget (package:flutter_test/src/controller.dart:828:44)
+#1      _performCatalogueAction (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4442:30)
+<asynchronous suspension>
+#2      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2186:9)
+<asynchronous suspension>
+#3      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#4      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 paged published Offers journey 640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:33 +6 -4: R5 paged published Offers journey 640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-2.0
+  
+01:33 +6 -4: R5 store-first catalogue journey shop-320x844-1.0
+01:42 +7 -4: R5 paged catalogue user actions shop-320x844-1.0
+01:48 +8 -4: R5 store-first catalogue journey shop-320x844-2.0
+02:01 +9 -4: R5 paged catalogue user actions shop-320x844-2.0
+02:08 +10 -4: R5 store-first catalogue journey shop-640x360-1.0
+02:18 +11 -4: R5 paged catalogue user actions shop-640x360-1.0
+02:28 +12 -4: R5 store-first catalogue journey shop-640x360-2.0
+02:38 +13 -4: R5 paged catalogue user actions shop-640x360-2.0
+02:48 +14 -4: R5 store-first catalogue journey wholesale-320x844-1.0
+03:01 +15 -4: R5 paged catalogue user actions wholesale-320x844-1.0
+03:13 +16 -4: R5 store-first catalogue journey wholesale-320x844-2.0
+03:26 +17 -4: R5 paged catalogue user actions wholesale-320x844-2.0
+03:35 +18 -4: R5 store-first catalogue journey wholesale-640x360-1.0
+03:44 +19 -4: R5 paged catalogue user actions wholesale-640x360-1.0
+03:53 +20 -4: R5 store-first catalogue journey wholesale-640x360-2.0
+04:04 +21 -4: R5 paged catalogue user actions wholesale-640x360-2.0
+04:12 +22 -4: (tearDownAll)
+04:12 +22 -4: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-2.0
+1

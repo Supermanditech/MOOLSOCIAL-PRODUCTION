@@ -1,0 +1,144 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: SKU long metadata shop 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: an object with length of <1>
+  Actual: [
+            LineMetrics:LineMetrics(hardBreak: false, ascent: 11.265233993530273, descent:
+2.5347652435302734, unscaledAscent: 11.265233993530273, height: 14.0, width: 69.23828125, left:
+0.125, baseline: 11.465234756469727, lineNumber: 0),
+            LineMetrics:LineMetrics(hardBreak: true, ascent: 11.265233993530273, descent:
+2.5347652435302734, unscaledAscent: 11.265233993530273, height: 14.0, width: 17.5625, left: 0.125,
+baseline: 25.465234756469727, lineNumber: 1)
+          ]
+   Which: has length of <2>
+The exact large fixture amount must not split its digit groups.
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:542:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 542
+The test description was:
+  SKU long metadata shop 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:16 +0 -1: SKU long metadata shop 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: SKU long metadata shop 1.0
+  
+00:16 +0 -1: SKU long metadata shop 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: an object with length of <1>
+  Actual: [
+            LineMetrics:LineMetrics(hardBreak: false, ascent: 35.91009521484375, descent:
+8.080052375793457, unscaledAscent: 35.91009521484375, height: 44.0, width: 242.68601989746094, left:
+0.125, baseline: 35.91994857788086, lineNumber: 0),
+            LineMetrics:LineMetrics(hardBreak: true, ascent: 35.91009521484375, descent:
+8.080052375793457, unscaledAscent: 35.91009521484375, height: 44.0, width: 27.444992065429688, left:
+0.125, baseline: 79.9199447631836, lineNumber: 1)
+          ]
+   Which: has length of <2>
+The exact large fixture amount must not split its digit groups.
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:542:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 542
+The test description was:
+  SKU long metadata shop 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:26 +0 -2: SKU long metadata shop 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: SKU long metadata shop 2.0
+  
+00:26 +0 -2: SKU long metadata wholesale 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: an object with length of <1>
+  Actual: [
+            LineMetrics:LineMetrics(hardBreak: false, ascent: 11.265233993530273, descent:
+2.5347652435302734, unscaledAscent: 11.265233993530273, height: 14.0, width: 69.23828125, left:
+0.125, baseline: 11.465234756469727, lineNumber: 0),
+            LineMetrics:LineMetrics(hardBreak: true, ascent: 11.265233993530273, descent:
+2.5347652435302734, unscaledAscent: 11.265233993530273, height: 14.0, width: 17.5625, left: 0.125,
+baseline: 25.465234756469727, lineNumber: 1)
+          ]
+   Which: has length of <2>
+The exact large fixture amount must not split its digit groups.
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:542:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 542
+The test description was:
+  SKU long metadata wholesale 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:34 +0 -3: SKU long metadata wholesale 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: SKU long metadata wholesale 1.0
+  
+00:34 +0 -3: SKU long metadata wholesale 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: an object with length of <1>
+  Actual: [
+            LineMetrics:LineMetrics(hardBreak: false, ascent: 35.91009521484375, descent:
+8.080052375793457, unscaledAscent: 35.91009521484375, height: 44.0, width: 242.68601989746094, left:
+0.125, baseline: 35.91994857788086, lineNumber: 0),
+            LineMetrics:LineMetrics(hardBreak: true, ascent: 35.91009521484375, descent:
+8.080052375793457, unscaledAscent: 35.91009521484375, height: 44.0, width: 27.444992065429688, left:
+0.125, baseline: 79.9199447631836, lineNumber: 1)
+          ]
+   Which: has length of <2>
+The exact large fixture amount must not split its digit groups.
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:542:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 542
+The test description was:
+  SKU long metadata wholesale 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:41 +0 -4: SKU long metadata wholesale 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: SKU long metadata wholesale 2.0
+  
+00:41 +0 -4: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU long metadata shop 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU long metadata shop 2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU long metadata wholesale 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: SKU long metadata wholesale 2.0

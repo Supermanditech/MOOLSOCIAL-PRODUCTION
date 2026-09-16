@@ -1,0 +1,11 @@
+{
+  "ticket": "SKU-M05",
+  "state": "device_presentation_correction_open",
+  "capture": "successor-captures/018-cart-normal.png",
+  "captureSha256": "A5FA8787D13AAD8EEB93C3637DD274D5C44A5FA40D6DDF765E8EFDA42DA251BF",
+  "observation": "The normal360-logical-width Cart reserves a wide price/quantity column while product name, pack and seller/delivery wrap in a narrow middle column; the blank area below quantity controls is avoidable. All words are visible; this finding is inefficient metadata layout, not an invented overlap or truncation.",
+  "requiredCorrection": "Reuse the existing stacked Cart composition when inline metadata needs excessive wrapping, making available width useful for full customer facts while keeping exact quantity actions and compact short-item behavior. Qualify actual normal/enlarged Cart and preserved quantities.",
+  "font200Observation": "019 shows normal viewport cropping of the long Cart row behind fixed checkout chrome; scroll reachability must be checked before assigning any clipping defect. Font restored to1.0 by the test finally block.",
+  "sourceEdited": false,
+  "additionalTicketCreated": false
+}

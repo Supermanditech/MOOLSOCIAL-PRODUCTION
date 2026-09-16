@@ -1,0 +1,22 @@
+{
+  "ticket": "SKU-M02",
+  "state": "device_failure_open",
+  "candidate": "UAW-CURSOR-SKU-METADATA-20260915",
+  "apkSha256": "209E51297A64D52A7C20E5B8E662EAFE0CE88D78A6A1F3C4D4B618F6D14A377E",
+  "device": "TG8HCYTGGQT885OF",
+  "capture": "successor-captures/014-product-detail-copy.png",
+  "captureSha256": "5D7228391D00A625720A200E647E192122E91E6798203F03674B1EFF59FB2B4D",
+  "visuallyConfirmed": [
+    "Product details retains optional Brand not provided row",
+    "Highlights exposes Red ripe / Grade A / SKU 1 generated bookkeeping"
+  ],
+  "hierarchyAlsoContains": [
+    "Specifications raw SKU 1",
+    "Description raw Fresh tomatoes 1 and SKU 1",
+    "Ratings/seller padded Mool Market 000001"
+  ],
+  "hierarchyLimit": "Specifications/description/later seller were below this captured viewport; not yet claimed visually inspected.",
+  "requiredCorrection": "Apply the strict generated-product display mapping consistently to structured product highlights/specifications/descriptions/seller presentation; omit missing optional brand row while preserving genuine model numbers, IDs and source data. Cover rendered lower detail copy, not only main cards.",
+  "deviceClosureEstablished": false,
+  "sourceEdited": false
+}

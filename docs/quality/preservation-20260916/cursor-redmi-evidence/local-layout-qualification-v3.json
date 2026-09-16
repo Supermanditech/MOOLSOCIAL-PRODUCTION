@@ -1,0 +1,434 @@
+{
+  "scope": "SKU-M01..M05 focused source qualification; device acceptance pending",
+  "runs": [
+    {
+      "log": "focused-04.log",
+      "passed": 31,
+      "failed": 0,
+      "terminal": "9ed3e4",
+      "sha256": "49A5D377B223808DCF0FFC99EAA915C9375DB11F35FA5059F3388B94869D0F4D"
+    },
+    {
+      "log": "corrections-03.log",
+      "passed": 26,
+      "failed": 0,
+      "terminal": "7c195a",
+      "sha256": "DF9FC4FBDA739B1E90C4BD1181070BF9B61A9FAEA96EC6FF1A0EE8B5C855D5EB"
+    }
+  ],
+  "source": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "0E9939E202275D540081E7578D955F5149D332FC73848455AC1EF424FAB37628",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart": "119FEB4843AC1C3309604731D60AF160B4C5E28F040A2416011A520B4AD9B197",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "F65B09A2C10100D49CD59546D599A5DF3D9293ABFF986BEE6326711C0D318693",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "5E298C5EA9973A46735C9E7B359C9D6D2CF3A29771FE63018CAC9D008766C509",
+    "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart": "873881B0F3CB66E855DB2DDEDF82AD80D20FAB4781FDDB4D69268A5D22F75CF2"
+  },
+  "images": [
+    {
+      "file": "local-v4/sku-baseline-shop-320-1.0.png",
+      "sha256": "E756187B4D744129E40360DA7970F46F4A2908EA154D5CC6866E9BF8BCB31E74",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-320-1.3.png",
+      "sha256": "6F8B09AD1592984F7BB37ABF797C05AE92DDF43C8B0A5B434E2C186336D19949",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-320-2.0.png",
+      "sha256": "AE90AEEEC987D7E0E0D503F0AB3B0B88C75924D387DB32F8B80DA3A6A6ABB404",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-360-1.0.png",
+      "sha256": "0853F981F3B453CA9103EAE9D8B875A595DBB09E49D7DA50ADBEC4DDE286BF8B",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-360-1.3.png",
+      "sha256": "0A9904AA535AC099E053F2D3B275D37A00B0B700FB359A34588E269F537EB3D3",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-360-2.0.png",
+      "sha256": "644F058B5840C0F70328F5807CF5BBFE08D0E695C831818527E84D6DBFC1668D",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-390-1.0.png",
+      "sha256": "2F0D0FF8711541A1E4C4C67C6E960A1950FDA4ACC6E4C4B6BC4AF63B2D77CBDB",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-390-1.3.png",
+      "sha256": "4301D0B07C17DB097057AB8E4D43E3E39283C2ADF3EB30E69D0916CBA73C5A74",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-shop-390-2.0.png",
+      "sha256": "A017BFD3C1DDB9D322E660A13575AD91A573C4226FB6012C54267D5279B339CE",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-320-1.0.png",
+      "sha256": "2A3D686186DACA9B82EDAF13C6B9AF53E7CDFCAA8E71B0FE7966FB4E575DE359",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-320-1.3.png",
+      "sha256": "1B80DBF775DB6DC78E127E8EBFAFCB5435A9D57645394FAE695E5EEF5929393B",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-320-2.0.png",
+      "sha256": "1233971D56876F292F1E2A6D062F9B09EE0DB15642152A5BD234AE24F93FDACB",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-360-1.0.png",
+      "sha256": "43CCE693F990BCBF248B839B9914F89B83393A83A0E0CA0F8C8C3FF8F0887234",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-360-1.3.png",
+      "sha256": "0A031DD02953299FC6969155475B43FCF64C2A799B2497D1A4BCC4EC1B8ABB09",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-360-2.0.png",
+      "sha256": "2362E231D4473B70ADC67FDFA145A2D8897FCA779F9FB75867C8BC282C5581D3",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-390-1.0.png",
+      "sha256": "3A94A660821F0E846AF4BD07CC0F69D86F294514C3878ABBA83FC93203218381",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-390-1.3.png",
+      "sha256": "18C9F0109237C35C603678530D43218E94147D68F11261D796F84B2B1B764845",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-baseline-wholesale-390-2.0.png",
+      "sha256": "79630301F92EF70F6DFAA50D87ADC4A13890D2450E62F44A11A85F8A51BF1D1B",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-long-shop-1.0.png",
+      "sha256": "498AEFCA878155A5EA283E918C18A4B8F3106D4A0C3F8EA4D86A0D87EB06F966",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-long-shop-2.0.png",
+      "sha256": "BA0F785200CF8A014358E15F8C0188FF94552D8EEFBF452C5FF3623179FCAF8B",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-long-wholesale-1.0.png",
+      "sha256": "B4D5B7D5D039F8EFF80459B953ABA88025A17154C4F50BF9F60FBCEEC361F441",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-long-wholesale-2.0.png",
+      "sha256": "68A965D74B7B4EB8781B6AE41F826293A405ED47CA4E8F785BCBAD4AEB901E34",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-orders-1.0-false-false.png",
+      "sha256": "484BB0AD8B24AE7C292B899DA7976181ABC7AF8011D66262EFDD927AB0C6D1F0",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-orders-1.0-false-true.png",
+      "sha256": "6673844CFE99B57D5804EE590763F08AE9981AF3319B459DCD85690C62B4F992",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-orders-1.0-true-false.png",
+      "sha256": "601B6594B025505E9B814E3A7B2C10528C8409F404A574FB9AC92602261D39E9",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "local-v4/sku-orders-1.0-true-true.png",
+      "sha256": "7349C66CC4E6C062E5C50E55C7AC0A23BF42EEAB31170EB5B06C7F945EC28FC2",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-orders-2.0-false-false.png",
+      "sha256": "FA82BDC332CDB7E186B57EEFE9D8C56CBBB6A3493C167E59DBA5EF374544FB72",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-orders-2.0-false-true.png",
+      "sha256": "EBACFEDCBB6BC511972FF25081A2085197F177A525AF8DF0E152B7B1881BEC96",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-orders-2.0-true-false.png",
+      "sha256": "D5F82BAA426569B5D70BDB57E33E5B8E54A33A0833643954E5F570E5F035C01A",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "local-v4/sku-orders-2.0-true-true.png",
+      "sha256": "A3C29614C37E97A0F9813E995F2F5C3A369E9BDAB45C832428BDC35268B9EC19",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "corrections-v3/001-medicine-1.0-cart-added.png",
+      "sha256": "E2C77F5202C2CF38EC70EE16E307EE15E8BC6BEAD2E1702622A0DBE6215B147A",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-medicine-1.0-cart-review.png",
+      "sha256": "831110A419172C956BFC59401ABB6CC5D857AD6EA333673FEC8460F679D9F933",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-medicine-1.0-product-action.png",
+      "sha256": "14B7A1FCAC6699B52F67E3752F2990FDD451F2E2FCD4B8E3D242FF79C8198212",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-medicine-1.0-product-facts.png",
+      "sha256": "C755EFE76A3494687A543744295FFAF7B813CB55DD26E0FA419969DE9B8B0F6D",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-medicine-2.0-cart-added.png",
+      "sha256": "2502ACD84B08826BA8FA04C93ED7A097A637B67BDC6CF016F8572126B5CEA3EC",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-medicine-2.0-cart-review.png",
+      "sha256": "CB503C0291F8A4B9876527A990AEBFD2FA459182E4DDCA15EE8FCF08F03C2F48",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-medicine-2.0-product-action.png",
+      "sha256": "65EF17E3609116DA9107B73235E418FA6793EF652A1487788639FC4B255DBA6F",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-medicine-2.0-product-facts.png",
+      "sha256": "1F6DAE49BADE67DE1A25E29180BA9A80A82CE11E9FDA7A6BFE4BD13789ADF978",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-1.0-cart-added.png",
+      "sha256": "12EB5A8C23FE8F7C8821508130348D851645FF64EFA027DCBDF62D92F6AF4010",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-1.0-cart-review.png",
+      "sha256": "E3AB759647279D1A4C95B898B2B98431FD69287F1C6F8A56BE2063FBFBD4E9A8",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-1.0-product-action.png",
+      "sha256": "5334E543689D385511A1F537FA511D1217ADD42E15938D2DF8136686E254EC72",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-1.0-product-facts.png",
+      "sha256": "135C7E34E0110EAA9409FBB3E8B6F92A82EA3FE6654C23FA7C76AD1B73750E02",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-2.0-cart-added.png",
+      "sha256": "6E6B707EC726CD87197170253ACD98B7DBEBB676C2646FD9E976CB4A64209A58",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-2.0-cart-review.png",
+      "sha256": "1309347398A93CA3D3CBA7D9CA989534799BAB3DEF5C9DF32584BC957719B7B2",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-2.0-product-action.png",
+      "sha256": "23F3A01C7D5150229897C1458EB6547323D31D0F9D2E6EB84BA7B61F3A2F6DAE",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-shop-2.0-product-facts.png",
+      "sha256": "3DF70EEA99B70716383D1D88FFA6ED49C5199E64A5183DAF7A31AE05D2C2A269",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "corrections-v3/001-wholesale-1.0-cart-added.png",
+      "sha256": "0B09E85A17A3361DB6187AF7AE89FACBF2AEFDCC40DA9563BFF672C611B1388D",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-1.0-cart-review.png",
+      "sha256": "94CEF5EC54AFD5377DCC177D6400D4CDD67C5E8A8F60F83A0C9B64941D3B55C0",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-1.0-delivery-visible.png",
+      "sha256": "8B9EDD95EC5EA391AFC1B565AE10C5558068728C38A08920711755CFD6C108F2",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-1.0-product-action.png",
+      "sha256": "D3EDCBEC5F24DE5DF720EC626EBA6F29DC45CA0205A3CC1930751A6737A11142",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-1.0-product-facts.png",
+      "sha256": "8B9EDD95EC5EA391AFC1B565AE10C5558068728C38A08920711755CFD6C108F2",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-2.0-cart-added.png",
+      "sha256": "542268E2B6CCFDAA8B46BC81282C493FDCCF9E1F926289E8F1181EC7AE972FBE",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-2.0-cart-review.png",
+      "sha256": "373ADB5A62C2D8671FA9BA89BA11A7D28964E0F3488CC21FFB5E6D4ABC4DEA49",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-2.0-delivery-visible.png",
+      "sha256": "08011F8458C6D983D50EBCDF69236559E2DE688482C29F4F9BAEB9CB10E3BCAA",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/001-wholesale-2.0-product-action.png",
+      "sha256": "D513C2D4A24E497FC1B807BADCAAC224C6B882A28A47CD376B2861C876FD92BA",
+      "visuallyReviewed": true
+    },
+    {
+      "file": "corrections-v3/001-wholesale-2.0-product-facts.png",
+      "sha256": "08011F8458C6D983D50EBCDF69236559E2DE688482C29F4F9BAEB9CB10E3BCAA",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-courier-1.0-bottom.png",
+      "sha256": "8B460178A71FA0030733515EDD52863631E6A0B698E8CEFDC1EB0DBA20D9FB87",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-courier-1.0-return.png",
+      "sha256": "8A20940A9AB4074614FD42DF044BCC35CEAF75CBF3E79517BD3E726849EF4732",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-courier-2.0-bottom.png",
+      "sha256": "6458A53B80178EC818481F530E702FFB04D5AF7E13FC3BB5A0F8172FDD7494AE",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-courier-2.0-return.png",
+      "sha256": "4AAB782C30694A1243ABEF37064667B2C8C70524E641307DE3EED4BFD52188AC",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-quick-1.0-bottom.png",
+      "sha256": "D9ABE23DE19D84024950E755A073F39870CE545C079BCBDBCC931DB085CB7A7A",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-quick-1.0-return.png",
+      "sha256": "A730E314846980BA499A54CA114DFC6A046175906C4ED61FADD679A3DD0642D8",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-quick-2.0-bottom.png",
+      "sha256": "4282D4189C45F21F725E2776BB6566111B7B71A2189130D5522A6EEFB3CCFDF9",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-monthly-quick-2.0-return.png",
+      "sha256": "1443BA02628538B723D23F92D5E05629A19DCEC58D8E1E829A50FDDB363EA8EA",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-offers-promotion-320-false-cta.png",
+      "sha256": "11E437FAE812BA570F39A6FED94161508A7329B5CD30280E5E1F33E4623F23F9",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-offers-promotion-320-true-cta.png",
+      "sha256": "11E437FAE812BA570F39A6FED94161508A7329B5CD30280E5E1F33E4623F23F9",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-offers-promotion-640-false-cta.png",
+      "sha256": "9B57426299941F274C910A5B5BABDFBC6FBD5CA43FD31E2283C03687C00FF554",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-offers-promotion-640-true-cta.png",
+      "sha256": "9B57426299941F274C910A5B5BABDFBC6FBD5CA43FD31E2283C03687C00FF554",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-three-line-offers-320-false.png",
+      "sha256": "AFB8E8663D34FD26D1DCF31025C0D9913A53AAF4AD57863E15BB82DD2DC781CB",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-three-line-offers-320-true.png",
+      "sha256": "AFB8E8663D34FD26D1DCF31025C0D9913A53AAF4AD57863E15BB82DD2DC781CB",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-three-line-offers-640-false.png",
+      "sha256": "82BCEFF9ECCF1ED0BFFFC8036EF2FCA454596B9EEF48DD1C368C715C46A061CB",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/r669-three-line-offers-640-true.png",
+      "sha256": "82BCEFF9ECCF1ED0BFFFC8036EF2FCA454596B9EEF48DD1C368C715C46A061CB",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/rv6-d021-before-text-1.0.png",
+      "sha256": "CA318D8EBFEFAFAB7C47CE6857A122F181A0FE4CEA670D4D1C5886DF15486285",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/rv6-d021-before-text-2.0.png",
+      "sha256": "9B1D260FEE6F1CB713CDEF5BDE422F1D78C5F7E318AFDA5837B3143D65CA0AC6",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/rv6-d021-empty-text-1.0.png",
+      "sha256": "BF9E631520575089D7A46D9C63A787A1E1652252E13E96C2995F34C0D23164E5",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/rv6-d021-empty-text-2.0.png",
+      "sha256": "7DF1E092BAF618F8C1A6ABD3B4606D7592A6C4DEF6D1298162F37202A19C0F47",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/sku-long-shop-1.0.png",
+      "sha256": "498AEFCA878155A5EA283E918C18A4B8F3106D4A0C3F8EA4D86A0D87EB06F966",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/sku-long-shop-2.0.png",
+      "sha256": "BA0F785200CF8A014358E15F8C0188FF94552D8EEFBF452C5FF3623179FCAF8B",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/sku-long-wholesale-1.0.png",
+      "sha256": "B4D5B7D5D039F8EFF80459B953ABA88025A17154C4F50BF9F60FBCEEC361F441",
+      "visuallyReviewed": false
+    },
+    {
+      "file": "corrections-v3/sku-long-wholesale-2.0.png",
+      "sha256": "68A965D74B7B4EB8781B6AE41F826293A405ED47CA4E8F785BCBAD4AEB901E34",
+      "visuallyReviewed": true
+    }
+  ],
+  "limits": [
+    "Run counts overlap; do not sum as unique tests",
+    "Landscape images are scrolled states; tests check each paragraph and action reachability",
+    "Analysis and combined regressions pending",
+    "No successor APK or Redmi redesign acceptance"
+  ]
+}

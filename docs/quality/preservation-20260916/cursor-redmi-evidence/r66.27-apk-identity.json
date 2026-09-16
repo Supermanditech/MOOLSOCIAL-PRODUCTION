@@ -1,0 +1,19 @@
+{
+  "candidate": "UAW-CURSOR-SKU-NAVIGATION-20260915",
+  "sourceHead": "f3403f9ad14a709e0bee9b37d2c5aa03a72c5a5a",
+  "applicationSource": "64ca4d757cffc1cc1fa575b84004cd827e6695ab",
+  "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.27\\artifacts\\uaw-cursor-sku-navigation-20260915-device-review-debug.apk",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r66.27-cursorreview",
+  "versionCode": 2026091503,
+  "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+  "apkSha256": "A218E31C209305FD709AEF4FCAC70DB10452C46B93B248B9E5E8AED3DF273EE9",
+  "bytes": 210813925,
+  "sourceManifestSha256": "9A1762C1C190AF5F46117CA0430240221F30A608467B2F1D2913CC303BEC0FF7",
+  "runtimeProfile": "CursorUiReview",
+  "buildMode": "debug",
+  "promotable": false,
+  "permittedDevice": "TG8HCYTGGQT885OF",
+  "installation": "not_yet_performed",
+  "deviceVerification": "twelve_SKU_records_pending_device_qualification"
+}

@@ -1,0 +1,8 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart
+00:00 +0: R66 Compare returns through source offers false at 1.0
+00:06 +1: R66 Compare returns through source offers false at 2.0
+00:10 +2: R66 Compare returns through source offers true at 1.0
+00:13 +3: R66 Compare returns through source offers true at 2.0
+00:17 +4: R66 Saved return retains the vertical browsing position
+00:18 +5: All tests passed!
+0

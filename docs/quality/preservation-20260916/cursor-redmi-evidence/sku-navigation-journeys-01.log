@@ -1,0 +1,273 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: SKU swipe pages and compact navigation shop 1.0
+00:08 +1: SKU swipe pages and compact navigation shop 2.0
+00:14 +2: SKU swipe pages and compact navigation wholesale 1.0
+00:19 +3: SKU swipe pages and compact navigation wholesale 2.0
+00:23 +4: SKU swipe final page shop
+00:24 +5: SKU swipe final page wholesale
+00:24 +6: SKU M02 ratings seller identity true 1.0
+00:24 +7: SKU M02 ratings seller identity false 1.0
+00:24 +8: SKU M02 ratings seller identity true 2.0
+00:24 +9: SKU M02 ratings seller identity false 2.0
+00:24 +10: R5 paged published Offers journey 320x844-1.0
+00:37 +11: R5 paged published Offers journey 320x844-2.0
+00:47 +12: R5 paged published Offers journey 640x360-1.0
+00:59 +13: R5 paged published Offers journey 640x360-2.0
+01:10 +14: R5 store-first catalogue journey shop-320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-shop-buy-catalogue-dev-v1-shop-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey shop-320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:17 +14 -1: R5 store-first catalogue journey shop-320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-320x844-1.0
+  
+01:17 +14 -1: R5 paged catalogue user actions shop-320x844-1.0
+01:22 +15 -1: R5 store-first catalogue journey shop-320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-shop-buy-catalogue-dev-v1-shop-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey shop-320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:30 +15 -2: R5 store-first catalogue journey shop-320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-320x844-2.0
+  
+01:30 +15 -2: R5 paged catalogue user actions shop-320x844-2.0
+01:35 +16 -2: R5 store-first catalogue journey shop-640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-shop-buy-catalogue-dev-v1-shop-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey shop-640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:43 +16 -3: R5 store-first catalogue journey shop-640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-640x360-1.0
+  
+01:43 +16 -3: R5 paged catalogue user actions shop-640x360-1.0
+01:50 +17 -3: R5 store-first catalogue journey shop-640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-shop-buy-catalogue-dev-v1-shop-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey shop-640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:56 +17 -4: R5 store-first catalogue journey shop-640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-640x360-2.0
+  
+01:56 +17 -4: R5 paged catalogue user actions shop-640x360-2.0
+02:03 +18 -4: R5 store-first catalogue journey wholesale-320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-wholesale-buy-catalogue-dev-v1-wholesale-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey wholesale-320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:10 +18 -5: R5 store-first catalogue journey wholesale-320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-320x844-1.0
+  
+02:10 +18 -5: R5 paged catalogue user actions wholesale-320x844-1.0
+02:15 +19 -5: R5 store-first catalogue journey wholesale-320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-wholesale-buy-catalogue-dev-v1-wholesale-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey wholesale-320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:22 +19 -6: R5 store-first catalogue journey wholesale-320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-320x844-2.0
+  
+02:22 +19 -6: R5 paged catalogue user actions wholesale-320x844-2.0
+02:27 +20 -6: R5 store-first catalogue journey wholesale-640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-wholesale-buy-catalogue-dev-v1-wholesale-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey wholesale-640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:33 +20 -7: R5 store-first catalogue journey wholesale-640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-640x360-1.0
+  
+02:33 +20 -7: R5 paged catalogue user actions wholesale-640x360-1.0
+02:41 +21 -7: R5 store-first catalogue journey wholesale-640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key
+[<'buy-page-status-store-wholesale-buy-catalogue-dev-v1-wholesale-store-000001'>] (considering only
+hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:4122:3)
+<asynchronous suspension>
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2392:11)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 4122
+The test description was:
+  R5 store-first catalogue journey wholesale-640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:47 +21 -8: R5 store-first catalogue journey wholesale-640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-640x360-2.0
+  
+02:47 +21 -8: R5 paged catalogue user actions wholesale-640x360-2.0
+02:55 +22 -8: (tearDownAll)
+02:55 +22 -8: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 store-first catalogue journey shop-320x844-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 store-first catalogue journey shop-320x844-2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 store-first catalogue journey shop-640x360-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 store-first catalogue journey shop-640x360-2.0
+  ... and 4 more

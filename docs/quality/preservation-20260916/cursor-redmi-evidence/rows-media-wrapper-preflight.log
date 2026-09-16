@@ -1,0 +1,12 @@
+C:\GUARANTEED 
+OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\scripts\test-release-production-plugin-integrity.ps1 : 
+Unable to find type [IO.Compression.ZipArchiveMode].
+At C:\GUARANTEED 
+OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\scripts\test-public-auth-sideload-build-controls.ps1:145 
+char:1
++ & $pluginIntegrityFixtureGate -RepositoryRoot $RepositoryRoot | Out-N ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : InvalidOperation: (IO.Compression.ZipArchiveMode:TypeName) [test-release-pr...n-integrit 
+   y.ps1], RuntimeException
+    + FullyQualifiedErrorId : TypeNotFound,test-release-production-plugin-integrity.ps1
+ 

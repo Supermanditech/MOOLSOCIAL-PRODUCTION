@@ -1,0 +1,53 @@
+{
+  "reason": "Archive generated golden failures; restore pre-run tracked evidence from unchanged HEAD17730e9c",
+  "files": [
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-360x800-android-cart_isolatedDiff.png",
+      "generatedSha256": "14AA587881A4813C0BECA6281228F6C32620BEA760F10CA1759DED6EDD7D7BBA",
+      "originalSha256": "DB125514A3476FBA8E5C4556B332059291D35C3E97D056BE947723E6FB794911",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-360x800-android-cart_isolatedDiff.png"
+    },
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-360x800-android-cart_maskedDiff.png",
+      "generatedSha256": "F5EFB10E361008AAF72C3F1DB8766FE0084BE5D68B0BA1D14703522AE3B03085",
+      "originalSha256": "5F3EA0A8E417E24530C64ABD00FD2B2C09A9E0C2BED4752D634282127F2E68EE",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-360x800-android-cart_maskedDiff.png"
+    },
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-360x800-android-cart_masterImage.png",
+      "generatedSha256": "9E52594E1E4CB6DD59C2C562880E9F5846B860C8DD3DAC8D54D9099C688D08FC",
+      "originalSha256": "C088C5A200581638EC340649C17ECD74A654B6CA437124896EFB6DB6B1DECE0C",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-360x800-android-cart_masterImage.png"
+    },
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-360x800-android-cart_testImage.png",
+      "generatedSha256": "21A82EBB4FFE2A61B28CD328A07E97BFA432236C9E7793DECCF3F71F03BAAE34",
+      "originalSha256": "CF08B475B7408E3497C41E6A0459B8D0DA26F12332F64605909D1A338EC42E8B",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-360x800-android-cart_testImage.png"
+    },
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-430x932-ios-cart_isolatedDiff.png",
+      "generatedSha256": "1177EF1EBCEFA66AE8FBE443E2F9798875982DFF26644E58F1D2D297BD04E35F",
+      "originalSha256": "25F9FE980C4A198A58D0A72D2646671D4EBABB1835A26D38CDC7697DB5974BF9",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-430x932-ios-cart_isolatedDiff.png"
+    },
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-430x932-ios-cart_maskedDiff.png",
+      "generatedSha256": "C7BA1A6EE368554A6291F885BB4A497DDD130F9DF5036224271E7C023DE94577",
+      "originalSha256": "C270D98BBE8F9D6405F454FB206810A6AABBA4C302D9CA9B7770994C9F5C73A2",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-430x932-ios-cart_maskedDiff.png"
+    },
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-430x932-ios-cart_masterImage.png",
+      "generatedSha256": "C47BD17943159F37C594E7CF1446765257FB6755F31CE028175098D2D06EFBDF",
+      "originalSha256": "C0761066D90E5E39F9082FBA66420ED07C6B05DA2BAF7C639FBB057987645FBB",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-430x932-ios-cart_masterImage.png"
+    },
+    {
+      "owner": "apps/mobile/test/ui_v2/buy/failures/buy-v2-r58-8-7-c24f-430x932-ios-cart_testImage.png",
+      "generatedSha256": "553B0F8FFCF5E07908FE94748568EC6CF663839EF5D3131553C75383C780930E",
+      "originalSha256": "89597046B9512899EB0A7BBC83E5FE029EFD96623F40DF8CBF87AAACF660993A",
+      "archive": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined01-golden-diffs\\buy-v2-r58-8-7-c24f-430x932-ios-cart_testImage.png"
+    }
+  ]
+}

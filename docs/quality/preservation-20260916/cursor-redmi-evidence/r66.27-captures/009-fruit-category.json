@@ -1,0 +1,17 @@
+{
+  "sourceHead": "f3403f9ad14a709e0bee9b37d2c5aa03a72c5a5a",
+  "apkSha256": "A218E31C209305FD709AEF4FCAC70DB10452C46B93B248B9E5E8AED3DF273EE9",
+  "installationReceiptSha256": "149994F73C65DB0810BD449C7165F7F41ADFF6E2CE3B7DB3FF3B4841FE32D69C",
+  "fontScale": "1.0",
+  "label": "009-fruit-category",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.27-cursorreview",
+  "capturedAt": "2026-09-15T22:50:03.047282+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "4cdaa75a93baba21ed7dbebe55acd31a7b5e3bb40ce771cd1004ff8494f44d3e",
+    ".xml": "a00962953f67bdd8464e885512fdd637f0ff31252ca02db929401ec9cdb84430",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

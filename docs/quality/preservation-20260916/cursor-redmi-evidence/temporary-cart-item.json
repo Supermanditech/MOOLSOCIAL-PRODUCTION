@@ -1,0 +1,14 @@
+{
+  "product": "Stone-ground wheat atta",
+  "pack": "5 kg bag",
+  "initialProductQuantity": 0,
+  "testQuantity": 1,
+  "savedBefore": true,
+  "restoreRequired": false,
+  "placedOrder": false,
+  "restoredQuantity": 0,
+  "savedAfter": true,
+  "restoredAt": "2026-09-15T03:52:23.674862+05:30",
+  "restorationCapture": "023-cart-quantity-restored",
+  "fontScaleRestored": "1.0"
+}

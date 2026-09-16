@@ -1,0 +1,25 @@
+{
+  "serial": "TG8HCYTGGQT885OF",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionCode": 2026091501,
+  "apkSha256": "209E51297A64D52A7C20E5B8E662EAFE0CE88D78A6A1F3C4D4B618F6D14A377E",
+  "fontScale": "1.0",
+  "packagePreservationFields": [
+    "userId=10304",
+    "dataDir=/data/user/0/com.moolsocial.app.cursorreview",
+    "firstInstallTime=2026-08-27 15:09:48",
+    "firstInstallTime=1970-01-01 05:30:00"
+  ],
+  "savedObservation": "One saved Shop product: Stone-ground wheat atta, 5 kg bag",
+  "area": "Any area",
+  "languageObserved": "English",
+  "cartObservation": "No active Cart quantity dock visible in Shop/Saved; exact basket quantities not inferred from absence",
+  "evidence": [
+    "034-before-r6626",
+    "035-pre-r6626-shop",
+    "036-pre-r6626-saved",
+    "037-pre-r6626-area"
+  ],
+  "capturedAt": "2026-09-15T19:58:44.431625+05:30",
+  "installMethod": "adb install -r; no clear-data or uninstall"
+}

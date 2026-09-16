@@ -1,0 +1,8 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_orders_purchased_item_continuity_test.dart
+00:00 +0: historical orders retain exact products and reorder into Cart
+00:00 +1: stale duplicate and cross-vertical identities fail atomically
+00:00 +2: exact current-session order retains item and product return depth
+00:00 +3: Delivered tab and query survive tracking return and Back
+00:00 +4: compact large-text reduced-motion Delivered action stays reachable
+00:02 +5: R58.7 Orders responsive founder captures
+00:02 +5 ~1: All tests passed!

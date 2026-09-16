@@ -1,0 +1,50 @@
+{
+  "ticket": "SKU-M05-C03",
+  "state": "focused_provider_refresh_pass_not_ticket_closure",
+  "passes": 4,
+  "failures": 0,
+  "terminal": "340acb",
+  "log": "provider-metadata-test-05.log",
+  "logSha256": "6546B3331711450DDD3C8E40833DB682A65A8485E1BF46C65496854DCDCF2C9D",
+  "gestureWarnings": 0,
+  "sourceHashes": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "AA60DAC56FAE040B26B185852DB4DA5B045086BF4A220DBB4C09AF53BEA6F9BF",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "05E4CC2B5C6B192C08A2A55EABF50123EE6397C8991279238A4F129781E85D19",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "9F01B83FFDEAEBF2ECAD5A50F22F2B1265CE4C83A69CA9D7870B6E1EB3501BBA"
+  },
+  "fix": "Accepted page changes call existing validated refreshProductFacts for admitted products; no new cache/backend owner.",
+  "covered": [
+    "both founder store names wrap completely",
+    "normal and doubled text in Shop/Wholesale",
+    "per-row height avoids padding later rows for first-row long provider",
+    "provider changes after refresh",
+    "stable product identity",
+    "Cart quantity preserved"
+  ],
+  "priorEvidence": [
+    "provider-metadata-test-03.log reproduces stale name",
+    "provider-metadata-test-04.log passes with gesture warning",
+    "provider-metadata-visual-04/provider-update-shop-1.0.png explicitly viewed; updated name and quantity1 visible"
+  ],
+  "currentCaptures": {
+    "provider-name-shop-1.0-buy-catalogue-dev-v1-shop-store-000001-sku-0001.png": "E619394524BC228B22AC93B5C920FEBC8B39D97E1428D1DF4F268082584DEEC3",
+    "provider-name-shop-1.0-buy-catalogue-dev-v1-shop-store-000001-sku-0004.png": "BBFEADE57B885A0E62D51C14BD52DF11EEFC658474E0CBDA761E24134EC90AA0",
+    "provider-name-shop-2.0-buy-catalogue-dev-v1-shop-store-000001-sku-0001.png": "A88EB89AA31AEA7E413C3EFF0666AD340AB4A7B5A257D88D8A553870C6C74766",
+    "provider-name-shop-2.0-buy-catalogue-dev-v1-shop-store-000001-sku-0004.png": "AC1E49B40A199656C77EA6E6BC4EADAE743E70DEAA5EE368A45DF3AE31294777",
+    "provider-name-wholesale-1.0-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001.png": "67B2E47FE839C0323138834403B23E9CABA183E409CE1EE00F0918C60160BBBA",
+    "provider-name-wholesale-1.0-buy-catalogue-dev-v1-wholesale-store-000001-sku-0002.png": "9F9285A89D2CE5EC9A1C1D8B4B2D12517318131D5C25E138A357801E158A6390",
+    "provider-name-wholesale-2.0-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001.png": "9845B47F26E14340511A353435D964E59CED8936186F911411E736ECAD7BB04B",
+    "provider-name-wholesale-2.0-buy-catalogue-dev-v1-wholesale-store-000001-sku-0002.png": "A7AB82DB86885E493E90C9EBAE451714A049DBFBF6FB8F8ED108B9F46A2F64F4",
+    "provider-update-shop-1.0.png": "27765002543CFF1CB3DF5B7BFEAB8ECFFDF82BC83B8327716F08E727DBA91196",
+    "provider-update-shop-2.0.png": "C1D008D69FADA01F86A0FCAF65EF7E755EE2BE544AEC355F81EC40FBD27CFF4D",
+    "provider-update-wholesale-1.0.png": "E8FC38B996B112785B6F8D2FCA07AE6592EB11DA1A6686DF38FAF50BD18BA466",
+    "provider-update-wholesale-2.0.png": "A1D5E0EA4247E7930DA3575E3001DA80FADA91E0AB8F48AC15511BDAAE18A0AF"
+  },
+  "limitations": [
+    "Other provider/product fields and presentations still require scoped coverage",
+    "Pagination and category/retry/return regression adaptation pending",
+    "Full current-source analysis/two combined regressions/gates pending",
+    "Redmi successor build and device qualification pending",
+    "Ten acceptance records remain open"
+  ]
+}

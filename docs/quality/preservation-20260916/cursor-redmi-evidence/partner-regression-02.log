@@ -1,0 +1,264 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: SKU order snapshot preview 1.0 lines true large false
+00:01 +1: SKU order snapshot preview 1.0 lines true large true
+00:01 +2: SKU order snapshot preview 1.0 lines false large false
+00:02 +3: SKU order snapshot preview 1.0 lines false large true
+00:02 +4: SKU order snapshot preview 2.0 lines true large false
+00:02 +5: SKU order snapshot preview 2.0 lines true large true
+00:02 +6: SKU order snapshot preview 2.0 lines false large false
+00:02 +7: SKU order snapshot preview 2.0 lines false large true
+00:02 +8: SKU metadata strips only exact development decoration
+00:02 +9: SKU metadata glance shop 320.0 1.0
+00:03 +10: SKU metadata glance shop 320.0 1.3
+00:03 +11: SKU metadata glance shop 320.0 2.0
+00:03 +12: SKU metadata glance shop 360.0 1.0
+00:04 +13: SKU metadata glance shop 360.0 1.3
+00:04 +14: SKU metadata glance shop 360.0 2.0
+00:04 +15: SKU metadata glance shop 390.0 1.0
+00:04 +16: SKU metadata glance shop 390.0 1.3
+00:05 +17: SKU metadata glance shop 390.0 2.0
+00:05 +18: SKU metadata glance wholesale 320.0 1.0
+00:05 +19: SKU metadata glance wholesale 320.0 1.3
+00:05 +20: SKU metadata glance wholesale 320.0 2.0
+00:06 +21: SKU metadata glance wholesale 360.0 1.0
+00:06 +22: SKU metadata glance wholesale 360.0 1.3
+00:06 +23: SKU metadata glance wholesale 360.0 2.0
+00:06 +24: SKU metadata glance wholesale 390.0 1.0
+00:06 +25: SKU metadata glance wholesale 390.0 1.3
+00:07 +26: SKU metadata glance wholesale 390.0 2.0
+00:07 +27: RV6 fixture access s-dog-food text 1.0
+00:08 +28: RV6 fixture access s-dog-food text 2.0
+00:08 +29: RV6 fixture access s-shampoo text 1.0
+00:09 +30: RV6 fixture access s-shampoo text 2.0
+00:09 +31: RV6 D002 last Store item removal retains catalogue s-eggs text 1.0
+00:13 +32: RV6 D002 last Store item removal retains catalogue s-eggs text 2.0
+00:16 +33: RV6 D002 last Store item removal retains catalogue w-notebook text 1.0
+00:19 +34: RV6 D002 last Store item removal retains catalogue w-notebook text 2.0
+00:21 +35: RV6 D002 paged Store last item retains category shop text 1.0
+00:24 +36: RV6 D002 paged Store last item retains category shop text 2.0
+00:26 +37: RV6 D002 paged Store last item retains category wholesale text 1.0
+00:29 +38: RV6 D002 paged Store last item retains category wholesale text 2.0
+00:31 +39: R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+00:32 +40: R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+00:33 +41: R669 small full catalogue exposes every SKU s-curd-711x320-1.0
+00:34 +42: R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+00:36 +43: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+00:37 +44: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+00:38 +45: R669 small full catalogue exposes every SKU w-notebook-711x320-1.0
+00:39 +46: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+00:40 +47: R669 area final row clears Android navigation Size(320.0, 711.0) 1.0
+00:41 +48: R669 area final row clears Android navigation Size(320.0, 711.0) 2.0
+00:42 +49: R669 area final row clears Android navigation Size(711.0, 320.0) 1.0
+00:43 +50: R669 area final row clears Android navigation Size(711.0, 320.0) 2.0
+00:43 +51: R5 paged published Offers journey 320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: 'Mool Market 000001'
+  Actual: 'Mool Market 1'
+   Which: is different.
+          Expected: ... ol Market 000001
+            Actual: ... ol Market 1
+                                  ^
+           Differ at offset 12
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1160:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1160
+The test description was:
+  R5 paged published Offers journey 320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:46 +51 -1: R5 paged published Offers journey 320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-1.0
+  
+00:46 +51 -1: R5 paged published Offers journey 320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: 'Mool Market 000001'
+  Actual: 'Mool Market 1'
+   Which: is different.
+          Expected: ... ol Market 000001
+            Actual: ... ol Market 1
+                                  ^
+           Differ at offset 12
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1160:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1160
+The test description was:
+  R5 paged published Offers journey 320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:49 +51 -2: R5 paged published Offers journey 320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-2.0
+  
+00:49 +51 -2: R5 paged published Offers journey 640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: 'Mool Market 000001'
+  Actual: 'Mool Market 1'
+   Which: is different.
+          Expected: ... ol Market 000001
+            Actual: ... ol Market 1
+                                  ^
+           Differ at offset 12
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1160:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1160
+The test description was:
+  R5 paged published Offers journey 640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:53 +51 -3: R5 paged published Offers journey 640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-1.0
+  
+00:53 +51 -3: R5 paged published Offers journey 640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: 'Mool Market 000001'
+  Actual: 'Mool Market 1'
+   Which: is different.
+          Expected: ... ol Market 000001
+            Actual: ... ol Market 1
+                                  ^
+           Differ at offset 12
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1160:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1160
+The test description was:
+  R5 paged published Offers journey 640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:56 +51 -4: R5 paged published Offers journey 640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-2.0
+  
+00:56 +51 -4: R5 store-first catalogue journey shop-320x844-1.0
+01:01 +52 -4: R5 paged catalogue user actions shop-320x844-1.0
+01:02 +53 -4: R5 store-first catalogue journey shop-320x844-2.0
+01:05 +54 -4: R5 paged catalogue user actions shop-320x844-2.0
+01:07 +55 -4: R5 store-first catalogue journey shop-640x360-1.0
+01:10 +56 -4: R5 paged catalogue user actions shop-640x360-1.0
+01:13 +57 -4: R5 store-first catalogue journey shop-640x360-2.0
+01:16 +58 -4: R5 paged catalogue user actions shop-640x360-2.0
+01:18 +59 -4: R5 store-first catalogue journey wholesale-320x844-1.0
+01:21 +60 -4: R5 paged catalogue user actions wholesale-320x844-1.0
+01:23 +61 -4: R5 store-first catalogue journey wholesale-320x844-2.0
+01:26 +62 -4: R5 paged catalogue user actions wholesale-320x844-2.0
+
+Warning: A call to drag() with finder "Found 1 widget with type "Scrollable" descending from widget with key [<'buy-paged-scroll-catalogue-wholesale'>] (ignoring all but first): [
+  Scrollable(axisDirection: down, physics: null, restorationId: null, dependencies: [InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope, _InheritedTheme, _LocalizationsScope-[GlobalKey#6f32a]], state: ScrollableState#7e6d6(position: ScrollPositionWithSingleContext#11fa5(offset: 245.0, range: 0.0..485.0, viewport: 550.0, ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#b0967, ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+]" derived an Offset (Offset(156.0, 467.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#949ff relayoutBoundary=up7
+The hit test result at that offset is: HitTestResult(RenderParagraph#5dec3@Offset(0.0, 1.0), RenderExcludeSemantics#fd3e1@Offset(0.0, 1.0), RenderPositionedBox#27cd7@Offset(0.0, 1.0), RenderAnimatedOpacity#585b2@Offset(0.0, 1.0), RenderStack#a6ccb@Offset(0.0, 1.0), RenderClipRect#8801f@Offset(0.0, 1.0), RenderConstrainedBox#37322@Offset(0.0, 1.0), RenderSemanticsAnnotations#9723c@Offset(0.0, 1.0), RenderFlex#ef222@Offset(0.0, 28.0), RenderFlex#a8d36@Offset(24.0, 28.0), RenderPadding#0a4af@Offset(32.0, 28.0), RenderPointerListener#f3963@Offset(32.0, 28.0), RenderSemanticsAnnotations#0ae91@Offset(32.0, 28.0), RenderMouseRegion#37235@Offset(32.0, 28.0), RenderSemanticsAnnotations#67adf@Offset(32.0, 28.0), _RenderInkFeatures#4ec96@Offset(32.0, 28.0), RenderCustomPaint#30982@Offset(32.0, 28.0), RenderPhysicalShape#da8f0@Offset(32.0, 28.0), RenderConstrainedBox#7e87e@Offset(32.0, 28.0), RenderPointerListener#63e08@Offset(32.0, 28.0), RenderSemanticsGestureHandler#c9632@Offset(32.0, 28.0), RenderSemanticsAnnotations#cc168@Offset(32.0, 28.0), RenderStack#cc371@Offset(156.0, 387.0), _RenderLayoutBuilder#99d24@Offset(156.0, 387.0), RenderStack#75a63@Offset(156.0, 387.0), RenderFlex#fa13b@Offset(156.0, 443.0), _RenderColoredBox#49bf3@Offset(156.0, 443.0), RenderPadding#c7a1b@Offset(156.0, 443.0), RenderDecoratedBox#a7038@Offset(156.0, 443.0), RenderConstrainedBox#066a0@Offset(156.0, 443.0), RenderPositionedBox#2c247@Offset(156.0, 443.0), RenderPadding#d2a20@Offset(156.0, 467.0), RenderDecoratedBox#6a637@Offset(156.0, 467.0), _RenderLayoutBuilder#437ff@Offset(156.0, 467.0), RenderCustomMultiChildLayoutBox#349ea@Offset(156.0, 467.0), _RenderInkFeatures#d09b3@Offset(156.0, 467.0), RenderPhysicalModel#18721@Offset(156.0, 467.0), RenderStack#28f62@Offset(156.0, 467.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#a8a03@Offset(156.0, 467.0), RenderSemanticsAnnotations#9e425@Offset(156.0, 467.0), RenderRepaintBoundary#d2c09@Offset(156.0, 467.0), RenderIgnorePointer#7ffaa@Offset(156.0, 467.0), RenderStack#692b5@Offset(156.0, 467.0), RenderDecoratedBox#1fa28@Offset(156.0, 467.0), RenderRepaintBoundary#baeee@Offset(156.0, 467.0), RenderSemanticsAnnotations#a6d86@Offset(156.0, 467.0), RenderOffstage#8678d@Offset(156.0, 467.0), RenderSemanticsAnnotations#9136d@Offset(156.0, 467.0), _RenderTheater#0fba1@Offset(156.0, 467.0), RenderAbsorbPointer#f38dd@Offset(156.0, 467.0), RenderPointerListener#73bb7@Offset(156.0, 467.0), RenderSemanticsAnnotations#df1c6@Offset(156.0, 467.0), RenderSemanticsAnnotations#b0ee7@Offset(156.0, 467.0), RenderSemanticsAnnotations#82fd3@Offset(156.0, 467.0), RenderSemanticsAnnotations#1bd36@Offset(156.0, 467.0), RenderTapRegionSurface#4592d@Offset(156.0, 467.0), RenderSemanticsAnnotations#b5fdc@Offset(156.0, 467.0), RenderSemanticsAnnotations#c1bae@Offset(156.0, 467.0), HitTestEntry<HitTestTarget>#5829d(_ReusableRenderView#f4785), HitTestEntry<HitTestTarget>#433da(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2476:17)
+<asynchronous suspension>
+#4      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#5      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#6      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#7      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:3225:3)
+<asynchronous suspension>
+#8      main.<anonymous closure>.revealControls (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1758:15)
+<asynchronous suspension>
+#9      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1815:11)
+<asynchronous suspension>
+#10     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#11     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#12     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+01:27 +63 -4: R5 store-first catalogue journey wholesale-640x360-1.0
+01:30 +64 -4: R5 paged catalogue user actions wholesale-640x360-1.0
+01:33 +65 -4: R5 store-first catalogue journey wholesale-640x360-2.0
+01:35 +66 -4: R5 paged catalogue user actions wholesale-640x360-2.0
+01:37 +67 -4: R669 collection discovery keeps the exact branch 320x844-1.0
+01:38 +68 -4: R669 collection discovery keeps the exact branch 320x844-2.0
+01:38 +69 -4: R669 collection discovery keeps the exact branch 640x360-1.0
+01:38 +70 -4: R669 collection discovery keeps the exact branch 640x360-2.0
+01:39 +71 -4: R5 collection visibility hides unsupported capability
+01:39 +72 -4: R5 collection visibility hides absent capability
+01:39 +73 -4: R5 collection visibility hides wrong-branch capability
+01:39 +74 -4: R5 collection visibility hides expired capability
+01:39 +75 -4: R5 collection visibility hides future-observation capability
+01:39 +76 -4: R5 collection visibility hides blank-source capability
+01:40 +77 -4: R5 collection visibility hides stale-facts capability
+01:40 +78 -4: R5 collection visibility hides wrong-product capability
+01:40 +79 -4: R5 collection visibility updates and expires on the same Store
+01:40 +80 -4: R5 collection visibility withdraws after an invalid refresh
+01:40 +81 -4: R5 collection visibility rechecks capability on app resume
+01:40 +82 -4: R66 supplier catalogue retains exact entry variant s-milk-500ml
+01:40 +83 -4: R66 supplier variant journey s-milk-500ml text 1.0
+01:43 +84 -4: R66 supplier variant journey s-milk-500ml text 2.0
+01:46 +85 -4: R66 supplier catalogue retains exact entry variant s-milk-2l
+01:46 +86 -4: R66 supplier variant journey s-milk-2l text 1.0
+01:48 +87 -4: R66 supplier variant journey s-milk-2l text 2.0
+01:50 +88 -4: R66 supplier catalogue retains exact entry variant w-rice-50kg
+01:50 +89 -4: R66 supplier variant journey w-rice-50kg text 1.0
+01:52 +90 -4: R66 supplier variant journey w-rice-50kg text 2.0
+01:55 +91 -4: R66 supplier catalogue retains exact entry variant w-oil-10l
+01:55 +92 -4: R66 supplier variant journey w-oil-10l text 1.0
+01:58 +93 -4: R66 supplier variant journey w-oil-10l text 2.0
+02:00 +94 -4: R66 Cart store continuation stays scoped after s-eggs
+02:02 +95 -4: R66 Cart store continuation stays scoped after w-notebook
+02:04 +96 -4: store and brand catalogues remain exact and destination-scoped
+02:04 +97 -4: Shop store catalogue reuses product cards and opens one item
+02:04 +98 -4: product details keeps Visit store as the single store route
+02:04 +99 -4: store grid keeps one full-size Add action
+02:05 +100 -4: store grid Add keeps the shopper in the store and updates Cart
+02:05 +101 -4: store catalogue exposes full products and exact related-store continuation
+02:05 +102 -4: four-product store keeps readable previews and all products reachable
+02:06 +103 -4: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-2.0

@@ -1,0 +1,16 @@
+warning: in the working copy of 'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/lib/ui_v2/buy/buy_v2_design.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_search_result_recovery_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_cart_trade_summary_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_checkout_receiving_lines_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'config/codex-development-regression-registry.json', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'config/codex-subagent-coordination-policy.json', CRLF will be replaced by LF the next time Git touches it
+warning: in the working copy of 'docs/quality/cursor-redmi-v6-audit-20260913/UAT.md', LF will be replaced by CRLF the next time Git touches it
+Incremental ticket gate passed: phase=pre_build; lane=cursor_ui; ticket=UAW-CURSOR-SKU-METADATA-20260914; scope=buy.sku_metadata; baseline=moolsocial-buy-chat-profile-r61-48-accepted-20260829@9dc34de2f5f6ed2b2ad8998442c935136e2a962f; version=1.0.0-r66.25+2026091501; package=com.moolsocial.app.cursorreview.

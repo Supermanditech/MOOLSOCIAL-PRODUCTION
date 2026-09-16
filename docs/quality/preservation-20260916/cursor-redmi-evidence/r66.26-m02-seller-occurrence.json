@@ -1,0 +1,17 @@
+{
+  "ticket": "SKU-M02",
+  "state": "device_failed_existing_acceptance",
+  "candidate": "UAW-CURSOR-SKU-CORRECTION-20260915",
+  "version": "1.0.0-r66.26-cursorreview",
+  "source": "d6d9890fa7754a38a05b183bc8ca6e89eccf22cc",
+  "serial": "TG8HCYTGGQT885OF",
+  "finding": "Product detail Ratings and seller exposes generated padded seller name Mool Market 000001; main supplier and order-details rows display Mool Market 1. Existing consumer-wording acceptance is not fully satisfied.",
+  "reproduction": "Offers > next manufacturer Fresh tomatoes 10 kg crate > View offer > scroll to Ratings and seller at normal text scale.",
+  "evidence": {
+    "022-product-description.png": "F8533137A5464CA2AABB0C2490DFCE9981B42D4F2A30EE679E41A02BC3A23689",
+    "022-product-description.xml": "BD0E9C164F1AD9C320E5CB4DE45A3F2E07C6CD9FD33A99423938B168E96F3C81",
+    "022-product-description.json": "4229DD918FC1B04643990872730B7F093652C3C02D7C51E721552997940CE7BB"
+  },
+  "newTicketCreated": false,
+  "next": "Finish current ten-ticket device round, correct this existing M02 occurrence in the shared admitted owner, run necessary focused/source gates and qualify any successor honestly."
+}

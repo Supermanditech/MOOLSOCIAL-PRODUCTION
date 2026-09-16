@@ -1,0 +1,18 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-windows-powershell-compatibility.ps1",
+    "-RepositoryRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+    "-IntegratedReviewSourceCommit",
+    "64ca4d757cffc1cc1fa575b84004cd827e6695ab"
+  ],
+  "exitCode": 0,
+  "sha256": "E419737DC0967569615034E500D21A5BCA96D77D0579C69CBBBE245CBD5DF1B1",
+  "requiredMarker": "Windows PowerShell 5.1 compatibility gate passed:",
+  "passed": true
+}

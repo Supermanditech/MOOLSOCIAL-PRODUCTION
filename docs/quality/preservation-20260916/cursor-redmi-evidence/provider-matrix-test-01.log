@@ -1,0 +1,22 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: (setUpAll)
+00:00 +0: SKU provider names adaptive shop 320.0 1.0
+00:04 +1: SKU provider names adaptive shop 320.0 1.3
+00:06 +2: SKU provider names adaptive shop 320.0 2.0
+00:08 +3: SKU provider names adaptive shop 360.0 1.0
+00:10 +4: SKU provider names adaptive shop 360.0 1.3
+00:12 +5: SKU provider names adaptive shop 360.0 2.0
+00:14 +6: SKU provider names adaptive shop 390.0 1.0
+00:16 +7: SKU provider names adaptive shop 390.0 1.3
+00:18 +8: SKU provider names adaptive shop 390.0 2.0
+00:20 +9: SKU provider names adaptive wholesale 320.0 1.0
+00:22 +10: SKU provider names adaptive wholesale 320.0 1.3
+00:24 +11: SKU provider names adaptive wholesale 320.0 2.0
+00:26 +12: SKU provider names adaptive wholesale 360.0 1.0
+00:28 +13: SKU provider names adaptive wholesale 360.0 1.3
+00:30 +14: SKU provider names adaptive wholesale 360.0 2.0
+00:31 +15: SKU provider names adaptive wholesale 390.0 1.0
+00:34 +16: SKU provider names adaptive wholesale 390.0 1.3
+00:35 +17: SKU provider names adaptive wholesale 390.0 2.0
+00:37 +18: (tearDownAll)
+00:37 +18: All tests passed!

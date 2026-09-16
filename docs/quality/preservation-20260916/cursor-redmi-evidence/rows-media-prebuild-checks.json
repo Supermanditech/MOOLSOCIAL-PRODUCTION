@@ -1,0 +1,65 @@
+{
+  "source": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+  "checks": {
+    "rows-media-admission-check-approved-ui-locks.log": {
+      "sha256": "3E4264965F00119D5F60E86C03C1262B7C17F6B683F112D3DC1C81A8C21BAC68",
+      "requiredMarker": "Approved UI reference and production locks passed.",
+      "exitCode": 0
+    },
+    "rows-media-admission-check-buy-protected-baseline.log": {
+      "sha256": "3E68F029704A44A57DDF4F9AD5650AC8C7A09CE0D44207F3ACD7B6333E8335A3",
+      "requiredMarker": "Protected Buy integrated review qualification passed:",
+      "exitCode": 0
+    },
+    "rows-media-admission-check-buy-backend-contract-boundary.log": {
+      "sha256": "8932532467D3BFE2DDF4D39236F6A2E7D070E6F1A5A5EDFE20BD66875D3B754C",
+      "requiredMarker": "Buy backend contract boundary passed:",
+      "exitCode": 0
+    },
+    "rows-media-admission-check-buy-data-egress-boundary.log": {
+      "sha256": "6584726EDC8AB1E76C363CEFF0FDC9CF318610AD6522AC32A3F72882AEF91FD3",
+      "requiredMarker": "Buy data-egress integrated review boundary passed:",
+      "exitCode": 0
+    },
+    "rows-media-admission-negative.log": {
+      "sha256": "73EC4C6C3CFAA7EFE6F07432FBF0D9DAFF55E47621DEAD2A857B45CE0BC3F0DB",
+      "requiredMarker": "SKU admission: exact source accepted; five negative cases rejected;",
+      "exitCode": 0
+    },
+    "rows-media-prebuild-profile.log": {
+      "sha256": "C337E4A1B5695870264C6AB2D0CC66EABA156EF1C936FE084D3ACAE7D63D9A7C",
+      "requiredMarker": "CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED",
+      "exitCode": 0
+    },
+    "rows-media-prebuild-brand.log": {
+      "sha256": "E341B22E21DC52E37C1E715BF599CA66A5D86EE475663AA49616839293F9A517",
+      "requiredMarker": "Brand integrity gate passed for surface: App",
+      "exitCode": 0
+    },
+    "rows-media-prebuild-clean-support.log": {
+      "sha256": "5A35C632098FB6FABDB678D17DA4E9D9A9F91A10321230CE9171430F8D78EBF9",
+      "requiredMarker": "Flutter tracked-support cleanliness guard passed.",
+      "exitCode": 0
+    },
+    "rows-media-prebuild-windows-compatibility.log": {
+      "sha256": "E419737DC0967569615034E500D21A5BCA96D77D0579C69CBBBE245CBD5DF1B1",
+      "requiredMarker": "Windows PowerShell 5.1 compatibility gate passed:",
+      "exitCode": 0
+    },
+    "rows-media-prebuild-incremental.log": {
+      "sha256": "24A1C03727DA0BAE821513575D6249009F2D4324AA553101A80B7D759B2F992D",
+      "requiredMarker": "Incremental ticket gate passed:",
+      "exitCode": 0
+    },
+    "rows-media-prebuild-memory.log": {
+      "sha256": "DD9DF3EF98AC9C50DAD6206F20A475BD1512CAFA91E7C934C9BB6FA3E5954771",
+      "requiredMarker": "Codex regression memory passed: entries=4589; applicable=224; phase=build; buildMode=debug.",
+      "exitCode": 0
+    }
+  },
+  "negativeReceiptSha256": "FDA788F3D6A15C88468AC95FE14EA8574AC7AABF33E24882F9C7DD742F93FFED",
+  "sourceQualificationReceiptSha256": "C8F598EE3007D1486F66433731257C90B74A1B9FC99281DFC3470EB18B0E30B6",
+  "sourceOwnersPreserved": 3044,
+  "acceptedFor": "twelve-record r66.28 Cursor Review prebuild",
+  "deviceClosure": false
+}

@@ -1,0 +1,661 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: SKU metadata strips only exact development decoration
+00:00 +1: SKU metadata glance shop 320.0 1.0
+00:01 +2: SKU metadata glance shop 320.0 1.3
+00:01 +3: SKU metadata glance shop 320.0 2.0
+00:02 +4: SKU metadata glance shop 360.0 1.0
+00:02 +5: SKU metadata glance shop 360.0 1.3
+00:02 +6: SKU metadata glance shop 360.0 2.0
+00:03 +7: SKU metadata glance shop 390.0 1.0
+00:03 +8: SKU metadata glance shop 390.0 1.3
+00:03 +9: SKU metadata glance shop 390.0 2.0
+00:03 +10: SKU metadata glance wholesale 320.0 1.0
+00:04 +11: SKU metadata glance wholesale 320.0 1.3
+00:04 +12: SKU metadata glance wholesale 320.0 2.0
+00:04 +13: SKU metadata glance wholesale 360.0 1.0
+00:04 +14: SKU metadata glance wholesale 360.0 1.3
+00:05 +15: SKU metadata glance wholesale 360.0 2.0
+00:05 +16: SKU metadata glance wholesale 390.0 1.0
+00:05 +17: SKU metadata glance wholesale 390.0 1.3
+00:05 +18: SKU metadata glance wholesale 390.0 2.0
+00:06 +19: RV6 fixture access s-dog-food text 1.0
+00:06 +20: RV6 fixture access s-dog-food text 2.0
+00:07 +21: RV6 fixture access s-shampoo text 1.0
+00:08 +22: RV6 fixture access s-shampoo text 2.0
+00:08 +23: RV6 D002 last Store item removal retains catalogue s-eggs text 1.0
+00:12 +24: RV6 D002 last Store item removal retains catalogue s-eggs text 2.0
+00:14 +25: RV6 D002 last Store item removal retains catalogue w-notebook text 1.0
+00:16 +26: RV6 D002 last Store item removal retains catalogue w-notebook text 2.0
+00:18 +27: RV6 D002 paged Store last item retains category shop text 1.0
+00:22 +28: RV6 D002 paged Store last item retains category shop text 2.0
+00:24 +29: RV6 D002 paged Store last item retains category wholesale text 1.0
+00:26 +30: RV6 D002 paged Store last item retains category wholesale text 2.0
+00:28 +31: R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _DescendantWidgetFinder:<Found 4 widgets with widget matching predicate descending from
+widgets with key [<'buy-shop-seller-full-catalogue-list'>]: [
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#3c4b4]], state: ScrollableState#97a38(position:
+ScrollPositionWithSingleContext#5e362(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#98bd4,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#3c4b4]], state: ScrollableState#408f3(position:
+ScrollPositionWithSingleContext#80466(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#92c5d,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#3c4b4]], state: ScrollableState#ba70a(position:
+ScrollPositionWithSingleContext#e3bbf(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#6d1c2,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#3c4b4]], state: ScrollableState#cfc25(position:
+ScrollPositionWithSingleContext#8f04d(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#c2dee,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:535:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 535
+The test description was:
+  R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:30 +31 -1: R669 small full catalogue exposes every SKU s-curd-320x711-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+  
+00:30 +31 -1: R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _DescendantWidgetFinder:<Found 4 widgets with widget matching predicate descending from
+widgets with key [<'buy-shop-seller-full-catalogue-list'>]: [
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#ee697]], state: ScrollableState#0f05c(position:
+ScrollPositionWithSingleContext#30fde(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#c2ceb,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#ee697]], state: ScrollableState#a25a5(position:
+ScrollPositionWithSingleContext#b0b78(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#4d00d,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#ee697]], state: ScrollableState#038c6(position:
+ScrollPositionWithSingleContext#f0326(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#32443,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#ee697]], state: ScrollableState#b9f4c(position:
+ScrollPositionWithSingleContext#94b60(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#10c6c,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:535:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 535
+The test description was:
+  R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:31 +31 -2: R669 small full catalogue exposes every SKU s-curd-320x711-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+  
+00:31 +31 -2: R669 small full catalogue exposes every SKU s-curd-711x320-1.0
+00:32 +32 -2: R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _DescendantWidgetFinder:<Found 4 widgets with widget matching predicate descending from
+widgets with key [<'buy-shop-seller-full-catalogue-list'>]: [
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#17769]], state: ScrollableState#90cee(position:
+ScrollPositionWithSingleContext#435a3(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#7fd5d,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#17769]], state: ScrollableState#9ffa3(position:
+ScrollPositionWithSingleContext#687a0(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#bde63,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#17769]], state: ScrollableState#36abf(position:
+ScrollPositionWithSingleContext#71edc(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#97b79,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#17769]], state: ScrollableState#760d0(position:
+ScrollPositionWithSingleContext#c76a3(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#3cba8,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:535:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 535
+The test description was:
+  R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:33 +32 -3: R669 small full catalogue exposes every SKU s-curd-711x320-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+  
+00:33 +32 -3: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _DescendantWidgetFinder:<Found 4 widgets with widget matching predicate descending from
+widgets with key [<'buy-wholesale-supplier-full-catalogue-list'>]: [
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#5a0c8]], state: ScrollableState#99905(position:
+ScrollPositionWithSingleContext#bc294(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#2db72,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#5a0c8]], state: ScrollableState#59ca6(position:
+ScrollPositionWithSingleContext#a78d1(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#b6121,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#5a0c8]], state: ScrollableState#41733(position:
+ScrollPositionWithSingleContext#4685c(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#59d0e,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#5a0c8]], state: ScrollableState#37868(position:
+ScrollPositionWithSingleContext#4c1bb(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#5750d,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:535:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 535
+The test description was:
+  R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:35 +32 -4: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+  
+00:35 +32 -4: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _DescendantWidgetFinder:<Found 4 widgets with widget matching predicate descending from
+widgets with key [<'buy-wholesale-supplier-full-catalogue-list'>]: [
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#76561]], state: ScrollableState#9de03(position:
+ScrollPositionWithSingleContext#cb3c7(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#28b79,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#76561]], state: ScrollableState#31d60(position:
+ScrollPositionWithSingleContext#18777(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#e8587,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#76561]], state: ScrollableState#715fa(position:
+ScrollPositionWithSingleContext#c9b07(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#db419,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#76561]], state: ScrollableState#14783(position:
+ScrollPositionWithSingleContext#a1e07(offset: 0.0, range: 0.0..0.0, viewport: 276.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#b3758,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:535:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 535
+The test description was:
+  R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:36 +32 -5: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+  
+00:36 +32 -5: R669 small full catalogue exposes every SKU w-notebook-711x320-1.0
+00:38 +33 -5: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly 2 matching candidates
+  Actual: _DescendantWidgetFinder:<Found 4 widgets with widget matching predicate descending from
+widgets with key [<'buy-wholesale-supplier-full-catalogue-list'>]: [
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#f26c9]], state: ScrollableState#2dfd4(position:
+ScrollPositionWithSingleContext#5f50f(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#5bdbb,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#f26c9]], state: ScrollableState#739a9(position:
+ScrollPositionWithSingleContext#76d72(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#3977a,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#f26c9]], state: ScrollableState#50484(position:
+ScrollPositionWithSingleContext#43a3c(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#27d89,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+            Scrollable(axisDirection: right, physics: null, restorationId: null, dependencies:
+[InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope,
+_InheritedTheme, _LocalizationsScope-[GlobalKey#f26c9]], state: ScrollableState#7a114(position:
+ScrollPositionWithSingleContext#05d3a(offset: 0.0, range: 0.0..0.0, viewport: 476.0,
+ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#f4062,
+ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+          ]>
+   Which: is too many
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:535:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 535
+The test description was:
+  R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:39 +33 -6: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+  
+00:39 +33 -6: R669 area final row clears Android navigation Size(320.0, 711.0) 1.0
+00:40 +34 -6: R669 area final row clears Android navigation Size(320.0, 711.0) 2.0
+00:41 +35 -6: R669 area final row clears Android navigation Size(711.0, 320.0) 1.0
+00:42 +36 -6: R669 area final row clears Android navigation Size(711.0, 320.0) 2.0
+00:43 +37 -6: R5 paged published Offers journey 320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _TextContainingWidgetFinder:<Found 0 widgets with text containing Published by Mool Market
+000001: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:988:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 988
+The test description was:
+  R5 paged published Offers journey 320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:46 +37 -7: R5 paged published Offers journey 320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-1.0
+  
+00:46 +37 -7: R5 paged published Offers journey 320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _TextContainingWidgetFinder:<Found 0 widgets with text containing Published by Mool Market
+000001: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:988:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 988
+The test description was:
+  R5 paged published Offers journey 320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:48 +37 -8: R5 paged published Offers journey 320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-2.0
+  
+00:48 +37 -8: R5 paged published Offers journey 640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _TextContainingWidgetFinder:<Found 0 widgets with text containing Published by Mool Market
+000001: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:988:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 988
+The test description was:
+  R5 paged published Offers journey 640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:51 +37 -9: R5 paged published Offers journey 640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-1.0
+  
+00:51 +37 -9: R5 paged published Offers journey 640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _TextContainingWidgetFinder:<Found 0 widgets with text containing Published by Mool Market
+000001: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:988:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 988
+The test description was:
+  R5 paged published Offers journey 640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:53 +37 -10: R5 paged published Offers journey 640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-2.0
+  
+00:53 +37 -10: R5 store-first catalogue journey shop-320x844-1.0
+00:57 +38 -10: R5 paged catalogue user actions shop-320x844-1.0
+00:58 +39 -10: R5 store-first catalogue journey shop-320x844-2.0
+01:02 +40 -10: R5 paged catalogue user actions shop-320x844-2.0
+01:03 +41 -10: R5 store-first catalogue journey shop-640x360-1.0
+01:07 +42 -10: R5 paged catalogue user actions shop-640x360-1.0
+01:09 +43 -10: R5 store-first catalogue journey shop-640x360-2.0
+01:12 +44 -10: R5 paged catalogue user actions shop-640x360-2.0
+01:15 +45 -10: R5 store-first catalogue journey wholesale-320x844-1.0
+01:17 +46 -10: R5 paged catalogue user actions wholesale-320x844-1.0
+01:19 +47 -10: R5 store-first catalogue journey wholesale-320x844-2.0
+01:21 +48 -10: R5 paged catalogue user actions wholesale-320x844-2.0
+
+Warning: A call to drag() with finder "Found 1 widget with type "Scrollable" descending from widget with key [<'buy-paged-scroll-catalogue-wholesale'>] (ignoring all but first): [
+  Scrollable(axisDirection: down, physics: null, restorationId: null, dependencies: [InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope, _InheritedTheme, _LocalizationsScope-[GlobalKey#c99dd]], state: ScrollableState#bd714(position: ScrollPositionWithSingleContext#dda7d(offset: 245.0, range: 0.0..485.0, viewport: 550.0, ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#766a0, ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+]" derived an Offset (Offset(156.0, 467.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#2ff2d relayoutBoundary=up7
+The hit test result at that offset is: HitTestResult(RenderParagraph#7959c@Offset(0.0, 1.0), RenderExcludeSemantics#8a2a3@Offset(0.0, 1.0), RenderPositionedBox#c234b@Offset(0.0, 1.0), RenderAnimatedOpacity#f834d@Offset(0.0, 1.0), RenderStack#ee22f@Offset(0.0, 1.0), RenderClipRect#eec3b@Offset(0.0, 1.0), RenderConstrainedBox#a489a@Offset(0.0, 1.0), RenderSemanticsAnnotations#e8b40@Offset(0.0, 1.0), RenderFlex#506da@Offset(0.0, 28.0), RenderFlex#d6d2d@Offset(24.0, 28.0), RenderPadding#97c50@Offset(32.0, 28.0), RenderPointerListener#c509b@Offset(32.0, 28.0), RenderSemanticsAnnotations#60c3a@Offset(32.0, 28.0), RenderMouseRegion#2db96@Offset(32.0, 28.0), RenderSemanticsAnnotations#5a170@Offset(32.0, 28.0), _RenderInkFeatures#9ffda@Offset(32.0, 28.0), RenderCustomPaint#d31c6@Offset(32.0, 28.0), RenderPhysicalShape#bd494@Offset(32.0, 28.0), RenderConstrainedBox#f5f3f@Offset(32.0, 28.0), RenderPointerListener#045df@Offset(32.0, 28.0), RenderSemanticsGestureHandler#29dbf@Offset(32.0, 28.0), RenderSemanticsAnnotations#cef3f@Offset(32.0, 28.0), RenderStack#f65c8@Offset(156.0, 387.0), _RenderLayoutBuilder#310db@Offset(156.0, 387.0), RenderStack#70bf7@Offset(156.0, 387.0), RenderFlex#64413@Offset(156.0, 443.0), _RenderColoredBox#03c27@Offset(156.0, 443.0), RenderPadding#da98f@Offset(156.0, 443.0), RenderDecoratedBox#e3ee7@Offset(156.0, 443.0), RenderConstrainedBox#e431e@Offset(156.0, 443.0), RenderPositionedBox#35c6a@Offset(156.0, 443.0), RenderPadding#f7d56@Offset(156.0, 467.0), RenderDecoratedBox#fc184@Offset(156.0, 467.0), _RenderLayoutBuilder#fcc14@Offset(156.0, 467.0), RenderCustomMultiChildLayoutBox#954ed@Offset(156.0, 467.0), _RenderInkFeatures#9bfd6@Offset(156.0, 467.0), RenderPhysicalModel#3145e@Offset(156.0, 467.0), RenderStack#c5cd2@Offset(156.0, 467.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#25f90@Offset(156.0, 467.0), RenderSemanticsAnnotations#638a4@Offset(156.0, 467.0), RenderRepaintBoundary#0f44d@Offset(156.0, 467.0), RenderIgnorePointer#7d0bd@Offset(156.0, 467.0), RenderStack#b47e2@Offset(156.0, 467.0), RenderDecoratedBox#c5fcf@Offset(156.0, 467.0), RenderRepaintBoundary#c3981@Offset(156.0, 467.0), RenderSemanticsAnnotations#920a6@Offset(156.0, 467.0), RenderOffstage#a86e0@Offset(156.0, 467.0), RenderSemanticsAnnotations#8c6e5@Offset(156.0, 467.0), _RenderTheater#ef40c@Offset(156.0, 467.0), RenderAbsorbPointer#d15a5@Offset(156.0, 467.0), RenderPointerListener#c240d@Offset(156.0, 467.0), RenderSemanticsAnnotations#6aca6@Offset(156.0, 467.0), RenderSemanticsAnnotations#fc07b@Offset(156.0, 467.0), RenderSemanticsAnnotations#8159d@Offset(156.0, 467.0), RenderSemanticsAnnotations#adc0e@Offset(156.0, 467.0), RenderTapRegionSurface#9591f@Offset(156.0, 467.0), RenderSemanticsAnnotations#86f1b@Offset(156.0, 467.0), RenderSemanticsAnnotations#76b6f@Offset(156.0, 467.0), HitTestEntry<HitTestTarget>#89d19(_ReusableRenderView#e6db6), HitTestEntry<HitTestTarget>#f8b54(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2476:17)
+<asynchronous suspension>
+#4      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#5      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#6      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#7      _revealPagedHeader (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:3017:3)
+<asynchronous suspension>
+#8      main.<anonymous closure>.revealControls (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1624:15)
+<asynchronous suspension>
+#9      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1681:11)
+<asynchronous suspension>
+#10     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#11     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#12     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+01:23 +49 -10: R5 store-first catalogue journey wholesale-640x360-1.0
+01:26 +50 -10: R5 paged catalogue user actions wholesale-640x360-1.0
+01:28 +51 -10: R5 store-first catalogue journey wholesale-640x360-2.0
+01:31 +52 -10: R5 paged catalogue user actions wholesale-640x360-2.0
+01:33 +53 -10: R669 collection discovery keeps the exact branch 320x844-1.0
+01:33 +54 -10: R669 collection discovery keeps the exact branch 320x844-2.0
+01:33 +55 -10: R669 collection discovery keeps the exact branch 640x360-1.0
+01:34 +56 -10: R669 collection discovery keeps the exact branch 640x360-2.0
+01:34 +57 -10: R5 collection visibility hides unsupported capability
+01:34 +58 -10: R5 collection visibility hides absent capability
+01:35 +59 -10: R5 collection visibility hides wrong-branch capability
+01:35 +60 -10: R5 collection visibility hides expired capability
+01:35 +61 -10: R5 collection visibility hides future-observation capability
+01:35 +62 -10: R5 collection visibility hides blank-source capability
+01:35 +63 -10: R5 collection visibility hides stale-facts capability
+01:35 +64 -10: R5 collection visibility hides wrong-product capability
+01:35 +65 -10: R5 collection visibility updates and expires on the same Store
+01:36 +66 -10: R5 collection visibility withdraws after an invalid refresh
+01:36 +67 -10: R5 collection visibility rechecks capability on app resume
+01:36 +68 -10: R66 supplier catalogue retains exact entry variant s-milk-500ml
+01:36 +69 -10: R66 supplier variant journey s-milk-500ml text 1.0
+01:39 +70 -10: R66 supplier variant journey s-milk-500ml text 2.0
+01:42 +71 -10: R66 supplier catalogue retains exact entry variant s-milk-2l
+01:42 +72 -10: R66 supplier variant journey s-milk-2l text 1.0
+01:45 +73 -10: R66 supplier variant journey s-milk-2l text 2.0
+01:48 +74 -10: R66 supplier catalogue retains exact entry variant w-rice-50kg
+01:48 +75 -10: R66 supplier variant journey w-rice-50kg text 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-product-w-rice-50kg'>] descending from widgets with key
+[<'buy-wholesale-supplier-sheet-w-rice-50kg'>]: []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.expectCompleteRiceEta (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2258:11)
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2273:9)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 2258
+The test description was:
+  R66 supplier variant journey w-rice-50kg text 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:49 +75 -11: R66 supplier variant journey w-rice-50kg text 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 supplier variant journey w-rice-50kg text 1.0
+  
+01:49 +75 -11: R66 supplier variant journey w-rice-50kg text 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-product-w-rice-50kg'>] descending from widgets with key
+[<'buy-wholesale-supplier-sheet-w-rice-50kg'>]: []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure>.expectCompleteRiceEta (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2258:11)
+#5      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2273:9)
+<asynchronous suspension>
+#6      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#7      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 2258
+The test description was:
+  R66 supplier variant journey w-rice-50kg text 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:50 +75 -12: R66 supplier variant journey w-rice-50kg text 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R66 supplier variant journey w-rice-50kg text 2.0
+  
+01:50 +75 -12: R66 supplier catalogue retains exact entry variant w-oil-10l
+01:50 +76 -12: R66 supplier variant journey w-oil-10l text 1.0
+01:53 +77 -12: R66 supplier variant journey w-oil-10l text 2.0
+01:55 +78 -12: R66 Cart store continuation stays scoped after s-eggs
+01:57 +79 -12: R66 Cart store continuation stays scoped after w-notebook
+01:59 +80 -12: store and brand catalogues remain exact and destination-scoped
+01:59 +81 -12: Shop store catalogue reuses product cards and opens one item
+02:00 +82 -12: product details keeps Visit store as the single store route
+02:00 +83 -12: store grid keeps one full-size Add action
+02:00 +84 -12: store grid Add keeps the shopper in the store and updates Cart
+02:00 +85 -12: store catalogue exposes full products and exact related-store continuation
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a value less than <130>
+  Actual: <169.5>
+   Which: is not a value less than <130>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2815:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 2815
+The test description was:
+  store catalogue exposes full products and exact related-store continuation
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:02 +85 -13: store catalogue exposes full products and exact related-store continuation [E]
+  Test failed. See exception logs above.
+  The test description was: store catalogue exposes full products and exact related-store continuation
+  
+02:02 +85 -13: four-product store fills one three-SKU row without dead width
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.first (dart:core/iterable.dart:663:7)
+#1      _FirstFinderMixin.filter (package:flutter_test/src/finders.dart:1383:28)
+#3      Iterable.length (dart:core/iterable.dart:544:15)
+#4      _FindsCountMatcher.describeMismatch (package:flutter_test/src/matchers.dart:1375:36)
+#5      _expect.<anonymous closure> (package:matcher/src/expect/expect.dart:105:13)
+#6      _expect (package:matcher/src/expect/expect.dart:182:17)
+#7      expect (package:matcher/src/expect/expect.dart:65:3)
+#8      expect (package:flutter_test/src/widget_tester.dart:473:18)
+#9      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2896:7)
+<asynchronous suspension>
+#10     testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#11     TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided 2 frames from dart:async-patch and package:stack_trace)
+
+The test description was:
+  four-product store fills one three-SKU row without dead width
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:03 +85 -14: four-product store fills one three-SKU row without dead width [E]
+  Test failed. See exception logs above.
+  The test description was: four-product store fills one three-SKU row without dead width
+  
+02:03 +85 -14: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-2.0
+  ... and 10 more

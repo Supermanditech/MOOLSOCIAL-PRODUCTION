@@ -1,0 +1,168 @@
+Field=application-id
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "Windows_NT" == "Windows_NT" setlocal
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set DIRNAME=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\ 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\" == "" set DIRNAME=. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set APP_BASE_NAME=apkanalyzer 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set APP_HOME=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\.. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set DEFAULT_JVM_OPTS=-Dcom.android.sdklib.toolsdir=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\\.. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if defined JAVA_HOME goto findJavaFromJavaHome 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set JAVA_EXE=C:\Program Files\Android\Android Studio\jbr/bin/java.exe 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if exist "C:\Program Files\Android\Android Studio\jbr/bin/java.exe" goto init 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if not "Windows_NT" == "Windows_NT" goto win9xME_args 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CMD_LINE_ARGS= 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set _SKIP=2 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "xmanifest" == "x" goto execute 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CMD_LINE_ARGS=manifest application-id "C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.26\artifacts\uaw-cursor-sku-correction-20260915-device-review-debug.apk" 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>setlocal enabledelayedexpansion 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>for /F "tokens=3" %a in ('""C:\Program Files\Android\Android Studio\jbr/bin/java.exe" -version 2>&1 |findstr "version""') do (for /F "tokens=1,2 delims=." %b in ('echo %a') do (set versionWithQ=%b%c ) ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>(for /F "tokens=1,2 delims=." %b in ('echo "21.0.10"') do (set versionWithQ=%b%c ) ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>(set versionWithQ="210 ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set version=!versionWithQ:"=! 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if !version! LSS 170 if "" == "" (
+echo Java version 17 or higher is required.  
+ echo To override this check set SKIP_JDK_VERSION_CHECK  
+ goto :eof 
+) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CLASSPATH=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\..\lib\apkanalyzer-classpath.jar 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>"C:\Program Files\Android\Android Studio\jbr/bin/java.exe" -Dcom.android.sdklib.toolsdir=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\\..    -classpath "C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\..\lib\apkanalyzer-classpath.jar" com.android.tools.apk.analyzer.ApkAnalyzerCli manifest application-id "C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.26\artifacts\uaw-cursor-sku-correction-20260915-device-review-debug.apk" 
+com.moolsocial.app.cursorreview
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "0" == "0" goto mainEnd 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "Windows_NT" == "Windows_NT" endlocal
+Field=version-name
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "Windows_NT" == "Windows_NT" setlocal
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set DIRNAME=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\ 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\" == "" set DIRNAME=. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set APP_BASE_NAME=apkanalyzer 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set APP_HOME=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\.. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set DEFAULT_JVM_OPTS=-Dcom.android.sdklib.toolsdir=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\\.. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if defined JAVA_HOME goto findJavaFromJavaHome 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set JAVA_EXE=C:\Program Files\Android\Android Studio\jbr/bin/java.exe 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if exist "C:\Program Files\Android\Android Studio\jbr/bin/java.exe" goto init 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if not "Windows_NT" == "Windows_NT" goto win9xME_args 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CMD_LINE_ARGS= 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set _SKIP=2 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "xmanifest" == "x" goto execute 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CMD_LINE_ARGS=manifest version-name "C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.26\artifacts\uaw-cursor-sku-correction-20260915-device-review-debug.apk" 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>setlocal enabledelayedexpansion 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>for /F "tokens=3" %a in ('""C:\Program Files\Android\Android Studio\jbr/bin/java.exe" -version 2>&1 |findstr "version""') do (for /F "tokens=1,2 delims=." %b in ('echo %a') do (set versionWithQ=%b%c ) ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>(for /F "tokens=1,2 delims=." %b in ('echo "21.0.10"') do (set versionWithQ=%b%c ) ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>(set versionWithQ="210 ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set version=!versionWithQ:"=! 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if !version! LSS 170 if "" == "" (
+echo Java version 17 or higher is required.  
+ echo To override this check set SKIP_JDK_VERSION_CHECK  
+ goto :eof 
+) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CLASSPATH=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\..\lib\apkanalyzer-classpath.jar 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>"C:\Program Files\Android\Android Studio\jbr/bin/java.exe" -Dcom.android.sdklib.toolsdir=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\\..    -classpath "C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\..\lib\apkanalyzer-classpath.jar" com.android.tools.apk.analyzer.ApkAnalyzerCli manifest version-name "C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.26\artifacts\uaw-cursor-sku-correction-20260915-device-review-debug.apk" 
+1.0.0-r66.26-cursorreview
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "0" == "0" goto mainEnd 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "Windows_NT" == "Windows_NT" endlocal
+Field=version-code
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "Windows_NT" == "Windows_NT" setlocal
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set DIRNAME=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\ 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\" == "" set DIRNAME=. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set APP_BASE_NAME=apkanalyzer 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set APP_HOME=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\.. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set DEFAULT_JVM_OPTS=-Dcom.android.sdklib.toolsdir=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\\.. 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if defined JAVA_HOME goto findJavaFromJavaHome 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set JAVA_HOME=C:\Program Files\Android\Android Studio\jbr 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set JAVA_EXE=C:\Program Files\Android\Android Studio\jbr/bin/java.exe 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if exist "C:\Program Files\Android\Android Studio\jbr/bin/java.exe" goto init 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if not "Windows_NT" == "Windows_NT" goto win9xME_args 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CMD_LINE_ARGS= 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set _SKIP=2 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "xmanifest" == "x" goto execute 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CMD_LINE_ARGS=manifest version-code "C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.26\artifacts\uaw-cursor-sku-correction-20260915-device-review-debug.apk" 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>setlocal enabledelayedexpansion 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>for /F "tokens=3" %a in ('""C:\Program Files\Android\Android Studio\jbr/bin/java.exe" -version 2>&1 |findstr "version""') do (for /F "tokens=1,2 delims=." %b in ('echo %a') do (set versionWithQ=%b%c ) ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>(for /F "tokens=1,2 delims=." %b in ('echo "21.0.10"') do (set versionWithQ=%b%c ) ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>(set versionWithQ="210 ) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set version=!versionWithQ:"=! 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if !version! LSS 170 if "" == "" (
+echo Java version 17 or higher is required.  
+ echo To override this check set SKIP_JDK_VERSION_CHECK  
+ goto :eof 
+) 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>set CLASSPATH=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\..\lib\apkanalyzer-classpath.jar 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>"C:\Program Files\Android\Android Studio\jbr/bin/java.exe" -Dcom.android.sdklib.toolsdir=C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\\..    -classpath "C:\Users\jisal\AppData\Local\Android\Sdk\cmdline-tools\latest\bin\..\lib\apkanalyzer-classpath.jar" com.android.tools.apk.analyzer.ApkAnalyzerCli manifest version-code "C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.26\artifacts\uaw-cursor-sku-correction-20260915-device-review-debug.apk" 
+2026091502
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "0" == "0" goto mainEnd 
+
+C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913>if "Windows_NT" == "Windows_NT" endlocal

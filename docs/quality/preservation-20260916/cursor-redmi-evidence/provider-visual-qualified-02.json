@@ -1,0 +1,54 @@
+{
+  "scope": "SKU-M05-C03 local provider names and update; not complete universal-provider/device qualification",
+  "test": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\provider-visual-test-02.log",
+    "sha256": "B7A5F5F30E2570994E0725838AF6E6160D497341EC32619249081EEFF93FE441",
+    "passed": 4,
+    "failed": 0,
+    "terminal": "dba604"
+  },
+  "analysis": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\analysis-09.log",
+    "sha256": "42BBC40EB27BC693794FE0B1C63912C51E73425BE1EB3BFA6838936E35D63092",
+    "result": "No issues found; 8.9 seconds",
+    "terminal": "2bdda6"
+  },
+  "visuallyInspected": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\provider-visual-02\\provider-name-shop-1.0-buy-catalogue-dev-v1-shop-store-000001-sku-0001.png",
+      "sha256": "E619394524BC228B22AC93B5C920FEBC8B39D97E1428D1DF4F268082584DEEC3"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\provider-visual-02\\provider-update-shop-1.0.png",
+      "sha256": "27765002543CFF1CB3DF5B7BFEAB8ECFFDF82BC83B8327716F08E727DBA91196"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\provider-visual-02\\provider-name-wholesale-1.0-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001.png",
+      "sha256": "67B2E47FE839C0323138834403B23E9CABA183E409CE1EE00F0918C60160BBBA"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\provider-visual-02\\provider-name-wholesale-2.0-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001.png",
+      "sha256": "9845B47F26E14340511A353435D964E59CED8936186F911411E736ECAD7BB04B"
+    }
+  ],
+  "observations": [
+    "Normal Shop and Wholesale use three vertical catalogue columns and compact yellow price highlights.",
+    "Long provider names wrap within card width.",
+    "Wholesale at 200 percent uses a readable single-column adaptive layout; scrolling is needed for tall cards.",
+    "Captures target provider fields and therefore show some card tops outside the viewport; these images alone do not prove complete first-screen composition.",
+    "Shop provider-update capture retains quantity 1 and shows its Cart indicator; no actual Redmi data changed."
+  ],
+  "remaining": [
+    "Mixed-script and long-unbroken/missing-field delivery-freight coverage across reused surfaces",
+    "First-glimpse visual capture at top of affected screens",
+    "Combined regression runs and gates",
+    "Successor APK and actual Redmi qualification"
+  ],
+  "sourceHead": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "sourceIsDirty": true,
+  "combinedRun": {
+    "session": 21205,
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined-correction-test-01.log",
+    "state": "started; terminal result pending"
+  }
+}

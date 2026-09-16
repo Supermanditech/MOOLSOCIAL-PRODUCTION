@@ -1,0 +1,63 @@
+{
+  "source": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
+  "checks": [
+    {
+      "log": "sku-admission-check-approved-ui-locks.log",
+      "sha256": "23BD281814268EBAC8017055B27CE88A70E1F27E9861447B2BA86C656E44DA59",
+      "verifiedMarker": "Approved UI reference and production locks passed."
+    },
+    {
+      "log": "sku-admission-check-buy-protected-baseline.log",
+      "sha256": "EFA46F0CB8E9490241426B112ED2AC29E142E096B834C00AF26D8662C17FD480",
+      "verifiedMarker": "Protected Buy integrated review qualification passed:"
+    },
+    {
+      "log": "sku-admission-check-buy-backend-contract-boundary.log",
+      "sha256": "04DA433522049BC3C857F7861B331F3F63D25A12F0BEBABFA1746BDD3544DA1F",
+      "verifiedMarker": "Buy backend contract boundary passed:"
+    },
+    {
+      "log": "sku-admission-check-buy-data-egress-boundary.log",
+      "sha256": "B09DF2D1B2EC325047E26237FD71A5DAFA50DFA29177476EA3E83BCDC425EF86",
+      "verifiedMarker": "Buy data-egress integrated review boundary passed:"
+    },
+    {
+      "log": "sku-admission-negative.log",
+      "sha256": "28EA0909E688A3336A0305C4A0C97D6E0136D0D4CF9A47AA9331CB4E533E59BB",
+      "verifiedMarker": "SKU admission: exact source accepted; five negative cases rejected;"
+    },
+    {
+      "log": "prebuild-profile-01.log",
+      "sha256": "30F66523E94117B81CCC2063C66F337CBD8B34615BDE3D787390C18E11653994",
+      "verifiedMarker": "CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED"
+    },
+    {
+      "log": "sku-prebuild-brand.log",
+      "sha256": "2CFCCBC99B12D239FE02D4E3D154DA66AF1F90A9E2DD839D810FF0349F25FC0F",
+      "verifiedMarker": "Brand integrity gate passed for surface: App"
+    },
+    {
+      "log": "prebuild-clean-support-01.log",
+      "sha256": "85683C3C4F1FBD9E2512F32C0E1AB7AC908757F75513EB68B360597EC80C4D91",
+      "verifiedMarker": "Flutter tracked-support cleanliness guard passed."
+    },
+    {
+      "log": "sku-prebuild-windows-compatibility.log",
+      "sha256": "41560852F7294771F08F70FEF485B1A1CD9143D00EBB0ECB9AB834BAD8573526",
+      "verifiedMarker": "Windows PowerShell 5.1 compatibility gate passed:"
+    },
+    {
+      "log": "sku-prebuild-incremental.log",
+      "sha256": "78BC98E59506633396CF469CF6C3106ADB29AF16FC4B0D76D698E40614BB3E63",
+      "verifiedMarker": "Incremental ticket gate passed:"
+    },
+    {
+      "log": "prebuild-memory-pwsh7-02.log",
+      "sha256": "569617EB3DEEF6C4C03FE804893D55DF48F4B2AAE83A9BE195D870079E1F11B6",
+      "verifiedMarker": "Codex regression memory passed: entries=4587; applicable=222; phase=build; buildMode=debug."
+    }
+  ],
+  "incrementalTerminal": "cb279c",
+  "brandAndWindowsTerminal": "e98a59",
+  "state": "source_gates_passed_candidate_machine_preflight_pending"
+}

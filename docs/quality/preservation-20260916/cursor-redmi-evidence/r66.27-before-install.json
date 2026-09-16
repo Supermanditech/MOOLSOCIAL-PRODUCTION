@@ -1,0 +1,21 @@
+{
+  "serial": "TG8HCYTGGQT885OF",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionCode": 2026091502,
+  "packagePreservationFields": [
+    "userId=10304",
+    "dataDir=/data/user/0/com.moolsocial.app.cursorreview",
+    "firstInstallTime=2026-08-27 15:09:48",
+    "firstInstallTime=1970-01-01 05:30:00"
+  ],
+  "fontScale": "1.0",
+  "evidence": [
+    "r66.26-captures/055-before-r6627",
+    "r66.26-captures/056-before-r6627-saved"
+  ],
+  "area": "Any area",
+  "languageObserved": "English",
+  "savedObservation": "One saved Stone-ground wheat atta 5 kg bag",
+  "cartObservation": "No quantity dock visible; exact basket count not inferred",
+  "capturedAt": "2026-09-15T22:44:44.492508+05:30"
+}

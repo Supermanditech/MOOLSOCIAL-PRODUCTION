@@ -1,0 +1,43 @@
+{
+  "ticket": "SKU-M05-C03",
+  "state": "static_names_and_per_row_sizing_pass_dynamic_refresh_failure_confirmed",
+  "staticNames": {
+    "log": "provider-metadata-test-01.log",
+    "passes": 4,
+    "failures": 0,
+    "terminal": "a19ae6",
+    "captures": 8,
+    "explicitlyReviewed": [
+      "provider-name-shop-1.0-buy-catalogue-dev-v1-shop-store-000001-sku-0004.png",
+      "provider-name-wholesale-2.0-buy-catalogue-dev-v1-wholesale-store-000001-sku-0002.png"
+    ]
+  },
+  "dynamicRefresh": {
+    "log": "provider-metadata-test-03.log",
+    "passes": 0,
+    "failures": 4,
+    "terminal": "79b68a",
+    "failure": "Refreshed provider name absent in product card at Shop/Wholesale normal and doubled text after successful page reload",
+    "sourceFinding": "BuyV2Session.productFactsFor caches by product.id; _retainCataloguePages replaces product records without invalidating retained facts. Existing refreshProductFacts validates and refreshes those facts.",
+    "next": "Use existing validated facts-refresh contract from scoped UI refresh path, with focused continuity checks; no backend or duplicate facts store."
+  },
+  "test02": "Failed before refresh because ensureVisible targeted an unmounted top control; test03 corrected traversal through scrollUntilVisible. Both failure logs preserved.",
+  "dockQualification": {
+    "log": "correction-dock-test-04.log",
+    "passes": 5,
+    "failures": 0,
+    "terminal": "71bddf",
+    "diagnosis": "Earlier whole-selection bounds included trailing whitespace. Per-word diagnostics and inspected200percent screenshot prove visible words fit; final assertion checks all visible word bounds and full natural height.",
+    "diagnosticLog": "correction-dock-test-03.log"
+  },
+  "newApkBuilt": false,
+  "ticketsClosed": 0,
+  "remaining": "All ten-record source/device acceptance and final Git handoff remain required.",
+  "logHashes": {
+    "provider-metadata-test-01.log": "FF2C10B8E12B1EB1FC5CECF551C6E7032895D8C7763B73D4E7D24E49C9DAEB7B",
+    "provider-metadata-test-02.log": "6BFD7B4D34BED4C941C6085835E8E9F7016B1E8E00D1602937F492A8A0FF7902",
+    "provider-metadata-test-03.log": "1E5BE012845CF3CEA5789929F60E17C25E7BF880FA574D6458BB76B304620332",
+    "correction-dock-test-03.log": "DF485BF14504443A6EA92B6CD0FFF999BAA080E45486ABCF7F0B824395C2EC18",
+    "correction-dock-test-04.log": "E36A9FF07B9EC3688E824D132BB267AF218E560FBFD082046E0C97CA95E0E017"
+  }
+}

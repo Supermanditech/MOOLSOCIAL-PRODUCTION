@@ -1,0 +1,17 @@
+{
+  "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+  "head": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
+  "sourceCommitTerminal": "2a9ccc",
+  "pushTerminal": "a2bad5",
+  "liveRemoteTerminal": "41c118",
+  "statusTerminal": "92dc4e",
+  "clean": true,
+  "liveRemoteEqual": true,
+  "changedOwners": 20,
+  "runtimeOwners": 3,
+  "testOwners": 11,
+  "qualificationReceiptSha256": "665EA731666C43789C44E606BE4AF47E21B4A503C3F9203ACBD405397B03928A",
+  "precommitGateTerminal": "e7c919",
+  "buildCompleted": false,
+  "deviceQualified": false
+}

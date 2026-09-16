@@ -1,0 +1,62 @@
+{
+  "candidate": "UAW-CURSOR-SKU-ROWS-MEDIA-20260916",
+  "sourceHead": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+  "applicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+  "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.28\\artifacts\\uaw-cursor-sku-rows-media-20260916-device-review-debug.apk",
+  "packageId": "com.moolsocial.app.cursorreview",
+  "versionName": "1.0.0-r66.28-cursorreview",
+  "versionCode": 2026091601,
+  "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+  "apkSha256": "B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8",
+  "bytes": 210821145,
+  "sourceManifestSha256": "3146E3ED92EC4810B2BDBB62D1C1A0A9B5A281CCED741E95743E9B5D17BE2224",
+  "runtimeProfile": "CursorUiReview",
+  "buildMode": "debug",
+  "promotable": false,
+  "permittedDevice": "TG8HCYTGGQT885OF",
+  "installation": "data_preserving_upgrade_succeeded",
+  "deviceVerification": "twelve_SKU_records_pending_device_qualification",
+  "installedChecksumEqual": true,
+  "installedApkSha256": "B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8",
+  "installedAt": "2026-09-16T03:11:54.522073+05:30",
+  "fontScale": "1.0",
+  "packagePreservationFieldsUnchanged": true,
+  "preferenceHashesUnchanged": true,
+  "reviewLanguageUnchanged": true,
+  "before": {
+    "fields": {
+      "userId": "10304",
+      "dataDir": "/data/user/0/com.moolsocial.app.cursorreview",
+      "firstInstallTime": "2026-08-27 15:09:48",
+      "versionCode": "2026091503 minSdk=24 targetSdk=36",
+      "versionName": "1.0.0-r66.27-cursorreview"
+    },
+    "preferenceHashes": {
+      "shared_prefs/FlutterSharedPreferences.xml": "79D6BB773C17225153384CB7DC66179A6DE773FBAA657DCA68DAD2F81F077620",
+      "files/datastore/FlutterSharedPreferences.preferences_pb": "1F50FAA257BB9669DE358BD0CC2367A9349B05466E4053C1B2ED4DC2ADC7524E"
+    },
+    "fontScale": "1.0",
+    "reviewLanguage": [
+      "en"
+    ]
+  },
+  "after": {
+    "fields": {
+      "userId": "10304",
+      "dataDir": "/data/user/0/com.moolsocial.app.cursorreview",
+      "firstInstallTime": "2026-08-27 15:09:48",
+      "versionCode": "2026091601 minSdk=24 targetSdk=36",
+      "versionName": "1.0.0-r66.28-cursorreview"
+    },
+    "preferenceHashes": {
+      "shared_prefs/FlutterSharedPreferences.xml": "79D6BB773C17225153384CB7DC66179A6DE773FBAA657DCA68DAD2F81F077620",
+      "files/datastore/FlutterSharedPreferences.preferences_pb": "1F50FAA257BB9669DE358BD0CC2367A9349B05466E4053C1B2ED4DC2ADC7524E"
+    },
+    "fontScale": "1.0",
+    "reviewLanguage": [
+      "en"
+    ]
+  },
+  "uiPreservationVerification": "pending actual launch and affected journeys",
+  "preUpgradeObservation": "r66.27 resumed with empty Shop body in captures019/020; Saved badge1 retained; no data cleared"
+}

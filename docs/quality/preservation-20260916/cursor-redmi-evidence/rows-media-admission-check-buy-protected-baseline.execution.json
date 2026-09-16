@@ -1,0 +1,18 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-buy-protected-baseline.ps1",
+    "-RepositoryRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+    "-IntegratedReviewSourceCommit",
+    "f0fc06a92bb43627ec4ca952e8996a888ec96ac2"
+  ],
+  "exitCode": 0,
+  "sha256": "3E68F029704A44A57DDF4F9AD5650AC8C7A09CE0D44207F3ACD7B6333E8335A3",
+  "requiredMarker": "Protected Buy integrated review qualification passed:",
+  "passed": true
+}

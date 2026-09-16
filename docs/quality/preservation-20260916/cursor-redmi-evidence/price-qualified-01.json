@@ -1,0 +1,40 @@
+{
+  "recordedAtUtc": "2026-09-15T08:12:27.537610+00:00",
+  "head": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "sourceCommitted": false,
+  "analysis": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\founder-analysis-06.log",
+    "sha256": "0638DB43455A3FA5FC15F8AFFD6096F74788F7DAB3C7AAD56DD9E1B85E3C9AFC",
+    "result": "No issues found"
+  },
+  "focusedTest": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-price-test-04.log",
+    "sha256": "FFD265FE135B12AC0AC83D7BCA1ACF062F34BED0404A620080A5DF12B20C4355",
+    "passes": 4,
+    "failures": 0,
+    "completionChunk": "59006d",
+    "scope": "Shop and Wholesale at 320 logical width, normal and 200 percent text; long metadata, exact crore price conversion/full-amount semantics, readable font/one-line label, Cart and product-detail checks in existing journey"
+  },
+  "visuallyInspected": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-price-visual-04\\sku-long-price-shop-1.0.png",
+      "sha256": "D161DEDDD7C7FFD32AD002E56886AB35B8D44F4B72EED588E82D59522FB48B00",
+      "finding": "Exact crore price is intact and highlighted closely; no split digits in reviewed price"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-price-visual-04\\sku-long-price-wholesale-2.0.png",
+      "sha256": "F846C0E6A94C2B75C298D74E25D72CDBBB9FAC3AB691127124D625A8D46113D8",
+      "finding": "Exact crore price is intact and highlighted closely; no split digits in reviewed price"
+    }
+  ],
+  "limitations": [
+    "Only these two captures explicitly inspected in this step",
+    "Does not prove every arbitrary price/provider input or every presentation",
+    "Three-file cross-surface regression still running in session 74147",
+    "No device closure or successor APK"
+  ],
+  "currentSourceNormalizedSha256": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "B0EB9F8B8FFE8B112ECACE51EBF63CEE36B259E53D4439983511F82EABF73FCB",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "1E0322CF52366D26A80FCAC9753A0B54AFAE5E7B106FD18FF80B23F2E6E406A4"
+  }
+}

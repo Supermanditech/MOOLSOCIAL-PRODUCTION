@@ -1,0 +1,51 @@
+{
+  "state": "focused_grid_pass_not_full_qualification",
+  "passed": 18,
+  "failed": 0,
+  "terminal": "9aaa0c",
+  "exitCode": 0,
+  "log": "founder-grid-test-01.log",
+  "logSha256": "FB0367BAE216BD2B41113C62D7024422C2F4890C436D518C5D771A2A424F43B7",
+  "normalizedOwnerHashes": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "41AE6DE3A74E632E0BEFC38B286E9EE9EC66537F2FE07E78BD7B02AF1C74FCDF",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart": "6DD64F9E659DCCCEBAF9DE88E8DEA4467240E8E008EF71F7DD672351317EDD95",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "CE64F15840FC8DB7651DA46DE3E56682A8B21B6F2086C0C110B1FB8123F74A17",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "86EEF27910E86FA3F0A10EDC7D50F68AC4018BD6AF448D62DB478404C7923F31"
+  },
+  "captures": {
+    "sku-baseline-shop-320-1.0.png": "51B2C4EEA0F7AA1B607555B0B9E46CCDCDA357256E5B03F583CA8CADB377302B",
+    "sku-baseline-shop-320-1.3.png": "42CBC6F683C8E176CFA64A73C5211775C01F98FEA2F0EC3B068ED1B582502D89",
+    "sku-baseline-shop-320-2.0.png": "2B55D0C456FD0248973D04D93391030FBF2C5528AF55438A6CFF850BD95F85D4",
+    "sku-baseline-shop-360-1.0.png": "C877AEE2DBDEC7F7F0A800888B7CE506A2CFA4A587020657E2CFCACC6B77EFA2",
+    "sku-baseline-shop-360-1.3.png": "C713E84B9F64E5E9D5B882B12185CAD95E88F2011DCA6C73887557F437EF52DC",
+    "sku-baseline-shop-360-2.0.png": "6290D8FBE47873BE0C3D0C3EB10336EBDD13BCCA10843F635E9088EA1198D461",
+    "sku-baseline-shop-390-1.0.png": "C2A32E5F1BDAF7240A00D756A2CED8E379160F9D54CCF21234C723624E12DE21",
+    "sku-baseline-shop-390-1.3.png": "547B8975B482B04CAF676730E6E1FAA318AFC96C0B31527DCC5987A1B023371C",
+    "sku-baseline-shop-390-2.0.png": "73EAFEF9B4B2E56D1772D24A7C9993AEC4C454D1683549FF2C55C75844D1AABE",
+    "sku-baseline-wholesale-320-1.0.png": "11870F47BA63EC7E13100EFA6B1D7C3171E8C972B23A4443046B7AC1B15DB2C6",
+    "sku-baseline-wholesale-320-1.3.png": "537C560B8929AED02655024EFF256B30849F54A1D416983FAE882D03E9CB3A5E",
+    "sku-baseline-wholesale-320-2.0.png": "EA87470807675F312AA91A0E4AD41DBB832F93D972FF7152E89060DFECE30BEC",
+    "sku-baseline-wholesale-360-1.0.png": "D1DFD050BE7887ABB46CD80CA45029B13A1D36FD07010B45CF216EF7FC4C020F",
+    "sku-baseline-wholesale-360-1.3.png": "A1F8C08D8D4D0A5FEEC479EAA4B04A1B86C5535CC5E2DDFB9C745BA428EA0897",
+    "sku-baseline-wholesale-360-2.0.png": "2CF6FE33C8874DA3167ABA7187A199EF1B67D60A852090BF31637F145F2AB10C",
+    "sku-baseline-wholesale-390-1.0.png": "1EFB1D9D66B5172744408BAEDA3D5BC6EE9ED1133C5B61175C241817D5C02D89",
+    "sku-baseline-wholesale-390-1.3.png": "7B107646C4DA73E30F3BCB4E4620EA79454D440FD680BA43B70BDF4EB965B4EF",
+    "sku-baseline-wholesale-390-2.0.png": "5F3AE5ED02C63B4DB83216B086DA918AF0CC1F3A583C8C2718CC134E54D24827"
+  },
+  "explicitlyViewed": [
+    "sku-baseline-shop-360-1.0.png",
+    "sku-baseline-wholesale-360-1.0.png"
+  ],
+  "proven": "Three columns at normal phone scale, fourth product on next vertical row, amber price emphasis without gradient, existing no-ellipsis checks at all tested text scales.",
+  "notProven": [
+    "bottom-pagination navigation and restoration",
+    "vertical category discovery all surfaces",
+    "detail pricing removal",
+    "Cart and dock corrections",
+    "full regressions and analysis",
+    "Redmi successor verification"
+  ],
+  "newApkBuilt": false,
+  "ticketsClosed": 0,
+  "gateRecovery": "Initial catalogue pin refresh asserted before writing because a textual marker occurrence was used. Exact physical markers then refreshed successfully; stale-pin gate failed607af1; fresh gate passedb47d15. No test preceded fresh pass."
+}

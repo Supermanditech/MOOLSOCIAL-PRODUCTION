@@ -1,0 +1,17 @@
+{
+  "sourceHead": "f3403f9ad14a709e0bee9b37d2c5aa03a72c5a5a",
+  "apkSha256": "A218E31C209305FD709AEF4FCAC70DB10452C46B93B248B9E5E8AED3DF273EE9",
+  "installationReceiptSha256": "149994F73C65DB0810BD449C7165F7F41ADFF6E2CE3B7DB3FF3B4841FE32D69C",
+  "fontScale": "1.0",
+  "label": "014-wholesale-return",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.27-cursorreview",
+  "capturedAt": "2026-09-15T22:51:51.079283+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "57655efcefb04afb454768018c350ec892067b4ad812ae8f8344c9f6fd3eb7a4",
+    ".xml": "691b55ddbbfa6dbe4f29d453c3339c243c2a28ceb406026e80553fb2f214b2de",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

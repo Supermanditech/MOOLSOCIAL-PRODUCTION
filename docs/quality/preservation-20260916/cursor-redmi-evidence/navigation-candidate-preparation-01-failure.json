@@ -1,0 +1,8 @@
+{
+  "terminalChunk": "7e42f6",
+  "exitCode": 1,
+  "stage": "read_only_evidence_validation_before_candidate_creation",
+  "cause": "Legacy preparer expected the test summary as final physical line; current support wrapper appends exactly one zero exit-code line. All raw hashes and native exit-zero receipts are preserved.",
+  "correction": "Require exact trailing zero, then exact expected preceding summary, plus existing log SHA and execution receipt; do not rerun tests or relax failure rejection.",
+  "candidateCreated": false
+}

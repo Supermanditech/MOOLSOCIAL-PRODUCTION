@@ -1,0 +1,28 @@
+{
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "r66.24",
+  "savedCount": 1,
+  "savedProduct": "Stone-ground wheat atta 2",
+  "savedPack": "5 kg bag",
+  "recentCount": 8,
+  "deliveryAddress": "Basni, Jodhpur / 342005",
+  "paymentPreference": "Paytm",
+  "shoppingArea": "Any area",
+  "deliveryMode": "Quick",
+  "fontScale": "1.0",
+  "visibleLanguage": "English",
+  "cartObservation": "No active Cart dock on full Shop or Saved; no quantities changed in the preinstall navigation. Earlier baseline recorded empty Cart.",
+  "evidence": [
+    "010-preinstall",
+    "012-preinstall-shop",
+    "013-preinstall-saved",
+    "014-preinstall-area",
+    "017-preinstall-tools-scrolled",
+    "018-preinstall-settings",
+    "020-preinstall-shop-ready"
+  ],
+  "navigationCorrection": "Two Back presses from settings returned to Mool (019) rather than Shop; preserved capture and reopened observed Open Shop. This was a navigation assumption in the check, not an app defect or data change.",
+  "noClearData": true,
+  "noUninstall": true,
+  "noOrderOrMessage": true
+}

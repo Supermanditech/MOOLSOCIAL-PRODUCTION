@@ -1,0 +1,6 @@
+Analyzing 5 items...                                            
+
+  error - The getter 'customerTitle' isn't defined for the type 'BuyV2Product'. Try importing the library that defines 'customerTitle', correcting the name to the name of an existing getter, or defining a getter or field named 'customerTitle' - test\ui_v2\buy\buy_v2_product_continuity_test.dart:266:59 - undefined_getter
+
+1 issue found. (ran in 11.3s)
+1

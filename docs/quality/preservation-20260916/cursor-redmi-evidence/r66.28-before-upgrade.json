@@ -1,0 +1,17 @@
+{
+  "fields": {
+    "userId": "10304",
+    "dataDir": "/data/user/0/com.moolsocial.app.cursorreview",
+    "firstInstallTime": "2026-08-27 15:09:48",
+    "versionCode": "2026091503 minSdk=24 targetSdk=36",
+    "versionName": "1.0.0-r66.27-cursorreview"
+  },
+  "preferenceHashes": {
+    "shared_prefs/FlutterSharedPreferences.xml": "79D6BB773C17225153384CB7DC66179A6DE773FBAA657DCA68DAD2F81F077620",
+    "files/datastore/FlutterSharedPreferences.preferences_pb": "1F50FAA257BB9669DE358BD0CC2367A9349B05466E4053C1B2ED4DC2ADC7524E"
+  },
+  "fontScale": "1.0",
+  "reviewLanguage": [
+    "en"
+  ]
+}

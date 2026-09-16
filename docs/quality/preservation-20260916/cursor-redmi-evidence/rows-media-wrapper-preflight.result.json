@@ -1,0 +1,23 @@
+{
+  "stage": "rows-media-wrapper-preflight",
+  "exitCode": 1,
+  "passed": false,
+  "source": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+  "seal": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+  "preservedOwnerCount": 3044,
+  "logSha256": "2ECB2A0ACCFD11D5A4ADBC56E3FDD0FC87FC6CBA5BD5960185AD6A1F7BA40163",
+  "terminalTail": [
+    "C:\\GUARANTEED",
+    "OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\scripts\\test-release-production-plugin-integrity.ps1 :",
+    "Unable to find type [IO.Compression.ZipArchiveMode].",
+    "At C:\\GUARANTEED",
+    "OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\scripts\\test-public-auth-sideload-build-controls.ps1:145",
+    "char:1",
+    "+ & $pluginIntegrityFixtureGate -RepositoryRoot $RepositoryRoot | Out-N ...",
+    "+ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~",
+    "+ CategoryInfo          : InvalidOperation: (IO.Compression.ZipArchiveMode:TypeName) [test-release-pr...n-integrit",
+    "y.ps1], RuntimeException",
+    "+ FullyQualifiedErrorId : TypeNotFound,test-release-production-plugin-integrity.ps1",
+    ""
+  ]
+}

@@ -1,0 +1,510 @@
+{
+  "scope": "SKU-M01 through SKU-M05 local qualification only",
+  "focused": {
+    "log": "focused-03.log",
+    "sha256": "1A234D30A13BCA4D059F31DC0B7FBC09445F185A36D234D8C193F3F16417061D",
+    "passed": 39,
+    "failed": 0,
+    "terminal": "8ab936",
+    "images": [
+      {
+        "file": "r5-offers-320x844-1.0-categories.png",
+        "sha256": "6B7B949A79E0368F33F97F8DF0B4A8BF7482A6984B1203F23A3C0A52310DBC94",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-expired.png",
+        "sha256": "E8CD13052BB705F73019F8245985EFABE7AD5BFB77A5AE3EABA862AD5F460D5F",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-header.png",
+        "sha256": "E63FE60F86D76A54C7CC0F860B5D9482EF8C36A6DE61FC74BBA0469FB67E8430",
+        "visuallyReviewed": true
+      },
+      {
+        "file": "r5-offers-320x844-1.0-initial.png",
+        "sha256": "AE8E9EE9B512BA08964270E1C240A07E4C93005A5F45E8CD88B7ADEBA88A6AAA",
+        "visuallyReviewed": true
+      },
+      {
+        "file": "r5-offers-320x844-1.0-products.png",
+        "sha256": "507110A1342EDA4102F909D16EAEB9E6A3069263A0E0B5EE4981D009A8F79E66",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-publisher.png",
+        "sha256": "9B35B705918B4C8AC8EDA5E299DECC956CD6CEF3CE9671A2DB192CCCEFA29655",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-recovered.png",
+        "sha256": "DCCB3A71F5BA7BDBDA5A0812AEE5CA0BD3B6D2A9A377804B1B4ED9002DAFCA08",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-retry.png",
+        "sha256": "B7CDD95AF5EAF74483D590B6E521475EB7820A139B121032936DA5E6BF1873E5",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-return.png",
+        "sha256": "C5D266CAD2AAD2458AC2EAC1AA803718FF9FB0BBBDB50B91F7AC79AA36D4CEFD",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-search-keyboard.png",
+        "sha256": "AAD4F487034DE6865DEDAD84C003D3FB633E93CE1F28FB5BF6CF4718B4842992",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-1.0-store.png",
+        "sha256": "DF88AB9D6141616FA12A30D6A461EE2B8BA4CE587270F9F47856882BD1AF9E6B",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-categories.png",
+        "sha256": "7F543458A3248606D6001B6568B40E4F8BC66BF750BF3F3981CDAAB883751E30",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-expired.png",
+        "sha256": "0ED298509E69C9838DC772C354A16AC761CA1012F2F1B1D4B2CD634820DA6CA4",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-header.png",
+        "sha256": "824CE7CAB203086F576EB98763CD338DE661E0E358DDB9DBEECBE0E073AA0E2C",
+        "visuallyReviewed": true
+      },
+      {
+        "file": "r5-offers-320x844-2.0-initial.png",
+        "sha256": "4AE64C2A65AE36DB8D7E6092E42004A7CED7314A77150D2A1D562ADBF363D530",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-products.png",
+        "sha256": "6BB4FFAC914B7C9787A01C844278D0875739E98C67EE444973AB037EC85D8EBE",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-publisher.png",
+        "sha256": "E03E6AE849AF1F10A11E78D7FE44322A742B65D86D7AD7252A9374373ABBC5F5",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-recovered.png",
+        "sha256": "EA9794841624B4F142251EC90C852EF9EBCC02C18609084719753A0FD14650EE",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-retry.png",
+        "sha256": "774A41B63EE304400648603F7CF1CEF34D8ADD96E965CC54FFF4ED1CF3D47FDF",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-return.png",
+        "sha256": "8AA623F9123EDD745F71DE2020A6D422A90A5015D85B8D0C0E568F12C34DFDC5",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-search-keyboard.png",
+        "sha256": "92E667E17311927BB1A0744162E5697621582EE0B3A406CAC250F9136CA3A1CD",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-320x844-2.0-store.png",
+        "sha256": "9049CAB24F5864AB1BE304DD457FA30F414FBCB2CCF0B8EE8964A2FEEB1FF2BA",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-categories.png",
+        "sha256": "A3F000A9BB0A8317C778F49813881BDA9D93817A5B979147982C174D46453D73",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-expired.png",
+        "sha256": "865B6422167C1148E4E68BE2BD823DE493B819EAAA5BBA702D2DE4FE9D629939",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-header.png",
+        "sha256": "0A6EBBE196661D84265D1D2640D0E8D5159EFCB46BFEF2A648DDF9B89D3B3C70",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-initial.png",
+        "sha256": "AB636EFCF87BED445BB73E9062B77509A5F22842F42179161F00BEDA705AF4D2",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-products.png",
+        "sha256": "48812B42DE79F3E24F4CD7D27A8E446695E266A37158B92C29A267DE18E70737",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-publisher.png",
+        "sha256": "3FA5CF992B1020D673A6EA51E6FB8046D0589BDB5C480624E461D18636CAE1F3",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-recovered.png",
+        "sha256": "9AA9DF8D5EDD01E20C701DB1B58854911E60DB56BFA03684432E1E27E7EFE5E0",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-retry.png",
+        "sha256": "E886F776363A3F9E95B7875A065F29C25370293C7934BCD9F200ADD925FA67F3",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-return.png",
+        "sha256": "C8BAF24ADC69DF73087270A309AE246B0E68AAF69B91BBC64ACC6EA1115CFFD7",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-search-keyboard.png",
+        "sha256": "D0B2C0472FD76F8074CE363D395F53BD30FCA7E21201B53AD693A145E8E7BCEA",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-1.0-store.png",
+        "sha256": "824A5063AD4D98640FAF4EA50A80C0F4E408980200E6203E51E78C5F96A34665",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-categories.png",
+        "sha256": "E21D7FFCBEB26107428CBE1FC94DB27E4F2FFAE5C7C14C7E1754FC256BEB821A",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-expired.png",
+        "sha256": "EAF76DE59CDB07FE7FAEA851D4B717E17972E428EA6C102C5733429DF0417397",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-header.png",
+        "sha256": "2CBD8E84E7963033DC5B5AF017B9C1471CEBCC39EEE4A6E930A56EFD2B64ABF8",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-initial.png",
+        "sha256": "1CE1DE9D87E24870F6B386FC075501864AB629DC1E7CDAF3D1425109CA6CF635",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-products.png",
+        "sha256": "8546C49C352D3AA3F161DB5F12CE0479660A7C9556AC887D817F4DE05CADA401",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-publisher.png",
+        "sha256": "2367B44686C2DAA196AF3C7CE4C06465E0A43D7F6621792C309AD921D9958CF7",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-recovered.png",
+        "sha256": "5C840BEBF3771B9DEE17DE401F18E5B6AD8FA65694DABE648FCAF6E6C3375157",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-retry.png",
+        "sha256": "CFBCC5AA2F12D3665E7272B8F067F575761DC6A6763831FDC9E3B6574E812E84",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-return.png",
+        "sha256": "3FCFF9D90CF404F5662791DA6746E21E13824D80E4449A28D6355320D92D98AD",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-search-keyboard.png",
+        "sha256": "AC49B3F58084CE5475580376BFE48B09687FD693662B4C1905D2A80934830570",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r5-offers-640x360-2.0-store.png",
+        "sha256": "1F5F8CEA253107839D39258145C0858F2A33EA22B0530ED0FDFF23EE0DDB1C54",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-320x844-1.0-manufacturer.png",
+        "sha256": "B018A0F385AE33ED8A915EF8433E9E991C0374B432682085C507E4C8D33FDCB3",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-320x844-1.0-retailer.png",
+        "sha256": "F5864101058B6324D555231042E3DA2EC9733C72322DF68566251A9B7C31FCDA",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-320x844-2.0-manufacturer.png",
+        "sha256": "AC6285674B7DCE25ABA7C2784A6E7F126511CF255D6E10C16335B55186CA25BE",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-320x844-2.0-retailer.png",
+        "sha256": "7FD84C8AA949BC9690EE3B7D51758F098B2E17BEEE411CA146E4CF4A6F8B9CE5",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-640x360-1.0-manufacturer.png",
+        "sha256": "EDD1EF77EDF6DF869A9CB0B5ADC5BE463A2C4553AD38AB03DA7C1E3641F66D60",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-640x360-1.0-retailer.png",
+        "sha256": "E2FC07FB36C94CDF97E464CD8599F18915139DCE38E34014E1BFA19BDACE51EC",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-640x360-2.0-manufacturer.png",
+        "sha256": "D8F21A5BDF63289D7C725A2E470F93A40BA70467213EF2F2E9F1330B2608F274",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-additional-benefits-640x360-2.0-retailer.png",
+        "sha256": "AD447DE42F0D3A9ED40C80B8BF637F94D089661828747CE92AD7F94B3FD9021D",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-320x711-1.0-last.png",
+        "sha256": "315AD63DA48805491EC9368184D4DCE5B1D0DC16927337FB76B3CE38797F88CF",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-320x711-1.0-open.png",
+        "sha256": "642BDB44BAA61FAE2B4874A8FED7D2D77A61D2DB226223F8AA12AC8FAD60A320",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-320x711-2.0-last.png",
+        "sha256": "F5AE12DD708F42D653B7AFA071395493133580CDDF80FA6161D1CD99EA5E2883",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-320x711-2.0-open.png",
+        "sha256": "184293089D4BA50112B4211639373092DBE263419BB7E42916C0004FF7CAE83E",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-711x320-1.0-last.png",
+        "sha256": "526BD8181B5C8E793E37E95F278F4342B7893B5F630D9AD345CC8B38D87EEF93",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-711x320-1.0-open.png",
+        "sha256": "7284A13E2F856BABA35E87B8CABCD5E4DB4299373F01B427963381F827C95CF3",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-711x320-2.0-last.png",
+        "sha256": "4173800F9548ADF438C55535CAFD5D3AAF0EE58E8CBD55A3B82168776BA255D0",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-s-curd-711x320-2.0-open.png",
+        "sha256": "373422A2684A893BB8367512355D7D6AB340F26F9B6E6034FB13989F681FF273",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-320x711-1.0-last.png",
+        "sha256": "C3A6EEC28EEB21A170897B1EF56F18E483F3680004B3E739397A1E3DD9494554",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-320x711-1.0-open.png",
+        "sha256": "0CAFF11790EB40D8FF437C8FDDEB61AA05336F7A773F76C22632F25DBA65ED02",
+        "visuallyReviewed": true
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-320x711-2.0-last.png",
+        "sha256": "EE674F1B1FA05033744092417D0074F4B10907705C78338F24BDC75432908FD2",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-320x711-2.0-open.png",
+        "sha256": "881BB21356E03D856E88F1EDF02B600E6242524F0EA28FC500AFD8A22810252B",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-711x320-1.0-last.png",
+        "sha256": "BE821756FE2A91C3493FC584A187123E4A6D2F1D8C5FCBB91FE61A0728895D9A",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-711x320-1.0-open.png",
+        "sha256": "AC1FCE0AC79AE7850D94A32F1F213C5699F43D63EFE685ABAB4B2CE650663D31",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-711x320-2.0-last.png",
+        "sha256": "9137330294190429C1F4A0BD402572C87AB083132370FBE830F0D7FB29136CB6",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "r669-small-catalogue-w-notebook-711x320-2.0-open.png",
+        "sha256": "680007BC48090609BD376DCB54174A073D0BCFC55FCA1CF6897A0D8CD17EA1EF",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-320-1.0.png",
+        "sha256": "EE8AA7AA3E97DB37A0611905C46A89412F66B499003F2F3A4B05ABED626E0413",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-320-1.3.png",
+        "sha256": "2FD96AEB56236D79BB8C0707B83E90655F899FFB20E9F73993F42AE6CEFD8DA6",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-320-2.0.png",
+        "sha256": "D9232F970AC7784085C1697B44E9F1B6A89A33EF8E80807D412546DF907EB4A1",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-360-1.0.png",
+        "sha256": "AAE2DADE44C315B1A30204EF4B948670E53636185B5D4F4103F1386674159A5C",
+        "visuallyReviewed": true
+      },
+      {
+        "file": "sku-baseline-shop-360-1.3.png",
+        "sha256": "301DC6BED152457705A10C2A20E002D1B25A84E74BAEA39D2EBB57922F1C80CC",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-360-2.0.png",
+        "sha256": "23E6247AACF1C4D4BE5DE299756B396443FADF4CBC20C28C7D04B1B80185B690",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-390-1.0.png",
+        "sha256": "06FB808052DDA83969BFC4DEB4D9B4713BB7BBFE3D1719069C05D3AD75E054F1",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-390-1.3.png",
+        "sha256": "75A580D30AE9063D51F792571E9F27C5711EBC950A406C7EB30B4F59F75ECCC8",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-shop-390-2.0.png",
+        "sha256": "19964BCC000030EFEB9E34B0F6DA7257D68E5F5F89837C16B3319ABD953A3507",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-320-1.0.png",
+        "sha256": "E6AD2F3DDF835D2396B191AD8767BF92CF655FDABE6062CAC58E7725093DAA18",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-320-1.3.png",
+        "sha256": "2216ABC77ED495A68600F5BAE99236D323B2AB13C84892EDC9084AA324AB2988",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-320-2.0.png",
+        "sha256": "91D620CA22582649E2A0A7F49DA3BF0CB6BE35949177226C54BF063CC9C55EF7",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-360-1.0.png",
+        "sha256": "105572E5247065E45DB31D0D1CC348D2CDCFBF862693EE02A3AE8960EABFDBB3",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-360-1.3.png",
+        "sha256": "655F3A154E4F3E68A6EC6694A8B8073BFD055B6C780FD20F3AFEA275D7F804DB",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-360-2.0.png",
+        "sha256": "B366AD9173933A78D7B6700909B4C3C43AB54198F4FC777AA0C74B95D38DEDA0",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-390-1.0.png",
+        "sha256": "EA1FFEDCC28F988952E31641313BA24D72951A89C5D487C57EEC94DD6CBB2487",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-390-1.3.png",
+        "sha256": "2DBA8B0550B17026FF923A00771BA518821D3BAEF335F695ADE754BFE2AD37BE",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-baseline-wholesale-390-2.0.png",
+        "sha256": "C994DCA23BB0221594256F390366FE17B55E4258467514E24809B8E5B6A55CE8",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-1.0-false-false.png",
+        "sha256": "C38D566AB4B817A3D0AD69813CB0B545D003FEC06F6DC7D6FC0AF3C4AA65C4D8",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-1.0-false-true.png",
+        "sha256": "737BC56CA1366AFDFAE96056C8B49FC8DFCF41C9D79C000E43E9893F35451D9C",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-1.0-true-false.png",
+        "sha256": "751E9823F0DCB10A77F9CA8FA7E479CD558862AC70CEE5F926B72D8DDDC7B6A8",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-1.0-true-true.png",
+        "sha256": "65AE5161FC5129B7317093B048CC1FCFC3342CFAFB55BAA8BBFA3A7F4A6933E2",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-2.0-false-false.png",
+        "sha256": "FA82BDC332CDB7E186B57EEFE9D8C56CBBB6A3493C167E59DBA5EF374544FB72",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-2.0-false-true.png",
+        "sha256": "EBACFEDCBB6BC511972FF25081A2085197F177A525AF8DF0E152B7B1881BEC96",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-2.0-true-false.png",
+        "sha256": "D5F82BAA426569B5D70BDB57E33E5B8E54A33A0833643954E5F570E5F035C01A",
+        "visuallyReviewed": false
+      },
+      {
+        "file": "sku-orders-2.0-true-true.png",
+        "sha256": "A3C29614C37E97A0F9813E995F2F5C3A369E9BDAB45C832428BDC35268B9EC19",
+        "visuallyReviewed": true
+      }
+    ]
+  },
+  "connectedPriorRun": {
+    "log": "partner-regression-02.log",
+    "sha256": "B151F4B6768FA373CF0523C13718BD47612CBB129B514AE7A6B880E73BD61786",
+    "passed": 103,
+    "failed": 4,
+    "terminal": "777618",
+    "cause": "Old padded seller label expectation; exact store ID assertion retained in correction."
+  },
+  "reusePriorRun": {
+    "log": "reuse-01.log",
+    "sha256": "D8D2F1184ED2F5DBA06247B23138693BB69CECA7FDC8A88837064964E1063AFC",
+    "passed": 31,
+    "failed": 3,
+    "terminal": "1c5bc6",
+    "cause": "Old packshot width, old Quick local wording, off-screen Offers Add gesture; fixes require new run."
+  },
+  "runtimeSource": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart": "119FEB4843AC1C3309604731D60AF160B4C5E28F040A2416011A520B4AD9B197",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "86A7BFC9D58632A8C6197FEC92EC43909102B140661768DBDDF944A510C4E844",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "F65B09A2C10100D49CD59546D599A5DF3D9293ABFF986BEE6326711C0D318693"
+  },
+  "limitations": [
+    "Full screen suite running separately; no inferred pass",
+    "No redesign APK built or installed",
+    "All five SKU tickets remain open",
+    "Existing 22 originals and sole child closures retained",
+    "Images at scrolled positions do not establish whole-journey visual acceptance"
+  ]
+}

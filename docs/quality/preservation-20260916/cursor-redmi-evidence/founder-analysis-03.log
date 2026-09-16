@@ -1,0 +1,5 @@
+Analyzing mobile...                                             
+
+warning - A value for optional parameter 'savedOnly' isn't ever given. Try removing the unused parameter - lib\ui_v2\buy\buy_v2_catalogue.dart:8936:8 - unused_element_parameter
+
+1 issue found. (ran in 79.8s)

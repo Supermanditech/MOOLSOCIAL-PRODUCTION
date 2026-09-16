@@ -1,0 +1,58 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart
+00:00 +0: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+The finder "Found 0 widgets with key [<'buy-recently-viewed-clear'>]: []" (used in a call to
+"getTopLeft()") could not find any matching widgets.
+
+When the exception was thrown, this was the stack:
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2095:7)
+#1      WidgetController.getTopLeft (package:flutter_test/src/controller.dart:1963:12)
+#2      WidgetController.getRect (package:flutter_test/src/controller.dart:2347:23)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1330:33)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:11 +0 -1: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+  
+00:11 +0 -1: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following assertion was thrown running a test:
+The finder "Found 0 widgets with key [<'buy-recently-viewed-clear'>]: []" (used in a call to
+"getTopLeft()") could not find any matching widgets.
+
+When the exception was thrown, this was the stack:
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2095:7)
+#1      WidgetController.getTopLeft (package:flutter_test/src/controller.dart:1963:12)
+#2      WidgetController.getRect (package:flutter_test/src/controller.dart:2347:23)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1330:33)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:21 +0 -2: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+  
+00:21 +0 -2: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0

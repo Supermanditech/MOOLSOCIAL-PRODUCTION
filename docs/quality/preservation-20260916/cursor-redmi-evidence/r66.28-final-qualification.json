@@ -1,0 +1,852 @@
+{
+  "recordedAt": "2026-09-15T22:22:20.480661+00:00",
+  "candidate": "UAW-CURSOR-SKU-ROWS-MEDIA-20260916",
+  "applicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+  "buildSeal": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+  "installation": {
+    "candidate": "UAW-CURSOR-SKU-ROWS-MEDIA-20260916",
+    "sourceHead": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+    "applicationSource": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+    "apk": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.28\\artifacts\\uaw-cursor-sku-rows-media-20260916-device-review-debug.apk",
+    "packageId": "com.moolsocial.app.cursorreview",
+    "versionName": "1.0.0-r66.28-cursorreview",
+    "versionCode": 2026091601,
+    "signerSha256": "CBDFC5969AD51ED570AFB1CF2FE60377E559D43F59D59E2AB66CCAF78EA9AC25",
+    "apkSha256": "B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8",
+    "bytes": 210821145,
+    "sourceManifestSha256": "3146E3ED92EC4810B2BDBB62D1C1A0A9B5A281CCED741E95743E9B5D17BE2224",
+    "runtimeProfile": "CursorUiReview",
+    "buildMode": "debug",
+    "promotable": false,
+    "permittedDevice": "TG8HCYTGGQT885OF",
+    "installation": "data_preserving_upgrade_succeeded",
+    "deviceVerification": "twelve_SKU_records_pending_device_qualification",
+    "installedChecksumEqual": true,
+    "installedApkSha256": "B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8",
+    "installedAt": "2026-09-16T03:11:54.522073+05:30",
+    "fontScale": "1.0",
+    "packagePreservationFieldsUnchanged": true,
+    "preferenceHashesUnchanged": true,
+    "reviewLanguageUnchanged": true,
+    "before": {
+      "fields": {
+        "userId": "10304",
+        "dataDir": "/data/user/0/com.moolsocial.app.cursorreview",
+        "firstInstallTime": "2026-08-27 15:09:48",
+        "versionCode": "2026091503 minSdk=24 targetSdk=36",
+        "versionName": "1.0.0-r66.27-cursorreview"
+      },
+      "preferenceHashes": {
+        "shared_prefs/FlutterSharedPreferences.xml": "79D6BB773C17225153384CB7DC66179A6DE773FBAA657DCA68DAD2F81F077620",
+        "files/datastore/FlutterSharedPreferences.preferences_pb": "1F50FAA257BB9669DE358BD0CC2367A9349B05466E4053C1B2ED4DC2ADC7524E"
+      },
+      "fontScale": "1.0",
+      "reviewLanguage": [
+        "en"
+      ]
+    },
+    "after": {
+      "fields": {
+        "userId": "10304",
+        "dataDir": "/data/user/0/com.moolsocial.app.cursorreview",
+        "firstInstallTime": "2026-08-27 15:09:48",
+        "versionCode": "2026091601 minSdk=24 targetSdk=36",
+        "versionName": "1.0.0-r66.28-cursorreview"
+      },
+      "preferenceHashes": {
+        "shared_prefs/FlutterSharedPreferences.xml": "79D6BB773C17225153384CB7DC66179A6DE773FBAA657DCA68DAD2F81F077620",
+        "files/datastore/FlutterSharedPreferences.preferences_pb": "1F50FAA257BB9669DE358BD0CC2367A9349B05466E4053C1B2ED4DC2ADC7524E"
+      },
+      "fontScale": "1.0",
+      "reviewLanguage": [
+        "en"
+      ]
+    },
+    "uiPreservationVerification": "pending actual launch and affected journeys",
+    "preUpgradeObservation": "r66.27 resumed with empty Shop body in captures019/020; Saved badge1 retained; no data cleared"
+  },
+  "sourceQualification": {
+    "path": "current-source-qualification-04.json",
+    "sha256": "C8F598EE3007D1486F66433731257C90B74A1B9FC99281DFC3470EB18B0E30B6",
+    "sourceOwnersVerified": 3044,
+    "combinedRuns": [
+      {
+        "passed": 2454,
+        "skipped": 27,
+        "failed": 0
+      },
+      {
+        "passed": 2454,
+        "skipped": 27,
+        "failed": 0
+      }
+    ],
+    "protectedReferenceExclusions": 10
+  },
+  "captures": [
+    {
+      "capture": "002-shop-ready",
+      "receiptSha256": "BE8FE107C8F427551A099506C8D561FC6D3B89A30D7D9F1B154CF3967132F043",
+      "files": {
+        ".png": "5c59b56c84dd32ad25b21bd84f04b3949b0dda954fecd58f0459c2af815d761a",
+        ".xml": "eb8a1ab5e7d2629cf3fa9584354002356f3baf3d5ec02ae3a675124eb9ea3bc8",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "003-shop-swipe-next",
+      "receiptSha256": "6C061BA01168065654D5243F2AEB0B7AE5D3B19A573B8EC5BB37946C35979174",
+      "files": {
+        ".png": "32325ad1dbe78c6a1d116adb956e82a5ee1009f2a1bb207ddd94a41d9f1a4284",
+        ".xml": "e3deab04b2dc989037844c00d162480c15ba2baa25debfb8073d30a16ed6c9ad",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "004-shop-swipe-back",
+      "receiptSha256": "816166CF1681258E8AEAC7F82BF9DA89F576A1B99D846F65E503059F0AF141F8",
+      "files": {
+        ".png": "bb6c83a8f563119a47d0bcda9c7eaf30031a394d1e5df4c4c69ae191016b64ed",
+        ".xml": "eb8a1ab5e7d2629cf3fa9584354002356f3baf3d5ec02ae3a675124eb9ea3bc8",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "005-shop-next-settled",
+      "receiptSha256": "88070469D42469CE4F8697DD0C351446F95EC99C0DC9C4FB1B39C68DBEC661DB",
+      "files": {
+        ".png": "f03921df526cf6e6a1589a07acd4b053eb0b7d4381c7d7d8f9bafaff28595b09",
+        ".xml": "e3deab04b2dc989037844c00d162480c15ba2baa25debfb8073d30a16ed6c9ad",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "006-shop-back-settled",
+      "receiptSha256": "FE3B5D4C33F89EAB9D1D6332DA7459ABD15764ED8C596AC493074818AFA13A90",
+      "files": {
+        ".png": "8fe199d0305a930a08236b176fb44f713823639d16d3288f9fe7b7f617862ddf",
+        ".xml": "eb8a1ab5e7d2629cf3fa9584354002356f3baf3d5ec02ae3a675124eb9ea3bc8",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "007-shop-vertical",
+      "receiptSha256": "E5F488405062351BF3359AA66942336BA93BE22ABAF6BA554D412465BF6B2C69",
+      "files": {
+        ".png": "8fe199d0305a930a08236b176fb44f713823639d16d3288f9fe7b7f617862ddf",
+        ".xml": "eb8a1ab5e7d2629cf3fa9584354002356f3baf3d5ec02ae3a675124eb9ea3bc8",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "008-shop-footer",
+      "receiptSha256": "312BDE4A02964CE48999C14137D86045B2521884077A70FEB034C8B8E2337EFE",
+      "files": {
+        ".png": "c7ca24e1709d4a8a652bf8795737c2dc63e477c5e6cc7216b182a351456c7ca7",
+        ".xml": "dc5ba8bab9a4d9f65c805d4b511e3144d5e8501fdb1b1e7043141a71bf8ef0ca",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "009-shop-footer-next",
+      "receiptSha256": "F329AB089658E17C6446C2E94DF489F42FA559AEC1F84ACDC0DB068CC31ED604",
+      "files": {
+        ".png": "eb240e9ba0dc10fb3194177c0b30869b26bf7b72137c0344d27d2f4d44a001a9",
+        ".xml": "e3deab04b2dc989037844c00d162480c15ba2baa25debfb8073d30a16ed6c9ad",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "010-shop-footer-return",
+      "receiptSha256": "F7EFD243981D947902261D2B3FDAF2BD29E80DC621709C12724ED6CBC1117338",
+      "files": {
+        ".png": "eb240e9ba0dc10fb3194177c0b30869b26bf7b72137c0344d27d2f4d44a001a9",
+        ".xml": "e3deab04b2dc989037844c00d162480c15ba2baa25debfb8073d30a16ed6c9ad",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "011-wholesale-top",
+      "receiptSha256": "6FA7AE1EC2B7B4ED413EE2CC7049347BEB87C0769F4D42FD07119E00DB0079C3",
+      "files": {
+        ".png": "fc1bcbdd24a6899c629faf466084d2943f73378c2adbf4fcc27ac87151ccd66c",
+        ".xml": "864e181f0df1217d771d485acee52530fbff02de4e8d7c7131f44e57d479914b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "012-wholesale-next",
+      "receiptSha256": "C2A66CC9741629EB32DB804F6D15B36106BF8F737C223F7C5741036B4CBD2C34",
+      "files": {
+        ".png": "fa1f0f4dc7b6e4516380206a80749956d617fd17d0f04e40edda2d42e7c6b0ed",
+        ".xml": "fadcc0dd632d278ed803379cb79e1021c705e33ccdf4a39bea429cc4596af954",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "013-wholesale-back",
+      "receiptSha256": "B982A3439E73B446BBF5B5C9F871F53C2C9FB239506E2069DD16AD6315921935",
+      "files": {
+        ".png": "31fb2fd94df6d5c1cdf81cfc13609e460e169f6b7a125d0454211e778700012b",
+        ".xml": "864e181f0df1217d771d485acee52530fbff02de4e8d7c7131f44e57d479914b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "014-wholesale-footer",
+      "receiptSha256": "22EC8DB342D5F9011E89680916830A146FCCE4288FE6C0AF03A426B648AA50E4",
+      "files": {
+        ".png": "2465187e42abacf04efe2ba32e885bc664661d693f52293b8146368234ecf7d2",
+        ".xml": "5225a80edf4de6a02d5c3e7062d9fd8430e8260e3c21bba6928ea64a0d36c0b9",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "015-bulk-top",
+      "receiptSha256": "A8F027749F80CCCAF7EC95E153537B796977C48DD86FA9A031DAF27F6629E249",
+      "files": {
+        ".png": "8d483217b1ec4b4f1f10f882eafaca47efaace4ca6b6e857e29dd113d500acad",
+        ".xml": "7ae6e66ddd60bcd930f30230b56a5f2508ea5283a77f0b8dff98adde3e9297a4",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "016-bulk-next",
+      "receiptSha256": "EBE7FBF0E0AA6A8A34C7BA53793DB3C4B900E7054AF6A92C0C63160883D8874F",
+      "files": {
+        ".png": "8d483217b1ec4b4f1f10f882eafaca47efaace4ca6b6e857e29dd113d500acad",
+        ".xml": "de2f06d248079a83bff81950f2c2aeb1c62b51eb88e76fd8770a9de1f6aa179d",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "017-bulk-back",
+      "receiptSha256": "45A193294FA7A05905B4F213EAA0FB0A4ACEE9733E0B24BE846F7F9E9EA26E8A",
+      "files": {
+        ".png": "8d483217b1ec4b4f1f10f882eafaca47efaace4ca6b6e857e29dd113d500acad",
+        ".xml": "de2f06d248079a83bff81950f2c2aeb1c62b51eb88e76fd8770a9de1f6aa179d",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "018-bulk-return-confirm",
+      "receiptSha256": "3FF1E6D5C26A72992EBB6C7D2E62356068E69C092EE710B0D19310ABCEA3B628",
+      "files": {
+        ".png": "b2253b9765cac78f2afbf60897c7b948b9da64f8716d6b7887410ca98102555c",
+        ".xml": "7ae6e66ddd60bcd930f30230b56a5f2508ea5283a77f0b8dff98adde3e9297a4",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "019-bulk-enlarged",
+      "receiptSha256": "FF0EECCDC80C4F97534B6A21F0E7F89A8A9378FD7387CAC3FB91F2DE9B8DA4F4",
+      "files": {
+        ".png": "a1a1a83d3c3ffafb7a5b1beeb99b504c72db1618b83940368047d1ac327ca9a7",
+        ".xml": "0468291d1efa1d628f9c887595a453892aa3108b40d95a1a71d7ed2e93e1f67d",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "020-shop-enlarged",
+      "receiptSha256": "B437BA1298113BBABA331B3768BBCFD75C82C9B6D7AB1F6232EB05D54DEB6AE1",
+      "files": {
+        ".png": "2d4b7a538b9ef403b9135883846995d0b82a1325fbe43cf499b1ef95df6a5795",
+        ".xml": "60143fb241ca95b68cbf0545e3462782e12c8487b093565576d529652b180366",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "021-shop-enlarged-previous",
+      "receiptSha256": "C895B72905FCF5202B0A71C48EB4E1DEABFA35C02CE1070D23845D641F39C73F",
+      "files": {
+        ".png": "ce16002100312421efe0bfe4577981c242f957a5e95025f3f24cc0de2213edd7",
+        ".xml": "db4673d5a0b96845953b901320961761e48b12d2958945ca8a68220caf482821",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "022-shop-enlarged-next",
+      "receiptSha256": "89F2F92F4A3F710DA8B4FF57F928C58099CD3EE62A3376E94BD6E5CF3B4BC118",
+      "files": {
+        ".png": "177997d4cc8e93367fc772814fae45a07892cfb32c59b5f1d274f271e92c8aac",
+        ".xml": "60143fb241ca95b68cbf0545e3462782e12c8487b093565576d529652b180366",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "023-saved-enlarged",
+      "receiptSha256": "77A2B2F0BBD2C2036686532A1B4D67D0969AECD4D7E59F21ABE7A088B9EE4D29",
+      "files": {
+        ".png": "55757d8359ee8d76a780e2bdc871663a02388058843d474c8faacfe559eb3140",
+        ".xml": "daaa2995a6d179bc282d74c7d5077a201d6199782648274191b02b4ca4498838",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "024-saved-enlarged-footer",
+      "receiptSha256": "2C95670D1E36434764DD8BC230AF461A63B37DD993D53509404ECEA8353C69AE",
+      "files": {
+        ".png": "3d07cae2fdc9497e86270043fce525ddd2ec9ab4e9496d512290a2db05ea6964",
+        ".xml": "9fdc500d8af5c4cca413cc899683a14d680c65523f6cb1328dc695535e0f767d",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "025-saved-normal",
+      "receiptSha256": "83133145FA1F7D0966AF92D7278BBAC404412B8DA70A4D638B20DC39681CC1D1",
+      "files": {
+        ".png": "f41dd4317b81c057a69804d26c84d2e6454c5cde18e8daac6f17b6aaace46b83",
+        ".xml": "895c572fcf476374638e8b3f4a831ebba5e8b515955160ecf4033a3be468a1dd",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "026-search-query",
+      "receiptSha256": "D4E38EDC608A65B121D644E8147C21B5A94BD4D93A7057173D0200B5B6CC6B10",
+      "files": {
+        ".png": "52ad5dbb52e79c8e3277482e54b7f12e9965312c4d33611119bc31f1e2d128c7",
+        ".xml": "a2aaf57441a6da2c24c77f39a8ef00bcad2bb53f67907ffecac648ef4ef280c6",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "027-search-top",
+      "receiptSha256": "A86C9DE7A3C760F0A0412739C257F3799F7D92B61008FB62AAC7B5B3C96263AA",
+      "files": {
+        ".png": "cfa5f84d896363ef749225289f4aab9cb60be99933fc1e51e0e295e14d0655a9",
+        ".xml": "e9fc9ae3e192614138ea37659a8bce39f0006f4fc713faa9fbfb4ca0cb3f867f",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "028-search-next",
+      "receiptSha256": "CAFB3A038C26E0FCDCA0C0367FF90B6E6E1BC61832418B9109EBAFB51D8CF59D",
+      "files": {
+        ".png": "cfa5f84d896363ef749225289f4aab9cb60be99933fc1e51e0e295e14d0655a9",
+        ".xml": "016ec6449848f5e4067bd1175c07bfe4f86f3db1900d6ef0e5f58ddfd719a52a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "029-search-back",
+      "receiptSha256": "E1EC62093FD2FA498C6780646B94585CECF4A543A22B6B947C334D6B27D51B0D",
+      "files": {
+        ".png": "3d1fe2ba0af919cf9d115629dfae7956974a71b6bc37e2591d4d4b41189e2344",
+        ".xml": "016ec6449848f5e4067bd1175c07bfe4f86f3db1900d6ef0e5f58ddfd719a52a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "030-search-footer",
+      "receiptSha256": "C4C3E0DA113EAB26E071447D05CC0E2C3477F149CB8396083854FA867F3012F2",
+      "files": {
+        ".png": "b4e68d3c63792e4ea55ae8eca599004e40110d89a41adfef70ec124664768aa1",
+        ".xml": "5b3f21378a768319adb80345f22cf78b22acfba3dae356cf40964cccb7567f9c",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "031-search-previous-confirm",
+      "receiptSha256": "9AF975D3AAB3CFE3EE019CEF01AF47B74BEACB6AD90A2C9CF2CB56F52A36D018",
+      "files": {
+        ".png": "569bb663a11ac82c8ec1a6dba9785e3fa5c06e31f5064bd55733fd846f99d820",
+        ".xml": "6fc44fb0bbb20712636db3e7dceb3905ae8cda5b43410c6b7386a132f6f8a64c",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "032-search-product-detail",
+      "receiptSha256": "865C57569841839B644105FD42788EF62BC80DFC118FF3475EB78D1642036060",
+      "files": {
+        ".png": "fc8902a059947ca7197fb57591dfaa98f1fbdd60e7202a36965dc597b60e1935",
+        ".xml": "d951b9072a1f71a39769d72e42086a31e49cc6ea3d76de5eb7b4032a19529a48",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "033-store-top",
+      "receiptSha256": "B91585267E3E45742FC1A2DDB56E6739B240C8017529C104258700389F4EBADB",
+      "files": {
+        ".png": "82fea606ce665655c3929b4fc758661bb946dc5f3ef0f4544a899445e07e1cd9",
+        ".xml": "6be9cebb14ae5ce97e8c176dc44f38c4de82fdee972ac2f7baaec856f8f41d96",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "034-store-horizontal-check",
+      "receiptSha256": "C89AFAB9468195A80313689216A2A9D540B47C110FD0ECE558147308B4428AD5",
+      "files": {
+        ".png": "28101b01ea9ab67833da5b16f4e6b50b5be2e326840d055f140c77f1999706f2",
+        ".xml": "6be9cebb14ae5ce97e8c176dc44f38c4de82fdee972ac2f7baaec856f8f41d96",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "035-store-full-catalogue",
+      "receiptSha256": "AD726A78CC13735A31B21C4E6217E8BFE454B4C3813949005F0D5A8958D0D6AE",
+      "files": {
+        ".png": "65b953f7e8f1769e6f58f37c0c7f13db1ec884726a6e35c4bccc69b6f5dc105c",
+        ".xml": "a58dfa8545d504f45cb5bd8cbd65b454bd31ecbc308f0397ec8f09717dbc026b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "036-store-next",
+      "receiptSha256": "A466ABC87C33117AB096FC2074F070646746A3F84B17041CB194250BFF9B06BE",
+      "files": {
+        ".png": "565b25357f08e1f7ee214e280a0c69f0c43291dacc974d0f83b3fc989cbc145a",
+        ".xml": "dbb13376c7097e00c303f7c4ad94945a216781337f91126fc122fa9cc35221bd",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "037-store-back",
+      "receiptSha256": "E25FCB709F8A4881EBBB48B77B9DF339CE91CCE08F273B81CAC5030B2DD19148",
+      "files": {
+        ".png": "c449d95adb4b1b8723cce357b80dc2677637f9c276e23c854e46901d39ec9847",
+        ".xml": "a58dfa8545d504f45cb5bd8cbd65b454bd31ecbc308f0397ec8f09717dbc026b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "038-store-footer",
+      "receiptSha256": "9A9DD42EE93CBE5627C3251C23EBFEFB954283B8EAB1C6F187931302D60C33C7",
+      "files": {
+        ".png": "5819da41a95ffb39e6728d818dc228792123b3fad37804c0735761e2f9e89671",
+        ".xml": "817a63b9abd89b1cb68b376987cfee0441fbd0c980b74b14729ffc6d50fdc078",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "039-store-search-return",
+      "receiptSha256": "D8CC245DD5229809A2A482D6FB635D82BF8DB9A622E5C5B56B17C1A847CFF134",
+      "files": {
+        ".png": "5b73529d50704349c023b23d17278796508edf4edb4b048c9d8ff5d0ac51a27f",
+        ".xml": "6fc44fb0bbb20712636db3e7dceb3905ae8cda5b43410c6b7386a132f6f8a64c",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "040-offers",
+      "receiptSha256": "446C9C8E930E95F391E594007E889CFA70FEE70F54F69B958D9F09EF25DBAAB7",
+      "files": {
+        ".png": "d9c43bf307ac8c62ee23627375500f960d13855e4fa5d71464d42e3c26893fb3",
+        ".xml": "052ac97b87ee36d6da6cc307488a3077caf3947d87591fe61b7395d57679141c",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "041-offers-ready",
+      "receiptSha256": "A25C28859431E715D14107AF7B5B319FE774653E8F32A11E25203448045F981F",
+      "files": {
+        ".png": "7bce6ec6ef349e916298db34f689e91bbb5c9dbb1a63f969ce5d21e6d9845dcc",
+        ".xml": "78647a96c89390fbfef3e2106e2b849f10b1d337018aabc4c973ca8da01dbd90",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "042-manufacturer-offer",
+      "receiptSha256": "E85836BE90EACBA6F755E467814CA9E216435E17A2B70F61D631B533CCF2CCD2",
+      "files": {
+        ".png": "f133180c44cf127a73431d8e2ed94ebec2d841c531e49cd82e6f7474f15983df",
+        ".xml": "5bb5cd3aad3ecd0f06af008410fe7ed280c1ca59efb2f69331e8064aabde7fb3",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "043-manufacturer-detail",
+      "receiptSha256": "0F249A884259AC1C6038872C86C71D259783D4A9986197512A803A944B77DBA0",
+      "files": {
+        ".png": "6a34698e8b17009896de78a3d319ccac6eea48ac27be638b4c726e59ae1690a3",
+        ".xml": "d38fdce539fb0c7ca3db75ff710bcde896721a5be9b95d0223f53a867bfe009b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "044-manufacturer-seller",
+      "receiptSha256": "CD898632BEF829DB73424912C03C65F8022790AAAB978888E5EAC714EE1A47CC",
+      "files": {
+        ".png": "6a34698e8b17009896de78a3d319ccac6eea48ac27be638b4c726e59ae1690a3",
+        ".xml": "d38fdce539fb0c7ca3db75ff710bcde896721a5be9b95d0223f53a867bfe009b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "045-manufacturer-lower-details",
+      "receiptSha256": "C0F75319EBFDF3BD4DD714AA710321CD150525144965257765C66DA63B1B9D43",
+      "files": {
+        ".png": "21a44ef2ada813d5ab52439995af36d3743581eef50f0db689a83cda2836ed82",
+        ".xml": "7276f8f8dd3bbb417e8d89ea5a39531e0cb79aefef548c0e7f24c0e8bb35c7ed",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "046-ratings-seller-normal",
+      "receiptSha256": "7A5C7BBE178EB83173ACE020D778A973A46B7762BB87C1889E49458F10C97157",
+      "files": {
+        ".png": "2b28a30697825517fa37253c4353b808653c7c91edd7ec6ca1c4c7aa9fbda084",
+        ".xml": "61982843a0117a40b69f886d6473b02ae4c150f65a2f51ab5b747f6247333c87",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "047-ratings-seller-visible",
+      "receiptSha256": "7F4E7963CBE9154EF702EB54C45EC3983700F19967FF9E3F5CE09CEE193C158D",
+      "files": {
+        ".png": "7eeb52031c06ccad7d7b9430f867865dd93aca6d42a14c61da858fdd390c6b24",
+        ".xml": "b08ac70402b24fae03acb82fc5fafaf7f95723d2a7341e73dacd0c1af3132ec7",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "048-manufacturer-enlarged",
+      "receiptSha256": "EB746A4D2044DA2D898281EDD6A87C116085BAD99962508F05265B9AD545F0A6",
+      "files": {
+        ".png": "c3e072a48f10349acc38714cfaccdaacfcb28426a7e2b2f9baf43e61b5aca358",
+        ".xml": "3674f8a4419ef903b13c775caca5fe725b76c54d95d15725b10f910f271c3668",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "049-ratings-seller-enlarged",
+      "receiptSha256": "D6A0643EA7B1EDD851C48993E694DDD2C4ABB2B7D1EB3E2590A600D3E1BD4D9F",
+      "files": {
+        ".png": "1eabb84898f7cfb98e778d58a7fddb62609b392a5b79436e84cbbf6db94c422d",
+        ".xml": "2626b21c91b49078488da462603e53d67f72c0761adb063a0fa96751c634802e",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "2.0"
+    },
+    {
+      "capture": "050-offers-return",
+      "receiptSha256": "7D37F6A5CED9B7A6DE32EBD30D2389A0EE4359A168C0352FD85C1692EDB69E4B",
+      "files": {
+        ".png": "90bf5fa895f9a90a963cf9f37497191ad38cadca7d37deb1626cc7a805d41519",
+        ".xml": "5bb5cd3aad3ecd0f06af008410fe7ed280c1ca59efb2f69331e8064aabde7fb3",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "051-shop-return",
+      "receiptSha256": "C16590A94280D959B87559E7CFFD277C1919BC636CBE75E6B3F0B6E297075C3D",
+      "files": {
+        ".png": "9abf5baa8a966bd76810c7827181924492e0a4f5a4a90bd170a3640bf046b5a7",
+        ".xml": "fa6556b617ee4e10fc133e4f3efd31a2480635ba7ec27158ce0abbf572de3142",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "052-shop-pull-refresh-final",
+      "receiptSha256": "59ED7F2F9E374357FAB2A21415E458CC10EA9F657840FACF4CF65D01073BEA80",
+      "files": {
+        ".png": "ca212258fef4c71c94830f45f588b601067cac1f922bcf5a8d8603bba7071f60",
+        ".xml": "fa6556b617ee4e10fc133e4f3efd31a2480635ba7ec27158ce0abbf572de3142",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "053-categories",
+      "receiptSha256": "3B2B5EECB4618F2279D24F9EB064A0766F8C7A39AAE8DD6C69C5BF537B76F818",
+      "files": {
+        ".png": "2cdc74190f5d083df5253072e640f00b1a3fd347930b62a5953706d213543d3b",
+        ".xml": "83266ac5dc0eb50dad0a43ccd7ec3bf392c555860b199ffc2d5e273d255487cf",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "054-fruit-category",
+      "receiptSha256": "51574A3E0F01A5E438492578F39BD51690AEA42B1F8FD14189644EC0B75EC06F",
+      "files": {
+        ".png": "f85d9102d6a183539ff5774dcebfc8a2737d2ce136d7a29ead4fd856359b992a",
+        ".xml": "9d95a1c48415fd982969e20ce347682581993bd05c247cff209dd7191c3e8875",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "055-fruit-vertical",
+      "receiptSha256": "69B8618865C795206673F47768ECFD8918F64E2F0CA7D17E9B5158280D653BB6",
+      "files": {
+        ".png": "ce57092df9546d8fcdece0c43a068153ff9c90ef2cb4b3db8478db04381264b1",
+        ".xml": "1a004b7339f49e2425d25a0aa45ba8446d53265ed899514d397680b05f29a946",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "056-final-shop-for-you",
+      "receiptSha256": "E6025E4BDB885293B4C3D404A1404349ABEA4BB454255A4FFD72D97588800D64",
+      "files": {
+        ".png": "b47d0aff6b840527da572c7f61501bc992d42d1e5c01269ebcb65fb351c5f71d",
+        ".xml": "fa6556b617ee4e10fc133e4f3efd31a2480635ba7ec27158ce0abbf572de3142",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "057-supplier-entry",
+      "receiptSha256": "305D909DC9D6842C9A692940FCDAFF9141F998CC497B2760B7883E80E2370C2A",
+      "files": {
+        ".png": "b8783106bbf0741d3e8d5306ee02e6c2bc63b926d9ffa49c7e9c70df12268ee1",
+        ".xml": "b5ff059d8dfce3772385ea9211dcfdc59e0e502e1140be188dc5cc0c1d87cb6f",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "058-supplier-products",
+      "receiptSha256": "5245C0C6DB6280C86AFD5775BDCFFE3B731F38DAFBCFDA30127EB149FE326712",
+      "files": {
+        ".png": "edeca35b58287bf2b495e420e0a4e93e7ec0534dade0482c217829aff82d4572",
+        ".xml": "31b8490a74a3907ae44cbec92cada74c45c84daf359945d15e7aaef9edee188b",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "059-supplier-full",
+      "receiptSha256": "9807CB6E4C49B3629B2DDB018DF8B5615AC2AB868EA2DC2A7A7C97E6760425B0",
+      "files": {
+        ".png": "74d0cddb491696095a5aff514c49332e0741efa423d280a46a98701ac4d2e62f",
+        ".xml": "b657435bdadc7b3acefd33d16c773f22ad4acd7241d386484007b58666f35729",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "060-supplier-next",
+      "receiptSha256": "917D5C78149D234E2C7A1E1F62F2A6BD5C523FD8ADE44C3C9CE5064FEDA9F69D",
+      "files": {
+        ".png": "20913638297a4d64c3b7d57c53726981b8a5801f492c9274938754bbab20f73c",
+        ".xml": "55815daeb8da01f71eac068da05ffdd38c0f945ae949506a08d9a2af4f12645a",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "061-supplier-back",
+      "receiptSha256": "A2A20061FFAC442F09C654EC4649D594F5F019A5FEBA087DE72519D49635A541",
+      "files": {
+        ".png": "74d0cddb491696095a5aff514c49332e0741efa423d280a46a98701ac4d2e62f",
+        ".xml": "b657435bdadc7b3acefd33d16c773f22ad4acd7241d386484007b58666f35729",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "062-supplier-footer",
+      "receiptSha256": "F299027D410C5FF9876C874B5F2886DCDB868FD224B9C65F82FB76CCB2A0788D",
+      "files": {
+        ".png": "f719d5b6dbc5885b9623358faecb63dc6f978e47837d46caa84cb0e089dec3b5",
+        ".xml": "7e3804df54e768454fc5eb090affef5bd518a41ee12b91a05ac7b82cbeb339fc",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    },
+    {
+      "capture": "063-final-restored",
+      "receiptSha256": "62687375D8B4BF4F0E67F78310D71E9197DA4163CB3F81C47BB8539A6F12D76B",
+      "files": {
+        ".png": "516dca8dd9aaa42c4c162a99da7a96d6a22b336f5ffcadeb2aebd9b62cd7d278",
+        ".xml": "fa6556b617ee4e10fc133e4f3efd31a2480635ba7ec27158ce0abbf572de3142",
+        ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+      },
+      "fontScale": "1.0"
+    }
+  ],
+  "manualAcceptedImages": [
+    2,
+    5,
+    8,
+    11,
+    12,
+    14,
+    15,
+    16,
+    19,
+    20,
+    21,
+    23,
+    24,
+    25,
+    27,
+    30,
+    31,
+    32,
+    33,
+    35,
+    36,
+    38,
+    39,
+    40,
+    42,
+    45,
+    46,
+    47,
+    48,
+    49,
+    51,
+    52,
+    53,
+    54,
+    55,
+    56,
+    57,
+    58,
+    60,
+    62,
+    63
+  ],
+  "tickets": [
+    {
+      "id": "SKU-M01",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Current normal/enlarged catalogue, full image/control separation; final local 25 media profiles.",
+      "captures": "002,011,015,019,020,023,025,058"
+    },
+    {
+      "id": "SKU-M02",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Customer product/seller wording; lower manufacturer Seller fixed at normal and 2x.",
+      "captures": "032,042,047,049"
+    },
+    {
+      "id": "SKU-M03",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Offer selection, conditions and product/Back preserved; prior enlarged Offer proof retained.",
+      "captures": "040,042,050; r66.26:018,019,020,033"
+    },
+    {
+      "id": "SKU-M04",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Prior actual normal/enlarged Order and Track/Back evidence retained with unchanged Orders runtime and final combined tests.",
+      "captures": "r66.26:014,015,016,017"
+    },
+    {
+      "id": "SKU-M05",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Affected Saved/Search/Store/Supplier current-device checks; unchanged Cart/Recent evidence retained.",
+      "captures": "023,025,027,031,032,035,037,038,039,058,059,061,062; r66.26:003,005,006,008,010,024,025,031,038,040,046,048"
+    },
+    {
+      "id": "SKU-M01-C01",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Yellow emphasis fits price only, without vacant blue panel.",
+      "captures": "002,011,015,025,035,058"
+    },
+    {
+      "id": "SKU-M01-C02",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Three columns at normal scale; adaptive readable enlarged layout.",
+      "captures": "002,011,015,019,020,023"
+    },
+    {
+      "id": "SKU-M05-C01",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Same page state reachable by gestures at top/bottom and local accessibility actions; visible controls superseded by C05.",
+      "captures": "002,005,006,008,009,030,031"
+    },
+    {
+      "id": "SKU-M05-C02",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Vertical products and category selection/discovery.",
+      "captures": "008,014,038,053,054,055,062"
+    },
+    {
+      "id": "SKU-M05-C03",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Available provider facts readable on device; extreme names/badges/prices qualified with local fixtures; publication dependency separate.",
+      "captures": "019,023,024,047,049,058; current-source-qualification-04.json"
+    },
+    {
+      "id": "SKU-M05-C04",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Next/previous on Shop, Wholesale, Bulk, Search, Store and Supplier; query/context retained.",
+      "captures": "002/005/006;011/012/013;015/016/018;020/021/022;027/028/031;035/036/037;059/060/061"
+    },
+    {
+      "id": "SKU-M05-C05",
+      "status": "closed_for_scoped_cursor_review_ui",
+      "qualification": "Both complete product control rows and their reserved height absent; accessibility ranges retained without painted rows.",
+      "captures": "002,008,011,014,027,030,035,038,059,062"
+    }
+  ],
+  "sourceParityFromR6626": [
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart"
+  ],
+  "preservation": "Data-preserving install; UID/dataDir/first install and language/preferences unchanged. Saved atta remains 1, font restored 1.0, no quantity changes, transactions or messages; browsing history retained. Final Shop For You restored at 063.",
+  "excludedEvidence": [
+    "001 partial splash/XML failure",
+    "003 transitional PNG; XML only for page state",
+    "007,010,017,029,034,044 unchanged/intermediate attempts not counted as transition passes",
+    "026 partial query superseded by 027",
+    "041 incidental profile drawer dismissed without changes",
+    "Earlier failed/interrupted local runs preserved, not passed"
+  ],
+  "deviceErrorLog": {
+    "path": "r66.28-final-device-errors.log",
+    "bytes": 0,
+    "sha256": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+    "scope": "current app PID since 2026-09-16 03:12; empty log is bounded evidence, not an exhaustive crash guarantee"
+  },
+  "limits": [
+    "Review-only debug APK; no production promotion or whole-app readiness claim.",
+    "R668-AUDIT-MEDIA-002 provider media publication remains OPEN with separate backend owner. Device illustration assets and local decoded photo fixtures do not prove live provider photo/video publication or playback.",
+    "Orders/Cart/Recent prior device evidence explicitly reused because corresponding runtime owners are unchanged; not represented as newly replayed r66.28 journeys.",
+    "27 inherited skips and ten protected-reference exclusions are not passes; frozen reference drift remains separately disclosed.",
+    "Prior 22 RV6 originals and D005-C01 closures preserved.",
+    "Final Git handoff is proven separately by r66.28-final-git-handoff.json; no integration or founder production acceptance implied."
+  ]
+}

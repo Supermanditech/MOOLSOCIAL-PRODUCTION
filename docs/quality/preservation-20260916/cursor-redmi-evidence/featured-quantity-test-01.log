@@ -1,0 +1,26 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart
+00:00 +0: R66 quantity targets featured quick at 320.0 / 1.0
+00:04 +1: R66 quantity targets featured quick at 320.0 / 2.0
+00:07 +2: R66 quantity targets featured quick at 360.0 / 1.0
+00:10 +3: R66 quantity targets featured quick at 360.0 / 2.0
+00:11 +4: R66 quantity targets featured quick at 430.0 / 1.0
+00:14 +5: R66 quantity targets featured quick at 430.0 / 2.0
+00:15 +6: R66 quantity targets featured scheduled at 320.0 / 1.0
+00:17 +7: R66 quantity targets featured scheduled at 320.0 / 2.0
+00:18 +8: R66 quantity targets featured scheduled at 360.0 / 1.0
+00:20 +9: R66 quantity targets featured scheduled at 360.0 / 2.0
+00:21 +10: R66 quantity targets featured scheduled at 430.0 / 1.0
+00:23 +11: R66 quantity targets featured scheduled at 430.0 / 2.0
+00:24 +12: R66 quantity targets featured wholesale at 320.0 / 1.0
+00:27 +13: R66 quantity targets featured wholesale at 320.0 / 2.0
+00:29 +14: R66 quantity targets featured wholesale at 360.0 / 1.0
+00:32 +15: R66 quantity targets featured wholesale at 360.0 / 2.0
+00:35 +16: R66 quantity targets featured wholesale at 430.0 / 1.0
+00:38 +17: R66 quantity targets featured wholesale at 430.0 / 2.0
+00:40 +18: R66 quantity targets featured bulk at 320.0 / 1.0
+00:40 +19: R66 quantity targets featured bulk at 320.0 / 2.0
+00:40 +20: R66 quantity targets featured bulk at 360.0 / 1.0
+00:40 +21: R66 quantity targets featured bulk at 360.0 / 2.0
+00:41 +22: R66 quantity targets featured bulk at 430.0 / 1.0
+00:41 +23: R66 quantity targets featured bulk at 430.0 / 2.0
+00:41 +24: All tests passed!

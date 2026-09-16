@@ -1,0 +1,36 @@
+{
+  "state": "source_corrections_in_progress_not_qualified",
+  "head": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "registryGeneration": 4588,
+  "changes": [
+    "strict exact-value structured fixture display mapping and missing-brand omission",
+    "complete Wholesale dock text and phone-width stacked layout",
+    "Cart stacked layout when inline metadata exceeds two lines"
+  ],
+  "focusedCopyTest": {
+    "exitCode": 0,
+    "passes": 1,
+    "toolCompletion": "508f7e",
+    "log": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\correction-copy-test-01.log",
+    "sha256": "F8CB1AC1E4E0D63F839428AC22437F09FE1C6F7822BF211B787C44CA55600101"
+  },
+  "dockRegressionAddedNotRun": true,
+  "remaining": [
+    "rendered lower metadata and Cart assertions",
+    "focused layout tests and actual Flutter visuals",
+    "analysis and required combined regressions",
+    "source commits and exact admission gates",
+    "unique successor build and Redmi qualification",
+    "final clean live Git equality"
+  ],
+  "formatRecovery": {
+    "oldSession": 2311,
+    "terminalExit": 1,
+    "terminalTool": "9b18ee",
+    "retryExit": 0,
+    "retryTool": "cc156d",
+    "detail": "Original format launcher remained live without SDK child. Stop-Process returned error and did not stop it; Ctrl-C terminated session. Confirmed original launcher absent before SDK-access retry."
+  },
+  "newApkBuilt": false,
+  "ticketsClosed": 0
+}

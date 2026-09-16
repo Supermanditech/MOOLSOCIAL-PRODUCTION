@@ -1,0 +1,16 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/test-cursor-ui-review-build-profile.ps1",
+    "-RepositoryRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913"
+  ],
+  "exitCode": 0,
+  "sha256": "C337E4A1B5695870264C6AB2D0CC66EABA156EF1C936FE084D3ACAE7D63D9A7C",
+  "requiredMarker": "CURSOR_UI_REVIEW_BUILD_PROFILE_TESTS_PASSED",
+  "passed": true
+}

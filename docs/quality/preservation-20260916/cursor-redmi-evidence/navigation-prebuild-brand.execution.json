@@ -1,0 +1,18 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-brand-integrity.ps1",
+    "-Surface",
+    "App",
+    "-IntegratedReviewSourceCommit",
+    "64ca4d757cffc1cc1fa575b84004cd827e6695ab"
+  ],
+  "exitCode": 0,
+  "sha256": "E341B22E21DC52E37C1E715BF599CA66A5D86EE475663AA49616839293F9A517",
+  "requiredMarker": "Brand integrity gate passed for surface: App",
+  "passed": true
+}

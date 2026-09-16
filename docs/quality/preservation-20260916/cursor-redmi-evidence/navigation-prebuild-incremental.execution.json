@@ -1,0 +1,30 @@
+{
+  "command": [
+    "pwsh",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-cross-agent-incremental-ticket-gate.ps1",
+    "-Phase",
+    "pre_build",
+    "-Lane",
+    "cursor_ui",
+    "-TicketId",
+    "UAW-CURSOR-SKU-METADATA-20260914",
+    "-UiScope",
+    "buy.sku_metadata",
+    "-CandidateVersionName",
+    "1.0.0-r66.27",
+    "-CandidateVersionCode",
+    "2026091503",
+    "-PackageId",
+    "com.moolsocial.app.cursorreview",
+    "-RepositoryRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913"
+  ],
+  "exitCode": 0,
+  "sha256": "B3127B9FE0E177B1E18CD6BC285AF17DEDFB68797D7439F87D1AB0DDF2014402",
+  "requiredMarker": "Incremental ticket gate passed:",
+  "passed": true
+}

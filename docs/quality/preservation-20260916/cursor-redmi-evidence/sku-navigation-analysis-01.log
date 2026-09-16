@@ -1,0 +1,6 @@
+Analyzing 4 items...                                            
+
+   info - Statements in an if should be enclosed in a block. Try wrapping the statement in a block - lib\ui_v2\buy\buy_v2_catalogue.dart:1262:25 - curly_braces_in_flow_control_structures
+   info - Parameters ''providerCount' and 'skusPerStore'' could be super parameters. Trying converting ''providerCount' and 'skusPerStore'' to super parameters - test\ui_v2\buy\buy_v2_partner_catalogue_test.dart:4258:3 - use_super_parameters
+
+2 issues found. (ran in 5.4s)

@@ -1,0 +1,26 @@
+{
+  "source": "253cbe16da07f069c878bed8f0f5722b8c4aa29c",
+  "positiveGates": [
+    {
+      "gate": "check-approved-ui-locks",
+      "exitCode": 0,
+      "logSha256": "23BD281814268EBAC8017055B27CE88A70E1F27E9861447B2BA86C656E44DA59"
+    },
+    {
+      "gate": "check-buy-protected-baseline",
+      "exitCode": 0,
+      "logSha256": "EFA46F0CB8E9490241426B112ED2AC29E142E096B834C00AF26D8662C17FD480"
+    },
+    {
+      "gate": "check-buy-backend-contract-boundary",
+      "exitCode": 0,
+      "logSha256": "04DA433522049BC3C857F7861B331F3F63D25A12F0BEBABFA1746BDD3544DA1F"
+    },
+    {
+      "gate": "check-buy-data-egress-boundary",
+      "exitCode": 0,
+      "logSha256": "B09DF2D1B2EC325047E26237FD71A5DAFA50DFA29177476EA3E83BCDC425EF86"
+    }
+  ],
+  "negativeReceiptSha256": "B2B8CC0E504CF1DD6F6173F80B9A97D5CB3E0446D7799C2EE122FD42AF78ACC4"
+}

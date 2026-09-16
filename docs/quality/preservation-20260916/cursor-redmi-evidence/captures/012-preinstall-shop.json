@@ -1,0 +1,17 @@
+{
+  "sourceHead": "32630c34df17d52bb0ac74156fb1580177977d9d",
+  "apkSha256": "E013B698C7F4BDA6FA92CF9BFA6219B686148EA89079F7FE1DD46D8220190AF8",
+  "installationReceiptSha256": "01502AFB9FBD621E777FB2220803A4D2F662E8DAB4390D48FEC380457099A885",
+  "fontScale": "1.0",
+  "label": "012-preinstall-shop",
+  "serial": "TG8HCYTGGQT885OF",
+  "version": "1.0.0-r66.24-cursorreview",
+  "capturedAt": "2026-09-15T03:24:34.201924+05:30",
+  "uiautomatorExit": 0,
+  "stderrBytes": 1988,
+  "files": {
+    ".png": "0cae8d6f1b3fcff060f90b10b0907023e9c06d6c9e042115f5d07e74aa74ea14",
+    ".xml": "38a461eac12b1b5d33ae067d171b49ebd2a8e2ad5908a1cbac44130a633b5b4a",
+    ".stderr.txt": "ae9bfed8ef3c44f6c9e8659d19c231c42c9acffc1e67c71446ec0448e821838f"
+  }
+}

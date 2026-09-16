@@ -1,0 +1,22 @@
+{
+  "command": [
+    "powershell",
+    "-NoProfile",
+    "-ExecutionPolicy",
+    "Bypass",
+    "-File",
+    "scripts/check-codex-development-regression-memory.ps1",
+    "-Phase",
+    "build",
+    "-BuildMode",
+    "debug",
+    "-RepositoryRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+    "-EvidenceArchiveRoot",
+    "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904"
+  ],
+  "exitCode": 0,
+  "sha256": "DD9DF3EF98AC9C50DAD6206F20A475BD1512CAFA91E7C934C9BB6FA3E5954771",
+  "requiredMarker": "Codex regression memory passed: entries=4589; applicable=224; phase=build; buildMode=debug.",
+  "passed": true
+}

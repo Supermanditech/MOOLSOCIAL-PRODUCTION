@@ -1,0 +1,5 @@
+Exception: C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\scripts\check-codex-development-regression-memory.ps1:76
+Line |
+  76 |      throw 'Regression evidence archive root is invalid or unavailable …
+     |      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | Regression evidence archive root is invalid or unavailable.

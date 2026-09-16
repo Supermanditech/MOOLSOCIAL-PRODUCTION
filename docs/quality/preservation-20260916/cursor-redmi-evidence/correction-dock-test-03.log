@@ -1,0 +1,49 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart
+00:00 +0: ready trade decision leads with MOQ, total and genuine signal
+00:03 +1: missing optional signal stays hidden and does not block trade
+00:03 +2: loading and adapter failure retain current trade facts
+00:04 +3: stale offer blocks Cart and exposes both recovery paths
+00:05 +4: compact Android and iOS insets keep the trade action usable
+DOCK_GEOMETRY Size(360.0, 800.0) 1.0 Bulk [TextBox.fromLTRBD(0.1, -0.0, 22.9, 12.0, TextDirection.ltr)] owner=Size(193.2, 12.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 1.0 freight [TextBox.fromLTRBD(25.3, -0.0, 60.5, 12.0, TextDirection.ltr)] owner=Size(193.2, 12.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 1.0 · [TextBox.fromLTRBD(62.9, -0.0, 66.7, 12.0, TextDirection.ltr)] owner=Size(193.2, 12.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 1.0 Dispatch [TextBox.fromLTRBD(69.1, -0.0, 115.3, 12.0, TextDirection.ltr)] owner=Size(193.2, 12.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 1.0 within [TextBox.fromLTRBD(117.8, -0.0, 150.1, 12.0, TextDirection.ltr)] owner=Size(193.2, 12.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 1.0 one [TextBox.fromLTRBD(152.5, -0.0, 171.8, 12.0, TextDirection.ltr)] owner=Size(193.2, 12.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 1.0 day [TextBox.fromLTRBD(174.3, -0.0, 193.3, 12.0, TextDirection.ltr)] owner=Size(193.2, 12.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 2.0 Bulk [TextBox.fromLTRBD(0.1, -0.1, 44.6, 24.1, TextDirection.ltr)] owner=Size(336.0, 48.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 2.0 freight [TextBox.fromLTRBD(49.3, -0.1, 117.9, 24.1, TextDirection.ltr)] owner=Size(336.0, 48.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 2.0 · [TextBox.fromLTRBD(122.5, -0.1, 129.8, 24.1, TextDirection.ltr)] owner=Size(336.0, 48.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 2.0 Dispatch [TextBox.fromLTRBD(134.4, -0.1, 224.8, 24.1, TextDirection.ltr)] owner=Size(336.0, 48.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 2.0 within [TextBox.fromLTRBD(229.4, -0.1, 292.6, 24.1, TextDirection.ltr)] owner=Size(336.0, 48.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 2.0 one [TextBox.fromLTRBD(297.2, -0.1, 335.1, 24.1, TextDirection.ltr)] owner=Size(336.0, 48.0)
+DOCK_GEOMETRY Size(360.0, 800.0) 2.0 day [TextBox.fromLTRBD(0.1, 23.9, 37.4, 48.1, TextDirection.ltr)] owner=Size(336.0, 48.0)
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a value less than or equal to <337.0>
+  Actual: <339.68359375>
+   Which: is not a value less than or equal to <337.0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart:423:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart line 423
+The test description was:
+  compact Android and iOS insets keep the trade action usable
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:06 +4 -1: compact Android and iOS insets keep the trade action usable [E]
+  Test failed. See exception logs above.
+  The test description was: compact Android and iOS insets keep the trade action usable
+  
+00:06 +4 -1: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_wholesale_trade_decision_test.dart: compact Android and iOS insets keep the trade action usable

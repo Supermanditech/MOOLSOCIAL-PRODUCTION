@@ -1,0 +1,398 @@
+{
+  "candidate": "UAW-CURSOR-SKU-CORRECTION-20260915",
+  "version": "1.0.0-r66.26-cursorreview",
+  "sourceCommit": "d6d9890fa7754a38a05b183bc8ca6e89eccf22cc",
+  "buildSeal": "dad26da0365006d16891203e45839db40b9ed8d6",
+  "apkSha256": "769296EC3CE6AD5DB6B34A9A93021BC3B3E2EE7826EF572202AC9754199169AC",
+  "serial": "TG8HCYTGGQT885OF",
+  "captures": [
+    {
+      "label": "001-shop-normal",
+      "receiptSha256": "B45C1B9CDD3D8CFF49A1B03FB5D22C1957EB069E877699544114F9CB90ED9670"
+    },
+    {
+      "label": "002-after-launch",
+      "receiptSha256": "26A31E9F4EA11BD05C86F5456391D50F7CEE5687D1ED7003B18B3A43834C8495"
+    },
+    {
+      "label": "003-saved-preserved",
+      "receiptSha256": "426ABC8D1EA8E44BBF478173ADF5CB2FEB0C1E4EF18BA902B0DFD2329C9AF8B8"
+    },
+    {
+      "label": "004-saved-add-action",
+      "receiptSha256": "4663C299601E47DAC0F4E073CFE50EAF4B932EF266697792D0C512EC1D74104D"
+    },
+    {
+      "label": "005-cart-normal",
+      "receiptSha256": "AAD2A7F480454510DA04E95F83760F9723AA3BCF920CFB06F1F3CA8C054D5ACD"
+    },
+    {
+      "label": "006-cart-enlarged",
+      "receiptSha256": "1DD25D3B988E8F5267AAB887583708C476E528E084AC70A57314C7F8951D7665"
+    },
+    {
+      "label": "007-cart-enlarged-lower",
+      "receiptSha256": "E49FEECC7C3DE4AA370490160D6404A66FA473404B749D47AE644A8B3B96140C"
+    },
+    {
+      "label": "008-cart-enlarged-provider",
+      "receiptSha256": "F1B93D86CDC45DCF95175FAEAAF80F058D0F7ADC9273AA4AEBF881676C2F0D7F"
+    },
+    {
+      "label": "009-cart-restored",
+      "receiptSha256": "A1E0B867B333058E3B6B7C668AB7A9949FC36BB70C61789399A4E202F93A440B"
+    },
+    {
+      "label": "010-saved-enlarged-lower",
+      "receiptSha256": "EFBDE521F987495581891B4E0938B8692A33DABC8690706759F4E0EF09353735"
+    },
+    {
+      "label": "011-shop-enlarged",
+      "receiptSha256": "C9A66DCAC71502102AB40A13C3D9DF7CD6A226864D7E7548A05962F37CCB9DA0"
+    },
+    {
+      "label": "012-wholesale-enlarged",
+      "receiptSha256": "0AA2A0ECDCCCB571124ADD94FFEAD1B0CD91188F1B64FD0ABFF2180A2B6ECF98"
+    },
+    {
+      "label": "013-wholesale-enlarged-lower",
+      "receiptSha256": "1D99D8CD2CFB66F2A8897672CBD9414B04FC4E755D2A8981B3E48B1A24A9B483"
+    },
+    {
+      "label": "014-orders-enlarged",
+      "receiptSha256": "8B6F947285E24E73F8992D1FB35D6B12043C805F44AA7CB482CDD42E23473408"
+    },
+    {
+      "label": "015-orders-enlarged-actions",
+      "receiptSha256": "97917D7D414EEA53B48588E506BBCCBAEAB238F3571EFF952BFBA5B5CCEE260D"
+    },
+    {
+      "label": "016-order-track-action",
+      "receiptSha256": "5122C5E803A9D82200E03840F75D328B708A76B8D536F13B8CF2C5E0ED11F62D"
+    },
+    {
+      "label": "017-orders-normal-return",
+      "receiptSha256": "753D6997032893E9C847ED57929B1C61565899A18B9FB376CA4E0FCD7AC10CA2"
+    },
+    {
+      "label": "018-offers-normal",
+      "receiptSha256": "82BAE20D82BFC4DDC7326594B939E0167395A4618CEBBB1DE1CEAB40DC647F26"
+    },
+    {
+      "label": "019-offer-next-selected",
+      "receiptSha256": "D6F94E05EE4E78902152BDC8357E46A7E236E66AA46837314CA26E1C5FE91285"
+    },
+    {
+      "label": "020-offer-product-normal",
+      "receiptSha256": "F7FEB47840956C7C1E95C3DFABFDAFFB6226ED5CF9C6C26FC1AF862A48C735A9"
+    },
+    {
+      "label": "021-product-metadata",
+      "receiptSha256": "5AC41746F27300CEE273000A89B4B291C98A704EFDF124D6145230EB92CCAA78"
+    },
+    {
+      "label": "022-product-description",
+      "receiptSha256": "4229DD918FC1B04643990872730B7F093652C3C02D7C51E721552997940CE7BB"
+    },
+    {
+      "label": "023-supplier-entry",
+      "receiptSha256": "637E8CA1FB41AD2A31CFB1D5A59C4BE0A8A6B37ED4C32B0EE8A4F3F3A71E2ECF"
+    },
+    {
+      "label": "024-supplier-normal",
+      "receiptSha256": "F8876126500006BDBA12A9E5332DDD69887B51990628BB37FB7ADA2D02A03FF2"
+    },
+    {
+      "label": "025-supplier-catalogue",
+      "receiptSha256": "8653DD2FF2AF055BB399B0E5D00A27238CF11813084461689E44819948B3C6AA"
+    },
+    {
+      "label": "026-supplier-vertical-depth",
+      "receiptSha256": "B9ED3BA88C8778B2ECA5C7B5E2D7F2A10C40986A1833CB3B14B21BEEA5232A5D"
+    },
+    {
+      "label": "027-supplier-bottom",
+      "receiptSha256": "31EB2D3C72CC3E80482B904E55032D46B384EB11C028BA950261FFE5D00ECF6B"
+    },
+    {
+      "label": "028-supplier-list-end",
+      "receiptSha256": "68D04F7C7B421E5D9903DF4E448B0C683983412582B529751C0D3F48C125EA3D"
+    },
+    {
+      "label": "029-supplier-next-page",
+      "receiptSha256": "45F3933F584B2FEF1CB6AFC67B9FD2395311FEA69AF6432DA64CE32963CD5DBB"
+    },
+    {
+      "label": "030-supplier-enlarged",
+      "receiptSha256": "6F064A096C0B5D6B1B7F279EB2196FF383CF519AB040D432A4D0130E76B7268B"
+    },
+    {
+      "label": "031-supplier-overview-enlarged",
+      "receiptSha256": "2DE83737FF71EB5BB41C1666AD95A3AFEFABC13C71D79E1D2686A97D1DDAEAC3"
+    },
+    {
+      "label": "032-product-dock-enlarged",
+      "receiptSha256": "CCCB4220DDAD25478A694B00621F423698EDC459BE99EF86F9E2E0B261E54B99"
+    },
+    {
+      "label": "033-offer-return-enlarged",
+      "receiptSha256": "1E2DE48D66713F6C96A99CA218ECB6652EF37C0D0A9AD3554A1CD16002012BA7"
+    },
+    {
+      "label": "034-shop-footer",
+      "receiptSha256": "F8534909165583C3074DCC025FB6CB6F255DD642F4FF2655564EABAF68A8D112"
+    },
+    {
+      "label": "035-shop-next-page",
+      "receiptSha256": "56F41C6E7450F34EC94548BB5F3AC0D41F331BE837521457068B135E0EDC4E81"
+    },
+    {
+      "label": "036-shop-page-restored",
+      "receiptSha256": "44D014F8C1432E2819D9069F1B586B6D5751925211044B216D6B886C94D925C9"
+    },
+    {
+      "label": "037-search-entry",
+      "receiptSha256": "FBCE2D03990CDD83CA03916312AC8429C3B5F02DFD746A8E7CC1269B363F9386"
+    },
+    {
+      "label": "038-search-results",
+      "receiptSha256": "538F5DC12C734B98FCE7C669CE01563B6494EB84C54F9FBB7D38EC963D0967A7"
+    },
+    {
+      "label": "039-search-product",
+      "receiptSha256": "E7EC8361A11F78131F6521A2904B5C478EB7158244522969F5792D843F60A38C"
+    },
+    {
+      "label": "040-retail-store",
+      "receiptSha256": "3D4CF126063EF5953F8721919216F869D8112798FE94D7C4148DBB0528026686"
+    },
+    {
+      "label": "041-search-return",
+      "receiptSha256": "30DB2A227D728928FB5EA1273C91CFFB5E898B62E4C46A72545EA4C69CD4378C"
+    },
+    {
+      "label": "042-search-exit",
+      "receiptSha256": "C3580A5ACB134ED9FAD452AEFD9C2E85694B38864A8ACDDB77C274790820F644"
+    },
+    {
+      "label": "043-shop-tools",
+      "receiptSha256": "96531D2CC5F1AE4793BF071A4CAD4E9E153B6F3B72E0CCD4F09BB99CAA219530"
+    },
+    {
+      "label": "044-shopping-tools",
+      "receiptSha256": "2C0A58E60296C519DD472E311D23EE4659DED3A95CD14EF3DC35DF06EA520621"
+    },
+    {
+      "label": "045-tools-lower",
+      "receiptSha256": "F8CF38605B70ED6166DBD9D07663BF0027623C162B086C8A08F87BE9CDA17D90"
+    },
+    {
+      "label": "046-recent-normal",
+      "receiptSha256": "A2A95EFCAF60B7939B969BE25BABA2D5778CD3759464C7498B55DB382BC5236A"
+    },
+    {
+      "label": "047-recent-open-product",
+      "receiptSha256": "DEA1640CF70398AE5B5F2F2D9C64A1840787E469DBE2FA31E9F2B44BA2D49778"
+    },
+    {
+      "label": "048-recent-return",
+      "receiptSha256": "907219321617009D56BC95F696170CBD8255AD73F51D592F7B877C0BF5DCF86E"
+    },
+    {
+      "label": "049-wholesale-normal",
+      "receiptSha256": "4E32DEE250FDE5B781582AD2F13D7ED18FB15902C649AC7551D2B41EF6E24283"
+    },
+    {
+      "label": "050-bulk-normal",
+      "receiptSha256": "85B69EAA9FE73CFEDEC4CCFB1E73A9E437EF11FD4B204A81F24EFA685D967877"
+    },
+    {
+      "label": "051-bulk-footer",
+      "receiptSha256": "D146C31ECD7EE6B43BA0B3966BE4AECA97C9DDAF67F90154642D895EC0868F76"
+    },
+    {
+      "label": "052-bulk-next-page",
+      "receiptSha256": "A73899BC96BBD8F857456964AF36F2D61272A075052CE7A235B56345EA279784"
+    },
+    {
+      "label": "053-search-restoration",
+      "receiptSha256": "56BF7D455DBD50B189EA701FBE69FE0F82D4146DFF0C431FA4FCA93BB54AAC23"
+    },
+    {
+      "label": "054-restored-shop",
+      "receiptSha256": "8B20828A26D8D9B99B0F1E174F6ACD55F3C900C126FC814C1B22E4C7C97157A0"
+    }
+  ],
+  "tickets": [
+    {
+      "id": "SKU-M01",
+      "state": "open_pending_final_qualification",
+      "observation": "Normal Shop, Wholesale and Bulk three-column cards show complete product/pack/price/unit/store/role/delivery/Add; enlarged cards stack and scroll.",
+      "capturePrefixes": [
+        "002",
+        "011",
+        "012",
+        "013",
+        "049",
+        "050"
+      ]
+    },
+    {
+      "id": "SKU-M02",
+      "state": "open_pending_final_qualification",
+      "observation": "Device FAILED: capture 022 Ratings and seller exposes Mool Market 000001. Existing acceptance occurrence, not a new ticket. One-line rendering correction locally passed; not installed.",
+      "capturePrefixes": [
+        "021",
+        "022"
+      ]
+    },
+    {
+      "id": "SKU-M03",
+      "state": "open_pending_final_qualification",
+      "observation": "Offers selected retailer/manufacturer metadata, View offer and return verified at normal/enlarged scale.",
+      "capturePrefixes": [
+        "018",
+        "019",
+        "020",
+        "033"
+      ]
+    },
+    {
+      "id": "SKU-M04",
+      "state": "open_pending_final_qualification",
+      "observation": "Existing order product, pack, quantity, provider and actions readable at normal/enlarged scale; Track and return preserve order.",
+      "capturePrefixes": [
+        "014",
+        "015",
+        "016",
+        "017"
+      ]
+    },
+    {
+      "id": "SKU-M05",
+      "state": "open_pending_final_qualification",
+      "observation": "Saved, Cart, Recently viewed, Search, Store and supplier reuse verified for available fixture metadata; depends on M02 correction for complete consumer wording.",
+      "capturePrefixes": [
+        "003",
+        "005",
+        "006",
+        "008",
+        "010",
+        "024",
+        "025",
+        "031",
+        "038",
+        "040",
+        "046",
+        "048"
+      ]
+    },
+    {
+      "id": "SKU-M01-C01",
+      "state": "open_pending_final_qualification",
+      "observation": "Available device prices use tight yellow digit emphasis; pack/unit/minimum facts remain outside. Extreme price values qualified locally, not injected into device.",
+      "capturePrefixes": [
+        "002",
+        "010",
+        "020",
+        "049",
+        "050"
+      ]
+    },
+    {
+      "id": "SKU-M01-C02",
+      "state": "open_pending_final_qualification",
+      "observation": "Three normal-scale columns observed on Shop, Wholesale, Bulk, Offers and supplier/store; enlarged layout readable through vertical scrolling.",
+      "capturePrefixes": [
+        "002",
+        "011",
+        "018",
+        "024",
+        "025",
+        "040",
+        "049",
+        "050"
+      ]
+    },
+    {
+      "id": "SKU-M05-C01",
+      "state": "open_pending_final_qualification",
+      "observation": "Shop, Bulk and full supplier catalogue footer Next advances range 1-40 to 41-80; top Previous restores range/state. Search results observed, but Search-specific footer transition is not evidenced in this round.",
+      "capturePrefixes": [
+        "028",
+        "029",
+        "034",
+        "035",
+        "036",
+        "051",
+        "052"
+      ]
+    },
+    {
+      "id": "SKU-M05-C02",
+      "state": "open_pending_final_qualification",
+      "observation": "Vertical product rows and supplier catalogue depth observed. Direct changed-category device journey is not evidenced in this round; local qualification remains distinct.",
+      "capturePrefixes": [
+        "026",
+        "028",
+        "034",
+        "049",
+        "050"
+      ]
+    },
+    {
+      "id": "SKU-M05-C03",
+      "state": "open_pending_final_qualification",
+      "observation": "Available actual provider/product/delivery facts observed at font scales 1 and 2. Explicit extreme provider-name matrix remains local qualification; provider publishing backend is not implemented or claimed device-qualified.",
+      "capturePrefixes": [
+        "008",
+        "010",
+        "013",
+        "014",
+        "031",
+        "032",
+        "033"
+      ]
+    }
+  ],
+  "excludedEvidence": {
+    "001": "startup splash",
+    "027": "supplier modal dismissed; not a footer/page test"
+  },
+  "preservation": "Data-preserving install. Font restored 1.0; temporary Cart quantity 1 removed to 0; Saved atta remains one; query cleared without clearing recent search history. No purchase/payment/message.",
+  "localCorrection": {
+    "runtimeOwner": "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+    "normalizedSha256": "9AFD18E028F175E45E30885E9473EBC605AC79CC8063711730C8D31FBB0E66BA",
+    "testTerminal": "fcd567",
+    "testsPassed": 4,
+    "analysisTerminal": "9f23ee",
+    "analysis": "No issues found; 2 items",
+    "focusedTest": {
+      "path": "m02-ratings-test-01.log",
+      "sha256": "9A8E167D757AA1BE503DF1BAF5A6527D3AB4B97F0D2527B25D0A124A28921E79"
+    },
+    "analysisLog": {
+      "path": "m02-analysis-01.log",
+      "sha256": "0A9CE98C5488BDEE49EC1CFC4C1F09B5CDDB53FAD03CB59C4C2D5100ACBF1ABD"
+    },
+    "visuals": [
+      {
+        "path": "m02-ratings-visual-01\\sku-m02-trust-seller-false-1.0.png",
+        "sha256": "71C494A8E0BD9599988A3A6A0A474E913AFCF4C5A451AF2FAD2231F45386D96C"
+      },
+      {
+        "path": "m02-ratings-visual-01\\sku-m02-trust-seller-false-2.0.png",
+        "sha256": "1379D4FB05928937BD505374B8C07AC8375D34149730F99988120A8116D42AC1"
+      },
+      {
+        "path": "m02-ratings-visual-01\\sku-m02-trust-seller-true-1.0.png",
+        "sha256": "3B0FC9962FAE1DE95A8F465C0797A441A9F45872FBA6918D99B294571170C6E0"
+      },
+      {
+        "path": "m02-ratings-visual-01\\sku-m02-trust-seller-true-2.0.png",
+        "sha256": "2380CAE3536FE748372A003525C22EFF7827F26E99EC383289111407ADF145A9"
+      }
+    ]
+  },
+  "qualificationLimits": "This receipt does not close all ten records. M02 successor device verification, specifically missing category/search paging evidence, required corrected-source combined runs and Git handoff remain."
+}

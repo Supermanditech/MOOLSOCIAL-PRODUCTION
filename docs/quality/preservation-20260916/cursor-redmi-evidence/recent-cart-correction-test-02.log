@@ -1,0 +1,180 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart
+00:00 +0: R664 Cart protects Recent heading and Clear at Size(360.0, 800.0) / 1.0
+00:04 +1: R664 Cart protects Recent heading and Clear at Size(360.0, 800.0) / 2.0
+00:07 +2: R664 Cart protects Recent heading and Clear at Size(320.0, 800.0) / 1.0
+00:10 +3: R664 Cart protects Recent heading and Clear at Size(320.0, 800.0) / 2.0
+
+Warning: A call to drag() with finder "Found 1 widget with widget matching predicate descending from widget with type "BuyV2CatalogueView" (ignoring all but first): [
+  Scrollable(axisDirection: down, physics: AlwaysScrollableScrollPhysics, restorationId: null, dependencies: [InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope, _InheritedTheme, _LocalizationsScope-[GlobalKey#3c08e]], state: ScrollableState#03638(position: ScrollPositionWithSingleContext#cb39b(offset: 240.0, range: 0.0..17284.0, viewport: 572.0, ScrollableState, AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#ab7a9, ScrollDirection.idle), effective physics: AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+]" derived an Offset (Offset(156.0, 454.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#05ced relayoutBoundary=up8
+The hit test result at that offset is: HitTestResult(RenderPointerListener#31661@Offset(1.0, 25.0), RenderSemanticsAnnotations#6fd5f@Offset(1.0, 25.0), RenderMouseRegion#ed1b1@Offset(1.0, 25.0), RenderSemanticsAnnotations#2d186@Offset(1.0, 25.0), _RenderInkFeatures#4cf8c@Offset(1.0, 25.0), RenderCustomPaint#1217a@Offset(1.0, 25.0), RenderPhysicalShape#326b6@Offset(1.0, 25.0), RenderConstrainedBox#7886d@Offset(1.0, 25.0), RenderPointerListener#aa036@Offset(1.0, 25.0), RenderSemanticsGestureHandler#c4aaf@Offset(1.0, 25.0), RenderSemanticsAnnotations#85b6f@Offset(1.0, 25.0), RenderStack#44320@Offset(156.0, 398.0), _RenderLayoutBuilder#1cb98@Offset(156.0, 398.0), RenderStack#76eb8@Offset(156.0, 398.0), RenderFlex#c0fc8@Offset(156.0, 454.0), _RenderColoredBox#c7ebb@Offset(156.0, 454.0), RenderPadding#d5ed7@Offset(156.0, 454.0), RenderDecoratedBox#f9edc@Offset(156.0, 454.0), RenderConstrainedBox#6e33c@Offset(156.0, 454.0), RenderPositionedBox#2cf66@Offset(156.0, 454.0), RenderPadding#26c6a@Offset(156.0, 454.0), RenderDecoratedBox#f81dc@Offset(156.0, 454.0), _RenderLayoutBuilder#f8888@Offset(156.0, 454.0), RenderCustomMultiChildLayoutBox#dae65@Offset(156.0, 454.0), _RenderInkFeatures#31539@Offset(156.0, 454.0), RenderPhysicalModel#6d2f1@Offset(156.0, 454.0), RenderStack#2e1c8@Offset(156.0, 454.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#5fc9c@Offset(156.0, 454.0), RenderSemanticsAnnotations#4427f@Offset(156.0, 454.0), RenderRepaintBoundary#63459@Offset(156.0, 454.0), RenderIgnorePointer#6ef2e@Offset(156.0, 454.0), RenderStack#2c14b@Offset(156.0, 454.0), RenderDecoratedBox#c705e@Offset(156.0, 454.0), RenderRepaintBoundary#93c6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#70564@Offset(156.0, 454.0), RenderOffstage#6123a@Offset(156.0, 454.0), RenderSemanticsAnnotations#3528b@Offset(156.0, 454.0), _RenderTheater#997a1@Offset(156.0, 454.0), RenderAbsorbPointer#f47ff@Offset(156.0, 454.0), RenderPointerListener#67ba2@Offset(156.0, 454.0), RenderSemanticsAnnotations#4e996@Offset(156.0, 454.0), RenderSemanticsAnnotations#28673@Offset(156.0, 454.0), RenderSemanticsAnnotations#a13ca@Offset(156.0, 454.0), RenderSemanticsAnnotations#26276@Offset(156.0, 454.0), RenderTapRegionSurface#a0ac1@Offset(156.0, 454.0), RenderSemanticsAnnotations#f1f6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#e8ba3@Offset(156.0, 454.0), RenderRepaintBoundary#8b07e@Offset(156.0, 454.0), HitTestEntry<HitTestTarget>#1a20d(_ReusableRenderView#67159), HitTestEntry<HitTestTarget>#d166d(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2476:17)
+<asynchronous suspension>
+#4      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#5      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#6      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1275:11)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#10     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+
+Warning: A call to drag() with finder "Found 1 widget with widget matching predicate descending from widget with type "BuyV2CatalogueView" (ignoring all but first): [
+  Scrollable(axisDirection: down, physics: AlwaysScrollableScrollPhysics, restorationId: null, dependencies: [InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope, _InheritedTheme, _LocalizationsScope-[GlobalKey#3c08e]], state: ScrollableState#03638(position: ScrollPositionWithSingleContext#cb39b(offset: 600.0, range: 0.0..17284.0, viewport: 572.0, ScrollableState, AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#48522, ScrollDirection.idle), effective physics: AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+]" derived an Offset (Offset(156.0, 454.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#05ced relayoutBoundary=up8
+The hit test result at that offset is: HitTestResult(RenderPointerListener#31661@Offset(1.0, 17.0), RenderSemanticsAnnotations#6fd5f@Offset(1.0, 17.0), RenderMouseRegion#ed1b1@Offset(1.0, 17.0), RenderSemanticsAnnotations#2d186@Offset(1.0, 17.0), _RenderInkFeatures#4cf8c@Offset(1.0, 17.0), RenderCustomPaint#1217a@Offset(1.0, 17.0), RenderPhysicalShape#326b6@Offset(1.0, 17.0), RenderConstrainedBox#7886d@Offset(1.0, 17.0), RenderPointerListener#aa036@Offset(1.0, 17.0), RenderSemanticsGestureHandler#c4aaf@Offset(1.0, 17.0), RenderSemanticsAnnotations#85b6f@Offset(1.0, 17.0), RenderStack#44320@Offset(156.0, 398.0), _RenderLayoutBuilder#1cb98@Offset(156.0, 398.0), RenderStack#76eb8@Offset(156.0, 398.0), RenderFlex#c0fc8@Offset(156.0, 454.0), _RenderColoredBox#c7ebb@Offset(156.0, 454.0), RenderPadding#d5ed7@Offset(156.0, 454.0), RenderDecoratedBox#f9edc@Offset(156.0, 454.0), RenderConstrainedBox#6e33c@Offset(156.0, 454.0), RenderPositionedBox#2cf66@Offset(156.0, 454.0), RenderPadding#26c6a@Offset(156.0, 454.0), RenderDecoratedBox#f81dc@Offset(156.0, 454.0), _RenderLayoutBuilder#f8888@Offset(156.0, 454.0), RenderCustomMultiChildLayoutBox#dae65@Offset(156.0, 454.0), _RenderInkFeatures#31539@Offset(156.0, 454.0), RenderPhysicalModel#6d2f1@Offset(156.0, 454.0), RenderStack#2e1c8@Offset(156.0, 454.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#5fc9c@Offset(156.0, 454.0), RenderSemanticsAnnotations#4427f@Offset(156.0, 454.0), RenderRepaintBoundary#63459@Offset(156.0, 454.0), RenderIgnorePointer#6ef2e@Offset(156.0, 454.0), RenderStack#2c14b@Offset(156.0, 454.0), RenderDecoratedBox#c705e@Offset(156.0, 454.0), RenderRepaintBoundary#93c6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#70564@Offset(156.0, 454.0), RenderOffstage#6123a@Offset(156.0, 454.0), RenderSemanticsAnnotations#3528b@Offset(156.0, 454.0), _RenderTheater#997a1@Offset(156.0, 454.0), RenderAbsorbPointer#f47ff@Offset(156.0, 454.0), RenderPointerListener#67ba2@Offset(156.0, 454.0), RenderSemanticsAnnotations#4e996@Offset(156.0, 454.0), RenderSemanticsAnnotations#28673@Offset(156.0, 454.0), RenderSemanticsAnnotations#a13ca@Offset(156.0, 454.0), RenderSemanticsAnnotations#26276@Offset(156.0, 454.0), RenderTapRegionSurface#a0ac1@Offset(156.0, 454.0), RenderSemanticsAnnotations#f1f6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#e8ba3@Offset(156.0, 454.0), RenderRepaintBoundary#8b07e@Offset(156.0, 454.0), HitTestEntry<HitTestTarget>#a1364(_ReusableRenderView#67159), HitTestEntry<HitTestTarget>#5012e(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2476:17)
+<asynchronous suspension>
+#4      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#5      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#6      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1275:11)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#10     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+
+Warning: A call to drag() with finder "Found 1 widget with widget matching predicate descending from widget with type "BuyV2CatalogueView" (ignoring all but first): [
+  Scrollable(axisDirection: down, physics: AlwaysScrollableScrollPhysics, restorationId: null, dependencies: [InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope, _InheritedTheme, _LocalizationsScope-[GlobalKey#3c08e]], state: ScrollableState#03638(position: ScrollPositionWithSingleContext#cb39b(offset: 1440.0, range: 0.0..17284.0, viewport: 572.0, ScrollableState, AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#c5a5e, ScrollDirection.idle), effective physics: AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+]" derived an Offset (Offset(156.0, 454.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#05ced relayoutBoundary=up8
+The hit test result at that offset is: HitTestResult(RenderPointerListener#31661@Offset(1.0, 44.0), RenderSemanticsAnnotations#6fd5f@Offset(1.0, 44.0), RenderMouseRegion#ed1b1@Offset(1.0, 44.0), RenderSemanticsAnnotations#2d186@Offset(1.0, 44.0), _RenderInkFeatures#4cf8c@Offset(1.0, 44.0), RenderCustomPaint#1217a@Offset(1.0, 44.0), RenderPhysicalShape#326b6@Offset(1.0, 44.0), RenderConstrainedBox#7886d@Offset(1.0, 44.0), RenderPointerListener#aa036@Offset(1.0, 44.0), RenderSemanticsGestureHandler#c4aaf@Offset(1.0, 44.0), RenderSemanticsAnnotations#85b6f@Offset(1.0, 44.0), RenderStack#44320@Offset(156.0, 398.0), _RenderLayoutBuilder#1cb98@Offset(156.0, 398.0), RenderStack#76eb8@Offset(156.0, 398.0), RenderFlex#c0fc8@Offset(156.0, 454.0), _RenderColoredBox#c7ebb@Offset(156.0, 454.0), RenderPadding#d5ed7@Offset(156.0, 454.0), RenderDecoratedBox#f9edc@Offset(156.0, 454.0), RenderConstrainedBox#6e33c@Offset(156.0, 454.0), RenderPositionedBox#2cf66@Offset(156.0, 454.0), RenderPadding#26c6a@Offset(156.0, 454.0), RenderDecoratedBox#f81dc@Offset(156.0, 454.0), _RenderLayoutBuilder#f8888@Offset(156.0, 454.0), RenderCustomMultiChildLayoutBox#dae65@Offset(156.0, 454.0), _RenderInkFeatures#31539@Offset(156.0, 454.0), RenderPhysicalModel#6d2f1@Offset(156.0, 454.0), RenderStack#2e1c8@Offset(156.0, 454.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#5fc9c@Offset(156.0, 454.0), RenderSemanticsAnnotations#4427f@Offset(156.0, 454.0), RenderRepaintBoundary#63459@Offset(156.0, 454.0), RenderIgnorePointer#6ef2e@Offset(156.0, 454.0), RenderStack#2c14b@Offset(156.0, 454.0), RenderDecoratedBox#c705e@Offset(156.0, 454.0), RenderRepaintBoundary#93c6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#70564@Offset(156.0, 454.0), RenderOffstage#6123a@Offset(156.0, 454.0), RenderSemanticsAnnotations#3528b@Offset(156.0, 454.0), _RenderTheater#997a1@Offset(156.0, 454.0), RenderAbsorbPointer#f47ff@Offset(156.0, 454.0), RenderPointerListener#67ba2@Offset(156.0, 454.0), RenderSemanticsAnnotations#4e996@Offset(156.0, 454.0), RenderSemanticsAnnotations#28673@Offset(156.0, 454.0), RenderSemanticsAnnotations#a13ca@Offset(156.0, 454.0), RenderSemanticsAnnotations#26276@Offset(156.0, 454.0), RenderTapRegionSurface#a0ac1@Offset(156.0, 454.0), RenderSemanticsAnnotations#f1f6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#e8ba3@Offset(156.0, 454.0), RenderRepaintBoundary#8b07e@Offset(156.0, 454.0), HitTestEntry<HitTestTarget>#4f307(_ReusableRenderView#67159), HitTestEntry<HitTestTarget>#95da3(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2476:17)
+<asynchronous suspension>
+#4      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#5      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#6      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1275:11)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#10     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+
+Warning: A call to drag() with finder "Found 1 widget with widget matching predicate descending from widget with type "BuyV2CatalogueView" (ignoring all but first): [
+  Scrollable(axisDirection: down, physics: AlwaysScrollableScrollPhysics, restorationId: null, dependencies: [InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope, _InheritedTheme, _LocalizationsScope-[GlobalKey#3c08e]], state: ScrollableState#03638(position: ScrollPositionWithSingleContext#cb39b(offset: 1800.0, range: 0.0..17284.0, viewport: 572.0, ScrollableState, AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#6bc34, ScrollDirection.idle), effective physics: AlwaysScrollableScrollPhysics -> ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+]" derived an Offset (Offset(156.0, 454.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#05ced relayoutBoundary=up8
+The hit test result at that offset is: HitTestResult(RenderPointerListener#31661@Offset(1.0, 13.0), RenderSemanticsAnnotations#6fd5f@Offset(1.0, 13.0), RenderMouseRegion#ed1b1@Offset(1.0, 13.0), RenderSemanticsAnnotations#2d186@Offset(1.0, 13.0), _RenderInkFeatures#4cf8c@Offset(1.0, 13.0), RenderCustomPaint#1217a@Offset(1.0, 13.0), RenderPhysicalShape#326b6@Offset(1.0, 13.0), RenderConstrainedBox#7886d@Offset(1.0, 13.0), RenderPointerListener#aa036@Offset(1.0, 13.0), RenderSemanticsGestureHandler#c4aaf@Offset(1.0, 13.0), RenderSemanticsAnnotations#85b6f@Offset(1.0, 13.0), RenderStack#44320@Offset(156.0, 398.0), _RenderLayoutBuilder#1cb98@Offset(156.0, 398.0), RenderStack#76eb8@Offset(156.0, 398.0), RenderFlex#c0fc8@Offset(156.0, 454.0), _RenderColoredBox#c7ebb@Offset(156.0, 454.0), RenderPadding#d5ed7@Offset(156.0, 454.0), RenderDecoratedBox#f9edc@Offset(156.0, 454.0), RenderConstrainedBox#6e33c@Offset(156.0, 454.0), RenderPositionedBox#2cf66@Offset(156.0, 454.0), RenderPadding#26c6a@Offset(156.0, 454.0), RenderDecoratedBox#f81dc@Offset(156.0, 454.0), _RenderLayoutBuilder#f8888@Offset(156.0, 454.0), RenderCustomMultiChildLayoutBox#dae65@Offset(156.0, 454.0), _RenderInkFeatures#31539@Offset(156.0, 454.0), RenderPhysicalModel#6d2f1@Offset(156.0, 454.0), RenderStack#2e1c8@Offset(156.0, 454.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#5fc9c@Offset(156.0, 454.0), RenderSemanticsAnnotations#4427f@Offset(156.0, 454.0), RenderRepaintBoundary#63459@Offset(156.0, 454.0), RenderIgnorePointer#6ef2e@Offset(156.0, 454.0), RenderStack#2c14b@Offset(156.0, 454.0), RenderDecoratedBox#c705e@Offset(156.0, 454.0), RenderRepaintBoundary#93c6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#70564@Offset(156.0, 454.0), RenderOffstage#6123a@Offset(156.0, 454.0), RenderSemanticsAnnotations#3528b@Offset(156.0, 454.0), _RenderTheater#997a1@Offset(156.0, 454.0), RenderAbsorbPointer#f47ff@Offset(156.0, 454.0), RenderPointerListener#67ba2@Offset(156.0, 454.0), RenderSemanticsAnnotations#4e996@Offset(156.0, 454.0), RenderSemanticsAnnotations#28673@Offset(156.0, 454.0), RenderSemanticsAnnotations#a13ca@Offset(156.0, 454.0), RenderSemanticsAnnotations#26276@Offset(156.0, 454.0), RenderTapRegionSurface#a0ac1@Offset(156.0, 454.0), RenderSemanticsAnnotations#f1f6b@Offset(156.0, 454.0), RenderSemanticsAnnotations#e8ba3@Offset(156.0, 454.0), RenderRepaintBoundary#8b07e@Offset(156.0, 454.0), HitTestEntry<HitTestTarget>#7c3dd(_ReusableRenderView#67159), HitTestEntry<HitTestTarget>#501a6(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2476:17)
+<asynchronous suspension>
+#4      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#5      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#6      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1275:11)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#10     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+00:13 +4: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key [<'buy-recently-viewed-clear'>]
+(considering only hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1325:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart line 1325
+The test description was:
+  R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:19 +4 -1: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+  
+00:19 +4 -1: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _HitTestableWidgetFinder:<Found 0 widgets with key [<'buy-recently-viewed-clear'>]
+(considering only hit-testable widgets with a RenderBox): []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1325:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart line 1325
+The test description was:
+  R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+00:26 +4 -2: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0
+  
+00:26 +4 -2: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_scoped_cart_checkout_dock_continuity_test.dart: R664 Cart protects Recent heading and Clear at Size(800.0, 360.0) / 2.0

@@ -1,0 +1,36 @@
+{
+  "recordedAtUtc": "2026-09-15T08:04:27.600797+00:00",
+  "head": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "priorLongMetadataRun": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-price-test-02.log",
+    "sha256": "C83B916565E549D99ED0E321F977B9E6426F4EE0F1CEDA8E3C9CADD9BA31AAA9",
+    "passes": 4,
+    "exitCode": 0,
+    "terminalChunk": "69e47a",
+    "visualQualification": "failed: large amount splits digit groups in inspected normal Shop capture",
+    "inspectedImage": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-price-visual-02\\sku-long-price-shop-1.0.png",
+    "imageSha256": "3D9C5E0C74A8E079822886A4C202A2EADAD273106A8E7EA71B193CFF44DAB24B"
+  },
+  "currentCorrections": [
+    "Price uses measured 12\u201320 font range and matching height measurement; test now requires an intact exact fixture amount",
+    "Featured uses shared vertical rows with its existing card/actions",
+    "Recently viewed uses shared vertical rows with full metadata cards; exact product identity and Clear preserved",
+    "Search, Saved and ordinary catalogue already converted; full cross-surface testing remains"
+  ],
+  "currentSourceNormalizedSha256": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "EF6A6306298F04ED342C687BDCC5872928DACEFEBF3CE56F8D88A57879C406DD",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "6180539D1A192767C680AE1E25EF09D8D869DFD54138164EEBC2980E14207ADF"
+  },
+  "running": {
+    "sessionId": 69844,
+    "sequence": [
+      "founder-analysis-05.log",
+      "vertical-price-test-03.log (4 long metadata cases and captures)",
+      "vertical-offers-store-test-01.log (5 Offers/Store cases, only if preceding stages pass)"
+    ],
+    "state": "no current result asserted"
+  },
+  "additionalInventory": "Prescription-match suggestions retain their existing horizontal capped-text presentation; determine applicable scope and preserve pharmacist/payment restrictions in the remaining cross-surface audit. No change to this presentation yet.",
+  "newApkBuilt": false,
+  "openAcceptanceRecords": 10
+}

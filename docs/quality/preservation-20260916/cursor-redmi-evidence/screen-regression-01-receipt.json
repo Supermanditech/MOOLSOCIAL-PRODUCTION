@@ -1,0 +1,160 @@
+{
+  "log": "screen-regression-01.log",
+  "sha256": "EBA49EBEC1090F253DBF745810EFE1DBEC85CD1CF52FA9E01DE5F18610B63C6B",
+  "passed": 325,
+  "failed": 15,
+  "terminal": "7aea6b",
+  "cases": {
+    "B01 T02 keeps one product while server promises 3 5 and 10 minutes": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: no matching candidates",
+        "  Actual: _TextWidgetFinder:<Found 3 widgets with text \"Ghar Bazaar\": [",
+        "            Text(\"Ghar Bazaar\", inherit: true, color: Color(alpha: 1.0000, red: 0.3843, green:",
+        "0.4039, blue: 0.5020, colorSpace: ColorSpace.sRGB), size: 11.0, weight: 600, height: 1.2x,"
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:4245:9)"
+    },
+    "R669 Monthly vertical discovery quick text 2.0": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: Set:['s-tomato', 's-rice', 's-soap', 's-onion', 's-bread', 's-chicken']",
+        "  Actual: Set:['s-tomato']",
+        "   Which: does not contain 's-rice'",
+        "Every Monthly SKU Add action must be discoverable with vertical scrolling alone."
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:7453:9)"
+    },
+    "R66 landscape shop 2.0 retains usable product actions": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value less than or equal to <270.0>",
+        "  Actual: <303.0>",
+        "   Which: is not a value less than or equal to <270.0>",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:8069:11)"
+    },
+    "R66 landscape wholesale 2.0 retains usable product actions": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value less than or equal to <270.0>",
+        "  Actual: <385.0>",
+        "   Which: is not a value less than or equal to <270.0>",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:8069:11)"
+    },
+    "R66 landscape medicine 2.0 retains usable product actions": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value less than or equal to <270.0>",
+        "  Actual: <386.0>",
+        "   Which: is not a value less than or equal to <270.0>",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:8069:11)"
+    },
+    "R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced false": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _TextWidgetFinder:<Found 0 widgets with text \"Published by MoolSocial\": []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:8971:11)"
+    },
+    "R669 Offers promotion category CTA Back Size(640.0, 360.0) reduced false": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _TextWidgetFinder:<Found 0 widgets with text \"Published by MoolSocial\": []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:8971:11)"
+    },
+    "R669 Offers promotion category CTA Back Size(320.0, 844.0) reduced true": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _TextWidgetFinder:<Found 0 widgets with text \"Published by MoolSocial\": []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:8971:11)"
+    },
+    "R669 Offers promotion category CTA Back Size(640.0, 360.0) reduced true": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _TextWidgetFinder:<Found 0 widgets with text \"Published by MoolSocial\": []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:8971:11)"
+    },
+    "Cart can return to Offers and add another product": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-offers-publisher-summary'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9142:5)"
+    },
+    "store Add feedback Cart access and product return keep one browse path": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _TextWidgetFinder:<Found 2 widgets with text \"Safe Protein Store\": [",
+        "            Text-[<'buy-cart-continue-store-name'>](\"Safe Protein Store\", inherit: true, size: 10.0,",
+        "weight: 800, height: 1.1x, dependencies: [DefaultSelectionStyle, DefaultTextStyle, MediaQuery]),"
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:9388:7)"
+    },
+    "RV6 D021 empty cart restores grid height text 1.0": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value greater than <302.0>",
+        "  Actual: <302.0>",
+        "   Which: is not a value greater than <302.0>",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:10060:23)"
+    },
+    "master Shop and Wholesale cards show real provider owners": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _DescendantWidgetFinder:<Found 0 widgets with text \"Retailer\" descending from widgets with",
+        "key [<'buy-product-s-tomato'>]: []>",
+        "   Which: means none were found but one was expected"
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:10772:5)"
+    },
+    "Masala Ghar storefront is compact and product-led": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value less than or equal to <232>",
+        "  Actual: <285.0>",
+        "   Which: is not a value less than or equal to <232>",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:11579:7)"
+    },
+    "Shop Quick Scheduled and Wholesale Bulk swipe selectors wire catalogues": {
+      "message": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: at least one matching candidate",
+        "  Actual: _TextContainingWidgetFinder:<Found 0 widgets with text containing At checkout: []>",
+        "   Which: means none were found but some were expected",
+        ""
+      ],
+      "line": "#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart:11781:7)"
+    }
+  },
+  "scope": "Local prebuild regression failures; no device closure; original log retained."
+}

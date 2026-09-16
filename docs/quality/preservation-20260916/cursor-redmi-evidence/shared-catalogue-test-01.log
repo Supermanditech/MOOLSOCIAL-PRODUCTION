@@ -1,0 +1,868 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: SKU order snapshot preview 1.0 lines true large false
+00:02 +1: SKU order snapshot preview 1.0 lines true large true
+00:02 +2: SKU order snapshot preview 1.0 lines false large false
+00:03 +3: SKU order snapshot preview 1.0 lines false large true
+00:03 +4: SKU order snapshot preview 2.0 lines true large false
+00:03 +5: SKU order snapshot preview 2.0 lines true large true
+00:04 +6: SKU order snapshot preview 2.0 lines false large false
+00:04 +7: SKU order snapshot preview 2.0 lines false large true
+00:04 +8: SKU provider names adaptive shop 1.0
+00:08 +9: SKU provider names adaptive shop 2.0
+00:10 +10: SKU provider names adaptive wholesale 1.0
+00:14 +11: SKU provider names adaptive wholesale 2.0
+00:16 +12: SKU metadata strips only exact development decoration
+00:16 +13: SKU metadata glance shop 320.0 1.0
+00:18 +14: SKU metadata glance shop 320.0 1.3
+00:18 +15: SKU metadata glance shop 320.0 2.0
+00:19 +16: SKU metadata glance shop 360.0 1.0
+00:20 +17: SKU metadata glance shop 360.0 1.3
+00:21 +18: SKU metadata glance shop 360.0 2.0
+00:22 +19: SKU metadata glance shop 390.0 1.0
+00:23 +20: SKU metadata glance shop 390.0 1.3
+00:24 +21: SKU metadata glance shop 390.0 2.0
+00:24 +22: SKU metadata glance wholesale 320.0 1.0
+00:25 +23: SKU metadata glance wholesale 320.0 1.3
+00:26 +24: SKU metadata glance wholesale 320.0 2.0
+00:27 +25: SKU metadata glance wholesale 360.0 1.0
+00:28 +26: SKU metadata glance wholesale 360.0 1.3
+00:28 +27: SKU metadata glance wholesale 360.0 2.0
+00:29 +28: SKU metadata glance wholesale 390.0 1.0
+00:30 +29: SKU metadata glance wholesale 390.0 1.3
+00:31 +30: SKU metadata glance wholesale 390.0 2.0
+00:31 +31: SKU long metadata shop 1.0
+00:34 +32: SKU long metadata shop 2.0
+00:37 +33: SKU long metadata wholesale 1.0
+00:39 +34: SKU long metadata wholesale 2.0
+00:41 +35: RV6 fixture access s-dog-food text 1.0
+00:43 +36: RV6 fixture access s-dog-food text 2.0
+00:43 +37: RV6 fixture access s-shampoo text 1.0
+00:44 +38: RV6 fixture access s-shampoo text 2.0
+00:45 +39: RV6 D002 last Store item removal retains catalogue s-eggs text 1.0
+00:49 +40: RV6 D002 last Store item removal retains catalogue s-eggs text 2.0
+00:52 +41: RV6 D002 last Store item removal retains catalogue w-notebook text 1.0
+00:55 +42: RV6 D002 last Store item removal retains catalogue w-notebook text 2.0
+00:58 +43: RV6 D002 paged Store last item retains category shop text 1.0
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'buy-add-buy-catalogue-dev-v1-shop-store-000001-sku-0001'>] descending from widget with key [<'buy-paged-scroll-store-shop-buy-catalogue-dev-v1-shop-store-000001'>]: [
+  Material-[<'buy-add-buy-catalogue-dev-v1-shop-store-000001-sku-0001'>](type: canvas, color: Color(alpha: 0.0000, red: 0.0000, green: 0.0000, blue: 0.0000, colorSpace: ColorSpace.sRGB), dependencies: [InheritedCupertinoTheme, _InheritedTheme, _LocalizationsScope-[GlobalKey#8d938], _ScrollableScope], state: _MaterialState#1d2b7),
+]" derived an Offset (Offset(68.0, -5.1)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(68.0, -5.1) is outside the bounds of the root of the render tree, Size(390.0, 844.0).
+The finder corresponds to this RenderBox: RenderPhysicalModel#788ba
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#c64ba(_ReusableRenderView#bf1e6), HitTestEntry<HitTestTarget>#042c7(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:962:24)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <1>
+  Actual: <0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:964:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 964
+The test description was:
+  RV6 D002 paged Store last item retains category shop text 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:15 +43 -1: RV6 D002 paged Store last item retains category shop text 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: RV6 D002 paged Store last item retains category shop text 1.0
+  
+01:15 +43 -1: RV6 D002 paged Store last item retains category shop text 2.0
+01:23 +44 -1: RV6 D002 paged Store last item retains category wholesale text 1.0
+
+Warning: A call to tap() with finder "Found 1 widget with key [<'buy-add-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001'>] descending from widget with key [<'buy-paged-scroll-store-wholesale-buy-catalogue-dev-v1-wholesale-store-000001'>]: [
+  Material-[<'buy-add-buy-catalogue-dev-v1-wholesale-store-000001-sku-0001'>](type: canvas, color: Color(alpha: 0.0000, red: 0.0000, green: 0.0000, blue: 0.0000, colorSpace: ColorSpace.sRGB), dependencies: [InheritedCupertinoTheme, _InheritedTheme, _LocalizationsScope-[GlobalKey#975f8], _ScrollableScope], state: _MaterialState#b8c0a),
+]" derived an Offset (Offset(68.0, -5.1)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+Indeed, Offset(68.0, -5.1) is outside the bounds of the root of the render tree, Size(390.0, 844.0).
+The finder corresponds to this RenderBox: RenderPhysicalModel#db030
+The hit test result at that offset is: HitTestResult(HitTestEntry<HitTestTarget>#0eeb9(_ReusableRenderView#bf1e6), HitTestEntry<HitTestTarget>#66c8c(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.tap (package:flutter_test/src/controller.dart:1080:7)
+#3      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:962:24)
+<asynchronous suspension>
+#4      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#5      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#6      StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "tap()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: <2>
+  Actual: <0>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:964:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 964
+The test description was:
+  RV6 D002 paged Store last item retains category wholesale text 1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:37 +44 -2: RV6 D002 paged Store last item retains category wholesale text 1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: RV6 D002 paged Store last item retains category wholesale text 1.0
+  
+01:37 +44 -2: RV6 D002 paged Store last item retains category wholesale text 2.0
+01:44 +45 -2: R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-shop-seller-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:45 +45 -3: R669 small full catalogue exposes every SKU s-curd-320x711-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU s-curd-320x711-1.0
+  
+01:45 +45 -3: R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-shop-seller-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:46 +45 -4: R669 small full catalogue exposes every SKU s-curd-320x711-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU s-curd-320x711-2.0
+  
+01:46 +45 -4: R669 small full catalogue exposes every SKU s-curd-711x320-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-shop-seller-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU s-curd-711x320-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:48 +45 -5: R669 small full catalogue exposes every SKU s-curd-711x320-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU s-curd-711x320-1.0
+  
+01:48 +45 -5: R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-shop-seller-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:49 +45 -6: R669 small full catalogue exposes every SKU s-curd-711x320-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU s-curd-711x320-2.0
+  
+01:49 +45 -6: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-wholesale-supplier-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:51 +45 -7: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU w-notebook-320x711-1.0
+  
+01:51 +45 -7: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-wholesale-supplier-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:52 +45 -8: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU w-notebook-320x711-2.0
+  
+01:52 +45 -8: R669 small full catalogue exposes every SKU w-notebook-711x320-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-wholesale-supplier-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU w-notebook-711x320-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:54 +45 -9: R669 small full catalogue exposes every SKU w-notebook-711x320-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU w-notebook-711x320-1.0
+  
+01:54 +45 -9: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: at least one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with widget matching predicate descending from
+widgets with key [<'buy-wholesale-supplier-full-catalogue-list'>]: []>
+   Which: means none were found but some were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1051:11)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1051
+The test description was:
+  R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+01:55 +45 -10: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R669 small full catalogue exposes every SKU w-notebook-711x320-2.0
+  
+01:55 +45 -10: R669 area final row clears Android navigation Size(320.0, 711.0) 1.0
+01:58 +46 -10: R669 area final row clears Android navigation Size(320.0, 711.0) 2.0
+02:01 +47 -10: R669 area final row clears Android navigation Size(711.0, 320.0) 1.0
+02:03 +48 -10: R669 area final row clears Android navigation Size(711.0, 320.0) 2.0
+02:06 +49 -10: R5 paged published Offers journey 320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _KeyWidgetFinder:<Found 1 widget with key [<'buy-page-range-published-offers'>]: [
+            Text-[<'buy-page-range-published-offers'>]("1–40 of 20,000,000 offers", inherit: true,
+color: Color(alpha: 1.0000, red: 0.3843, green: 0.4039, blue: 0.5020, colorSpace: ColorSpace.sRGB),
+size: 10.0, weight: 800, height: 1.2x, dependencies: [DefaultSelectionStyle, DefaultTextStyle,
+MediaQuery]),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1344:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1344
+The test description was:
+  R5 paged published Offers journey 320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:10 +49 -11: R5 paged published Offers journey 320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-1.0
+  
+02:10 +49 -11: R5 paged published Offers journey 320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _KeyWidgetFinder:<Found 1 widget with key [<'buy-page-range-published-offers'>]: [
+            Text-[<'buy-page-range-published-offers'>]("1–40 of 20,000,000 offers", inherit: true,
+color: Color(alpha: 1.0000, red: 0.3843, green: 0.4039, blue: 0.5020, colorSpace: ColorSpace.sRGB),
+size: 10.0, weight: 800, height: 1.2x, dependencies: [DefaultSelectionStyle, DefaultTextStyle,
+MediaQuery]),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1344:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1344
+The test description was:
+  R5 paged published Offers journey 320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:14 +49 -12: R5 paged published Offers journey 320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 320x844-2.0
+  
+02:14 +49 -12: R5 paged published Offers journey 640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _KeyWidgetFinder:<Found 1 widget with key [<'buy-page-range-published-offers'>]: [
+            Text-[<'buy-page-range-published-offers'>]("1–40 of 20,000,000 offers", inherit: true,
+color: Color(alpha: 1.0000, red: 0.3843, green: 0.4039, blue: 0.5020, colorSpace: ColorSpace.sRGB),
+size: 10.0, weight: 800, height: 1.2x, dependencies: [DefaultSelectionStyle, DefaultTextStyle,
+MediaQuery]),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1344:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1344
+The test description was:
+  R5 paged published Offers journey 640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:19 +49 -13: R5 paged published Offers journey 640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-1.0
+  
+02:19 +49 -13: R5 paged published Offers journey 640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: no matching candidates
+  Actual: _KeyWidgetFinder:<Found 1 widget with key [<'buy-page-range-published-offers'>]: [
+            Text-[<'buy-page-range-published-offers'>]("1–40 of 20,000,000 offers", inherit: true,
+color: Color(alpha: 1.0000, red: 0.3843, green: 0.4039, blue: 0.5020, colorSpace: ColorSpace.sRGB),
+size: 10.0, weight: 800, height: 1.2x, dependencies: [DefaultSelectionStyle, DefaultTextStyle,
+MediaQuery]),
+          ]>
+   Which: means one was found but none were expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:1344:9)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 1344
+The test description was:
+  R5 paged published Offers journey 640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:24 +49 -14: R5 paged published Offers journey 640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 paged published Offers journey 640x360-2.0
+  
+02:24 +49 -14: R5 store-first catalogue journey shop-320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey shop-320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+02:40 +49 -15: R5 store-first catalogue journey shop-320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-320x844-1.0
+  
+02:40 +49 -15: R5 paged catalogue user actions shop-320x844-1.0
+02:47 +50 -15: R5 store-first catalogue journey shop-320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey shop-320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+03:02 +50 -16: R5 store-first catalogue journey shop-320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-320x844-2.0
+  
+03:02 +50 -16: R5 paged catalogue user actions shop-320x844-2.0
+03:08 +51 -16: R5 store-first catalogue journey shop-640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey shop-640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+03:22 +51 -17: R5 store-first catalogue journey shop-640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-640x360-1.0
+  
+03:22 +51 -17: R5 paged catalogue user actions shop-640x360-1.0
+03:30 +52 -17: R5 store-first catalogue journey shop-640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey shop-640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+03:48 +52 -18: R5 store-first catalogue journey shop-640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey shop-640x360-2.0
+  
+03:48 +52 -18: R5 paged catalogue user actions shop-640x360-2.0
+03:57 +53 -18: R5 store-first catalogue journey wholesale-320x844-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey wholesale-320x844-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+04:13 +53 -19: R5 store-first catalogue journey wholesale-320x844-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-320x844-1.0
+  
+04:13 +53 -19: R5 paged catalogue user actions wholesale-320x844-1.0
+04:20 +54 -19: R5 store-first catalogue journey wholesale-320x844-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey wholesale-320x844-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+04:36 +54 -20: R5 store-first catalogue journey wholesale-320x844-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-320x844-2.0
+  
+04:36 +54 -20: R5 paged catalogue user actions wholesale-320x844-2.0
+04:45 +55 -20: R5 store-first catalogue journey wholesale-640x360-1.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey wholesale-640x360-1.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+05:00 +55 -21: R5 store-first catalogue journey wholesale-640x360-1.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-640x360-1.0
+  
+05:00 +55 -21: R5 paged catalogue user actions wholesale-640x360-1.0
+05:08 +56 -21: R5 store-first catalogue journey wholesale-640x360-2.0
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following StateError was thrown running a test:
+Bad state: No element
+
+When the exception was thrown, this was the stack:
+#0      Iterable.single (dart:core/iterable.dart:694:25)
+#1      WidgetController.element (package:flutter_test/src/controller.dart:888:30)
+#2      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2482:38)
+<asynchronous suspension>
+#3      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#4      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#5      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#6      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:2060:11)
+<asynchronous suspension>
+#7      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#8      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+The test description was:
+  R5 store-first catalogue journey wholesale-640x360-2.0
+════════════════════════════════════════════════════════════════════════════════════════════════════
+05:21 +56 -22: R5 store-first catalogue journey wholesale-640x360-2.0 [E]
+  Test failed. See exception logs above.
+  The test description was: R5 store-first catalogue journey wholesale-640x360-2.0
+  
+05:21 +56 -22: R5 paged catalogue user actions wholesale-640x360-2.0
+05:29 +57 -22: R669 collection discovery keeps the exact branch 320x844-1.0
+05:29 +58 -22: R669 collection discovery keeps the exact branch 320x844-2.0
+05:30 +59 -22: R669 collection discovery keeps the exact branch 640x360-1.0
+05:30 +60 -22: R669 collection discovery keeps the exact branch 640x360-2.0
+05:30 +61 -22: R5 collection visibility hides unsupported capability
+05:30 +62 -22: R5 collection visibility hides absent capability
+05:30 +63 -22: R5 collection visibility hides wrong-branch capability
+05:31 +64 -22: R5 collection visibility hides expired capability
+05:31 +65 -22: R5 collection visibility hides future-observation capability
+05:31 +66 -22: R5 collection visibility hides blank-source capability
+05:31 +67 -22: R5 collection visibility hides stale-facts capability
+05:31 +68 -22: R5 collection visibility hides wrong-product capability
+05:31 +69 -22: R5 collection visibility updates and expires on the same Store
+05:32 +70 -22: R5 collection visibility withdraws after an invalid refresh
+05:32 +71 -22: R5 collection visibility rechecks capability on app resume
+05:32 +72 -22: R66 supplier catalogue retains exact entry variant s-milk-500ml
+05:32 +73 -22: R66 supplier variant journey s-milk-500ml text 1.0
+05:35 +74 -22: R66 supplier variant journey s-milk-500ml text 2.0
+05:37 +75 -22: R66 supplier catalogue retains exact entry variant s-milk-2l
+05:37 +76 -22: R66 supplier variant journey s-milk-2l text 1.0
+05:39 +77 -22: R66 supplier variant journey s-milk-2l text 2.0
+05:41 +78 -22: R66 supplier catalogue retains exact entry variant w-rice-50kg
+05:41 +79 -22: R66 supplier variant journey w-rice-50kg text 1.0
+05:45 +80 -22: R66 supplier variant journey w-rice-50kg text 2.0
+05:47 +81 -22: R66 supplier catalogue retains exact entry variant w-oil-10l
+05:47 +82 -22: R66 supplier variant journey w-oil-10l text 1.0
+05:50 +83 -22: R66 supplier variant journey w-oil-10l text 2.0
+05:53 +84 -22: R66 Cart store continuation stays scoped after s-eggs
+05:56 +85 -22: R66 Cart store continuation stays scoped after w-notebook
+05:59 +86 -22: store and brand catalogues remain exact and destination-scoped
+05:59 +87 -22: Shop store catalogue reuses product cards and opens one item
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-grid'>]: []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:3152:5)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 3152
+The test description was:
+  Shop store catalogue reuses product cards and opens one item
+════════════════════════════════════════════════════════════════════════════════════════════════════
+06:00 +87 -23: Shop store catalogue reuses product cards and opens one item [E]
+  Test failed. See exception logs above.
+  The test description was: Shop store catalogue reuses product cards and opens one item
+  
+06:00 +87 -23: product details keeps Visit store as the single store route
+06:01 +88 -23: store grid keeps one full-size Add action
+06:01 +89 -23: store grid Add keeps the shopper in the store and updates Cart
+06:01 +90 -23: store catalogue exposes full products and exact related-store continuation
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: a value greater than or equal to <134>
+  Actual: <110.66666666666667>
+   Which: is not a value greater than or equal to <134>
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:3350:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 3350
+The test description was:
+  store catalogue exposes full products and exact related-store continuation
+════════════════════════════════════════════════════════════════════════════════════════════════════
+06:03 +90 -24: store catalogue exposes full products and exact related-store continuation [E]
+  Test failed. See exception logs above.
+  The test description was: store catalogue exposes full products and exact related-store continuation
+  
+06:03 +90 -24: four-product store keeps readable previews and all products reachable
+══╡ EXCEPTION CAUGHT BY FLUTTER TEST FRAMEWORK ╞════════════════════════════════════════════════════
+The following TestFailure was thrown running a test:
+Expected: exactly one matching candidate
+  Actual: _DescendantWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-lane-0'>]
+descending from widgets with key [<'buy-shop-seller-sheet-s-curd'>]: []>
+   Which: means none were found but one was expected
+
+When the exception was thrown, this was the stack:
+#4      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:3411:7)
+<asynchronous suspension>
+#5      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#6      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+<asynchronous suspension>
+(elided one frame from package:stack_trace)
+
+This was caught by the test expectation on the following line:
+  file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart line 3411
+The test description was:
+  four-product store keeps readable previews and all products reachable
+════════════════════════════════════════════════════════════════════════════════════════════════════
+06:04 +90 -25: four-product store keeps readable previews and all products reachable [E]
+  Test failed. See exception logs above.
+  The test description was: four-product store keeps readable previews and all products reachable
+  
+06:05 +90 -25: Some tests failed.
+
+Failing tests:
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 320x844-2.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-1.0
+  C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart: R5 paged published Offers journey 640x360-2.0
+  ... and 21 more

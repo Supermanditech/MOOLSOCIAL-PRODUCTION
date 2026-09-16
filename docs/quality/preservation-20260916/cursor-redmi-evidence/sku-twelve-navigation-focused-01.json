@@ -1,0 +1,93 @@
+{
+  "state": "twelve_record_amendment_focused_qualified_combined_and_device_pending",
+  "tickets": [
+    "SKU-M05-C04",
+    "SKU-M05-C05"
+  ],
+  "totalScopeRecords": 12,
+  "founderPageSwipeAgreement": true,
+  "currentOwnerHashes": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "D41B14C5D56B207AE74AF981F55575BEF3376072D47603BEF35BE926E1823B97",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "9AFD18E028F175E45E30885E9473EBC605AC79CC8063711730C8D31FBB0E66BA",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "DA8EBBB4218DC835BC808F6560DE041E9533E2130207EB915062E1E449C9949D",
+    "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart": "A56375D7AF7823CBC19E764C02C5EC39F50D80F462C8B1DCC20949E382323CA0"
+  },
+  "runs": {
+    "sku-swipe-test-03.log": {
+      "passed": 6,
+      "failed": 0,
+      "terminal": "e1a4da",
+      "qualificationStage": "before style-only guard braces and test super-parameter cleanup",
+      "sha256": "9359B2F48DA49A10C9933F179E7F497218CFEA12978CB48DE7BB41F6A9B1DE59"
+    },
+    "sku-navigation-journeys-01.log": {
+      "passed": 22,
+      "failed": 8,
+      "terminal": "cf1bb3",
+      "failureDisposition": "All eight Store cases targeted a removed numeric label/blank semantic row as hit target; corrected to actual Next button and rerun separately",
+      "sha256": "1E261B7252C2C573539F7878429F13FCC41170BE80EC4FB7A576A149C0ADC0F7"
+    },
+    "sku-navigation-store-02.log": {
+      "passed": 8,
+      "failed": 0,
+      "terminal": "1e461a",
+      "sha256": "55AAECBA23AB66722DDCCB8F0141A8858FD1994BAF5A7CAA98BBBAA761CB16B2"
+    },
+    "sku-navigation-search-01.log": {
+      "passed": 8,
+      "failed": 0,
+      "terminal": "510c89",
+      "sha256": "E829282292BD9F4BB5B000DFB39EA803944B52D6450E0F2CA9B1B0609F068543"
+    },
+    "sku-navigation-analysis-02.log": {
+      "issues": 0,
+      "terminal": "f02648",
+      "qualificationStage": "before one-line Store test target correction",
+      "sha256": "CC594220BCFB8C99F3F87150B55BC3A1BAB6F7472774EE665591B0522B536D8B"
+    }
+  },
+  "visuals": [
+    {
+      "name": "sku-swipe-shop-1.0-bottom.png",
+      "sha256": "EB49071AA225B50CA0CE9DF1AF73F21858054284C3017D5C213DA568FB3F2880"
+    },
+    {
+      "name": "sku-swipe-shop-1.0-top.png",
+      "sha256": "8B24CD48505E4D7C379EFBF20B2D94C96498B52FFA56AEBBFE1A554FF2A20EA7"
+    },
+    {
+      "name": "sku-swipe-shop-2.0-bottom.png",
+      "sha256": "533C574C66D7A8D79FAEAC3AE15C6E28ED42764780DA4E048EA3EE0C6BAA1C54"
+    },
+    {
+      "name": "sku-swipe-shop-2.0-top.png",
+      "sha256": "3DF6E8B3A0484378F42C3F3A36976038E85813029D93E2ABAA94F01EEBCC6E98"
+    },
+    {
+      "name": "sku-swipe-wholesale-1.0-bottom.png",
+      "sha256": "0F4E57A0E93307B149D5A1199D3DF634E3B97BE8577653532BC91EC9DA5E34E4"
+    },
+    {
+      "name": "sku-swipe-wholesale-1.0-top.png",
+      "sha256": "08E8B399B94AD1D4F3FC0FFCC601A780750FE31A99476548D55CAE287C2FDB5C"
+    },
+    {
+      "name": "sku-swipe-wholesale-2.0-bottom.png",
+      "sha256": "0C268614915298B738AE60EDF63AE02B62C052AAF039061D5B4B05610EC9C37A"
+    },
+    {
+      "name": "sku-swipe-wholesale-2.0-top.png",
+      "sha256": "90EEDC76E0F0AA51B6738FFFC9761B3F15E8FFF9AEA680D17576DCB1FEAC0E80"
+    }
+  ],
+  "manualVisualReviews": [
+    "sku-swipe-shop-1.0-top.png",
+    "sku-swipe-wholesale-2.0-bottom.png"
+  ],
+  "remaining": [
+    "final current-source analysis and two required combined runs",
+    "atomic commit/push and exact clean live remote equality",
+    "unique successor APK and Redmi-only data-preserving install",
+    "affected swipe/category/search/M02 Redmi checks and twelve-record final reconciliation"
+  ]
+}

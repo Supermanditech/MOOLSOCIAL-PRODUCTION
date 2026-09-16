@@ -1,0 +1,20 @@
+{
+  "recordedAt": "2026-09-15T22:26:51.952240+00:00",
+  "branch": "work/cursor-ui/redmi-v6-audit-20260913",
+  "head": "067b26d1c66ac9511d026539470103baaea194fc",
+  "liveRemote": "067b26d1c66ac9511d026539470103baaea194fc",
+  "status": {
+    "bytes": 0,
+    "records": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrBytes": 0,
+    "exitCode": 0
+  },
+  "sourceCommit": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+  "buildSeal": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+  "evidenceOnlyFinalCommit": true,
+  "applicationDeltaSinceQualifiedSource": false,
+  "qualificationReportSha256": "D8A4A26B26F3165048C6D1AEAA9763A2601324F07C8B8DCB03F4E03EF4296873",
+  "installationReceiptSha256": "A566539242CA94960635B651C3B8E5BE0DD93783F399D2ED00F8B4776AF50066",
+  "coordinationHandoffGate": "pending separate terminal receipt"
+}

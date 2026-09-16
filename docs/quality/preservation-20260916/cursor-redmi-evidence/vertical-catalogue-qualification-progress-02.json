@@ -1,0 +1,41 @@
+{
+  "recordedAtUtc": "2026-09-15T07:53:38.439804+00:00",
+  "head": "4467b078a9e10e0549567b3a3c68b97e791186ed",
+  "sourceCommitted": false,
+  "sharedCatalogue02": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\shared-catalogue-test-02.log",
+    "sha256": "5C4EC931CF5EB195676DC390F3285D12601B98EB24B1084D9EBF78D0DA701A27",
+    "passes": 110,
+    "failures": 5,
+    "exitCode": 1,
+    "terminalChunk": "e3ca47",
+    "remainingFailureGroups": [
+      "4 Offers reads of obsolete hidden status widget",
+      "1 Store View more lookup before vertical scrolling"
+    ]
+  },
+  "changesSinceRun": [
+    "Offers checks now read the visible range Text and preserve range assertions",
+    "Store View more check scrolls to and hit-tests the control",
+    "Search, Saved and ordinary catalogue reuse the vertical adaptive grid",
+    "Price text no longer scales down; card height measures wrapped price",
+    "Long-price test asserts minimum font size, no FittedBox, full paragraph height and captures actual Flutter rendering"
+  ],
+  "currentSourceNormalizedSha256": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "C7F57F9AEEC5902F0AD60C84633106D2F1E5E6AEAF99B5DFE327F30A8CE35AAC",
+    "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart": "EC5BCB01C2B4881C275E0F6AA39F88351AC7B856650F14FC05386284F7CA60FD"
+  },
+  "nextRun": {
+    "analysisPath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\founder-analysis-03.log",
+    "testPath": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\vertical-price-offers-test-01.log",
+    "actualTestFilter": "SKU long metadata",
+    "sessionId": 42091,
+    "state": "running; no result asserted"
+  },
+  "nextUnimplementedSurfaces": [
+    "Featured product section",
+    "Recently viewed product section"
+  ],
+  "newApkBuilt": false,
+  "openAcceptanceRecords": 10
+}

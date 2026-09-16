@@ -1,0 +1,5 @@
+Analyzing mobile...                                             
+
+   info - Statements in an if should be enclosed in a block. Try wrapping the statement in a block - test\ui_v2\buy\buy_v2_partner_catalogue_test.dart:4037:5 - curly_braces_in_flow_control_structures
+
+1 issue found. (ran in 11.5s)

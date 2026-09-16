@@ -1,0 +1,35 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart
+00:00 +0: SKU provider names adaptive shop 1.0
+00:11 +1: SKU provider names adaptive shop 2.0
+00:16 +2: SKU provider names adaptive wholesale 1.0
+00:24 +3: SKU provider names adaptive wholesale 2.0
+
+Warning: A call to drag() with finder "Found 1 widget with type "Scrollable" descending from widget with key [<'buy-paged-scroll-catalogue-wholesale'>] (ignoring all but first): [
+  Scrollable(axisDirection: down, physics: null, restorationId: null, dependencies: [InheritedCupertinoTheme, MediaQuery, ScrollConfiguration, UnmanagedRestorationScope, _InheritedTheme, _LocalizationsScope-[GlobalKey#27103]], state: ScrollableState#78c6d(position: ScrollPositionWithSingleContext#4047c(offset: 632.0, range: 0.0..35922.0, viewport: 572.0, ScrollableState, ClampingScrollPhysics -> RangeMaintainingScrollPhysics, IdleScrollActivity#18fde, ScrollDirection.idle), effective physics: ClampingScrollPhysics -> RangeMaintainingScrollPhysics)),
+]" derived an Offset (Offset(176.0, 454.0)) that would not hit test on the specified widget.
+Maybe the widget is actually off-screen, or another widget is obscuring it, or the widget cannot receive pointer events.
+The finder corresponds to this RenderBox: RenderClipRect#93205 relayoutBoundary=up7
+The hit test result at that offset is: HitTestResult(RenderPointerListener#92e17@Offset(12.0, 58.0), RenderSemanticsAnnotations#80781@Offset(12.0, 58.0), RenderMouseRegion#dfe83@Offset(12.0, 58.0), RenderSemanticsAnnotations#685cc@Offset(12.0, 58.0), _RenderInkFeatures#936e2@Offset(12.0, 58.0), RenderCustomPaint#569d0@Offset(12.0, 58.0), RenderPhysicalShape#7297f@Offset(12.0, 58.0), RenderConstrainedBox#47c47@Offset(12.0, 58.0), RenderPointerListener#214cd@Offset(12.0, 58.0), RenderSemanticsGestureHandler#41765@Offset(12.0, 58.0), RenderSemanticsAnnotations#e5857@Offset(12.0, 58.0), RenderStack#196e4@Offset(176.0, 398.0), _RenderLayoutBuilder#a08fd@Offset(176.0, 398.0), RenderStack#bb2d8@Offset(176.0, 398.0), RenderFlex#2db52@Offset(176.0, 454.0), _RenderColoredBox#3e78a@Offset(176.0, 454.0), RenderPadding#92c35@Offset(176.0, 454.0), RenderDecoratedBox#a182a@Offset(176.0, 454.0), RenderConstrainedBox#c4283@Offset(176.0, 454.0), RenderPositionedBox#29719@Offset(176.0, 454.0), RenderPadding#be737@Offset(176.0, 454.0), RenderDecoratedBox#22568@Offset(176.0, 454.0), _RenderLayoutBuilder#c515b@Offset(176.0, 454.0), RenderCustomMultiChildLayoutBox#dc057@Offset(176.0, 454.0), _RenderInkFeatures#2a7a1@Offset(176.0, 454.0), RenderPhysicalModel#d41a4@Offset(176.0, 454.0), RenderStack#07084@Offset(176.0, 454.0), RenderAnnotatedRegion<SystemUiOverlayStyle>#6c467@Offset(176.0, 454.0), RenderSemanticsAnnotations#b4aa6@Offset(176.0, 454.0), RenderRepaintBoundary#59188@Offset(176.0, 454.0), RenderIgnorePointer#02b97@Offset(176.0, 454.0), RenderStack#5305f@Offset(176.0, 454.0), RenderDecoratedBox#453e3@Offset(176.0, 454.0), RenderRepaintBoundary#afcfc@Offset(176.0, 454.0), RenderSemanticsAnnotations#0e9ff@Offset(176.0, 454.0), RenderOffstage#d823d@Offset(176.0, 454.0), RenderSemanticsAnnotations#95bd8@Offset(176.0, 454.0), _RenderTheater#eb8f9@Offset(176.0, 454.0), RenderAbsorbPointer#fb23f@Offset(176.0, 454.0), RenderPointerListener#16bd7@Offset(176.0, 454.0), RenderSemanticsAnnotations#41860@Offset(176.0, 454.0), RenderRepaintBoundary#2d10d@Offset(176.0, 454.0), RenderSemanticsAnnotations#31321@Offset(176.0, 454.0), RenderSemanticsAnnotations#f1eb3@Offset(176.0, 454.0), RenderSemanticsAnnotations#ac204@Offset(176.0, 454.0), RenderTapRegionSurface#ba507@Offset(176.0, 454.0), RenderSemanticsAnnotations#526c9@Offset(176.0, 454.0), RenderSemanticsAnnotations#badbc@Offset(176.0, 454.0), HitTestEntry<HitTestTarget>#cd1ea(_ReusableRenderView#10030), HitTestEntry<HitTestTarget>#6bd6f(<AutomatedTestWidgetsFlutterBinding>))
+#0      WidgetController._getElementPoint (package:flutter_test/src/controller.dart:2165:25)
+#1      WidgetController.getCenter (package:flutter_test/src/controller.dart:1947:12)
+#2      WidgetController.drag (package:flutter_test/src/controller.dart:1604:7)
+#3      WidgetController.dragUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2476:17)
+<asynchronous suspension>
+#4      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#5      WidgetController.scrollUntilVisible.<anonymous closure> (package:flutter_test/src/controller.dart:2439:7)
+<asynchronous suspension>
+#6      TestAsyncUtils.guard.<anonymous closure> (package:flutter_test/src/test_async_utils.dart:130:27)
+<asynchronous suspension>
+#7      main.<anonymous closure> (file:///C:/GUARANTEED%20OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart:242:9)
+<asynchronous suspension>
+#8      testWidgets.<anonymous closure>.<anonymous closure> (package:flutter_test/src/widget_tester.dart:192:15)
+<asynchronous suspension>
+#9      TestWidgetsFlutterBinding._runTestBody (package:flutter_test/src/binding.dart:1952:5)
+<asynchronous suspension>
+#10     StackZoneSpecification._registerCallback.<anonymous closure> (package:stack_trace/src/stack_zone_specification.dart:114:42)
+<asynchronous suspension>
+To silence this warning, pass "warnIfMissed: false" to "drag()".
+To make this warning fatal, set WidgetController.hitTestWarningShouldBeFatal to true.
+
+00:29 +4: All tests passed!

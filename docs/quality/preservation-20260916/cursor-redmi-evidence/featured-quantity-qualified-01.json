@@ -1,0 +1,51 @@
+{
+  "recordedAtUtc": "2026-09-15T08:46:19.099443+00:00",
+  "test": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\featured-quantity-test-01.log",
+    "sha256": "232F731F2A9D0C699A26ECA42943EB8714C20B55BE064DF59EA8B3018C0FF7F5",
+    "passes": 24,
+    "failures": 0,
+    "exitCode": 0,
+    "terminalChunk": "5980ae",
+    "scope": "Featured quick, scheduled, wholesale and bulk at 320/360/430 logical widths and normal/200 percent text; target bounds/non-overlap/corner taps/quantity and unrelated Cart preservation"
+  },
+  "qualifiedSourceNormalizedSha256": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "E0E66A9446040A3CA9CC211E50FC041EC6355ED3F634F8FD9C27AD63D1348BCE",
+    "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart": "D3BD0E2BFD78232318BA142603AC5EC08186187AE1AE2D029FCA9E1B64C9AFD9"
+  },
+  "analysis": {
+    "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\founder-analysis-07.log",
+    "sha256": "B14E5DAA45D9F8AF2D4962549212583ECB3F3CC00DBD33ABD4F729908D980CFE",
+    "result": "No issues found"
+  },
+  "inspectedImages": [
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\featured-quantity-visual-01\\featured-quick-s-tomato-360.0-1.0.png",
+      "sha256": "7D50838DC0F0F50F742EF209B46223176EDEC0C155EE244F16A9E8E7CA6BDB3B",
+      "finding": "Quantity controls are visually separated"
+    },
+    {
+      "path": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\featured-quantity-visual-01\\featured-scheduled-s-atta-320.0-2.0.png",
+      "sha256": "B959C98F3B01D7BA430857B63754B32C831614555BE9A442EC031A3FA706D71E",
+      "finding": "Quantity controls are visually separated"
+    }
+  ],
+  "otherVisualFindings": [
+    "Normal Featured badges split short words; reduced padding after this run and added word-fit assertion",
+    "More products retained Swipe for more text; corrected to Browse categories after this run",
+    "Scheduled capture contains a media fallback; this report does not qualify product media availability"
+  ],
+  "currentChangesNotCoveredByPriorPass": [
+    "Featured badge padding",
+    "Category-action wording",
+    "New badge word-fit assertions"
+  ],
+  "currentRun": {
+    "session": 57664,
+    "analysis": "founder-analysis-08.log",
+    "test": "vertical-corrections-test-01.log",
+    "state": "running; no result asserted"
+  },
+  "openAcceptanceRecords": 10,
+  "newApkBuilt": false
+}

@@ -1,0 +1,12 @@
+Analyzing mobile...                                             
+
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:67:10 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:67:26 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:67:38 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:67:49 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:69:15 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:69:39 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:69:59 - unnecessary_brace_in_string_interps
+   info - Unnecessary braces in a string interpolation. Try removing the braces - lib\ui_v2\buy\buy_v2_design.dart:69:70 - unnecessary_brace_in_string_interps
+
+8 issues found. (ran in 99.5s)

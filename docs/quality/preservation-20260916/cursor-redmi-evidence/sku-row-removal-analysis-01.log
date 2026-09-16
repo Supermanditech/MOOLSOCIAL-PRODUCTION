@@ -1,0 +1,10 @@
+Analyzing 3 items...                                            
+
+  error - The name 'CustomSemanticsAction' isn't a class. Try correcting the name to match an existing class - lib\ui_v2\buy\buy_v2_catalogue.dart:1164:17 - creation_with_non_type
+  error - The name 'CustomSemanticsAction' isn't a class. Try correcting the name to match an existing class - lib\ui_v2\buy\buy_v2_catalogue.dart:1167:17 - creation_with_non_type
+  error - The name 'CustomSemanticsAction' isn't a class. Try correcting the name to match an existing class - lib\ui_v2\buy\buy_v2_catalogue.dart:1169:17 - creation_with_non_type
+warning - A value for optional parameter 'areaLabel' isn't ever given. Try removing the unused parameter - lib\ui_v2\buy\buy_v2_catalogue.dart:1345:10 - unused_element_parameter
+warning - A value for optional parameter 'onArea' isn't ever given. Try removing the unused parameter - lib\ui_v2\buy\buy_v2_catalogue.dart:1346:10 - unused_element_parameter
+
+5 issues found. (ran in 24.1s)
+1

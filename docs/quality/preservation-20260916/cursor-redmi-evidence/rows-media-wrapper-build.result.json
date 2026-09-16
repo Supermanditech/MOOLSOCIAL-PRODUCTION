@@ -1,0 +1,23 @@
+{
+  "stage": "rows-media-wrapper-build",
+  "exitCode": 0,
+  "passed": true,
+  "source": "f0fc06a92bb43627ec4ca952e8996a888ec96ac2",
+  "seal": "e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+  "preservedOwnerCount": 3044,
+  "logSha256": "DDB8E052511DC2089EC3D1A200B2A9C5214B1602B0039FA3C44CDB548546C6A4",
+  "terminalTail": [
+    "Version=1.0.0-r66.28",
+    "VersionCode=2026091601",
+    "BuildMode=debug",
+    "MachineState=C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.28\\machine-state.json",
+    "RuntimeState=C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.28\\machine-state.json",
+    "Branch=work/cursor-ui/redmi-v6-audit-20260913",
+    "HEAD=e450af636f61e86abbcbb9fd3acb1fe34d2696dc",
+    "SourceFingerprint=3146E3ED92EC4810B2BDBB62D1C1A0A9B5A281CCED741E95743E9B5D17BE2224",
+    "APK=C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\\apps\\mobile\\build\\cursor-review-r66.28\\artifacts\\uaw-cursor-sku-rows-media-20260916-device-review-debug.apk",
+    "Bytes=210821145",
+    "SHA256=B3172EFB64135D606CD249F751617FE21AB065E50996FE459AEEF991CA7946A8",
+    "BuiltAt=2026-09-16T03:08:36.3046461+05:30"
+  ]
+}

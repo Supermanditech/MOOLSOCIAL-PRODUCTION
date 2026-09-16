@@ -1,0 +1,14 @@
+[
+  {
+    "file": "prepare-sku-candidate.py",
+    "sha256": "D4406336E622B809E5FF1E5C40C7A087B94282FD8DF0959938BD2987B6E55060",
+    "syntax": "valid",
+    "executed": false
+  },
+  {
+    "file": "verify-current-qualification.py",
+    "sha256": "036D3EE46C695288ADC213E09BDED77FC88CC281488C1BADFF98AED3A023D493",
+    "syntax": "valid",
+    "executed": false
+  }
+]

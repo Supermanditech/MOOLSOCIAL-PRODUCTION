@@ -1,0 +1,14 @@
+{
+  "ticket": "SKU-M05",
+  "state": "device_failure_open",
+  "candidate": "UAW-CURSOR-SKU-METADATA-20260915",
+  "apkSha256": "209E51297A64D52A7C20E5B8E662EAFE0CE88D78A6A1F3C4D4B618F6D14A377E",
+  "device": "TG8HCYTGGQT885OF",
+  "capture": "successor-captures/006-offer-product.png",
+  "captureSha256": "5A2747EF3E06420BB6A16B5183E7CF0D595A0B6A7257DF7466951ED0406AC9F2",
+  "observation": "At normal font scale1.0, Offers manufacturer-price Fresh tomatoes 10kg crate detail fixed purchase dock ends delivery copy with visible ellipsis (checkout truncated). Accessible hierarchy contains the full promise; the visual bottom-bar text is nevertheless truncated. Main product metadata continues in scrollable content.",
+  "requiredCorrection": "Make the reused purchase-dock essential delivery/pack/price facts fully readable without truncation while keeping Add reachable and content scrollable at normal/enlarged text. Qualify affected local and actual Redmi cases.",
+  "notAnAppDefect": "Visit store was not in the initial detail viewport; semantic action script correctly stopped without tapping an absent target. Scroll to discover the real action before continuing.",
+  "deviceClosureEstablished": false,
+  "sourceEdited": false
+}

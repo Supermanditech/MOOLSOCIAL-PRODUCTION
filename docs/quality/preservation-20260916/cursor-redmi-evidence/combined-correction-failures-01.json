@@ -1,0 +1,202 @@
+{
+  "log": "C:\\GUARANTEED OUTCOME\\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\\sku-metadata-redmi-20260914\\combined-correction-test-01.log",
+  "sha256": "985A1664B47FDD581363AE6E003E03ABCA78809F1722CF676B9C121469B6A1C2",
+  "terminal": "3a0cac",
+  "session": 21205,
+  "exitCode": 1,
+  "passed": 2338,
+  "skipped": 27,
+  "failed": 30,
+  "groups": {
+    "buy_v2_cart_relevance_widget_test.dart:891": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-lane-0'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ]
+    },
+    "buy_v2_product_actions_test.dart:1582": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-grid'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ]
+    },
+    "buy_v2_product_continuity_test.dart:912": {
+      "count": 1,
+      "reason": [
+        "The following StateError was thrown running a test:",
+        "Bad state: No element",
+        "",
+        "When the exception was thrown, this was the stack:",
+        "#0      Iterable.last (dart:core/iterable.dart:679:7)"
+      ]
+    },
+    "buy_v2_screen_test.dart:530": {
+      "count": 2,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: at least one matching candidate",
+        "  Actual: _TypeWidgetFinder:<Found 0 widgets with type \"BuyV2ProductCard\": []>",
+        "   Which: means none were found but some were expected",
+        ""
+      ]
+    },
+    "buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1301": {
+      "count": 6,
+      "reason": [
+        "The following StateError was thrown running a test:",
+        "Bad state: No element",
+        "",
+        "When the exception was thrown, this was the stack:",
+        "#0      Iterable.single (dart:core/iterable.dart:694:25)"
+      ]
+    },
+    "buy_v2_search_result_recovery_test.dart:171": {
+      "count": 4,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-lane-1'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ]
+    },
+    "buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1364": {
+      "count": 2,
+      "reason": [
+        "The following StateError was thrown running a test:",
+        "Bad state: Too many elements",
+        "",
+        "When the exception was thrown, this was the stack:",
+        "#0      Iterable.single (dart:core/iterable.dart:696:24)"
+      ]
+    },
+    "buy_v2_shop_pharmacy_seller_continuity_test.dart:177": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-grid'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ]
+    },
+    "buy_v2_scoped_cart_checkout_dock_continuity_test.dart:1373": {
+      "count": 2,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value greater than or equal to <30.6328125>",
+        "  Actual: <9.166666666666671>",
+        "   Which: is not a value greater than or equal to <30.6328125>",
+        "Complete word: Lowest"
+      ]
+    },
+    "buy_v2_wholesale_supplier_continuity_test.dart:116": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-grid'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ]
+    },
+    "buy_v2_screen_test.dart:2131": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value greater than or equal to <145>",
+        "  Actual: <88.0>",
+        "   Which: is not a value greater than or equal to <145>",
+        ""
+      ]
+    },
+    "buy_v2_screen_test.dart:3274": {
+      "count": 1,
+      "reason": [
+        "The following StateError was thrown running a test:",
+        "Bad state: No element",
+        "",
+        "When the exception was thrown, this was the stack:",
+        "#0      Iterable.single (dart:core/iterable.dart:694:25)"
+      ]
+    },
+    "buy_v2_screen_test.dart:3353": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-lane-0'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ]
+    },
+    "buy_v2_screen_test.dart:4428": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value greater than or equal to <145>",
+        "  Actual: <88.0>",
+        "   Which: is not a value greater than or equal to <145>",
+        ""
+      ]
+    },
+    "buy_v2_screen_test.dart:4766": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-grid'>]: []>",
+        "   Which: means none were found but one was expected",
+        "shop"
+      ]
+    },
+    "buy_v2_screen_test.dart:8002": {
+      "count": 2,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: a value less than or equal to <270.0>",
+        "  Actual: <321.0>",
+        "   Which: is not a value less than or equal to <270.0>",
+        ""
+      ]
+    },
+    "buy_v2_screen_test.dart:8914": {
+      "count": 1,
+      "reason": [
+        "The following StateError was thrown running a test:",
+        "Bad state: No element",
+        "",
+        "When the exception was thrown, this was the stack:",
+        "#0      Iterable.single (dart:core/iterable.dart:694:25)"
+      ]
+    },
+    "buy_v2_screen_test.dart:9232": {
+      "count": 1,
+      "reason": [
+        "The following StateError was thrown running a test:",
+        "Bad state: No element",
+        "",
+        "When the exception was thrown, this was the stack:",
+        "#0      Iterable.single (dart:core/iterable.dart:694:25)"
+      ]
+    },
+    "buy_v2_screen_test.dart:11618": {
+      "count": 1,
+      "reason": [
+        "The following TestFailure was thrown running a test:",
+        "Expected: exactly one matching candidate",
+        "  Actual: _KeyWidgetFinder:<Found 0 widgets with key [<'buy-horizontal-product-grid'>]: []>",
+        "   Which: means none were found but one was expected",
+        ""
+      ]
+    }
+  }
+}

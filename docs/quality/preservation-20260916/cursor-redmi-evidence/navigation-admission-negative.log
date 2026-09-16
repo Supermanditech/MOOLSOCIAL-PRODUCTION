@@ -1,0 +1,10 @@
+Buy backend contract boundary self-test passed: seven mobile cases and one backend owner behaved as required; the exact SUP-001/SUP-003/B2B-002 pure-contract allowlist does not authorize a service or gateway.
+Buy data-egress boundary self-test passed: seven forbidden cases were rejected and two safe cases were accepted.
+C:\GUARANTEED 
+OUTCOME\MOOLSOCIAL-CURSOR-BUY-UAT-20260905\sku-metadata-redmi-20260914\test-sku-navigation-source-admission.ps1 : The 
+term 'Get-FileHash' is not recognized as the name of a cmdlet, function, script file, or operable program. Check the 
+spelling of the name, or if a path was included, verify that the path is correct and try again.
+    + CategoryInfo          : ObjectNotFound: (Get-FileHash:String) [test-sku-navigation-source-admission.ps1], Comman 
+   dNotFoundException
+    + FullyQualifiedErrorId : CommandNotFoundException,test-sku-navigation-source-admission.ps1
+ 

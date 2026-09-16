@@ -1,0 +1,16 @@
+{
+  "failedTerminal": "ca2e51",
+  "exitCode": 1,
+  "logSha256": "849F318EC9AA2BA04078DB20CB629ECE3726BAB8417CFC8C8F4209523D0FA4DF",
+  "cause": "EvidenceArchiveRoot was incorrectly assigned a new candidate output folder; this parameter resolves existing historical archived evidence, not build output.",
+  "existingPrevention": [
+    "REG-20260912-4610-BUILD-ARCHIVED-EVIDENCE-LOOKUP",
+    "REG-20260905-4567-CURSOR-PRESERVED-EVIDENCE-ARCHIVE-ARGUMENT"
+  ],
+  "correction": "Use existing C:/GUARANTEED OUTCOME/MOOLSOCIAL-ARCHIVE-DIRTY-WORKTREES-20260904 as documented in RESULTS.md and STORE-PROCUREMENT-BRIDGE-20260912.md; verified ordinary existing directory b30914.",
+  "sourceChanged": false,
+  "gateChanged": false,
+  "apkBuilt": false,
+  "archiveModified": false,
+  "retryLog": "sku-wrapper-preflight-02.log"
+}

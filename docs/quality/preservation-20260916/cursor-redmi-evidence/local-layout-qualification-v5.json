@@ -1,0 +1,56 @@
+{
+  "state": "current_runtime_focused_qualified_combined_and_device_pending",
+  "runtimeNormalizedHashes": {
+    "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart": "99054262369CDC1923B953D5B2BA04A06493B8A18CE2C6E146E95ACD50DA4A56",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart": "45A72138CD0C7052F83B30DF10E993F8F0423FADA34A7ABE10881F5FE777A5C6",
+    "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart": "6F847B0A58594C1ECA571C8F530A12217BFB57B1A05C8A79C0AE20573206C706"
+  },
+  "runs": [
+    {
+      "log": "focused-06.log",
+      "passed": 31,
+      "failed": 0,
+      "logSha256": "3D43533F1E5B425596C36E27CAEE27F29B48534FB68B421C07D90A5E8814E891",
+      "testOwnerNormalizedHash": "11BF493A2E7F9D94B673CAA13A68AC7DD474549761229908E1DBABC2A0D449EA"
+    },
+    {
+      "log": "focused-07.log",
+      "exitCode": 0,
+      "terminal": "c76709",
+      "passed": 4,
+      "failed": 0,
+      "logSha256": "0F0DFA5900BFDFC995A0130095FEA1B4146EAED7FBACDEB2558ED9A1DA909DCA",
+      "testOwnerNormalizedHash": "59D73F7E184B3181CDF6EDA39369A7C983E70EF030B82AE9B85306F10666244C"
+    }
+  ],
+  "countsOverlapDoNotSum": true,
+  "priorVisualReport": "local-layout-qualification-v4.json",
+  "priorVisualReportSha256": "35CD07B5B14663024F760DDEC69A6AC42CC92E9E0DA9E3C386D2FD44AAA4AD11",
+  "additionalImages": {
+    "local-v7\\sku-long-cart-shop-1.0.png": "85B077ECB7BCEEACFF594C88C2C33D27C99E44F1C67DBF8C5A9DA0EB0702F272",
+    "local-v7\\sku-long-cart-shop-2.0.png": "C62A8039C0561E5D77AB02AD01AA2300D69B7AF3A4415C8EC455CECE82DF251B",
+    "local-v7\\sku-long-cart-wholesale-1.0.png": "1F098C8019878D37A2C882495D8A80646AA229791D6E1E926A591027094AA6C6",
+    "local-v7\\sku-long-cart-wholesale-2.0.png": "717B8CF3276E74B5B82010137972CEBBFF4718EA95DDF87DCDC448518346B79A",
+    "local-v7\\sku-long-report-facts-shop-1.0.png": "314A0662FAD90A68EC41747D792A7ECBD6E28054EC1F0D7C96492EAB51C13D82",
+    "local-v7\\sku-long-report-facts-shop-2.0.png": "DBD9618BC21EAE0506799387FB18D840022E206B0D1FABB622D3E8E391964EDF",
+    "local-v7\\sku-long-report-facts-wholesale-1.0.png": "264FD6F2706A914AB91DE73576045EFB8F1457D62C91462A3049DF439E60B0FB",
+    "local-v7\\sku-long-report-facts-wholesale-2.0.png": "0EB664C8BB8494AAD09DED7F5C074F5AFCF659EB665EBDC9CE2D2622EE91F90C",
+    "local-v7\\sku-long-report-shop-1.0.png": "314A0662FAD90A68EC41747D792A7ECBD6E28054EC1F0D7C96492EAB51C13D82",
+    "local-v7\\sku-long-report-shop-2.0.png": "6C3F98B6CC051716B56D7C4B88CBC1927BBCC4E37ABFA331171C17AD60A262F9",
+    "local-v7\\sku-long-report-wholesale-1.0.png": "264FD6F2706A914AB91DE73576045EFB8F1457D62C91462A3049DF439E60B0FB",
+    "local-v7\\sku-long-report-wholesale-2.0.png": "0D33A983C3EDB837DCEEEED954F947307C9BFA4AA7860201530FD9D54CBA6C38",
+    "local-v7\\sku-long-shop-1.0.png": "498AEFCA878155A5EA283E918C18A4B8F3106D4A0C3F8EA4D86A0D87EB06F966",
+    "local-v7\\sku-long-shop-2.0.png": "BA0F785200CF8A014358E15F8C0188FF94552D8EEFBF452C5FF3623179FCAF8B",
+    "local-v7\\sku-long-wholesale-1.0.png": "B4D5B7D5D039F8EFF80459B953ABA88025A17154C4F50BF9F60FBCEEC361F441",
+    "local-v7\\sku-long-wholesale-2.0.png": "68A965D74B7B4EB8781B6AE41F826293A405ED47CA4E8F785BCBAD4AEB901E34"
+  },
+  "additionalManuallyReviewed": [
+    "local-v7/sku-long-report-facts-wholesale-2.0.png"
+  ],
+  "currentTestOwnerNormalizedHash": "59D73F7E184B3181CDF6EDA39369A7C983E70EF030B82AE9B85306F10666244C",
+  "limits": [
+    "Every report identity text field independently fits within the real scroll viewport; not all fields fit simultaneously at200 percent.",
+    "No report was submitted.",
+    "Current-source analysis05 and combined03/04 are running; no combined or device closure claimed."
+  ]
+}

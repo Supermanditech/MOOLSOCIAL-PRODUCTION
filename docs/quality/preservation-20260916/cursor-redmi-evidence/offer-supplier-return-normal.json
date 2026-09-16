@@ -1,0 +1,18 @@
+{
+  "offerSummaryPreserved": true,
+  "summary": "Manufacturer price\nFresh tomatoes\nOffer price \u20b9580 \u00b7 10 kg crate\nMinimum 2 packs\nFrom Mool Market 1",
+  "captures": [
+    "005-offer-next",
+    "006-offer-product",
+    "007-product-scrolled",
+    "008-supplier-overview",
+    "009-supplier-catalogue",
+    "010-supplier-next-page",
+    "011-supplier-return",
+    "012-offer-product-return",
+    "013-offer-return"
+  ],
+  "cartChanged": false,
+  "collectionStarted": false,
+  "messageSent": false
+}
