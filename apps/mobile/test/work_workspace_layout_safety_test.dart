@@ -23951,6 +23951,8 @@ void main() {
         // STORE-LEDGER-02-C01: a retained purchase scroll offset must not
         // become the supplier account expansion state after leaving Orders.
         await openCounterSaleFromSales(tester);
+        await tester.tap(find.byKey(const Key('work-counter-close')));
+        await tester.pumpAndSettle();
         await tester.tap(find.byKey(const Key('work-store-orders')));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Purchases').hitTestable());
