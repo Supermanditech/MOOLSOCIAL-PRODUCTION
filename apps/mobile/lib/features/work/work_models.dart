@@ -4347,6 +4347,17 @@ class WorkspaceCatalogueItem {
   final WorkspaceStockMode stockMode;
   final int lowStockThreshold;
 
+  bool get matchesMasterCatalogueIdentity => workspaceMasterCatalogue.any(
+    (item) =>
+        item.canonicalId == canonicalId &&
+        item.title == title &&
+        item.brand == brand &&
+        item.pack == pack &&
+        item.variant == variant &&
+        item.categoryId == categoryId &&
+        item.barcode == barcode,
+  );
+
   bool get published =>
       publicListing &&
       available &&
@@ -4369,7 +4380,7 @@ class WorkspaceCatalogueItem {
     unitPrice: unitPrice,
     badge: badge,
     seller: storeName,
-    sellerType: 'Verified retailer',
+    sellerType: 'Store',
     deliveryPromise: deliveryPromise,
     origin: origin,
     confirmedOn: confirmedOn,

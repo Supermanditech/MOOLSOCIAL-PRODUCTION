@@ -20,6 +20,7 @@ import '../widgets/work_widgets.dart';
 import '../work_models.dart';
 import '../work_invoice_pdf.dart';
 import 'work_invoice_pdf_screen.dart';
+import 'store_add_product_sheet.dart';
 import '../work_services.dart';
 import '../work_session.dart';
 
@@ -1348,7 +1349,7 @@ class _WorkWorkspaceDashboardScreenState
               }
               final catalogue = _catalogueKey.currentState;
               if (catalogue != null) {
-                await catalogue._edit(catalogue._blankProduct());
+                await catalogue._addProducts();
               }
             },
             onOrders: () => _showOperation(_WorkspaceOperation.orders),
@@ -12498,12 +12499,34 @@ class _WorkspaceCatalogueSurfaceState
       unitPrice: '',
       stock: 0,
       deliveryPromise: 'Store pickup or local delivery',
-      origin: 'India',
+      origin: '',
       visualLabel: 'Product image pending',
       visualKind: 'catalogue-packshot',
       available: false,
       publicListing: false,
     );
+  }
+
+  Future<void> _addProducts() async {
+    final storeId =
+        widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+    final product = await Navigator.of(context).push<WorkspaceCatalogueItem>(
+      MaterialPageRoute(
+        builder: (context) => StoreAddProductSheet(
+          catalogue: workspaceMasterCatalogue,
+          ownedProducts: List.of(widget.session.workspaceCatalogueItems),
+          createProduct: (barcode) => _blankProduct(barcode: barcode),
+          scanBarcode: () => showBuyV2ProductScanner(context),
+        ),
+      ),
+    );
+    if (!mounted || product == null) return;
+    if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+        storeId) {
+      widget.session.showError('Your store changed. Open Add products again.');
+      return;
+    }
+    await _edit(product);
   }
 
   Future<void> _edit(WorkspaceCatalogueItem product) async {
@@ -12796,6 +12819,12 @@ class _WorkspaceCatalogueSurfaceState
 
   void _togglePublic(WorkspaceCatalogueItem product) {
     final makePublic = !product.publicListing;
+    if (makePublic && !product.matchesMasterCatalogueIdentity) {
+      widget.session.showError(
+        'This product stays private until its details are reviewed.',
+      );
+      return;
+    }
     if (makePublic && (product.sellingPrice <= 0 || !product.available)) {
       widget.session.showError(
         'Add a customer price and make this product available before publishing.',
@@ -14830,6 +14859,14 @@ class _CatalogueProductEditor extends StatefulWidget {
 }
 
 class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
+  late final String? _storeId;
+
+  @override
+  void initState() {
+    super.initState();
+    _storeId = widget.session.activeWorkspace?.id ?? widget.session.workspaceId;
+  }
+
   late final TextEditingController _title = TextEditingController(
     text: widget.product.title,
   );
@@ -14897,9 +14934,16 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   late WorkspaceStockMode _stockMode = widget.product.stockMode;
   String? _error;
 
-  bool get _catalogueMatched => workspaceMasterCatalogue.any(
-    (product) => product.canonicalId == widget.product.canonicalId,
-  );
+  bool get _catalogueMatched => widget.product
+      .copyWith(
+        title: _title.text.trim(),
+        brand: _brand.text.trim(),
+        pack: _pack.text.trim(),
+        variant: _variant.text.trim(),
+        categoryId: _category.text.trim(),
+        barcode: _barcode.text.trim(),
+      )
+      .matchesMasterCatalogueIdentity;
 
   @override
   void dispose() {
@@ -14927,6 +14971,26 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
   }
 
   void _save() {
+    if ((widget.session.activeWorkspace?.id ?? widget.session.workspaceId) !=
+        _storeId) {
+      setState(
+        () => _error =
+            'Your store changed. Close this product and open it in the correct store.',
+      );
+      return;
+    }
+    final duplicate = widget.session.workspaceCatalogueItems.any(
+      (item) =>
+          item.id != widget.product.id &&
+          item.sku.trim().toLowerCase() == _sku.text.trim().toLowerCase(),
+    );
+    if (duplicate) {
+      setState(
+        () => _error =
+            'This store SKU is already in use. Edit that product or choose a different SKU.',
+      );
+      return;
+    }
     final purchase = int.tryParse(_purchase.text.trim());
     final selling = int.tryParse(_selling.text.trim());
     final mrp = int.tryParse(_mrp.text.trim());
@@ -14981,7 +15045,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
             ? '₹$selling/${_pack.text.trim()}'
             : _unitPrice.text.trim(),
         deliveryPromise: _delivery.text.trim(),
-        origin: _origin.text.trim().isEmpty ? 'India' : _origin.text.trim(),
+        origin: _origin.text.trim(),
         visualLabel: _visualLabel.text.trim().isEmpty
             ? '${_brand.text.trim()} ${_title.text.trim()} ${_pack.text.trim()}'
             : _visualLabel.text.trim(),
@@ -15240,7 +15304,7 @@ class _CatalogueProductEditorState extends State<_CatalogueProductEditor> {
                                   ),
                                   Text(
                                     _catalogueMatched
-                                        ? 'Buy shows your price and availability. Purchase cost stays private.'
+                                        ? 'Include in your customer preview. Live publication is not connected yet.'
                                         : 'This product stays private until its details are reviewed.',
                                     style: const TextStyle(
                                       color: MoolColors.muted,

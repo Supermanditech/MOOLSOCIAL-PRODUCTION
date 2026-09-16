@@ -7534,6 +7534,116 @@ void main() {
     });
   }
 
+  testWidgets('CATALOGUE01 owner offer saves privately from the Store rail', (
+    tester,
+  ) async {
+    final work = storeViewFixture();
+    final count = work.workspaceCatalogueItems.length;
+    final product = workspaceMasterCatalogue.firstWhere(
+      (candidate) => !work.workspaceCatalogueItems.any(
+        (owned) => owned.id == candidate.id,
+      ),
+    );
+    await mount(
+      tester,
+      route: '/app/work/workspace/dashboard',
+      work: work,
+      viewport: const Size(412, 915),
+      textScale: 1,
+    );
+    final entry = find.byKey(const Key('work-quick-add-products'));
+    await reveal(tester, entry);
+    await tester.tap(entry);
+    await tester.pumpAndSettle();
+    final choice = find.byKey(Key('work-add-product-${product.id}'));
+    await reveal(tester, choice);
+    await tester.tap(choice);
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.byKey(const Key('work-product-selling-price')),
+      '30',
+    );
+    await tester.enterText(find.byKey(const Key('work-product-stock')), '2');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    final details = find.byKey(const Key('work-product-details-section'));
+    await reveal(tester, details);
+    await tester.tap(details);
+    await tester.pumpAndSettle();
+    final cost = find.byKey(const Key('work-product-purchase-price'));
+    await reveal(tester, cost);
+    await tester.enterText(cost, '20');
+    tester.testTextInput.hide();
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('work-product-save')));
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-product-fast-editor')), findsNothing);
+    expect(work.workspaceCatalogueItems.length, count + 1);
+    final saved = work.workspaceCatalogueItems.singleWhere(
+      (item) => item.id == product.id,
+    );
+    expect(saved.sellingPrice, 30);
+    expect(saved.stock, 2);
+    expect(saved.publicListing, isFalse);
+    expect(tester.takeException(), isNull);
+  });
+
+  for (final scenario in ['duplicate SKU', 'store changed']) {
+    testWidgets('CATALOGUE01 save rejects $scenario without changing stock', (
+      tester,
+    ) async {
+      final work = storeViewFixture();
+      work.workspaceCatalogueItems.add(
+        workspaceMasterCatalogue
+            .firstWhere(
+              (product) => product.id != work.workspaceCatalogueItems.first.id,
+            )
+            .copyWith(sku: 'OTHER-STORE-SKU'),
+      );
+      final before = List.of(work.workspaceCatalogueItems);
+      final originalWorkspace = work.activeWorkspace;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        work: work,
+        viewport: const Size(412, 915),
+        textScale: 1,
+      );
+      final action = find.byKey(const Key('work-quick-add-products'));
+      await reveal(tester, action);
+      await tester.tap(action);
+      await tester.pumpAndSettle();
+      await tester.tap(find.byKey(Key('work-add-product-${before.first.id}')));
+      await tester.pumpAndSettle();
+      if (scenario == 'duplicate SKU') {
+        final section = find.byKey(const Key('work-product-details-section'));
+        await reveal(tester, section);
+        await tester.tap(section);
+        await tester.pumpAndSettle();
+        final sku = find.byKey(const Key('work-product-sku'));
+        await reveal(tester, sku);
+        await tester.enterText(
+          find.descendant(of: sku, matching: find.byType(EditableText)),
+          before[1].sku,
+        );
+        tester.testTextInput.hide();
+        await tester.pumpAndSettle();
+      } else {
+        work.activeWorkspace = null;
+        work.workspaceId = 'different-store';
+      }
+      await tester.tap(find.byKey(const Key('work-product-save')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('work-product-error')), findsOneWidget);
+      if (scenario == 'store changed') {
+        expect(work.workspaceCatalogueItems, isEmpty);
+        work.activeWorkspace = originalWorkspace;
+      }
+      expect(work.workspaceCatalogueItems, before);
+      expect(tester.takeException(), isNull);
+    });
+  }
+
   testWidgets('DASHRAIL product and promotion reuse scoped destinations', (
     tester,
   ) async {
@@ -7554,6 +7664,9 @@ void main() {
     var action = find.byKey(const Key('work-quick-add-products'));
     await reveal(tester, action);
     await tester.tap(action);
+    await tester.pumpAndSettle();
+    expect(find.byKey(const Key('work-add-products-picker')), findsOneWidget);
+    await tester.tap(find.byKey(const Key('work-add-product-manual')));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('work-product-fast-editor')), findsOneWidget);
     await captureStoreView(tester, 'dashboard-add-products');
