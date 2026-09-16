@@ -2552,7 +2552,9 @@ if ($ProductionLane -ceq 'baseline') {
         'apps/mobile/lib/main.dart' = '5FE1A6762CBB516D4935AACABF5DA0A81D0307ABD78EA96026335659AEB196EB'
         'apps/mobile/lib/app/ui_review_language_store.dart' = '30816600AEDA842CBE06BBF38B11F6EA79D41679A03D3F8CF31BF9C975372A74'
         'apps/mobile/test/app/ui_review_language_store_test.dart' = '921F901A32EE5A5BEB905CF07F8E05E1C7B9ED97D38A912B96631E0D17494A3F'
-        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = 'BCECD833942CE9B4ADBD8218E688D3A0B8FC164FB6A7392B7A6400F89C7F43C7'
+        # Founder handoff preserves exact archived WIP 72f5d36a, not qualified
+        # runtime acceptance. Existing APK/boundary gates remain unchanged.
+        'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart' = '0770772C953D85C1DB861EF2444F492063AC39C092916BAEF8CC6E78AD1A659A'
         'apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart' = '858B2FC79D514E9738ED3A3460BE11A1ABDD74B79E35CB1A9FC2791C0AD50189'
       }
       $fixtureHashes['apps/mobile/lib/ui_v2/buy/buy_v2_design.dart'] = '761A5F4BB1A4C5EB3EAA56C139D969E86BF3796CB4311E66CBD04A31C4CFCA60'

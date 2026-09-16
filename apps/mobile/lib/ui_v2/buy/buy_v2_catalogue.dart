@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart' show immutable, kDebugMode, listEquals;
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart' show TickerCanceled;
 import 'package:flutter/semantics.dart' show CustomSemanticsAction;
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
@@ -901,7 +902,6 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
   Timer? _publicationExpiry;
   bool _restoring = false;
   int _openSequence = 0;
-  double _pageDrag = 0;
 
   @override
   void initState() {
@@ -1255,28 +1255,12 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                     return Semantics(
                       onScrollLeft: canNext ? _pager.next : null,
                       onScrollRight: canPrevious ? _pager.previous : null,
-                      child: GestureDetector(
+                      child: _CataloguePageSwipe(
                         key: ValueKey('buy-page-swipe-${widget.scopeKey}'),
-                        behavior: HitTestBehavior.opaque,
-                        onHorizontalDragStart: (_) => _pageDrag = 0,
-                        onHorizontalDragUpdate: (details) {
-                          _pageDrag += details.primaryDelta ?? 0;
-                        },
-                        onHorizontalDragCancel: () => _pageDrag = 0,
-                        onHorizontalDragEnd: (_) {
-                          final distance = _pageDrag;
-                          _pageDrag = 0;
-                          if (_pager.loading ||
-                              _pager.query != widget.query ||
-                              distance.abs() < 48) {
-                            return;
-                          }
-                          if (distance < 0 && canNext) {
-                            _pager.next();
-                          } else if (distance > 0 && canPrevious) {
-                            _pager.previous();
-                          }
-                        },
+                        contextIdentity: widget.query,
+                        pageIdentity: page,
+                        onNext: canNext ? _pager.next : null,
+                        onPrevious: canPrevious ? _pager.previous : null,
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 10,
@@ -1337,6 +1321,164 @@ String _catalogueCount(int value) => value.toString().replaceAllMapped(
   RegExp(r'(\d)(?=(\d{3})+(?!\d))'),
   (match) => '${match[1]},',
 );
+
+/// Moves the complete grid, leaving the existing vertical scroll owner intact.
+/// Only authoritative pager results can become the incoming product page.
+class _CataloguePageSwipe extends StatefulWidget {
+  const _CataloguePageSwipe({
+    super.key,
+    required this.contextIdentity,
+    required this.pageIdentity,
+    required this.child,
+    this.onNext,
+    this.onPrevious,
+  });
+
+  final Object contextIdentity;
+  final Object? pageIdentity;
+  final Future<void> Function()? onNext;
+  final Future<void> Function()? onPrevious;
+  final Widget child;
+
+  @override
+  State<_CataloguePageSwipe> createState() => _CataloguePageSwipeState();
+}
+
+class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _offset = AnimationController.unbounded(
+    vsync: this,
+  );
+  double _distance = 0;
+  bool _changingPage = false;
+  Widget? _departingChild;
+  int _generation = 0;
+
+  @override
+  void didUpdateWidget(covariant _CataloguePageSwipe oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.contextIdentity != widget.contextIdentity ||
+        (!_changingPage && oldWidget.pageIdentity != widget.pageIdentity)) {
+      _generation++;
+      _changingPage = false;
+      _departingChild = null;
+      _distance = 0;
+      _offset.stop();
+      _offset.value = 0;
+    }
+  }
+
+  Future<void> _settle(double target) async {
+    if (!mounted) return;
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _offset.value = target;
+      return;
+    }
+    await _offset.animateTo(
+      target,
+      duration: const Duration(milliseconds: 160),
+      curve: Curves.easeOutCubic,
+    ).orCancel;
+  }
+
+  Future<void> _finish(DragEndDetails details, double width) async {
+    if (_changingPage) return;
+    final distance = _distance;
+    _distance = 0;
+    final velocity = details.primaryVelocity ?? 0;
+    final committed = distance.abs() >= 48 ||
+        (distance.abs() >= 18 && velocity.abs() >= 500 &&
+            velocity.sign == distance.sign);
+    final forward = distance < 0;
+    final action = forward ? widget.onNext : widget.onPrevious;
+    if (!committed || action == null) {
+      try {
+        await _settle(0);
+      } on TickerCanceled {
+        // A new gesture or route/query change owns the position now.
+      }
+      return;
+    }
+    final generation = ++_generation;
+    final previousPage = widget.pageIdentity;
+    setState(() {
+      _changingPage = true;
+      _departingChild = widget.child;
+    });
+    try {
+      // Start the real request immediately; do not invent a neighbour page.
+      final request = action();
+      await _settle(forward ? -width : width);
+      await request;
+      await WidgetsBinding.instance.endOfFrame;
+      if (!mounted || generation != _generation) return;
+      setState(() => _departingChild = null);
+      if (widget.pageIdentity != previousPage) {
+        _offset.value = forward ? width : -width;
+      }
+      // Failed requests return the retained page without pretending to advance.
+      await _settle(0);
+    } on TickerCanceled {
+      // Disposal or a query change cancels the finite transition.
+    } finally {
+      if (mounted && generation == _generation) {
+        setState(() => _changingPage = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _generation++;
+    _offset.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) => ClipRect(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onHorizontalDragStart: (_) {
+          if (_changingPage) return;
+          _offset.stop();
+          _distance = 0;
+        },
+        onHorizontalDragUpdate: (details) {
+          if (_changingPage) return;
+          _distance += details.primaryDelta ?? 0;
+          final available = _distance < 0
+              ? widget.onNext != null
+              : widget.onPrevious != null;
+          _offset.value = available
+              ? _distance.clamp(-constraints.maxWidth, constraints.maxWidth)
+              : (_distance * .18).clamp(-32.0, 32.0);
+        },
+        onHorizontalDragCancel: () {
+          _distance = 0;
+          if (!_changingPage) {
+            unawaited(_settle(0).catchError((Object error) {
+              if (error is! TickerCanceled) throw error;
+            }));
+          }
+        },
+        onHorizontalDragEnd: (details) =>
+            unawaited(_finish(details, constraints.maxWidth)),
+        child: IgnorePointer(
+          ignoring: _changingPage,
+          child: AnimatedBuilder(
+            animation: _offset,
+            child: _departingChild ?? widget.child,
+            builder: (context, child) => Transform.translate(
+              offset: Offset(_offset.value, 0),
+              child: child,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
 
 class _CataloguePageControls extends StatelessWidget {
   const _CataloguePageControls({
@@ -2633,7 +2775,8 @@ class _CatalogueStoreMatchesState extends State<_CatalogueStoreMatches>
           onNext: !loading && page?.nextCursor != null ? _pager.next : null,
           onRefresh: loading ? null : _pager.refresh,
         ),
-        if (loading) const LinearProgressIndicator(minHeight: 2),
+        // The enclosing product search owns the shared progress line. The
+        // store control above keeps its own truthful "Loading stores" state.
         if (message != null)
           _CataloguePageNotice(
             title: 'Stores could not refresh',
