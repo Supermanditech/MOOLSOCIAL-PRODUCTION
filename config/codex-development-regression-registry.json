@@ -103573,6 +103573,26 @@
   "evidence": [
     "docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"
   ]
+},
+{
+  "id": "REG-20260916-4621-COUNTER-OPPO-JOURNEY-REPAIR",
+  "status": "registered_prevention_active",
+  "appliesTo": ["primary", "implementation", "build", "device", "evidence"],
+  "mistake": "V29 physical OPPO audit found CF-01 through CF-12: UPI collection defaults to Cash, landscape and keyboard action fitment, narrow and inconsistent sale layout, hidden invoice columns, incomplete recent-customer reuse, delayed partial-payment feedback, generic validation and missing visible payment reference. Cold review workspace recovery remains separately limited. Reconstruction also repeated truncated grouped/historical reads and omitted the existing regression evidence archive parameter.",
+  "rootCause": "Passing host paths did not cover the physical multi-stage layout and tender handoff. An unpaid payment record has an unknown recorded tender; initial collection choice must use the matching saved invoice method, with a retained form override. The first repair also underestimated persistent customer/scanner controls at 320x568/text2, producing a 1.4-pixel overflow and zero-height product viewport. A focused sale initially lost Profile/Files access and could loop Back between customer and items; retain the existing Profile route and distinguish editing customer from returning to the first step. Stored reference absence must not be inferred from missing display. Historical broad reconstruction and an incomplete gate invocation obscured existing evidence. A later diagnostic emitted full nested exception messages and truncated; use bounded summaries and absolute scratch paths. Do not guess test or release-document paths; discover literal owners before reads.",
+  "prevention": "Bind all CF findings to the counter-oppo-repair-v1 interaction contract and preserve the original physical captures. Test tender continuity, field-specific validation, IME reachability, responsive invoice rows, recent identity restart, immediate balance feedback, and exact navigation outcomes. Preserve immutable invoices and authorization boundaries; do not claim production authentication or live settlement. Use bounded exact-owner reads and the proven EvidenceArchiveRoot parameter, then replay coordination and incremental gates. Two affected cycles and exact installed OPPO proof precede review; founder acceptance remains separate.",
+  "gates": ["scripts/check-codex-development-regression-memory.ps1", "scripts/check-codex-subagent-coordination-policy.ps1", "scripts/check-cross-agent-incremental-ticket-gate.ps1"],
+  "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
+},
+{
+  "id": "REG-20260916-4622-COUNTER-EXACT-OWNER-PATCH",
+  "status": "registered_prevention_active",
+  "appliesTo": ["implementation", "primary"],
+  "mistake": "A collection layout hunk matched the similar Store money-entry wrapper; immediate diff readback caught the unintended location before analysis or build. A preceding test lookup also guessed an absent dashboard test filename.",
+  "rootCause": "Shared widget syntax supplied an ambiguous mutation anchor and a semantic filename was mistaken for an existing owner.",
+  "prevention": "Restore only the unintended hunk from inspected diff, anchor collection changes to its exact class or unique payment field, and read back the resulting class. Use the discovered work_workspace_layout_safety_test.dart owner. Run analysis and connected behavior checks before claiming any fix.",
+  "gates": ["scripts/check-codex-subagent-coordination-policy.ps1"],
+  "evidence": ["docs/quality/STORE-PROCUREMENT-BRIDGE-20260912.md"]
 }
 ]
 }
