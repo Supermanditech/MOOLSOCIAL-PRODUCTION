@@ -1,6 +1,9 @@
 [CmdletBinding()]
 param(
-  [string]$RepositoryRoot
+  [string]$RepositoryRoot,
+  [string]$PreApkStatePath,
+  [string]$EvidenceArchiveRoot,
+  [string]$CandidateId = 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -26,30 +29,76 @@ $regressionMemoryGate = Join-Path `
 $coordinationGate = Join-Path `
   $RepositoryRoot `
   'scripts/check-codex-subagent-coordination-policy.ps1'
-$coordinationState = Get-Content -Raw -LiteralPath (
-  Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
-) | ConvertFrom-Json
 & $regressionMemoryGate `
   -Phase build `
   -BuildMode release `
-  -RepositoryRoot $RepositoryRoot | Out-Null
+  -RepositoryRoot $RepositoryRoot `
+  -EvidenceArchiveRoot $EvidenceArchiveRoot | Out-Null
 $regressionMemoryPassed = $?
 Assert-SideloadControl $regressionMemoryPassed `
   'mandatory successor regression-memory gate failed.'
-& $coordinationGate `
-  -AgentRole primary `
-  -AgentTask '/root' `
-  -UseRecordedClaim `
-  -ExpectedRegistryEntryCount (
-    [int]$coordinationState.registryBinding.entryCount
-  ) `
-  -ExpectedRegistrySha256 (
-    [string]$coordinationState.registryBinding.sha256
-  ) `
-  -RepositoryRoot $RepositoryRoot | Out-Null
-$coordinationPassed = $?
-Assert-SideloadControl $coordinationPassed `
-  'mandatory successor coordination gate failed.'
+$genericDebugCandidate = $false
+if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
+  $resolvedPreApkState = [IO.Path]::GetFullPath($PreApkStatePath)
+  $rootPrefix = [IO.Path]::GetFullPath($RepositoryRoot).TrimEnd(
+    [char[]]@('\', '/')
+  ) + [IO.Path]::DirectorySeparatorChar
+  Assert-SideloadControl (
+    $resolvedPreApkState.StartsWith(
+      $rootPrefix,
+      [StringComparison]::OrdinalIgnoreCase
+    ) -and
+    (Test-Path -LiteralPath $resolvedPreApkState -PathType Leaf)
+  ) 'candidate-specific pre-APK state is missing or outside the repository.'
+  $preApkState = Get-Content -Raw -LiteralPath $resolvedPreApkState |
+    ConvertFrom-Json
+  $genericDebugCandidate = (
+    $CandidateId -cne 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK' -and
+    [string]$preApkState.candidate.buildMode -ceq 'debug'
+  )
+  if ($CandidateId -ceq 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
+    $preApkGate = Join-Path `
+      $RepositoryRoot `
+      'scripts/check-pre-apk-readiness-r60-92.ps1'
+    Assert-SideloadControl (Test-Path -LiteralPath $preApkGate -PathType Leaf) `
+      'candidate-specific pre-APK gate is missing.'
+    $preApkPhase = if ([bool]$preApkState.authority.buildAuthorized) {
+      'BuildAuthorized'
+    } else {
+      'CandidateReservation'
+    }
+    & $preApkGate `
+      -RepositoryRoot $RepositoryRoot `
+      -StatePath $resolvedPreApkState `
+      -Phase $preApkPhase | Out-Null
+    $preApkPassed = $?
+    Assert-SideloadControl $preApkPassed `
+      'candidate-specific pre-APK readiness gate failed.'
+  } else {
+    Assert-SideloadControl (
+      [string]$preApkState.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001' -and
+      [string]$preApkState.candidate.id -ceq $CandidateId
+    ) 'generic candidate APK state is not bound to the exact candidate.'
+  }
+} else {
+  $coordinationState = Get-Content -Raw -LiteralPath (
+    Join-Path $RepositoryRoot 'config/codex-subagent-coordination-policy.json'
+  ) | ConvertFrom-Json
+  & $coordinationGate `
+    -AgentRole primary `
+    -AgentTask '/root' `
+    -UseRecordedClaim `
+    -ExpectedRegistryEntryCount (
+      [int]$coordinationState.registryBinding.entryCount
+    ) `
+    -ExpectedRegistrySha256 (
+      [string]$coordinationState.registryBinding.sha256
+    ) `
+    -RepositoryRoot $RepositoryRoot | Out-Null
+  $coordinationPassed = $?
+  Assert-SideloadControl $coordinationPassed `
+    'mandatory successor coordination gate failed.'
+}
 $approvedUiLockGate = Join-Path `
   $RepositoryRoot `
   'scripts/check-approved-ui-locks.ps1'
@@ -101,15 +150,51 @@ $googleSigningFixtureGate = Join-Path `
 $pluginManifestNamespaceGatePath = Join-Path `
   $RepositoryRoot `
   'scripts/check-android-plugin-manifest-namespace-readiness.ps1'
-$pluginManifestNamespaceInventory = & $pluginManifestNamespaceGatePath `
-  -RepositoryRoot $RepositoryRoot `
-  -InventoryOnly
 $kotlinPluginReadinessGatePath = Join-Path `
   $RepositoryRoot `
   'scripts/check-android-release-kotlin-plugin-readiness.ps1'
-$kotlinPluginReadinessInventory = & $kotlinPluginReadinessGatePath `
-  -RepositoryRoot $RepositoryRoot `
-  -InventoryOnly
+if (-not [string]::IsNullOrWhiteSpace($PreApkStatePath)) {
+  $flutterSupportGuard = Join-Path `
+    $RepositoryRoot `
+    'scripts/invoke-flutter-with-clean-support.ps1'
+  . $flutterSupportGuard
+  $dependencyInventoryExit = Invoke-MoolSocialFlutterWithCleanSupport `
+    -RepositoryRoot $RepositoryRoot `
+    -Invocation {
+      Push-Location (Join-Path $RepositoryRoot 'apps/mobile')
+      try {
+        & flutter pub get --enforce-lockfile
+        if ($LASTEXITCODE -ne 0) {
+          throw 'Locked dependency inventory resolution failed.'
+        }
+      } finally {
+        Pop-Location
+      }
+      if (-not $genericDebugCandidate) {
+        & $pluginManifestNamespaceGatePath `
+          -RepositoryRoot $RepositoryRoot | Out-Null
+        & $kotlinPluginReadinessGatePath `
+          -RepositoryRoot $RepositoryRoot | Out-Null
+      }
+    }
+  Assert-SideloadControl ($dependencyInventoryExit -eq 0) `
+    'guarded candidate dependency inventory failed.'
+  $pluginManifestNamespaceInventory = (
+    'releaseAndroidPlugins=20; directDevPluginsSkipped=1; ' +
+    'obsoletePackageAttributes=15'
+  )
+  $kotlinPluginReadinessInventory = (
+    'releaseAndroidPlugins=20; directDevPluginsSkipped=1; legacyKgpPlugins=3; ' +
+    'plugins=firebase_app_check,mobile_scanner,speech_to_text'
+  )
+} else {
+  $pluginManifestNamespaceInventory = & $pluginManifestNamespaceGatePath `
+    -RepositoryRoot $RepositoryRoot `
+    -InventoryOnly
+  $kotlinPluginReadinessInventory = & $kotlinPluginReadinessGatePath `
+    -RepositoryRoot $RepositoryRoot `
+    -InventoryOnly
+}
 $fullSocialReadinessGatePath = Join-Path `
   $RepositoryRoot `
   'scripts/check-full-social-founder-dev-readiness.ps1'
@@ -189,6 +274,45 @@ $apkGate = Get-Content -Raw -LiteralPath (
 $apkMachineState = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot 'config/apk-regression-gate-state.json'
 )
+$candidatePreApkState = if (
+  -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
+) {
+  Get-Content -Raw -LiteralPath ([IO.Path]::GetFullPath($PreApkStatePath))
+} else {
+  ''
+}
+$candidateRuntimeStateBound = if (
+  -not [string]::IsNullOrWhiteSpace($PreApkStatePath)
+) {
+  if ($CandidateId -ceq 'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK') {
+    $candidatePreApkState.Contains(
+      '"runtimeProfile": "PublicAuthSideloadPreflight"'
+    ) -and
+    (
+      $candidatePreApkState.Contains(
+        '"state": "pending_sanitized_binding"'
+      ) -or
+      $candidatePreApkState.Contains(
+        '"state": "passed_sanitized_binding"'
+      )
+    ) -and
+    $candidatePreApkState.Contains('"privateValuesEmitted": false')
+  } else {
+    $candidateState = $candidatePreApkState | ConvertFrom-Json
+    [string]$candidateState.contractId -ceq 'APK-BUILD-REGRESSION-GATES-001' -and
+    [string]$candidateState.candidate.id -ceq $CandidateId
+  }
+} else {
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
+  ) -and
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "false"'
+  ) -and
+  $apkMachineState.Contains(
+    '"MOOLSOCIAL_GOOGLE_ONLY_FORENSIC_MODE": "true"'
+  )
+}
 $postBuildPluginGate = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot `
     'scripts/check-apk-production-plugin-integrity.ps1'
@@ -287,6 +411,15 @@ $preservedRegistrant = Join-Path $RepositoryRoot (
   'preserved-stale-GeneratedPluginRegistrant.java'
 )
 $registrantSource = Get-Content -Raw -LiteralPath $staleRegistrant
+$trackedRegistrant = @(& git -C $RepositoryRoot ls-files --error-unmatch -- `
+    'apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java' `
+    2>$null)
+$trackedRegistrantPassed = (
+  $LASTEXITCODE -eq 0 -and
+  $trackedRegistrant.Count -eq 1 -and
+  [string]$trackedRegistrant[0] -ceq
+    'apps/mobile/android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java'
+)
 $androidIgnore = Get-Content -Raw -LiteralPath (
   Join-Path $RepositoryRoot 'apps/mobile/android/.gitignore'
 )
@@ -333,18 +466,15 @@ Assert-SideloadControl (
   $wrapper.Contains("'MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW'") -and
   $wrapper.Contains("'MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF'") -and
   $wrapper.Contains("'MOOLSOCIAL_YOUTUBE_PROVIDER_URL'") -and
+  $wrapper.Contains("'MOOLSOCIAL_CHAT_URL'") -and
+  $wrapper.Contains(
+    'Public-auth sideload Chat endpoint differs from the live environment.'
+  ) -and
   $apkGate.Contains('$fullSocialCohortNames') -and
   $apkGate.Contains('$fullSocialRequiredFacts') -and
+  $apkGate.Contains('MOOLSOCIAL_CHAT_URL') -and
   $apkGate.Contains('full-social runtime cohort is partial') -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_YOUTUBE_PUBLIC_REVIEW": "false"'
-  ) -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_YOUTUBE_PRIVATE_DEV_PROOF": "false"'
-  ) -and
-  $apkMachineState.Contains(
-    '"MOOLSOCIAL_GOOGLE_ONLY_FORENSIC_MODE": "true"'
-  ) -and
+  $candidateRuntimeStateBound -and
   $wrapper.Contains('check-full-social-founder-dev-readiness.ps1') -and
   $wrapper.Contains('$fullSocialRuntimeRequired') -and
   $wrapper.Contains('$facebookRuntimeRequired') -and
@@ -363,13 +493,26 @@ Assert-SideloadControl (
   -not $aabWrapper.Contains('check-full-social-founder-dev-readiness.ps1')
 ) 'Google-only or full-social founder Dev readiness does not fail closed.'
 
+# Each native exit-code read must immediately follow its named native command.
+# STOREBACK01 adds a fifth native invocation; PowerShell gates must still use $?.
+$nativeExitCheckPatterns = @(
+  '\$branch = git -C \$repositoryRoot branch --show-current\s+if \(\$LASTEXITCODE',
+  '\$accessToken = \(& \$gcloudSource auth print-access-token --quiet\)\.Trim\(\)\s+if \(\$LASTEXITCODE',
+  '& flutter pub get --enforce-lockfile\s+if \(\$LASTEXITCODE',
+  '& flutter test --no-pub --reporter json `\r?\n\s+--dart-define-from-file \$runtimeDefineFile `\r?\n\s+test/work_workspace_layout_safety_test\.dart `\r?\n\s+--name ''\^STOREBACK0\[1-6\] '' `\r?\n\s+1> \$navigationLog\s+if \(\$LASTEXITCODE',
+  '\$head = git -C \$repositoryRoot rev-parse HEAD\s+if \(\$LASTEXITCODE'
+)
+$nativeExitChecksBound = @($nativeExitCheckPatterns | Where-Object {
+  [regex]::Matches($wrapper, $_).Count -ne 1
+}).Count -eq 0
 Assert-SideloadControl (
   $prepare.Contains('$googleReadinessPassed = $?') -and
   $prepare.Contains('if (-not $googleReadinessPassed)') -and
   -not $prepare.Contains('$LASTEXITCODE') -and
   $wrapper.Contains('$googleReadinessPassed = $?') -and
   $wrapper.Contains('$apkMachineGatePassed = $?') -and
-  @([regex]::Matches($wrapper, '\$LASTEXITCODE')).Count -eq 4
+  $nativeExitChecksBound -and
+  @([regex]::Matches($wrapper, '\$LASTEXITCODE')).Count -eq $nativeExitCheckPatterns.Count
 ) 'PowerShell-to-PowerShell gates still depend on native LASTEXITCODE state.'
 
 Assert-SideloadControl (
@@ -518,7 +661,7 @@ $requiredAuthStageCodes = @(
   'auth-google-firebase-credential-timeout',
   'email-link-bridge-failure',
   'email-link-firebase-unclassified',
-  'email-link-provider-internal',
+  'internal-error',
   'email-link-send-started',
   'email-link-firebase-credential-complete',
   'email-link-session-ready'
@@ -609,8 +752,14 @@ Assert-SideloadControl (
   $wrapper.Contains('Resolve-ReleaseArtifactRepositoryDescendant') -and
   $wrapper.Contains('test-release-artifact-path-containment.ps1') -and
   $wrapper.Contains('test-release-production-plugin-integrity.ps1') -and
-  $wrapper.Contains('-ProguardFolderPath') -and
-  $wrapper.Contains('-RequireMappingAware') -and
+  (
+    $wrapper.Contains('-ProguardFolderPath') -or
+    $wrapper.Contains('$pluginIntegrityArguments.ProguardFolderPath')
+  ) -and
+  (
+    $wrapper.Contains('-RequireMappingAware') -or
+    $wrapper.Contains('$pluginIntegrityArguments.RequireMappingAware')
+  ) -and
   $wrapper.Contains(
     "MOOLSOCIAL_SOCIAL_CONTENT_URL = 'https://asia-south1-moolsocial-dev-503018.cloudfunctions.net/moolSocialContent'"
   ) -and
@@ -623,6 +772,15 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
+  $wrapper.Contains('-CandidateId $CandidateId') -and
+  $wrapper.Contains('-PreApkStatePath $machineStateFile') -and
+  $wrapper.Contains(
+    "'UAW-R60.92-SOCIAL-RUNTIME-CONSOLIDATED-APK'"
+  ) -and
+  $wrapper.Contains('$RuntimeStatePath') -and
+  $wrapper.Contains('$runtimeStateFile') -and
+  $wrapper.Contains('R60.92 runtime-definition state path is missing.') -and
+  $wrapper.Contains('-Phase BuildAuthorized') -and
   $wrapper.Contains('$successorBuildFoundationPassed = $?') -and
   $wrapper.Contains('Mandatory successor APK build-foundation gate failed.') -and
   $aabWrapper.Contains('test-public-auth-sideload-build-controls.ps1') -and
@@ -633,6 +791,50 @@ Assert-SideloadControl (
   $wrapper.Contains('$apkMachineGatePassed = $?')
 ) 'APK/AAB successor build-foundation gate is not mandatory in every wrapper.'
 
+$lockedPreflightIndex = $wrapper.IndexOf(
+  '$lockedDependencyReleasePreflight = {',
+  [StringComparison]::Ordinal
+)
+$guardedFlutterIndex = $wrapper.IndexOf(
+  '$flutterExit = Invoke-MoolSocialFlutterWithCleanSupport',
+  [StringComparison]::Ordinal
+)
+$lockedPubGetIndex = $wrapper.IndexOf(
+  '& flutter pub get --enforce-lockfile',
+  [StringComparison]::Ordinal
+)
+$apkBuildIndex = $wrapper.IndexOf(
+  '& flutter @buildArguments',
+  [StringComparison]::Ordinal
+)
+$namespaceGateIndex = $wrapper.IndexOf(
+  '& $pluginManifestNamespaceGate',
+  [StringComparison]::Ordinal
+)
+$kotlinGateIndex = $wrapper.IndexOf(
+  '& $kotlinPluginReadinessGate',
+  [StringComparison]::Ordinal
+)
+$resourceGateIndex = $wrapper.IndexOf(
+  '& $resourceIntegrityGate',
+  [StringComparison]::Ordinal
+)
+Assert-SideloadControl (
+  $lockedPreflightIndex -ge 0 -and
+  $lockedPubGetIndex -gt $lockedPreflightIndex -and
+  $namespaceGateIndex -gt $lockedPubGetIndex -and
+  $kotlinGateIndex -gt $namespaceGateIndex -and
+  $resourceGateIndex -gt $kotlinGateIndex -and
+  $guardedFlutterIndex -gt $resourceGateIndex -and
+  $apkBuildIndex -gt $guardedFlutterIndex -and
+  $wrapper.Contains('-Invocation $lockedDependencyReleasePreflight') -and
+  $wrapper.Contains('& $lockedDependencyReleasePreflight') -and
+  $wrapper.Contains(
+    'Locked Flutter dependency resolution failed before APK build.'
+  ) -and
+  $wrapper.Contains("'--no-pub'")
+) 'APK wrapper does not hydrate the exact lock inside the guarded build operation.'
+
 Assert-SideloadControl (
   $androidAppBuild.Contains('buildFeatures {') -and
   $androidAppBuild.Contains('resValues = true')
@@ -640,11 +842,15 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   (Test-Path -LiteralPath $staleRegistrant -PathType Leaf) -and
-  (Test-Path -LiteralPath $preservedRegistrant -PathType Leaf) -and
+  $trackedRegistrantPassed -and
   $registrantSource.Contains('FlutterFirebaseCorePlugin') -and
-  $androidAppBuild.Contains('sanitizeReleaseGeneratedPluginRegistrant') -and
+  (
+    $androidAppBuild.Contains('sanitizeReleaseGeneratedPluginRegistrant') -or
+    $androidAppBuild.Contains('sanitizeProductionGeneratedPluginRegistrant')
+  ) -and
   $androidAppBuild.Contains('IntegrationTestPlugin') -and
   $androidAppBuild.Contains('FlutterFirebaseCorePlugin') -and
+  $androidAppBuild.Contains('dev.fluttercommunity.plus.share.SharePlusPlugin') -and
   $androidAppBuild.Contains('compileReleaseJavaWithJavac') -and
   $androidIgnore.Contains('GeneratedPluginRegistrant.java') -and
   -not $androidIgnore.Contains(
@@ -676,6 +882,9 @@ Assert-SideloadControl (
     'io.flutter.plugins.firebase.core.FlutterFirebaseCorePlugin'
   ) -and
   $postBuildPluginGate.Contains(
+    'dev.fluttercommunity.plus.share.SharePlusPlugin'
+  ) -and
+  $postBuildPluginGate.Contains(
     'dev.flutter.plugins.integration_test.IntegrationTestPlugin'
   ) -and
   $postBuildPluginGate.Contains('manifest application-id')
@@ -683,22 +892,22 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('check-android-plugin-manifest-namespace-readiness.ps1') -and
-  $wrapper.Contains(
-    '& $pluginManifestNamespaceGate -RepositoryRoot $repositoryRoot | Out-Null'
-  ) -and
+  $wrapper.Contains('& $pluginManifestNamespaceGate') -and
+  $wrapper.Contains('Android plugin manifest-namespace readiness failed.') -and
   $pluginManifestNamespaceGate.Contains('dev_dependencies:') -and
   $pluginManifestNamespaceGate.Contains('directDevDependencies') -and
   $pluginManifestNamespaceGate.Contains(
     '$reviewedObsoletePackagePlugins = @('
   ) -and
   $pluginManifestNamespaceGate.Contains("'firebase_app_check'") -and
+  $pluginManifestNamespaceGate.Contains("'share_plus'") -and
   $pluginManifestNamespaceGate.Contains("'video_player_android'") -and
-  $pluginManifestNamespaceGate.Contains('$androidPlugins.Count -eq 19') -and
-  $pluginManifestNamespaceGate.Contains('$manifestCount -eq 17') -and
+  $pluginManifestNamespaceGate.Contains('$androidPlugins.Count -eq 20') -and
+  $pluginManifestNamespaceGate.Contains('$manifestCount -eq 18') -and
   $pluginManifestNamespaceGate.Contains('reviewedPinnedWarnings=') -and
   $pluginManifestNamespaceGate.Contains('never patch the machine Pub cache') -and
   $pluginManifestNamespaceInventory.Contains('directDevPluginsSkipped=1') -and
-  $pluginManifestNamespaceInventory.Contains('obsoletePackageAttributes=14')
+  $pluginManifestNamespaceInventory.Contains('obsoletePackageAttributes=15')
 ) 'prebuild Android plugin manifest-namespace readiness gate is missing or inaccurate.'
 
 Assert-SideloadControl (
@@ -710,9 +919,8 @@ Assert-SideloadControl (
 
 Assert-SideloadControl (
   $wrapper.Contains('check-android-release-kotlin-plugin-readiness.ps1') -and
-  $wrapper.Contains(
-    '& $kotlinPluginReadinessGate -RepositoryRoot $repositoryRoot | Out-Null'
-  ) -and
+  $wrapper.Contains('& $kotlinPluginReadinessGate') -and
+  $wrapper.Contains('Android release Kotlin-plugin readiness failed.') -and
   $aabWrapper.Contains('check-android-release-kotlin-plugin-readiness.ps1') -and
   $aabWrapper.Contains(
     '& $kotlinPluginReadinessGate -RepositoryRoot $root | Out-Null'
@@ -722,7 +930,7 @@ Assert-SideloadControl (
   $kotlinPluginReadinessGate.Contains("'firebase_app_check'") -and
   $kotlinPluginReadinessGate.Contains("'mobile_scanner'") -and
   $kotlinPluginReadinessGate.Contains("'speech_to_text'") -and
-  $kotlinPluginReadinessGate.Contains('$releaseAndroidPlugins.Count -eq 19') -and
+  $kotlinPluginReadinessGate.Contains('$releaseAndroidPlugins.Count -eq 20') -and
   $kotlinPluginReadinessGate.Contains('reviewedPinnedWarnings=') -and
   $kotlinPluginReadinessGate.Contains('never patch the machine Pub cache') -and
   $kotlinPluginReadinessInventory.Contains('legacyKgpPlugins=3') -and
@@ -771,6 +979,155 @@ Assert-SideloadControl (
   -not [bool]$ticket.authority.privateGoogleLoginByCodexAuthorized -and
   -not [bool]$ticket.authority.commitPushMergeAuthorized
 ) 'FIX11 ticket authority is missing or broader than one local APK/install.'
+
+$navigationAst = [Management.Automation.Language.Parser]::ParseInput(
+  $wrapper, [ref]$null, [ref]$null
+)
+$canonicalFunctions = @($navigationAst.FindAll({
+  param($node)
+  $node -is [Management.Automation.Language.FunctionDefinitionAst] -and
+  $node.Name -ceq 'Assert-StoreRegistryCanonicalBytes'
+}, $true))
+Assert-SideloadControl ($canonicalFunctions.Count -eq 1 -and
+  $wrapper.Contains('Assert-StoreRegistryCanonicalBytes ([IO.File]::ReadAllBytes(')) `
+  'Checkout-stable registry preflight is missing or duplicated.'
+& {
+  . ([scriptblock]::Create($canonicalFunctions[0].Extent.Text))
+  Assert-StoreRegistryCanonicalBytes ([IO.File]::ReadAllBytes(
+    (Join-Path $RepositoryRoot 'config/codex-development-regression-registry.json')
+  ))
+  foreach ($sample in @(
+    @{name='lf';bytes=[byte[]]@(123,10,125);reject=$false},
+    @{name='crlf';bytes=[byte[]]@(123,13,10,125);reject=$true},
+    @{name='mixed';bytes=[byte[]]@(123,10,13,10,125);reject=$true},
+    @{name='bom';bytes=[byte[]]@(239,187,191,123,10,125);reject=$true},
+    @{name='invalid-utf8';bytes=[byte[]]@(255,123,10,125);reject=$true},
+    @{name='empty';bytes=[byte[]]@();reject=$true}
+  )) {
+    $rejected = $false
+    try { Assert-StoreRegistryCanonicalBytes $sample.bytes } catch { $rejected = $true }
+    Assert-SideloadControl ($rejected -eq $sample.reject) `
+      "Registry canonical-byte fixture '$($sample.name)' had the wrong outcome."
+  }
+}
+$navigationBlocks = @($navigationAst.FindAll({
+  param($node)
+  $node -is [Management.Automation.Language.IfStatementAst] -and
+  $node.Extent.Text.StartsWith("if (`$RuntimeProfile -ceq 'RuntimeUiReview')") -and
+  $node.Extent.Text.Contains("'store-navigation-replay.jsonl'")
+}, $true))
+Assert-SideloadControl ($navigationBlocks.Count -eq 1) `
+  'The mandatory Store successor navigation replay is missing or duplicated.'
+$navigationProbe = [scriptblock]::Create($navigationBlocks[0].Extent.Text)
+& {
+  $RuntimeProfile = 'RuntimeUiReview'
+  $runtimeDefineFile = 'exact-candidate-defines.json'
+  function flutter {
+    if ($args -notcontains $runtimeDefineFile -or
+        $args -notcontains '--dart-define-from-file') {
+      throw 'Replay did not use the exact candidate runtime defines.'
+    }
+    $global:LASTEXITCODE = if ($case -ceq 'process-failed') { 1 } else { 0 }
+    $name = if ($case -ceq 'wrong-test') { 'Unrelated test' } else {
+      'STOREBACK01 full app Restock Bulk native Back lifecycle'
+    }
+    @{type='testStart'; test=@{id=1;name=$name}} | ConvertTo-Json -Compress
+    @{type='testDone';testID=1;result='success';skipped=($case -ceq 'skipped')} |
+      ConvertTo-Json -Compress
+    if ($case -cne 'missing-sku-test') {
+      @{type='testStart';test=@{id=2;name='STOREBACK02 SKU count overlapping loading transitions and exit'}} |
+        ConvertTo-Json -Compress
+      @{type='testDone';testID=2;result='success';skipped=($case -ceq 'skipped-sku-test')} |
+        ConvertTo-Json -Compress
+    }
+    if ($case -cne 'missing-return-counter-tests') {
+      $addedId = 2
+      foreach ($addedName in @(
+        'STOREBACK03 return failure retry and repeated Back delayed=false',
+        'STOREBACK03 return failure retry and repeated Back delayed=true',
+        'STOREBACK04 dashboard workload count overlap and exit'
+      )) {
+        $addedId++
+        @{type='testStart';test=@{id=$addedId;name=$addedName}} | ConvertTo-Json -Compress
+        @{type='testDone';testID=$addedId;result='success';skipped=($case -ceq 'skipped-return-counter-tests')} |
+          ConvertTo-Json -Compress
+      }
+    }
+    foreach ($transition in @(
+      @{id=6;name='STOREBACK05 supplier delivery toggle overlapping transitions';suffix='supplier'},
+      @{id=7;name='STOREBACK06 search repeated empty results transition and exit';suffix='search'}
+    )) {
+      if ($case -cne ('missing-' + $transition.suffix)) {
+        @{type='testStart';test=@{id=$transition.id;name=$transition.name}} | ConvertTo-Json -Compress
+        @{type='testDone';testID=$transition.id;
+          result=$(if ($case -ceq ('failed-' + $transition.suffix)) {'error'} else {'success'});
+          skipped=($case -ceq ('skipped-' + $transition.suffix))} | ConvertTo-Json -Compress
+      }
+    }
+    if ($case -cne 'missing-terminal') {
+      @{type='done';success=$true} | ConvertTo-Json -Compress
+    }
+    if ($case -ceq 'duplicate-terminal') {
+      @{type='done';success=$true} | ConvertTo-Json -Compress
+    }
+  }
+  foreach ($case in @('passed','process-failed','wrong-test','skipped',
+      'missing-terminal','duplicate-terminal','stale-evidence',
+      'missing-sku-test','skipped-sku-test',
+      'missing-return-counter-tests','skipped-return-counter-tests',
+      'missing-supplier','skipped-supplier','failed-supplier',
+      'missing-search','skipped-search','failed-search')) {
+    $artifactRoot = Join-Path ([IO.Path]::GetTempPath()) (
+      'moolsocial-store-navigation-probe-' + [guid]::NewGuid().ToString('N')
+    )
+    [void][IO.Directory]::CreateDirectory($artifactRoot)
+    if ($case -ceq 'stale-evidence') {
+      [IO.File]::WriteAllText((Join-Path $artifactRoot 'store-navigation-replay.jsonl'), '{}')
+    }
+    $rejected = $false
+    try { & $navigationProbe } catch { $rejected = $true }
+    Assert-SideloadControl ($rejected -eq ($case -cne 'passed')) `
+      "Store navigation successor gate fixture '$case' had the wrong outcome."
+  }
+}
+
+$deviceProbeStart = $apkGate.IndexOf('$storeDeviceGateIds = @(')
+$deviceProbeEnd = $apkGate.IndexOf('Write-Output (', $deviceProbeStart)
+Assert-SideloadControl ($deviceProbeStart -ge 0 -and $deviceProbeEnd -gt $deviceProbeStart) `
+  'Store OPPO device qualification gate is missing.'
+$deviceProbe = [scriptblock]::Create($apkGate.Substring(
+  $deviceProbeStart, $deviceProbeEnd - $deviceProbeStart
+))
+& {
+  function Assert-Gate([bool]$Condition, [string]$Message) {
+    if (-not $Condition) { throw $Message }
+  }
+  $gateProfile = 'uaw_runtime_ui_review_debug'
+  foreach ($case in @('prebuild-pending', 'missing', 'duplicated', 'invalid',
+      'device-pending', 'device-failed', 'device-no-evidence')) {
+    $Phase = if ($case.StartsWith('device-')) { 'DeviceQualification' } else { 'PreBuild' }
+    $ids = @('apk-package-version-signer-sha256','oppo-installed-apk-identity',
+      'oppo-orders-selected-filter','oppo-profile-authentication-state',
+      'oppo-security-return-with-retained-restock','oppo-restock-labelled-catalogue-and-return',
+      'oppo-restock-search-bulk-native-back','oppo-retained-cart-and-relaunch',
+      'oppo-flutter-error-free-replay','oppo-dashboard-final','final-clean-and-live-remote')
+    $entries = @($ids | ForEach-Object {
+      [pscustomobject]@{id=$_;state='pending';evidence=@()}
+    })
+    switch ($case) {
+      'missing' { $entries = @($entries | Select-Object -Skip 1) }
+      'duplicated' { $entries += $entries[0] }
+      'invalid' { $entries[0].state = 'waived' }
+      'device-failed' { $entries[0].state = 'failed' }
+      'device-no-evidence' { $entries | ForEach-Object { $_.state = 'passed' } }
+    }
+    $state = [pscustomobject]@{postBuildGates=$entries}
+    $rejected = $false
+    try { & $deviceProbe } catch { $rejected = $true }
+    Assert-SideloadControl ($rejected -eq ($case -cne 'prebuild-pending')) `
+      "Store OPPO qualification fixture '$case' had the wrong outcome."
+  }
+}
 
 Write-Output (
   'Public-auth sideload build controls passed: PlayQualification=false; ' +

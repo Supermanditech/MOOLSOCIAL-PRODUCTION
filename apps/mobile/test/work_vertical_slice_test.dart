@@ -1,14 +1,353 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:moolsocial/app/moolsocial_app.dart';
+import 'package:moolsocial/core/design/mool_theme.dart';
+import 'package:moolsocial/features/buy/buy_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_session.dart';
+import 'package:moolsocial/features/buy/buy_v2_saved_products_store.dart';
 import 'package:moolsocial/features/journey01/journey_services.dart';
 import 'package:moolsocial/features/journey01/journey_session.dart';
 import 'package:moolsocial/features/work/work_models.dart';
 import 'package:moolsocial/features/work/work_services.dart';
 import 'package:moolsocial/features/work/work_session.dart';
+import 'package:moolsocial/features/work/screens/work_onboarding_screens.dart';
+import 'package:moolsocial/features/work/screens/work_workspace_dashboard_screen.dart';
+
+class _ReviewCaseMemoryStore implements BuyV2CustomerStateStore {
+  @override
+  String get ownerScope => 'review-case-widget';
+  @override
+  Future<BuyV2CustomerStateSnapshot?> read() async => null;
+  @override
+  Future<bool> write(BuyV2CustomerStateSnapshot snapshot) async => true;
+}
+
+class _ReviewCaseDraftStore implements WorkPendingProofStore {
+  Map<String, Object?>? draft;
+  @override
+  String get accountScope => 'review-case-widget';
+  @override
+  Future<Map<String, Object?>?> read(String scope) async =>
+      scope == accountScope ? draft : null;
+  @override
+  Future<void> save(String scope, Map<String, Object?> value) async {
+    if (scope == accountScope) draft = Map.of(value);
+  }
+
+  @override
+  Future<void> clear(String scope) async {
+    if (scope == accountScope) draft = null;
+  }
+}
 
 void main() {
+  test('Store review seed V1 is deterministic scoped and internally valid', () {
+    final now = DateTime.utc(2026, 9, 11, 12);
+    for (final count in [12, 100, 1000]) {
+      final seed = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: count,
+        now: now,
+      );
+      final same = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: count,
+        now: now,
+      );
+      expect(seed.orders.length, count);
+      expect(seed.storeId, same.storeId);
+      expect(
+        seed.storeId,
+        isNot(
+          StoreReviewSeed(
+            accountScope: 'other-account',
+            orderCount: count,
+            now: now,
+          ).storeId,
+        ),
+      );
+      expect(seed.orders.map((o) => o.id).toSet().length, count);
+      expect(
+        seed.orders.map((o) => (o.id, o.stage, o.createdAt)),
+        same.orders.map((o) => (o.id, o.stage, o.createdAt)),
+      );
+      expect(seed.orders.every((o) => o.hasCompleteItemSnapshot), isTrue);
+      expect(
+        seed.orders.every(
+          (o) => o.itemSnapshots.single.lineTotalPaise == o.amount * 100,
+        ),
+        isTrue,
+      );
+      expect(seed.finance.valid, isTrue);
+      expect(seed.finance.historyComplete, isFalse);
+      expect(
+        seed.purchases.every(
+          (p) =>
+              p.valid &&
+              p.accountScope == 'qa-account' &&
+              p.workspaceId == seed.storeId,
+        ),
+        isTrue,
+      );
+      expect(
+        seed.offers.every((o) => o.valid && o.workspaceId == seed.storeId),
+        isTrue,
+      );
+      expect(
+        seed.offers.map((o) => o.supplierType).toSet(),
+        WorkspaceStockSupplierType.values.toSet(),
+      );
+      expect(seed.orders.every((o) => o.collectionStoreId == null), isTrue);
+      expect(() => seed.orders.clear(), throwsUnsupportedError);
+    }
+    expect(
+      () => StoreReviewSeed(accountScope: '', orderCount: 12, now: now),
+      throwsArgumentError,
+    );
+    expect(
+      () => StoreReviewSeed(accountScope: 'qa', orderCount: 13, now: now),
+      throwsArgumentError,
+    );
+  });
+
+  test(
+    'Store review seed loader is gated and never overwrites another Store',
+    () {
+      final drafts = _ReviewCaseDraftStore();
+      final work = WorkSession(
+        contactDraftStore: drafts,
+        pendingProofStore: drafts,
+      )..seedVerifiedWorkspace();
+      addTearDown(work.dispose);
+      const enabled =
+          bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+          bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+      final original = work.activeWorkspace!;
+      final originalProducts = List.of(work.workspaceCatalogueItems);
+      expect(work.canLoadStoreReviewSeed, enabled);
+      expect(
+        work.loadStoreReviewSeed(100, now: DateTime.utc(2026, 9, 11)),
+        enabled,
+      );
+      if (!enabled) {
+        expect(work.activeWorkspace, original);
+        expect(work.workspaceOrders, isEmpty);
+        return;
+      }
+      final seedStoreId = StoreReviewSeed(
+        accountScope: drafts.accountScope,
+        orderCount: 100,
+        now: DateTime.now(),
+      ).storeId;
+      expect(work.activeWorkspace!.id, seedStoreId);
+      expect(work.workspaceOrders.length, 100);
+      expect(work.workspaceFinance!.valid, isTrue);
+      expect(work.otherWorkspaces, contains(original));
+      expect(work.selectWorkspaceOrder('QA-ORDER-0001'), isTrue);
+      work.workspaceCatalogueItems[0] = work.workspaceCatalogueItems.first
+          .copyWith(stock: 123);
+      expect(work.loadStoreReviewSeed(100), isTrue);
+      expect(work.currentWorkspaceOrderId, 'QA-ORDER-0001');
+      expect(work.workspaceCatalogueItems.first.stock, 123);
+      work.activeWorkspace = original;
+      expect(work.workspaceCatalogueItems, originalProducts);
+      expect(work.workspaceOrders, isEmpty);
+      expect(work.loadStoreReviewSeed(100), isTrue);
+      expect(work.currentWorkspaceOrderId, 'QA-ORDER-0001');
+      expect(work.workspaceCatalogueItems.first.stock, 123);
+      expect(work.loadStoreReviewSeed(999), isFalse);
+      expect(work.activeWorkspace!.id, seedStoreId);
+    },
+  );
+
+  test(
+    'Store review seed lost reply reconciles once without blocking another order',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: 100,
+        now: DateTime.now(),
+      );
+      final gateway = StoreReviewOrderGateway(seed);
+      final operations = WorkOrderOperations(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        gateway: gateway,
+      );
+      addTearDown(operations.dispose);
+      for (final row in gateway.snapshots) {
+        expect(operations.observe(row), isTrue);
+      }
+      gateway.nextResponse = StoreReviewOrderResponse.lostReply;
+      expect(
+        await operations.act('QA-ORDER-0000', WorkOrderAction.accept),
+        isFalse,
+      );
+      expect(
+        operations.state('QA-ORDER-0000'),
+        WorkOrderOperationState.uncertain,
+      );
+      expect(operations.order('QA-ORDER-0000')!.order!.stage, 'Confirmed');
+      expect(
+        await operations.act('QA-ORDER-0004', WorkOrderAction.accept),
+        isTrue,
+      );
+      expect(operations.order('QA-ORDER-0004')!.order!.stage, 'Preparing');
+      expect(await operations.retry('QA-ORDER-0000'), isTrue);
+      expect(operations.order('QA-ORDER-0000')!.order!.stage, 'Preparing');
+      expect(operations.order('QA-ORDER-0000')!.revision, 2);
+      expect(await operations.retry('QA-ORDER-0000'), isFalse);
+    },
+  );
+
+  test(
+    'Store review seed simulator rejects changed operation identity and supports retry evidence',
+    () async {
+      final seed = StoreReviewSeed(
+        accountScope: 'qa-account',
+        orderCount: 12,
+        now: DateTime.now(),
+      );
+      final gateway = StoreReviewOrderGateway(seed);
+      WorkOrderCommand command(String order) => WorkOrderCommand(
+        accountScope: seed.accountScope,
+        workspaceId: seed.storeId,
+        orderId: order,
+        operationId: 'QA-OPERATION-1',
+        expectedRevision: 1,
+        action: WorkOrderAction.accept,
+      );
+      gateway.nextResponse = StoreReviewOrderResponse.lostReply;
+      await expectLater(
+        gateway.submitOrderCommand(command('QA-ORDER-0000')),
+        throwsA(isA<TimeoutException>()),
+      );
+      final result = await gateway.reconcileOrderCommand(
+        command('QA-ORDER-0000'),
+      );
+      expect(result.revision, 2);
+      expect(
+        await gateway.submitOrderCommand(command('QA-ORDER-0000')),
+        same(result),
+      );
+      await expectLater(
+        gateway.submitOrderCommand(command('QA-ORDER-0004')),
+        throwsStateError,
+      );
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    for (final count in [100, 1000]) {
+      testWidgets('Store review seed dashboard $count orders at $scale', (
+        tester,
+      ) async {
+        const enabled =
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = scale == 1
+            ? const Size(412, 915)
+            : const Size(320, 568);
+        tester.view.viewPadding = const FakeViewPadding(bottom: 24);
+        addTearDown(tester.view.reset);
+        final drafts = _ReviewCaseDraftStore();
+        final work = WorkSession(
+          contactDraftStore: drafts,
+          pendingProofStore: drafts,
+        )..seedVerifiedWorkspace();
+        final core = BuySession();
+        final procurement = BuyV2Session(
+          core: core,
+          customerStateStore: _ReviewCaseMemoryStore(),
+        );
+        final router = GoRouter(
+          initialLocation: '/app/work/workspace/dashboard',
+          routes: [
+            GoRoute(
+              path: '/app/work/workspace/dashboard',
+              builder: (_, _) => WorkWorkspaceDashboardScreen(
+                session: work,
+                procurementSession: procurement,
+              ),
+            ),
+          ],
+        );
+        addTearDown(() {
+          router.dispose();
+          procurement.dispose();
+          core.dispose();
+          work.dispose();
+        });
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('store-seed-capture'),
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        final menu = find.byKey(const Key('store-review-seed-menu'));
+        if (!enabled) {
+          expect(menu, findsNothing);
+          expect(work.workspaceOrders, isEmpty);
+          return;
+        }
+        await tester.tap(menu);
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Test Store · $count orders'));
+        await tester.pumpAndSettle();
+        expect(
+          work.activeWorkspace!.id,
+          StoreReviewSeed(
+            accountScope: drafts.accountScope,
+            orderCount: count,
+            now: DateTime.now(),
+          ).storeId,
+        );
+        expect(work.workspaceOrders.length, count);
+        expect(
+          find.byKey(const Key('work-workspace-dashboard')),
+          findsOneWidget,
+        );
+        expect(tester.takeException(), isNull);
+        if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          expect(folder, isNotEmpty);
+          await expectLater(
+            find.byKey(const Key('store-seed-capture')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/seed-$count-$scale.png',
+            ),
+          );
+        }
+        final accept = find.byKey(const Key('work-activity-order-accept'));
+        await tester.ensureVisible(accept);
+        await tester.pumpAndSettle();
+        expect(accept.hitTestable(), findsOneWidget);
+        expect(work.currentWorkspaceOrderId, 'QA-ORDER-0000');
+        expect(tester.takeException(), isNull);
+        if (const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) {
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          await expectLater(
+            find.byKey(const Key('store-seed-capture')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/seed-action-$count-$scale.png',
+            ),
+          );
+        }
+      });
+    }
+  }
+
   Future<JourneySession> readyJourney() async {
     final session = JourneySession(
       store: MemoryJourneyStore(
@@ -22,17 +361,41 @@ void main() {
       otpGateway: ReviewOtpGateway(signedIn: true),
     );
     await session.start();
+    session
+      ..accountIdentity = const AuthenticatedAccountIdentity(
+        displayName: 'Asha Sharma',
+        emailAddress: 'asha@example.com',
+        phoneNumber: '+91 98290 12321',
+        providerAccountLabel: 'asha@example.com',
+        signInMethods: ['Google', 'Phone'],
+      )
+      ..socialAuthProvider = SocialAuthProvider.google;
     return session;
+  }
+
+  void confirmWorkspaceContacts(WorkSession work) {
+    work.hydrateAccountSnapshot(
+      const WorkAccountSnapshot(
+        displayName: 'Asha Sharma',
+        email: 'asha@example.com',
+        mobile: '+91 98290 12321',
+        providerLabel: 'Google',
+        providerAccount: 'asha@example.com',
+        emailConfirmed: true,
+        mobileConfirmed: true,
+      ),
+    );
   }
 
   Future<(JourneySession, WorkSession)> mount(
     WidgetTester tester, {
     required String route,
+    JourneySession? journeySession,
     WorkSession? workSession,
     Size size = const Size(412, 915),
   }) async {
     await tester.binding.setSurfaceSize(size);
-    final journey = await readyJourney();
+    final journey = journeySession ?? await readyJourney();
     final work = workSession ?? WorkSession();
     addTearDown(() {
       tester.binding.setSurfaceSize(null);
@@ -111,9 +474,13 @@ void main() {
   }
 
   Future<void> chooseRetailer(WidgetTester tester) async {
-    await tapVisible(tester, const Key('work-family-products-trade'));
     await tapVisible(tester, const Key('work-profile-retailer-grocery'));
-    await tapVisible(tester, const Key('work-continue-proof'));
+    await tapVisible(tester, const Key('work-profile-choose-retailer-grocery'));
+    await tapVisible(tester, const Key('work-requirements-ready'));
+    await tapVisible(tester, const Key('work-contact-email-send-otp'));
+    await enter(tester, const Key('work-contact-email-otp'), '123456');
+    await tapVisible(tester, const Key('work-contact-email-confirm-otp'));
+    await tapVisible(tester, const Key('work-contact-continue'));
     expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
   }
 
@@ -127,17 +494,21 @@ void main() {
     (tester) async {
       final (_, work) = await mount(tester, route: '/app/work/earn');
 
-      await tapVisible(tester, const Key('work-opportunity-mool-explainer'));
-      await tapVisible(tester, const Key('work-review-mool-explainer'));
+      await tapVisible(
+        tester,
+        const Key('work-opportunity-quick-delivery-biker'),
+      );
       expect(find.byKey(const Key('work-opportunity-screen')), findsOneWidget);
-      await tapVisible(tester, const Key('work-term-payment'));
-      expect(find.textContaining('₹1,500 is reserved'), findsOneWidget);
+      await tapVisible(tester, const Key('work-detail-payment'));
+      expect(
+        find.text('Up to ₹19,500 monthly for 30 completed shifts'),
+        findsWidgets,
+      );
 
       await tapVisible(tester, const Key('work-apply-opportunity'));
-      expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
-      expect(work.savedOpportunity?.id, 'mool-explainer');
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(work.selectedOpportunity?.id, 'quick-delivery-biker');
 
-      await tapVisible(tester, const Key('my-work-start'));
       await chooseRetailer(tester);
       await enter(tester, const Key('work-name'), 'Mahadev Fresh Mart');
       await enter(tester, const Key('work-area'), 'Sardarpura, Jodhpur');
@@ -149,19 +520,24 @@ void main() {
       await tapVisible(tester, const Key('work-details-continue'));
       await addProof(tester, 'shop-front');
       await addProof(tester, 'owner-authority');
+      await addProof(tester, 'payout-bank-account');
       await tapVisible(tester, const Key('work-proof-review'));
       await tapVisible(tester, const Key('work-declaration'));
       await tapVisible(tester, const Key('work-submit-profile'));
 
-      expect(find.byKey(const Key('work-status-screen')), findsOneWidget);
+      expect(
+        find.byKey(const Key('work-inline-review-status')),
+        findsOneWidget,
+      );
       expect(work.reviewCaseId, isNotNull);
-      await tapVisible(tester, const Key('work-remind-gst'));
-      expect(work.gstReminder, isTrue);
-      await tapVisible(tester, const Key('work-check-review'));
-
-      expect(find.byKey(const Key('workspace-ready-screen')), findsOneWidget);
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
       expect(work.activeWorkspace?.verified, isTrue);
-      await tapVisible(tester, const Key('work-set-up-shop'));
+      expect(find.text('Workspace approved'), findsNothing);
+
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(work.activeWorkspace?.verified, isTrue);
+      await tapVisible(tester, const Key('work-dashboard-priority-action'));
       await tapVisible(tester, const Key('retailer-add-catalog-product'));
       await enter(tester, const Key('retailer-product-quantity'), '24');
       await enter(tester, const Key('retailer-product-buy-price'), '48');
@@ -171,34 +547,31 @@ void main() {
 
       expect(work.reviewStage, WorkReviewStage.live);
       expect(work.retailerSetupSaved, isTrue);
-      expect(find.text('Shop ready'), findsOneWidget);
-      expect(work.gateway.submissionCalls, 1);
-      expect(work.gateway.reviewCalls, 1);
-      expect(work.gateway.setupCalls, 1);
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(find.text('Shop ready'), findsNothing);
+      final gateway = work.gateway as ReviewWorkGateway;
+      expect(gateway.submissionCalls, 1);
+      expect(gateway.reviewCalls, 1);
+      expect(gateway.setupCalls, 1);
     },
   );
 
   testWidgets(
-    'verified workspace application failure replays once without duplication',
+    'Apply Now enters Workspace onboarding with the exact opportunity',
     (tester) async {
-      final gateway = ReviewWorkGateway()..failApplication = true;
+      final gateway = ReviewWorkGateway();
       final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
       await mount(
         tester,
-        route: '/app/work/opportunity/mool-explainer',
+        route: '/app/work/opportunity/quick-delivery-biker',
         workSession: work,
       );
 
       await tapVisible(tester, const Key('work-apply-opportunity'));
-      expect(
-        find.text('Application was not sent. Your opportunity is still saved.'),
-        findsOneWidget,
-      );
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(work.selectedOpportunity?.id, 'quick-delivery-biker');
       expect(work.applicationId, isNull);
-      await tapVisible(tester, const Key('work-apply-opportunity'));
-      expect(work.applicationId, isNotNull);
-      expect(gateway.applicationCalls, 2);
-      expect(find.text('Application sent'), findsOneWidget);
+      expect(gateway.applicationCalls, 0);
     },
   );
 
@@ -209,25 +582,38 @@ void main() {
     final work = WorkSession(gateway: gateway);
     await mount(tester, route: '/app/work/earn', workSession: work);
 
+    await tapVisible(tester, const Key('work-filter-button'));
     await tapVisible(tester, const Key('work-filter-jobs'));
-    expect(find.text('City operations coordinator'), findsOneWidget);
-    expect(find.text('Make one MoolSocial explainer video'), findsNothing);
+    await tapVisible(tester, const Key('work-filter-show-results'));
+    expect(find.text('Quick Delivery Biker'), findsOneWidget);
+    expect(find.text('Social Content Creator'), findsNothing);
 
+    await tapVisible(tester, const Key('work-search'));
     await enter(tester, const Key('work-search'), 'no funded work');
     expect(find.byKey(const Key('work-empty')), findsOneWidget);
     await tapVisible(tester, const Key('work-empty-action'));
     expect(work.filter, WorkFeedFilter.forYou);
     expect(work.searchQuery, isEmpty);
 
-    await tapVisible(tester, const Key('work-refresh-feed'));
+    final list = find.byKey(const Key('work-earn-screen'));
+    await tester.drag(list, const Offset(0, 320));
+    await tester.pumpAndSettle();
     expect(
       find.text(
         'Work could not be refreshed. Check your connection and try again.',
       ),
       findsOneWidget,
     );
-    await tapVisible(tester, const Key('work-refresh-feed'));
-    expect(find.text('Verified work is up to date.'), findsOneWidget);
+    final refresh = tester.widget<RefreshIndicator>(
+      find.byType(RefreshIndicator),
+    );
+    final refreshFuture = refresh.onRefresh();
+    await tester.pump(const Duration(milliseconds: 30));
+    await refreshFuture;
+    await tester.pump();
+    expect(find.text('Work opportunities refreshed.'), findsOneWidget);
+    await tester.pump(const Duration(milliseconds: 1300));
+    expect(find.text('Work opportunities refreshed.'), findsNothing);
   });
 
   testWidgets(
@@ -241,44 +627,174 @@ void main() {
         workSession: work,
       );
 
-      await tapVisible(tester, const Key('work-family-products-trade'));
       await tapVisible(tester, const Key('work-profile-retailer-grocery'));
-      await enter(tester, const Key('work-alternate-mobile'), '123');
-      await tapVisible(tester, const Key('work-send-alternate-otp'));
+      await tapVisible(
+        tester,
+        const Key('work-profile-choose-retailer-grocery'),
+      );
+      await tapVisible(tester, const Key('work-requirements-ready'));
+      await enter(tester, const Key('work-alternate-contact-field'), '123');
+      await tapVisible(tester, const Key('work-alternate-contact-send-otp'));
       expect(
         find.text('Enter a valid 10-digit alternate mobile number.'),
         findsOneWidget,
       );
 
-      await enter(tester, const Key('work-alternate-mobile'), '9829012321');
-      await tapVisible(tester, const Key('work-send-alternate-otp'));
+      await enter(
+        tester,
+        const Key('work-alternate-contact-field'),
+        '9829012321',
+      );
+      await tapVisible(tester, const Key('work-alternate-contact-send-otp'));
       expect(
-        find.text('This is already your verified account number.'),
+        find.text('This is already the number customers can reach you on.'),
         findsOneWidget,
       );
 
-      await enter(tester, const Key('work-alternate-mobile'), '9251893684');
-      await tapVisible(tester, const Key('work-send-alternate-otp'));
+      await enter(
+        tester,
+        const Key('work-alternate-contact-field'),
+        '9251893684',
+      );
+      await tapVisible(tester, const Key('work-alternate-contact-send-otp'));
       expect(
         find.text('OTP could not be sent. Check the number and try again.'),
         findsOneWidget,
       );
-      await tapVisible(tester, const Key('work-send-alternate-otp'));
+      await tapVisible(tester, const Key('work-alternate-contact-send-otp'));
       expect(gateway.otpCalls, 2);
 
-      await enter(tester, const Key('work-alternate-otp'), '000000');
-      await tapVisible(tester, const Key('work-verify-alternate'));
-      expect(
-        find.text('Enter the 6-digit OTP sent to the alternate number.'),
-        findsOneWidget,
-      );
-      await enter(tester, const Key('work-alternate-otp'), '123456');
-      await tapVisible(tester, const Key('work-verify-alternate'));
+      await enter(tester, const Key('work-alternate-contact-otp'), '000000');
+      await tapVisible(tester, const Key('work-alternate-contact-confirm-otp'));
+      expect(find.text('That code does not match. Try again.'), findsOneWidget);
+      await enter(tester, const Key('work-alternate-contact-otp'), '123456');
+      await tapVisible(tester, const Key('work-alternate-contact-confirm-otp'));
       expect(work.alternateVerified, isTrue);
-      await tapVisible(tester, const Key('work-continue-proof'));
+      await tapVisible(tester, const Key('work-contact-email-send-otp'));
+      await enter(tester, const Key('work-contact-email-otp'), '123456');
+      await tapVisible(tester, const Key('work-contact-email-confirm-otp'));
+      await tapVisible(tester, const Key('work-contact-continue'));
       expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'Google email is shown alone and missing phone is confirmed in place',
+    (tester) async {
+      final journey = JourneySession(
+        store: MemoryJourneyStore(
+          snapshot: const JourneySnapshot(
+            languageCode: 'en',
+            areaMode: 'manual',
+            areaLabel: 'Jodhpur',
+            setupComplete: true,
+          ),
+        ),
+        otpGateway: ReviewOtpGateway(signedIn: true),
+      );
+      await journey.start();
+      journey
+        ..accountIdentity = const AuthenticatedAccountIdentity(
+          displayName: 'Asha Sharma',
+          emailAddress: 'asha@example.com',
+          providerAccountLabel: 'asha@example.com',
+          signInMethods: ['Google'],
+        )
+        ..socialAuthProvider = SocialAuthProvider.google;
+      final work = WorkSession()
+        ..selectFamily('products-trade')
+        ..selectProfile('retailer-grocery');
+
+      await mount(
+        tester,
+        route: '/app/work/workspace/contact',
+        journeySession: journey,
+        workSession: work,
+      );
+
+      expect(find.byKey(const Key('workspace-account-setup-hero')), findsOne);
+      expect(find.text('Google account'), findsOne);
+      expect(find.text('asha@example.com'), findsWidgets);
+      expect(find.textContaining('Facebook'), findsNothing);
+      expect(find.textContaining('YouTube account'), findsNothing);
+      expect(work.contactEmailVerified, isFalse);
+      expect(work.primaryMobileVerified, isFalse);
+
+      await enter(
+        tester,
+        const Key('work-primary-contact-field'),
+        '9829012321',
+      );
+      await tapVisible(tester, const Key('work-primary-contact-send-otp'));
+      await enter(tester, const Key('work-primary-contact-otp'), '123456');
+      await tapVisible(tester, const Key('work-primary-contact-confirm-otp'));
+
+      expect(work.primaryMobileVerified, isTrue);
+      await tapVisible(tester, const Key('work-contact-email-send-otp'));
+      await enter(tester, const Key('work-contact-email-otp'), '123456');
+      await tapVisible(tester, const Key('work-contact-email-confirm-otp'));
+      expect(work.contactEmailVerified, isTrue);
+      expect(work.workspaceContactsReady, isTrue);
+      await tapVisible(tester, const Key('work-contact-continue'));
+      expect(find.byKey(const Key('work-proof-screen')), findsOneWidget);
+    },
+  );
+
+  for (final entry in [
+    (
+      WorkContactChannel.primaryMobile,
+      '123',
+      '9999999901',
+      'Enter a valid 10-digit phone number.',
+      'Confirm the phone number customers can reach you on before continuing.',
+    ),
+    (
+      WorkContactChannel.email,
+      'not-an-email',
+      'changed@example.com',
+      'Enter a valid email address.',
+      'Confirm your email address before continuing.',
+    ),
+    (
+      WorkContactChannel.alternateMobile,
+      '123',
+      '9999999902',
+      'Enter a valid 10-digit alternate mobile number.',
+      'Confirm or remove the alternate contact number.',
+    ),
+  ]) {
+    test(
+      'r6611 contact Continue separates format and confirmation ${entry.$1}',
+      () {
+        final work = WorkSession()
+          ..selectFamily('products-trade')
+          ..selectProfile('retailer-grocery');
+        addTearDown(work.dispose);
+        confirmWorkspaceContacts(work);
+        expect(work.workspaceContactsReady, isTrue);
+        work.beginWorkspaceContactEdit(entry.$1);
+        for (final invalid in [
+          entry.$2,
+          if (entry.$1 != WorkContactChannel.alternateMobile) '',
+        ]) {
+          work.editWorkspaceContact(entry.$1, invalid);
+          expect(work.continueToProof(), isFalse);
+          expect(work.errorMessage, entry.$4);
+          expect(work.workspaceContactVerified(entry.$1), isFalse);
+        }
+        work.editWorkspaceContact(entry.$1, entry.$3);
+        expect(work.continueToProof(), isFalse);
+        expect(work.errorMessage, entry.$5);
+        expect(work.workspaceContactVerified(entry.$1), isFalse);
+        work.cancelWorkspaceContactEdit(entry.$1);
+        expect(work.continueToProof(), isTrue);
+        expect(work.errorMessage, isNull);
+        expect(work.primaryMobileVerified, isTrue);
+        expect(work.contactEmailVerified, isTrue);
+        expect(work.alternateMobile, isEmpty);
+      },
+    );
+  }
 
   testWidgets(
     'unsupported profile request validates and creates no workspace',
@@ -287,44 +803,253 @@ void main() {
         tester,
         route: '/app/work/workspace/choose',
       );
+      final missingRole = find.byKey(const Key('work-profile-not-shown'));
+      await tester.scrollUntilVisible(
+        missingRole,
+        260,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-choose-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+        maxScrolls: 40,
+      );
       await tapVisible(tester, const Key('work-profile-not-shown'));
       await tapVisible(tester, const Key('work-send-profile-request'));
-      expect(find.text('Describe the work profile you need.'), findsOneWidget);
+      expect(
+        find.text('Enter your business, profession or service.'),
+        findsOneWidget,
+      );
 
       await enter(
         tester,
         const Key('work-request-profile-name'),
         'Community library operator',
       );
+      expect(
+        find.text('Enter your business, profession or service.'),
+        findsNothing,
+      );
+      expect(find.text('Choose the closest category.'), findsOneWidget);
       await tapVisible(tester, const Key('work-request-family'));
       await tester.tap(find.text('Other').last);
       await tester.pumpAndSettle();
+      expect(
+        find.byKey(const Key('work-request-other-activity')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('work-send-profile-request'));
+      expect(
+        find.text('Enter the activity you want to offer.'),
+        findsOneWidget,
+      );
+      await enter(
+        tester,
+        const Key('work-request-other-activity'),
+        'Community library and reading services',
+      );
+      expect(find.text('Enter the activity you want to offer.'), findsNothing);
+      expect(find.text('Enter your city or service area.'), findsOneWidget);
       await enter(tester, const Key('work-request-area'), 'Jodhpur');
+      expect(find.byKey(const Key('work-profile-request-error')), findsNothing);
       await tapVisible(tester, const Key('work-send-profile-request'));
 
       expect(work.unsupportedRequestSent, isTrue);
+      expect(
+        work.unsupportedOtherActivity,
+        'Community library and reading services',
+      );
       expect(work.activeWorkspace, isNull);
-      expect(find.textContaining('No workspace was created'), findsOneWidget);
+      expect(
+        find.textContaining('MoolSocial will review your request'),
+        findsOneWidget,
+      );
     },
   );
 
   testWidgets(
-    'selected work profile is informative and does not advertise a no-op tap',
+    'selected role opens its complete document requirements and Back restores roles',
     (tester) async {
       await mount(tester, route: '/app/work/workspace/choose');
 
-      await tapVisible(tester, const Key('work-family-products-trade'));
-      await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+      final profileLabels = workProfiles
+          .map((profile) => profile.label)
+          .toList();
+      expect(profileLabels, isNot(contains('Local Service Provider')));
+      expect(profileLabels, isNot(contains('Ride / Delivery Captain')));
+      expect(
+        profileLabels,
+        containsAll(const [
+          'Bike Travel Provider',
+          'Auto Travel Provider',
+          'Cab Travel Provider',
+          'Bus Travel Provider',
+          'Quick Delivery Biker',
+          'Wholesale Fleet Delivery',
+          'Bulk Delivery Fleet',
+        ]),
+      );
+      expect(
+        workProfiles
+            .where(
+              (profile) => const {
+                'Travel Partners',
+                'Delivery & Logistics',
+              }.contains(profile.familyLabel),
+            )
+            .map((profile) => profile.familyLabel)
+            .toSet(),
+        const {'Travel Partners', 'Delivery & Logistics'},
+      );
 
-      final selectedCard = find.byKey(
-        const Key('work-profile-retailer-grocery'),
+      await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+      expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
+      expect(
+        find.byKey(const Key('workspace-benefits-retailer-grocery')),
+        findsOneWidget,
       );
-      expect(selectedCard, findsOneWidget);
-      final inkWell = tester.widget<InkWell>(
-        find.descendant(of: selectedCard, matching: find.byType(InkWell)).first,
+      await tapVisible(
+        tester,
+        const Key('work-profile-choose-retailer-grocery'),
       );
-      expect(inkWell.onTap, isNull);
-      expect(find.text('Selected workspace'), findsOneWidget);
+      expect(find.byKey(const Key('work-requirements-screen')), findsOneWidget);
+      expect(find.text('Your identity proof'), findsOneWidget);
+      expect(find.text('Shop address proof'), findsOneWidget);
+      expect(
+        find.textContaining('You can add documents later.'),
+        findsOneWidget,
+      );
+      final gstDocument = workProfiles
+          .singleWhere((profile) => profile.id == 'retailer-grocery')
+          .verificationDocuments
+          .singleWhere(
+            (document) => document.title == 'GST registration certificate',
+          );
+      expect(gstDocument.importance, WorkDocumentImportance.ifApplicable);
+      await tester.scrollUntilVisible(
+        find.text('Bank proof for payments'),
+        240,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-requirements-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Bank proof for payments'), findsOneWidget);
+      expect(
+        find.textContaining('cancelled cheque or recent bank statement PDF'),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        find.text('GST certificate'),
+        240,
+        scrollable: find
+            .descendant(
+              of: find.byKey(const Key('work-requirements-screen')),
+              matching: find.byType(Scrollable),
+            )
+            .first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('GST certificate'), findsOneWidget);
+      expect(
+        find.text(
+          'Your registration certificate, where GST registration applies to your business.',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('When applicable'), findsWidgets);
+      expect(find.textContaining('GST certificate is optional'), findsNothing);
+      expect(find.byKey(const Key('work-requirements-ready')), findsOneWidget);
+
+      await tapVisible(tester, const Key('work-back'));
+      expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+      expect(find.byKey(const Key('work-requirements-screen')), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'Workspace submits without documents and keeps review status in the same screen',
+    (tester) async {
+      final gateway = ReviewWorkGateway();
+      final work = WorkSession(gateway: gateway)
+        ..selectFamily('products-trade')
+        ..selectProfile('retailer-grocery');
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
+
+      await enter(tester, const Key('work-name'), 'Mahadev Fresh Mart');
+      await enter(tester, const Key('work-area'), 'Jodhpur');
+      await enter(tester, const Key('work-activity'), 'Grocery retail');
+      expect(find.byKey(const Key('work-workspace-progress')), findsOneWidget);
+      expect(find.text('Verified'), findsNothing);
+      expect(find.byKey(const Key('work-global-chat')), findsNothing);
+      expect(find.byKey(const Key('work-help')), findsNothing);
+      await tapVisible(tester, const Key('work-details-continue'));
+      expect(find.text('Documents'), findsWidgets);
+      expect(find.byKey(const Key('work-proof-back-details')), findsNothing);
+      expect(find.text('Add document'), findsWidgets);
+      await tapVisible(tester, const Key('work-proof-review'));
+      await tapVisible(tester, const Key('work-declaration'));
+      await tapVisible(tester, const Key('work-submit-profile'));
+
+      expect(
+        find.byKey(const Key('work-inline-review-status')),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-status-screen')), findsNothing);
+      expect(find.text('Application received'), findsOneWidget);
+      expect(gateway.lastSubmission?.proofReferences, isEmpty);
+      expect(
+        find.byKey(const Key('work-inline-update-documents')),
+        findsNothing,
+      );
+      expect(work.submittedProfile, same(gateway.lastSubmission));
+      expect(gateway.lastSubmission?.primaryMobile, '9829012321');
+      expect(gateway.lastSubmission?.email, 'asha@example.com');
+      expect(gateway.submissionCalls, 1);
+    },
+  );
+
+  testWidgets(
+    'rejected Workspace explains the reason inside Complete your Workspace',
+    (tester) async {
+      final work = WorkSession()
+        ..selectFamily('products-trade')
+        ..selectProfile('retailer-grocery')
+        ..reviewCaseId = 'WP-REVIEW-92'
+        ..remoteReviewStatus = WorkRemoteReviewStatus.rejected
+        ..reviewReason =
+            'The shop address could not be confirmed. Add a clearer address document or update the operating address.';
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
+
+      expect(
+        find.byKey(const Key('work-inline-review-status')),
+        findsOneWidget,
+      );
+      expect(find.text('Application not approved'), findsOneWidget);
+      expect(
+        find.textContaining('shop address could not be confirmed'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-status-screen')), findsNothing);
+      expect(find.byKey(const Key('work-inline-review-update')), findsNothing);
+      expect(
+        find.byKey(const Key('work-inline-review-support')),
+        findsOneWidget,
+      );
     },
   );
 
@@ -335,6 +1060,7 @@ void main() {
       final work = WorkSession(gateway: gateway)
         ..selectFamily('products-trade')
         ..selectProfile('retailer-grocery');
+      confirmWorkspaceContacts(work);
       await mount(
         tester,
         route: '/app/work/workspace/proof',
@@ -342,7 +1068,10 @@ void main() {
       );
 
       await tapVisible(tester, const Key('work-details-continue'));
-      expect(find.text('Enter the work or business name.'), findsOneWidget);
+      expect(
+        find.text('Enter the business name shown on its PAN card.'),
+        findsOneWidget,
+      );
       await enter(tester, const Key('work-name'), 'Mahadev Fresh Mart');
       await enter(tester, const Key('work-area'), 'Jodhpur');
       await enter(tester, const Key('work-activity'), 'Grocery retail');
@@ -352,17 +1081,18 @@ void main() {
       await tapVisible(tester, const Key('work-proof-source-upload'));
       expect(
         find.text(
-          'Proof was not added. Choose the same file or source and retry.',
+          'Document not added. Choose the same file or another option and try again.',
         ),
         findsOneWidget,
       );
       await tapVisible(tester, const Key('work-proof-source-upload'));
       await addProof(tester, 'owner-authority');
+      await addProof(tester, 'payout-bank-account');
       await tapVisible(tester, const Key('work-proof-review'));
 
       await tapVisible(tester, const Key('work-submit-profile'));
       expect(
-        find.text('Confirm the declaration before submission.'),
+        find.text('Confirm that these details are correct before submitting.'),
         findsOneWidget,
       );
       await tapVisible(tester, const Key('work-declaration'));
@@ -370,12 +1100,15 @@ void main() {
       await tapVisible(tester, const Key('work-submit-profile'));
       expect(
         find.text(
-          'Work profile was not submitted. Your details and proof remain saved.',
+          'Workspace profile was not submitted. Your details and documents remain saved.',
         ),
         findsOneWidget,
       );
       await tapVisible(tester, const Key('work-submit-profile'));
-      expect(find.byKey(const Key('work-status-screen')), findsOneWidget);
+      expect(
+        find.byKey(const Key('work-inline-review-status')),
+        findsOneWidget,
+      );
       expect(gateway.submissionCalls, 2);
 
       final submittedAgain = await work.submitProfile();
@@ -385,10 +1118,10 @@ void main() {
   );
 
   testWidgets(
-    'GST and review failures keep one case then reach approved workspace',
+    'document and automatic review failures preserve one case with exact retry',
     (tester) async {
       final gateway = ReviewWorkGateway()
-        ..failGst = true
+        ..failProof = true
         ..failReview = true;
       final work = WorkSession(gateway: gateway)
         ..selectFamily('products-trade')
@@ -398,43 +1131,256 @@ void main() {
           area: 'Jodhpur',
           activity: 'Grocery retail',
         );
-      work
-        ..reviewCaseId = 'WP-240701'
-        ..reviewStage = WorkReviewStage.gstPending;
-      await mount(tester, route: '/app/work/status', workSession: work);
-
-      await tapVisible(tester, const Key('work-add-gst'));
-      await enter(tester, const Key('work-gstin'), 'INVALID');
-      await tapVisible(tester, const Key('work-submit-gst'));
-      expect(find.text('Enter a valid 15-character GSTIN.'), findsOneWidget);
-      await enter(tester, const Key('work-gstin'), '22AAAAA0000A1Z5');
-      await tapVisible(tester, const Key('work-submit-gst'));
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
+      await tapVisible(tester, const Key('work-details-continue'));
+      await tapVisible(tester, const Key('work-add-proof-gst'));
+      await tapVisible(tester, const Key('work-proof-source-upload'));
       expect(
-        find.text('Attach the GST certificate before submission.'),
+        find.text(
+          'Document not added. Choose the same file or another option and try again.',
+        ),
         findsOneWidget,
       );
-      await tapVisible(tester, const Key('work-attach-gst'));
-      await tapVisible(tester, const Key('work-submit-gst'));
-      expect(
-        find.text('GST proof was not submitted. Your review remains active.'),
-        findsOneWidget,
-      );
-      await tapVisible(tester, const Key('work-submit-gst'));
-      expect(gateway.gstCalls, 2);
-
-      await tapVisible(tester, const Key('work-check-review'));
+      await tapVisible(tester, const Key('work-proof-source-upload'));
+      expect(work.addedProofs['gst'], isNotNull);
+      await tapVisible(tester, const Key('work-proof-review'));
+      await tapVisible(tester, const Key('work-declaration'));
+      await tapVisible(tester, const Key('work-submit-profile'));
+      final caseId = work.reviewCaseId;
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
       expect(
         find.text(
           'Review update is unavailable. No duplicate request was created.',
         ),
         findsOneWidget,
       );
-      await tapVisible(tester, const Key('work-check-review'));
-      expect(find.byKey(const Key('workspace-ready-screen')), findsOneWidget);
+      await tapVisible(tester, const Key('work-inline-review-check'));
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
       expect(gateway.reviewCalls, 2);
+      expect(gateway.submissionCalls, 1);
+      expect(work.reviewCaseId, caseId);
       expect(work.activeWorkspace?.id, isNotNull);
     },
   );
+
+  testWidgets(
+    'pending review continues with bounded backoff and resumes without duplicate submission',
+    (tester) async {
+      final gateway = ReviewWorkGateway(
+        initialReviewStatus: WorkRemoteReviewStatus.pending,
+      );
+      final work = WorkSession(gateway: gateway)
+        ..selectProfile('retailer-grocery')
+        ..saveDetails(
+          name: 'QA Retail Store',
+          area: 'Jodhpur',
+          activity: 'Grocery retail',
+        )
+        ..businessRelationship = 'Owner';
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
+      await tapVisible(tester, const Key('work-details-continue'));
+      await tapVisible(tester, const Key('work-proof-review'));
+      await tapVisible(tester, const Key('work-declaration'));
+      await tapVisible(tester, const Key('work-submit-profile'));
+      final caseId = work.reviewCaseId;
+      expect(caseId, isNotNull);
+      expect(gateway.submissionCalls, 1);
+      for (var attempt = 0; attempt < 20; attempt++) {
+        await tester.pump(const Duration(seconds: 30));
+        await tester.pumpAndSettle();
+      }
+      expect(gateway.reviewCalls, 20);
+      expect(work.activeWorkspace, isNull);
+      await tester.pump(const Duration(minutes: 4));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 20);
+      await tester.pump(const Duration(minutes: 1));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 21);
+      expect(work.reviewCaseId, caseId);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+      await tester.pump(const Duration(minutes: 20));
+      expect(gateway.reviewCalls, 21);
+      tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 22);
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 23);
+      expect(work.activeWorkspace, isNull);
+      gateway.reviewResultStatus = WorkRemoteReviewStatus.approved;
+      await tester.pump(const Duration(seconds: 31));
+      await tester.pumpAndSettle();
+      expect(gateway.reviewCalls, 24);
+      expect(gateway.submissionCalls, 1);
+      expect(work.reviewCaseId, caseId);
+      expect(work.activeWorkspace?.id, isNotNull);
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      expect(tester.takeException(), isNull);
+    },
+  );
+
+  for (final scale in [1.0, 2.0]) {
+    testWidgets(
+      'r66.8 review controls are isolated and navigate same case at $scale',
+      (tester) async {
+        const enabled =
+            bool.fromEnvironment('MOOLSOCIAL_DEVICE_REVIEW') &&
+            bool.fromEnvironment('MOOLSOCIAL_UI_REVIEW_ONLY');
+        tester.platformDispatcher.textScaleFactorTestValue = scale;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final gateway = ReviewWorkGateway(
+          initialReviewStatus: WorkRemoteReviewStatus.pending,
+        );
+        final work =
+            WorkSession(
+                gateway: gateway,
+                contactDraftStore: _ReviewCaseDraftStore(),
+                pendingProofStore: _ReviewCaseDraftStore(),
+              )
+              ..selectProfile('retailer-grocery')
+              ..saveDetails(
+                name: 'QA Retail Store',
+                area: 'Jodhpur',
+                activity: 'Grocery retail',
+              )
+              ..businessRelationship = 'Owner'
+              ..declarationAccepted = true;
+        confirmWorkspaceContacts(work);
+        final submission = work.submitProfile();
+        await tester.pump(const Duration(seconds: 1));
+        expect(await submission, isTrue);
+        final caseId = work.reviewCaseId!;
+        final viewport = scale == 1
+            ? const Size(412, 915)
+            : const Size(320, 568);
+        tester.view.devicePixelRatio = 1;
+        tester.view.physicalSize = viewport;
+        tester.view.viewPadding = const FakeViewPadding(bottom: 44);
+        addTearDown(tester.view.reset);
+        final core = BuySession();
+        final procurement = BuyV2Session(
+          core: core,
+          customerStateStore: _ReviewCaseMemoryStore(),
+        );
+        final router = GoRouter(
+          initialLocation: '/app/work/workspace/proof',
+          routes: [
+            GoRoute(
+              path: '/app/work/workspace/proof',
+              builder: (_, _) => WorkProfileProofScreen(session: work),
+            ),
+            GoRoute(
+              path: '/app/work/workspace/dashboard',
+              builder: (_, _) => WorkWorkspaceDashboardScreen(
+                session: work,
+                procurementSession: procurement,
+              ),
+            ),
+          ],
+        );
+        addTearDown(() {
+          router.dispose();
+          procurement.dispose();
+          core.dispose();
+          work.dispose();
+        });
+        await tester.pumpWidget(
+          RepaintBoundary(
+            key: const Key('review-case-root'),
+            child: MaterialApp.router(
+              debugShowCheckedModeBanner: false,
+              theme: MoolTheme.light(),
+              routerConfig: router,
+            ),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(
+          MediaQuery.sizeOf(
+            tester.element(find.byType(WorkProfileProofScreen)),
+          ),
+          viewport,
+        );
+        final appBar = tester.getRect(find.byType(AppBar));
+        for (final key in ['work-page-title', 'work-page-subtitle']) {
+          final text = tester.getRect(find.byKey(Key(key)));
+          expect(text.top, greaterThanOrEqualTo(appBar.top));
+          expect(text.bottom, lessThanOrEqualTo(appBar.bottom));
+          expect(text.right, lessThanOrEqualTo(appBar.right));
+        }
+        Future<void> capture(String state) async {
+          if (!const bool.fromEnvironment('MOOL_CAPTURE_STORE_VIEW_V2')) return;
+          if (state != 'selector' && state != 'approved') {
+            final body = find.byKey(const Key('work-proof-screen'));
+            await tester.drag(body, const Offset(0, 2200));
+            await tester.pumpAndSettle();
+          }
+          const folder = String.fromEnvironment('MOOL_STORE_VIEW_CAPTURE_DIR');
+          expect(folder, isNotEmpty);
+          await expectLater(
+            find.byKey(const Key('review-case-root')),
+            matchesGoldenFile(
+              '../../../../MOOLSOCIAL-POST-UI-AUDIT-20260905/$folder/r668-review-$state-$scale.png',
+            ),
+          );
+        }
+
+        final control = find.byKey(const Key('work-review-test-controls'));
+        if (!enabled) {
+          expect(control, findsNothing);
+          expect(work.hasVerifiedWorkspace, isFalse);
+          expect(work.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+          expect(tester.takeException(), isNull);
+          return;
+        }
+        await tapVisible(tester, const Key('work-review-test-controls'));
+        await capture('selector');
+        expect(
+          find.text(
+            'Test data only. No real application, payment or approval is changed.',
+          ),
+          findsOneWidget,
+        );
+        await tester.binding.handlePopRoute();
+        await tester.pumpAndSettle();
+        expect(work.remoteReviewStatus, WorkRemoteReviewStatus.pending);
+        await capture('pending');
+        for (final scenario in ['clarification', 'rejected', 'approved']) {
+          await tapVisible(tester, const Key('work-review-test-controls'));
+          await tapVisible(tester, Key('work-review-test-$scenario'));
+          await capture(scenario);
+          expect(work.reviewCaseId, caseId);
+          expect(tester.takeException(), isNull);
+          if (scenario == 'clarification') {
+            expect(find.text('More information needed'), findsOneWidget);
+            expect(work.hasVerifiedWorkspace, isFalse);
+          } else if (scenario == 'rejected') {
+            expect(find.text('Application not approved'), findsOneWidget);
+            expect(work.hasVerifiedWorkspace, isFalse);
+          } else {
+            expect(
+              find.byKey(const Key('work-workspace-dashboard')),
+              findsOneWidget,
+            );
+            expect(work.hasVerifiedWorkspace, isTrue);
+          }
+        }
+        expect(gateway.submissionCalls, 1);
+      },
+    );
+  }
 
   testWidgets(
     'retailer setup rejects incomplete inputs and exact failure retry goes live',
@@ -443,7 +1389,8 @@ void main() {
       final work = WorkSession(gateway: gateway)..seedVerifiedWorkspace();
       await mount(tester, route: '/app/work/ready', workSession: work);
 
-      await tapVisible(tester, const Key('work-set-up-shop'));
+      expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+      await tapVisible(tester, const Key('work-dashboard-priority-action'));
       await tapVisible(tester, const Key('retailer-finish-setup'));
       expect(
         find.text('Add at least one product from the verified catalogue.'),
@@ -478,29 +1425,36 @@ void main() {
     },
   );
 
-  testWidgets('single and multiple workspaces remain inside My Work', (
+  testWidgets('R669 existing stores stay out of the new Workspace selector', (
     tester,
   ) async {
     final work = WorkSession()..seedMultipleWorkspaces();
-    await mount(tester, route: '/app/work/my-work', workSession: work);
+    await mount(tester, route: '/app/work/workspace/choose', workSession: work);
 
-    expect(find.text('Mahadev Fresh Mart'), findsWidgets);
-    await tapVisible(tester, const Key('my-work-other-list'));
-    expect(find.byKey(const Key('my-work-other-list')), findsOneWidget);
-    expect(find.text('Creator Work'), findsOneWidget);
-
-    await tapVisible(tester, const Key('my-work-settlement'));
-    expect(find.byKey(const Key('my-work-settlement-sheet')), findsOneWidget);
-    await tapVisible(tester, const Key('my-work-settlement-close'));
-    await tapVisible(tester, const Key('my-work-settlement'));
-    await tapVisible(tester, const Key('my-work-settlement-open-workspace'));
-    expect(find.byKey(const Key('retailer-home-screen')), findsOneWidget);
+    expect(find.byKey(const Key('my-work-screen')), findsNothing);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+    expect(find.byKey(const Key('workspace-other-list')), findsNothing);
+    expect(find.byKey(const Key('workspace-settlement')), findsNothing);
+    expect(find.byKey(const Key('workspace-open-active')), findsNothing);
+    expect(find.text('Mahadev Fresh Mart'), findsNothing);
+    expect(find.text('No payout is due now'), findsNothing);
+    expect(work.activeWorkspace?.id, 'WK-510001');
+    expect(work.otherWorkspaces, hasLength(2));
+    await tapVisible(tester, const Key('work-profile-retailer-grocery'));
+    expect(
+      find.byKey(const Key('workspace-benefits-retailer-grocery')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+    expect(find.text('Mahadev Fresh Mart'), findsNothing);
+    work.startAnotherWork();
     tester.element(find.byType(Scaffold).first).go('/app/work/my-work');
     await tester.pumpAndSettle();
 
-    await tapVisible(tester, const Key('my-work-add-another'));
-    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
     expect(work.activeWorkspace?.name, 'Mahadev Fresh Mart');
+    expect(work.otherWorkspaces, hasLength(2));
   });
 
   testWidgets('status Chat returns to the exact review screen', (tester) async {
@@ -508,15 +1462,326 @@ void main() {
       ..selectFamily('products-trade')
       ..selectProfile('retailer-grocery')
       ..reviewCaseId = 'WP-240701'
-      ..reviewStage = WorkReviewStage.gstPending;
+      ..reviewStage = WorkReviewStage.gstPending
+      ..remoteReviewStatus = WorkRemoteReviewStatus.rejected
+      ..reviewReason = 'The submitted address could not be confirmed.';
     await mount(tester, route: '/app/work/status', workSession: work);
 
-    await tapVisible(tester, const Key('work-status-open-chat'));
-    expect(find.byKey(const Key('chat-inbox-screen')), findsOneWidget);
-    expect(find.byKey(const Key('chat-back')), findsNothing);
+    expect(find.byKey(const Key('work-global-chat')), findsNothing);
+    expect(find.byKey(const Key('work-help')), findsNothing);
+    await tapVisible(tester, const Key('work-inline-review-support'));
+    expect(find.byKey(const Key('chat-thread-screen')), findsOneWidget);
+    expect(find.byKey(const Key('chat-inbox-screen')), findsNothing);
+    expect(find.byKey(const Key('chat-back')), findsOneWidget);
+    expect(find.text('Application support'), findsOneWidget);
     await tester.binding.handlePopRoute();
     await tester.pumpAndSettle();
-    expect(find.byKey(const Key('work-status-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-inline-review-status')), findsOneWidget);
+    expect(work.reviewCaseId, 'WP-240701');
+    expect(work.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
+  });
+
+  testWidgets(
+    'review step animates and offers direct detail and document corrections',
+    (tester) async {
+      final work = WorkSession()
+        ..selectFamily('products-trade')
+        ..selectProfile('retailer-grocery')
+        ..saveDetails(
+          name: 'Mahadev Fresh Mart',
+          area: 'Sardarpura, Jodhpur',
+          activity: 'Grocery retail',
+        );
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
+
+      await tapVisible(tester, const Key('work-details-continue'));
+      await addProof(tester, 'shop-front');
+      await tapVisible(tester, const Key('work-proof-review'));
+      expect(find.byKey(const Key('work-review-corrections')), findsOneWidget);
+      expect(find.text('Shop address document'), findsWidgets);
+
+      await tapVisible(tester, const Key('work-declaration'));
+      expect(work.declarationAccepted, isTrue);
+      await tapVisible(tester, const Key('work-review-edit-details'));
+      expect(work.declarationAccepted, isFalse);
+      await enter(tester, const Key('work-name'), 'Mahadev Daily Store');
+      await tapVisible(tester, const Key('work-details-continue'));
+      expect(find.text('Mahadev Daily Store'), findsOneWidget);
+
+      await tapVisible(tester, const Key('work-review-edit-documents'));
+      expect(
+        find.byKey(const Key('work-remove-proof-shop-front')),
+        findsOneWidget,
+      );
+      await tapVisible(tester, const Key('work-back'));
+      expect(find.byKey(const Key('work-review-corrections')), findsOneWidget);
+      await tapVisible(tester, const Key('work-review-edit-contact'));
+      await enter(tester, const Key('work-person-name'), 'Asha Kumar');
+      await tapVisible(tester, const Key('work-contact-continue'));
+      expect(find.byKey(const Key('work-review-corrections')), findsOneWidget);
+      expect(find.text('Asha Kumar'), findsOneWidget);
+      expect(work.declarationAccepted, isFalse);
+      expect(work.workName, 'Mahadev Daily Store');
+      expect(find.byKey(const Key('work-global-chat')), findsNothing);
+      expect(find.byKey(const Key('work-help')), findsNothing);
+    },
+  );
+
+  testWidgets('clarification corrections update the existing review reference', (
+    tester,
+  ) async {
+    final gateway = ReviewWorkGateway()
+      ..reviewResultStatus = WorkRemoteReviewStatus.pending
+      ..reviewResultReason =
+          'Please confirm the shop entrance and upload a clearer address document.';
+    final work = WorkSession(gateway: gateway)
+      ..selectFamily('products-trade')
+      ..selectProfile('retailer-grocery')
+      ..saveDetails(
+        name: 'Mahadev Fresh Mart',
+        area: 'Sardarpura, Jodhpur',
+        activity: 'Grocery retail',
+      )
+      ..reviewCaseId = 'WP-CLARIFY-101'
+      ..reviewStage = WorkReviewStage.gstPending
+      ..remoteReviewStatus = WorkRemoteReviewStatus.pending
+      ..reviewReason =
+          'Please confirm the shop entrance and upload a clearer address document.';
+    confirmWorkspaceContacts(work);
+    await mount(tester, route: '/app/work/workspace/proof', workSession: work);
+
+    expect(find.text('More information needed'), findsOneWidget);
+    expect(
+      find.textContaining('Please confirm the shop entrance'),
+      findsOneWidget,
+    );
+    await tapVisible(tester, const Key('work-inline-update-details'));
+    expect(
+      find.byKey(const Key('work-correction-instruction')),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Please confirm the shop entrance'),
+      findsOneWidget,
+    );
+    await enter(tester, const Key('work-area'), 'Ratanada, Jodhpur');
+    await tapVisible(tester, const Key('work-details-continue'));
+    await addProof(tester, 'shop-front');
+    await tapVisible(tester, const Key('work-proof-review'));
+    await tapVisible(tester, const Key('work-declaration'));
+    await tapVisible(tester, const Key('work-submit-profile'));
+
+    expect(gateway.correctionCalls, 1);
+    expect(gateway.submissionCalls, 0);
+    expect(work.reviewCaseId, 'WP-CLARIFY-101');
+    expect(work.reviewCorrectionDraft, isFalse);
+    expect(find.byKey(const Key('work-inline-review-status')), findsOneWidget);
+  });
+
+  testWidgets(
+    'rejected Workspace retains its decision and cannot restart submission',
+    (tester) async {
+      final gateway = ReviewWorkGateway();
+      final work = WorkSession(gateway: gateway)
+        ..selectFamily('products-trade')
+        ..selectProfile('retailer-grocery')
+        ..saveDetails(
+          name: 'Mahadev Fresh Mart',
+          area: 'Sardarpura, Jodhpur',
+          activity: 'Grocery retail',
+        )
+        ..reviewCaseId = 'WP-REJECTED-101'
+        ..reviewStage = WorkReviewStage.gstPending
+        ..remoteReviewStatus = WorkRemoteReviewStatus.rejected
+        ..reviewReason = 'The submitted address could not be confirmed.';
+      confirmWorkspaceContacts(work);
+      await mount(
+        tester,
+        route: '/app/work/workspace/proof',
+        workSession: work,
+      );
+
+      expect(find.text('Application not approved'), findsOneWidget);
+      expect(
+        find.text('The submitted address could not be confirmed.'),
+        findsOneWidget,
+      );
+      expect(find.byKey(const Key('work-inline-review-update')), findsNothing);
+      expect(find.byKey(const Key('work-inline-update-details')), findsNothing);
+      expect(work.beginReviewCorrection(), isFalse);
+      work.reviseRejectedProfile();
+      await tester.pumpAndSettle();
+      expect(work.reviewCaseId, 'WP-REJECTED-101');
+      expect(
+        find.text('The submitted address could not be confirmed.'),
+        findsOneWidget,
+      );
+      expect(gateway.submissionCalls, 0);
+      expect(gateway.correctionCalls, 0);
+      expect(work.remoteReviewStatus, WorkRemoteReviewStatus.rejected);
+      expect(
+        find.byKey(const Key('work-inline-review-status')),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets('approved review opens the selected Workspace dashboard', (
+    tester,
+  ) async {
+    final gateway = ReviewWorkGateway();
+    final work = WorkSession(gateway: gateway)
+      ..selectFamily('health')
+      ..selectProfile('clinic')
+      ..saveDetails(
+        name: 'Asha Family Clinic',
+        area: 'Jodhpur',
+        activity: 'Consultations and follow-up',
+      )
+      ..reviewCaseId = 'WP-CLINIC-101'
+      ..reviewStage = WorkReviewStage.gstPending
+      ..remoteReviewStatus = WorkRemoteReviewStatus.pending;
+    confirmWorkspaceContacts(work);
+    await mount(tester, route: '/app/work/workspace/proof', workSession: work);
+
+    expect(find.text('Workspace approved'), findsNothing);
+    expect(find.byKey(const Key('work-inline-review-approved')), findsNothing);
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+    expect(find.text('Your trusted care desk'), findsOneWidget);
+    expect(find.textContaining('Clinic / Doctor'), findsWidgets);
+    expect(find.textContaining('Set up my shop'), findsNothing);
+    expect(find.text('View approved record'), findsOneWidget);
+    await tapVisible(tester, const Key('work-dashboard-add-workspace'));
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('workspace-existing-summary')), findsNothing);
+    expect(work.activeWorkspace?.name, 'Asha Family Clinic');
+    await tapVisible(tester, const Key('work-back'));
+    expect(find.byKey(const Key('work-workspace-dashboard')), findsOneWidget);
+  });
+
+  testWidgets(
+    'restored live retailer opens operations without setup downgrade',
+    (tester) async {
+      final work = WorkSession()
+        ..seedVerifiedWorkspace()
+        ..reviewStage = WorkReviewStage.live
+        ..remoteReviewStatus = WorkRemoteReviewStatus.live
+        ..retailerSetupSaved = false;
+      await mount(
+        tester,
+        route: '/app/work/workspace/dashboard',
+        workSession: work,
+      );
+
+      expect(find.byKey(const Key('work-store-activity-deck')), findsOneWidget);
+      await tapVisible(tester, const Key('work-store-stock'));
+      expect(
+        find.byKey(const Key('work-dashboard-catalogue-screen')),
+        findsOneWidget,
+      );
+      expect(find.text('What would you like to do?'), findsNothing);
+      expect(work.reviewStage, WorkReviewStage.live);
+    },
+  );
+
+  testWidgets('every approved profile receives a purposeful dashboard', (
+    tester,
+  ) async {
+    const familySignal = <String, String>{
+      'products-trade': 'Catalogue',
+      'food-business': 'Menu',
+      'health': 'Appointments',
+      'services': 'Services',
+      'travel': 'Trips and routes',
+      'delivery': 'Assignments',
+      'create-work': 'Opportunities',
+    };
+    for (final profile in workProfiles) {
+      final work = WorkSession()
+        ..selectFamily(profile.familyId)
+        ..selectProfile(profile.id)
+        ..saveDetails(
+          name: '${profile.label} Workspace',
+          area: 'Jodhpur',
+          activity: profile.label,
+        )
+        ..reviewCaseId = 'WP-${profile.id}'
+        ..workspaceId = 'WK-${profile.id}'
+        ..reviewStage = WorkReviewStage.approved
+        ..remoteReviewStatus = WorkRemoteReviewStatus.approved
+        ..activeWorkspace = WorkWorkspace(
+          id: 'WK-${profile.id}',
+          name: '${profile.label} Workspace',
+          profileLabel: profile.label,
+          area: 'Jodhpur',
+          verified: true,
+        );
+      confirmWorkspaceContacts(work);
+      await mount(tester, route: '/app/work/my-work', workSession: work);
+
+      expect(
+        find.byKey(const Key('work-workspace-dashboard')),
+        findsOneWidget,
+        reason: profile.id,
+      );
+      final retailer = const {
+        'retailer-grocery',
+        'retailer-speciality',
+      }.contains(profile.id);
+      if (!retailer) {
+        expect(
+          find.textContaining(profile.label),
+          findsWidgets,
+          reason: profile.id,
+        );
+      }
+      expect(
+        find.text(retailer ? 'Stock' : familySignal[profile.familyId]!),
+        findsOneWidget,
+        reason: profile.id,
+      );
+      final accountState = find.byKey(
+        const Key('work-dashboard-account-state'),
+      );
+      if (retailer) {
+        expect(accountState, findsNothing, reason: profile.id);
+        expect(
+          find
+                  .byKey(const Key('work-store-activity-deck'))
+                  .evaluate()
+                  .isNotEmpty ||
+              find
+                  .byKey(const Key('work-activity-setup'))
+                  .evaluate()
+                  .isNotEmpty,
+          isTrue,
+          reason: profile.id,
+        );
+        expect(
+          find.byKey(const Key('work-dashboard-settings')),
+          findsOneWidget,
+          reason: profile.id,
+        );
+      } else {
+        await tester.scrollUntilVisible(
+          accountState,
+          260,
+          scrollable: find
+              .descendant(
+                of: find.byKey(const Key('work-workspace-dashboard')),
+                matching: find.byType(Scrollable),
+              )
+              .first,
+        );
+        expect(accountState, findsOneWidget, reason: profile.id);
+      }
+      expect(find.textContaining('Set up my shop'), findsNothing);
+    }
   });
 
   testWidgets('Work remains usable on compact width with larger text', (
@@ -530,9 +1795,9 @@ void main() {
 
     await mount(tester, route: '/app/work/earn', size: const Size(360, 800));
     for (final key in const [
-      Key('work-refresh-feed'),
       Key('work-search'),
-      Key('work-filter-forYou'),
+      Key('work-filter-button'),
+      Key('work-opportunity-apply-quick-delivery-biker'),
       Key('mool-compact-launcher'),
     ]) {
       final finder = find.byKey(key);
@@ -568,7 +1833,8 @@ void main() {
     expect(find.byKey(const Key('work-local-workspace')), findsOneWidget);
     expect(find.byKey(const Key('mool-root-chat')), findsNothing);
     await tapVisible(tester, const Key('work-local-workspace'));
-    expect(find.byKey(const Key('my-work-screen')), findsOneWidget);
+    expect(find.byKey(const Key('work-choose-screen')), findsOneWidget);
+    expect(find.byKey(const Key('my-work-screen')), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

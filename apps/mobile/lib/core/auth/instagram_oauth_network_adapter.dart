@@ -68,6 +68,7 @@ bool _isValidInstagramAuthorizationUri(
       uri.hasFragment ||
       !_hasExactInstagramQueryKeys(uri.queryParametersAll, {
         'response_type',
+        'force_reauth',
         'client_id',
         'redirect_uri',
         'scope',
@@ -76,11 +77,13 @@ bool _isValidInstagramAuthorizationUri(
     return false;
   }
   final responseType = _singleInstagramQueryValue(uri, 'response_type');
+  final forceReauth = _singleInstagramQueryValue(uri, 'force_reauth');
   final clientId = _singleInstagramQueryValue(uri, 'client_id');
   final redirectUri = _singleInstagramQueryValue(uri, 'redirect_uri');
   final scope = _singleInstagramQueryValue(uri, 'scope');
   final state = _singleInstagramQueryValue(uri, 'state');
   return responseType == 'code' &&
+      forceReauth == 'true' &&
       clientId != null &&
       clientId.isNotEmpty &&
       clientId.length <= 256 &&
