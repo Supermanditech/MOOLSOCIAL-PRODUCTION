@@ -1,0 +1,2477 @@
+{
+  "worktrees": [
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-PRODUCTION",
+      "branch": "refs/heads/remediation/prototype-conformance-2026-07-20",
+      "head": "6192baec29eebb23ca374c5213bc1ef22396a5d6",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-android-share-contract-fix-v1-20260905",
+      "branch": "refs/heads/work/codex-ui/android-share-contract-fix-v1-20260905",
+      "head": "8aa20c6de70535b280241f9c317c9e477e9878bf",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-buy-contextual-chat-v1-20260904",
+      "branch": "refs/heads/work/codex-ui/buy-contextual-chat-v1-20260904",
+      "head": "30b9b8c7eb92b7ee688a40550a438175bb522e08",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-buy-external-share-return-v1-20260904",
+      "branch": "refs/heads/work/codex-ui/buy-external-share-return-v1-20260904",
+      "head": "477a0084f1264231e69cb54a4eaab6358f6bdd14",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-care-medicine-alias-fix-v1-20260905",
+      "branch": "refs/heads/work/codex-ui/care-medicine-alias-fix-v1-20260905",
+      "head": "3ccc62edf3489b96a05ee1d6eb9c60fcea3d77a2",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-care-medicine-routing-v1-20260905",
+      "branch": "refs/heads/work/codex-ui/care-medicine-routing-v1-20260905",
+      "head": "55df304f951b770c45b197a02f0918c41b34497e",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-chat-commerce-identity-fix-v1-20260905",
+      "branch": "refs/heads/work/codex-ui/chat-commerce-identity-fix-v1-20260905",
+      "head": "268ac8ddca6bb2c45d74693205bd18c9dca60177",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912",
+      "branch": "refs/heads/work/codex-ui/store-procurement-bridge-20260912",
+      "head": "54eae4970959d39cb978cd01082be828625721f9",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-universal-c20e-test-contract-v1-20260904",
+      "branch": "refs/heads/work/codex-ui/universal-c20e-test-contract-v1-20260904",
+      "head": "009b37210f9ec7795d8f9915417ff8a20842d630",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-work-earn-payment-fit-v1-20260905",
+      "branch": "refs/heads/work/codex-ui/work-earn-payment-fit-v1-20260905",
+      "head": "f4658311d6a8000d680205b1a6043ee4e723cca5",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-youtube-backend-contract-repair-20260824",
+      "branch": "refs/heads/work/codex-auth/youtube-backend-contract-repair-20260824",
+      "head": "6192baec29eebb23ca374c5213bc1ef22396a5d6",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-card-overflow-v1-20260905",
+      "branch": "refs/heads/work/cursor-ui/buy-card-overflow-v1-20260905",
+      "head": "e2dd3bc706065fbc08d9c526c48e24374cd32e6e",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-buy-redmi-uat-v1-20260905",
+      "branch": "refs/heads/work/cursor-ui/buy-redmi-uat-v1-20260905",
+      "head": "a09a2ecccf1e701a60117bdf34aa6a732cb132e2",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913",
+      "branch": "refs/heads/work/cursor-ui/redmi-v6-audit-20260913",
+      "head": "e5d39769e260c1a6691ea7808642308472261a97",
+      "changes": [
+        "M apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"
+      ],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-shop-chat-v1-child9-20260829",
+      "branch": "refs/heads/work/cursor-ui/shop-chat-v1-child9-20260829",
+      "head": "5e0d7644f77bd86d8cbced2298f93d50fb57a3f6",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-post-integration-ui-v1-20260905",
+      "branch": "refs/heads/work/integration-repair/post-integration-ui-v1-20260905",
+      "head": "1fbf9665068e55b025617714b2a944db2b43ecda",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-shop-chat-shared-v1-20260829",
+      "branch": "refs/heads/work/integration-repair/shop-chat-shared-v1-20260829",
+      "head": "bdfd72e7a654b80687d3abcee9203c10da896db0",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-20260912",
+      "branch": "refs/heads/work/integration-repair/store-buy-20260912",
+      "head": "fb300e169e1f3bdf84052d9cc05a6d311aa51132",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-20260825",
+      "branch": "refs/heads/integration/moolsocial/social-runtime-chat-20260825",
+      "head": "792ad84b2a033a489add056b3e21620b142e9dcc",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-social-runtime-chat-v2-20260825",
+      "branch": "refs/heads/integration/moolsocial/social-runtime-chat-v2-20260825",
+      "head": "58a8375d25e0f9777b6c62c49a10da144c3e4cff",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-20260912",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-20260912",
+      "head": "fe6cb7028beaadedd50b857c83fbe1ffb4c86a82",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v12-20260913",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v12-20260913",
+      "head": "c6cfc1693f1f229a3eaf79b158b2e5eb4fb65dd2",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v13-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v13-20260914",
+      "head": "f564028a062b6df0e7133c3e59f43b32027ec897",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v14-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v14-20260914",
+      "head": "fae46d913c3d9c4cebcd872d5ae8b77491692af1",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v15-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v15-20260914",
+      "head": "202fcd1890551fef17cae49e60e73034935262c8",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v16-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v16-20260914",
+      "head": "cb4423bd481df15e2ef430991e94cf31a6ac4cef",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v17-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v17-20260914",
+      "head": "8ce155ace32def91e2c86c26cec319f5d8f155f1",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v18-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v18-20260914",
+      "head": "ed8085e4b9aaf6a5c3a7fcff4656796be57a55de",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v19-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v19-20260914",
+      "head": "7bb89a10585859cf7288d39db1dd6815a9e5ce45",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v2-20260912",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v2-20260912",
+      "head": "d7ffaf6756122d97cb5e4c804a21eaf119ef74fb",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v20-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v20-20260914",
+      "head": "107c33b3bb25d908ef960c2e193192894ddc265a",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v21-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v21-20260914",
+      "head": "671a50c13038fa5eb259d5bd3b27938e7baca8ea",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v22-20260914",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v22-20260914",
+      "head": "e257e0db45845080192891b2621bfaead69728db",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v23-20260915",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v23-20260915",
+      "head": "defc4b168391d610b5877181ae42e1dcdf62b589",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v24-20260915",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v24-20260915",
+      "head": "049c0f1346d1ed565145cf223c3e236982b2d03e",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v25-20260915",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v25-20260915",
+      "head": "dcf85f9094ede24509658a49800902cb0fb4952a",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v26-20260915",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v26-20260915",
+      "head": "48d1ddf46c946b783489cd361b91fbd69104ae09",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v29-20260916",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v29-20260916",
+      "head": "210f80fb3d3b32c94f4035f77d49b3d3fd5eb46e",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v3-20260912",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v3-20260912",
+      "head": "d174a64016baebf09b10e2d70365f52746267cbf",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v31-20260916",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v31-20260916",
+      "head": "21977bff27cf22bfadb50f592a635355bb80574e",
+      "changes": [],
+      "remoteExact": true
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v5-20260912",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v5-20260912",
+      "head": "1a33cbc36beed5d6615acb7d7b10a24d4c7789bf",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-final-v7-20260913",
+      "branch": "refs/heads/integration/moolsocial/store-buy-final-v7-20260913",
+      "head": "4e8c1fa8862b9556ade0fb9c1aadbeab8dfbb48a",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-post-ui-v1-20260905",
+      "branch": "refs/heads/integration/moolsocial/work-store-buy-post-ui-v1-20260905",
+      "head": "fd0786f15a3ad1b80508ca054c302809d16a8a7f",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v3-20260904",
+      "branch": "refs/heads/integration/moolsocial/work-store-buy-v3-20260904",
+      "head": "25bb984bb3eaf620036829ae7c0790cb04cb44ca",
+      "changes": [],
+      "remoteExact": false
+    },
+    {
+      "path": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v4-20260904",
+      "branch": "refs/heads/integration/moolsocial/work-store-buy-v4-20260904",
+      "head": "f94cfd4752dd73b58a69568475803d6cf25cb8d0",
+      "changes": [],
+      "remoteExact": true
+    }
+  ],
+  "branches": [
+    {
+      "ref": "refs/heads/archive/counter-v31-prefix-20260916",
+      "sha": "50c68459d6c2481093b3bec7490253e84301b53a",
+      "remoteExact": true,
+      "remoteSha": "50c68459d6c2481093b3bec7490253e84301b53a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/buy-b01-t01-20260826",
+      "sha": "73b96eb82f10827d0f10fdcf5e32ff21e3402c90",
+      "remoteExact": true,
+      "remoteSha": "73b96eb82f10827d0f10fdcf5e32ff21e3402c90",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/buy-cursor-gst-fixes-20260827",
+      "sha": "071e6820e812843944a7908fcc977939da92cf60",
+      "remoteExact": true,
+      "remoteSha": "071e6820e812843944a7908fcc977939da92cf60",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/buy-shared-baseline-v1-20260827",
+      "sha": "ee430fa893e2ce6cfea6791fd8ea197c8d7b615b",
+      "remoteExact": true,
+      "remoteSha": "ee430fa893e2ce6cfea6791fd8ea197c8d7b615b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/chat-codex-cursor-v1-20260829",
+      "sha": "0c82b80614b25654faf921ab8d7f51c483a7987c",
+      "remoteExact": true,
+      "remoteSha": "0c82b80614b25654faf921ab8d7f51c483a7987c",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/codex-r6197-cursor-r6179-v1-20260831",
+      "sha": "ae021c0d711c2ff6bebcc9fe0ee664a8f0a9e235",
+      "remoteExact": true,
+      "remoteSha": "ae021c0d711c2ff6bebcc9fe0ee664a8f0a9e235",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/global-personal-profile-v1-20260827",
+      "sha": "aafd66716f067cf9a7bd034fc2a424ca78384978",
+      "remoteExact": true,
+      "remoteSha": "aafd66716f067cf9a7bd034fc2a424ca78384978",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/reconciled-debug-baseline-v7-20260828",
+      "sha": "369bb45599366de8a8d95a9f0824c8cb961d0692",
+      "remoteExact": true,
+      "remoteSha": "369bb45599366de8a8d95a9f0824c8cb961d0692",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/retailer-onboarding-v1-20260827",
+      "sha": "4426ff8a1d3b3616c99019e4e53841df8809d890",
+      "remoteExact": true,
+      "remoteSha": "4426ff8a1d3b3616c99019e4e53841df8809d890",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/shop-product-experience-r629-v1-20260901",
+      "sha": "21118db8c061b085fe60ac419d52ee0fd83fcde2",
+      "remoteExact": true,
+      "remoteSha": "21118db8c061b085fe60ac419d52ee0fd83fcde2",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/social-runtime-chat-20260825",
+      "sha": "792ad84b2a033a489add056b3e21620b142e9dcc",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/social-runtime-chat-v2-20260825",
+      "sha": "58a8375d25e0f9777b6c62c49a10da144c3e4cff",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/social-runtime-chat-v3-20260826",
+      "sha": "bbe1ef2bd95fc534f0dba093b71477adeb158c22",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/social-runtime-chat-v4-20260826",
+      "sha": "0a40f68dc7697ae226aef469604761fa8b3d1301",
+      "remoteExact": true,
+      "remoteSha": "0a40f68dc7697ae226aef469604761fa8b3d1301",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/social-runtime-share-v5-20260826",
+      "sha": "4768eb11890c4db065fb357d161021f783b3472f",
+      "remoteExact": true,
+      "remoteSha": "4768eb11890c4db065fb357d161021f783b3472f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-20260912",
+      "sha": "fe6cb7028beaadedd50b857c83fbe1ffb4c86a82",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v10-20260913",
+      "sha": "fe6b1c5d87d14ee32e1c7dc17cdc369f02033751",
+      "remoteExact": true,
+      "remoteSha": "fe6b1c5d87d14ee32e1c7dc17cdc369f02033751",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v11-20260913",
+      "sha": "2e67debd69403e055b1d7bed2f3a3bd45340ddd0",
+      "remoteExact": true,
+      "remoteSha": "2e67debd69403e055b1d7bed2f3a3bd45340ddd0",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v12-20260913",
+      "sha": "c6cfc1693f1f229a3eaf79b158b2e5eb4fb65dd2",
+      "remoteExact": true,
+      "remoteSha": "c6cfc1693f1f229a3eaf79b158b2e5eb4fb65dd2",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v13-20260914",
+      "sha": "f564028a062b6df0e7133c3e59f43b32027ec897",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v14-20260914",
+      "sha": "fae46d913c3d9c4cebcd872d5ae8b77491692af1",
+      "remoteExact": true,
+      "remoteSha": "fae46d913c3d9c4cebcd872d5ae8b77491692af1",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v15-20260914",
+      "sha": "202fcd1890551fef17cae49e60e73034935262c8",
+      "remoteExact": true,
+      "remoteSha": "202fcd1890551fef17cae49e60e73034935262c8",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v16-20260914",
+      "sha": "cb4423bd481df15e2ef430991e94cf31a6ac4cef",
+      "remoteExact": true,
+      "remoteSha": "cb4423bd481df15e2ef430991e94cf31a6ac4cef",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v17-20260914",
+      "sha": "8ce155ace32def91e2c86c26cec319f5d8f155f1",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v18-20260914",
+      "sha": "ed8085e4b9aaf6a5c3a7fcff4656796be57a55de",
+      "remoteExact": true,
+      "remoteSha": "ed8085e4b9aaf6a5c3a7fcff4656796be57a55de",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v19-20260914",
+      "sha": "7bb89a10585859cf7288d39db1dd6815a9e5ce45",
+      "remoteExact": true,
+      "remoteSha": "7bb89a10585859cf7288d39db1dd6815a9e5ce45",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v2-20260912",
+      "sha": "d7ffaf6756122d97cb5e4c804a21eaf119ef74fb",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v20-20260914",
+      "sha": "107c33b3bb25d908ef960c2e193192894ddc265a",
+      "remoteExact": true,
+      "remoteSha": "107c33b3bb25d908ef960c2e193192894ddc265a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v21-20260914",
+      "sha": "671a50c13038fa5eb259d5bd3b27938e7baca8ea",
+      "remoteExact": true,
+      "remoteSha": "671a50c13038fa5eb259d5bd3b27938e7baca8ea",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v22-20260914",
+      "sha": "e257e0db45845080192891b2621bfaead69728db",
+      "remoteExact": true,
+      "remoteSha": "e257e0db45845080192891b2621bfaead69728db",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v23-20260915",
+      "sha": "defc4b168391d610b5877181ae42e1dcdf62b589",
+      "remoteExact": true,
+      "remoteSha": "defc4b168391d610b5877181ae42e1dcdf62b589",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v24-20260915",
+      "sha": "049c0f1346d1ed565145cf223c3e236982b2d03e",
+      "remoteExact": true,
+      "remoteSha": "049c0f1346d1ed565145cf223c3e236982b2d03e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v25-20260915",
+      "sha": "dcf85f9094ede24509658a49800902cb0fb4952a",
+      "remoteExact": true,
+      "remoteSha": "dcf85f9094ede24509658a49800902cb0fb4952a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v26-20260915",
+      "sha": "48d1ddf46c946b783489cd361b91fbd69104ae09",
+      "remoteExact": true,
+      "remoteSha": "48d1ddf46c946b783489cd361b91fbd69104ae09",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v27-20260916",
+      "sha": "e7a85e5b9fa4a80e9d969903c3fe7e4166c5a44e",
+      "remoteExact": true,
+      "remoteSha": "e7a85e5b9fa4a80e9d969903c3fe7e4166c5a44e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v28-20260916",
+      "sha": "d8e5f14882bdc2ec0cd78d17a8c914ca4e4c7809",
+      "remoteExact": true,
+      "remoteSha": "d8e5f14882bdc2ec0cd78d17a8c914ca4e4c7809",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v29-20260916",
+      "sha": "210f80fb3d3b32c94f4035f77d49b3d3fd5eb46e",
+      "remoteExact": true,
+      "remoteSha": "210f80fb3d3b32c94f4035f77d49b3d3fd5eb46e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v3-20260912",
+      "sha": "d174a64016baebf09b10e2d70365f52746267cbf",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v30-20260916",
+      "sha": "cebdb74b17b96c92e3093f4206fcb5bedecdf4c6",
+      "remoteExact": true,
+      "remoteSha": "cebdb74b17b96c92e3093f4206fcb5bedecdf4c6",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v31-20260916",
+      "sha": "21977bff27cf22bfadb50f592a635355bb80574e",
+      "remoteExact": true,
+      "remoteSha": "21977bff27cf22bfadb50f592a635355bb80574e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v4-20260912",
+      "sha": "f6cb6eda9c3cfde3baf881197154d6572f309a88",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v5-20260912",
+      "sha": "1a33cbc36beed5d6615acb7d7b10a24d4c7789bf",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v6-20260912",
+      "sha": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+      "remoteExact": true,
+      "remoteSha": "da4d266f97b4081f55bd98f1e9522f25bc8ee05f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v7-20260913",
+      "sha": "4e8c1fa8862b9556ade0fb9c1aadbeab8dfbb48a",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v8-20260913",
+      "sha": "a79c70652e06d5aab154c243e545c0352d6f07ca",
+      "remoteExact": true,
+      "remoteSha": "a79c70652e06d5aab154c243e545c0352d6f07ca",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/store-buy-final-v9-20260913",
+      "sha": "8a302b5f3a2141c0917d2e4c391b363275114520",
+      "remoteExact": true,
+      "remoteSha": "8a302b5f3a2141c0917d2e4c391b363275114520",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/work-main-v1-20260827",
+      "sha": "bf6015cdac88aeed6bccf1cf458064cecdb94973",
+      "remoteExact": true,
+      "remoteSha": "bf6015cdac88aeed6bccf1cf458064cecdb94973",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/work-store-buy-post-ui-v1-20260905",
+      "sha": "fd0786f15a3ad1b80508ca054c302809d16a8a7f",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/work-store-buy-v3-20260904",
+      "sha": "25bb984bb3eaf620036829ae7c0790cb04cb44ca",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/work-store-buy-v4-20260904",
+      "sha": "f94cfd4752dd73b58a69568475803d6cf25cb8d0",
+      "remoteExact": true,
+      "remoteSha": "f94cfd4752dd73b58a69568475803d6cf25cb8d0",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/youtube-api-review-r60-93-20260827",
+      "sha": "4768eb11890c4db065fb357d161021f783b3472f",
+      "remoteExact": true,
+      "remoteSha": "4768eb11890c4db065fb357d161021f783b3472f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/youtube-api-review-r60-94-20260827",
+      "sha": "a9304c5e955679eb54b54e29f82dc6f1b3da69e5",
+      "remoteExact": true,
+      "remoteSha": "a9304c5e955679eb54b54e29f82dc6f1b3da69e5",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/integration/moolsocial/youtube-api-review-r60-95-20260827",
+      "sha": "f2ef92180bc4c9d14683d98664da84a1628f6725",
+      "remoteExact": true,
+      "remoteSha": "f2ef92180bc4c9d14683d98664da84a1628f6725",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/reconcile/codex-cursor/pre-buy-baseline-v1",
+      "sha": "f6dfe7587aa02d782e94282d14af8bafff48ded0",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/review/cursor-ui/buy-next-cycle-r61-72-20260831",
+      "sha": "1aa3beedf574c848a235c7754c64e7900112e73c",
+      "remoteExact": true,
+      "remoteSha": "1aa3beedf574c848a235c7754c64e7900112e73c",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/review/cursor-ui/oppo-live-20260826",
+      "sha": "5802f595fc2d96ce024f1f4e75750c68854a4c9e",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/android-artifact-baseline-20260827",
+      "sha": "f2ef92180bc4c9d14683d98664da84a1628f6725",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/android-debug-package-isolation-20260827",
+      "sha": "649bef384eafe961d3afaa80b65b8adfba7f2dea",
+      "remoteExact": true,
+      "remoteSha": "649bef384eafe961d3afaa80b65b8adfba7f2dea",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/buy-baseline-runtime-debug-oppo-20260827",
+      "sha": "ee430fa893e2ce6cfea6791fd8ea197c8d7b615b",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/cross-agent-incremental-ticket-gate-20260827",
+      "sha": "5068702e580a318265d619f9b9073d2062c89945",
+      "remoteExact": true,
+      "remoteSha": "5068702e580a318265d619f9b9073d2062c89945",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/cursorreview-firebase-runtime-20260827",
+      "sha": "e1f7ad310c2d9ce1107a458cc23e9ad56d8ebdb0",
+      "remoteExact": true,
+      "remoteSha": "e1f7ad310c2d9ce1107a458cc23e9ad56d8ebdb0",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/email-link-auth-20260823",
+      "sha": "84ab8e55414d4b87b3442a3b9631fe058efc6efe",
+      "remoteExact": true,
+      "remoteSha": "84ab8e55414d4b87b3442a3b9631fe058efc6efe",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/facebook-auth-prebuild-20260824",
+      "sha": "2024c25690b81b438c8c08f0081c6b60bd104010",
+      "remoteExact": true,
+      "remoteSha": "2024c25690b81b438c8c08f0081c6b60bd104010",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/incremental-gate-roll-v5-20260827",
+      "sha": "48bc2684459157f754ad4f5634676d68f17668d0",
+      "remoteExact": true,
+      "remoteSha": "48bc2684459157f754ad4f5634676d68f17668d0",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/r60-92-build-state-split-20260826",
+      "sha": "4746632ff8c6d06bfd35e28f33e6252ce6b95063",
+      "remoteExact": true,
+      "remoteSha": "4746632ff8c6d06bfd35e28f33e6252ce6b95063",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/r60-92-runtime-state-split-20260826",
+      "sha": "33c697f67f2435a8b76105b37cff9bd6bc22f12e",
+      "remoteExact": true,
+      "remoteSha": "33c697f67f2435a8b76105b37cff9bd6bc22f12e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/screen02-lock-current-mainactivity-20260827",
+      "sha": "7f5b3e2007ff59ebc837f3c2487237d7716df4d6",
+      "remoteExact": true,
+      "remoteSha": "7f5b3e2007ff59ebc837f3c2487237d7716df4d6",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/shop-v2-protected-candidate-gate-20260828",
+      "sha": "05d0a8c7cf1bd62bcadffb48aa66c4f0a357e6ed",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/shop-v2-r61-5-buy-regression-fix-20260828",
+      "sha": "14fcd6b2be25cd9ebee0ca803606069f49dd74c3",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/shop-v2-r61-5-cursor-review-build-20260828",
+      "sha": "43ab53e35e8cedf0c8d604aa0ee3f60b4a86467e",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/social-protected-v74-gate-fix-20260828",
+      "sha": "17af6df85a6a6987a5995f4ee01eedb0c11dacbe",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/social-runtime-core-20260824",
+      "sha": "922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9",
+      "remoteExact": true,
+      "remoteSha": "922c2a9d776f7de96ba9ec9a7ca6175d1cc2fce9",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/social-runtime-dotenv-exclusion-20260826",
+      "sha": "41d6135f2fc5172ac6be6aec6ba107c642f49177",
+      "remoteExact": true,
+      "remoteSha": "41d6135f2fc5172ac6be6aec6ba107c642f49177",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/social-runtime-executor-r60-92-fix-20260826",
+      "sha": "6a0762688773cdf5f91026c16574881b41167481",
+      "remoteExact": true,
+      "remoteSha": "6a0762688773cdf5f91026c16574881b41167481",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/social-runtime-preactivation-audit-20260826",
+      "sha": "ac5ff1335136c99370b36afacdb2a47ca5ef6aff",
+      "remoteExact": true,
+      "remoteSha": "ac5ff1335136c99370b36afacdb2a47ca5ef6aff",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/social-share-runtime-20260826",
+      "sha": "bf98277acdd6c4e171d3e0466dabdef314b2da76",
+      "remoteExact": true,
+      "remoteSha": "bf98277acdd6c4e171d3e0466dabdef314b2da76",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/v74-buy-protection-brand-gate-fix-20260828",
+      "sha": "b528accb39e87831659db1a9a640e529784af350",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/youtube-backend-contract-repair-20260824",
+      "sha": "6192baec29eebb23ca374c5213bc1ef22396a5d6",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/youtube-connect-prebuild-20260824",
+      "sha": "a9f9f8ab196ff5426f60e4ab09de135c4a49cf2e",
+      "remoteExact": true,
+      "remoteSha": "a9f9f8ab196ff5426f60e4ab09de135c4a49cf2e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-auth/youtube-connect-prebuild-20260824-v2",
+      "sha": "2ca1920dfbe89b7aa33288f943f8882f13b21c3d",
+      "remoteExact": false,
+      "remoteSha": "c2a65ac51ed58174754b9b07f2223583c48500b3",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-backend/shop-mvp-commerce-adapters-v1-20260829",
+      "sha": "b52b6473090ea1060cf64983fd44040a696eb4e3",
+      "remoteExact": true,
+      "remoteSha": "b52b6473090ea1060cf64983fd44040a696eb4e3",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-chat/chat-call-presence-service-v1-20260829",
+      "sha": "b68cbf19b456a8fa3d9608acd54a7dd432d25b67",
+      "remoteExact": true,
+      "remoteSha": "b68cbf19b456a8fa3d9608acd54a7dd432d25b67",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-chat/chat-final-integrated-qualification-v1-20260829",
+      "sha": "cb59c6265b27a2954d59e42ffba0ecb60a9e3001",
+      "remoteExact": true,
+      "remoteSha": "cb59c6265b27a2954d59e42ffba0ecb60a9e3001",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-chat/chat-group-membership-service-v1-20260829",
+      "sha": "8ac00e87299d9f73d868c45c2c0aca62adc510ad",
+      "remoteExact": true,
+      "remoteSha": "8ac00e87299d9f73d868c45c2c0aca62adc510ad",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-chat/chat-media-voice-delivery-v1-20260829",
+      "sha": "2bd1234f6b038f737176adb830fff00f6d89c00c",
+      "remoteExact": true,
+      "remoteSha": "2bd1234f6b038f737176adb830fff00f6d89c00c",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-chat/chat-notifications-quiet-hours-v1-20260829",
+      "sha": "cb59c6265b27a2954d59e42ffba0ecb60a9e3001",
+      "remoteExact": true,
+      "remoteSha": "cb59c6265b27a2954d59e42ffba0ecb60a9e3001",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-chat/chat-privacy-safety-service-v1-20260829",
+      "sha": "6680f0c40264aa4dce330c52c382b70dd5b9ff8d",
+      "remoteExact": true,
+      "remoteSha": "6680f0c40264aa4dce330c52c382b70dd5b9ff8d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-integration/combined-mvp-baseline-v1-20260830",
+      "sha": "d6238c1ba4f299e8ebd8a9fc9b733cfe6c7403cb",
+      "remoteExact": true,
+      "remoteSha": "d6238c1ba4f299e8ebd8a9fc9b733cfe6c7403cb",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-platform/cursorreview-debug-build-profile-20260827",
+      "sha": "dca29015afc6fa122207572b5c7bb0b6e5dc52a4",
+      "remoteExact": true,
+      "remoteSha": "dca29015afc6fa122207572b5c7bb0b6e5dc52a4",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-platform/runtime-debug-build-path-v7-20260828",
+      "sha": "2a4ce30b9811cdbe73669a3b741e90442d99bcef",
+      "remoteExact": true,
+      "remoteSha": "2a4ce30b9811cdbe73669a3b741e90442d99bcef",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/android-share-contract-fix-v1-20260905",
+      "sha": "8aa20c6de70535b280241f9c317c9e477e9878bf",
+      "remoteExact": true,
+      "remoteSha": "8aa20c6de70535b280241f9c317c9e477e9878bf",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/buy-contextual-chat-v1-20260904",
+      "sha": "30b9b8c7eb92b7ee688a40550a438175bb522e08",
+      "remoteExact": true,
+      "remoteSha": "30b9b8c7eb92b7ee688a40550a438175bb522e08",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/buy-dependency-metadata-v1-20260904",
+      "sha": "8617c10b8e813e3fca392fcf53a71017ffb953d2",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/buy-external-share-return-v1-20260904",
+      "sha": "477a0084f1264231e69cb54a4eaab6358f6bdd14",
+      "remoteExact": true,
+      "remoteSha": "477a0084f1264231e69cb54a4eaab6358f6bdd14",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/buy-global-chat-profile-standardization-v1-20260829",
+      "sha": "9dc34de2f5f6ed2b2ad8998442c935136e2a962f",
+      "remoteExact": true,
+      "remoteSha": "9dc34de2f5f6ed2b2ad8998442c935136e2a962f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/care-medicine-alias-fix-v1-20260905",
+      "sha": "3ccc62edf3489b96a05ee1d6eb9c60fcea3d77a2",
+      "remoteExact": true,
+      "remoteSha": "3ccc62edf3489b96a05ee1d6eb9c60fcea3d77a2",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/care-medicine-routing-v1-20260905",
+      "sha": "55df304f951b770c45b197a02f0918c41b34497e",
+      "remoteExact": true,
+      "remoteSha": "55df304f951b770c45b197a02f0918c41b34497e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-commerce-identity-fix-v1-20260905",
+      "sha": "268ac8ddca6bb2c45d74693205bd18c9dca60177",
+      "remoteExact": true,
+      "remoteSha": "268ac8ddca6bb2c45d74693205bd18c9dca60177",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-conversation-search-v1-20260829",
+      "sha": "82205f9d4eef33213e685eec2a8e4cf0f01084b5",
+      "remoteExact": true,
+      "remoteSha": "82205f9d4eef33213e685eec2a8e4cf0f01084b5",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-draft-continuity-v1-20260829",
+      "sha": "a99028620085f13571f4f0da29308bcf93ad8391",
+      "remoteExact": true,
+      "remoteSha": "a99028620085f13571f4f0da29308bcf93ad8391",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-final-intent-matrix-v1-20260829",
+      "sha": "e7898a33afcfc63773533732f61fcc1ff78d0416",
+      "remoteExact": true,
+      "remoteSha": "e7898a33afcfc63773533732f61fcc1ff78d0416",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-global-nonbuy-micro-audit-v1-20260829",
+      "sha": "9ea0a72fe42e7e5fbf59a4325cfa3cca84adc719",
+      "remoteExact": true,
+      "remoteSha": "9ea0a72fe42e7e5fbf59a4325cfa3cca84adc719",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-global-settings-hub-v1-20260829",
+      "sha": "11b007c2ec0d3eca27b9eeabd3906423b8fbc619",
+      "remoteExact": true,
+      "remoteSha": "11b007c2ec0d3eca27b9eeabd3906423b8fbc619",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-group-info-v1-20260829",
+      "sha": "affa0832e640304fb2fd0e171589cb98681a3eed",
+      "remoteExact": true,
+      "remoteSha": "affa0832e640304fb2fd0e171589cb98681a3eed",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-inbox-controls-v1-20260829",
+      "sha": "ca35a3c7cdd8ca4e8a38ac83515eae8f57588e87",
+      "remoteExact": true,
+      "remoteSha": "ca35a3c7cdd8ca4e8a38ac83515eae8f57588e87",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-message-controls-v1-20260829",
+      "sha": "55ff08099cfa791af14085bdbbf4d08dd8d532e0",
+      "remoteExact": true,
+      "remoteSha": "55ff08099cfa791af14085bdbbf4d08dd8d532e0",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-shared-content-v1-20260829",
+      "sha": "92eed92ab1ba342d39428069311d40840ac89830",
+      "remoteExact": true,
+      "remoteSha": "92eed92ab1ba342d39428069311d40840ac89830",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-shell-impl-v1-20260829",
+      "sha": "30f4614574aae3c315d586944636a35ba314873d",
+      "remoteExact": true,
+      "remoteSha": "30f4614574aae3c315d586944636a35ba314873d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/chat-wellbeing-send-review-v1-20260829",
+      "sha": "bc86e93529685466db21576323395aeb753e014a",
+      "remoteExact": true,
+      "remoteSha": "bc86e93529685466db21576323395aeb753e014a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/codex-oppo-review-v1-20260905",
+      "sha": "2a860f9f9fd793d4f366c5952f4f8eb05326f58b",
+      "remoteExact": true,
+      "remoteSha": "2a860f9f9fd793d4f366c5952f4f8eb05326f58b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-contextual-chat-shell-v1-20260828",
+      "sha": "def65feec3d7248ca2c8f0a5d215e7572768c905",
+      "remoteExact": true,
+      "remoteSha": "def65feec3d7248ca2c8f0a5d215e7572768c905",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-contextual-chat-shell-v1-implementation-20260829",
+      "sha": "30f4614574aae3c315d586944636a35ba314873d",
+      "remoteExact": true,
+      "remoteSha": "30f4614574aae3c315d586944636a35ba314873d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-help-origin-return-v1-20260828",
+      "sha": "5f101823b349896fca810f60a3dd539d353ba30a",
+      "remoteExact": true,
+      "remoteSha": "5f101823b349896fca810f60a3dd539d353ba30a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-help-support-v1-20260828",
+      "sha": "50e81663a7d8dfe686df57ce81e72a990792d13b",
+      "remoteExact": true,
+      "remoteSha": "50e81663a7d8dfe686df57ce81e72a990792d13b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-help-topic-return-continuity-v1-20260828",
+      "sha": "66979db4ada6e70bfd9f5138100bf3bc88feee01",
+      "remoteExact": true,
+      "remoteSha": "66979db4ada6e70bfd9f5138100bf3bc88feee01",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-interaction-feedback-v1-20260828",
+      "sha": "4989fa669abe50bbf843a47630c32dc4e8612b9b",
+      "remoteExact": true,
+      "remoteSha": "4989fa669abe50bbf843a47630c32dc4e8612b9b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-native-back-control-v1-20260828",
+      "sha": "e253f20e59b11265f0c3853157c4a57c91a43056",
+      "remoteExact": true,
+      "remoteSha": "e253f20e59b11265f0c3853157c4a57c91a43056",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-personal-profile-20260827",
+      "sha": "13574deb716accb29992857f310acfc81c52477f",
+      "remoteExact": true,
+      "remoteSha": "13574deb716accb29992857f310acfc81c52477f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-personal-profile-return-v1-20260828",
+      "sha": "de887ad47a4f72bbffac2f62425f2b33d8650a36",
+      "remoteExact": true,
+      "remoteSha": "de887ad47a4f72bbffac2f62425f2b33d8650a36",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-personal-profile-v2-20260827",
+      "sha": "728371b33ef08f9f8a7cb60d57fe9abedcdc4971",
+      "remoteExact": true,
+      "remoteSha": "728371b33ef08f9f8a7cb60d57fe9abedcdc4971",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-privacy-preferences-v1-20260828",
+      "sha": "ee2b175b07db5fe33a9ee07bce1d5d7fd5ac48ab",
+      "remoteExact": true,
+      "remoteSha": "ee2b175b07db5fe33a9ee07bce1d5d7fd5ac48ab",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-care-context-v1-20260828",
+      "sha": "07a741ada8002c0c3705c7a00dfb478cbba50084",
+      "remoteExact": true,
+      "remoteSha": "07a741ada8002c0c3705c7a00dfb478cbba50084",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-food-context-v1-20260828",
+      "sha": "452615675c2db5571a0072c7e1dddd2bf933f1e9",
+      "remoteExact": true,
+      "remoteSha": "452615675c2db5571a0072c7e1dddd2bf933f1e9",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-language-fitment-v1-20260828",
+      "sha": "fbcfa74ac06c4ba652cc085474b28c51599d3ba3",
+      "remoteExact": true,
+      "remoteSha": "fbcfa74ac06c4ba652cc085474b28c51599d3ba3",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-native-back-control-v1-20260828",
+      "sha": "e3ae8a4713eaf67b4e504282d6d9bfec995db8e0",
+      "remoteExact": true,
+      "remoteSha": "e3ae8a4713eaf67b4e504282d6d9bfec995db8e0",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-origin-return-v1-20260828",
+      "sha": "3a699f1bb487329621aa374489745301adeb5ccf",
+      "remoteExact": true,
+      "remoteSha": "3a699f1bb487329621aa374489745301adeb5ccf",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-remove-help-entry-v1-20260828",
+      "sha": "3c4efcb5e5efa1cb1c89af06d3ddeece0ccf977f",
+      "remoteExact": true,
+      "remoteSha": "3c4efcb5e5efa1cb1c89af06d3ddeece0ccf977f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-service-area-fitment-v1-20260828",
+      "sha": "9bc2ba0428a400364db349269ffbae9793330a8e",
+      "remoteExact": true,
+      "remoteSha": "9bc2ba0428a400364db349269ffbae9793330a8e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-travel-context-v1-20260828",
+      "sha": "f1ee346a7b32e111587519b6dcb6dc0e7e17ce6a",
+      "remoteExact": true,
+      "remoteSha": "f1ee346a7b32e111587519b6dcb6dc0e7e17ce6a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-profile-work-context-v1-20260828",
+      "sha": "22f3e2dba016f176325aadd17ea68e42da3b8b43",
+      "remoteExact": true,
+      "remoteSha": "22f3e2dba016f176325aadd17ea68e42da3b8b43",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-security-origin-return-v1-20260828",
+      "sha": "fd6b174c29c0f4c83773d35e7ff4283bb900ab24",
+      "remoteExact": true,
+      "remoteSha": "fd6b174c29c0f4c83773d35e7ff4283bb900ab24",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-security-sign-in-continuity-v1-20260828",
+      "sha": "5cce6a55663aadbd96f5829cc898a20a00b541d7",
+      "remoteExact": true,
+      "remoteSha": "5cce6a55663aadbd96f5829cc898a20a00b541d7",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/global-security-v1-20260828",
+      "sha": "49f304cd7585c35cd2083d53f382fd19586ffbf2",
+      "remoteExact": true,
+      "remoteSha": "49f304cd7585c35cd2083d53f382fd19586ffbf2",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/oppo-defect-cycle-r61-50-v1-20260830",
+      "sha": "4eb6fc2e57f647bea65f99cdd0a0dfdb6dbcb356",
+      "remoteExact": true,
+      "remoteSha": "4eb6fc2e57f647bea65f99cdd0a0dfdb6dbcb356",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/phase1-post-r6167-v1-20260831",
+      "sha": "aaf5444713e2f5aa3952c5e66ce3199d3725c2f9",
+      "remoteExact": true,
+      "remoteSha": "aaf5444713e2f5aa3952c5e66ce3199d3725c2f9",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/retailer-workspace-onboarding-20260827",
+      "sha": "4a7ef49bc1abdaa44d88136641090801cab0c28a",
+      "remoteExact": true,
+      "remoteSha": "4a7ef49bc1abdaa44d88136641090801cab0c28a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/shop-product-experience-correction-v1-20260901",
+      "sha": "78ed25a5ff48a4b75686a61630bfdaca02f2d173",
+      "remoteExact": true,
+      "remoteSha": "78ed25a5ff48a4b75686a61630bfdaca02f2d173",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/social-create-composer-contextual-layout-v1-20260831",
+      "sha": "3461c9af55f43a7469ad4c0fb10240ac0ffcdf3e",
+      "remoteExact": true,
+      "remoteSha": "3461c9af55f43a7469ad4c0fb10240ac0ffcdf3e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/store-buy-contract-followup-20260912",
+      "sha": "35b97857f3635c01aa283635fda32ad43c608a1e",
+      "remoteExact": true,
+      "remoteSha": "35b97857f3635c01aa283635fda32ad43c608a1e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/store-procurement-bridge-20260912",
+      "sha": "54eae4970959d39cb978cd01082be828625721f9",
+      "remoteExact": true,
+      "remoteSha": "54eae4970959d39cb978cd01082be828625721f9",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/universal-c20e-test-contract-v1-20260904",
+      "sha": "009b37210f9ec7795d8f9915417ff8a20842d630",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/universal-c20e-test-contract-v2-20260904",
+      "sha": "300f4247165a097d82624f4b40c9c2d611c7bc48",
+      "remoteExact": true,
+      "remoteSha": "300f4247165a097d82624f4b40c9c2d611c7bc48",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/universal-chat-boundary-contract-v1-20260904",
+      "sha": "f208fbef80303ad3c6b1bf41a385616adcc969b5",
+      "remoteExact": true,
+      "remoteSha": "f208fbef80303ad3c6b1bf41a385616adcc969b5",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/universal-global-profile-entry-20260827",
+      "sha": "0d31ff598103b836af4d1e672dbe005cb4cd06db",
+      "remoteExact": true,
+      "remoteSha": "0d31ff598103b836af4d1e672dbe005cb4cd06db",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/work-core-controls-v1-20260902",
+      "sha": "b758c5f6771a0c8e39d127c6de1ef76809e37049",
+      "remoteExact": true,
+      "remoteSha": "b758c5f6771a0c8e39d127c6de1ef76809e37049",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/work-earn-payment-fit-v1-20260905",
+      "sha": "f4658311d6a8000d680205b1a6043ee4e723cca5",
+      "remoteExact": true,
+      "remoteSha": "f4658311d6a8000d680205b1a6043ee4e723cca5",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/work-main-landing-shell-20260827",
+      "sha": "4494f5ce8f81cba710ea548e169c88ede272b0a8",
+      "remoteExact": true,
+      "remoteSha": "4494f5ce8f81cba710ea548e169c88ede272b0a8",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/work-opportunity-route-contract-v1-20260905",
+      "sha": "1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d",
+      "remoteExact": true,
+      "remoteSha": "1f3c91d07af1b4487d9b4039f13d3fd5cefeea7d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/work-store-live-v1-20260903",
+      "sha": "aa335eb1497d77c859e7d34b549716350612c5c8",
+      "remoteExact": true,
+      "remoteSha": "aa335eb1497d77c859e7d34b549716350612c5c8",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/work-uiux-codex-lane-v1-20260901",
+      "sha": "38e6841b8d67232229509c9267aafb5daf74ad58",
+      "remoteExact": true,
+      "remoteSha": "38e6841b8d67232229509c9267aafb5daf74ad58",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-ui/workspace-profile-destination-v1-20260828",
+      "sha": "22f3e2dba016f176325aadd17ea68e42da3b8b43",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-workspace/business-identification-v1-20260829",
+      "sha": "70e413e53efb6daddb01413020a76cbd42b2b1d3",
+      "remoteExact": true,
+      "remoteSha": "70e413e53efb6daddb01413020a76cbd42b2b1d3",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-workspace/retailer-catalogue-availability-v1-20260829",
+      "sha": "ae0e6d3e0b563bf2c4a2a706aaeae5ebe21fa3a2",
+      "remoteExact": true,
+      "remoteSha": "ae0e6d3e0b563bf2c4a2a706aaeae5ebe21fa3a2",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-workspace/retailer-onboarding-documents-v1-20260829",
+      "sha": "8738899b8dee58592e0605105c34757aca5d336e",
+      "remoteExact": true,
+      "remoteSha": "8738899b8dee58592e0605105c34757aca5d336e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/codex-workspace/retailer-order-lifecycle-v1-20260829",
+      "sha": "62fb05c4cf4e27dc47e1a1eb4d0db69672f183ce",
+      "remoteExact": true,
+      "remoteSha": "62fb05c4cf4e27dc47e1a1eb4d0db69672f183ce",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-b01-t01-20260826",
+      "sha": "c37bb3d7f6a6182f142aaad0669066b065c79911",
+      "remoteExact": true,
+      "remoteSha": "c37bb3d7f6a6182f142aaad0669066b065c79911",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-b01-t01-v2-20260826",
+      "sha": "73b96eb82f10827d0f10fdcf5e32ff21e3402c90",
+      "remoteExact": true,
+      "remoteSha": "73b96eb82f10827d0f10fdcf5e32ff21e3402c90",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-b01-t01a-r60-91-20260826",
+      "sha": "54eed61079af8b6ac9102316239b8eae8c82eb19",
+      "remoteExact": true,
+      "remoteSha": "54eed61079af8b6ac9102316239b8eae8c82eb19",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-b01-t01b-fix1-gst-safe-cta-20260827",
+      "sha": "033cec595834c71b0a43837c9fd77b54ecf823ad",
+      "remoteExact": true,
+      "remoteSha": "033cec595834c71b0a43837c9fd77b54ecf823ad",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-b01-t01b-gst-20260826",
+      "sha": "69dbe713e68d1bd2fc196750a6376c6d845b6e5a",
+      "remoteExact": true,
+      "remoteSha": "69dbe713e68d1bd2fc196750a6376c6d845b6e5a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-b01-t01c-split-deliveries-20260826",
+      "sha": "c030cd3763dcd5c951d915ee863cdb698ac93578",
+      "remoteExact": true,
+      "remoteSha": "c030cd3763dcd5c951d915ee863cdb698ac93578",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-b01-t02-auto-fulfilment-20260826",
+      "sha": "820ce11ac96a88020bae7bc341974c95720d87e8",
+      "remoteExact": true,
+      "remoteSha": "820ce11ac96a88020bae7bc341974c95720d87e8",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-card-overflow-v1-20260905",
+      "sha": "e2dd3bc706065fbc08d9c526c48e24374cd32e6e",
+      "remoteExact": true,
+      "remoteSha": "e2dd3bc706065fbc08d9c526c48e24374cd32e6e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-cart-safe-clear-v1-20260901",
+      "sha": "958e767e6f910e40b8f475d99173011f0f07ea78",
+      "remoteExact": true,
+      "remoteSha": "958e767e6f910e40b8f475d99173011f0f07ea78",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-catalogue-copy-hierarchy-20260827",
+      "sha": "b95780ed853ffb620e66e8ced798b2f0408d90aa",
+      "remoteExact": true,
+      "remoteSha": "b95780ed853ffb620e66e8ced798b2f0408d90aa",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-catalogue-copy-hierarchy-fix1-20260827",
+      "sha": "efd15867789a5fd02ecb736fffb25585b59529f9",
+      "remoteExact": true,
+      "remoteSha": "efd15867789a5fd02ecb736fffb25585b59529f9",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-checkout-gst-controller-test-plumbing-fix1-20260827",
+      "sha": "718436b7cf7efeb668062f65213f1c77933aee20",
+      "remoteExact": true,
+      "remoteSha": "718436b7cf7efeb668062f65213f1c77933aee20",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-compact-search-test-contract-fix1-20260827",
+      "sha": "534223f7a095a8f3064c4296f813ed056b5f11b7",
+      "remoteExact": true,
+      "remoteSha": "534223f7a095a8f3064c4296f813ed056b5f11b7",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-founder-approved-three-product-grid-fix1-20260827",
+      "sha": "65349ff6a8795b7569f62dc6dfd95e71720e4143",
+      "remoteExact": true,
+      "remoteSha": "65349ff6a8795b7569f62dc6dfd95e71720e4143",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-gst-native-field-semantics-20260827",
+      "sha": "685e3f1c92983cdd501c652e09993773edfa341e",
+      "remoteExact": true,
+      "remoteSha": "685e3f1c92983cdd501c652e09993773edfa341e",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-gst-native-field-semantics-fix1-20260827",
+      "sha": "685e3f1c92983cdd501c652e09993773edfa341e",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-mvp-help-unification-v1-20260831",
+      "sha": "9be29fd6d9b9ada335dec4a3bd495e65fb7def5a",
+      "remoteExact": true,
+      "remoteSha": "9be29fd6d9b9ada335dec4a3bd495e65fb7def5a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-mvp-ticket14-v1-20260902",
+      "sha": "fd55d1cfffa5ed10f753f2ed24461ef9ac6a9a5d",
+      "remoteExact": true,
+      "remoteSha": "fd55d1cfffa5ed10f753f2ed24461ef9ac6a9a5d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-next-cycle-v1-20260831",
+      "sha": "c7b77687d1671f23f95e603772dbd436a0ccd270",
+      "remoteExact": true,
+      "remoteSha": "c7b77687d1671f23f95e603772dbd436a0ccd270",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-order-promise-test-contract-fix1-20260827",
+      "sha": "6d847c7965d0762811a5de3707c49b902303415d",
+      "remoteExact": true,
+      "remoteSha": "6d847c7965d0762811a5de3707c49b902303415d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-product-action-test-contract-migration-20260827",
+      "sha": "61ee941e1e0b132d3905cca6dcccc294172108a7",
+      "remoteExact": true,
+      "remoteSha": "61ee941e1e0b132d3905cca6dcccc294172108a7",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-product-decision-glance-20260827",
+      "sha": "30b3c9182d0b5f2599c4c25450154c3dad5abe51",
+      "remoteExact": true,
+      "remoteSha": "30b3c9182d0b5f2599c4c25450154c3dad5abe51",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-product-offer-decision-20260827",
+      "sha": "7d5622d6ace8aee4126fba2a80ad56f5339d51aa",
+      "remoteExact": true,
+      "remoteSha": "7d5622d6ace8aee4126fba2a80ad56f5339d51aa",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-promotion-rail-state-isolation-20260827",
+      "sha": "63c682603d45f590b7e1cc9c49199083f91c9b2b",
+      "remoteExact": true,
+      "remoteSha": "63c682603d45f590b7e1cc9c49199083f91c9b2b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-redmi-fixes-v1-20260905",
+      "sha": "4d5ae49543cc5e88eecda2a48e948cbd18500a4d",
+      "remoteExact": true,
+      "remoteSha": "4d5ae49543cc5e88eecda2a48e948cbd18500a4d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-redmi-uat-v1-20260905",
+      "sha": "a09a2ecccf1e701a60117bdf34aa6a732cb132e2",
+      "remoteExact": true,
+      "remoteSha": "a09a2ecccf1e701a60117bdf34aa6a732cb132e2",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-responsive-product-grid-20260827",
+      "sha": "7cb200511a49d3fccd70b734099638ff3dca6209",
+      "remoteExact": true,
+      "remoteSha": "7cb200511a49d3fccd70b734099638ff3dca6209",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-screen-subactions-ui-20260823",
+      "sha": "fd3141472699628c73102c109d1f7b8f1a220cfc",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-shop-root-single-tap-20260827",
+      "sha": "00e95396a38e2f6763d249bc25fadede67872a4f",
+      "remoteExact": true,
+      "remoteSha": "00e95396a38e2f6763d249bc25fadede67872a4f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-cart-trade-summary-20260827",
+      "sha": "2f0801cb99c66484497784f78abe5e1e6bec8f6d",
+      "remoteExact": true,
+      "remoteSha": "2f0801cb99c66484497784f78abe5e1e6bec8f6d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-checkout-landed-summary-20260827",
+      "sha": "b5bf6fa406530aad706c51b652dabda16b86899d",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-checkout-pack-count-20260827",
+      "sha": "17bfeb29624d33576d5ba9c9cc721a460c1b7f9f",
+      "remoteExact": true,
+      "remoteSha": "17bfeb29624d33576d5ba9c9cc721a460c1b7f9f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-checkout-pack-count-fix1-20260827",
+      "sha": "bc0a48a3dcff73e0562d8cebf36445b98d645dfb",
+      "remoteExact": true,
+      "remoteSha": "bc0a48a3dcff73e0562d8cebf36445b98d645dfb",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-checkout-receiving-lines-20260827",
+      "sha": "226cbb91f0192d294f733fadb6a4f45c00aef388",
+      "remoteExact": true,
+      "remoteSha": "226cbb91f0192d294f733fadb6a4f45c00aef388",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-checkout-receiving-location-20260827",
+      "sha": "b5bf6fa406530aad706c51b652dabda16b86899d",
+      "remoteExact": true,
+      "remoteSha": "b5bf6fa406530aad706c51b652dabda16b86899d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-dock-semantic-tap-fix1-20260827",
+      "sha": "c7c291162a074ae7ee564bb1b2db99368bd9d21b",
+      "remoteExact": true,
+      "remoteSha": "c7c291162a074ae7ee564bb1b2db99368bd9d21b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/buy-wholesale-trade-decision-20260827",
+      "sha": "9c7af4e545406c4777b2ce142f9d4c39ed43d19b",
+      "remoteExact": true,
+      "remoteSha": "9c7af4e545406c4777b2ce142f9d4c39ed43d19b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/chat-shell-impl-v1-20260829",
+      "sha": "30f4614574aae3c315d586944636a35ba314873d",
+      "remoteExact": true,
+      "remoteSha": "30f4614574aae3c315d586944636a35ba314873d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/global-bottom-rail-action-restore-fix1-20260827",
+      "sha": "3047421f93c96670b76aa43737ac04fbbdbc950d",
+      "remoteExact": true,
+      "remoteSha": "3047421f93c96670b76aa43737ac04fbbdbc950d",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/global-bottom-rail-action-restore-fix2-test-20260827",
+      "sha": "dcf9a310d1c573cbbb3406cce6cedd79e1c60b30",
+      "remoteExact": true,
+      "remoteSha": "dcf9a310d1c573cbbb3406cce6cedd79e1c60b30",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/global-mool-launcher-continuity-20260827",
+      "sha": "09566cdb3d0ef8fd7cd04be8cd3032da72b49011",
+      "remoteExact": true,
+      "remoteSha": "09566cdb3d0ef8fd7cd04be8cd3032da72b49011",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/redmi-v6-audit-20260913",
+      "sha": "e5d39769e260c1a6691ea7808642308472261a97",
+      "remoteExact": true,
+      "remoteSha": "e5d39769e260c1a6691ea7808642308472261a97",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-phase1-gap-v1-20260829",
+      "sha": "51c3665837d5a2c84b6862bff0f029fa9c8e6a5a",
+      "remoteExact": true,
+      "remoteSha": "51c3665837d5a2c84b6862bff0f029fa9c8e6a5a",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-ui-20260824",
+      "sha": "00ce93552091ee51739266c0a8fbe6d207d9f695",
+      "remoteExact": true,
+      "remoteSha": "00ce93552091ee51739266c0a8fbe6d207d9f695",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-20260829",
+      "sha": "6057f6dc925431b6f0e5a852a9b19c6309ed8d08",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child10-20260829",
+      "sha": "5e0d7644f77bd86d8cbced2298f93d50fb57a3f6",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child2-20260829",
+      "sha": "f8b0785b2d7311ce327f221700cb90dd57d3f2d8",
+      "remoteExact": false,
+      "remoteSha": "3245b6cd21da9dfa69ffc863b261391bde7dcd1c",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child3-20260829",
+      "sha": "e89e7ebf633e77e78c835c8e9a80410dbce70b5f",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child4-20260829",
+      "sha": "908b357a6c210d0513853f20258a106daef1b635",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child5-20260829",
+      "sha": "d8b8d5fcd784fb2e3d7ae99eeff5c71bdde37281",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child6-20260829",
+      "sha": "7e423afdd7ea0295acbc18d2fbe65f150e88720d",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child7-20260829",
+      "sha": "1dc31ac4aac5dcdbc8d25238f44ffa93477ac898",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child8-20260829",
+      "sha": "ca79ba390c0329e6385a2dc72227f71e40abe9a1",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-child9-20260829",
+      "sha": "5e0d7644f77bd86d8cbced2298f93d50fb57a3f6",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-chat-v1-implementation-20260829",
+      "sha": "e5720cb86bd2119afc3d84a83d3116018f17f9a3",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-gst-store-recovery-v1-20260831",
+      "sha": "caddfac595cd835ce5ebf22a0a8819b41c6f0575",
+      "remoteExact": true,
+      "remoteSha": "caddfac595cd835ce5ebf22a0a8819b41c6f0575",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-landing-v1-20260828",
+      "sha": "b4d23efe26681b2bcd45275187c6740a36025fbe",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-landing-v1-fix1-20260828",
+      "sha": "cfe7a91141c2628779bf64c322d02b28842d0766",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-landing-v1-fix2-20260828",
+      "sha": "085712fe0111d0b133f99710ab5e683c8f14f0d9",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-landing-v2-20260828",
+      "sha": "5c92134bfb407357ce53cb294c660fdac709c05a",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-landing-v2-child1-tooling-20260828",
+      "sha": "d233cfc4673cdf01673ec4a7cf262eb22c0db319",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-landing-v2-child2-test-inventory-20260828",
+      "sha": "8d74dc56d01fba6050b0c04ed75851fdc6191abc",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-landing-v2-child3-order-oracle-20260828",
+      "sha": "db3b0036246843ff44a3002a063046bac9a65574",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-20260828",
+      "sha": "ddfc9a3c66a994c404818cd067541d4783384fc0",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child10-20260828",
+      "sha": "7a910dc6bcfa66a795784ceacb97891397f1d92d",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child11-20260828",
+      "sha": "0846d7b4bb5e18168ea388b8d50bda9cea44e14b",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child12-20260828",
+      "sha": "d03e3d16912f196f2b3b08b87b82157702eb2137",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child13-20260828",
+      "sha": "21cc89e0dbaff0687d7d942607c409d146299c6c",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child14-20260828",
+      "sha": "21cc89e0dbaff0687d7d942607c409d146299c6c",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child15-20260828",
+      "sha": "676d5c7f6c263800d09f4caa6ad816e0d8d63ade",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child16-20260828",
+      "sha": "73a68c81cdd63d30c98aba5def9fffc5a8dbd121",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child17-20260828",
+      "sha": "517aca8be094f859d75bfa1bc42e66db2b7edeca",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child18-20260828",
+      "sha": "db049222f7d25ac2e3b9d16559488ec77392f43b",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child2-20260828",
+      "sha": "5ae635e46992f186a38c34d35e2a8de28d10f0e1",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child3-20260828",
+      "sha": "c74df540bcacdc6ce221ad4e64d7c5eaf166cebe",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child4-20260828",
+      "sha": "0b2fa960040c92a6fd021e0d838b672ca8e43ee0",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child5-20260828",
+      "sha": "e2ed0b31abae392b11a3ce3575b4784de7975e32",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child6-20260828",
+      "sha": "2b096246c40d23885fb5ee176f5d9519a8c36969",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child7-20260828",
+      "sha": "d6bc74c501f8ae24515648c96be7f6d8cee637b4",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child8-20260828",
+      "sha": "74424e80e801bb8b13afa8c11c9db56d16204484",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-location-address-v1-child9-20260828",
+      "sha": "4065edbd89b31bb2a4c431a45b38f8f50f04d8f4",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-mvp-go-live-v1-20260829",
+      "sha": "f513ecc78de2a6b72223f25bdd18203387e13be0",
+      "remoteExact": true,
+      "remoteSha": "f513ecc78de2a6b72223f25bdd18203387e13be0",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-product-discovery-depth-v1-20260831",
+      "sha": "0df24cc11f06ec5032a0f6def454c03b41c09e30",
+      "remoteExact": true,
+      "remoteSha": "0df24cc11f06ec5032a0f6def454c03b41c09e30",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-store-card-clarity-v1-20260831",
+      "sha": "06d88307b30804788cb82282b34c4af49e2fd595",
+      "remoteExact": true,
+      "remoteSha": "06d88307b30804788cb82282b34c4af49e2fd595",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-store-interaction-repair-v1-20260831",
+      "sha": "59f63db15d2aeb970dcfc5b4d39eaf312ca76168",
+      "remoteExact": true,
+      "remoteSha": "59f63db15d2aeb970dcfc5b4d39eaf312ca76168",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-v2-child4-profile-geometry-20260828",
+      "sha": "58a04f2329b658c7b7296ad7055fda43be2a1022",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-v2-child5-orders-owner-20260828",
+      "sha": "1d5ed8825b30b9872212631a2a035419a511f3c7",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-v2-child6-clean-flutter-20260828",
+      "sha": "1d5ed8825b30b9872212631a2a035419a511f3c7",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/shop-v2-child7-clean-flutter-20260828",
+      "sha": "e383eb8558492c947aa1dabbbd7341ab6ce32e38",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/cursor-ui/workspace-home-profile-v1-20260901",
+      "sha": "21118db8c061b085fe60ac419d52ee0fd83fcde2",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/approved-commit-coverage-v1-20260901",
+      "sha": "4e908c850800c54f41a7c6d582cca12bc0201de6",
+      "remoteExact": true,
+      "remoteSha": "4e908c850800c54f41a7c6d582cca12bc0201de6",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/buy-shared-baseline-conflict-20260827",
+      "sha": "67eb5cc4cf9f102fba3593be374d9ad1186a3e51",
+      "remoteExact": true,
+      "remoteSha": "67eb5cc4cf9f102fba3593be374d9ad1186a3e51",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/post-integration-ui-v1-20260905",
+      "sha": "1fbf9665068e55b025617714b2a944db2b43ecda",
+      "remoteExact": true,
+      "remoteSha": "1fbf9665068e55b025617714b2a944db2b43ecda",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-address-r61-6-build-c3-20260828",
+      "sha": "e87644be4209127c77ba0c4de374ad23f105f12d",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-address-r61-6-build-c4-20260828",
+      "sha": "ca54d3d3386f9695fe4bec601a8d1bdfee5067d3",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-address-r61-6-build-c7-20260828",
+      "sha": "40f1d8f736a5d55dbd2f4287b5cc8b1287fa6789",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-address-r61-6-build-c8-20260828",
+      "sha": "15c9bd7c1e438b10f82476b59bdc551fc99d3472",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-address-r61-6-build-c9-20260828",
+      "sha": "fa09a2ba171b2e6a709771ab46b37fc3821c99a3",
+      "remoteExact": true,
+      "remoteSha": "fa09a2ba171b2e6a709771ab46b37fc3821c99a3",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-chat-phase1-r6110-20260829",
+      "sha": "bffd23ed892d431f27fa1153ff4d535b3618a81f",
+      "remoteExact": true,
+      "remoteSha": "bffd23ed892d431f27fa1153ff4d535b3618a81f",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-chat-shared-v1-20260829",
+      "sha": "bdfd72e7a654b80687d3abcee9203c10da896db0",
+      "remoteExact": false,
+      "remoteSha": "03ccd371f0f182b885c35c9a26c69c5348c766ca",
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-chat-shared-v1-base-20260829",
+      "sha": "011fd09d1d94fce02d0bbc9c7b94c90f742624e6",
+      "remoteExact": true,
+      "remoteSha": "011fd09d1d94fce02d0bbc9c7b94c90f742624e6",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-chat-single-assist-fix1-20260829",
+      "sha": "609d74d48ef61b14d6bf7a9780856a151a7f5e63",
+      "remoteExact": true,
+      "remoteSha": "609d74d48ef61b14d6bf7a9780856a151a7f5e63",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-location-address-r61-6-cursor-review-build-20260828",
+      "sha": "0d602987809a93f1601375dd866aae3099ce52ae",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-location-address-r61-6-cursor-review-build-child2-20260828",
+      "sha": "30099f5861dbf0a22a5cadab1c99ce6c2d60b94d",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-v2-r61-5-buy-regression-fix-20260828",
+      "sha": "2ff8062dee1027e25ca128c2df968d16896e434e",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/shop-v2-r61-5-cursor-review-build-20260828",
+      "sha": "9d5b31765e65f72d501945b8f32cc37a407b67f5",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/social-runtime-chat-conflict-correction-20260825",
+      "sha": "0ab14a57abe239518f3c1b8f48f39be3580bb253",
+      "remoteExact": true,
+      "remoteSha": "0ab14a57abe239518f3c1b8f48f39be3580bb253",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/store-buy-20260912",
+      "sha": "fb300e169e1f3bdf84052d9cc05a6d311aa51132",
+      "remoteExact": true,
+      "remoteSha": "fb300e169e1f3bdf84052d9cc05a6d311aa51132",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/store-buy-conflict-repair-v1-20260904",
+      "sha": "c48e4ecc5c3ccc7a3079d3f64988437599cc78de",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/store-buy-conflict-repair-v2-20260904",
+      "sha": "54cba31ee8dd27054ffad517b814b780f9e21e10",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/store-buy-conflict-repair-v3-20260904",
+      "sha": "9e7894a21c6ca16c07b4dc8e0f1b9a55747d61cb",
+      "remoteExact": true,
+      "remoteSha": "9e7894a21c6ca16c07b4dc8e0f1b9a55747d61cb",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": true
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/store-buy-conflict-repair-v3-failed-subject-20260904",
+      "sha": "473ff2ebc6403f739b472ad27182398232fdf8b4",
+      "remoteExact": false,
+      "remoteSha": null,
+      "reachableFromRemoteHead": false,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/store-buy-diagnostic-evidence-v1-20260904",
+      "sha": "3fc346f12b22b7c13fb6c1b47c32ec7317e7be2b",
+      "remoteExact": true,
+      "remoteSha": "3fc346f12b22b7c13fb6c1b47c32ec7317e7be2b",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    },
+    {
+      "ref": "refs/heads/work/integration-repair/store-buy-diagnostic-evidence-v2-20260904",
+      "sha": "58af65f0bb566aaf275c3a856d02d11dba3df822",
+      "remoteExact": true,
+      "remoteSha": "58af65f0bb566aaf275c3a856d02d11dba3df822",
+      "reachableFromRemoteHead": true,
+      "ancestorOfV31": false
+    }
+  ],
+  "remoteHeadsNotLocallyAvailable": 94,
+  "cursorIntegrationInV31": true
+}

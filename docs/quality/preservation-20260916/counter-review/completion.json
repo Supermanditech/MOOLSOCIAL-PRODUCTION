@@ -1,0 +1,19 @@
+{
+  "versionName": "1.0.0-r66.32-runtime",
+  "versionCode": "2026091602",
+  "apkSha256": "BDD42F436703FD401B98CE752EA8B2572EAFEEB90909C80AA9666FB1206B1365",
+  "installed": true,
+  "counterReplayCompleted": true,
+  "productionQualified": false,
+  "founderApproved": false,
+  "dataCleared": false,
+  "testStoreOpen": true,
+  "fontScale": 1.0,
+  "autoRotate": 1,
+  "remainingColdWorkspaceLimitation": true,
+  "flutterAndroidRuntimeErrorLogBytes": 0,
+  "pdfBytes": 8325,
+  "pdfSha256": "a5d08ac0f39463a058c61498a244e6221e9865d2b06df3414ff74a3bd86f00d5",
+  "screenshots": 22,
+  "integrationCommit": "21977bff27cf22bfadb50f592a635355bb80574e"
+}

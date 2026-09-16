@@ -1,0 +1,202 @@
+[
+  {
+    "id": "CF-01",
+    "priority": "P1",
+    "type": "Technical / payment UX",
+    "title": "UPI invoice opens collection with Cash selected",
+    "steps": "Create a counter invoice with UPI selected → Record payment received.",
+    "actual": "The ₹56 UPI invoice opened Record collection with Cash selected. UPI had to be selected again. No incorrect cash entry was submitted in this audit.",
+    "expected": "Carry the selected method forward, or require an explicit collection-method choice. Do not silently substitute Cash.",
+    "evidence": [
+      "136-upi-create",
+      "139-upi-collection",
+      "140-collection-upi"
+    ],
+    "retest": "Create Cash and UPI invoices; open, cancel and reopen collection. Verify method continuity and the method saved with each collection, including partial payments.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-02",
+    "priority": "P1",
+    "type": "Device fitment",
+    "title": "Landscape leaves only 136 px for the customer form",
+    "steps": "Open optional customer details → rotate OPPO to landscape at default text size.",
+    "actual": "The fixed header, financial panels and bottom navigation leave y=410–546 for the form. One field fragment and a clipped optional-details control are visible; normal form completion requires excessive scrolling.",
+    "expected": "Give the active sale a usable viewport in landscape; collapse unrelated dashboard chrome and keep required fields/actions reachable.",
+    "evidence": [
+      "93-rotation",
+      "94-landscape-scroll"
+    ],
+    "retest": "Complete customer entry, products, review, payment and handover in landscape with keyboard open/closed; check system navigation insets.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-03",
+    "priority": "P2",
+    "type": "Keyboard / validation",
+    "title": "UPI validation pushes Confirm collection below the keyboard",
+    "steps": "Record UPI collection → enter amount → submit without reference → focus reference and type it.",
+    "actual": "The error expands the form. Confirm collection has only 2 px of visible semantics at the numeric keyboard boundary, then disappears while the alphabetic keyboard is open. Dismissing the keyboard allowed submission.",
+    "expected": "Keep the active field, relevant error and confirmation action reachable above the keyboard; scroll deliberately to the error/action.",
+    "evidence": [
+      "142-upi-keyboard",
+      "144-upi-ref-error",
+      "146-upi-ref-keyboard"
+    ],
+    "retest": "Repeat missing/invalid reference and amount errors with both keyboards at 1.0× and 1.6×. Confirm without relying on hidden controls.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-04",
+    "priority": "P2",
+    "type": "Visual / invoice usability",
+    "title": "Unpaid invoice hides quantity and price columns horizontally",
+    "steps": "Create/open an unpaid multi-item invoice → scroll to the item table → swipe horizontally.",
+    "actual": "Initially only Item / pack is visible. A horizontal swipe reveals Qty, Unit price and Amount while hiding product names. There is no clear affordance explaining this. Values exist; this is not missing financial data.",
+    "expected": "Use mobile invoice rows that show name, pack, quantity, unit price and line total together, or make overflow unmistakable.",
+    "evidence": [
+      "36-invoice-scroll",
+      "121-unpaid-table",
+      "122-table-horizontal"
+    ],
+    "retest": "Verify all line values together on a 360 dp viewport, long product names, multiple items and enlarged text; totals must remain unchanged.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-05",
+    "priority": "P2",
+    "type": "Technical / customer continuity",
+    "title": "Recent customer does not reuse saved name and disappears after restart",
+    "steps": "Complete a sale with customer name/business → Next sale → choose that recent phone → expand details → restart and reopen customer entry.",
+    "actual": "The recent entry showed only the phone. The next draft Name field was empty, despite the completed invoice retaining QA Counter Audit September. After restart the recent list returned to seeded customers; the completed named invoice still existed in Sales.",
+    "expected": "Retain useful recent-customer identity and reuse previously supplied billing details with an edit option.",
+    "evidence": [
+      "31-details-reopen",
+      "52-paid",
+      "79-recent",
+      "92-restored-form",
+      "93-rotation",
+      "128-upi-recent",
+      "118-paid-after-restart"
+    ],
+    "retest": "Repeat two sales for one named customer before/after restart. Verify recent identity and field reuse; old invoice snapshots must remain immutable. Business-field reuse needs an explicit retest.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-06",
+    "priority": "P2",
+    "type": "Visual / layout consistency",
+    "title": "Active sale changes between a narrow dashboard pane and full width",
+    "steps": "Open Customer, focus/dismiss keyboard, enter products, create invoice, record payment.",
+    "actual": "Default portrait customer inputs are only 456 px wide on a 720 px screen. Dashboard finance and side actions remain prominent. Focusing the keyboard expands the form; invoice/collection returns to the narrow pane. Unpaid handover heading wraps over three lines.",
+    "expected": "Keep a stable, focused sale layout across customer, review, collection and handover with clear hierarchy.",
+    "evidence": [
+      "04-customer",
+      "06-short-phone",
+      "35-created",
+      "38-payment",
+      "42-payment-keyboard",
+      "52-paid"
+    ],
+    "retest": "Compare every phase at default/enlarged text with keyboard transitions. Check reading width, button wrapping and scroll position continuity.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-07",
+    "priority": "P2",
+    "type": "Navigation / discoverability",
+    "title": "Customer continuation sits below recent-customer suggestions",
+    "steps": "Start Counter sale → enter a valid phone → optionally expand details.",
+    "actual": "Add items to bill is not initially visible. It sits after explanatory copy and recent customers; optional details and enlarged text add more scrolling.",
+    "expected": "Make the primary continuation obvious once required input is valid; keep suggestions secondary.",
+    "evidence": [
+      "04-customer",
+      "08-expanded",
+      "13-form-bottom",
+      "75-large-form-lower",
+      "76-short-submit"
+    ],
+    "retest": "New and returning users must locate continuation without exploring the whole form; test keyboard open/closed and four recent customers.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-08",
+    "priority": "P2",
+    "type": "Payment feedback",
+    "title": "Partial collection returns to the invoice top and hides the new balance",
+    "steps": "Record ₹64 against a ₹164 invoice.",
+    "actual": "The app returns to the tall invoice header. Received ₹64 / Due ₹100 is below the initial viewport and requires another scroll. The data is correct.",
+    "expected": "Make the collection outcome and remaining balance immediately visible, preserving a useful reading position.",
+    "evidence": [
+      "47-part-paid",
+      "48-part-paid-status"
+    ],
+    "retest": "Submit partial Cash/UPI records and immediately verify received/due amounts without scrolling or inferring changes from global totals.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-09",
+    "priority": "P3",
+    "type": "Validation copy",
+    "title": "Cash overpayment error unnecessarily mentions a UPI reference",
+    "steps": "Choose Cash → enter ₹165 against ₹164 due → Confirm collection.",
+    "actual": "The combined message asks for an amount within the balance and a UPI reference when applicable. It is not specific to the Cash error.",
+    "expected": "Show a precise amount error beside the amount field; show reference errors only for UPI.",
+    "evidence": [
+      "44-overpay-result",
+      "144-upi-ref-error"
+    ],
+    "retest": "Check blank, zero, excess amount, decimal format and missing-reference messages independently.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-10",
+    "priority": "P3",
+    "type": "Typography / accessibility",
+    "title": "Largest text truncates task title and product search hint",
+    "steps": "Set OPPO Font to Very large (system scale 1.6) → open counter products.",
+    "actual": "Counter sale becomes Counter s… and Search your products is truncated. Customer labels and optional actions wrap heavily. Product/review controls were still operable in the tested cases.",
+    "expected": "Preserve meaningful labels through responsive typography and concise copy; keep accessibility scaling supported.",
+    "evidence": [
+      "74-large-ime",
+      "80-recent-selected",
+      "83-large-review"
+    ],
+    "retest": "Check all sale stages at the supported maximum text scale, including long labels and keyboard errors. Do not simply disable font scaling.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-11",
+    "priority": "P2",
+    "type": "Receipt / auditability",
+    "title": "UPI completion does not show the recorded method/reference in the inspected receipt details",
+    "steps": "Record the synthetic UPI payment with QAUPI202609160001 → inspect paid receipt and expanded Invoice details.",
+    "actual": "The receipt says Paid to store. The inspected expanded details show invoice identity/store/date but not the entered UPI reference or explicit UPI method. This audit does not claim the reference is absent from storage.",
+    "expected": "Allow the cashier to verify recorded tender and reference from the receipt or a clear linked collection record.",
+    "evidence": [
+      "148-upi-paid",
+      "150-upi-details",
+      "152-upi-pdf"
+    ],
+    "retest": "Verify displayed and persisted method/reference, including split collections, and distinguish a manual record from provider-confirmed settlement.",
+    "status": "Open — not fixed"
+  },
+  {
+    "id": "CF-12",
+    "priority": "P1",
+    "type": "Known review-runtime limitation",
+    "title": "Restart requires workspace recovery and changes the active sale presentation",
+    "steps": "Leave an unfinished 1-unit / ₹264 draft → force-stop and reopen the app → reselect the existing review workspace → reopen Counter sale.",
+    "actual": "Launch starts at Shop and the synthetic workspace setup must be traversed again. The draft survives and reopens in the compact dashboard pane rather than the previous full-screen view. The completed paid invoice also survives. This is a review-runtime limitation, not evidence of lost invoices/drafts.",
+    "expected": "Before production acceptance, restore the authorized workspace/session and provide a clear resume path to the retained sale.",
+    "evidence": [
+      "98-draft-before-background",
+      "99-draft-after-background",
+      "104-cold-ready",
+      "106-draft-reset",
+      "118-paid-after-restart"
+    ],
+    "retest": "Qualify authenticated production-like cold launch, OS process death and explicit draft resume. Preserve all saved records and distinguish route recovery from data recovery.",
+    "status": "Open — not fixed"
+  }
+]

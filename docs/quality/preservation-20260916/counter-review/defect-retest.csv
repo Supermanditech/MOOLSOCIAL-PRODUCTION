@@ -1,0 +1,13 @@
+id,priority,title,retest_result
+CF-01,P1,UPI invoice opens collection with Cash selected,Verified: UPI retained on initial and remainder collection
+CF-02,P1,Landscape leaves only 136 px for the customer form,Verified customer/products/review in landscape; complete landscape payment replay remains untested
+CF-03,P2,UPI validation pushes Confirm collection below the keyboard,Verified Cash errors and UPI missing reference with keyboard; UPI at 1.6 text
+CF-04,P2,Unpaid invoice hides quantity and price columns horizontally,"Verified two-item mobile invoice, no horizontal table required"
+CF-05,P2,Recent customer does not reuse saved name and disappears after restart,"Verified older saved identity after initial cold launch, new identity recall and phone-change clearing"
+CF-06,P2,Active sale changes between a narrow dashboard pane and full width,Verified focused full-width counter stages
+CF-07,P2,Customer continuation sits below recent-customer suggestions,Verified continuation with keyboard and expanded details
+CF-08,P2,Partial collection returns to the invoice top and hides the new balance,Verified immediate Cash and UPI partial balances
+CF-09,P3,Cash overpayment error unnecessarily mentions a UPI reference,Verified Cash zero/excess errors are amount-specific
+CF-10,P3,Largest text truncates task title and product search hint,Verified title/search at 1.6 and UPI keyboard form
+CF-11,P2,UPI completion does not show the recorded method/reference in the inspected receipt details,Verified Cash and UPI split receipt methods and UPI references
+CF-12,P1,Restart requires workspace recovery and changes the active sale presentation,Partial: focused layout improved; cold-start workspace recovery remains open

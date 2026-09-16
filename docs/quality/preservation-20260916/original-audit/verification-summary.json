@@ -1,0 +1,12 @@
+{
+  "settings": {
+    "font_scale": "1.0",
+    "user_rotation": "0",
+    "accelerometer_rotation": "1"
+  },
+  "matchingErrorLines": [],
+  "logScope": "Filtered device log since 09-16 06:20:36.000, captured after UPI branch; bounded evidence only.",
+  "findings": 12,
+  "coverageRows": 35,
+  "missingEvidenceLinks": []
+}

@@ -1,0 +1,117 @@
+{
+  "purpose": "Preservation only. No ticket acceptance, release promotion or merge of historical work.",
+  "youtubeFinal": {
+    "version": "r60.95",
+    "commit": "f2ef92180bc4c9d14683d98664da84a1628f6725",
+    "tag": "moolsocial-youtube-api-review-r60.95-cutoff-20260827",
+    "basis": "Recorded Play-delivered reviewer journey and founder confirmation; no new Play-console operation."
+  },
+  "latestIntegration": "21977bff27cf22bfadb50f592a635355bb80574e",
+  "historicalTags": [
+    {
+      "name": "preservation/20260916/history-009b37210f9e",
+      "sha": "009b37210f9ec7795d8f9915417ff8a20842d630"
+    },
+    {
+      "name": "preservation/20260916/history-085712fe0111",
+      "sha": "085712fe0111d0b133f99710ab5e683c8f14f0d9"
+    },
+    {
+      "name": "preservation/20260916/history-1a33cbc36bee",
+      "sha": "1a33cbc36beed5d6615acb7d7b10a24d4c7789bf"
+    },
+    {
+      "name": "preservation/20260916/history-25bb984bb3ea",
+      "sha": "25bb984bb3eaf620036829ae7c0790cb04cb44ca"
+    },
+    {
+      "name": "preservation/20260916/history-473ff2ebc640",
+      "sha": "473ff2ebc6403f739b472ad27182398232fdf8b4"
+    },
+    {
+      "name": "preservation/20260916/history-4e8c1fa8862b",
+      "sha": "4e8c1fa8862b9556ade0fb9c1aadbeab8dfbb48a"
+    },
+    {
+      "name": "preservation/20260916/history-54cba31ee8dd",
+      "sha": "54cba31ee8dd27054ffad517b814b780f9e21e10"
+    },
+    {
+      "name": "preservation/20260916/history-5802f595fc2d",
+      "sha": "5802f595fc2d96ce024f1f4e75750c68854a4c9e"
+    },
+    {
+      "name": "preservation/20260916/history-58a8375d25e0",
+      "sha": "58a8375d25e0f9777b6c62c49a10da144c3e4cff"
+    },
+    {
+      "name": "preservation/20260916/history-5e0d7644f77b",
+      "sha": "5e0d7644f77bd86d8cbced2298f93d50fb57a3f6"
+    },
+    {
+      "name": "preservation/20260916/history-6192baec29ee",
+      "sha": "6192baec29eebb23ca374c5213bc1ef22396a5d6"
+    },
+    {
+      "name": "preservation/20260916/history-792ad84b2a03",
+      "sha": "792ad84b2a033a489add056b3e21620b142e9dcc"
+    },
+    {
+      "name": "preservation/20260916/history-8ce155ace32d",
+      "sha": "8ce155ace32def91e2c86c26cec319f5d8f155f1"
+    },
+    {
+      "name": "preservation/20260916/history-b4d23efe2668",
+      "sha": "b4d23efe26681b2bcd45275187c6740a36025fbe"
+    },
+    {
+      "name": "preservation/20260916/history-bbe1ef2bd95f",
+      "sha": "bbe1ef2bd95fc534f0dba093b71477adeb158c22"
+    },
+    {
+      "name": "preservation/20260916/history-bdfd72e7a654",
+      "sha": "bdfd72e7a654b80687d3abcee9203c10da896db0"
+    },
+    {
+      "name": "preservation/20260916/history-cfe7a91141c2",
+      "sha": "cfe7a91141c2628779bf64c322d02b28842d0766"
+    },
+    {
+      "name": "preservation/20260916/history-d174a64016ba",
+      "sha": "d174a64016baebf09b10e2d70365f52746267cbf"
+    },
+    {
+      "name": "preservation/20260916/history-d7ffaf675612",
+      "sha": "d7ffaf6756122d97cb5e4c804a21eaf119ef74fb"
+    },
+    {
+      "name": "preservation/20260916/history-f564028a062b",
+      "sha": "f564028a062b6df0e7133c3e59f43b32027ec897"
+    },
+    {
+      "name": "preservation/20260916/history-f6cb6eda9c3c",
+      "sha": "f6cb6eda9c3cfde3baf881197154d6572f309a88"
+    },
+    {
+      "name": "preservation/20260916/history-fd0786f15a3a",
+      "sha": "fd0786f15a3ad1b80508ca054c302809d16a8a7f"
+    },
+    {
+      "name": "preservation/20260916/history-fd3141472699",
+      "sha": "fd3141472699628c73102c109d1f7b8f1a220cfc"
+    },
+    {
+      "name": "preservation/20260916/history-fe6cb7028bea",
+      "sha": "fe6cb7028beaadedd50b857c83fbe1ffb4c86a82"
+    }
+  ],
+  "cursorUncommittedSnapshot": {
+    "commit": "72f5d36a45525ee36740a1e7214d0cc88a8a0f2a",
+    "ref": "refs/heads/archive/preservation-20260916-cursor-catalogue",
+    "originalHead": "e5d39769e260c1a6691ea7808642308472261a97",
+    "file": "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+    "sha256": "9242ae0732826d55ee1d927141f4f81c6d5b603655028b1ea0f31226bd58a2e2",
+    "acceptance": "WIP only; original checkout and index untouched"
+  },
+  "artifacts": "Review evidence committed below. APK and private phone backup remain local; APK hash retained. No credentials or private phone backup uploaded."
+}

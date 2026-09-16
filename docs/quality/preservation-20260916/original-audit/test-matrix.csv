@@ -1,0 +1,36 @@
+﻿Check,Result,Observed outcome,Screenshot
+New customer phone/name/business entry,Passed,Values retained through product/customer edit round trip,31-details-reopen.png
+Invalid short phone,Passed,123 rejected with a 10-digit phone message at 1.6×,77-short-validation.png
+Empty bill,Passed,Review disabled at 0 units / ₹0,15-products.png
+Add multiple products / quantities,Passed,2 salts + 1 atta = 3 units / ₹220,20-no-results.png
+Reduce quantity,Passed,1 salt + 1 atta = 2 units / ₹164,29-reduced.png
+Search match and no result,Passed,Salt result correct; no-result state retained ₹220 bill,21-search-salt.png
+Product search keyboard fit,Passed,Total and Review visible above keyboard in tested portrait state,20-no-results.png
+Review/edit round trip,Passed,Amounts and selections retained,34-create.png
+Review customer identity,Design gap,Phone shown instead of saved name/business,23-review.png
+Cash / UPI selection,Passed,Selected states switch; unavailable live UPI authority explained,25-upi-selected.png
+Cash invoice creation,Passed,"One observed invoice, ₹164, saved identity and item lines",35-created.png
+Blank collection,Passed,Rejected with amount validation,40-empty-validation.png
+Over-balance collection,Passed with copy defect,₹165 rejected against ₹164; CF-09,44-overpay-result.png
+Partial Cash collection,Passed with feedback defect,₹64 received / ₹100 due; CF-08,48-part-paid-status.png
+Complete Cash collection,Passed,Remaining ₹100 recorded; Paid in cash ₹164,52-paid.png
+Stock effect of Cash sale,Passed for observed items,"Atta and salt displayed 9999 before, 9998 after; one unit each",98-draft-before-background.png
+Invoice PDF contents / filename,Passed,"Seller/business/invoice filename, saved names, ₹108 + ₹56 = ₹164",55-pdf-ready.png
+Native PDF save,Passed,"Saved file read back, 8335 bytes, PDF header/end marker",59-saved.png
+Native share / cancel,Passed,PDF filename in Android chooser; cancellation returned to app; no recipient,61-share-sheet.png
+Next sale reset,Passed,Customer field reset; new bill starts empty,64-next-sale-reset.png
+Repeat customer reuse,Defect,Name not reused; recent customer missing after restart; CF-05,128-upi-recent.png
+Largest font fit,Mixed,Products/review usable; customer flow and labels degrade; CF-07/10,83-large-review.png
+Landscape customer form,Defect,Only 136 px form viewport; CF-02,93-rotation.png
+Background / return,Passed,Same 1-unit / ₹264 draft,99-draft-after-background.png
+Unknown barcode input,Passed for simulated input,Visible unavailable-catalogue error; draft unchanged; not physical scanner proof,102-unknown-barcode.png
+Cold restart draft data,Passed with route limitation,Customer and 1-unit / ₹264 recovered after workspace selection; CF-12,106-draft-reset.png
+Cold restart completed invoice,Passed,"Same cash-paid ₹164 invoice, business and lines",118-paid-after-restart.png
+Leave unfinished sale,Passed,Keep editing / Discard sale confirmation appeared; audit draft discarded,112-sales-persisted.png
+Unpaid table access,Usability defect,Horizontal scrolling reveals values while hiding names; CF-04,122-table-horizontal.png
+UPI invoice → collection default,Defect,Cash selected despite UPI invoice; CF-01,139-upi-collection.png
+Missing UPI reference,Passed with keyboard defect,Rejected; error pushes confirmation below keyboard; CF-03,144-upi-ref-error.png
+Manual UPI record,Passed for local recording,₹56 + synthetic reference reached Paid to store; no real transfer,148-upi-paid.png
+UPI receipt details,Usability gap,Explicit method/reference absent from inspected receipt details; CF-11,150-upi-details.png
+UPI PDF / share destination,Passed,Paid PDF opened; correct filename offered in native share sheet,154-upi-share-sheet.png
+Original device settings restored,Passed,"font_scale=1.0, user_rotation=0, accelerometer_rotation=1",159-final.png
