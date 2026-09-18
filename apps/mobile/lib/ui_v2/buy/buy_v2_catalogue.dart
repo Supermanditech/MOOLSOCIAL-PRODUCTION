@@ -798,15 +798,9 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
           else
             LayoutBuilder(
               builder: (context, constraints) {
-                final scale = MediaQuery.textScalerOf(context).scale(1);
                 final cardWidth = constraints.maxWidth * .80 - 12;
-                final contentWidth = cardWidth - 16;
-                final imageWidth = 64.0;
-                final ctaWidth = (82.0 * scale).clamp(82.0, contentWidth * .45);
-                final textWidth = (contentWidth - ctaWidth - 10).clamp(
-                  60.0,
-                  double.infinity,
-                );
+                final imageWidth = cardWidth * .43;
+                final textWidth = cardWidth - imageWidth - 16;
                 double measure(
                   String text,
                   double size,
@@ -924,12 +918,12 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                           child: InkWell(
                             key: ValueKey('buy-published-offer-${product.id}'),
                             onTap: open,
-                            child: Padding(
-                              padding: const EdgeInsets.all(8),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Expanded(
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                Expanded(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(8),
                                     child: Column(
                                       crossAxisAlignment:
                                           CrossAxisAlignment.start,
@@ -998,17 +992,17 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
-                                  SizedBox(
-                                    width: ctaWidth,
+                                ),
+                                SizedBox(
+                                  width: imageWidth,
+                                  child: ColoredBox(
+                                    color: const Color(0xFFFFF8F0),
                                     child: Column(
                                       children: [
-                                        SizedBox(
-                                          width: imageWidth,
-                                          height: 64,
+                                        Expanded(
                                           child: BuyV2ProductPackshot(
                                             product: product,
-                                            borderRadius: 12,
+                                            borderRadius: 0,
                                           ),
                                         ),
                                         TextButton(
@@ -1017,7 +1011,9 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                           ),
                                           onPressed: open,
                                           style: TextButton.styleFrom(
-                                            foregroundColor: Colors.white,
+                                            foregroundColor: const Color(
+                                              0xFF30232D,
+                                            ),
                                             padding: EdgeInsets.zero,
                                             minimumSize: const Size(44, 48),
                                           ),
@@ -1032,8 +1028,8 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                       ],
                                     ),
                                   ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

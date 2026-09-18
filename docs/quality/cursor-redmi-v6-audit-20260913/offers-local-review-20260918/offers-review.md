@@ -47,3 +47,7 @@ Founder requested further narrowing and premium gradient backgrounds. Width is n
 
 ## Shallow horizontal revision 6
 Founder clarified horizontal length around 80% and reduced vertical depth, with no green background. Carousel now uses 80%; image and CTA sit beside the details, removing the separate footer. Supplier gradient is charcoal-burgundy; MoolSocial remains plum. Action column is bounded at enlarged text to preserve space for product details. Current captures: offers-review-cinematic-v6-final. All 20 selected Offers tests passed, including narrow and enlarged-text cases. Local visual approval remains pending before Redmi upgrade.
+
+
+## Photo panel revision 7 — founder approved
+Text occupies the left side; the right 43% is a full-height image/action panel with an expanded contained packshot. Card retains 80% viewport length, compact height and charcoal-burgundy/plum backgrounds. All 20 selected Offers tests passed; source analysis has no issues. Founder approved this local visual in conversation. Next: Redmi build, install and device qualification.
