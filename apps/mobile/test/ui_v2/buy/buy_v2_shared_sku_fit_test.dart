@@ -99,20 +99,29 @@ void main() {
               find.byKey(ValueKey('buy-grid-packshot-${p.id}')),
             );
             expect(frame.width, closeTo(frame.height, 1));
-            expect(
-              frame.top - rects[i].top,
-              inInclusiveRange(0, 6),
-              reason: 'The product photo starts at the top of every shared SKU',
-            );
             final badge = find.byKey(
               ValueKey('buy-product-card-badge-${p.id}'),
             );
             if (badge.evaluate().isNotEmpty) {
               expect(
-                tester.getRect(badge).top,
-                greaterThanOrEqualTo(frame.bottom),
+                tester.getRect(badge).bottom,
+                lessThanOrEqualTo(frame.top),
               );
             }
+            final saveBounds = tester.getRect(
+              find.byKey(ValueKey('buy-save-${p.id}')),
+            );
+            final badgeBottom = badge.evaluate().isEmpty
+                ? saveBounds.bottom
+                : tester.getRect(badge).bottom;
+            final controlsBottom = badgeBottom > saveBounds.bottom
+                ? badgeBottom
+                : saveBounds.bottom;
+            expect(
+              frame.top - controlsBottom,
+              inInclusiveRange(0, 2),
+              reason: 'Only a thin gap follows controls, including long badges',
+            );
             expect(
               frame.overlaps(
                 tester.getRect(find.byKey(ValueKey('buy-save-${p.id}'))),
@@ -138,16 +147,13 @@ void main() {
           }
           final first = products.first;
           final save = find.byKey(ValueKey('buy-save-${first.id}'));
-          final photo = tester.getRect(
-            find.byKey(ValueKey('buy-grid-packshot-${first.id}')),
-          );
           final saveRect = tester.getRect(save);
           expect(saveRect.width, greaterThanOrEqualTo(28));
           expect(saveRect.height, greaterThanOrEqualTo(28));
           expect(
-            saveRect.bottom - photo.bottom,
-            lessThanOrEqualTo(30),
-            reason: 'Save uses a thin footer without reducing the photo',
+            saveRect.top - rects.first.top,
+            closeTo(0, 1),
+            reason: 'Save is attached to the top card edge',
           );
           final wasSaved = session.isSaved(first.id);
           await tester.ensureVisible(save);

@@ -11812,14 +11812,10 @@ class BuyV2ProductCard extends StatelessWidget {
                   ],
                 ),
                 Positioned(
-                  top: compact && alignMediaAtTop
-                      ? _skuPhotoExtent(constraints.maxWidth) + 4
-                      : compact
-                      ? 0
-                      : 2,
+                  top: compact ? 0 : 2,
                   right: 2,
                   child: _ProductSaveButton(
-                    compactFooter: compact && alignMediaAtTop,
+                    compactEdgeControls: compact && alignMediaAtTop,
                     session: session,
                     product: product,
                     showRemoveLabel: savedContext,
@@ -12106,7 +12102,7 @@ class _ProductSaveButton extends StatelessWidget {
     required this.product,
     this.showRemoveLabel = false,
     this.compactLabel = false,
-    this.compactFooter = false,
+    this.compactEdgeControls = false,
     this.beforeToggle,
   });
 
@@ -12114,7 +12110,7 @@ class _ProductSaveButton extends StatelessWidget {
   final BuyV2Product product;
   final bool showRemoveLabel;
   final bool compactLabel;
-  final bool compactFooter;
+  final bool compactEdgeControls;
   final bool Function()? beforeToggle;
 
   @override
@@ -12129,7 +12125,7 @@ class _ProductSaveButton extends StatelessWidget {
       session.toggleSaved(product.id);
     }
 
-    if (compactFooter) {
+    if (compactEdgeControls) {
       return IconButton(
         key: ValueKey('buy-save-${product.id}'),
         tooltip: saved
@@ -12144,9 +12140,17 @@ class _ProductSaveButton extends StatelessWidget {
           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
           foregroundColor: saved ? BuyV2Colors.orange : BuyV2Colors.navy,
         ),
-        icon: Icon(
-          saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-          size: 15,
+        icon: Container(
+          width: 22,
+          height: 22,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+            size: 15,
+          ),
         ),
       );
     }
@@ -12333,20 +12337,12 @@ class _ProductVisual extends StatelessWidget {
       squarePhoto ? 30 : reservedActionWidth,
       minimumControlExtent: squarePhoto ? 28 : minimumControlExtent,
     );
-    final photoInset = squarePhoto
-        ? 4.0
-        : compact
-        ? visualLayout.photoInset
-        : 0.0;
+    final photoInset = compact ? visualLayout.photoInset : 0.0;
     final photoExtent = squarePhoto
         ? _skuPhotoExtent(constraints.maxWidth)
         : 70.0;
     return SizedBox(
-      height: squarePhoto
-          ? photoExtent + 4 + visualLayout.photoInset
-          : compact
-          ? photoInset + photoExtent
-          : 110,
+      height: compact ? photoInset + photoExtent : 110,
       child: Stack(
         children: [
           Positioned.fill(
@@ -12388,11 +12384,7 @@ class _ProductVisual extends StatelessWidget {
             Positioned(
               key: ValueKey('buy-product-card-badge-${product.id}'),
               left: 6,
-              top: squarePhoto
-                  ? photoExtent + 4 + visualLayout.badgeTop
-                  : compact
-                  ? visualLayout.badgeTop
-                  : 6,
+              top: compact ? visualLayout.badgeTop : 6,
               right: compact ? visualLayout.badgeRight : 6,
               child: Align(
                 alignment: Alignment.topLeft,
