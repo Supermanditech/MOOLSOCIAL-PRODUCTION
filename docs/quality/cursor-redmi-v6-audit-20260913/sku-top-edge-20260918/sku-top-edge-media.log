@@ -1,0 +1,40 @@
+00:00 +0: loading C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913/apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart
+00:00 +0: R669 supplier media contract SKU media grid shop 320.0 1.0 store false
+00:01 +1: R669 supplier media contract SKU media grid shop 320.0 1.0 store true
+00:01 +2: R669 supplier media contract SKU media grid shop 320.0 1.0 store false offers aligned
+00:01 +3: R669 supplier media contract SKU media grid shop 320.0 2.0 store false
+00:02 +4: R669 supplier media contract SKU media grid shop 320.0 2.0 store true
+00:02 +5: R669 supplier media contract SKU media grid shop 320.0 2.0 store false offers aligned
+00:02 +6: R669 supplier media contract SKU media grid shop 360.0 1.0 store false
+00:02 +7: R669 supplier media contract SKU media grid shop 360.0 1.0 store true
+00:03 +8: R669 supplier media contract SKU media grid shop 360.0 1.0 store false offers aligned
+00:03 +9: R669 supplier media contract SKU media grid shop 360.0 2.0 store false
+00:03 +10: R669 supplier media contract SKU media grid shop 360.0 2.0 store true
+00:04 +11: R669 supplier media contract SKU media grid shop 360.0 2.0 store false offers aligned
+00:04 +12: R669 supplier media contract SKU media grid shop 390.0 1.0 store false
+00:04 +13: R669 supplier media contract SKU media grid shop 390.0 1.0 store true
+00:04 +14: R669 supplier media contract SKU media grid shop 390.0 1.0 store false offers aligned
+00:05 +15: R669 supplier media contract SKU media grid shop 390.0 2.0 store false
+00:05 +16: R669 supplier media contract SKU media grid shop 390.0 2.0 store true
+00:05 +17: R669 supplier media contract SKU media grid shop 390.0 2.0 store false offers aligned
+00:06 +18: R669 supplier media contract SKU media grid shop 430.0 1.0 store false saved long badge
+00:06 +19: R669 supplier media contract SKU media grid shop 430.0 1.0 store false saved long badge offers aligned
+00:06 +20: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store false
+00:06 +21: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store true
+00:07 +22: R669 supplier media contract SKU media grid wholesale 320.0 1.0 store false offers aligned
+00:07 +23: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store false
+00:07 +24: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store true
+00:07 +25: R669 supplier media contract SKU media grid wholesale 320.0 2.0 store false offers aligned
+00:08 +26: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store false
+00:08 +27: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store true
+00:08 +28: R669 supplier media contract SKU media grid wholesale 360.0 1.0 store false offers aligned
+00:08 +29: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store false
+00:09 +30: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store true
+00:09 +31: R669 supplier media contract SKU media grid wholesale 360.0 2.0 store false offers aligned
+00:09 +32: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store false
+00:09 +33: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store true
+00:10 +34: R669 supplier media contract SKU media grid wholesale 390.0 1.0 store false offers aligned
+00:10 +35: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store false
+00:10 +36: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store true
+00:10 +37: R669 supplier media contract SKU media grid wholesale 390.0 2.0 store false offers aligned
+00:11 +38: All tests passed!

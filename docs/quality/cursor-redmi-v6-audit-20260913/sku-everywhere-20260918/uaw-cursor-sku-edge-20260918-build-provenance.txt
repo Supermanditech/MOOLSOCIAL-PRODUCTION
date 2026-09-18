@@ -1,0 +1,15 @@
+CandidateId=UAW-CURSOR-SKU-EDGE-20260918
+RuntimeProfile=CursorUiReview
+RuntimeDefines=CursorUiReview;MOOLSOCIAL_UI_REVIEW_ONLY=true;MOOLSOCIAL_DEVICE_REVIEW=true;MOOLSOCIAL_USE_EMULATORS=true;MOOLSOCIAL_CANDIDATE_ID=UAW-CURSOR-SKU-EDGE-20260918;AndroidDebugPackage=cursorreview;Promotable=false
+Version=1.0.0-r66.30
+VersionCode=2026091802
+BuildMode=debug
+MachineState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.30\machine-state.json
+RuntimeState=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.30\machine-state.json
+Branch=work/cursor-ui/redmi-v6-audit-20260913
+HEAD=da4bd11dfb2b7cba809f9187d94cbcbf99944de9
+SourceFingerprint=6297FE491819F175699110F48C14A9B1BDFB9AA892FD2451F9BC45C842A4C541
+APK=C:\GUARANTEED OUTCOME\MOOLSOCIAL-WORKTREE-CURSOR-redmi-v6-audit-20260913\apps\mobile\build\cursor-review-r66.30\artifacts\uaw-cursor-sku-edge-20260918-device-review-debug.apk
+Bytes=210853633
+SHA256=2AA02DA4E28CE087E21D61F558BC8C705251E0A56A1A73721068E6A9C2C160B3
+BuiltAt=2026-09-18T21:48:06.1389462+05:30
