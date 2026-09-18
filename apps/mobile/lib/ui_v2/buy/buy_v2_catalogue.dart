@@ -1001,6 +1001,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
           (_pager.page == null && !_pager.loading && _pager.message == null)) {
         await _pager.open(widget.query);
       }
+      if (mounted && sequence == _openSequence) {
+        unawaited(_pager.prefetchAdjacent());
+      }
     });
   }
 
@@ -1029,6 +1032,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     if (!mounted) return;
     if (_shownPage != _pager.page) {
       _shownPage = _pager.page;
+      unawaited(_pager.prefetchAdjacent());
       // The pager admits current product records before notifying this view.
       // Refresh their validated facts as well, so provider identity and
       // fulfilment text cannot remain cached from a previous publication.
@@ -1070,7 +1074,7 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
     if (!widget.publishedOffers) return;
     final now = widget.session.catalogueNow();
     Duration? earliest;
-    for (final item in _pager.page?.items ?? const <Object>[]) {
+    for (final item in _pager.cachedItems) {
       final offer = item as BuyV2PublishedCatalogueOffer;
       if (!offer.validUntil.isAfter(now)) continue;
       final remaining = offer.validUntil.difference(now);
@@ -1267,14 +1271,69 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                       denseStore: widget.storeContext,
                       scrollIndicatorInset: true,
                     );
-                    final rowHeights = _productGridRowHeights(
-                      context,
-                      widget.session,
-                      products,
-                      columns: layout.columns,
-                      cardWidth: layout.cardWidth,
-                      storeContext: widget.storeContext,
-                    );
+                    Widget grid(
+                      List<BuyV2Product> items, {
+                      bool preview = false,
+                    }) {
+                      final rowHeights = _productGridRowHeights(
+                        context,
+                        widget.session,
+                        items,
+                        columns: layout.columns,
+                        cardWidth: layout.cardWidth,
+                        storeContext: widget.storeContext,
+                      );
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 6,
+                        ),
+                        child: Wrap(
+                          key: preview
+                              ? null
+                              : ValueKey(
+                                  'buy-paged-vertical-grid-${widget.scopeKey}',
+                                ),
+                          spacing: 7,
+                          runSpacing: 10,
+                          children: [
+                            for (final (index, product) in items.indexed)
+                              SizedBox(
+                                width: layout.cardWidth,
+                                height: rowHeights[index ~/ layout.columns],
+                                child: BuyV2ProductCard(
+                                  key: ValueKey('buy-paged-card-${product.id}'),
+                                  session: widget.session,
+                                  product: product,
+                                  compact: true,
+                                  storeContext: widget.storeContext,
+                                  onOpenProduct: widget.onOpenProduct,
+                                ),
+                              ),
+                          ],
+                        ),
+                      );
+                    }
+
+                    Widget? adjacent(bool forward) {
+                      final adjacent = _pager.adjacentPage(forward: forward);
+                      if (adjacent == null) return null;
+                      final items = <BuyV2Product>[];
+                      for (final item in adjacent.items) {
+                        if (item is BuyV2PublishedCatalogueOffer) {
+                          if (!item.isCurrent(
+                            now: widget.session.catalogueNow(),
+                          )) {
+                            return null;
+                          }
+                          items.add(item.product);
+                        } else {
+                          items.add(item as BuyV2Product);
+                        }
+                      }
+                      return grid(items, preview: true);
+                    }
+
                     final canPrevious =
                         !loading &&
                         publicationCurrent &&
@@ -1292,36 +1351,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                         pageIdentity: page,
                         onNext: canNext ? _pager.next : null,
                         onPrevious: canPrevious ? _pager.previous : null,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          child: Wrap(
-                            key: ValueKey(
-                              'buy-paged-vertical-grid-${widget.scopeKey}',
-                            ),
-                            spacing: 7,
-                            runSpacing: 10,
-                            children: [
-                              for (final (index, product) in products.indexed)
-                                SizedBox(
-                                  width: layout.cardWidth,
-                                  height: rowHeights[index ~/ layout.columns],
-                                  child: BuyV2ProductCard(
-                                    key: ValueKey(
-                                      'buy-paged-card-${product.id}',
-                                    ),
-                                    session: widget.session,
-                                    product: product,
-                                    compact: true,
-                                    storeContext: widget.storeContext,
-                                    onOpenProduct: widget.onOpenProduct,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
+                        nextChild: adjacent(true),
+                        previousChild: adjacent(false),
+                        child: grid(products),
                       ),
                     );
                   },
@@ -1363,8 +1395,12 @@ class _CataloguePageSwipe extends StatefulWidget {
     required this.child,
     this.onNext,
     this.onPrevious,
+    this.nextChild,
+    this.previousChild,
   });
 
+  final Widget? nextChild;
+  final Widget? previousChild;
   final Object contextIdentity;
   final Object? pageIdentity;
   final Future<void> Function()? onNext;
@@ -1382,7 +1418,11 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
   );
   double _distance = 0;
   bool _changingPage = false;
+  bool _pointerCancelled = false;
   Widget? _departingChild;
+  Widget? _incomingChild;
+  Object? _departingPage;
+  bool _forward = true;
   int _generation = 0;
 
   @override
@@ -1393,6 +1433,7 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
       _generation++;
       _changingPage = false;
       _departingChild = null;
+      _incomingChild = null;
       _distance = 0;
       _offset.stop();
       _offset.value = 0;
@@ -1420,10 +1461,11 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
     _distance = 0;
     final velocity = details.primaryVelocity ?? 0;
     final committed =
-        distance.abs() >= 48 ||
-        (distance.abs() >= 18 &&
-            velocity.abs() >= 500 &&
-            velocity.sign == distance.sign);
+        !_pointerCancelled &&
+        (distance.abs() >= 48 ||
+            (distance.abs() >= 18 &&
+                velocity.abs() >= 500 &&
+                velocity.sign == distance.sign));
     final forward = distance < 0;
     final action = forward ? widget.onNext : widget.onPrevious;
     if (!committed || action == null) {
@@ -1439,17 +1481,23 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
     setState(() {
       _changingPage = true;
       _departingChild = widget.child;
+      _departingPage = widget.pageIdentity;
+      _forward = forward;
+      _incomingChild = forward ? widget.nextChild : widget.previousChild;
     });
     try {
-      // Start the real request immediately; do not invent a neighbour page.
+      // Promote the validated preview, or await its real request.
       final request = action();
       await _settle(forward ? -width : width);
       await request;
       await WidgetsBinding.instance.endOfFrame;
       if (!mounted || generation != _generation) return;
-      setState(() => _departingChild = null);
+      setState(() {
+        _departingChild = null;
+        _incomingChild = null;
+      });
       if (widget.pageIdentity != previousPage) {
-        _offset.value = forward ? width : -width;
+        _offset.value = 0;
       }
       // Failed requests return the retained page without pretending to advance.
       await _settle(0);
@@ -1472,43 +1520,95 @@ class _CataloguePageSwipeState extends State<_CataloguePageSwipe>
   @override
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) => ClipRect(
-      child: GestureDetector(
-        behavior: HitTestBehavior.opaque,
-        onHorizontalDragStart: (_) {
-          if (_changingPage) return;
-          _offset.stop();
-          _distance = 0;
-        },
-        onHorizontalDragUpdate: (details) {
-          if (_changingPage) return;
-          _distance += details.primaryDelta ?? 0;
-          final available = _distance < 0
-              ? widget.onNext != null
-              : widget.onPrevious != null;
-          _offset.value = available
-              ? _distance.clamp(-constraints.maxWidth, constraints.maxWidth)
-              : (_distance * .18).clamp(-32.0, 32.0);
-        },
-        onHorizontalDragCancel: () {
-          _distance = 0;
-          if (!_changingPage) {
-            unawaited(
-              _settle(0).catchError((Object error) {
-                if (error is! TickerCanceled) throw error;
-              }),
-            );
-          }
-        },
-        onHorizontalDragEnd: (details) =>
-            unawaited(_finish(details, constraints.maxWidth)),
-        child: IgnorePointer(
-          ignoring: _changingPage,
-          child: AnimatedBuilder(
-            animation: _offset,
-            child: _departingChild ?? widget.child,
-            builder: (context, child) => Transform.translate(
-              offset: Offset(_offset.value, 0),
-              child: child,
+      child: Listener(
+        onPointerCancel: (_) => _pointerCancelled = true,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onHorizontalDragStart: (_) {
+            if (_changingPage) return;
+            _offset.stop();
+            _pointerCancelled = false;
+            _distance = 0;
+          },
+          onHorizontalDragUpdate: (details) {
+            if (_changingPage) return;
+            _distance += details.primaryDelta ?? 0;
+            final available = _distance < 0
+                ? widget.onNext != null
+                : widget.onPrevious != null;
+            _offset.value = available
+                ? _distance.clamp(-constraints.maxWidth, constraints.maxWidth)
+                : (_distance * .18).clamp(-32.0, 32.0);
+          },
+          onHorizontalDragCancel: () {
+            _distance = 0;
+            if (!_changingPage) {
+              unawaited(
+                _settle(0).catchError((Object error) {
+                  if (error is! TickerCanceled) throw error;
+                }),
+              );
+            }
+          },
+          onHorizontalDragEnd: (details) =>
+              unawaited(_finish(details, constraints.maxWidth)),
+          child: IgnorePointer(
+            ignoring: _changingPage,
+            child: AnimatedBuilder(
+              animation: _offset,
+              child: _departingChild ?? widget.child,
+              builder: (context, child) {
+                final forward = _changingPage ? _forward : _offset.value < 0;
+                final available = forward
+                    ? widget.onNext != null
+                    : widget.onPrevious != null;
+                final incoming =
+                    _changingPage && widget.pageIdentity != _departingPage
+                    ? widget.child
+                    : _changingPage
+                    ? (_incomingChild ??
+                          (forward ? widget.nextChild : widget.previousChild))
+                    : (forward ? widget.nextChild : widget.previousChild);
+                return Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Transform.translate(
+                      offset: Offset(_offset.value, 0),
+                      child: child,
+                    ),
+                    if (_offset.value != 0 && (available || _changingPage))
+                      Positioned.fill(
+                        key: const ValueKey('buy-incoming-grid'),
+                        child: Transform.translate(
+                          offset: Offset(
+                            _offset.value +
+                                (forward
+                                    ? constraints.maxWidth
+                                    : -constraints.maxWidth),
+                            0,
+                          ),
+                          child: IgnorePointer(
+                            child: ExcludeSemantics(
+                              child: ClipRect(
+                                child: OverflowBox(
+                                  alignment: Alignment.topCenter,
+                                  minHeight: 0,
+                                  maxHeight: double.infinity,
+                                  child:
+                                      incoming ??
+                                      const Padding(
+                                        padding: EdgeInsets.all(24),
+                                        child: Text('Loading products…'),
+                                      ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              },
             ),
           ),
         ),

@@ -156,15 +156,33 @@ void main() {
             );
             expect(tester.getTopLeft(cards[i]).dy, closeTo(before[i].dy, 1));
           }
-          expect(
-            source.pages.length,
-            1,
-            reason: 'Movement must precede the page request',
+          final incoming = source.pages.firstWhere((p) => p.startIndex == 40);
+          final incomingCard = find.byKey(
+            ValueKey('buy-product-${incoming.items.first.id}'),
           );
+          expect(incomingCard, findsOneWidget);
+          final incomingRect = tester.getRect(incomingCard);
+          expect(incomingRect.left, lessThan(390));
+          expect(incomingRect.right, greaterThan(320));
+          final status = find.byKey(
+            ValueKey('buy-page-status-catalogue-${destination.name}'),
+          );
+          expect(
+            tester.widget<Semantics>(status).properties.label,
+            startsWith('1–'),
+          );
+
           await _capture(tester, 'c04-${destination.name}-$reduced-during');
+          await gesture.moveBy(const Offset(-100, 0));
+          await tester.pump();
+          expect(tester.getRect(incomingCard).left, lessThan(240));
+          await _capture(tester, 'c04-${destination.name}-$reduced-halfway');
           await gesture.up();
           await tester.pumpAndSettle();
-          expect(source.pages.last.startIndex, 40);
+          expect(
+            tester.widget<Semantics>(status).properties.label,
+            startsWith('41–'),
+          );
           await _capture(tester, 'c04-${destination.name}-$reduced-after');
           final grid = find.byKey(
             ValueKey('buy-paged-vertical-grid-catalogue-${destination.name}'),
@@ -180,7 +198,10 @@ void main() {
           expect(tester.getTopLeft(grid).dx - settledX, closeTo(70, 1));
           await returnGesture.up();
           await tester.pumpAndSettle();
-          expect(source.pages.last.startIndex, 0);
+          expect(
+            tester.widget<Semantics>(status).properties.label,
+            startsWith('1–'),
+          );
           expect(session.itemCount, 0);
           expect(tester.takeException(), isNull);
         },
@@ -265,6 +286,13 @@ void main() {
       await gesture.moveBy(const Offset(-70, 0));
       await tester.pump();
       expect(tester.getTopLeft(grid).dx - before.dx, closeTo(-70, 1));
+      expect(
+        find.descendant(
+          of: find.byKey(const ValueKey('buy-incoming-grid')),
+          matching: find.byType(BuyV2ProductCard),
+        ),
+        findsWidgets,
+      );
       await gesture.up();
       await tester.pumpAndSettle();
       expect(
@@ -278,6 +306,51 @@ void main() {
       expect(tester.takeException(), isNull);
     });
   }
+
+  testWidgets('C04 cancelling a drag restores the same grid and page', (
+    tester,
+  ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(390, 844);
+    addTearDown(tester.view.reset);
+    final core = BuySession();
+    final source = _Source(BuyV2Destination.shop);
+    final session = BuyV2Session(
+      core: core,
+      reviewDataEnabled: true,
+      cataloguePageSource: source,
+      initialCatalogueRegionId: 'jodhpur',
+    );
+    addTearDown(core.dispose);
+    addTearDown(session.dispose);
+    await tester.pumpWidget(_app(session));
+    await tester.pumpAndSettle();
+    final grid = find.byKey(
+      const ValueKey('buy-paged-vertical-grid-catalogue-shop'),
+    );
+    final initial = tester.getTopLeft(grid);
+    final gesture = await tester.startGesture(Offset(260, initial.dy + 60));
+    await gesture.moveBy(const Offset(-25, 0));
+    await tester.pump();
+    await gesture.moveBy(const Offset(-90, 0));
+    await tester.pump();
+    expect(find.byKey(const ValueKey('buy-incoming-grid')), findsOneWidget);
+    await gesture.cancel();
+    await tester.pumpAndSettle();
+    expect(tester.getTopLeft(grid), initial);
+    expect(
+      tester
+          .widget<Semantics>(
+            find.byKey(const ValueKey('buy-page-status-catalogue-shop')),
+          )
+          .properties
+          .label,
+      startsWith('1–'),
+    );
+    expect(find.byKey(const ValueKey('buy-incoming-grid')), findsNothing);
+    expect(session.itemCount, 0);
+    expect(tester.takeException(), isNull);
+  });
 
   for (final productsFirst in [true, false]) {
     testWidgets(

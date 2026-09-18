@@ -459,7 +459,8 @@ void main() {
           final scroll = find.byKey(ValueKey('buy-paged-scroll-$scope'));
           final controller = tester.widget<ListView>(scroll).controller!;
           final status = find.byKey(ValueKey('buy-page-status-$scope'));
-          final initialQuery = source.requests.single;
+          addTearDown(() => session.releaseCatalogueProducts(scope));
+          final initialQuery = source.requests.first;
           Future<void> expectStart(int start) async {
             controller.jumpTo(0);
             await tester.pumpAndSettle();
@@ -514,7 +515,7 @@ void main() {
             const Offset(0, 300),
           );
           await tester.pumpAndSettle();
-          expect(source.requests.length, beforePull + 1);
+          expect(source.requests.length, beforePull + 2);
           await expectStart(0);
           final initialRequests = source.requests.length;
           await swipe(170);
@@ -536,10 +537,16 @@ void main() {
             if (!delay.isCompleted) delay.complete();
           });
           source.pageDelay = delay;
+          final pager = session.acquireCatalogueProducts(scope);
+          source.pageDelay = null;
+          await pager.refresh();
+          source.pageDelay = delay;
+          await tester.pump(const Duration(milliseconds: 50));
+          final delayedRequests = source.requests.length;
           await swipe(-170, settle: false);
-          expect(source.requests.length, initialRequests + 1);
+          expect(source.requests.length, delayedRequests);
           await swipe(-170, settle: false);
-          expect(source.requests.length, initialRequests + 1);
+          expect(source.requests.length, delayedRequests);
           source.pageDelay = null;
           delay.complete();
           await tester.pumpAndSettle();
@@ -549,9 +556,12 @@ void main() {
           await swipe(-170);
           await expectStart(40);
           source.failNext = true;
+          // Discard the successful speculative neighbour before exercising failure.
+          await pager.refresh();
+          await tester.pumpAndSettle();
           await swipe(-170);
           expect(find.text('Results could not refresh'), findsOneWidget);
-          await expectStart(40);
+          await expectStart(0);
           source.failNext = false;
           final retry = find.widgetWithText(TextButton, 'Try again');
           await tester.ensureVisible(retry);
@@ -559,8 +569,6 @@ void main() {
           expect(retry.hitTestable(), findsOneWidget);
           await tester.tap(retry);
           await tester.pumpAndSettle();
-          await expectStart(80);
-          await swipe(170);
           await expectStart(40);
           await swipe(170);
           await expectStart(0);
