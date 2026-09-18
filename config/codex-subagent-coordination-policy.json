@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4598,
-    "sha256": "FF8162791D69C60661A5AA0E1913809FFDA32CD9E7C19AC0EBB5914B596FEF38"
+    "entryCount": 4599,
+    "sha256": "FD8979D3A780BCAF4628DC2D7CFB885E643891276BC0C07BD10667E2711CA268"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -334,7 +334,10 @@
         "docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json",
         "docs/quality/STORE-BUY-SKU-REPAIR-20260918.md",
         "docs/quality/UAW-CURSOR-REDMI-V6-AUDIT-20260913.md",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart"
+        "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md",
+        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"
       ]
     },
     {
@@ -376,7 +379,6 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_screen.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_partner_catalogue_test.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_design.dart",
-        "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_shop_chat.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_invoice.dart",
         "apps/mobile/lib/ui_v2/buy/buy_v2_invoice_downloader.dart",
@@ -409,7 +411,6 @@
         "apps/mobile/lib/main.dart",
         "apps/mobile/lib/app/ui_review_language_store.dart",
         "apps/mobile/test/app/ui_review_language_store_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_actions_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_variant_selection_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_responsive_product_grid_test.dart",
@@ -2117,6 +2118,27 @@
           "docs/quality/STORE-BUY-SKU-REPAIR-20260918.md"
         ],
         "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_store_buy_baseline_fixes_20260918",
+        "state": "founder_authorized_2026_09_18",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "store-buy-baseline-fixes-20260918",
+        "ticketId": "UAW-STORE-BUY-BASELINE-FIXES-20260918",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-baseline-fixes-20260918",
+        "branch": "work/codex-ui/store-buy-baseline-fixes-20260918",
+        "baselineHead": "6e7e34c0e7aa15d4710b1132bf4371f7dddf65d3",
+        "bootstrapCommitSubject": "coordination(store-buy-baseline-fixes-20260918): register bounded Cart readability correction",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md"
+        ],
+        "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
       }
     ],
