@@ -623,6 +623,26 @@ void main() {
       final packshot = find.byKey(ValueKey('buy-cart-packshot-${product.id}'));
       await showInMainCartList(tester, packshot);
       expect(packshot, findsOneWidget);
+      final save = find.byKey(ValueKey('buy-save-${product.id}'));
+      expect(save, findsOneWidget);
+      expect(
+        tester.getRect(save).bottom,
+        lessThanOrEqualTo(tester.getRect(packshot).top),
+      );
+      expect(tester.getSize(packshot), const Size(60, 60));
+      final quantity = session.quantityFor(product.id);
+      final wasSaved = session.isSaved(product.id);
+      await Scrollable.ensureVisible(tester.element(save), alignment: 0.5);
+      await tester.pumpAndSettle();
+      expect(save.hitTestable(), findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(product.id), !wasSaved);
+      expect(session.quantityFor(product.id), quantity);
+      expect(find.byKey(const ValueKey('buy-cart-empty')), findsOneWidget);
+      await tester.tap(save);
+      await tester.pumpAndSettle();
+      expect(session.isSaved(product.id), wasSaved);
     }
     expect(find.text('Shop order'), findsNothing);
     expect(find.text('Wholesale order'), findsNothing);
@@ -932,10 +952,13 @@ void main() {
       expect(target.hitTestable(), findsOneWidget);
     }
 
-    expect(find.text('Remove'), findsWidgets);
+    expect(
+      find.byTooltip('Remove ${shop.customerTitle} from Saved'),
+      findsOneWidget,
+    );
     expect(
       tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).height,
-      greaterThanOrEqualTo(44),
+      equals(28),
     );
     expect(
       tester.getSize(find.byKey(ValueKey('buy-save-${shop.id}'))).width,

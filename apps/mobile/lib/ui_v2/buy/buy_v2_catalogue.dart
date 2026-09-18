@@ -10788,8 +10788,8 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
       context,
       product,
       constraints.maxWidth,
-      42,
-      minimumControlExtent: 48,
+      30,
+      minimumControlExtent: 28,
     );
     final stacked =
         quantity > 0 &&
@@ -10854,9 +10854,10 @@ class _FeaturedProductCardState extends State<_FeaturedProductCard> {
                             ),
                           ),
                           Positioned(
-                            top: 2,
+                            top: 0,
                             right: 2,
                             child: _ProductSaveButton(
+                              compactEdgeControls: true,
                               session: session,
                               product: product,
                             ),
@@ -10914,8 +10915,8 @@ class _FeaturedProductVisual extends StatelessWidget {
         context,
         product,
         constraints.maxWidth,
-        42,
-        minimumControlExtent: 48,
+        30,
+        minimumControlExtent: 28,
       );
       final stacked = _gridQuantityStacks(
         constraints.maxWidth - 14,
@@ -12091,6 +12092,74 @@ class _QuantityStepperTargets extends StatelessWidget {
             child: action('Increase', 'Add one', onIncrease),
           ),
         ],
+      );
+    },
+  );
+}
+
+/// Shared thin top edge for SKU surfaces outside the catalogue grid.
+class BuyV2ProductEdgeControls extends StatelessWidget {
+  const BuyV2ProductEdgeControls({
+    super.key,
+    required this.session,
+    required this.product,
+  });
+  final BuyV2Session session;
+  final BuyV2Product product;
+
+  @override
+  Widget build(BuildContext context) => LayoutBuilder(
+    builder: (context, constraints) {
+      final layout = _compactProductVisualLayout(
+        context,
+        product,
+        constraints.maxWidth,
+        30,
+        minimumControlExtent: 28,
+      );
+      return SizedBox(
+        height: layout.photoInset,
+        child: Stack(
+          children: [
+            if (product.badge.trim().isNotEmpty)
+              Positioned(
+                key: ValueKey('buy-edge-badge-${product.id}'),
+                left: 6,
+                top: layout.badgeTop,
+                right: layout.badgeRight,
+                child: Align(
+                  alignment: Alignment.topLeft,
+                  child: Container(
+                    constraints: BoxConstraints(maxWidth: layout.badgeMaxWidth),
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: product.requiresPrescription
+                          ? BuyV2Colors.navy
+                          : BuyV2Colors.green,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      _compactProductBadge(product.badge),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 8,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            Positioned(
+              top: 0,
+              right: 2,
+              child: _ProductSaveButton(
+                session: session,
+                product: product,
+                compactEdgeControls: true,
+              ),
+            ),
+          ],
+        ),
       );
     },
   );

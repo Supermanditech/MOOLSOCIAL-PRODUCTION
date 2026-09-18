@@ -16,7 +16,8 @@ import '../../features/work/scan_and_pick_contract.dart';
 import '../../features/journey01/journey_services.dart';
 import 'buy_v2_address_form_sheet_motion.dart';
 import 'buy_v2_address_sheet_motion.dart';
-import 'buy_v2_catalogue.dart' show BuyV2ProgressiveProductGrid;
+import 'buy_v2_catalogue.dart'
+    show BuyV2ProgressiveProductGrid, BuyV2ProductEdgeControls;
 import 'buy_v2_design.dart';
 import 'buy_v2_filter_sheet_motion.dart';
 import 'buy_v2_invoice.dart';
@@ -17865,22 +17866,17 @@ class _CartProductLane extends StatelessWidget {
           const SizedBox(height: 7),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(minHeight: 174),
-              child: IntrinsicHeight(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    for (var index = 0; index < products.length; index++) ...[
-                      if (index > 0) const SizedBox(width: 7),
-                      _CartRecommendationCard(
-                        session: session,
-                        product: products[index],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                for (var index = 0; index < products.length; index++) ...[
+                  if (index > 0) const SizedBox(width: 7),
+                  _CartRecommendationCard(
+                    session: session,
+                    product: products[index],
+                  ),
+                ],
+              ],
             ),
           ),
         ],
@@ -17921,48 +17917,16 @@ class _CartRecommendationCard extends StatelessWidget {
           child: Padding(
             padding: const EdgeInsets.all(6),
             child: Column(
+              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                BuyV2ProductEdgeControls(session: session, product: product),
                 SizedBox(
                   height: 68,
-                  child: Stack(
-                    children: [
-                      Positioned.fill(
-                        child: BuyV2ProductPackshot(
-                          product: product,
-                          borderRadius: 10,
-                        ),
-                      ),
-                      if (product.badge.trim().isNotEmpty)
-                        Positioned(
-                          key: ValueKey(
-                            'buy-related-product-badge-${product.id}',
-                          ),
-                          left: 4,
-                          top: 4,
-                          child: Container(
-                            constraints: const BoxConstraints(maxWidth: 92),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 5,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: BuyV2Colors.green,
-                              borderRadius: BorderRadius.circular(7),
-                            ),
-                            child: Text(
-                              product.badge,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 7,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                          ),
-                        ),
-                    ],
+                  width: double.infinity,
+                  child: BuyV2ProductPackshot(
+                    product: product,
+                    borderRadius: 10,
                   ),
                 ),
                 const SizedBox(height: 5),
@@ -18697,94 +18661,112 @@ class _CartLine extends StatelessWidget {
 
     return Container(
       key: ValueKey('buy-cart-line-${product.id}'),
-      padding: const EdgeInsets.fromLTRB(10, 9, 9, 9),
       decoration: buyV2CardDecoration(radius: 14),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final controlsWidth =
-              (88 + quantitySize.width.clamp(44.0, double.infinity)).clamp(
-                lineTotalSize.width,
-                double.infinity,
-              );
-          // Image, chevron and gaps also share the inline product row.
-          final inlineTitleWidth = constraints.maxWidth - controlsWidth - 96;
-          final metadataNeedsMoreWidth =
-              [
-                (text: product.customerTitle, style: context.buyBody),
-                (
-                  text: '${product.customerVariant} ${product.pack}',
-                  style: context.buyMeta.copyWith(fontSize: 11),
-                ),
-                (
-                  text:
-                      '$buyerPromise ${product.customerSeller(automaticFulfilment ? facts.partner : product.seller)}',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ].any(
-                (field) =>
-                    inlineTitleWidth <= 0 ||
-                    field.text
-                        .split(RegExp(r'\s+'))
-                        .any(
-                          (word) =>
-                              buyV2ValueTextSize(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          BuyV2ProductEdgeControls(session: session, product: product),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(10, 0, 9, 9),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final controlsWidth =
+                    (88 + quantitySize.width.clamp(44.0, double.infinity))
+                        .clamp(lineTotalSize.width, double.infinity);
+                // Image, chevron and gaps also share the inline product row.
+                final inlineTitleWidth =
+                    constraints.maxWidth - controlsWidth - 96;
+                final metadataNeedsMoreWidth =
+                    [
+                      (text: product.customerTitle, style: context.buyBody),
+                      (
+                        text: '${product.customerVariant} ${product.pack}',
+                        style: context.buyMeta.copyWith(fontSize: 11),
+                      ),
+                      (
+                        text:
+                            '$buyerPromise ${product.customerSeller(automaticFulfilment ? facts.partner : product.seller)}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ].any(
+                      (field) =>
+                          inlineTitleWidth <= 0 ||
+                          field.text
+                              .split(RegExp(r'\s+'))
+                              .any(
+                                (word) =>
+                                    buyV2ValueTextSize(
+                                      context,
+                                      word,
+                                      field.style,
+                                    ).width >
+                                    inlineTitleWidth,
+                              ) ||
+                          buyV2ValueTextSize(
                                 context,
-                                word,
+                                field.text,
                                 field.style,
-                              ).width >
-                              inlineTitleWidth,
-                        ) ||
-                    buyV2ValueTextSize(
-                          context,
-                          field.text,
-                          field.style,
-                          maxWidth: math.max(1, inlineTitleWidth),
-                          maxLines: null,
-                        ).height >
-                        buyV2ValueTextSize(context, 'Ag', field.style).height *
-                            2,
-              );
-          final compactDetails =
-              (wholesale && constraints.maxWidth < 340) ||
-              MediaQuery.textScalerOf(context).scale(1) > 1.2 ||
-              metadataNeedsMoreWidth;
-          if (compactDetails) {
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                productBody,
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.only(top: 8),
-                  decoration: const BoxDecoration(
-                    border: Border(top: BorderSide(color: BuyV2Colors.line)),
-                  ),
-                  child: Wrap(
-                    alignment: WrapAlignment.spaceBetween,
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [price, quantityControl],
-                  ),
-                ),
-              ],
-            );
-          }
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: productBody),
-              const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [price, const SizedBox(height: 5), quantityControl],
-              ),
-            ],
-          );
-        },
+                                maxWidth: math.max(1, inlineTitleWidth),
+                                maxLines: null,
+                              ).height >
+                              buyV2ValueTextSize(
+                                    context,
+                                    'Ag',
+                                    field.style,
+                                  ).height *
+                                  2,
+                    );
+                final compactDetails =
+                    (wholesale && constraints.maxWidth < 340) ||
+                    MediaQuery.textScalerOf(context).scale(1) > 1.2 ||
+                    metadataNeedsMoreWidth;
+                if (compactDetails) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      productBody,
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.only(top: 8),
+                        decoration: const BoxDecoration(
+                          border: Border(
+                            top: BorderSide(color: BuyV2Colors.line),
+                          ),
+                        ),
+                        child: Wrap(
+                          alignment: WrapAlignment.spaceBetween,
+                          crossAxisAlignment: WrapCrossAlignment.center,
+                          spacing: 12,
+                          runSpacing: 8,
+                          children: [price, quantityControl],
+                        ),
+                      ),
+                    ],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: productBody),
+                    const SizedBox(width: 8),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        price,
+                        const SizedBox(height: 5),
+                        quantityControl,
+                      ],
+                    ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
       ),
     );
   }
