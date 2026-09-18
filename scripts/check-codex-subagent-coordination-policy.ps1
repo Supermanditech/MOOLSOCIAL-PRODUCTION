@@ -872,7 +872,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 78) `
+Assert-Coordination ($continuationBindings.Count -eq 79) `
   'founder-authorized continuation binding inventory changed.'
 
 $redmiExpectedBinding = @'
@@ -2508,6 +2508,22 @@ if ($ProductionLane -ceq 'baseline') {
           'docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md'
         )
       )
+      $oppoBaselineQualificationOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq 'codex_oppo_baseline_qualification_20260918' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq '123ff42cf8179b272d33b480e8267dfa83af2de3' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'oppo-baseline-qualification-20260918' -and
+        $ProductionTicketId -ceq 'UAW-OPPO-BASELINE-QUALIFICATION-20260918' -and
+        (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-oppo-baseline-qualification-20260918' -and
+        $effectiveOwner -cin @(
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'scripts/check-approved-ui-locks.ps1',
+          'docs/quality/OPPO-BASELINE-QUALIFICATION-20260918.md'
+        )
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -2520,7 +2536,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner) {
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or $oppoBaselineQualificationOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -2532,7 +2548,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or $oppoBaselineQualificationOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }

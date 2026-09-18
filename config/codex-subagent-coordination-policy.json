@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4601,
-    "sha256": "74FBCD2BF89615CCBA2205AC18AECAFA22D69EBA7EE2D195C68A3B1FB5A18423"
+    "entryCount": 4603,
+    "sha256": "3DD8D12DB63A082A1BC4FA4F27E0FBEACFF42E7235A2D083938B6607CD98F925"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -338,7 +338,8 @@
         "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
+        "docs/quality/OPPO-BASELINE-QUALIFICATION-20260918.md"
       ]
     },
     {
@@ -2137,6 +2138,27 @@
           "config/codex-subagent-coordination-policy.json",
           "scripts/check-codex-subagent-coordination-policy.ps1",
           "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md"
+        ],
+        "cursorIndependent": true,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_oppo_baseline_qualification_20260918",
+        "state": "founder_authorized_2026_09_18",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "oppo-baseline-qualification-20260918",
+        "ticketId": "UAW-OPPO-BASELINE-QUALIFICATION-20260918",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-oppo-baseline-qualification-20260918",
+        "branch": "work/codex-ui/oppo-baseline-qualification-20260918",
+        "baselineHead": "123ff42cf8179b272d33b480e8267dfa83af2de3",
+        "bootstrapCommitSubject": "coordination(oppo-baseline-qualification-20260918): register exact baseline device qualification",
+        "bootstrapOwners": [
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/OPPO-BASELINE-QUALIFICATION-20260918.md"
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
