@@ -361,6 +361,15 @@ void main() {
         await tester.tap(add);
         await tester.pumpAndSettle();
         expect(session.quantityFor(ids.first), 1);
+        if (scale == 1) {
+          final quantity = find.byKey(ValueKey('buy-quantity-${ids.first}'));
+          expect(
+            tester.getSize(quantity).height,
+            44,
+            reason: 'Normal quantity must not become a tall two-row box',
+          );
+          await _capture(tester, 'offers-${size.width}-$scale-quantity');
+        }
         expect(tester.getSize(neighbour).height, closeTo(neighbourHeight, .1));
         final increase = find.descendant(
           of: firstCard,

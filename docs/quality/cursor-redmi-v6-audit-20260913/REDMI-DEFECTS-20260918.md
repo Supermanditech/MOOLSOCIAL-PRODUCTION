@@ -44,3 +44,5 @@ OPEN, newly observed on device; accessibility follow-up to OFFERS-01/03, not a n
 - Restored font_scale1.0, user_rotation0, accelerometer_rotation1, verified via ADB. Fixture cart retains founder Shop3/145 plus audit Wholesale4/2320 (aggregate2465) for reproduction; no purchase. Original Shop Saved1 retained; temporary Wholesale save removed.
 
 Disposition: THREE distinct visual defects registered. No new app code during this audit phase. r66.29 NOT qualified because defects remain open. Floating mini-cart overlaps photos while avoiding registered text/actions; existing movable/avoidance design is not counted as a fourth confirmed ticket. This is a bounded requested-screen UI audit, not exhaustive app/backend/live-data/release-performance qualification. Implementation and successor retest remain pending.
+
+Local implementation follow-up: all three defects and founder promo-gradient/thin-footer additions are implemented with local evidence in SKU-DEVICE-FIXES-20260918.md. Device closure remains pending visual approval and successor Redmi retest.

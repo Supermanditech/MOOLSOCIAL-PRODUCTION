@@ -584,7 +584,9 @@ void main() {
                         );
                         expect(
                           badgeBounds.top,
-                          greaterThan(removeBounds.bottom),
+                          greaterThanOrEqualTo(removeBounds.bottom),
+                          reason:
+                              'A thin footer may share a boundary without overlapping Save',
                         );
                         expect(
                           badgeBounds.width,

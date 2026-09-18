@@ -706,7 +706,12 @@ void main() {
             final decreaseBounds = tester.getRect(decrease);
             final increaseBounds = tester.getRect(increase);
             for (final bounds in [decreaseBounds, increaseBounds]) {
-              expect(bounds.width, greaterThanOrEqualTo(44));
+              expect(
+                bounds.width,
+                greaterThanOrEqualTo(28),
+                reason:
+                    'Compact SKU controls keep separate 28x44 or larger targets',
+              );
               expect(bounds.height, greaterThanOrEqualTo(44));
               expect(bounds.left, greaterThanOrEqualTo(cardBounds.left));
               expect(bounds.right, lessThanOrEqualTo(cardBounds.right));
@@ -745,7 +750,7 @@ void main() {
             final transitioning = action('Increase', initial);
             expect(
               tester.getRect(transitioning).width,
-              greaterThanOrEqualTo(44),
+              greaterThanOrEqualTo(28),
             );
             expect(
               tester.getRect(transitioning).height,

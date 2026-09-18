@@ -668,10 +668,17 @@ class _OffersCategoryControl extends StatelessWidget {
                   color: BuyV2Colors.softBlue,
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: Row(
+                child: Flex(
+                  direction: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                      ? Axis.vertical
+                      : Axis.horizontal,
                   children: [
                     for (final mool in [false, true])
-                      Expanded(
+                      Flexible(
+                        fit: FlexFit.tight,
+                        flex: MediaQuery.textScalerOf(context).scale(1) > 1.3
+                            ? 0
+                            : 1,
                         child: TextButton(
                           key: ValueKey(
                             'buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}',
@@ -800,8 +807,12 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final cardWidth = constraints.maxWidth * .80 - 12;
-                final imageWidth = cardWidth * .43;
-                final textWidth = cardWidth - imageWidth - 16;
+                final largeText =
+                    MediaQuery.textScalerOf(context).scale(1) > 1.3;
+                final imageWidth = largeText ? cardWidth : cardWidth * .43;
+                final textWidth = largeText
+                    ? cardWidth - 16
+                    : cardWidth - imageWidth - 16;
                 double measure(
                   String text,
                   double size,
@@ -870,7 +881,9 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         textWidth,
                       );
                   final candidate =
-                      16 + (contentHeight > 112 ? contentHeight : 112.0);
+                      16 +
+                      (contentHeight > 112 ? contentHeight : 112.0) +
+                      (largeText ? 112 : 0);
                   if (candidate > height) height = candidate;
                 }
                 return SizedBox(
@@ -919,7 +932,10 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                           child: InkWell(
                             key: ValueKey('buy-published-offer-${product.id}'),
                             onTap: open,
-                            child: Row(
+                            child: Flex(
+                              direction: largeText
+                                  ? Axis.vertical
+                                  : Axis.horizontal,
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: [
                                 Expanded(
@@ -996,9 +1012,37 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                 ),
                                 SizedBox(
                                   width: imageWidth,
-                                  child: ColoredBox(
-                                    color: const Color(0xFFFFF8F0),
-                                    child: Column(
+                                  height: largeText ? 112 : null,
+                                  child: Container(
+                                    decoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0xFFF7EAE3),
+                                          Color(0xFFECDDE7),
+                                        ],
+                                      ),
+                                      border: Border(
+                                        left: BorderSide(
+                                          color: Color(0x337C5264),
+                                        ),
+                                      ),
+                                    ),
+                                    foregroundDecoration: const BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors: [
+                                          Color(0x05A36B76),
+                                          Color(0x16A36B76),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Flex(
+                                      direction: largeText
+                                          ? Axis.horizontal
+                                          : Axis.vertical,
                                       children: [
                                         Expanded(
                                           child: BuyV2ProductPackshot(
@@ -1006,23 +1050,27 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                             borderRadius: 0,
                                           ),
                                         ),
-                                        TextButton(
-                                          key: ValueKey(
-                                            'buy-offer-promotion-cta-${product.id}',
-                                          ),
-                                          onPressed: open,
-                                          style: TextButton.styleFrom(
-                                            foregroundColor: const Color(
-                                              0xFF30232D,
+                                        SizedBox(
+                                          width: largeText ? 112 : null,
+                                          child: TextButton(
+                                            key: ValueKey(
+                                              'buy-offer-promotion-cta-${product.id}',
                                             ),
-                                            padding: EdgeInsets.zero,
-                                            minimumSize: const Size(44, 48),
-                                          ),
-                                          child: const Text(
-                                            'View offer →',
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              height: 1.15,
+                                            onPressed: open,
+                                            style: TextButton.styleFrom(
+                                              foregroundColor: const Color(
+                                                0xFF30232D,
+                                              ),
+                                              padding: EdgeInsets.zero,
+                                              minimumSize: const Size(44, 48),
+                                            ),
+                                            child: const Text(
+                                              'View offer →',
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                height: 1.15,
+                                              ),
                                             ),
                                           ),
                                         ),
@@ -9804,8 +9852,17 @@ const _gridQuantityStyle = TextStyle(
   fontWeight: FontWeight.w900,
 );
 
+// Keep the normal count on one row in a narrow three-column SKU card.
+// Each side retains a separate target at least 28 wide and 44 high; the
+// editable count has at least 24 width. Large values fall back to two rows.
 bool _gridQuantityStacks(double width, double valueWidth) =>
-    width < 88 + (valueWidth + 16).clamp(44.0, double.infinity);
+    width < 56 + (valueWidth + 12).clamp(24.0, double.infinity);
+
+double _gridQuantitySideWidth(double width, double valueWidth) =>
+    ((width - (valueWidth + 12).clamp(24.0, double.infinity)) / 2).clamp(
+      28.0,
+      44.0,
+    );
 
 double _gridMaximumQuantityWidth(
   BuildContext context,
@@ -11755,9 +11812,14 @@ class BuyV2ProductCard extends StatelessWidget {
                   ],
                 ),
                 Positioned(
-                  top: compact ? 0 : 2,
+                  top: compact && alignMediaAtTop
+                      ? _skuPhotoExtent(constraints.maxWidth) + 4
+                      : compact
+                      ? 0
+                      : 2,
                   right: 2,
                   child: _ProductSaveButton(
+                    compactFooter: compact && alignMediaAtTop,
                     session: session,
                     product: product,
                     showRemoveLabel: savedContext,
@@ -11885,22 +11947,38 @@ class _QuantityStepper extends StatelessWidget {
                   ),
                 ],
               )
-            : Row(
-                children: [
-                  const SizedBox(
-                    width: 44,
-                    child: Icon(
-                      Icons.remove,
-                      size: 17,
-                      color: BuyV2Colors.navy,
-                    ),
-                  ),
-                  Expanded(child: value),
-                  const SizedBox(
-                    width: 44,
-                    child: Icon(Icons.add, size: 17, color: BuyV2Colors.navy),
-                  ),
-                ],
+            : LayoutBuilder(
+                builder: (context, constraints) {
+                  final side = _gridQuantitySideWidth(
+                    constraints.maxWidth,
+                    buyV2ValueTextSize(
+                      context,
+                      '$quantity',
+                      _gridQuantityStyle,
+                    ).width,
+                  );
+                  return Row(
+                    children: [
+                      SizedBox(
+                        width: side,
+                        child: const Icon(
+                          Icons.remove,
+                          size: 17,
+                          color: BuyV2Colors.navy,
+                        ),
+                      ),
+                      Expanded(child: value),
+                      SizedBox(
+                        width: side,
+                        child: const Icon(
+                          Icons.add,
+                          size: 17,
+                          color: BuyV2Colors.navy,
+                        ),
+                      ),
+                    ],
+                  );
+                },
               ),
       ),
     );
@@ -11934,6 +12012,16 @@ class _QuantityStepperTargets extends StatelessWidget {
   Widget build(BuildContext context) => LayoutBuilder(
     builder: (context, constraints) {
       const target = BuyV2Metrics.minimumTap;
+      final sideWidth = stacked
+          ? target
+          : _gridQuantitySideWidth(
+              constraints.maxWidth - visualInset * 2,
+              buyV2ValueTextSize(
+                context,
+                '$quantity',
+                _gridQuantityStyle,
+              ).width,
+            );
       final maximumInset = ((constraints.maxWidth - target * 2) / 2).clamp(
         0.0,
         double.infinity,
@@ -11955,8 +12043,8 @@ class _QuantityStepperTargets extends StatelessWidget {
             child: IconButton(
               tooltip: tooltip,
               onPressed: onTap,
-              constraints: const BoxConstraints.tightFor(
-                width: target,
+              constraints: BoxConstraints.tightFor(
+                width: sideWidth,
                 height: target,
               ),
               padding: EdgeInsets.zero,
@@ -11967,8 +12055,8 @@ class _QuantityStepperTargets extends StatelessWidget {
       return Stack(
         children: [
           Positioned(
-            left: stacked ? 0 : visualInset + target,
-            right: stacked ? 0 : visualInset + target,
+            left: stacked ? 0 : visualInset + sideWidth,
+            right: stacked ? 0 : visualInset + sideWidth,
             top: 0,
             height: stacked
                 ? _gridQuantityLabelHeight(
@@ -11991,7 +12079,7 @@ class _QuantityStepperTargets extends StatelessWidget {
           Positioned(
             left: inset,
             bottom: 0,
-            width: target,
+            width: sideWidth,
             height: target,
             child: action(
               'Decrease',
@@ -12002,7 +12090,7 @@ class _QuantityStepperTargets extends StatelessWidget {
           Positioned(
             right: inset,
             bottom: 0,
-            width: target,
+            width: sideWidth,
             height: target,
             child: action('Increase', 'Add one', onIncrease),
           ),
@@ -12018,6 +12106,7 @@ class _ProductSaveButton extends StatelessWidget {
     required this.product,
     this.showRemoveLabel = false,
     this.compactLabel = false,
+    this.compactFooter = false,
     this.beforeToggle,
   });
 
@@ -12025,6 +12114,7 @@ class _ProductSaveButton extends StatelessWidget {
   final BuyV2Product product;
   final bool showRemoveLabel;
   final bool compactLabel;
+  final bool compactFooter;
   final bool Function()? beforeToggle;
 
   @override
@@ -12039,6 +12129,27 @@ class _ProductSaveButton extends StatelessWidget {
       session.toggleSaved(product.id);
     }
 
+    if (compactFooter) {
+      return IconButton(
+        key: ValueKey('buy-save-${product.id}'),
+        tooltip: saved
+            ? 'Remove ${product.customerTitle} from Saved'
+            : 'Save ${product.customerTitle}',
+        onPressed: toggleSaved,
+        padding: EdgeInsets.zero,
+        constraints: const BoxConstraints.tightFor(width: 28, height: 28),
+        style: IconButton.styleFrom(
+          minimumSize: const Size(28, 28),
+          maximumSize: const Size(28, 28),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          foregroundColor: saved ? BuyV2Colors.orange : BuyV2Colors.navy,
+        ),
+        icon: Icon(
+          saved ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+          size: 15,
+        ),
+      );
+    }
     if (showRemoveLabel && saved) {
       return Semantics(
         key: ValueKey('buy-save-${product.id}'),
@@ -12131,10 +12242,10 @@ class _ProductSaveButton extends StatelessWidget {
       icon: BuyV2FiniteVisualTransition(
         key: ValueKey('buy-save-visual-${product.id}'),
         stateKey: saved,
-        ownerSize: const Size.square(27),
+        ownerSize: const Size.square(22),
         child: Container(
-          width: 27,
-          height: 27,
+          width: 22,
+          height: 22,
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: .92),
             shape: BoxShape.circle,
@@ -12219,15 +12330,23 @@ class _ProductVisual extends StatelessWidget {
       context,
       product,
       constraints.maxWidth,
-      reservedActionWidth,
-      minimumControlExtent: minimumControlExtent,
+      squarePhoto ? 30 : reservedActionWidth,
+      minimumControlExtent: squarePhoto ? 28 : minimumControlExtent,
     );
-    final photoInset = compact ? visualLayout.photoInset : 0.0;
+    final photoInset = squarePhoto
+        ? 4.0
+        : compact
+        ? visualLayout.photoInset
+        : 0.0;
     final photoExtent = squarePhoto
         ? _skuPhotoExtent(constraints.maxWidth)
         : 70.0;
     return SizedBox(
-      height: compact ? photoInset + photoExtent : 110,
+      height: squarePhoto
+          ? photoExtent + 4 + visualLayout.photoInset
+          : compact
+          ? photoInset + photoExtent
+          : 110,
       child: Stack(
         children: [
           Positioned.fill(
@@ -12241,8 +12360,11 @@ class _ProductVisual extends StatelessWidget {
               ),
             ),
           ),
-          Padding(
-            padding: EdgeInsets.only(top: photoInset),
+          Positioned(
+            left: 0,
+            right: 0,
+            top: photoInset,
+            height: compact ? photoExtent : 86,
             child: Align(
               alignment: compact ? Alignment.center : const Alignment(0, .35),
               child: SizedBox(
@@ -12266,7 +12388,11 @@ class _ProductVisual extends StatelessWidget {
             Positioned(
               key: ValueKey('buy-product-card-badge-${product.id}'),
               left: 6,
-              top: compact ? visualLayout.badgeTop : 6,
+              top: squarePhoto
+                  ? photoExtent + 4 + visualLayout.badgeTop
+                  : compact
+                  ? visualLayout.badgeTop
+                  : 6,
               right: compact ? visualLayout.badgeRight : 6,
               child: Align(
                 alignment: Alignment.topLeft,

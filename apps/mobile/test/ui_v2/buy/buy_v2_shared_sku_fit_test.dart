@@ -100,6 +100,20 @@ void main() {
             );
             expect(frame.width, closeTo(frame.height, 1));
             expect(
+              frame.top - rects[i].top,
+              inInclusiveRange(0, 6),
+              reason: 'The product photo starts at the top of every shared SKU',
+            );
+            final badge = find.byKey(
+              ValueKey('buy-product-card-badge-${p.id}'),
+            );
+            if (badge.evaluate().isNotEmpty) {
+              expect(
+                tester.getRect(badge).top,
+                greaterThanOrEqualTo(frame.bottom),
+              );
+            }
+            expect(
               frame.overlaps(
                 tester.getRect(find.byKey(ValueKey('buy-save-${p.id}'))),
               ),
@@ -122,6 +136,29 @@ void main() {
               expect(below.first.top - rects[i].bottom, closeTo(10, 1));
             }
           }
+          final first = products.first;
+          final save = find.byKey(ValueKey('buy-save-${first.id}'));
+          final photo = tester.getRect(
+            find.byKey(ValueKey('buy-grid-packshot-${first.id}')),
+          );
+          final saveRect = tester.getRect(save);
+          expect(saveRect.width, greaterThanOrEqualTo(28));
+          expect(saveRect.height, greaterThanOrEqualTo(28));
+          expect(
+            saveRect.bottom - photo.bottom,
+            lessThanOrEqualTo(30),
+            reason: 'Save uses a thin footer without reducing the photo',
+          );
+          final wasSaved = session.isSaved(first.id);
+          await tester.ensureVisible(save);
+          await tester.pumpAndSettle();
+          await tester.tap(save);
+          await tester.pumpAndSettle();
+          expect(session.isSaved(first.id), !wasSaved);
+          expect(session.view, BuyV2View.catalogue);
+          await tester.tap(save);
+          await tester.pumpAndSettle();
+          expect(session.isSaved(first.id), wasSaved);
           const root = String.fromEnvironment('FOUNDER_PENDING_CAPTURE_DIR');
           if (root.isNotEmpty && width == 390 && scale == 1) {
             await tester.runAsync(() async {
