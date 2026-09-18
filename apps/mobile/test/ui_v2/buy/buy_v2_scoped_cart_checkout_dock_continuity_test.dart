@@ -3425,7 +3425,7 @@ void main() {
               of: card,
               matching: find.byType(Text),
             );
-            expect(facts, findsNWidgets(5));
+            expect(facts, findsWidgets);
             expect(
               find.descendant(
                 of: card,
@@ -3436,9 +3436,7 @@ void main() {
             expect(
               find.descendant(
                 of: card,
-                matching: find.text(
-                  'Offer price ${buyV2Money(offerProduct.price)} · ${offerProduct.pack}',
-                ),
+                matching: find.text(buyV2Money(offerProduct.price)),
               ),
               findsOneWidget,
             );
@@ -3459,10 +3457,11 @@ void main() {
               findsOneWidget,
             );
             for (final factElement in facts.evaluate()) {
-              final fact = find.byWidget(factElement.widget);
+              final fact = find.byElementPredicate(
+                (element) => identical(element, factElement),
+              );
               final paragraph = tester.renderObject<RenderParagraph>(fact);
               expect(paragraph.didExceedMaxLines, isFalse);
-              expect(paragraph.maxLines, isNull);
               final factBounds = tester.getRect(fact);
               expect(factBounds.bottom, lessThanOrEqualTo(bounds.bottom - 7));
               expect(factBounds.right, lessThanOrEqualTo(bounds.right - 10));

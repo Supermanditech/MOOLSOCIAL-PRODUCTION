@@ -1773,6 +1773,8 @@ void main() {
         await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
         await tester.pumpAndSettle();
         const scope = 'published-offers';
+        final pager = session.acquireCatalogueOffers(scope);
+        addTearDown(() => session.releaseCatalogueOffers(scope));
         final range = find.byKey(const ValueKey('buy-page-status-$scope'));
         final next = find.byKey(const ValueKey('buy-page-status-$scope'));
         final vertical = find.byKey(const ValueKey('buy-paged-scroll-$scope'));
@@ -1898,9 +1900,9 @@ void main() {
           tester.widget<Semantics>(range).properties.label,
           '1–40 of 20,000,000 offers',
         );
-        expect(published.pages.single.items.length, 40);
+        expect(published.pages.first.items.length, 40);
         await capture('initial');
-        final original = published.pages.single.items;
+        final original = published.pages.first.items;
         final retailProduct = original
             .firstWhere(
               (offer) => offer.product.destination == BuyV2Destination.shop,
@@ -1953,6 +1955,8 @@ void main() {
         await capture('products');
         await reveal(next);
         published.failNext = true;
+        await pager.refresh();
+        await tester.pumpAndSettle();
         await _performCatalogueAction(tester, next, 'Next products');
         await tester.pumpAndSettle();
         final retry = find.widgetWithText(TextButton, 'Try again');
@@ -1972,7 +1976,7 @@ void main() {
           tester.widget<Semantics>(range).properties.label,
           '41–80 of 20,000,000 offers',
         );
-        final pageProduct = published.pages.last.items.first.product;
+        final pageProduct = pager.page!.items.first.product;
         await reveal(
           find.byKey(const ValueKey('buy-paged-vertical-grid-$scope')),
         );
@@ -1997,27 +2001,28 @@ void main() {
           closeTo(offset, 1),
         );
         await capture('return');
-        final makerIndex = published.pages.last.items.indexWhere(
+        final makerIndex = pager.page!.items.indexWhere(
           (offer) =>
               offer.publisherType == BuyV2OfferPublisherType.manufacturer,
         );
         expect(makerIndex, greaterThanOrEqualTo(0));
-        final promotionNext = find.byKey(
-          const ValueKey('buy-offer-promotion-next'),
-        );
+        final promotionCarousel = find.byType(PageView);
         final promotionRequests = published.queries.length;
-        await reveal(promotionNext);
+        await reveal(find.byKey(const ValueKey('buy-published-offer-facts')));
         for (var index = 0; index < makerIndex; index++) {
-          await tester.ensureVisible(promotionNext);
-          await tester.pumpAndSettle();
-          expect(promotionNext.hitTestable(), findsOneWidget);
-          await tester.tap(promotionNext);
+          final visible = tester
+              .getRect(promotionCarousel)
+              .intersect(tester.getRect(vertical));
+          await tester.dragFrom(
+            Offset(visible.right - 20, visible.top + 30),
+            Offset(-visible.width * .8, 0),
+          );
           await tester.pumpAndSettle();
         }
         expect(published.queries.length, promotionRequests);
         expect(published.queries.last.offerPublisher, isNull);
-        expect(published.pages.last.totalCount, 20000000);
-        final makerPublication = published.pages.last.items[makerIndex];
+        expect(pager.page!.totalCount, 20000000);
+        final makerPublication = pager.page!.items[makerIndex];
         expect(
           session.featuredOfferPublicationId,
           makerPublication.publicationId,
@@ -2127,9 +2132,9 @@ void main() {
         await tester.tap(categoryTarget);
         await tester.pumpAndSettle();
         expect(published.queries.last.categoryId, category.id);
-        expect(published.pages.last.items, isNotEmpty);
+        expect(pager.page!.items, isNotEmpty);
         expect(
-          published.pages.last.items.every(
+          pager.page!.items.every(
             (offer) => offer.product.categoryId == category.id,
           ),
           isTrue,
@@ -2152,7 +2157,7 @@ void main() {
         );
         await tester.pumpAndSettle();
         expect(published.queries.last.query, 'SKU 46');
-        expect(published.pages.last.items, isNotEmpty);
+        expect(pager.page!.items, isNotEmpty);
         await capture('search-keyboard');
         tester.view.viewInsets = const FakeViewPadding();
         await tester.enterText(searchField, '');
@@ -2171,9 +2176,7 @@ void main() {
         await tester.tap(refresh);
         await tester.pumpAndSettle();
         expect(
-          published.pages.last.items.every(
-            (offer) => offer.isCurrent(now: now),
-          ),
+          pager.page!.items.every((offer) => offer.isCurrent(now: now)),
           isTrue,
         );
         await reveal(

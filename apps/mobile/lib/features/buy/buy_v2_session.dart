@@ -4053,7 +4053,9 @@ class BuyV2Session extends ChangeNotifier {
   // Ephemeral Offers presentation state survives product/store Back navigation.
   // Publication validity and product facts still come from the source contracts.
   String? featuredOfferPublicationId;
+  bool featuredOffersMoolSocial = false;
   String finiteOffersCategoryId = 'all';
+  BuyV2OfferPublisherType? finiteOffersPublisher;
   final Map<String, BuyV2CartBenefitsLoadState> _productBenefitStates = {};
   final Map<String, String> _productBenefitMessages = {};
   final Map<String, int> _productBenefitRequestSequences = {};

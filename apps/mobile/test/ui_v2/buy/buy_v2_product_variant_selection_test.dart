@@ -404,7 +404,9 @@ void main() {
     ]) {
       for (final width in [320.0, 360.0, 390.0, 430.0]) {
         for (final scale in [1.0, 2.0]) {
-          for (final storeContext in [false, true]) {
+          for (final surface in ['catalogue', 'store', 'offers']) {
+            final storeContext = surface == 'store';
+            final offersContext = surface == 'offers';
             final savedContext = width == 430;
             if (savedContext &&
                 (destination != BuyV2Destination.shop ||
@@ -414,7 +416,7 @@ void main() {
             }
             testWidgets(
               'SKU media grid ${destination.name} $width $scale store $storeContext'
-              '${savedContext ? ' saved long badge' : ''}',
+              '${savedContext ? ' saved long badge' : ''}${offersContext ? ' offers aligned' : ''}',
               (tester) async {
                 tester.view.devicePixelRatio = 1;
                 tester.view.physicalSize = Size(width, 844);
@@ -501,6 +503,16 @@ void main() {
                             products: products,
                             storageKey: 'sku-media-grid',
                             semanticLabel: 'Products',
+                            alignMediaAtTop: offersContext,
+                            productCardBuilder: offersContext
+                                ? (product) => BuyV2ProductCard(
+                                    session: session,
+                                    product: product,
+                                    compact: true,
+                                    alignMediaAtTop: true,
+                                    savedContext: savedContext,
+                                  )
+                                : null,
                             storeContext: storeContext,
                             savedContext: savedContext,
                           ),
@@ -1438,6 +1450,18 @@ void main() {
         }
         final source = session.product(sourceId);
         final sourceCard = find.byKey(ValueKey('buy-product-$sourceId'));
+        if (offers) {
+          await tester.scrollUntilVisible(
+            sourceCard,
+            180,
+            scrollable: find
+                .descendant(
+                  of: find.byKey(const PageStorageKey('buy-offers')),
+                  matching: find.byType(Scrollable),
+                )
+                .first,
+          );
+        }
         await Scrollable.ensureVisible(
           tester.element(sourceCard),
           alignment: .5,

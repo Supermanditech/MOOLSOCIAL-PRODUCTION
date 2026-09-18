@@ -9083,35 +9083,38 @@ void main() {
           await tester.pumpAndSettle();
           await tester.tap(find.byKey(const ValueKey('buy-local-tab-offers')));
           await tester.pumpAndSettle();
+          Future<void> selectSource(bool mool) async {
+            final target = find.byKey(
+              ValueKey('buy-offer-group-${mool ? 'moolsocial' : 'suppliers'}'),
+            );
+            await tester.scrollUntilVisible(
+              target,
+              -150,
+              scrollable: find
+                  .descendant(
+                    of: find.byKey(const PageStorageKey('buy-offers')),
+                    matching: find.byType(Scrollable),
+                  )
+                  .first,
+            );
+            await tester.ensureVisible(target);
+            await tester.pumpAndSettle();
+            await tester.tap(target);
+            await tester.pumpAndSettle();
+          }
+
+          await selectSource(true);
           expect(find.text('Rice buying offer'), findsOneWidget);
           expect(find.text('From MoolSocial'), findsOneWidget);
           expect(find.text('Makers'), findsNothing);
           expect(find.text('Categories'), findsNothing);
-          final next = find.byKey(const ValueKey('buy-offer-promotion-next'));
-          final previous = find.byKey(
-            const ValueKey('buy-offer-promotion-previous'),
-          );
-          expect(tester.widget<IconButton>(previous).onPressed, isNull);
-          await Scrollable.ensureVisible(tester.element(next), alignment: .5);
-          await tester.pumpAndSettle();
-          expect(next.hitTestable(), findsOneWidget);
-          await tester.tap(next);
-          await tester.pump();
-          final opacity = find.descendant(
-            of: find.byKey(const ValueKey('buy-offer-promotion-motion')),
-            matching: find.byType(Opacity),
-          );
           expect(
-            tester.widget<Opacity>(opacity).opacity,
-            reducedMotion ? 1 : lessThan(1),
+            find.byKey(const ValueKey('buy-offer-promotion-next')),
+            findsNothing,
           );
-          await tester.pump(const Duration(milliseconds: 500));
-          expect(tester.widget<Opacity>(opacity).opacity, 1);
-          expect(find.text('Rice buying offer'), findsNothing);
+          await selectSource(false);
           expect(find.text('Fresh produce offer'), findsOneWidget);
           expect(find.text('From Test produce supplier'), findsOneWidget);
-          expect(tester.widget<IconButton>(next).onPressed, isNull);
-          expect(session.featuredOfferPublicationId, 'test-supplier-tomato');
           final cta = find.byKey(
             const ValueKey('buy-offer-promotion-cta-s-tomato'),
           );
@@ -9135,12 +9138,9 @@ void main() {
           await tester.pumpAndSettle();
           expect(session.featuredOfferPublicationId, 'test-supplier-tomato');
           expect(find.text('Fresh produce offer'), findsOneWidget);
-          await tester.ensureVisible(previous);
-          await tester.pumpAndSettle();
-          expect(previous.hitTestable(), findsOneWidget);
-          await tester.tap(previous);
-          await tester.pumpAndSettle();
+          await selectSource(true);
           expect(find.text('Rice buying offer'), findsOneWidget);
+          await selectSource(false);
           final categoryControl = find.byKey(
             const ValueKey('buy-offers-category-control'),
           );
@@ -9207,7 +9207,7 @@ void main() {
           );
           await tester.pumpAndSettle();
           expect(session.finiteOffersCategoryId, 'all');
-          expect(find.text('Rice buying offer'), findsOneWidget);
+          expect(find.text('Fresh produce offer'), findsOneWidget);
           expect(session.itemCount, 0);
           expect(tester.takeException(), isNull);
         },
