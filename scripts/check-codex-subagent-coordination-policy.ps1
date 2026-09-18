@@ -449,7 +449,7 @@ function Assert-IntegrationRepairMerge(
   $expectedRepairConflictKeys = @($expectedRepairConflictOwners |
     ForEach-Object { $_.ToLowerInvariant() })
   $repairOwnerClaim = @($claims | Where-Object {
-    [string]$_.task -ceq $(if ($storeBuySeptember12) { '/root' } else { '/root/repair_store_buy_conflict_v3_20260904' })
+    [string]$_.task -ceq $(if ($storeBuySeptember12 -or $storeBuySkuSeptember18) { '/root' } else { '/root/repair_store_buy_conflict_v3_20260904' })
   })
   Assert-Coordination ($repairOwnerClaim.Count -eq 1) `
     'integration repair exact owner claim is missing or ambiguous.'
@@ -805,7 +805,7 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 75) `
+Assert-Coordination ($continuationBindings.Count -eq 76) `
   'founder-authorized continuation binding inventory changed.'
 $continuationBindingIds = @()
 foreach ($continuationBinding in $continuationBindings) {
@@ -832,7 +832,8 @@ foreach ($continuationBinding in $continuationBindings) {
       'founder_authorized_2026_09_03',
       'founder_authorized_2026_09_04',
       'founder_authorized_2026_09_05',
-      'founder_authorized_2026_09_12'
+      'founder_authorized_2026_09_12',
+      'founder_authorized_2026_09_18'
     ) -and
     [string]$continuationBinding.lane -cin @('cursor_ui','codex_ui','codex_auth','integration_repair') -and
     [string]$continuationBinding.role -cin @('primary','subagent') -and
@@ -1195,9 +1196,10 @@ $storeBuyFinalAdmission = (
   (ConvertTo-ProductionForwardPath $root) -ceq
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912'
 )
+$storeBuySkuSeptember18 = $false
 $storeBuySeptember12 = $ProductionLane -ceq 'integration_repair' -and
   $ProductionWorkId -ceq 'store-buy-20260912'
-if ($storeBuySeptember12) {
+if ($storeBuySeptember12 -or $storeBuySkuSeptember18) {
   Assert-Coordination (
     $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
     $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-20260912' -and
@@ -1233,6 +1235,52 @@ if ($storeBuySeptember12) {
   $integrationRepair.preMergeCoordinationOwners = @('docs/quality/STORE-BUY-REPAIR-20260912.md')
   $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-REPAIR-20260912.md')
   $integrationRepair.maximumPostMergeClosureCommits = 1
+}
+$storeBuySkuSeptember18 = $ProductionLane -ceq 'integration_repair' -and
+  $ProductionWorkId -ceq 'store-buy-sku-20260918'
+if ($storeBuySkuSeptember18) {
+  Assert-Coordination (
+    $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+    $ProductionTicketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-SKU-20260918' -and
+    (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-sku-20260918'
+  ) 'September18 repair identity changed.'
+  $literalBinding = @($continuationBindings | Where-Object {
+    $_.id -ceq 'integration_repair_store_buy_sku_20260918'
+  })
+  Assert-Coordination (
+    $literalBinding.Count -eq 1 -and
+    $literalBinding[0].baselineHead -ceq 'cbaa68ad00f2285329d2d5c584689b9c6be1123a' -and
+    $literalBinding[0].branch -ceq 'work/integration-repair/store-buy-sku-20260918' -and
+    $literalBinding[0].task -ceq '/root' -and
+    $literalBinding[0].workId -ceq 'store-buy-sku-20260918' -and
+    $literalBinding[0].ticketId -ceq 'UAW-INTEGRATION-REPAIR-STORE-BUY-SKU-20260918' -and
+    $literalBinding[0].bootstrapCommitSubject -ceq 'coordination(store-buy-sku-20260918): bind exact Store Buy catalogue repair' -and
+    (@($literalBinding[0].bootstrapOwners | Sort-Object) -join '|') -ceq
+      'config/codex-subagent-coordination-policy.json|docs/quality/STORE-BUY-SKU-REPAIR-20260918.md|scripts/check-codex-subagent-coordination-policy.ps1'
+  ) 'September18 repair baseline or binding changed.'
+  $integrationRepair = $integrationRepair.PSObject.Copy()
+  $integrationRepair.requiredCodexCommit = 'cbaa68ad00f2285329d2d5c584689b9c6be1123a'
+  $integrationRepair.requiredCodexBranch = 'work/codex-ui/store-product-catalogue-20260916'
+  $integrationRepair.requiredCursorCommit = 'ee42be0e21f1707e1cbf2ba3ad966579f118b209'
+  $integrationRepair.requiredCursorBranch = 'work/cursor-ui/redmi-v6-audit-20260913'
+  $expectedRepairConflictOwners = @(
+    'apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart',
+    'config/codex-development-regression-registry.json',
+    'config/codex-subagent-coordination-policy.json',
+    'scripts/check-buy-backend-contract-boundary.ps1',
+    'scripts/check-buy-protected-baseline.ps1',
+    'scripts/check-codex-subagent-coordination-policy.ps1'
+  )
+  $expectedRepairUnmergedOwners = @($expectedRepairConflictOwners)
+  $integrationRepair.exactConflictOwners = @($expectedRepairConflictOwners)
+  $integrationRepair.preMergeCoordinationOwners = @('docs/quality/STORE-BUY-SKU-REPAIR-20260918.md')
+  $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-SKU-REPAIR-20260918.md')
+  $integrationRepair.maximumPostMergeClosureCommits = 1
+  $integrationRepair.freshIntegrationWorkId = 'store-buy-sku-baseline-20260918'
+  $integrationRepair.freshIntegrationTicketId = 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-20260918'
+  $integrationRepair.freshIntegrationBranch = 'integration/moolsocial/store-buy-sku-baseline-20260918'
+  $integrationRepair.freshIntegrationWorktreePath = 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-20260918'
+  $integrationRepair.freshIntegrationMergeSubject = 'merge(store-buy-sku-baseline-20260918): integrate reconciled Cursor and Codex'
 }
 Assert-ExactNames $gitDiscipline.promotion @(
   'directFeatureToRemediationAllowed','mainFrozen','founderAuthorizationRequired',
@@ -1700,7 +1748,7 @@ if ($ProductionLane -ceq 'baseline') {
   } else {
     Assert-Coordination (
       [string]$selectedLane.agentRole -ceq $AgentRole -and
-      ($storeBuySeptember12 -or $storeBuyFinalSeptember12 -or $AgentTask.StartsWith(
+      ($storeBuySeptember12 -or $storeBuySkuSeptember18 -or $storeBuyFinalSeptember12 -or $AgentTask.StartsWith(
         [string]$selectedLane.taskPrefix,
         [StringComparison]::Ordinal
       ))
@@ -4684,7 +4732,7 @@ if ($ProductionLane -ceq 'baseline') {
           Get-CanonicalOwner ([string]$_)
         }
       )
-      if ($storeBuySeptember12) {
+      if ($storeBuySeptember12 -or $storeBuySkuSeptember18) {
         Assert-Coordination (
           (@($effectiveOwners | Sort-Object) -join '|') -ceq
           (@($expectedBootstrapOwners | Sort-Object) -join '|')

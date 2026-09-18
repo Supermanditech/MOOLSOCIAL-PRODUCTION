@@ -340,7 +340,8 @@
         "scripts/check-buy-data-egress-boundary.ps1",
         "scripts/check-brand-integrity.ps1",
         "docs/quality/UAW-CURSOR-BUY-REDMI-FIXES-V1-20260905.md",
-        "docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json"
+        "docs/quality/cursor-buy-redmi-fixes-v1-20260905/scope-state.json",
+        "docs/quality/STORE-BUY-SKU-REPAIR-20260918.md"
       ]
     },
     {
@@ -2099,6 +2100,26 @@
         ],
         "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "integration_repair_store_buy_sku_20260918",
+        "state": "founder_authorized_2026_09_18",
+        "lane": "integration_repair",
+        "role": "primary",
+        "task": "/root",
+        "workId": "store-buy-sku-20260918",
+        "ticketId": "UAW-INTEGRATION-REPAIR-STORE-BUY-SKU-20260918",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-REPAIR-store-buy-sku-20260918",
+        "branch": "work/integration-repair/store-buy-sku-20260918",
+        "baselineHead": "cbaa68ad00f2285329d2d5c584689b9c6be1123a",
+        "bootstrapCommitSubject": "coordination(store-buy-sku-20260918): bind exact Store Buy catalogue repair",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/STORE-BUY-SKU-REPAIR-20260918.md"
+        ],
+        "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
       }
     ],
     "workspaceIsolation": {
@@ -2411,15 +2432,15 @@
         "preMergeCoordinationOwners": [
           "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md"
         ],
-      "maximumPostMergeClosureCommits": 3,
-      "postMergeClosureOwners": [
-        "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
-        "config/codex-development-regression-registry.json",
-        "config/codex-subagent-coordination-policy.json",
-        "scripts/check-codex-development-regression-memory.ps1",
-        "scripts/check-codex-subagent-coordination-policy.ps1",
-        "scripts/test-codex-integration-repair-coordination-policy.ps1"
-      ],
+        "maximumPostMergeClosureCommits": 3,
+        "postMergeClosureOwners": [
+          "docs/quality/UAW-INTEGRATION-REPAIR-STORE-BUY-V3-20260904.md",
+          "config/codex-development-regression-registry.json",
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-development-regression-memory.ps1",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "scripts/test-codex-integration-repair-coordination-policy.ps1"
+        ],
         "directSourceCommitsAllowed": false,
         "conflictResolutionAllowed": true,
         "exactConflictOwners": [
@@ -2428,11 +2449,11 @@
           "scripts/check-codex-subagent-coordination-policy.ps1"
         ],
         "remoteRepairBranchMustEqualHeadBeforeAdmission": true,
-      "freshIntegrationWorkId": "work-store-buy-v4-20260904",
-      "freshIntegrationTicketId": "UAW-INTEGRATION-WORK-STORE-BUY-V4-20260904",
-      "freshIntegrationBranch": "integration/moolsocial/work-store-buy-v4-20260904",
-      "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v4-20260904",
-      "freshIntegrationMergeSubject": "merge(work-store-buy-v4-20260904): integrate corrected Store Chat and Buy"
+        "freshIntegrationWorkId": "work-store-buy-v4-20260904",
+        "freshIntegrationTicketId": "UAW-INTEGRATION-WORK-STORE-BUY-V4-20260904",
+        "freshIntegrationBranch": "integration/moolsocial/work-store-buy-v4-20260904",
+        "freshIntegrationWorktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-work-store-buy-v4-20260904",
+        "freshIntegrationMergeSubject": "merge(work-store-buy-v4-20260904): integrate corrected Store Chat and Buy"
       }
     },
     "promotion": {
