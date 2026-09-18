@@ -1387,7 +1387,7 @@ if ($storeBuySkuSeptember18) {
   $expectedRepairUnmergedOwners = @($expectedRepairConflictOwners)
   $integrationRepair.exactConflictOwners = @($expectedRepairConflictOwners)
   $integrationRepair.preMergeCoordinationOwners = @('docs/quality/STORE-BUY-SKU-REPAIR-20260918.md')
-  $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-SKU-REPAIR-20260918.md')
+  $integrationRepair.postMergeClosureOwners = @('docs/quality/STORE-BUY-SKU-REPAIR-20260918.md', 'scripts/check-codex-subagent-coordination-policy.ps1')
   $integrationRepair.maximumPostMergeClosureCommits = 1
   $integrationRepair.freshIntegrationWorkId = 'store-buy-sku-baseline-20260918'
   $integrationRepair.freshIntegrationTicketId = 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-20260918'
@@ -5206,7 +5206,7 @@ if ($ProductionLane -ceq 'baseline') {
       Assert-Coordination ($LASTEXITCODE -eq 0) `
         'integration repair merge-state path read failed.'
       $repairMergeActive = Test-Path -LiteralPath $repairMergeHeadPath -PathType Leaf
-      $existingRepairMerges = @(& git -C $root rev-list --merges `
+      $existingRepairMerges = @(& git -C $root rev-list --first-parent --merges `
           "$baseCommit..$head")
       Assert-Coordination ($LASTEXITCODE -eq 0) `
         'integration repair existing merge inventory failed.'

@@ -368,3 +368,32 @@ Scoped bootstrap and regression-memory gates pass. Wrong-ticket negative rejects
 - cbaa68ad00f2285329d2d5c584689b9c6be1123a — ui(store-product-catalogue-20260916): add scoped product setup from Store rail
 
 Expected resolution: preserve both catalogue features, all 4598 unique full registry records; numeric collision mapping must retain original IDs as aliases/evidence. Automatically merged source/test files must remain byte-identical to Git merge result. No source merge has yet been accepted.
+
+## Reconciled source checkpoint
+
+Repair merge: `990ce3c02a142c5b24f25b107013893aa85e5f75`, exact two parents: pre-merge checkpoint `8d0a06a3` and Cursor `ee42be0e`. All 347 divergent source commits remain ancestors; no squash or selected-commit replay. The full prior Codex/V31 history is preserved.
+
+Local verification: 213 SKU/Cart/responsive/founder-pending tests passed; 871 Store Add Product/workspace tests passed (79 explicitly skipped); 459 session/router/route-continuity/Offers tests passed. Total: 1,543 passed, 79 skipped. Four combined Buy Dart owners analyze cleanly. Boundary-checker self-test passes. Combined regression-memory and scoped pre-commit gates pass. Source/config/script whitespace check passes; inherited raw evidence logs retain their original whitespace unchanged.
+
+Git automatic merge tree `4a05446a24a51f8e7492fcc497b40e682baa6c2f` differs only in the six authorized conflict files. Both policy helper/admission histories remain. All 4,598 regression records preserve source content; five distinct Cursor IDs colliding numerically with Codex incidents are mapped to 4623–4627 with originalId and explicit reconciliation table. Existing historical originalId fields remain untouched.
+
+Cart follow-up is fixed at `ee42be0e` and locally tested (37 tests before integration). Founder explicitly waived another Redmi test for this follow-up. The existing Redmi r66.30 evidence remains evidence for its original source, not for this new combined source. No new device qualification is claimed here.
+
+Strict production boundary result: FAIL, 18 findings, retained in the log below. Backend files are byte-identical to the Codex parent. Existing review-only source/admission and backend-contract limitations remain; this merge does not grant production transport/publication authority. Full Store metadata/media editing, publication and provider wiring remain the dependencies documented in STORE-CATALOGUE-ENTRY-20260916.md. This is a reconciled source checkpoint; production acceptance/release is unresolved. No production deployment is implied.
+
+Earlier analyzer/interface mismatch was corrected before the passing runs. Initial ownership gate rejection was corrected by restoring the exact primary conflict claim. An attempted overlapping analyzer invocation was rejected by the guard and later run successfully after the test lock released. Failed/diagnostic logs are retained, not counted as passes.
+
+Local evidence root: `C:/Users/jisal/Documents/Codex/2026-09-18/whi/work/`.
+
+- `integration-combined-widgets.log` SHA256 `b7ed834ee2a6819d163034c2ff478e1df1d1d929f69f986fc4c1ed0b0ae70850`
+- `integration-store-tests.log` SHA256 `862f1110a2cd8c92c400f1f3e062d40a38db2ea845ff46c1e12c2b6c838f84e6`
+- `integration-connected-tests.log` SHA256 `593531b734acf33419320b36c74b2119ce433a1d2d58c6bb768efbe4c4425279`
+- `integration-combined-analysis-v2.log` SHA256 `daa47515af88860b60502862f9191c4ece5eff18632b30ab1360353e794b843a`
+- `integration-merged-memory.log` SHA256 `c93b48b9992ada1cec3bce3c3c3397e23540cf7c6d5e5dab23ef176f2e4c6c70`
+- `integration-repair-precommit-final.log` SHA256 `51b35c37faaef332d160087e4906d5e4aea3c2a6939e6190dcf57c4b9f9a3aa2`
+- `integration-boundary-selftest.log` SHA256 `e104e61312586e550dffdbe3110f89936b037d8c436bf7749486f8e61da4b5b9`
+- `integration-backend-boundary.log` SHA256 `5b99b05d0dbce3c8ace883a6ee1f28a7570db35a3f25dc2c5a6036ef54e72758`
+
+### Bounded closure gate correction
+
+The pre-closure gate counted all ancestry merges and rejected the preserved Cursor V6 merge `da4d266f` as a second repair merge. Exact evidence: `git rev-list --merges abf25ccb..990ce3c0` returns 990ce3c0 and da4d266f; `--first-parent` returns only 990ce3c0. Correct the inventory to first-parent, matching the existing handoff and qualified-repair logic. This one closure therefore owns the exact coordination checker plus this evidence document. No application or conflict resolution changes are admitted after the merge. One post-merge closure maximum remains. The earlier doc-only closure plan is superseded only for this demonstrated gate correction; no source history is rewritten or omitted.
