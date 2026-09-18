@@ -335,6 +335,7 @@
         "docs/quality/STORE-BUY-SKU-REPAIR-20260918.md",
         "docs/quality/UAW-CURSOR-REDMI-V6-AUDIT-20260913.md",
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
+        "docs/quality/COUNTER-SALE-20260919.md",
         "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
@@ -2118,6 +2119,26 @@
           "docs/quality/STORE-BUY-SKU-REPAIR-20260918.md"
         ],
         "cursorIndependent": false,
+        "integrationRequiredBeforeSuccessorApk": true
+      },
+      {
+        "id": "codex_counter_sale_20260919",
+        "state": "founder_authorized_2026_09_19",
+        "lane": "codex_ui",
+        "role": "primary",
+        "task": "/root",
+        "workId": "counter-sale-20260919",
+        "ticketId": "UAW-COUNTER-SALE-20260919",
+        "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919",
+        "branch": "work/codex-ui/counter-sale-20260919",
+        "baselineHead": "123ff42cf8179b272d33b480e8267dfa83af2de3",
+        "bootstrapCommitSubject": "coordination(counter-sale-20260919): admit reproduced Counter Sale corrections",
+        "bootstrapOwners": [
+          "config/codex-subagent-coordination-policy.json",
+          "scripts/check-codex-subagent-coordination-policy.ps1",
+          "docs/quality/COUNTER-SALE-20260919.md"
+        ],
+        "cursorIndependent": true,
         "integrationRequiredBeforeSuccessorApk": true
       },
       {

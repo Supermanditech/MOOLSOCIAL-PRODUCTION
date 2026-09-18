@@ -872,8 +872,53 @@ Assert-Coordination (
   [bool]$gitDiscipline.workStart.featureBranchesMustStartAtTag
 ) 'production work-start contract changed.'
 $continuationBindings = @($gitDiscipline.continuationBindings)
-Assert-Coordination ($continuationBindings.Count -eq 78) `
+Assert-Coordination ($continuationBindings.Count -eq 79) `
   'founder-authorized continuation binding inventory changed.'
+
+# Founder standing approval is limited to this exact Counter Sale continuation.
+# Validate every field, including bootstrap owners, rather than admitting a date
+# or allowing arbitrary new bindings with the same inventory count.
+$counterSaleExpectedBinding = @'
+{
+  "id": "codex_counter_sale_20260919",
+  "state": "founder_authorized_2026_09_19",
+  "lane": "codex_ui",
+  "role": "primary",
+  "task": "/root",
+  "workId": "counter-sale-20260919",
+  "ticketId": "UAW-COUNTER-SALE-20260919",
+  "worktreePath": "C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-counter-sale-20260919",
+  "branch": "work/codex-ui/counter-sale-20260919",
+  "baselineHead": "123ff42cf8179b272d33b480e8267dfa83af2de3",
+  "bootstrapCommitSubject": "coordination(counter-sale-20260919): admit reproduced Counter Sale corrections",
+  "bootstrapOwners": [
+    "config/codex-subagent-coordination-policy.json",
+    "scripts/check-codex-subagent-coordination-policy.ps1",
+    "docs/quality/COUNTER-SALE-20260919.md"
+  ],
+  "cursorIndependent": true,
+  "integrationRequiredBeforeSuccessorApk": true
+}
+'@ | ConvertFrom-Json
+$counterSaleBindings = @($continuationBindings | Where-Object {
+  $_.id -ceq 'codex_counter_sale_20260919'
+})
+Assert-Coordination ($counterSaleBindings.Count -eq 1) `
+  'Exact Counter Sale continuation is missing or duplicated.'
+foreach ($property in $counterSaleExpectedBinding.PSObject.Properties) {
+  $actual = $counterSaleBindings[0].($property.Name)
+  if ($property.Name -ceq 'bootstrapOwners') {
+    Assert-Coordination (
+      (@($actual | Sort-Object) -join '|') -ceq
+      (@($property.Value | Sort-Object) -join '|')
+    ) 'Counter Sale bootstrap owners changed.'
+  } else {
+    Assert-Coordination (
+      (ConvertTo-Json -InputObject $actual -Compress) -ceq
+      (ConvertTo-Json -InputObject $property.Value -Compress)
+    ) "Counter Sale continuation changed: $($property.Name)"
+  }
+}
 
 $redmiExpectedBinding = @'
 {
@@ -928,6 +973,8 @@ foreach ($continuationBinding in $continuationBindings) {
   Assert-Coordination (
     [string]$continuationBinding.id -cmatch '^[a-z0-9][a-z0-9_]{4,79}$' -and
     (
+      ([string]$continuationBinding.id -ceq 'codex_counter_sale_20260919' -and
+       [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_19') -or
       ([string]$continuationBinding.id -ceq 'cursor_redmi_v6_audit_20260913' -and
        [string]$continuationBinding.state -ceq 'founder_authorized_2026_09_13') -or
       [string]$continuationBinding.state -cin @(
