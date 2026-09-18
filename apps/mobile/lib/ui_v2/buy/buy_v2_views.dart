@@ -18423,6 +18423,21 @@ class _CartLine extends StatelessWidget {
     final buyerPromise = automaticFulfilment
         ? buyV2BuyerDeliveryPromise(facts)
         : product.deliveryPromise;
+    // Keep the complete illustration disclosure readable in a Cart thumbnail.
+    // Its measured width grows with accessibility text instead of hiding media.
+    final thumbnailExtent =
+        (buyV2ValueTextSize(
+                  context,
+                  BuyV2ProductPackshot.illustrationLabel(product),
+                  const TextStyle(
+                    fontSize: 10,
+                    height: 1.2,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ).width.ceilToDouble() +
+                10)
+            .clamp(76.0, double.infinity)
+            .toDouble();
     final productDetailsLabel = 'View ${product.customerTitle} product details';
     void openProductDetails() {
       HapticFeedback.selectionClick();
@@ -18453,8 +18468,8 @@ class _CartLine extends StatelessWidget {
                 children: [
                   SizedBox(
                     key: ValueKey('buy-cart-packshot-${product.id}'),
-                    width: 60,
-                    height: 60,
+                    width: thumbnailExtent,
+                    height: thumbnailExtent,
                     child: BuyV2ProductPackshot(
                       product: product,
                       borderRadius: 11,
@@ -18676,7 +18691,7 @@ class _CartLine extends StatelessWidget {
                         .clamp(lineTotalSize.width, double.infinity);
                 // Image, chevron and gaps also share the inline product row.
                 final inlineTitleWidth =
-                    constraints.maxWidth - controlsWidth - 96;
+                    constraints.maxWidth - controlsWidth - thumbnailExtent - 36;
                 final metadataNeedsMoreWidth =
                     [
                       (text: product.customerTitle, style: context.buyBody),

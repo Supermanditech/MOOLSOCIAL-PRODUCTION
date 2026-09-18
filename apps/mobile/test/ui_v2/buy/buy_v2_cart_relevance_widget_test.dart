@@ -629,7 +629,17 @@ void main() {
         tester.getRect(save).bottom,
         lessThanOrEqualTo(tester.getRect(packshot).top),
       );
-      expect(tester.getSize(packshot), const Size(60, 60));
+      expect(tester.getSize(packshot).width, greaterThanOrEqualTo(76));
+      expect(tester.getSize(packshot).width, tester.getSize(packshot).height);
+      expect(
+        find.descendant(
+          of: packshot,
+          matching: find.byKey(
+            ValueKey('buy-product-illustration-${product.id}'),
+          ),
+        ),
+        findsOneWidget,
+      );
       final quantity = session.quantityFor(product.id);
       final wasSaved = session.isSaved(product.id);
       await Scrollable.ensureVisible(tester.element(save), alignment: 0.5);
