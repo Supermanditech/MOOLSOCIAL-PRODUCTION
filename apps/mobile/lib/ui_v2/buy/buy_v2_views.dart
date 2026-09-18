@@ -18636,10 +18636,41 @@ class _CartLine extends StatelessWidget {
             borderRadius: BorderRadius.circular(11),
             child: ConstrainedBox(
               constraints: const BoxConstraints(minHeight: 60),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  SizedBox(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final fields = [
+                    (text: product.customerTitle, style: context.buyBody),
+                    (
+                      text: '${product.customerVariant} · ${product.pack}',
+                      style: context.buyMeta.copyWith(fontSize: 11),
+                    ),
+                    (
+                      text: automaticFulfilment
+                          ? '$buyerPromise · ${product.customerSeller(facts.partner)}'
+                          : '${product.deliveryPromise} · ${product.customerSeller(product.seller)}',
+                      style: const TextStyle(
+                        color: BuyV2Colors.green,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ];
+                  final titleWidth =
+                      constraints.maxWidth - thumbnailExtent - 28;
+                  final stackMedia = fields.any(
+                    (field) => field.text
+                        .split(RegExp(r'\s+'))
+                        .any(
+                          (word) =>
+                              buyV2ValueTextSize(
+                                context,
+                                word,
+                                field.style,
+                              ).width >
+                              titleWidth,
+                        ),
+                  );
+                  final photo = SizedBox(
                     key: ValueKey('buy-cart-packshot-${product.id}'),
                     width: thumbnailExtent,
                     height: thumbnailExtent,
@@ -18647,40 +18678,47 @@ class _CartLine extends StatelessWidget {
                       product: product,
                       borderRadius: 11,
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(product.customerTitle, style: context.buyBody),
-                        Text(
-                          '${product.customerVariant} · ${product.pack}',
-                          style: context.buyMeta.copyWith(fontSize: 11),
-                        ),
-                        const SizedBox(height: 3),
-                        Text(
-                          automaticFulfilment
-                              ? '$buyerPromise · ${product.customerSeller(facts.partner)}'
-                              : '${product.deliveryPromise} · ${product.customerSeller(product.seller)}',
-                          style: const TextStyle(
-                            color: BuyV2Colors.green,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
+                  );
+                  final metadata = Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (var index = 0; index < fields.length; index++) ...[
+                        if (index == 2) const SizedBox(height: 3),
+                        Text(fields[index].text, style: fields[index].style),
                       ],
-                    ),
-                  ),
-                  const Padding(
+                    ],
+                  );
+                  const chevron = Padding(
                     padding: EdgeInsets.only(top: 20, right: 2),
                     child: Icon(
                       Icons.chevron_right_rounded,
                       size: 18,
                       color: BuyV2Colors.navy,
                     ),
-                  ),
-                ],
+                  );
+                  if (stackMedia) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [photo, const Spacer(), chevron],
+                        ),
+                        const SizedBox(height: 8),
+                        metadata,
+                      ],
+                    );
+                  }
+                  return Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      photo,
+                      const SizedBox(width: 8),
+                      Expanded(child: metadata),
+                      chevron,
+                    ],
+                  );
+                },
               ),
             ),
           ),

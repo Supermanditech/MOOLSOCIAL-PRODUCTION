@@ -104548,6 +104548,27 @@
       "evidence": [
         "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md"
       ]
+    },
+    {
+      "id": "REG-20260918-4629-BASELINE-FEATURED-PHOTO-REGRESSION-CHECK",
+      "status": "registered_prevention_active",
+      "appliesTo": [
+        "primary",
+        "implementation",
+        "testing",
+        "build",
+        "device",
+        "evidence"
+      ],
+      "mistake": "Combined retained-behaviour suite reports a failure in featured products keep compact photos and readable filtered cards.",
+      "rootCause": "The existing filtered-card test still required the former 96x70 rectangular photo after founder approval of square shared SKU media. Actual size was 92x92, contained by the card; quantity behaviour remained correct.",
+      "prevention": "Assert square aspect ratio, visible minimum size, card containment and preserved Add/quantity behaviour rather than obsolete fixed dimensions. Original focused case passed after assertion correction; runtime photo geometry was unchanged.",
+      "gates": [
+        "scripts/check-codex-development-regression-memory.ps1"
+      ],
+      "evidence": [
+        "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md"
+      ]
     }
   ],
   "integrationIdReconciliation20260918": [

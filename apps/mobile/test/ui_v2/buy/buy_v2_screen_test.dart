@@ -4481,7 +4481,21 @@ void main() {
         ValueKey('buy-grid-packshot-${product.id}'),
       );
       expect(densePhoto, findsOneWidget);
-      expect(tester.getSize(densePhoto), const Size(96, 70));
+      final denseSize = tester.getSize(densePhoto);
+      expect(denseSize.width, greaterThanOrEqualTo(44));
+      expect(denseSize.height, denseSize.width);
+      final denseCard = tester.getRect(
+        find.byKey(ValueKey('buy-product-${product.id}')),
+      );
+      expect(
+        tester.getRect(densePhoto).left,
+        greaterThanOrEqualTo(denseCard.left),
+      );
+      expect(
+        tester.getRect(densePhoto).right,
+        lessThanOrEqualTo(denseCard.right),
+      );
+      expect(session.quantityFor(product.id), 1);
       expect(find.byType(BuyV2ProductCard), findsWidgets);
       expect(tester.takeException(), isNull);
     },

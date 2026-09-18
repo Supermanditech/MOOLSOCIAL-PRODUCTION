@@ -4,8 +4,8 @@
   "effectiveDate": "2026-08-18",
   "state": "mandatory_before_every_subagent_action",
   "registryBinding": {
-    "entryCount": 4599,
-    "sha256": "FD8979D3A780BCAF4628DC2D7CFB885E643891276BC0C07BD10667E2711CA268"
+    "entryCount": 4600,
+    "sha256": "9C6A4B70C957F92A2F8548CD20F25D46B36C6B807119A2B548EC3CB642837FC7"
   },
   "mandatoryReads": [
     "../AGENTS.md",
@@ -337,7 +337,8 @@
         "apps/mobile/lib/ui_v2/buy/buy_v2_catalogue.dart",
         "docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md",
         "apps/mobile/lib/ui_v2/buy/buy_v2_views.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart"
+        "apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart",
+        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart"
       ]
     },
     {
@@ -394,7 +395,6 @@
         "apps/mobile/lib/ui_v2/profile/global_security_v2.dart",
         "apps/mobile/test/ui_v2/profile/global_security_v2_test.dart",
         "apps/mobile/test/ui_v2/buy/buy_v2_product_continuity_test.dart",
-        "apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart",
         "apps/mobile/lib/features/chat/screens/chat_thread_screen.dart",
         "apps/mobile/lib/features/chat/screens/chat_settings_screen.dart",
         "apps/mobile/test/ui_v2/buy/buy_route_continuity_test.dart",

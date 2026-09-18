@@ -599,6 +599,58 @@ void main() {
     );
   }
 
+  testWidgets(
+    'REG4628 Cart preserves illustration and whole title words at 200 percent',
+    (tester) async {
+      tester.view.devicePixelRatio = 1;
+      tester.view.physicalSize = const Size(320, 844);
+      addTearDown(tester.view.reset);
+      final core = BuySession();
+      final session = BuyV2Session(core: core);
+      addTearDown(core.dispose);
+      addTearDown(session.dispose);
+      const id = 'm-paracetamol-500';
+      session.addProduct(id);
+      session.openCart();
+      final quantity = session.quantityFor(id);
+      final total = session.cartTotal;
+      await tester.pumpWidget(app(session, textScale: 2));
+      await tester.pumpAndSettle();
+      final summary = find.byKey(
+        const ValueKey('buy-cart-product-summary-$id'),
+      );
+      final title = find.descendant(
+        of: summary,
+        matching: find.text(session.product(id).customerTitle),
+      );
+      await showInMainCartList(tester, title);
+      final paragraph = tester.renderObject<RenderParagraph>(title);
+      final boxes = paragraph.getBoxesForSelection(
+        const TextSelection(baseOffset: 0, extentOffset: 11),
+      );
+      expect(boxes, isNotEmpty);
+      expect(
+        boxes.map((box) => box.top).toSet(),
+        hasLength(1),
+        reason: 'Paracetamol must not split inside its word',
+      );
+      final photo = find.byKey(const ValueKey('buy-cart-packshot-$id'));
+      expect(
+        find.descendant(
+          of: photo,
+          matching: find.byKey(const ValueKey('buy-product-illustration-$id')),
+        ),
+        findsOneWidget,
+      );
+      expect(tester.takeException(), isNull);
+      await tester.tap(title);
+      await tester.pumpAndSettle();
+      expect(session.view, BuyV2View.product);
+      expect(session.quantityFor(id), quantity);
+      expect(session.cartTotal, total);
+    },
+  );
+
   testWidgets('mixed Cart uses real media and context-specific benefit pages', (
     tester,
   ) async {

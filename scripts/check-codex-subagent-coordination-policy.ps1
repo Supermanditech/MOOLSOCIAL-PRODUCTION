@@ -1304,6 +1304,13 @@ $storeBuyFinalAdmission = (
   (ConvertTo-ProductionForwardPath $root) -ceq
     'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-contract-followup-20260912'
 )
+$storeBuyBaselineFixAdmission = (
+  $ProductionLane -ceq 'codex_ui' -and
+  $ProductionWorkId -ceq 'store-buy-baseline-fixes-20260918' -and
+  $ProductionTicketId -ceq 'UAW-STORE-BUY-BASELINE-FIXES-20260918' -and
+  $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+  (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-baseline-fixes-20260918'
+)
 $storeBuySkuSeptember18 = $false
 $storeBuySeptember12 = $ProductionLane -ceq 'integration_repair' -and
   $ProductionWorkId -ceq 'store-buy-20260912'
@@ -2481,6 +2488,26 @@ if ($ProductionLane -ceq 'baseline') {
         $ProductionWorkId -ceq 'redmi-v6-audit-20260913' -and
         $effectiveOwner -cin @('apps/mobile/lib/main.dart','apps/mobile/lib/app/ui_review_language_store.dart','apps/mobile/test/app/ui_review_language_store_test.dart')
       )
+      # Founder requests correction of defects found in the combined baseline.
+      # Exact Cart/test owners plus the required registration and evidence files.
+      $baselineCartFixOwner = (
+        $hasContinuationBinding -and
+        [string]$selectedContinuationBinding.id -ceq 'codex_store_buy_baseline_fixes_20260918' -and
+        [string]$selectedContinuationBinding.baselineHead -ceq '6e7e34c0e7aa15d4710b1132bf4371f7dddf65d3' -and
+        $ProductionLane -ceq 'codex_ui' -and $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionWorkId -ceq 'store-buy-baseline-fixes-20260918' -and
+        $ProductionTicketId -ceq 'UAW-STORE-BUY-BASELINE-FIXES-20260918' -and
+        (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-baseline-fixes-20260918' -and
+        $effectiveOwner -cin @(
+          'apps/mobile/lib/ui_v2/buy/buy_v2_views.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_cart_relevance_widget_test.dart',
+          'apps/mobile/test/ui_v2/buy/buy_v2_screen_test.dart',
+          'config/codex-development-regression-registry.json',
+          'config/codex-subagent-coordination-policy.json',
+          'scripts/check-codex-subagent-coordination-policy.ps1',
+          'docs/quality/STORE-BUY-BASELINE-FIXES-20260918.md'
+        )
+      )
       $allowedOwner = $false
       foreach ($allowedRoot in @($selectedLane.allowedOwnerRoots)) {
         if (Test-ProductionOwnerRoot $effectiveOwner ([string]$allowedRoot)) {
@@ -2493,7 +2520,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner) {
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner) {
         $allowedOwner = $true
       }
       Assert-Coordination $allowedOwner `
@@ -2505,7 +2532,7 @@ if ($ProductionLane -ceq 'baseline') {
           $retainedBuyGeneratedPackageOwner -or
           $earnPaymentEvidenceSupportOwner -or
           $workRouteContractOwner -or
-          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or
+          $codexOppoReviewOwner -or $storeBuyFollowupOwner -or $storeProcurementBridgeOwner -or $redmiLanguageOwner -or $baselineCartFixOwner -or
           -not (Test-ProductionOwnerRoot $effectiveOwner ([string]$forbiddenRoot))
         ) "production lane claims a forbidden owner: $effectiveOwner"
       }
@@ -2524,7 +2551,7 @@ if ($ProductionLane -ceq 'baseline') {
         'coordination_bootstrap','task_start','implementation','pre_commit','handoff',
         'founder_acceptance','ticket_acceptance','ticket_close'
       )
-      if ($storeBuyFinalAdmission) { 'integration_admission_authorize' }
+      if ($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission) { 'integration_admission_authorize' }
     }
     'codex_auth' {
       @('coordination_bootstrap','task_start','implementation','pre_commit','handoff','ticket_acceptance','ticket_close')
@@ -5504,7 +5531,7 @@ if ($ProductionLane -ceq 'baseline') {
 
   if (($ProductionPhase -cin @(
       'handoff','founder_acceptance','ticket_acceptance','ticket_close'
-    )) -or ($storeBuyFinalAdmission -and
+    )) -or (($storeBuyFinalAdmission -or $storeBuyBaselineFixAdmission) -and
       $ProductionPhase -ceq 'integration_admission_authorize')) {
     Assert-Coordination ($head -cne $baseCommit) `
       'production handoff contains no feature commit.'
@@ -5652,7 +5679,35 @@ if ($ProductionLane -ceq 'baseline') {
   }
 
   if ($ProductionPhase -ceq 'integration_admission_authorize') {
-    if ($storeBuyFinalAdmission) {
+    if ($ProductionLane -ceq 'codex_ui' -and
+        $ProductionWorkId -ceq 'store-buy-baseline-fixes-20260918') {
+      Assert-Coordination (
+        $AgentRole -ceq 'primary' -and $AgentTask -ceq '/root' -and
+        $ProductionTicketId -ceq 'UAW-STORE-BUY-BASELINE-FIXES-20260918' -and
+        (ConvertTo-ProductionForwardPath $root) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-CODEX-store-buy-baseline-fixes-20260918' -and
+        $branch -ceq 'work/codex-ui/store-buy-baseline-fixes-20260918'
+      ) 'Combined baseline correction source identity changed.'
+      & git -C $root merge-base --is-ancestor '6e7e34c0e7aa15d4710b1132bf4371f7dddf65d3' $head
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and
+        (Test-ProductionWorktreeClean) -and
+        (Get-ProductionRemoteBranchHead $branch) -ceq $head) 'Combined correction lost repair ancestry or clean remote-equal source.'
+      Assert-Coordination (
+        $IntegrationTargetWorkId -ceq 'store-buy-sku-baseline-20260918' -and
+        $IntegrationTargetTicketId -ceq 'UAW-INTEGRATION-STORE-BUY-SKU-BASELINE-20260918' -and
+        (ConvertTo-ProductionForwardPath $IntegrationTargetRoot) -ceq 'C:/GUARANTEED OUTCOME/MOOLSOCIAL-WORKTREE-INTEGRATION-store-buy-sku-baseline-20260918'
+      ) 'Combined baseline target identity changed.'
+      $targetBranch = @(& git -C $IntegrationTargetRoot branch --show-current)
+      $targetHead = @(& git -C $IntegrationTargetRoot rev-parse HEAD)
+      $targetStatus = @(& git -C $IntegrationTargetRoot status --porcelain=v1 --untracked-files=normal)
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetBranch.Count -eq 1 -and
+        $targetBranch[0] -ceq 'integration/moolsocial/store-buy-sku-baseline-20260918' -and
+        $targetHead.Count -eq 1 -and $targetHead[0] -ceq $workStartCommit -and
+        $targetStatus.Count -eq 0) 'Combined target is not clean at the governance tag.'
+      Assert-ProductionManagedWorktreesClean
+      $targetRemote = @(& git -C $IntegrationTargetRoot ls-remote --heads origin 'refs/heads/integration/moolsocial/store-buy-sku-baseline-20260918')
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $targetRemote.Count -eq 0) 'Combined baseline target remote already exists.'
+      Write-Output 'merge(store-buy-sku-baseline-20260918): integrate reconciled Cursor and Codex'
+    } elseif ($storeBuyFinalAdmission) {
       $qualifiedSource = 'a98fe59a5485f7237e6e18bcf4fa09781173f13c'
       & git -C $root merge-base --is-ancestor $qualifiedSource $head
       Assert-Coordination ($LASTEXITCODE -eq 0) 'Final admission lost the qualified Store correction.'
@@ -5950,6 +6005,17 @@ if ($ProductionLane -ceq 'baseline') {
       $approvedRemoteHead = Get-ProductionRemoteBranchHead $approvedBranch
       Assert-Coordination ($approvedRemoteHead -ceq $approvedCommit) `
         "approved feature remote branch differs from its accepted commit: $approvedBranch"
+    }
+    if ($storeBuySkuSeptember18 -and $approvedBranches.Count -eq 1 -and
+        [string]$approvedBranches[0] -ceq 'work/codex-ui/store-buy-baseline-fixes-20260918') {
+      $sealedRepair = '6e7e34c0e7aa15d4710b1132bf4371f7dddf65d3'
+      Assert-QualifiedIntegrationRepairTip -RepairCommit $sealedRepair
+      & git -C $root merge-base --is-ancestor $sealedRepair ([string]$approvedCommits[0])
+      Assert-Coordination ($LASTEXITCODE -eq 0 -and $integrationMerges.Count -eq 1) 'Combined correction lost exact repair ancestry or has extra integration merges.'
+      Assert-Coordination (
+        (Get-ProductionRemoteBranchHead 'work/codex-ui/store-product-catalogue-20260916') -ceq 'cbaa68ad00f2285329d2d5c584689b9c6be1123a' -and
+        (Get-ProductionRemoteBranchHead 'work/cursor-ui/redmi-v6-audit-20260913') -ceq 'ee42be0e21f1707e1cbf2ba3ad966579f118b209'
+      ) 'Combined baseline sealed source branches moved.'
     }
     if ($approvedBranches.Count -eq 1 -and
         [string]$approvedBranches[0] -ceq
