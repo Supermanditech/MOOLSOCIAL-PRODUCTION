@@ -57,3 +57,7 @@ Text occupies the left side; the right 43% is a full-height image/action panel w
 Founder clarified approval applies ONLY to OFFERS-01 promotional card. OFFERS-02 SKU grid and OFFERS-03 toolbar are NOT visually approved. Redmi build/install is on hold; no new APK was built or installed.
 
 OFFERS-02 now replaces the shallow 70px media frame with a square frame sized to card width (70–130px bound), preserving contained full-photo rendering and separate Save/badge space. Both finite and paged Offers row measurements reserve the larger area. Other Shop/Store media remains unchanged. Current visuals: offers-sku-fit-v8-final. All 112 media/Offers interaction tests passed, with square-frame and photo/control separation checks; analysis passed. OFFERS-03 category, publisher selection, Saved and filter interactions remain locally verified, awaiting founder visual approval alongside SKU fit.
+
+
+## SKU sizing audit revision 9
+See OFFERS-SKU-AUDIT-20260918.md for SKU-SIZE-01 and SKU-SIZE-02. Offers cards now take natural content height rather than the tallest row estimate, eliminating filler below Add and quantity controls. 112 tests and six strengthened control/geometry cases passed; analysis passed. Current visuals: offers-sku-audit-v9-final. Only promotional card is approved; SKU grid and toolbar await founder approval. No Redmi build/install.

@@ -290,7 +290,67 @@ void main() {
             expect(rect.top, closeTo(firstRects.first.top, 1));
           }
         }
+        final ids = packshots
+            .evaluate()
+            .take(3)
+            .map(
+              (e) => ((e.widget.key as ValueKey<String>).value).substring(
+                'buy-grid-packshot-'.length,
+              ),
+            )
+            .toList();
+        for (final id in ids) {
+          final card = tester.getRect(find.byKey(ValueKey('buy-product-$id')));
+          final action = tester.getRect(
+            find.byKey(ValueKey('buy-add-shell-$id')),
+          );
+          expect(
+            card.bottom - action.bottom,
+            inInclusiveRange(0, 4),
+            reason:
+                'SKU card must end at its own action, without row-height filler',
+          );
+        }
         await _capture(tester, 'offers-${size.width}-$scale-grid');
+        final firstCard = find.byKey(ValueKey('buy-product-${ids.first}'));
+        final originalHeight = tester.getSize(firstCard).height;
+        final neighbour = find.byKey(ValueKey('buy-product-${ids[1]}'));
+        final neighbourHeight = tester.getSize(neighbour).height;
+        final add = find.byKey(ValueKey('buy-add-${ids.first}'));
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.ensureVisible(add);
+        await tester.pumpAndSettle();
+        await tester.tap(add);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(ids.first), 1);
+        expect(tester.getSize(neighbour).height, closeTo(neighbourHeight, .1));
+        final increase = find.descendant(
+          of: firstCard,
+          matching: find.byTooltip('Add one'),
+        );
+        await tester.ensureVisible(increase);
+        await tester.pumpAndSettle();
+        await tester.tap(increase);
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(ids.first), 2);
+        final decrease = find.descendant(
+          of: firstCard,
+          matching: find.byTooltip('Remove one'),
+        );
+        await tester.tap(decrease);
+        await tester.pumpAndSettle();
+        await tester.tap(
+          find.descendant(
+            of: firstCard,
+            matching: find.byTooltip('Remove from Cart'),
+          ),
+        );
+        await tester.pumpAndSettle();
+        expect(session.quantityFor(ids.first), 0);
+        expect(tester.getSize(firstCard).height, closeTo(originalHeight, .1));
+        expect(tester.takeException(), isNull);
+
         tester
             .widget<ListView>(
               find.byKey(const ValueKey('buy-paged-scroll-published-offers')),

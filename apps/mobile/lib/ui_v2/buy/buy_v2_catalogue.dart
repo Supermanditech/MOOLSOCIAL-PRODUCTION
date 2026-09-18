@@ -1631,15 +1631,9 @@ class _BuyV2PagedProductCatalogueState extends State<BuyV2PagedProductCatalogue>
                             for (final (index, product) in items.indexed)
                               SizedBox(
                                 width: layout.cardWidth,
-                                height:
-                                    rowHeights[index ~/ layout.columns] +
-                                    (widget.publishedOffers
-                                        ? 4 +
-                                              _offersPhotoExtent(
-                                                layout.cardWidth,
-                                              ) -
-                                              70
-                                        : 0),
+                                height: widget.publishedOffers
+                                    ? null
+                                    : rowHeights[index ~/ layout.columns],
                                 child: BuyV2ProductCard(
                                   key: ValueKey('buy-paged-card-${product.id}'),
                                   session: widget.session,
@@ -9518,13 +9512,9 @@ class BuyV2ProgressiveProductGrid extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: [
                           SizedBox(
-                            height:
-                                rowHeights[index ~/ layout.columns] +
-                                (alignMediaAtTop
-                                    ? 4 +
-                                          _offersPhotoExtent(layout.cardWidth) -
-                                          70
-                                    : 0),
+                            height: alignMediaAtTop
+                                ? null
+                                : rowHeights[index ~/ layout.columns],
                             child:
                                 productCardBuilder?.call(product) ??
                                 BuyV2ProductCard(
@@ -11225,6 +11215,9 @@ class BuyV2ProductCard extends StatelessWidget {
             child: Stack(
               children: [
                 Column(
+                  mainAxisSize: compact && alignMediaAtTop
+                      ? MainAxisSize.min
+                      : MainAxisSize.max,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (compact && alignMediaAtTop)
