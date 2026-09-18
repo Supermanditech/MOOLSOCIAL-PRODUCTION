@@ -206,6 +206,9 @@ function Get-CursorAccessibilityNativeProjection {
     # Founder-approved C04/C06/C07 and shared SKU/Offers visual successor.
     & git -C $root merge-base --is-ancestor '6f0632ad9c73b59288df128ef6540ce04f104957' HEAD
     if ($LASTEXITCODE -eq 0) { $redmiSource = '6f0632ad9c73b59288df128ef6540ce04f104957' }
+    # Founder-approved shared SKU top edge, compact quantity and Cart rollout.
+    & git -C $root merge-base --is-ancestor '1880614bb499a47993df86ebed6599926414fc50' HEAD
+    if ($LASTEXITCODE -eq 0) { $redmiSource = '1880614bb499a47993df86ebed6599926414fc50' }
     & git -C $root diff --quiet $redmiSource HEAD -- @redmiBoundaries
     if ($LASTEXITCODE -ne 0) {
       throw 'Redmi audit committed source differs from its exact admitted source.'
