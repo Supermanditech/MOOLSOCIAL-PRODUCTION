@@ -353,7 +353,7 @@ function Test-IntegratedStoreBuyReviewSource {
     '253cbe16da07f069c878bed8f0f5722b8c4aa29c',
     'd6d9890fa7754a38a05b183bc8ca6e89eccf22cc',
     '64ca4d757cffc1cc1fa575b84004cd827e6695ab',
-    'f0fc06a92bb43627ec4ca952e8996a888ec96ac2'
+    'f0fc06a92bb43627ec4ca952e8996a888ec96ac2', '6f0632ad9c73b59288df128ef6540ce04f104957'
   )
   if ($SourceCommit -cne '10fb79b4469203371edf888e7d4b8aacb3546581' -and -not $redmiSuccessor) { return $false }
   $canonicalRoot = [IO.Path]::GetFullPath($root).TrimEnd([char[]]@('\','/')).Replace('\','/')
