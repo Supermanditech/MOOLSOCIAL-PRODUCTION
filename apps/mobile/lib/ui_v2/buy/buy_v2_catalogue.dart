@@ -778,7 +778,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
         (e) => e.offer.identity == widget.session.featuredOfferPublicationId,
       );
       _controller = PageController(
-        viewportFraction: .91,
+        viewportFraction: .86,
         initialPage: retained < 0 ? 0 : retained,
       );
       _pageKey = key;
@@ -799,9 +799,9 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
             LayoutBuilder(
               builder: (context, constraints) {
                 final scale = MediaQuery.textScalerOf(context).scale(1);
-                final cardWidth = constraints.maxWidth * .91 - 12;
-                final contentWidth = cardWidth - 24;
-                final imageWidth = scale > 1.4 ? 76.0 : 92.0;
+                final cardWidth = constraints.maxWidth * .86 - 12;
+                final contentWidth = cardWidth - 16;
+                final imageWidth = 72.0;
                 final textWidth = (contentWidth - imageWidth - 10).clamp(
                   60.0,
                   double.infinity,
@@ -836,18 +836,18 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                   final body =
                       measure(
                         product.customerTitle,
-                        16,
+                        15,
                         FontWeight.w800,
                         textWidth,
                       ) +
                       measure(
                         buyV2Money(product.price),
-                        24,
+                        22,
                         FontWeight.w900,
                         textWidth,
                       ) +
                       measure(product.pack, 11, FontWeight.w500, textWidth) +
-                      6 +
+                      4 +
                       (product.minimumOrder > 1
                           ? measure(
                               'Minimum ${product.minimumOrder} packs',
@@ -867,16 +867,15 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                   );
                   final footerHeight = bottom > 48 ? bottom : 48.0;
                   final candidate =
-                      24 +
+                      16 +
                       measure(
                         entry.offer.headline,
                         11,
                         FontWeight.w700,
                         contentWidth,
                       ) +
-                      8 +
-                      (body < 92 ? 92 : body) +
                       4 +
+                      (body < 72 ? 72 : body) +
                       footerHeight;
                   if (candidate > height) height = candidate;
                 }
@@ -908,7 +907,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                         child: Container(
                           clipBehavior: Clip.antiAlias,
                           decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(22),
+                            borderRadius: BorderRadius.circular(16),
                             gradient: LinearGradient(
                               begin: Alignment.topLeft,
                               end: Alignment.bottomRight,
@@ -927,7 +926,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                             key: ValueKey('buy-published-offer-${product.id}'),
                             onTap: open,
                             child: Padding(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(8),
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: [
@@ -940,7 +939,7 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
+                                  const SizedBox(height: 4),
                                   Row(
                                     crossAxisAlignment:
                                         CrossAxisAlignment.center,
@@ -954,17 +953,17 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                               product.customerTitle,
                                               style: const TextStyle(
                                                 color: Colors.white,
-                                                fontSize: 16,
+                                                fontSize: 15,
                                                 height: 1.15,
                                                 fontWeight: FontWeight.w800,
                                               ),
                                             ),
-                                            const SizedBox(height: 6),
+                                            const SizedBox(height: 4),
                                             Text(
                                               buyV2Money(product.price),
                                               style: const TextStyle(
                                                 color: Color(0xFFFFD381),
-                                                fontSize: 24,
+                                                fontSize: 22,
                                                 height: 1.15,
                                                 fontWeight: FontWeight.w900,
                                               ),
@@ -994,15 +993,14 @@ class _PublishedOfferPromotionState extends State<_PublishedOfferPromotion> {
                                       const SizedBox(width: 10),
                                       SizedBox(
                                         width: imageWidth,
-                                        height: 92,
+                                        height: 72,
                                         child: BuyV2ProductPackshot(
                                           product: product,
-                                          borderRadius: 16,
+                                          borderRadius: 12,
                                         ),
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(height: 4),
                                   Row(
                                     children: [
                                       Expanded(
